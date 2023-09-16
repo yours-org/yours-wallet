@@ -4,12 +4,16 @@ import { SnackbarType } from "../contexts/SnackbarContext";
 import { colors } from "../colors";
 
 export const SnackBarContainer = styled.div<{ color?: string }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   width: 80%;
   height: 2.5rem;
   position: absolute;
-  bottom: 1.5rem;
-  color: ${(props) => props.color};
-  border-radius: 0.5rem;
+  bottom: 1.75rem;
+  background-color: ${(props) => props.color};
+  color: ${colors.white};
 `;
 
 export type SnackbarProps = {
@@ -29,7 +33,7 @@ export const Snackbar = (props: SnackbarProps) => {
           : colors.lime
       }
     >
-      <DescText>{message}</DescText>
+      <DescText style={{ margin: 0 }}>{message}</DescText>
     </SnackBarContainer>
   );
 };

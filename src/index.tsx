@@ -2,7 +2,6 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
 import { App } from "./App";
-import { SnackbarProvider } from "./contexts/SnackbarContext";
 
 import { Buffer } from "buffer";
 import process from "process";
@@ -16,8 +15,6 @@ document.body.appendChild(root);
 const rootDiv = ReactDOM.createRoot(root);
 rootDiv.render(
   <React.StrictMode>
-    <SnackbarProvider>
-      <App />
-    </SnackbarProvider>
+    <App />
   </React.StrictMode>
 );

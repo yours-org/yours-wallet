@@ -23,6 +23,11 @@ export const SnackbarProvider = (props: SnackbarProviderProps) => {
   const addSnackbar = (msg: string, type: SnackbarType) => {
     setMessage(msg);
     setSnackBarType(type);
+
+    setTimeout(() => {
+      setMessage(null);
+      setSnackBarType(null);
+    }, 3000);
   };
 
   return (

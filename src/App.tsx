@@ -3,6 +3,7 @@ import { Start } from "./pages/Start";
 import { MemoryRouter as Router, Routes, Route } from "react-router-dom";
 import { colors } from "./colors";
 import { CreateWallet } from "./pages/CreateWallet";
+import { SnackbarProvider } from "./contexts/SnackbarContext";
 
 const Container = styled.div`
   display: flex;
@@ -16,12 +17,14 @@ const Container = styled.div`
 export const App = () => {
   return (
     <Container>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Start />} />
-          <Route path="/create-wallet" element={<CreateWallet />} />
-        </Routes>
-      </Router>
+      <SnackbarProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Start />} />
+            <Route path="/create-wallet" element={<CreateWallet />} />
+          </Routes>
+        </Router>
+      </SnackbarProvider>
     </Container>
   );
 };
