@@ -169,7 +169,11 @@ export const CreateWallet = () => {
         <DescText style={{ marginBottom: "1rem" }}>
           Your Panda Wallet is ready to go.
         </DescText>
-        <Button type="primary" label="Enter" onClick={() => "do something"} />
+        <Button
+          type="primary"
+          label="Enter"
+          onClick={() => navigate("/wallet")}
+        />
       </Content>
     </>
   );
