@@ -4,6 +4,8 @@ import { Button } from "../components/Button";
 import { PandaHead } from "../components/PandaHead";
 import { useNavigate } from "react-router-dom";
 import { DescText } from "../components/Reusable";
+import { storage } from "../utils/storage";
+import { useEffect } from "react";
 
 const Content = styled.div`
   display: flex;
@@ -23,6 +25,16 @@ const TitleText = styled.h1`
 
 export const Start = () => {
   const navigate = useNavigate();
+
+  // If the encrypted keys are present, take the user to the wallet page.
+  useEffect(() => {
+    storage.get("encryptedKeys", (result) => {
+      if (result?.encryptedKeys) {
+        navigate("/wallet");
+      }
+    });
+  }, [navigate]);
+
   return (
     <>
       <Content>

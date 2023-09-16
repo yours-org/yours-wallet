@@ -22,6 +22,7 @@ export const App = () => {
           <Routes>
             <Route path="/" element={<Start />} />
             <Route path="/create-wallet" element={<CreateWallet />} />
+            <Route path="/wallet" element={<div>My Wallet</div>} />
           </Routes>
         </Router>
       </SnackbarProvider>
