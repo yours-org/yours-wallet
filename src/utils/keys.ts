@@ -4,6 +4,8 @@ import * as bsv from "bsv";
 const getWif = (seedPhrase: string, isOrd?: boolean) => {
   const seed = bip39.mnemonicToSeedSync(seedPhrase);
   const masterNode = bsv.HDPrivateKey.fromSeed(seed);
+
+  // Using 236 for Wallet Keys and 237 for Ordinal Keys
   const derivationPath = `m/0'/${isOrd ? "237" : "236"}'/0'/0/0`;
   const childNode = masterNode.deriveChild(derivationPath);
 
