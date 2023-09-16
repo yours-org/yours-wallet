@@ -13,11 +13,18 @@ interface Rotation {
   y: number;
 }
 
-export const PandaHead = () => {
+export type PandaHeadProps = {
+  /** Whether or not the head should follow the mouse */
+  animated?: boolean;
+};
+
+export const PandaHead = (props: PandaHeadProps) => {
+  const { animated } = props;
   const [rotation, setRotation] = useState<Rotation>({ x: 0, y: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
+    if (!animated) return;
     const handleMouseMove = (e: MouseEvent) => {
       if (!imgRef.current) return;
 
@@ -42,7 +49,7 @@ export const PandaHead = () => {
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
     };
-  }, []);
+  }, [animated]);
 
   return (
     <PandaImg

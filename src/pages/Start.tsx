@@ -26,10 +26,10 @@ export const Start = () => {
   return (
     <>
       <Content>
-        <PandaHead />
+        <PandaHead animated />
         <TitleText>Panda Wallet</TitleText>
         <DescText style={{ marginBottom: "5rem" }}>
-          A non-custodial and open-source wallet for BSV and 1Sat Ordinals
+          A non-custodial and open-source wallet for BSV and 1Sat Ordinals.
         </DescText>
         <Button
           type="primary"

@@ -27,7 +27,7 @@ export const SnackbarProvider = (props: SnackbarProviderProps) => {
     setTimeout(() => {
       setMessage(null);
       setSnackBarType(null);
-    }, 3000);
+    }, 2500);
   };
 
   return (

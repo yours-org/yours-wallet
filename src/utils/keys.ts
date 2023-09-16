@@ -3,9 +3,6 @@ import * as bsv from "bsv";
 
 const getWif = (seedPhrase: string, isOrd?: boolean) => {
   const seed = bip39.mnemonicToSeedSync(seedPhrase);
-
-  // Use bsv's HDPrivateKey to generate master node
-  console.log(bsv);
   const masterNode = bsv.HDPrivateKey.fromSeed(seed);
   const derivationPath = `m/0'/${isOrd ? "237" : "236"}'/0'/0/0`;
   const childNode = masterNode.deriveChild(derivationPath);
@@ -17,8 +14,8 @@ const getWif = (seedPhrase: string, isOrd?: boolean) => {
   return wif;
 };
 
-export const generateKeys = () => {
-  const mnemonic = bip39.generateMnemonic();
+export const getKeys = (validMnemonic?: string) => {
+  let mnemonic = validMnemonic ?? bip39.generateMnemonic();
   const walletWif = getWif(mnemonic);
   const walletPk = bsv.PrivateKey.fromWIF(walletWif);
   const walletAddress = bsv.PublicKey.fromPrivateKey(walletPk)
@@ -37,6 +34,5 @@ export const generateKeys = () => {
     ordAddress,
   };
 
-  console.log(keys);
   return keys;
 };
