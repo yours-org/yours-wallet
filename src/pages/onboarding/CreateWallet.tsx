@@ -1,16 +1,17 @@
 import styled from "styled-components";
-import { DescText, HeaderText } from "../components/Reusable";
-import { Input } from "../components/Input";
-import { Button } from "../components/Button";
-import { BackButton } from "../components/BackButton";
+import { colors } from "../../colors";
 import { useNavigate } from "react-router-dom";
-import { getKeys } from "../utils/keys";
-import { useState } from "react";
-import { useSnackbar } from "../hooks/useSnackbar";
-import { storage } from "../utils/storage";
-import { encrypt } from "../utils/crypto";
-import { colors } from "../colors";
-import { PandaHead } from "../components/PandaHead";
+import { useEffect, useState } from "react";
+import { useSnackbar } from "../../hooks/useSnackbar";
+import { BackButton } from "../../components/BackButton";
+import { DescText, HeaderText } from "../../components/Reusable";
+import { Input } from "../../components/Input";
+import { Button } from "../../components/Button";
+import { PandaHead } from "../../components/PandaHead";
+import { useKeys } from "../../hooks/useKeys";
+import { useBottomMenu } from "../../hooks/useBottomMenu";
+import { PageLoader } from "../../components/PageLoader";
+import { Show } from "../../components/Show";
 
 const Content = styled.div`
   display: flex;
@@ -62,38 +63,48 @@ export const CreateWallet = () => {
   const [seedWords, setSeedWords] = useState<string[]>([]);
 
   const { addSnackbar } = useSnackbar();
+  const { generateSeedAndStoreEncrypted } = useKeys();
+  const { hideMenu, showMenu } = useBottomMenu();
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    hideMenu();
+
+    return () => {
+      showMenu();
+    };
+  }, [hideMenu, showMenu]);
 
   const handleCopyToClipboard = () => {
-    // Logic to copy the seed words to clipboard goes here
     navigator.clipboard.writeText(seedWords.join(" ")).then(() => {
-      addSnackbar("Copied!", "info");
+      addSnackbar("Copied!", "success");
     });
   };
 
-  const handleKeyGeneration = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleKeyGeneration = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    setLoading(true);
     event.preventDefault();
     if (password.length < 8) {
+      setLoading(false);
       addSnackbar("The password must be at least 8 characters", "error");
       return;
     }
 
     if (password !== passwordConfirm) {
+      setLoading(false);
       addSnackbar("The passwords do not match", "error");
       return;
     }
-    const keys = getKeys();
-    setSeedWords(keys.mnemonic.split(" "));
-    const encryptedKeys = encrypt(JSON.stringify(keys), password);
-    storage.set({ encryptedKeys });
 
+    // Some artificial delay for the loader
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const mnemonic = generateSeedAndStoreEncrypted(password);
+    setSeedWords(mnemonic.split(" "));
+
+    setLoading(false);
     setStep(2);
-
-    // storage.get("encryptedKeys", (result) => {
-    //   console.log("Value currently is " + result.encryptedKeys);
-
-    //   const d = decrypt(result.encryptedKeys, password);
-    //   console.log(JSON.parse(d));
-    // });
   };
 
   const passwordStep = (
@@ -156,7 +167,14 @@ export const CreateWallet = () => {
           label="Copy to clipboard"
           onClick={handleCopyToClipboard}
         />
-        <Button type="primary" label="Next" onClick={() => setStep(3)} />
+        <Button
+          type="primary"
+          label="Next"
+          onClick={() => {
+            setStep(3);
+            setSeedWords([]);
+          }}
+        />
       </Content>
     </>
   );
@@ -169,14 +187,19 @@ export const CreateWallet = () => {
         <DescText style={{ marginBottom: "1rem" }}>
           Your Panda Wallet is ready to go.
         </DescText>
-        <Button
-          type="primary"
-          label="Enter"
-          onClick={() => navigate("/wallet")}
-        />
+        <Button type="primary" label="Enter" onClick={() => navigate("/bsv")} />
       </Content>
     </>
   );
 
-  return step === 1 ? passwordStep : step === 2 ? copySeedStep : successStep;
+  return (
+    <>
+      <Show when={loading}>
+        <PageLoader message="Generating keys..." />
+      </Show>
+      <Show when={!loading && step === 1}>{passwordStep}</Show>
+      <Show when={!loading && step === 2}>{copySeedStep}</Show>
+      <Show when={!loading && step === 3}>{successStep}</Show>
+    </>
+  );
 };

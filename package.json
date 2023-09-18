@@ -12,13 +12,16 @@
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
     "assert": "^2.1.0",
+    "axios": "^1.5.0",
     "bip39": "^3.1.0",
+    "bitcoin-address-validation": "^2.2.3",
     "browserify": "^17.0.0",
     "bsv": "^1.5.6",
     "buffer": "^6.0.3",
     "crypto-js": "^4.1.1",
     "ecpair": "^2.1.0",
     "process": "^0.11.10",
+    "qrcode": "^1.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.16.0",
@@ -57,6 +60,7 @@
   "devDependencies": {
     "@types/chrome": "^0.0.246",
     "@types/crypto-js": "^4.1.2",
+    "@types/qrcode": "^1.5.2",
     "crypto-browserify": "^3.12.0",
     "react-app-rewired": "^2.2.1"
   }
