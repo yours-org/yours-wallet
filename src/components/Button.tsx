@@ -42,18 +42,23 @@ export type ButtonProps = {
   label: string;
   type: ButtonStyles;
   onClick?: () => void;
+  disabled?: boolean;
 };
 
 export const Button = (props: ButtonProps) => {
-  const { label, type, onClick } = props;
+  const { label, type, onClick, disabled } = props;
   return (
     <>
       <Show when={type === "primary"}>
-        <Primary onClick={onClick}>{label}</Primary>
+        <Primary disabled={disabled} onClick={onClick}>
+          {label}
+        </Primary>
       </Show>
 
       <Show when={type === "secondary"}>
-        <Secondary onClick={onClick}>{label}</Secondary>
+        <Secondary disabled={disabled} onClick={onClick}>
+          {label}
+        </Secondary>
       </Show>
     </>
   );
