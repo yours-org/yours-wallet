@@ -59,7 +59,7 @@ const MiddleContainer = styled.div`
   width: 80%;
   padding: 2.75rem 1rem;
   border-radius: 1rem;
-  border: 0.0625rem solid ${colors.white + "80"};
+  border: 0.25rem solid ${colors.seaFoam + "70"};
   background-color: ${colors.darkNavy};
 `;
 
