@@ -1,6 +1,6 @@
 interface Storage {
   set: (obj: any, callback?: () => void) => void;
-  get: (key: string, callback: (result: any) => void) => void;
+  get: (key: string | string[], callback: (result: any) => void) => void;
 }
 
 const mockStorage: Storage = {
@@ -10,9 +10,20 @@ const mockStorage: Storage = {
     });
     if (callback) callback();
   },
-  get: (key, callback) => {
-    const value = localStorage.getItem(key);
-    callback({ [key]: value });
+  get: (keyOrKeys, callback) => {
+    // Define an indexable type for the result object
+    const result: { [key: string]: string | null } = {};
+
+    if (typeof keyOrKeys === "string") {
+      const value = localStorage.getItem(keyOrKeys);
+      result[keyOrKeys] = value;
+      callback(result);
+    } else if (Array.isArray(keyOrKeys)) {
+      keyOrKeys.forEach((key) => {
+        result[key] = localStorage.getItem(key);
+      });
+      callback(result);
+    }
   },
 };
 
