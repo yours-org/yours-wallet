@@ -25,6 +25,7 @@ type SendBsvResponse = {
 
 export const useBsv = () => {
   const [bsvBalance, setBsvBalance] = useState(0);
+  const [exchangerate, setExchangeRate] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const { retrieveKeys, bsvAddress, verifyPassword } = useKeys();
 
@@ -127,8 +128,15 @@ export const useBsv = () => {
     setBsvBalance(total);
   };
 
+  const getExchangeRate = async () => {
+    const { data } = await axios.get(`${WOC_BASE_URL}/exchangerate`);
+    const rate = Number(data.rate.toFixed(2));
+    setExchangeRate(rate);
+  };
+
   useEffect(() => {
     getBsvBalance();
+    getExchangeRate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -139,5 +147,6 @@ export const useBsv = () => {
     sendBsv,
     setIsProcessing,
     getBsvBalance,
+    exchangerate,
   };
 };

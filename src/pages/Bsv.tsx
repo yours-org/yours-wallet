@@ -16,6 +16,7 @@ import { PageLoader } from "../components/PageLoader";
 import { Input } from "../components/Input";
 import { BSV_DECIMAL_CONVERSION } from "../utils/constants";
 import { validate } from "bitcoin-address-validation";
+import { formatUSD } from "../utils/format";
 
 const MainContent = styled.div`
   display: flex;
@@ -111,6 +112,7 @@ export const Bsv = () => {
     setIsProcessing,
     sendBsv,
     getBsvBalance,
+    exchangerate,
   } = useBsv();
 
   useEffect(() => {
@@ -236,6 +238,7 @@ export const Bsv = () => {
           <Icon src={bsvCoin} />
           {formatBalance(bsvBalance)}
         </BalanceContainer>
+        <DescText>{formatUSD(bsvBalance * exchangerate)}</DescText>
       </MiddleContainer>
       <ButtonContainer>
         <Button
