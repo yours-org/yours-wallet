@@ -1,5 +1,18 @@
 import CryptoJS from "crypto-js";
 
+export const deriveKey = (password: string, salt: string) => {
+  const key = CryptoJS.PBKDF2(password, salt, {
+    keySize: 256 / 32,
+    iterations: 100000,
+  });
+
+  return key.toString(CryptoJS.enc.Hex);
+};
+
+export const generateRandomSalt = (length = 16) => {
+  return CryptoJS.lib.WordArray.random(length).toString(CryptoJS.enc.Hex);
+};
+
 export const encrypt = (textToEncrypt: string, password: string): string => {
   const salt = CryptoJS.lib.WordArray.random(128 / 8); // 128-bit salt
   const key256Bits = CryptoJS.PBKDF2(password, salt, {
