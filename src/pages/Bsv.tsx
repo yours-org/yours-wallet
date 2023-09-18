@@ -159,19 +159,22 @@ export const Bsv = () => {
     await new Promise((resolve) => setTimeout(resolve, 25));
     if (!validate(receiveAddress)) {
       addSnackbar(
-        "You must enter a valid BSV address. Paymail not yet supported",
+        "You must enter a valid BSV address. Paymail not yet supported.",
         "info"
       );
+      setIsProcessing(false);
       return;
     }
 
     if (!satSendAmount) {
       addSnackbar("You must enter an amount.", "info");
+      setIsProcessing(false);
       return;
     }
 
     if (!passwordConfirm) {
       addSnackbar("Invalid password!", "error");
+      setIsProcessing(false);
       return;
     }
 

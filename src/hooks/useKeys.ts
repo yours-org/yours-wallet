@@ -21,7 +21,7 @@ export const useKeys = () => {
     existingSalt?: string,
     mnemonic?: string
   ) => {
-    const salt = existingSalt ?? generateRandomSalt();
+    const salt = existingSalt ?? generateRandomSalt(); //TODO: Review is the existing salt is needed for this still.
     const passKey = deriveKey(password, salt);
     const keys = getKeys(mnemonic);
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
