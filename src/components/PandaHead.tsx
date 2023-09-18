@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import styled from "styled-components";
 import panda from "../assets/panda.svg";
 
-const PandaImg = styled.img<{ rotation: { x: number; y: number } }>`
+const PandaImg = styled.img<{
+  rotation: { x: number; y: number };
+}>`
   transition: transform 0.1s;
-  width: 6.25rem;
-  height: 6.25rem;
+  width: ${(props) => props.width ?? "6.25rem"};
+  height: ${(props) => props.width ?? "6.25rem"};
 `;
 
 interface Rotation {
@@ -14,12 +16,14 @@ interface Rotation {
 }
 
 export type PandaHeadProps = {
+  /** The size of the head */
+  width?: string;
   /** Whether or not the head should follow the mouse */
   animated?: boolean;
 };
 
 export const PandaHead = (props: PandaHeadProps) => {
-  const { animated } = props;
+  const { animated, width } = props;
   const [rotation, setRotation] = useState<Rotation>({ x: 0, y: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -55,6 +59,7 @@ export const PandaHead = (props: PandaHeadProps) => {
     <PandaImg
       ref={imgRef}
       src={panda}
+      width={width}
       alt="Panda Head"
       rotation={rotation}
       style={{
