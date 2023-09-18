@@ -54,8 +54,13 @@ const ReceiveContent = styled(MainContent)`
 const MiddleContainer = styled.div`
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-direction: column;
-  width: 100%;
+  width: 80%;
+  padding: 2.75rem 1rem;
+  border-radius: 1rem;
+  border: 0.0625rem solid ${colors.white + "80"};
+  background-color: ${colors.darkNavy};
 `;
 
 const ButtonContainer = styled.div`
@@ -238,7 +243,9 @@ export const Bsv = () => {
           <Icon src={bsvCoin} />
           {formatBalance(bsvBalance)}
         </BalanceContainer>
-        <DescText>{formatUSD(bsvBalance * exchangerate)}</DescText>
+        <DescText style={{ margin: "0.5rem 0 0 0" }}>
+          {formatUSD(bsvBalance * exchangerate)}
+        </DescText>
       </MiddleContainer>
       <ButtonContainer>
         <Button
