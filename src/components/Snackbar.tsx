@@ -19,7 +19,6 @@ export const SnackBarContainer = styled.div<{ color?: string }>`
   background-color: ${(props) => props.color};
   color: ${colors.white};
   z-index: 100;
-  opacity: 0.98;
 `;
 
 const Image = styled.img`
