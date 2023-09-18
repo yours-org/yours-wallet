@@ -59,8 +59,15 @@ const MiddleContainer = styled.div`
   width: 80%;
   padding: 2.75rem 1rem;
   border-radius: 1rem;
-  border: 0.25rem solid ${colors.seaFoam + "70"};
+  border: 0.25rem solid ${colors.navy + "70"};
   background-color: ${colors.darkNavy};
+`;
+
+const PandHeadContainer = styled.div`
+  position: absolute;
+  top: 10rem;
+  right: 2.25rem;
+  opacity: 0.5;
 `;
 
 const ButtonContainer = styled.div`
@@ -237,7 +244,9 @@ export const Bsv = () => {
 
   const main = (
     <MainContent>
-      <PandaHead width="2.5rem" />
+      <PandHeadContainer>
+        <PandaHead width="1.75rem" />
+      </PandHeadContainer>
       <MiddleContainer>
         <BalanceContainer>
           <Icon src={bsvCoin} />
