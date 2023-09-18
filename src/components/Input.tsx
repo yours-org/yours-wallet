@@ -5,26 +5,41 @@ import { InputHTMLAttributes } from "react";
 const TheInput = styled.input`
   background-color: ${colors.darkNavy};
   border-radius: 0.25rem;
-  border: 1px solid ${colors.offWhite};
+  border: 1px solid ${colors.white + "50"};
   width: 80%;
   height: 2rem;
   padding-left: 0.5rem;
   margin: 0.5rem;
   outline: none;
-  color: ${colors.offWhite};
+  color: ${colors.white + "80"};
 
-  &::placeholder {
-    color: ${colors.offWhite};
+  &[type="number"]::-webkit-inner-spin-button,
+  &[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
 
-  /* &:focus {
-    outline: none;
-  } */
+  &[type="number"] {
+    -moz-appearance: textfield; /* Firefox */
+  }
+
+  &::placeholder {
+    color: ${colors.white + "80"};
+  }
 `;
 
 export type InputProps = InputHTMLAttributes<HTMLInputElement>;
 
 export const Input = (props: InputProps) => {
   const { ...allProps } = props;
-  return <TheInput {...allProps} />;
+
+  const preventScroll = (e: any) => {
+    e.target.blur();
+    e.stopPropagation();
+    setTimeout(() => {
+      e.target.focus();
+    }, 0);
+  };
+
+  return <TheInput {...allProps} onWheel={preventScroll} />;
 };
