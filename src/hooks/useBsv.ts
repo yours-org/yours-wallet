@@ -117,16 +117,17 @@ export const useBsv = () => {
     return fundingUtxos;
   };
 
+  const getBsvBalance = async () => {
+    const keys = await retrieveKeys();
+    const { data } = await axios.get(
+      `${WOC_BASE_URL}/address/${keys.walletAddress}/balance`
+    );
+    const satBalance = data.confirmed + data.unconfirmed;
+    const total = satBalance / BSV_DECIMAL_CONVERSION;
+    setBsvBalance(total);
+  };
+
   useEffect(() => {
-    const getBsvBalance = async () => {
-      const keys = await retrieveKeys();
-      const { data } = await axios.get(
-        `${WOC_BASE_URL}/address/${keys.walletAddress}/balance`
-      );
-      const satBalance = data.confirmed + data.unconfirmed;
-      const total = satBalance / BSV_DECIMAL_CONVERSION;
-      setBsvBalance(total);
-    };
     getBsvBalance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -137,5 +138,6 @@ export const useBsv = () => {
     isProcessing,
     sendBsv,
     setIsProcessing,
+    getBsvBalance,
   };
 };

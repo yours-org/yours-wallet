@@ -104,8 +104,14 @@ export const Bsv = () => {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [successTxId, setSuccessTxId] = useState("");
   const { addSnackbar, message } = useSnackbar();
-  const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv } =
-    useBsv();
+  const {
+    bsvAddress,
+    bsvBalance,
+    isProcessing,
+    setIsProcessing,
+    sendBsv,
+    getBsvBalance,
+  } = useBsv();
 
   useEffect(() => {
     setSelected("bsv");
@@ -115,9 +121,9 @@ export const Bsv = () => {
     if (!successTxId) return;
     if (!message) {
       setPageState("main");
-      setTimeout(() => window.location.reload(), 1000);
+      getBsvBalance();
     }
-  }, [successTxId, message]);
+  }, [successTxId, message, getBsvBalance]);
 
   const resetSendState = () => {
     setSatSendAmount(0);
@@ -205,7 +211,7 @@ export const Bsv = () => {
       <BackButton
         onClick={() => {
           setPageState("main");
-          setTimeout(() => window.location.reload(), 1000);
+          getBsvBalance();
         }}
       />
       <HeaderText>Only send BSV</HeaderText>
