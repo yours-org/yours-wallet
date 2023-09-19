@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { DescText } from "./Reusable";
+import { Text } from "./Reusable";
 import { SnackbarType } from "../contexts/SnackbarContext";
 import { colors } from "../colors";
 import errorIcon from "../assets/error.svg";
@@ -55,7 +55,7 @@ export const Snackbar = (props: SnackbarProps) => {
             : successIcon
         }
       />
-      <DescText
+      <Text
         style={{
           margin: 0,
           fontWeight: 500,
@@ -64,7 +64,7 @@ export const Snackbar = (props: SnackbarProps) => {
         }}
       >
         {message}
-      </DescText>
+      </Text>
     </SnackBarContainer>
   );
 };

@@ -3,7 +3,7 @@ import { colors } from "../../colors";
 import { Button } from "../../components/Button";
 import { PandaHead } from "../../components/PandaHead";
 import { useNavigate } from "react-router-dom";
-import { DescText } from "../../components/Reusable";
+import { Text } from "../../components/Reusable";
 import { storage } from "../../utils/storage";
 import { useEffect, useState } from "react";
 import { useBottomMenu } from "../../hooks/useBottomMenu";
@@ -42,7 +42,7 @@ export const Start = () => {
     storage.get("encryptedKeys", (result) => {
       if (result?.encryptedKeys) {
         setShowStart(false);
-        navigate("/bsv");
+        navigate("/bsv-wallet");
         return;
       }
       setShowStart(true);
@@ -55,9 +55,9 @@ export const Start = () => {
         <Content>
           <PandaHead animated />
           <TitleText>Panda Wallet</TitleText>
-          <DescText style={{ marginBottom: "5rem" }}>
+          <Text style={{ marginBottom: "5rem" }}>
             A non-custodial and open-source wallet for BSV and 1Sat Ordinals.
-          </DescText>
+          </Text>
           <Button
             type="primary"
             label="Create New Wallet"

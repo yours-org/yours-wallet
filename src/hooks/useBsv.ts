@@ -25,22 +25,20 @@ type SendBsvResponse = {
 
 export const useBsv = () => {
   const [bsvBalance, setBsvBalance] = useState(0);
-  const [exchangerate, setExchangeRate] = useState(0);
+  const [exchangeRate, setExchangeRate] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const { retrieveKeys, bsvAddress, verifyPassword } = useKeys();
 
   const sendBsv = async (
     toAddress: string,
     amount: number,
-    password: string,
-    sendAll?: boolean
+    password: string
   ): Promise<SendBsvResponse> => {
     try {
       // Gather keys for tx
       setIsProcessing(true);
       const isAuthenticated = await verifyPassword(password);
       if (!isAuthenticated) {
-        setIsProcessing(false);
         return { error: "invalid-password" };
       }
       const feeSats = 20;
@@ -52,9 +50,10 @@ export const useBsv = () => {
       const utxos = await getUxos(fromAddress);
       const totalSats = utxos.reduce((a, item) => a + item.satoshis, 0);
       if (totalSats < amount) {
-        setIsProcessing(false);
         return { error: "insufficient-funds" };
       }
+
+      const sendAll = totalSats === amount;
       const satsOut = sendAll ? totalSats - feeSats : amount;
       const inputs = getInputs(utxos, satsOut);
 
@@ -63,7 +62,7 @@ export const useBsv = () => {
       bsvTx.to(toAddress, satsOut);
       if (!sendAll) {
         const change = totalSats - satsOut - feeSats;
-        bsvTx.change(fromAddress, change);
+        bsvTx.to(fromAddress, change);
       }
 
       // Sign and get raw tx
@@ -83,12 +82,12 @@ export const useBsv = () => {
     }
   };
 
-  const getInputs = (utxos: UTXO[], amount: number) => {
+  const getInputs = (utxos: UTXO[], satsOut: number) => {
     let sum = 0;
     let index = 0;
     let inputs: UTXO[] = [];
 
-    while (sum < amount) {
+    while (sum < satsOut) {
       const utxo = utxos[index];
       sum += utxo.satoshis;
       inputs.push(utxo);
@@ -147,6 +146,6 @@ export const useBsv = () => {
     sendBsv,
     setIsProcessing,
     getBsvBalance,
-    exchangerate,
+    exchangeRate,
   };
 };

@@ -7,7 +7,7 @@ import bsvCoin from "../assets/bsv-coin.svg";
 import { Button } from "../components/Button";
 import { PandaHead } from "../components/PandaHead";
 import { BackButton } from "../components/BackButton";
-import { DescText, HeaderText } from "../components/Reusable";
+import { Text, HeaderText } from "../components/Reusable";
 import { QrCode } from "../components/QrCode";
 import { Show } from "../components/Show";
 import { useSnackbar } from "../hooks/useSnackbar";
@@ -109,7 +109,7 @@ const Icon = styled.img`
 
 type PageState = "main" | "receive" | "send";
 
-export const Bsv = () => {
+export const BsvWallet = () => {
   const { handleSelect, selected, setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>("main");
   const [satSendAmount, setSatSendAmount] = useState(0);
@@ -124,7 +124,7 @@ export const Bsv = () => {
     setIsProcessing,
     sendBsv,
     getBsvBalance,
-    exchangerate,
+    exchangeRate,
   } = useBsv();
 
   useEffect(() => {
@@ -232,16 +232,16 @@ export const Bsv = () => {
         }}
       />
       <HeaderText>Only send BSV</HeaderText>
-      <DescText style={{ marginBottom: "1rem" }}>
+      <Text style={{ marginBottom: "1rem" }}>
         Do not send ordinals to this address!
-      </DescText>
+      </Text>
       <QrCode address={bsvAddress} onClick={handleCopyToClipboard} />
-      <DescText
+      <Text
         style={{ marginTop: "1.5rem", cursor: "pointer" }}
         onClick={handleCopyToClipboard}
       >
         {bsvAddress}
-      </DescText>
+      </Text>
     </ReceiveContent>
   );
 
@@ -255,9 +255,9 @@ export const Bsv = () => {
           <Icon src={bsvCoin} />
           {formatBalance(bsvBalance)}
         </BalanceContainer>
-        <DescText style={{ margin: "0.5rem 0 0 0" }}>
-          {formatUSD(bsvBalance * exchangerate)}
-        </DescText>
+        <Text style={{ margin: "0.5rem 0 0 0" }}>
+          {formatUSD(bsvBalance * exchangeRate)}
+        </Text>
       </MiddleContainer>
       <ButtonContainer>
         <Button
@@ -285,10 +285,10 @@ export const Bsv = () => {
       />
       <ConfirmContent>
         <HeaderText>Send BSV</HeaderText>
-        <DescText
+        <Text
           style={{ cursor: "pointer" }}
           onClick={fillInputWithAllBsv}
-        >{`Available Balance: ${bsvBalance}`}</DescText>
+        >{`Available Balance: ${bsvBalance}`}</Text>
         <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
           <Input
             placeholder="Enter Address"
@@ -314,9 +314,9 @@ export const Bsv = () => {
             type="password"
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
-          <DescText style={{ margin: "3rem 0 1rem" }}>
+          <Text style={{ margin: "3rem 0 1rem" }}>
             Double check details before sending.
-          </DescText>
+          </Text>
           <Button type="primary" label="Send BSV" disabled={isProcessing} />
         </FormContainer>
       </ConfirmContent>

@@ -7,7 +7,7 @@
     "default_popup": "index.html",
     "default_title": "Panda Wallet"
   },
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "https://api.whatsonchain.com/"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self';"
   },

@@ -2,7 +2,7 @@ import styled from "styled-components";
 import { colors } from "../colors";
 import { BottomMenu } from "../components/BottomMenu";
 import { useBottomMenu } from "../hooks/useBottomMenu";
-import { DescText } from "../components/Reusable";
+import { Text } from "../components/Reusable";
 import { useEffect } from "react";
 
 const Content = styled.div`
@@ -32,7 +32,7 @@ export const Settings = () => {
     <Content>
       <TitleText>⚙️</TitleText>
       <TitleText>My Settings</TitleText>
-      <DescText>Feature under development</DescText>
+      <Text>Feature under development</Text>
       <BottomMenu handleSelect={handleSelect} selected={selected} />
     </Content>
   );

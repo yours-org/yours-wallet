@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useSnackbar } from "../../hooks/useSnackbar";
 import { BackButton } from "../../components/BackButton";
-import { DescText, HeaderText } from "../../components/Reusable";
+import { Text, HeaderText } from "../../components/Reusable";
 import { Input } from "../../components/Input";
 import { Button } from "../../components/Button";
 import { PandaHead } from "../../components/PandaHead";
@@ -112,7 +112,7 @@ export const CreateWallet = () => {
       <BackButton onClick={() => navigate("/")} />
       <Content>
         <HeaderText>Create a password</HeaderText>
-        <DescText>This is used to unlock your wallet.</DescText>
+        <Text>This is used to unlock your wallet.</Text>
         <FormContainer onSubmit={handleKeyGeneration}>
           <Input
             placeholder="Password"
@@ -124,9 +124,9 @@ export const CreateWallet = () => {
             type="password"
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
-          <DescText style={{ margin: "3rem 0 1rem" }}>
+          <Text style={{ margin: "3rem 0 1rem" }}>
             Make sure you are in a safe place and no one is watching.
-          </DescText>
+          </Text>
           <Button type="primary" label="Generate Seed" />
         </FormContainer>
       </Content>
@@ -157,10 +157,10 @@ export const CreateWallet = () => {
       <BackButton onClick={() => setStep(1)} />
       <Content>
         <HeaderText>Your recovery phrase</HeaderText>
-        <DescText style={{ marginBottom: "1rem" }}>
+        <Text style={{ marginBottom: "1rem" }}>
           Safely store your seed phrase. This is the only way you can recover
           your account.
-        </DescText>
+        </Text>
         {seedWordsList(seedWords)}
         <Button
           type="secondary"
@@ -184,10 +184,14 @@ export const CreateWallet = () => {
       <Content>
         <PandaHead />
         <HeaderText>Success!</HeaderText>
-        <DescText style={{ marginBottom: "1rem" }}>
+        <Text style={{ marginBottom: "1rem" }}>
           Your Panda Wallet is ready to go.
-        </DescText>
-        <Button type="primary" label="Enter" onClick={() => navigate("/bsv")} />
+        </Text>
+        <Button
+          type="primary"
+          label="Enter"
+          onClick={() => navigate("/bsv-wallet")}
+        />
       </Content>
     </>
   );

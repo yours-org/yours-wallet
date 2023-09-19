@@ -42,8 +42,8 @@ export const BottomMenu = (props: BottomMenuProps) => {
       />
       <Icon
         src={nfts}
-        onClick={() => handleSelect("nfts")}
-        opacity={selected === "nfts" ? 1 : 0.4}
+        onClick={() => handleSelect("ords")}
+        opacity={selected === "ords" ? 1 : 0.4}
       />
       <Icon
         src={settings}

@@ -2,8 +2,8 @@ import styled from "styled-components";
 import { colors } from "../colors";
 import { BottomMenu } from "../components/BottomMenu";
 import { useBottomMenu } from "../hooks/useBottomMenu";
-import { DescText } from "../components/Reusable";
 import { useEffect } from "react";
+import { Text } from "../components/Reusable";
 
 const Content = styled.div`
   display: flex;
@@ -21,18 +21,18 @@ const TitleText = styled.h1`
   text-align: center;
 `;
 
-export const Nfts = () => {
+export const OrdWallet = () => {
   const { handleSelect, selected, setSelected } = useBottomMenu();
 
   useEffect(() => {
-    setSelected("nfts");
+    setSelected("ords");
   }, [setSelected]);
 
   return (
     <Content>
       <TitleText>🛠</TitleText>
-      <TitleText>My NFTs</TitleText>
-      <DescText>Feature under development</DescText>
+      <TitleText>My Ordinals</TitleText>
+      <Text>Feature under development</Text>
       <BottomMenu handleSelect={handleSelect} selected={selected} />
     </Content>
   );

@@ -1,6 +1,6 @@
 import styled, { keyframes } from "styled-components";
 import { colors } from "../colors";
-import { DescText } from "./Reusable";
+import { Text } from "./Reusable";
 
 const spin = keyframes`
   0% { transform: rotate(0deg); }
@@ -36,9 +36,7 @@ export const PageLoader = (props: PageLoaderProps) => {
   const { message } = props;
   return (
     <LoaderContainer>
-      <DescText style={{ fontSize: "1rem", color: colors.white }}>
-        {message}
-      </DescText>
+      <Text style={{ fontSize: "1rem", color: colors.white }}>{message}</Text>
       <Loader />
     </LoaderContainer>
   );

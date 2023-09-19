@@ -10,7 +10,7 @@ export const HeaderText = styled.h1`
   text-align: center;
 `;
 
-export const DescText = styled.p`
+export const Text = styled.p`
   font-size: 0.9rem;
   color: ${colors.white + "90"};
   font-family: Arial, Helvetica, sans-serif;

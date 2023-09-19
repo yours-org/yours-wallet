@@ -13,9 +13,9 @@ export const useBottomMenu = () => {
   useEffect(() => {
     if (!context || !navigate) return;
     return context.selected === "bsv"
-      ? navigate("/bsv")
-      : context.selected === "nfts"
-      ? navigate("/nfts")
+      ? navigate("/bsv-wallet")
+      : context.selected === "ords"
+      ? navigate("/ord-wallet")
       : context.selected === "settings"
       ? navigate("/settings")
       : undefined;

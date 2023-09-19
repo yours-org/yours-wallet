@@ -1,7 +1,7 @@
 import { ReactNode, createContext, useState } from "react";
 import { BottomMenu } from "../components/BottomMenu";
 
-export type MenuItems = "bsv" | "nfts" | "settings";
+export type MenuItems = "bsv" | "ords" | "settings";
 
 type BottomMenuContextType = {
   selected: MenuItems | null;
