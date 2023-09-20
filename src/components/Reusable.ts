@@ -19,3 +19,44 @@ export const Text = styled.p`
   text-align: center;
   width: 80%;
 `;
+
+export const ConfirmContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+`;
+
+export const FormContainer = styled.form`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+`;
+
+export const ButtonContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  width: 100%;
+  margin: 1rem 0 2.5rem 0;
+`;
+
+export const MainContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: calc(100% - 3.75rem);
+`;
+
+export const ReceiveContent = styled(MainContent)`
+  justify-content: center;
+  width: 100%;
+  height: calc(100% - 3.75rem);
+`;

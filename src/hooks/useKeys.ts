@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   decrypt,
   deriveKey,
@@ -16,6 +16,7 @@ type KeyStorage = {
 
 export const useKeys = () => {
   const [bsvAddress, setBsvAddress] = useState("");
+  const [ordAddress, setOrdAddress] = useState("");
   const generateSeedAndStoreEncrypted = (
     password: string,
     existingSalt?: string,
@@ -38,6 +39,7 @@ export const useKeys = () => {
             const d = decrypt(result.encryptedKeys, result.passKey);
             const keys: Keys = JSON.parse(d);
             setBsvAddress(keys.walletAddress);
+            setOrdAddress(keys.ordAddress);
             resolve(keys);
           } catch (error) {
             reject(error);
@@ -60,10 +62,15 @@ export const useKeys = () => {
     });
   };
 
+  useEffect(() => {
+    retrieveKeys();
+  }, []);
+
   return {
     generateSeedAndStoreEncrypted,
     retrieveKeys,
     verifyPassword,
     bsvAddress,
+    ordAddress,
   };
 };

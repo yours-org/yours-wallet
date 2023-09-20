@@ -8,7 +8,11 @@
     "default_title": "Panda Wallet"
   },
   "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://api.whatsonchain.com/*"],
+  "host_permissions": [
+    "https://api.whatsonchain.com/*",
+    "https://ordinals.gorillapool.io/*",
+    "https://arc.gorillapool.io/v1"
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self';"
   },

@@ -7,7 +7,15 @@ import bsvCoin from "../assets/bsv-coin.svg";
 import { Button } from "../components/Button";
 import { PandaHead } from "../components/PandaHead";
 import { BackButton } from "../components/BackButton";
-import { Text, HeaderText } from "../components/Reusable";
+import {
+  Text,
+  HeaderText,
+  ButtonContainer,
+  ReceiveContent,
+  MainContent,
+  ConfirmContent,
+  FormContainer,
+} from "../components/Reusable";
 import { QrCode } from "../components/QrCode";
 import { Show } from "../components/Show";
 import { useSnackbar } from "../hooks/useSnackbar";
@@ -17,39 +25,6 @@ import { Input } from "../components/Input";
 import { BSV_DECIMAL_CONVERSION } from "../utils/constants";
 import { validate } from "bitcoin-address-validation";
 import { formatUSD } from "../utils/format";
-
-const MainContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  height: calc(100% - 3.75rem);
-`;
-
-const ConfirmContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-`;
-
-const FormContainer = styled.form`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: none;
-`;
-
-const ReceiveContent = styled(MainContent)`
-  justify-content: center;
-  width: 100%;
-  height: calc(100% - 3.75rem);
-`;
 
 const MiddleContainer = styled.div`
   display: flex;
@@ -68,14 +43,6 @@ const PandHeadContainer = styled.div`
   top: 10rem;
   right: 2.25rem;
   opacity: 0.5;
-`;
-
-const ButtonContainer = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  width: 100%;
-  margin-bottom: 3rem;
 `;
 
 const BalanceContainer = styled.div`
@@ -133,11 +100,11 @@ export const BsvWallet = () => {
 
   useEffect(() => {
     if (!successTxId) return;
-    if (!message) {
+    if (!message && bsvAddress) {
       setPageState("main");
-      getBsvBalance();
+      getBsvBalance(bsvAddress);
     }
-  }, [successTxId, message, getBsvBalance]);
+  }, [successTxId, message, getBsvBalance, bsvAddress]);
 
   const resetSendState = () => {
     setSatSendAmount(0);
@@ -173,7 +140,7 @@ export const BsvWallet = () => {
     }
 
     if (!passwordConfirm) {
-      addSnackbar("Invalid password!", "error");
+      addSnackbar("You must enter a password!", "error");
       setIsProcessing(false);
       return;
     }
@@ -228,10 +195,10 @@ export const BsvWallet = () => {
       <BackButton
         onClick={() => {
           setPageState("main");
-          getBsvBalance();
+          getBsvBalance(bsvAddress);
         }}
       />
-      <HeaderText>Only send BSV</HeaderText>
+      <HeaderText>Only Send BSV</HeaderText>
       <Text style={{ marginBottom: "1rem" }}>
         Do not send ordinals to this address!
       </Text>

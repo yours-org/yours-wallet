@@ -1,22 +1,7 @@
 import { useEffect, useState } from "react";
-import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL } from "../utils/constants";
-import axios from "axios";
 import { useKeys } from "./useKeys";
 import * as bsv from "bsv";
-
-type WocUtxo = {
-  height: number;
-  tx_pos: number;
-  tx_hash: string;
-  value: number;
-};
-
-type UTXO = {
-  satoshis: number;
-  vout: number;
-  txid: string;
-  script: string;
-};
+import { UTXO, useWhatsOnChain } from "./useWhatsOnChain";
 
 type SendBsvResponse = {
   txid?: string;
@@ -27,6 +12,8 @@ export const useBsv = () => {
   const [bsvBalance, setBsvBalance] = useState(0);
   const [exchangeRate, setExchangeRate] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const { getUxos, getBsvBalance, getExchangeRate, broadcastRawTx } =
+    useWhatsOnChain();
   const { retrieveKeys, bsvAddress, verifyPassword } = useKeys();
 
   const sendBsv = async (
@@ -69,10 +56,7 @@ export const useBsv = () => {
       bsvTx.sign(paymentPk);
       const txhex = bsvTx.toString();
 
-      // Broadcast to miners
-      const { data: txid } = await axios.post(`${WOC_BASE_URL}/tx/raw`, {
-        txhex,
-      });
+      const txid = await broadcastRawTx(txhex);
 
       return { txid };
     } catch (error: any) {
@@ -96,48 +80,22 @@ export const useBsv = () => {
     return inputs;
   };
 
-  const getUxos = async (fromAddress: string) => {
-    const { data } = await axios.get(
-      `${WOC_BASE_URL}/address/${fromAddress}/unspent`
-    );
-
-    const script = bsv.Script.fromAddress(fromAddress).toHex();
-
-    const fundingUtxos: UTXO[] = data
-      .map((utxo: WocUtxo) => {
-        return {
-          satoshis: utxo.value,
-          vout: utxo.tx_pos,
-          txid: utxo.tx_hash,
-          script,
-        };
-      })
-      .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
-
-    return fundingUtxos;
-  };
-
-  const getBsvBalance = async () => {
-    const keys = await retrieveKeys();
-    const { data } = await axios.get(
-      `${WOC_BASE_URL}/address/${keys.walletAddress}/balance`
-    );
-    const satBalance = data.confirmed + data.unconfirmed;
-    const total = satBalance / BSV_DECIMAL_CONVERSION;
+  const balance = async () => {
+    const total = await getBsvBalance(bsvAddress);
     setBsvBalance(total);
   };
 
-  const getExchangeRate = async () => {
-    const { data } = await axios.get(`${WOC_BASE_URL}/exchangerate`);
-    const rate = Number(data.rate.toFixed(2));
-    setExchangeRate(rate);
+  const rate = async () => {
+    const r = await getExchangeRate();
+    setExchangeRate(r);
   };
 
   useEffect(() => {
-    getBsvBalance();
-    getExchangeRate();
+    if (!bsvAddress) return;
+    balance();
+    rate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [bsvAddress]);
 
   return {
     bsvBalance,
