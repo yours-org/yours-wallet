@@ -1,9 +1,6 @@
 import styled from "styled-components";
-// import { colors } from "../colors";
-import { BottomMenu } from "../components/BottomMenu";
 import { useBottomMenu } from "../hooks/useBottomMenu";
 import { useEffect, useState } from "react";
-// import { Text } from "../components/Reusable";
 import { Button } from "../components/Button";
 import {
   ButtonContainer,
@@ -47,7 +44,7 @@ const Ordinal = styled.div<{ url: string; selected?: boolean }>`
 type PageState = "main" | "receive" | "transfer";
 
 export const OrdWallet = () => {
-  const { handleSelect, selected, setSelected } = useBottomMenu();
+  const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>("main");
   const {
     ordAddress,
@@ -183,7 +180,6 @@ export const OrdWallet = () => {
           }}
         />
       </ButtonContainer>
-      <BottomMenu handleSelect={handleSelect} selected={selected} />
     </MainContent>
   );
 

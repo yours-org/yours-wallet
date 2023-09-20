@@ -161,7 +161,7 @@ export const RestoreWallet = () => {
   return (
     <>
       <Show when={loading}>
-        <PageLoader message="Generating keys..." />
+        <PageLoader message="Restoring Wallet..." />
       </Show>
       <Show when={!loading && step === 1}>{enterSeedStep}</Show>
       <Show when={!loading && step === 2}>{passwordStep}</Show>

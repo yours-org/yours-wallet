@@ -8,7 +8,7 @@ import {
 import { Keys, getKeys } from "../utils/keys";
 import { storage } from "../utils/storage";
 
-type KeyStorage = {
+export type KeyStorage = {
   encryptedKeys: string;
   passKey: string;
   salt: string;

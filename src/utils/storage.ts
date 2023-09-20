@@ -1,6 +1,7 @@
 interface Storage {
   set: (obj: any, callback?: () => void) => void;
   get: (key: string | string[], callback: (result: any) => void) => void;
+  clear: () => Promise<void>; // Modified the clear method to return a Promise
 }
 
 const mockStorage: Storage = {
@@ -24,6 +25,13 @@ const mockStorage: Storage = {
       });
       callback(result);
     }
+  },
+  clear: async () => {
+    // Made the clear method asynchronous
+    await new Promise<void>((resolve) => {
+      localStorage.clear();
+      resolve();
+    });
   },
 };
 

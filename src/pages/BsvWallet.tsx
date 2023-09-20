@@ -1,6 +1,5 @@
 import styled from "styled-components";
 import { colors } from "../colors";
-import { BottomMenu } from "../components/BottomMenu";
 import { useBottomMenu } from "../hooks/useBottomMenu";
 import React, { useEffect, useState } from "react";
 import bsvCoin from "../assets/bsv-coin.svg";
@@ -77,7 +76,7 @@ const Icon = styled.img`
 type PageState = "main" | "receive" | "send";
 
 export const BsvWallet = () => {
-  const { handleSelect, selected, setSelected } = useBottomMenu();
+  const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>("main");
   const [satSendAmount, setSatSendAmount] = useState(0);
   const [receiveAddress, setReceiveAddress] = useState("");
@@ -238,7 +237,6 @@ export const BsvWallet = () => {
           onClick={() => setPageState("send")}
         />
       </ButtonContainer>
-      <BottomMenu handleSelect={handleSelect} selected={selected} />
     </MainContent>
   );
 

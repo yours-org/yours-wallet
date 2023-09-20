@@ -2,7 +2,7 @@ import styled from "styled-components";
 import { colors } from "../colors";
 import { Show } from "./Show";
 
-export type ButtonStyles = "primary" | "secondary";
+export type ButtonStyles = "primary" | "secondary" | "warn";
 
 const Primary = styled.button`
   width: 80%;
@@ -38,6 +38,11 @@ const Secondary = styled(Primary)`
   }
 `;
 
+const Warn = styled(Primary)`
+  background-color: ${colors.red};
+  color: ${colors.white};
+`;
+
 export type ButtonProps = {
   label: string;
   type: ButtonStyles;
@@ -54,11 +59,15 @@ export const Button = (props: ButtonProps) => {
           {label}
         </Primary>
       </Show>
-
       <Show when={type === "secondary"}>
         <Secondary disabled={disabled} onClick={onClick}>
           {label}
         </Secondary>
+      </Show>
+      <Show when={type === "warn"}>
+        <Warn disabled={disabled} onClick={onClick}>
+          {label}
+        </Warn>
       </Show>
     </>
   );
