@@ -8,6 +8,7 @@ import { BottomMenuProvider } from "./contexts/BottomMenuContext";
 import { Settings } from "./pages/Settings";
 import { BsvWallet } from "./pages/BsvWallet";
 import { OrdWallet } from "./pages/OrdWallet";
+import { RestoreWallet } from "./pages/onboarding/RestoreWallet";
 
 const Container = styled.div`
   display: flex;
@@ -27,6 +28,7 @@ export const App = () => {
             <Routes>
               <Route path="/" element={<Start />} />
               <Route path="/create-wallet" element={<CreateWallet />} />
+              <Route path="/restore-wallet" element={<RestoreWallet />} />
               <Route path="/bsv-wallet" element={<BsvWallet />} />
               <Route path="/ord-wallet" element={<OrdWallet />} />
               <Route path="/settings" element={<Settings />} />

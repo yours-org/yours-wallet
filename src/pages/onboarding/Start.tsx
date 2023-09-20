@@ -66,7 +66,7 @@ export const Start = () => {
           <Button
             type="secondary"
             label="Restore Wallet"
-            onClick={() => console.log("import wallet")}
+            onClick={() => navigate("/restore-wallet")}
           />
         </Content>
       ) : (

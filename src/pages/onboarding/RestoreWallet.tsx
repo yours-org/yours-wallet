@@ -31,36 +31,29 @@ const FormContainer = styled.form`
   background: none;
 `;
 
-const SeedContainer = styled.div`
-  display: flex;
-  justify-content: space-between;
-  width: 75%;
-  margin: 0.5rem 0;
-`;
-
-const Column = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-const SeedPill = styled.div`
-  display: flex;
-  align-items: center;
+const SeedInput = styled.textarea`
   background-color: ${colors.darkNavy};
-  padding: 0.1rem 0 0.1rem 1rem;
-  border-radius: 1rem;
-  color: ${colors.white};
-  font-size: 0.85rem;
-  margin: 0.25rem;
-  width: 6rem;
+  border-radius: 0.25rem;
+  border: 1px solid ${colors.white + "50"};
+  width: 80%;
+  height: 7rem;
+  padding: 1rem;
+  margin: 0.5rem;
+  outline: none;
+  color: ${colors.white + "80"};
+  resize: none;
+
+  &::placeholder {
+    color: ${colors.white + "80"};
+  }
 `;
 
-export const CreateWallet = () => {
+export const RestoreWallet = () => {
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [step, setStep] = useState(1);
-  const [seedWords, setSeedWords] = useState<string[]>([]);
+  const [seedWords, setSeedWords] = useState<string>("");
 
   const { addSnackbar } = useSnackbar();
   const { generateSeedAndStoreEncrypted } = useKeys();
@@ -75,15 +68,7 @@ export const CreateWallet = () => {
     };
   }, [hideMenu, showMenu]);
 
-  const handleCopyToClipboard = () => {
-    navigator.clipboard.writeText(seedWords.join(" ")).then(() => {
-      addSnackbar("Copied!", "success");
-    });
-  };
-
-  const handleKeyGeneration = async (
-    event: React.FormEvent<HTMLFormElement>
-  ) => {
+  const handleRestore = async (event: React.FormEvent<HTMLFormElement>) => {
     setLoading(true);
     event.preventDefault();
     if (password.length < 8) {
@@ -100,11 +85,14 @@ export const CreateWallet = () => {
 
     // Some artificial delay for the loader
     await new Promise((resolve) => setTimeout(resolve, 50));
-    const mnemonic = generateSeedAndStoreEncrypted(password);
-    setSeedWords(mnemonic.split(" "));
+    const mnemonic = generateSeedAndStoreEncrypted(password, seedWords);
+    if (!mnemonic) {
+      addSnackbar("An error occurred while restoring the wallet!", "error");
+      return;
+    }
 
     setLoading(false);
-    setStep(2);
+    setStep(3);
   };
 
   const passwordStep = (
@@ -113,7 +101,7 @@ export const CreateWallet = () => {
       <Content>
         <HeaderText>Create a password</HeaderText>
         <Text>This is used to unlock your wallet.</Text>
-        <FormContainer onSubmit={handleKeyGeneration}>
+        <FormContainer onSubmit={handleRestore}>
           <Input
             placeholder="Password"
             type="password"
@@ -123,54 +111,32 @@ export const CreateWallet = () => {
             placeholder="Confirm Password"
             type="password"
             onChange={(e) => setPasswordConfirm(e.target.value)}
+            style={{ marginBottom: "2rem" }}
           />
-          <Text style={{ margin: "3rem 0 1rem" }}>
-            Make sure you are in a safe place and no one is watching.
-          </Text>
-          <Button type="primary" label="Generate Seed" />
+          <Button type="primary" label="Finish" />
         </FormContainer>
       </Content>
     </>
   );
 
-  const copySeedStep = (
+  const enterSeedStep = (
     <>
-      <BackButton onClick={() => setStep(1)} />
+      <BackButton onClick={() => navigate("/")} />
       <Content>
-        <HeaderText>Your recovery phrase</HeaderText>
-        <Text style={{ marginBottom: "1rem" }}>
-          Safely store your seed phrase. This is the only way you can recover
-          your account.
+        <HeaderText>Restore a wallet</HeaderText>
+        <Text>
+          Only input a seed phrase previously generated from Panda Wallet.
         </Text>
-        <SeedContainer>
-          <Column>
-            {seedWords.slice(0, 6).map((word, index) => (
-              <SeedPill key={index}>
-                {index + 1}. {word}
-              </SeedPill>
-            ))}
-          </Column>
-          <Column>
-            {seedWords.slice(6).map((word, index) => (
-              <SeedPill key={index + 6}>
-                {index + 7}. {word}
-              </SeedPill>
-            ))}
-          </Column>
-        </SeedContainer>
-        <Button
-          type="secondary"
-          label="Copy to clipboard"
-          onClick={handleCopyToClipboard}
-        />
-        <Button
-          type="primary"
-          label="Next"
-          onClick={() => {
-            setStep(3);
-            setSeedWords([]);
-          }}
-        />
+        <FormContainer onSubmit={() => setStep(2)}>
+          <SeedInput
+            placeholder="Enter secret recovery words"
+            onChange={(e) => setSeedWords(e.target.value)}
+          />
+          <Text style={{ margin: "3rem 0 1rem" }}>
+            Make sure you are in a safe place and no one is watching.
+          </Text>
+          <Button type="primary" label="Next" />
+        </FormContainer>
       </Content>
     </>
   );
@@ -181,7 +147,7 @@ export const CreateWallet = () => {
         <PandaHead />
         <HeaderText>Success!</HeaderText>
         <Text style={{ marginBottom: "1rem" }}>
-          Your Panda Wallet is ready to go.
+          Your Panda Wallet has been restored.
         </Text>
         <Button
           type="primary"
@@ -197,8 +163,8 @@ export const CreateWallet = () => {
       <Show when={loading}>
         <PageLoader message="Generating keys..." />
       </Show>
-      <Show when={!loading && step === 1}>{passwordStep}</Show>
-      <Show when={!loading && step === 2}>{copySeedStep}</Show>
+      <Show when={!loading && step === 1}>{enterSeedStep}</Show>
+      <Show when={!loading && step === 2}>{passwordStep}</Show>
       <Show when={!loading && step === 3}>{successStep}</Show>
     </>
   );

@@ -19,10 +19,9 @@ export const useKeys = () => {
   const [ordAddress, setOrdAddress] = useState("");
   const generateSeedAndStoreEncrypted = (
     password: string,
-    existingSalt?: string,
     mnemonic?: string
   ) => {
-    const salt = existingSalt ?? generateRandomSalt(); //TODO: Review is the existing salt is needed for this still.
+    const salt = generateRandomSalt();
     const passKey = deriveKey(password, salt);
     const keys = getKeys(mnemonic);
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
