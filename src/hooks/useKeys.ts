@@ -36,6 +36,7 @@ export const useKeys = () => {
         ["encryptedKeys", "passKey", "salt"],
         (result: KeyStorage) => {
           try {
+            if (!result.encryptedKeys || !result.passKey) return;
             const d = decrypt(result.encryptedKeys, result.passKey);
             const keys: Keys = JSON.parse(d);
             setBsvAddress(keys.walletAddress);
