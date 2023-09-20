@@ -42,9 +42,9 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       storage.set({ lastActiveTime: timestamp });
     } else {
       setVerificationFailed(true);
-      setPassword(""); // This clears the input
+      setPassword("");
       setTimeout(() => {
-        setVerificationFailed(false); // Reset the failed state after a short delay (length of the shake animation or slightly more)
+        setVerificationFailed(false);
       }, 900);
     }
   };

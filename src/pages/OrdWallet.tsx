@@ -217,13 +217,13 @@ export const OrdWallet = () => {
         <HeaderText>Transfer Ordinal</HeaderText>
         <FormContainer noValidate onSubmit={(e) => handlTransferOrdinal(e)}>
           <Input
-            placeholder="Enter Address"
+            placeholder="Receive Address"
             type="text"
             onChange={(e) => setReceiveAddress(e.target.value)}
             value={receiveAddress}
           />
           <Input
-            placeholder="Enter Wallet Password"
+            placeholder="Password"
             type="password"
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
