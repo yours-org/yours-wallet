@@ -1,4 +1,6 @@
-# Panda Wallet - Non-Custodial Web3 Wallet For BSV
+![Example Image](/public/logo192.png)
+
+# Panda Wallet | Non-Custodial Web3 Wallet For BSV
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
