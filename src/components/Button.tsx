@@ -4,6 +4,12 @@ import { Show } from "./Show";
 
 export type ButtonStyles = "primary" | "secondary" | "warn";
 
+const disabledStyles = `
+  cursor: not-allowed;
+  opacity: 0.6;
+  background-color: ${colors.lime + "40"};
+`;
+
 const Primary = styled.button`
   width: 80%;
   height: 2.5rem;
@@ -19,6 +25,10 @@ const Primary = styled.button`
   transition: all 0.3s ease;
   transform: scale(1);
 
+  &:disabled {
+    ${disabledStyles}
+  }
+
   &:hover {
     transform: scale(1.025);
   }
@@ -33,6 +43,11 @@ const Secondary = styled(Primary)`
   transition: none;
   transform: none;
 
+  &:disabled {
+    background: transparent;
+    color: ${colors.white + "40"};
+  }
+
   &:hover {
     transform: none;
   }
@@ -41,6 +56,10 @@ const Secondary = styled(Primary)`
 const Warn = styled(Primary)`
   background-color: ${colors.red};
   color: ${colors.white};
+
+  &:disabled {
+    background-color: ${colors.red + "40"};
+  }
 `;
 
 export type ButtonProps = {

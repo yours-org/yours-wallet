@@ -12,6 +12,7 @@ import { useKeys } from "../../hooks/useKeys";
 import { useBottomMenu } from "../../hooks/useBottomMenu";
 import { PageLoader } from "../../components/PageLoader";
 import { Show } from "../../components/Show";
+import { sleep } from "../../utils/sleep";
 
 const Content = styled.div`
   display: flex;
@@ -84,7 +85,7 @@ export const RestoreWallet = () => {
     }
 
     // Some artificial delay for the loader
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await sleep(50);
     const mnemonic = generateSeedAndStoreEncrypted(password, seedWords);
     if (!mnemonic) {
       addSnackbar("An error occurred while restoring the wallet!", "error");

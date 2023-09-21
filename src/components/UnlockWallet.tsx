@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useKeys } from "../hooks/useKeys";
 import { storage } from "../utils/storage";
 import { PandaHead } from "./PandaHead";
+import { sleep } from "../utils/sleep";
 
 const Container = styled.div`
   display: flex;
@@ -29,23 +30,28 @@ export type UnlockWalletProps = {
 export const UnlockWallet = (props: UnlockWalletProps) => {
   const { onUnlock } = props;
   const [password, setPassword] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
 
   const { verifyPassword } = useKeys();
 
   const handleUnlock = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsProcessing(true);
+    await sleep(25);
     const isVerified = await verifyPassword(password);
     if (isVerified) {
       onUnlock();
       setVerificationFailed(false);
       const timestamp = Date.now();
       storage.set({ lastActiveTime: timestamp });
+      setIsProcessing(false);
     } else {
       setVerificationFailed(true);
       setPassword("");
       setTimeout(() => {
         setVerificationFailed(false);
+        setIsProcessing(false);
       }, 900);
     }
   };
@@ -62,7 +68,11 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           style={{ marginBottom: "2rem" }}
           shake={verificationFailed ? "true" : "false"}
         />
-        <Button type="primary" label="Unlock" />
+        <Button
+          type="primary"
+          label={isProcessing ? "Unlocking..." : "Unlock"}
+          disabled={isProcessing}
+        />
       </FormContainer>
     </Container>
   );

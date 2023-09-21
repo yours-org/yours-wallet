@@ -29,18 +29,31 @@ export const useKeys = () => {
     return keys.mnemonic;
   };
 
-  const retrieveKeys = (): Promise<Keys> => {
+  /**
+   *
+   * @param password An optional password can be passed to unlock sensitive information
+   * @returns
+   */
+  const retrieveKeys = (password?: string): Promise<Keys | Partial<Keys>> => {
     return new Promise((resolve, reject) => {
       storage.get(
         ["encryptedKeys", "passKey", "salt"],
-        (result: KeyStorage) => {
+        async (result: KeyStorage) => {
           try {
             if (!result.encryptedKeys || !result.passKey) return;
             const d = decrypt(result.encryptedKeys, result.passKey);
             const keys: Keys = JSON.parse(d);
             setBsvAddress(keys.walletAddress);
             setOrdAddress(keys.ordAddress);
-            resolve(keys);
+            if (password) {
+              const isVerified = await verifyPassword(password);
+              isVerified ? resolve(keys) : reject("Unauthorized!");
+            } else {
+              resolve({
+                ordAddress: keys.ordAddress,
+                walletAddress: keys.walletAddress,
+              });
+            }
           } catch (error) {
             reject(error);
           }
@@ -64,6 +77,7 @@ export const useKeys = () => {
 
   useEffect(() => {
     retrieveKeys();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {

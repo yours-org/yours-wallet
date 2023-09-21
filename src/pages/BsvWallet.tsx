@@ -24,6 +24,7 @@ import { Input } from "../components/Input";
 import { BSV_DECIMAL_CONVERSION } from "../utils/constants";
 import { validate } from "bitcoin-address-validation";
 import { formatUSD } from "../utils/format";
+import { sleep } from "../utils/sleep";
 
 const MiddleContainer = styled.div`
   display: flex;
@@ -131,7 +132,7 @@ export const BsvWallet = () => {
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    await sleep(25);
     if (!validate(receiveAddress)) {
       addSnackbar(
         "You must enter a valid BSV address. Paymail not yet supported.",

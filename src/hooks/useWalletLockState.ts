@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { storage } from "../utils/storage";
 
-const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes TODO: change this back
+const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 export const useWalletLockState = () => {
   const [isLocked, setIsLocked] = useState<boolean>(false);
@@ -27,10 +27,9 @@ export const useWalletLockState = () => {
 
     checkLockState();
 
-    // Optionally, set an interval to check the lock state regularly
-    const interval = setInterval(checkLockState, 5000); // check every 5 seconds
+    // Set an interval to check the lock state regularly
+    const interval = setInterval(checkLockState, 5000);
 
-    // Cleanup interval when the component is unmounted
     return () => {
       clearInterval(interval);
     };

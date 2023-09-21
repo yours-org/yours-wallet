@@ -22,6 +22,7 @@ import { useSnackbar } from "../hooks/useSnackbar";
 import { PageLoader } from "../components/PageLoader";
 import validate from "bitcoin-address-validation";
 import { Input } from "../components/Input";
+import { sleep } from "../utils/sleep";
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -100,7 +101,7 @@ export const OrdWallet = () => {
     e.preventDefault();
     setIsProcessing(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    await sleep(25);
     if (!validate(receiveAddress)) {
       addSnackbar("You must enter a valid 1Sat Ordinal address.", "info");
       setIsProcessing(false);

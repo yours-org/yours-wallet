@@ -5,6 +5,7 @@ import { useKeys } from "./useKeys";
 import { UTXO, useWhatsOnChain } from "./useWhatsOnChain";
 import { Transaction, Script, PrivateKey } from "bsv";
 import { sendOrdinal } from "../utils/js-1sat-ord";
+import { Keys } from "../utils/keys";
 
 type OrdinalResponse = {
   id: number;
@@ -145,7 +146,7 @@ export const useOrds = () => {
         return { error: "invalid-password" };
       }
 
-      const keys = await retrieveKeys();
+      const keys = (await retrieveKeys(password)) as Keys;
       const ordinalAddress = keys.ordAddress;
       const ordWifPk = keys.ordWif;
       const fundingAndChangeAddress = keys.walletAddress;
