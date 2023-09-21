@@ -16,6 +16,8 @@ Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV
 
 ## Getting Started (Alpha)
 
+Version: 0.0.3
+
 The alpha version of the wallet is open and available to all users. While it has been tested, it is still new software so use at your own risk. The plan once out of alpha/beta is to launch on the Google Chrome Store.
 
 1. **Download:** First you will need to <a id="raw-url" href="https://github.com/Panda-Wallet/panda-wallet/raw/main/public/builds/pw-0.0.3.zip" download="panda-wallet-0.0.3.zip">Download The Current Build</a>
