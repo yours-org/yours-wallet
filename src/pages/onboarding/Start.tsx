@@ -7,6 +7,7 @@ import { Text } from "../../components/Reusable";
 import { storage } from "../../utils/storage";
 import { useEffect, useState } from "react";
 import { useBottomMenu } from "../../hooks/useBottomMenu";
+import gihubIcon from "../../assets/github.svg";
 
 const Content = styled.div`
   display: flex;
@@ -22,6 +23,13 @@ const TitleText = styled.h1`
   font-weight: 600;
   margin: 0.25rem 0;
   text-align: center;
+`;
+
+const GithubIcon = styled.img`
+  width: 1.5rem;
+  height: 1.5rem;
+  position: absolute;
+  bottom: 1.5rem;
 `;
 
 export const Start = () => {
@@ -55,7 +63,7 @@ export const Start = () => {
         <Content>
           <PandaHead animated />
           <TitleText>Panda Wallet</TitleText>
-          <Text style={{ marginBottom: "5rem" }}>
+          <Text style={{ marginBottom: "3rem" }}>
             A non-custodial and open-source wallet for BSV and 1Sat Ordinals.
           </Text>
           <Button
@@ -67,6 +75,15 @@ export const Start = () => {
             type="secondary"
             label="Restore Wallet"
             onClick={() => navigate("/restore-wallet")}
+          />
+          <GithubIcon
+            src={gihubIcon}
+            onClick={() =>
+              window.open(
+                "https://github.com/Panda-Wallet/panda-wallet",
+                "_blank"
+              )
+            }
           />
         </Content>
       ) : (
