@@ -1,6 +1,7 @@
 ![Example Image](/public/banner.png)
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
 Alpha Version: 0.0.4
 
 # Panda Wallet | Non-Custodial Web3 Wallet For BSV
