@@ -75,10 +75,10 @@ Prettier is a powerful code formatter that helps ensure our code remains well-or
 
 [PR Guidelines](PR_GUIDELINES.md)
 
-## License
-
-Panda Wallet is released under the [MIT License](https://opensource.org/licenses/MIT)
-
 ## Submit Issues
 
 Submit issues to the [Kanban Board](https://github.com/orgs/Panda-Wallet/projects/1)
+
+## License
+
+Panda Wallet is released under the [MIT License](https://opensource.org/licenses/MIT)
