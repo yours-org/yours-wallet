@@ -16,7 +16,8 @@ Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV
 
 The alpha version of the wallet is open and available to all users. While it has been tested, it is still new software so use at your own risk. The plan once out of alpha/beta is to launch on the Google Chrome Store.
 
-1. **Download:** First you will need to Download The Current Build. \*\*Always double check that you are at the official Panda Wallet github repo before downloading anything. https://github.com/Panda-Wallet/panda-wallet.
+1. **Download:** First you will need to [Download The Current Build](https://github.com/yourusername/yourrepository/raw/main/path/to/yourfile.zip)
+   . \*\*Always double check that you are at the official Panda Wallet github repo before downloading anything. https://github.com/Panda-Wallet/panda-wallet.
 2. **Unzip** Unzip the build zip file then head to [Chrome Extensions](chrome://extensions)
 3. **Load The Build File** In the top right of Chrome Extensions, enable dev mode, then on the left select "Load unpacked".
 4. **Finish** If you did this properly, you should now see Panda Wallet available in the list of extensions. You can now manage and pin the extension just like you would any other Chrome extension you have.
