@@ -4,8 +4,6 @@
 
 Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV) and 1Sat Ordinals. This wallet allows users to have full control over their funds, providing security and independence in managing their assets.
 
-![Panda Wallet Screenshot](screenshot.png)
-
 ## Features
 
 - **Non-Custodial:** Your private keys are encrypted and stored locally on your device, ensuring complete control over your funds.
@@ -14,14 +12,14 @@ Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV
 - **1Sat Ordinals:** Full support for sending and transferring 1Sat Ordinals.
 - **Secure:** Open Source and audited by the community.
 
-## Getting Started
+## Getting Started (Alpha)
 
-To get started with Panda Wallet, follow these steps:
+The alpha version of the wallet is open and available to all users. While it has been tested, it is still new software so use at your own risk. The plan once out of alpha/beta is to launch on the Google Chrome Store.
 
-1. **Installation:** Install the Panda Wallet chrome extension. TODO: insert link
-2. **Create or Import Wallet:** Create a new wallet or import an existing Panda Wallet using your recovery phrase.
-3. **Connect to Providers:** Connect your wallet to 3rd party applications that have integrated the Panda Wallet provider.
-4. **Manage Your Assets:** Start sending and receiving BSV and 1Sat Ordinals, manage your portfolio, and explore decentralized applications.
+1. **Download:** First you will need to Download The Current Build. \*\*Always double check that you are at the official Panda Wallet github repo before downloading anything. https://github.com/Panda-Wallet/panda-wallet.
+2. **Unzip** Unzip the build zip file then head to [Chrome Extensions](chrome://extensions)
+3. **Load The Build File** In the top right of Chrome Extensions, enable dev mode, then on the left select "Load unpacked".
+4. **Finish** If you did this properly, you should now see Panda Wallet available in the list of extensions. You can now manage and pin the extension just like you would any other Chrome extension you have.
 
 ## Development
 
