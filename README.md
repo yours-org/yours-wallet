@@ -75,9 +75,9 @@ Prettier is a powerful code formatter that helps ensure our code remains well-or
 
 [PR Guidelines](PR_GUIDELINES.md)
 
-## Submit Issues or Feature Requests
+## Issues, Bugs, and Feature Requests
 
-Submit issues to the [Kanban Board](https://github.com/orgs/Panda-Wallet/projects/1)
+Submit your requests to the [Kanban Board](https://github.com/orgs/Panda-Wallet/projects/1)
 
 ## Support The Project
 
