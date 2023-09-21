@@ -27,7 +27,7 @@ The alpha version of the wallet is open and available to all users. While it has
 
    Files can also be found in `public/builds`
 
-2. **Unzip:** Unzip the build zip file then head to [Chrome Extensions](chrome://extensions)
+2. **Unzip:** Unzip the build zip file then head to <a href="chrome://extensions"> Chrome Extensions</a>
 3. **Load The Build File:** In the top right of Chrome Extensions, enable dev mode, then on the left select "Load unpacked".
 4. **Finish:** If you did this properly, you should now see Panda Wallet available in the list of extensions. You can now manage and pin the extension just like you would any other Chrome extension you have.
 
@@ -61,7 +61,7 @@ If you'd like to contribute to Panda Wallet's development, follow these steps:
 
 5. **Run The Extension:** Load the extension into your browser using dev mode:
 
-   1. Navigate to [Chrome Extensions](chrome://extensions/) and turn on dev mode.
+   1. Navigate to <a href="chrome://extensions"> Chrome Extensions</a> and turn on dev mode.
    2. Click "Load Unpacked".
    3. Upload the production `build` folder.
 
