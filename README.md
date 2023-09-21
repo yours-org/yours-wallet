@@ -19,12 +19,12 @@ The alpha version of the wallet is open and available to all users. While it has
 1. **Download:** First you will need to [Download The Current Build](https://github.com/Panda-Wallet/panda-wallet/blob/main/public/builds/panda-wallet-0.0.1.zip)
    . \*\*Always double check that you are at the official Panda Wallet github repo before downloading anything. https://github.com/Panda-Wallet/panda-wallet.
 
-   **v0.0.1 SHA256 Checksum** For extra security you can check the checksum:
+   **v0.0.1 SHA256 Checksum:** For extra security you can check the checksum:
    `29eaa08e0ea88175ee88fe60dd302dbdfacd294a0462edfda98e32421f970a08`
 
-2. **Unzip** Unzip the build zip file then head to [Chrome Extensions](chrome://extensions)
-3. **Load The Build File** In the top right of Chrome Extensions, enable dev mode, then on the left select "Load unpacked".
-4. **Finish** If you did this properly, you should now see Panda Wallet available in the list of extensions. You can now manage and pin the extension just like you would any other Chrome extension you have.
+2. **Unzip:** Unzip the build zip file then head to [Chrome Extensions](chrome://extensions)
+3. **Load The Build File:** In the top right of Chrome Extensions, enable dev mode, then on the left select "Load unpacked".
+4. **Finish:** If you did this properly, you should now see Panda Wallet available in the list of extensions. You can now manage and pin the extension just like you would any other Chrome extension you have.
 
 ## Development
 
@@ -42,25 +42,25 @@ If you'd like to contribute to Panda Wallet's development, follow these steps:
    npm install
    ```
 
-3. **Start the App** Open a local instance of the app:
+3. **Start the App:** Open a local instance of the app:
 
    ```bash
    npm run start
    ```
 
-4. **Build The Extension** To create a production build of the app, run:
+4. **Build The Extension:** To create a production build of the app, run:
 
    ```bash
    npm run build
    ```
 
-5. **Run The Extension** Load the extension into your browser using dev mode:
+5. **Run The Extension:** Load the extension into your browser using dev mode:
 
    1. Navigate to [Chrome Extensions](chrome://extensions/) and turn on dev mode.
    2. Click "Load Unpacked".
    3. Upload the production `build` folder.
 
-6. **Customize and Contribute**: Customize the extension or contribute by opening pull requests.
+6. **Customize and Contribute:**: Customize the extension or contribute by opening pull requests.
 
 **\*Always Use Prettier for Code Formatting**
 
@@ -68,9 +68,13 @@ Prettier is a powerful code formatter that helps ensure our code remains well-or
 
 ## Pull Request (PR) Guidelines
 
-1. **Small and Focused Changes:** PRs should focus on addressing a specific issue, implementing a single feature, or fixing a bug. Keep changes small and avoid bundling unrelated changes in the same PR.
+1. **Small and Focused Changes:**
 
-2. **Branch Naming Convention:** Use descriptive branch names that reflect the purpose of the PR. For example, use `feature/add-authentication` or `bugfix/fix-login-issue`.
+   - PRs should focus on addressing a specific issue, implementing a single feature, or fixing a bug. Keep changes small and avoid bundling unrelated changes in the same PR.
+
+2. **Branch Naming Convention:**
+
+   - Use descriptive branch names that reflect the purpose of the PR. For example, use `feature/add-authentication` or `bugfix/fix-login-issue`.
 
 3. **Code Quality:**
 
@@ -92,7 +96,9 @@ Prettier is a powerful code formatter that helps ensure our code remains well-or
    - Write clear and concise commit messages that explain the purpose of each commit.
    - Use a conventional format like "feat(ordinal): implement transfers" or "fix(service-worker): resolve issue with listener."
 
-7. **Rebase and Resolve Conflicts:** Before merging, ensure your PR is up-to-date with the latest changes from the main branch. Resolve any conflicts that arise during the rebase.
+7. **Rebase and Resolve Conflicts:**
+
+   - Before merging, ensure your PR is up-to-date with the latest changes from the main branch. Resolve any conflicts that arise during the rebase.
 
 8. **Peer Review:**
 
@@ -109,24 +115,34 @@ Prettier is a powerful code formatter that helps ensure our code remains well-or
     - Apply labels to categorize PRs (e.g., bug, feature, documentation).
     - Associate PRs with project milestones when applicable.
 
-11. **Avoid Force Pushing:** Once a PR is open, avoid force-pushing changes to the branch. If you need to update the PR, make new commits.
+11. **Avoid Force Pushing:**
+
+    - Once a PR is open, avoid force-pushing changes to the branch. If you need to update the PR, make new commits.
 
 12. **Ownership and Responsibility:**
 
     - Assign the PR to the person responsible for reviewing and merging it.
     - Authors should address feedback promptly and engage in the review process.
 
-13. **Merging:** PRs should be merged after receiving approval from reviewers and passing all checks.
+13. **Merging:**
 
-14. **Delete Branches:** After a successful merge, delete the feature or bugfix branch unless it's a long-lived branch or follows a specific naming convention (e.g., `release/1.0`).
+    - PRs should be merged after receiving approval from reviewers and passing all checks.
 
-15. **Changelog Updates:** If your project maintains a changelog, update it with changes introduced in the PR.
+14. **Delete Branches:**
+
+    - After a successful merge, delete the feature or bugfix branch unless it's a long-lived branch or follows a specific naming convention (e.g., `release/1.0`).
+
+15. **Changelog Updates:**
+
+    - If your project maintains a changelog, update it with changes introduced in the PR.
 
 16. **Security and Compliance:**
 
     - Consider security implications in your code changes.
 
-17. **Communication:** Provide context and any relevant information in the PR description.
+17. **Communication:**
+
+    - Provide context and any relevant information in the PR description.
 
 ## License
 
