@@ -29,10 +29,13 @@ export const App = () => {
   useActivityDetector(isLocked);
 
   const handleUnlock = async () => {
-    await chrome.runtime.sendMessage({
-      action: "userDecision",
-      decision: "confirmed",
-    });
+    if (chrome.runtime) {
+      await chrome.runtime.sendMessage({
+        action: "userDecision",
+        decision: "confirmed",
+      });
+    }
+
     setIsLocked(false);
   };
 

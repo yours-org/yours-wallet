@@ -2,6 +2,7 @@ import styled from "styled-components";
 import { useBottomMenu } from "../hooks/useBottomMenu";
 import { useEffect, useState } from "react";
 import { Button } from "../components/Button";
+import oneSatLogo from "../assets/1sat-logo.svg";
 import {
   ButtonContainer,
   ConfirmContent,
@@ -39,6 +40,21 @@ const Ordinal = styled.div<{ url: string; selected?: boolean }>`
   cursor: pointer;
   border: ${(props) =>
     props.selected ? `0.3rem solid ${colors.seaFoam}` : undefined};
+`;
+
+const NoInscriptionWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8rem;
+  width: 100%;
+`;
+
+const OneSatLogo = styled.img`
+  width: 3rem;
+  height: 3rem;
+  margin: 0 0 1rem 0;
 `;
 
 type PageState = "main" | "receive" | "transfer";
@@ -135,15 +151,17 @@ export const OrdWallet = () => {
       <Show
         when={ordinals.length > 0}
         whenFalseContent={
-          <Text
-            style={{
-              marginTop: "11rem",
-              color: colors.white,
-              fontSize: "1rem",
-            }}
-          >
-            You have no 1Sat Ordinals. NGMI 😬
-          </Text>
+          <NoInscriptionWrapper>
+            <OneSatLogo src={oneSatLogo} />
+            <Text
+              style={{
+                color: colors.white,
+                fontSize: "1rem",
+              }}
+            >
+              You have no 1Sat Ordinals. NGMI 😬
+            </Text>
+          </NoInscriptionWrapper>
         }
       >
         <OrdinalsList>

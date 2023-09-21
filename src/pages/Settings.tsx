@@ -31,7 +31,7 @@ export const Settings = () => {
 
   const handleSignOut = async () => {
     await storage.clear();
-    window.location.href = "/";
+    window.location.reload();
   };
 
   const handleCancel = () => {

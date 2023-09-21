@@ -4,8 +4,10 @@ console.log("I am a background script!");
 
 let responseCallbackForConnectRequest; // Store the callback to respond later
 let popupWindowId = null;
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log(message);
+
   if (message.action === "connect") {
     responseCallbackForConnectRequest = sendResponse; // Store the callback for later
 
@@ -37,25 +39,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           error: "User canceled connection",
         });
       }
-      sendResponse(responseCallbackForConnectRequest);
       responseCallbackForConnectRequest = null; // Reset callback
+      popupWindowId = null; // Reset the stored window ID
     }
+    return true; // To indicate we've handled the decision
   } else if (message.action === "getAddress") {
     const dummyAddress = "0x1234abcd5678efgh9012ijklmnop3456";
-
     sendResponse({
       type: "getAddress",
       success: true,
       data: dummyAddress,
     });
+    return true; // Indicates that we've handled the request
   }
 });
 
 chrome.windows.onRemoved.addListener((closedWindowId) => {
   if (closedWindowId === popupWindowId) {
-    // The popup was closed. Now, send a message or take some action.
-    console.log("Popup was closed.");
-    // If needed, send a message to content scripts or other parts of your extension.
+    // The popup was closed by the user. Send a "canceled" response.
+    if (responseCallbackForConnectRequest) {
+      responseCallbackForConnectRequest({
+        type: "connect",
+        success: false,
+        error: "User closed the popup",
+      });
+      responseCallbackForConnectRequest = null; // Reset callback
+    }
     popupWindowId = null; // Reset the stored ID
   }
 });

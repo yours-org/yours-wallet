@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { storage } from "../utils/storage";
 
-const INACTIVITY_LIMIT = 0.05 * 60 * 1000; // 5 minutes
+const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes TODO: change this back
 
 export const useWalletLockState = () => {
   const [isLocked, setIsLocked] = useState<boolean>(false);

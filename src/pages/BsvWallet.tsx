@@ -94,6 +94,15 @@ export const BsvWallet = () => {
   } = useBsv();
 
   useEffect(() => {
+    if (chrome.runtime) {
+      chrome.runtime.sendMessage({
+        action: "userDecision",
+        decision: "confirmed",
+      });
+    }
+  }, []);
+
+  useEffect(() => {
     setSelected("bsv");
   }, [setSelected]);
 
