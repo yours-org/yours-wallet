@@ -19,7 +19,7 @@ The alpha version of the wallet is open and available to all users. While it has
 1. **Download:** First you will need to [Download The Current Build](https://github.com/Panda-Wallet/panda-wallet/blob/main/public/builds/panda-wallet-0.0.1.zip)
    . \*\*Always double check that you are at the official Panda Wallet github repo before downloading anything. https://github.com/Panda-Wallet/panda-wallet.
 
-   **v0.0.1 SHA256 Checksum:** For extra security you can check the checksum:
+   **v0.0.1 SHA256 Checksum:** For extra security you can check the checksum. Files can also be found in `public/builds`:
    `29eaa08e0ea88175ee88fe60dd302dbdfacd294a0462edfda98e32421f970a08`
 
 2. **Unzip:** Unzip the build zip file then head to [Chrome Extensions](chrome://extensions)
