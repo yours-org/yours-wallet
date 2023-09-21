@@ -69,8 +69,8 @@ export const RestoreWallet = () => {
   }, [hideMenu, showMenu]);
 
   const handleRestore = async (event: React.FormEvent<HTMLFormElement>) => {
-    setLoading(true);
     event.preventDefault();
+    setLoading(true);
     if (password.length < 8) {
       setLoading(false);
       addSnackbar("The password must be at least 8 characters!", "error");

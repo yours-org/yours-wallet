@@ -28,14 +28,20 @@ export const App = () => {
 
   useActivityDetector(isLocked);
 
+  const handleUnlock = async () => {
+    await chrome.runtime.sendMessage({
+      action: "userDecision",
+      decision: "confirmed",
+    });
+    setIsLocked(false);
+  };
+
   return (
     <Container>
       <SnackbarProvider>
         <Show
           when={!isLocked}
-          whenFalseContent={
-            <UnlockWallet onUnlock={() => setIsLocked(false)} />
-          }
+          whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}
         >
           <BottomMenuProvider>
             <Router>

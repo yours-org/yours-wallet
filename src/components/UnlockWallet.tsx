@@ -33,7 +33,8 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
 
   const { verifyPassword } = useKeys();
 
-  const handleUnlock = async () => {
+  const handleUnlock = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     const isVerified = await verifyPassword(password);
     if (isVerified) {
       onUnlock();

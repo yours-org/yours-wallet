@@ -80,7 +80,7 @@ export const OrdWallet = () => {
     setIsProcessing(false);
   };
 
-  const handlTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
 
@@ -215,7 +215,7 @@ export const OrdWallet = () => {
       />
       <ConfirmContent>
         <HeaderText>Transfer Ordinal</HeaderText>
-        <FormContainer noValidate onSubmit={(e) => handlTransferOrdinal(e)}>
+        <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>
           <Input
             placeholder="Receive Address"
             type="text"
