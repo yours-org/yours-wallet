@@ -192,7 +192,7 @@ export const OrdWallet = () => {
           label="Transfer"
           onClick={async () => {
             if (!selectedOrdinal) {
-              addSnackbar("You must select an ordinal to send!", "info");
+              addSnackbar("You must select an ordinal to transfer!", "info");
               return;
             }
             setPageState("transfer");
@@ -249,7 +249,7 @@ export const OrdWallet = () => {
           <Text style={{ margin: "3rem 0 1rem" }}>
             Double check details before sending.
           </Text>
-          <Button type="primary" label="Send BSV" disabled={isProcessing} />
+          <Button type="primary" label="Transfer Now" disabled={isProcessing} />
         </FormContainer>
       </ConfirmContent>
     </>
