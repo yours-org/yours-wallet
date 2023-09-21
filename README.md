@@ -1,8 +1,8 @@
 ![Example Image](/public/banner.png)
 
-# Panda Wallet | Non-Custodial Web3 Wallet For BSV
-
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+# Panda Wallet | Non-Custodial Web3 Wallet For BSV
 
 Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV) and [1Sat Ordinals](https://docs.1satordinals.com/). This wallet allows users to have full control over their funds, providing security and independence in managing their assets.
 
