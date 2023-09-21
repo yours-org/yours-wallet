@@ -1,4 +1,4 @@
-![Example Image](/public/logo192.png)
+![Example Image](/public/banner.png)
 
 # Panda Wallet | Non-Custodial Web3 Wallet For BSV
 
