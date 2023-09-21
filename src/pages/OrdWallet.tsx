@@ -85,9 +85,11 @@ export const OrdWallet = () => {
   useEffect(() => {
     if (!successTxId) return;
     if (!message && ordAddress) {
+      resetSendState();
       setPageState("main");
       getOrdinals();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, getOrdinals, ordAddress]);
 
   const resetSendState = () => {

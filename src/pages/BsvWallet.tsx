@@ -110,9 +110,11 @@ export const BsvWallet = () => {
   useEffect(() => {
     if (!successTxId) return;
     if (!message && bsvAddress) {
+      resetSendState();
       setPageState("main");
       getBsvBalance(bsvAddress);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, getBsvBalance, bsvAddress]);
 
   const resetSendState = () => {
