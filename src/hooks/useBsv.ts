@@ -29,7 +29,7 @@ export const useBsv = () => {
         return { error: "invalid-password" };
       }
       const feeSats = 20;
-      const keys = await retrieveKeys();
+      const keys = await retrieveKeys(password);
       const paymentPk = bsv.PrivateKey.fromWIF(keys.walletWif);
       const fromAddress = paymentPk.toAddress().toString();
 
@@ -44,11 +44,13 @@ export const useBsv = () => {
       const satsOut = sendAll ? totalSats - feeSats : amount;
       const inputs = getInputs(utxos, satsOut);
 
+      const totalInputSats = inputs.reduce((a, item) => a + item.satoshis, 0);
+
       // Build tx
       const bsvTx = bsv.Transaction().from(inputs);
       bsvTx.to(toAddress, satsOut);
       if (!sendAll) {
-        const change = totalSats - satsOut - feeSats;
+        const change = totalInputSats - satsOut - feeSats;
         bsvTx.to(fromAddress, change);
       }
 
