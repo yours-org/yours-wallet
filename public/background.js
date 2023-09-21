@@ -1,6 +1,6 @@
 /* global chrome */
 
-console.log("I am a background script!");
+console.log("Panda background script running!");
 
 let responseCallbackForConnectRequest; // Store the callback to respond later
 let popupWindowId = null;

@@ -15,7 +15,6 @@ document.addEventListener("PandaRequest", (e) => {
 });
 
 const responseCallback = (response) => {
-  console.log(response); //TODO: Remove this
   const responseEvent = new CustomEvent("PandaResponse", { detail: response });
   document.dispatchEvent(responseEvent);
 };

@@ -30,6 +30,7 @@ const GithubIcon = styled.img`
   height: 1.5rem;
   position: absolute;
   bottom: 1.5rem;
+  cursor: pointer;
 `;
 
 export const Start = () => {
