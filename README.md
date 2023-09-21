@@ -6,11 +6,11 @@ Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV
 
 ## Features
 
-- **Non-Custodial:** Your private keys are encrypted and stored locally on your device, ensuring complete control over your funds.
-- **User-Friendly:** A user-friendly interface makes asset management a breeze.
-- **BSV Support:** Receive and Send BSV payments.
-- **1Sat Ordinals:** Full support for sending and transferring 1Sat Ordinals.
-- **Secure:** Open Source and audited by the community.
+🔑 **Non-Custodial:** Your private keys are encrypted and stored locally on your device, ensuring complete control over your funds.
+😎 **User-Friendly:** A user-friendly interface makes asset management a breeze.
+✅ **BSV Support:** Receive and Send BSV payments.
+🟡 **1Sat Ordinals:** Full support for sending and transferring 1Sat Ordinals.
+🔐 **Secure:** Open Source and audited by the community.
 
 ## Getting Started (Alpha)
 
