@@ -153,14 +153,14 @@ export const CreateWallet = (props: CreateWalletProps) => {
         <SeedContainer>
           <Column>
             {seedWords.slice(0, 6).map((word, index) => (
-              <SeedPill key={index}>
+              <SeedPill theme={theme} key={index}>
                 {index + 1}. {word}
               </SeedPill>
             ))}
           </Column>
           <Column>
             {seedWords.slice(6).map((word, index) => (
-              <SeedPill key={index + 6}>
+              <SeedPill theme={theme} key={index + 6}>
                 {index + 7}. {word}
               </SeedPill>
             ))}

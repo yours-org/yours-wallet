@@ -21,9 +21,9 @@ const shakeAnimation = keyframes`
 `;
 
 const TheInput = styled.input<{ theme: Theme; shake?: string }>`
-  background-color: ${({ theme }) => theme.darkAccent};
+  background-color: ${({ theme }) => theme.darkAccent + "60"};
   border-radius: 0.25rem;
-  border: 1px solid ${({ theme }) => theme.white + "50"};
+  border: 1px solid ${({ theme }) => theme.white + "40"};
   width: 80%;
   height: 2rem;
   padding-left: 0.5rem;

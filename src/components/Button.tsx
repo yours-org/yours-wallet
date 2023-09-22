@@ -8,7 +8,7 @@ const Primary = styled.button<ColorThemeProps>`
   width: 80%;
   height: 2.5rem;
   background-color: ${({ theme }) => theme.primaryButton};
-  color: ${({ theme }) => theme.darkAccent};
+  color: ${({ theme }) => theme.mainBackground};
   border: none;
   border-radius: 0.35rem;
   font-family: Arial, Helvetica, sans-serif;
