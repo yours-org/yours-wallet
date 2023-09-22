@@ -1,12 +1,14 @@
 import styled from "styled-components";
 import { Text } from "./Reusable";
 import { SnackbarType } from "../contexts/SnackbarContext";
-import { colors } from "../colors";
+import { ColorThemeProps, Theme } from "../theme";
 import errorIcon from "../assets/error.svg";
 import infoIcon from "../assets/info.svg";
 import successIcon from "../assets/success.svg";
 
-export const SnackBarContainer = styled.div<{ color?: string }>`
+type SnackBarColorTheme = ColorThemeProps & { color: string };
+
+export const SnackBarContainer = styled.div<SnackBarColorTheme>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -16,8 +18,8 @@ export const SnackBarContainer = styled.div<{ color?: string }>`
   height: 100%;
   position: absolute;
   margin: 0;
-  background-color: ${(props) => props.color};
-  color: ${colors.white};
+  background-color: ${({ color }) => color};
+  color: ${({ theme }) => theme.white};
   z-index: 100;
 `;
 
@@ -32,18 +34,19 @@ export type SnackbarProps = {
   message: string;
   /** The type of snackbar. success | error | info */
   type: SnackbarType | null;
+  theme: Theme;
 };
 
 export const Snackbar = (props: SnackbarProps) => {
-  const { message, type } = props;
+  const { message, type, theme } = props;
   return (
     <SnackBarContainer
       color={
         type === "error"
-          ? colors.red
+          ? theme.errorRed
           : type === "info"
-          ? colors.seaFoam
-          : colors.lime
+          ? theme.lightAccent
+          : theme.primaryButton
       }
     >
       <Image
@@ -56,11 +59,12 @@ export const Snackbar = (props: SnackbarProps) => {
         }
       />
       <Text
+        theme={theme}
         style={{
           margin: 0,
           fontWeight: 500,
           fontSize: "1.25rem",
-          color: type === "error" ? colors.white : colors.darkNavy,
+          color: type === "error" ? theme.white : theme.darkAccent,
         }}
       >
         {message}

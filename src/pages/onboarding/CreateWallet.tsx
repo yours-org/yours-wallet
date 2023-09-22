@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { colors } from "../../colors";
+import { ColorThemeProps, Theme } from "../../theme";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useSnackbar } from "../../hooks/useSnackbar";
@@ -44,19 +44,24 @@ const Column = styled.div`
   flex-direction: column;
 `;
 
-const SeedPill = styled.div`
+const SeedPill = styled.div<ColorThemeProps>`
   display: flex;
   align-items: center;
-  background-color: ${colors.darkNavy};
+  background-color: ${({ theme }) => theme.darkAccent};
   padding: 0.1rem 0 0.1rem 1rem;
   border-radius: 1rem;
-  color: ${colors.white};
+  color: ${({ theme }) => theme.white};
   font-size: 0.85rem;
   margin: 0.25rem;
   width: 6rem;
 `;
 
-export const CreateWallet = () => {
+export type CreateWalletProps = {
+  theme: Theme;
+};
+
+export const CreateWallet = (props: CreateWalletProps) => {
+  const { theme } = props;
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -112,23 +117,25 @@ export const CreateWallet = () => {
     <>
       <BackButton onClick={() => navigate("/")} />
       <Content>
-        <HeaderText>Create a password</HeaderText>
-        <Text>This is used to unlock your wallet.</Text>
+        <HeaderText theme={theme}>Create a password</HeaderText>
+        <Text theme={theme}>This is used to unlock your wallet.</Text>
         <FormContainer onSubmit={handleKeyGeneration}>
           <Input
+            theme={theme}
             placeholder="Password"
             type="password"
             onChange={(e) => setPassword(e.target.value)}
           />
           <Input
+            theme={theme}
             placeholder="Confirm Password"
             type="password"
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
-          <Text style={{ margin: "3rem 0 1rem" }}>
+          <Text theme={theme} style={{ margin: "3rem 0 1rem" }}>
             Make sure you are in a safe place and no one is watching.
           </Text>
-          <Button type="primary" label="Generate Seed" />
+          <Button theme={theme} type="primary" label="Generate Seed" />
         </FormContainer>
       </Content>
     </>
@@ -138,8 +145,8 @@ export const CreateWallet = () => {
     <>
       <BackButton onClick={() => setStep(1)} />
       <Content>
-        <HeaderText>Your recovery phrase</HeaderText>
-        <Text style={{ marginBottom: "1rem" }}>
+        <HeaderText theme={theme}>Your recovery phrase</HeaderText>
+        <Text theme={theme} style={{ marginBottom: "1rem" }}>
           Safely store your seed phrase. This is the only way you can recover
           your account.
         </Text>
@@ -160,11 +167,13 @@ export const CreateWallet = () => {
           </Column>
         </SeedContainer>
         <Button
+          theme={theme}
           type="secondary"
           label="Copy to clipboard"
           onClick={handleCopyToClipboard}
         />
         <Button
+          theme={theme}
           type="primary"
           label="Next"
           onClick={() => {
@@ -180,11 +189,12 @@ export const CreateWallet = () => {
     <>
       <Content>
         <PandaHead />
-        <HeaderText>Success!</HeaderText>
-        <Text style={{ marginBottom: "1rem" }}>
+        <HeaderText theme={theme}>Success!</HeaderText>
+        <Text theme={theme} style={{ marginBottom: "1rem" }}>
           Your Panda Wallet is ready to go.
         </Text>
         <Button
+          theme={theme}
           type="primary"
           label="Enter"
           onClick={() => navigate("/bsv-wallet")}
@@ -196,7 +206,7 @@ export const CreateWallet = () => {
   return (
     <>
       <Show when={loading}>
-        <PageLoader message="Generating keys..." />
+        <PageLoader theme={theme} message="Generating keys..." />
       </Show>
       <Show when={!loading && step === 1}>{passwordStep}</Show>
       <Show when={!loading && step === 2}>{copySeedStep}</Show>

@@ -1,18 +1,18 @@
 import styled from "styled-components";
-import { colors } from "../colors";
+import { ColorThemeProps } from "../theme";
 
-export const HeaderText = styled.h1`
+export const HeaderText = styled.h1<ColorThemeProps>`
   font-size: 1.75rem;
-  color: ${colors.white};
+  color: ${({ theme }) => theme.white};
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 600;
   margin: 0.25rem 0;
   text-align: center;
 `;
 
-export const Text = styled.p`
+export const Text = styled.p<ColorThemeProps>`
   font-size: 0.9rem;
-  color: ${colors.white + "90"};
+  color: ${({ theme }) => theme.white + "90"};
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 400;
   margin: 0.5rem 0 2rem 0;

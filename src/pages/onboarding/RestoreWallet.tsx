@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { colors } from "../../colors";
+import { ColorThemeProps, Theme } from "../../theme";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useSnackbar } from "../../hooks/useSnackbar";
@@ -32,24 +32,29 @@ const FormContainer = styled.form`
   background: none;
 `;
 
-const SeedInput = styled.textarea`
-  background-color: ${colors.darkNavy};
+const SeedInput = styled.textarea<ColorThemeProps>`
+  background-color: ${({ theme }) => theme.darkAccent};
   border-radius: 0.25rem;
-  border: 1px solid ${colors.white + "50"};
+  border: 1px solid ${({ theme }) => theme.white + "50"};
   width: 80%;
   height: 7rem;
   padding: 1rem;
   margin: 0.5rem;
   outline: none;
-  color: ${colors.white + "80"};
+  color: ${({ theme }) => theme.white + "80"};
   resize: none;
 
   &::placeholder {
-    color: ${colors.white + "80"};
+    color: ${({ theme }) => theme.white + "80"};
   }
 `;
 
-export const RestoreWallet = () => {
+export type RestoreWalletProps = {
+  theme: Theme;
+};
+
+export const RestoreWallet = (props: RestoreWalletProps) => {
+  const { theme } = props;
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -100,21 +105,23 @@ export const RestoreWallet = () => {
     <>
       <BackButton onClick={() => navigate("/")} />
       <Content>
-        <HeaderText>Create a password</HeaderText>
-        <Text>This is used to unlock your wallet.</Text>
+        <HeaderText theme={theme}>Create a password</HeaderText>
+        <Text theme={theme}>This is used to unlock your wallet.</Text>
         <FormContainer onSubmit={handleRestore}>
           <Input
+            theme={theme}
             placeholder="Password"
             type="password"
             onChange={(e) => setPassword(e.target.value)}
           />
           <Input
+            theme={theme}
             placeholder="Confirm Password"
             type="password"
             onChange={(e) => setPasswordConfirm(e.target.value)}
             style={{ marginBottom: "2rem" }}
           />
-          <Button type="primary" label="Finish" />
+          <Button theme={theme} type="primary" label="Finish" />
         </FormContainer>
       </Content>
     </>
@@ -124,19 +131,20 @@ export const RestoreWallet = () => {
     <>
       <BackButton onClick={() => navigate("/")} />
       <Content>
-        <HeaderText>Restore a wallet</HeaderText>
-        <Text>
+        <HeaderText theme={theme}>Restore a wallet</HeaderText>
+        <Text theme={theme}>
           Only input a seed phrase previously generated from Panda Wallet.
         </Text>
         <FormContainer onSubmit={() => setStep(2)}>
           <SeedInput
+            theme={theme}
             placeholder="Enter secret recovery words"
             onChange={(e) => setSeedWords(e.target.value)}
           />
-          <Text style={{ margin: "3rem 0 1rem" }}>
+          <Text theme={theme} style={{ margin: "3rem 0 1rem" }}>
             Make sure you are in a safe place and no one is watching.
           </Text>
-          <Button type="primary" label="Next" />
+          <Button theme={theme} type="primary" label="Next" />
         </FormContainer>
       </Content>
     </>
@@ -146,11 +154,12 @@ export const RestoreWallet = () => {
     <>
       <Content>
         <PandaHead />
-        <HeaderText>Success!</HeaderText>
-        <Text style={{ marginBottom: "1rem" }}>
+        <HeaderText theme={theme}>Success!</HeaderText>
+        <Text theme={theme} style={{ marginBottom: "1rem" }}>
           Your Panda Wallet has been restored.
         </Text>
         <Button
+          theme={theme}
           type="primary"
           label="Enter"
           onClick={() => navigate("/bsv-wallet")}
@@ -162,7 +171,7 @@ export const RestoreWallet = () => {
   return (
     <>
       <Show when={loading}>
-        <PageLoader message="Restoring Wallet..." />
+        <PageLoader theme={theme} message="Restoring Wallet..." />
       </Show>
       <Show when={!loading && step === 1}>{enterSeedStep}</Show>
       <Show when={!loading && step === 2}>{passwordStep}</Show>

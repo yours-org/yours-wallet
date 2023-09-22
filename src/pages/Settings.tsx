@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { colors } from "../colors";
+import { ColorThemeProps, Theme } from "../theme";
 import { useBottomMenu } from "../hooks/useBottomMenu";
 import { Text } from "../components/Reusable";
 import { useEffect, useState } from "react";
@@ -16,16 +16,20 @@ const Content = styled.div`
   position: relative;
 `;
 
-const TitleText = styled.h1`
+const TitleText = styled.h1<ColorThemeProps>`
   font-size: 2rem;
-  color: ${colors.white};
+  color: ${({ theme }) => theme.white};
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 600;
   margin: 0.25rem 0;
   text-align: center;
 `;
 
-export const Settings = () => {
+export type SettingsProps = {
+  theme: Theme;
+};
+export const Settings = (props: SettingsProps) => {
+  const { theme } = props;
   const { setSelected } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
 
@@ -48,6 +52,7 @@ export const Settings = () => {
         when={!showSpeedBump}
         whenFalseContent={
           <SpeedBump
+            theme={theme}
             message="Make sure you have your seed phrase backed up!"
             onCancel={handleCancel}
             onConfirm={handleSignOut}
@@ -55,10 +60,11 @@ export const Settings = () => {
           />
         }
       >
-        <TitleText>⚙️</TitleText>
-        <TitleText>My Settings</TitleText>
-        <Text>Page is under active development.</Text>
+        <TitleText theme={theme}>⚙️</TitleText>
+        <TitleText theme={theme}>My Settings</TitleText>
+        <Text theme={theme}>Page is under active development.</Text>
         <Button
+          theme={theme}
           label="Sign Out"
           type="warn"
           onClick={() => setShowSpeedBump(true)}

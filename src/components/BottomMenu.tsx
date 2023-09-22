@@ -1,11 +1,11 @@
 import { styled } from "styled-components";
-import { colors } from "../colors";
+import { ColorThemeProps, Theme } from "../theme";
 import coins from "../assets/coins.svg";
 import nfts from "../assets/items.svg";
 import settings from "../assets/settings.svg";
 import { MenuItems } from "../contexts/BottomMenuContext";
 
-const Container = styled.div`
+const Container = styled.div<ColorThemeProps>`
   display: flex;
   align-items: center;
   justify-content: space-evenly;
@@ -13,8 +13,8 @@ const Container = styled.div`
   height: 3.75rem;
   position: absolute;
   bottom: 0;
-  background: ${colors.darkNavy};
-  color: ${colors.white + "80"};
+  background: ${({ theme }) => theme.darkAccent};
+  color: ${({ theme }) => theme.white + "80"};
 `;
 
 const Icon = styled.img<{ opacity: number }>`
@@ -28,13 +28,14 @@ const Icon = styled.img<{ opacity: number }>`
 export type BottomMenuProps = {
   selected: MenuItems | null;
   handleSelect: (item: MenuItems) => void;
+  theme: Theme;
 };
 
 export const BottomMenu = (props: BottomMenuProps) => {
-  const { selected, handleSelect } = props;
+  const { selected, handleSelect, theme } = props;
 
   return (
-    <Container>
+    <Container theme={theme}>
       <Icon
         src={coins}
         onClick={() => handleSelect("bsv")}

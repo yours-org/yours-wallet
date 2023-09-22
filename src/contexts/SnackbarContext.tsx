@@ -1,5 +1,6 @@
 import { ReactNode, createContext, useState } from "react";
 import { Snackbar } from "../components/Snackbar";
+import { Theme } from "../theme";
 
 export type SnackbarType = "error" | "info" | "success";
 
@@ -13,10 +14,11 @@ export const SnackbarContext = createContext<SnackbarContextType | null>(null);
 
 type SnackbarProviderProps = {
   children: ReactNode;
+  theme: Theme;
 };
 
 export const SnackbarProvider = (props: SnackbarProviderProps) => {
-  const { children } = props;
+  const { children, theme } = props;
   const [message, setMessage] = useState<string | null>(null);
   const [snackBarType, setSnackBarType] = useState<SnackbarType | null>(null);
 
@@ -32,7 +34,9 @@ export const SnackbarProvider = (props: SnackbarProviderProps) => {
 
   return (
     <SnackbarContext.Provider value={{ message, snackBarType, addSnackbar }}>
-      {message && <Snackbar message={message} type={snackBarType} />}
+      {message && (
+        <Snackbar theme={theme} message={message} type={snackBarType} />
+      )}
       {children}
     </SnackbarContext.Provider>
   );

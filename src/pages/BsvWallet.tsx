@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { colors } from "../colors";
+import { ColorThemeProps, Theme } from "../theme";
 import { useBottomMenu } from "../hooks/useBottomMenu";
 import React, { useEffect, useState } from "react";
 import bsvCoin from "../assets/bsv-coin.svg";
@@ -26,7 +26,7 @@ import { validate } from "bitcoin-address-validation";
 import { formatUSD } from "../utils/format";
 import { sleep } from "../utils/sleep";
 
-const MiddleContainer = styled.div`
+const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -34,8 +34,8 @@ const MiddleContainer = styled.div`
   width: 80%;
   padding: 2.75rem 1rem;
   border-radius: 1rem;
-  border: 0.25rem solid ${colors.navy + "70"};
-  background-color: ${colors.darkNavy};
+  border: 0.25rem solid ${({ theme }) => theme.mainBackground + "70"};
+  background-color: ${({ theme }) => theme.darkAccent};
 `;
 
 const PandHeadContainer = styled.div`
@@ -50,9 +50,9 @@ const BalanceContainer = styled.div`
   align-items: center;
 `;
 
-const NumberWrapper = styled.span`
+const NumberWrapper = styled.span<ColorThemeProps>`
   font-size: 2.5rem;
-  color: ${colors.white};
+  color: ${({ theme }) => theme.white};
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 600;
   margin: 0.25rem 0;
@@ -63,9 +63,9 @@ const Major = styled.span`
   font-size: inherit;
 `;
 
-const Minor = styled.span`
+const Minor = styled.span<ColorThemeProps>`
   font-size: 1rem;
-  color: ${colors.white + "80"};
+  color: ${({ theme }) => theme.white + "80"};
 `;
 
 const Icon = styled.img`
@@ -76,7 +76,12 @@ const Icon = styled.img`
 
 type PageState = "main" | "receive" | "send";
 
-export const BsvWallet = () => {
+export type BsvWalletProps = {
+  theme: Theme;
+};
+
+export const BsvWallet = (props: BsvWalletProps) => {
+  const { theme } = props;
   const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>("main");
   const [satSendAmount, setSatSendAmount] = useState(0);
@@ -194,9 +199,11 @@ export const BsvWallet = () => {
     const lastThreeDecimal = rest.slice(3, 6).join("");
 
     return (
-      <NumberWrapper>
-        <Major>{`${whole}.${firstTwoDecimal}`}</Major>
-        <Minor>{` ${nextThreeDecimal} ${lastThreeDecimal}`}</Minor>
+      <NumberWrapper theme={theme}>
+        <Major theme={theme}>{`${whole}.${firstTwoDecimal}`}</Major>
+        <Minor
+          theme={theme}
+        >{` ${nextThreeDecimal} ${lastThreeDecimal}`}</Minor>
       </NumberWrapper>
     );
   };
@@ -209,12 +216,13 @@ export const BsvWallet = () => {
           getBsvBalance(bsvAddress);
         }}
       />
-      <HeaderText>Only Send BSV</HeaderText>
-      <Text style={{ marginBottom: "1rem" }}>
+      <HeaderText theme={theme}>Only Send BSV</HeaderText>
+      <Text theme={theme} style={{ marginBottom: "1rem" }}>
         Do not send ordinals to this address!
       </Text>
       <QrCode address={bsvAddress} onClick={handleCopyToClipboard} />
       <Text
+        theme={theme}
         style={{ marginTop: "1.5rem", cursor: "pointer" }}
         onClick={handleCopyToClipboard}
       >
@@ -228,22 +236,24 @@ export const BsvWallet = () => {
       <PandHeadContainer>
         <PandaHead width="1.75rem" />
       </PandHeadContainer>
-      <MiddleContainer>
+      <MiddleContainer theme={theme}>
         <BalanceContainer>
           <Icon src={bsvCoin} />
           {formatBalance(bsvBalance)}
         </BalanceContainer>
-        <Text style={{ margin: "0.5rem 0 0 0" }}>
+        <Text theme={theme} style={{ margin: "0.5rem 0 0 0" }}>
           {formatUSD(bsvBalance * exchangeRate)}
         </Text>
       </MiddleContainer>
       <ButtonContainer>
         <Button
+          theme={theme}
           type="primary"
           label="Receive"
           onClick={() => setPageState("receive")}
         />
         <Button
+          theme={theme}
           type="primary"
           label="Send"
           onClick={() => setPageState("send")}
@@ -261,19 +271,22 @@ export const BsvWallet = () => {
         }}
       />
       <ConfirmContent>
-        <HeaderText>Send BSV</HeaderText>
+        <HeaderText theme={theme}>Send BSV</HeaderText>
         <Text
+          theme={theme}
           style={{ cursor: "pointer" }}
           onClick={fillInputWithAllBsv}
         >{`Available Balance: ${bsvBalance}`}</Text>
         <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
           <Input
+            theme={theme}
             placeholder="Enter Address"
             type="text"
             onChange={(e) => setReceiveAddress(e.target.value)}
             value={receiveAddress}
           />
           <Input
+            theme={theme}
             placeholder="Enter BSV Amount"
             type="number"
             step="0.00000001"
@@ -287,14 +300,20 @@ export const BsvWallet = () => {
             }
           />
           <Input
+            theme={theme}
             placeholder="Enter Wallet Password"
             type="password"
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
-          <Text style={{ margin: "3rem 0 1rem" }}>
+          <Text theme={theme} style={{ margin: "3rem 0 1rem" }}>
             Double check details before sending.
           </Text>
-          <Button type="primary" label="Send BSV" disabled={isProcessing} />
+          <Button
+            theme={theme}
+            type="primary"
+            label="Send BSV"
+            disabled={isProcessing}
+          />
         </FormContainer>
       </ConfirmContent>
     </>
@@ -303,10 +322,10 @@ export const BsvWallet = () => {
   return (
     <>
       <Show when={isProcessing && pageState === "main"}>
-        <PageLoader message="Loading wallet..." />
+        <PageLoader theme={theme} message="Loading wallet..." />
       </Show>
       <Show when={isProcessing && pageState === "send"}>
-        <PageLoader message="Sending BSV..." />
+        <PageLoader theme={theme} message="Sending BSV..." />
       </Show>
       <Show when={!isProcessing && pageState === "main"}>{main}</Show>
       <Show when={!isProcessing && pageState === "receive"}>{receive}</Show>

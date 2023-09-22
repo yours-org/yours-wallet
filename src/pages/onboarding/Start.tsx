@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { colors } from "../../colors";
+import { ColorThemeProps, Theme } from "../../theme";
 import { Button } from "../../components/Button";
 import { PandaHead } from "../../components/PandaHead";
 import { useNavigate } from "react-router-dom";
@@ -16,9 +16,9 @@ const Content = styled.div`
   width: 100%;
 `;
 
-const TitleText = styled.h1`
+const TitleText = styled.h1<ColorThemeProps>`
   font-size: 2rem;
-  color: ${colors.white};
+  color: ${({ theme }) => theme.white};
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 600;
   margin: 0.25rem 0;
@@ -33,7 +33,12 @@ const GithubIcon = styled.img`
   cursor: pointer;
 `;
 
-export const Start = () => {
+export type StartProps = {
+  theme: Theme;
+};
+
+export const Start = (props: StartProps) => {
+  const { theme } = props;
   const navigate = useNavigate();
   const [showStart, setShowStart] = useState(false);
   const { hideMenu, showMenu } = useBottomMenu();
@@ -63,16 +68,18 @@ export const Start = () => {
       {showStart ? (
         <Content>
           <PandaHead animated />
-          <TitleText>Panda Wallet</TitleText>
-          <Text style={{ marginBottom: "3rem" }}>
+          <TitleText theme={theme}>Panda Wallet</TitleText>
+          <Text theme={theme} style={{ marginBottom: "3rem" }}>
             A non-custodial and open-source wallet for BSV and 1Sat Ordinals.
           </Text>
           <Button
+            theme={theme}
             type="primary"
             label="Create New Wallet"
             onClick={() => navigate("/create-wallet")}
           />
           <Button
+            theme={theme}
             type="secondary"
             label="Restore Wallet"
             onClick={() => navigate("/restore-wallet")}

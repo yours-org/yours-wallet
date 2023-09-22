@@ -15,7 +15,7 @@ import {
 import { useOrds } from "../hooks/useOrds";
 import { GP_BASE_URL } from "../utils/constants";
 import { Show } from "../components/Show";
-import { colors } from "../colors";
+import { ColorThemeProps, Theme } from "../theme";
 import { BackButton } from "../components/BackButton";
 import { QrCode } from "../components/QrCode";
 import { useSnackbar } from "../hooks/useSnackbar";
@@ -24,6 +24,8 @@ import validate from "bitcoin-address-validation";
 import { Input } from "../components/Input";
 import { sleep } from "../utils/sleep";
 
+type OrdinalDivProps = ColorThemeProps & { url: string; selected?: boolean };
+
 const OrdinalsList = styled.div`
   display: flex;
   align-items: center;
@@ -31,7 +33,7 @@ const OrdinalsList = styled.div`
   flex-wrap: wrap;
   overflow-y: auto;
 `;
-const Ordinal = styled.div<{ url: string; selected?: boolean }>`
+const Ordinal = styled.div<OrdinalDivProps>`
   height: 9rem;
   width: 9rem;
   background-image: url(${(props) => props.url});
@@ -40,7 +42,7 @@ const Ordinal = styled.div<{ url: string; selected?: boolean }>`
   margin: 0.5rem;
   cursor: pointer;
   border: ${(props) =>
-    props.selected ? `0.3rem solid ${colors.seaFoam}` : undefined};
+    props.selected ? `0.3rem solid ${props.theme.lightAccent}` : undefined};
 `;
 
 const NoInscriptionWrapper = styled.div`
@@ -60,7 +62,12 @@ const OneSatLogo = styled.img`
 
 type PageState = "main" | "receive" | "transfer";
 
-export const OrdWallet = () => {
+export type OrdWalletProps = {
+  theme: Theme;
+};
+
+export const OrdWallet = (props: OrdWalletProps) => {
+  const { theme } = props;
   const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>("main");
   const {
@@ -158,7 +165,7 @@ export const OrdWallet = () => {
             <OneSatLogo src={oneSatLogo} />
             <Text
               style={{
-                color: colors.white,
+                color: theme.white,
                 fontSize: "1rem",
               }}
             >
@@ -171,6 +178,7 @@ export const OrdWallet = () => {
           {ordinals.map((ord) => {
             return (
               <Ordinal
+                theme={theme}
                 key={ord.origin}
                 url={`${GP_BASE_URL}/files/inscriptions/${ord.origin}`}
                 selected={selectedOrdinal === ord.origin}
@@ -185,11 +193,13 @@ export const OrdWallet = () => {
       </Show>
       <ButtonContainer>
         <Button
+          theme={theme}
           type="primary"
           label="Receive"
           onClick={() => setPageState("receive")}
         />
         <Button
+          theme={theme}
           type="primary"
           label="Transfer"
           onClick={async () => {
@@ -212,12 +222,13 @@ export const OrdWallet = () => {
           getOrdinals();
         }}
       />
-      <HeaderText>Only Send 1Sat Ordinals</HeaderText>
-      <Text style={{ marginBottom: "1rem" }}>
+      <HeaderText theme={theme}>Only Send 1Sat Ordinals</HeaderText>
+      <Text theme={theme} style={{ marginBottom: "1rem" }}>
         Do not send BSV to this address!
       </Text>
       <QrCode address={ordAddress} onClick={handleCopyToClipboard} />
       <Text
+        theme={theme}
         style={{ marginTop: "1.5rem", cursor: "pointer" }}
         onClick={handleCopyToClipboard}
       >
@@ -235,23 +246,30 @@ export const OrdWallet = () => {
         }}
       />
       <ConfirmContent>
-        <HeaderText>Transfer Ordinal</HeaderText>
+        <HeaderText theme={theme}>Transfer Ordinal</HeaderText>
         <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>
           <Input
+            theme={theme}
             placeholder="Receive Address"
             type="text"
             onChange={(e) => setReceiveAddress(e.target.value)}
             value={receiveAddress}
           />
           <Input
+            theme={theme}
             placeholder="Password"
             type="password"
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
-          <Text style={{ margin: "3rem 0 1rem" }}>
+          <Text theme={theme} style={{ margin: "3rem 0 1rem" }}>
             Double check details before sending.
           </Text>
-          <Button type="primary" label="Transfer Now" disabled={isProcessing} />
+          <Button
+            theme={theme}
+            type="primary"
+            label="Transfer Now"
+            disabled={isProcessing}
+          />
         </FormContainer>
       </ConfirmContent>
     </>
@@ -260,10 +278,10 @@ export const OrdWallet = () => {
   return (
     <>
       <Show when={isProcessing && pageState === "main"}>
-        <PageLoader message="Loading ordinals..." />
+        <PageLoader theme={theme} message="Loading ordinals..." />
       </Show>
       <Show when={isProcessing && pageState === "transfer"}>
-        <PageLoader message="Sending Ordinal..." />
+        <PageLoader theme={theme} message="Sending Ordinal..." />
       </Show>
       <Show when={!isProcessing && pageState === "main"}>{main}</Show>
       <Show when={!isProcessing && pageState === "receive"}>{receive}</Show>

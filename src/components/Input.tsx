@@ -1,5 +1,5 @@
 import styled, { keyframes, css } from "styled-components";
-import { colors } from "../colors";
+import { Theme } from "../theme";
 import { InputHTMLAttributes } from "react";
 
 const shakeAnimation = keyframes`
@@ -20,16 +20,16 @@ const shakeAnimation = keyframes`
   }
 `;
 
-const TheInput = styled.input<{ shake?: string }>`
-  background-color: ${colors.darkNavy};
+const TheInput = styled.input<{ theme: Theme; shake?: string }>`
+  background-color: ${({ theme }) => theme.darkAccent};
   border-radius: 0.25rem;
-  border: 1px solid ${colors.white + "50"};
+  border: 1px solid ${({ theme }) => theme.white + "50"};
   width: 80%;
   height: 2rem;
   padding-left: 0.5rem;
   margin: 0.5rem;
   outline: none;
-  color: ${colors.white + "80"};
+  color: ${({ theme }) => theme.white + "80"};
   animation: ${(props) =>
     props.shake === "true"
       ? css`
@@ -48,16 +48,17 @@ const TheInput = styled.input<{ shake?: string }>`
   }
 
   &::placeholder {
-    color: ${colors.white + "80"};
+    color: ${({ theme }) => theme.white + "80"};
   }
 `;
 
 export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
+  theme: Theme;
   shake?: string;
 };
 
 export const Input = (props: InputProps) => {
-  const { shake = "false", ...allProps } = props;
+  const { shake = "false", theme, ...allProps } = props;
 
   const preventScroll = (e: any) => {
     e.target.blur();
@@ -67,5 +68,12 @@ export const Input = (props: InputProps) => {
     }, 0);
   };
 
-  return <TheInput {...allProps} onWheel={preventScroll} shake={shake} />;
+  return (
+    <TheInput
+      {...allProps}
+      theme={theme}
+      onWheel={preventScroll}
+      shake={shake}
+    />
+  );
 };
