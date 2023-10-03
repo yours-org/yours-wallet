@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { ColorThemeProps, Theme } from "../../theme";
+import { ColorThemeProps } from "../../theme";
 import { Button } from "../../components/Button";
 import { PandaHead } from "../../components/PandaHead";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +8,7 @@ import { storage } from "../../utils/storage";
 import { useEffect, useState } from "react";
 import { useBottomMenu } from "../../hooks/useBottomMenu";
 import gihubIcon from "../../assets/github.svg";
+import { useTheme } from "../../hooks/useTheme";
 
 const Content = styled.div`
   display: flex;
@@ -33,12 +34,8 @@ const GithubIcon = styled.img`
   cursor: pointer;
 `;
 
-export type StartProps = {
-  theme: Theme;
-};
-
-export const Start = (props: StartProps) => {
-  const { theme } = props;
+export const Start = () => {
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const [showStart, setShowStart] = useState(false);
   const { hideMenu, showMenu } = useBottomMenu();

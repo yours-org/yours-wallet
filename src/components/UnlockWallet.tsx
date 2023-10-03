@@ -1,6 +1,6 @@
 import { FormContainer, HeaderText } from "./Reusable";
 import { Button } from "./Button";
-import { ColorThemeProps, Theme } from "../theme";
+import { ColorThemeProps } from "../theme";
 import { styled } from "styled-components";
 import { Input } from "./Input";
 import { useState } from "react";
@@ -8,6 +8,7 @@ import { useKeys } from "../hooks/useKeys";
 import { storage } from "../utils/storage";
 import { PandaHead } from "./PandaHead";
 import { sleep } from "../utils/sleep";
+import { useTheme } from "../hooks/useTheme";
 
 const Container = styled.div<ColorThemeProps>`
   display: flex;
@@ -24,12 +25,12 @@ const Container = styled.div<ColorThemeProps>`
 `;
 
 export type UnlockWalletProps = {
-  theme: Theme;
   onUnlock: () => void;
 };
 
 export const UnlockWallet = (props: UnlockWalletProps) => {
-  const { onUnlock, theme } = props;
+  const { onUnlock } = props;
+  const { theme } = useTheme();
   const [password, setPassword] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
@@ -42,11 +43,11 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
     await sleep(25);
     const isVerified = await verifyPassword(password);
     if (isVerified) {
-      onUnlock();
       setVerificationFailed(false);
       const timestamp = Date.now();
       storage.set({ lastActiveTime: timestamp });
       setIsProcessing(false);
+      onUnlock();
     } else {
       setVerificationFailed(true);
       setPassword("");

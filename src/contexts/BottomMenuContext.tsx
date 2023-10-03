@@ -1,6 +1,6 @@
 import { ReactNode, createContext, useState } from "react";
 import { BottomMenu } from "../components/BottomMenu";
-import { Theme } from "../theme";
+import { useTheme } from "../hooks/useTheme";
 
 export type MenuItems = "bsv" | "ords" | "settings";
 
@@ -19,11 +19,11 @@ export const BottomMenuContext = createContext<BottomMenuContextType | null>(
 
 type BottomMenuProviderProps = {
   children: ReactNode;
-  theme: Theme;
 };
 
 export const BottomMenuProvider = (props: BottomMenuProviderProps) => {
-  const { children, theme } = props;
+  const { children } = props;
+  const { theme } = useTheme();
   const [selected, setSelected] = useState<MenuItems | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 

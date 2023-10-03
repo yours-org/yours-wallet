@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { ColorThemeProps, Theme } from "../../theme";
+import { ColorThemeProps } from "../../theme";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useSnackbar } from "../../hooks/useSnackbar";
@@ -13,6 +13,7 @@ import { useBottomMenu } from "../../hooks/useBottomMenu";
 import { PageLoader } from "../../components/PageLoader";
 import { Show } from "../../components/Show";
 import { sleep } from "../../utils/sleep";
+import { useTheme } from "../../hooks/useTheme";
 
 const Content = styled.div`
   display: flex;
@@ -49,12 +50,8 @@ const SeedInput = styled.textarea<ColorThemeProps>`
   }
 `;
 
-export type RestoreWalletProps = {
-  theme: Theme;
-};
-
-export const RestoreWallet = (props: RestoreWalletProps) => {
-  const { theme } = props;
+export const RestoreWallet = () => {
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");

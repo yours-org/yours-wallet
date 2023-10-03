@@ -1,6 +1,6 @@
 import { ReactNode, createContext, useState } from "react";
 import { Snackbar } from "../components/Snackbar";
-import { Theme } from "../theme";
+import { useTheme } from "../hooks/useTheme";
 
 export type SnackbarType = "error" | "info" | "success";
 
@@ -14,11 +14,11 @@ export const SnackbarContext = createContext<SnackbarContextType | null>(null);
 
 type SnackbarProviderProps = {
   children: ReactNode;
-  theme: Theme;
 };
 
 export const SnackbarProvider = (props: SnackbarProviderProps) => {
-  const { children, theme } = props;
+  const { children } = props;
+  const { theme } = useTheme();
   const [message, setMessage] = useState<string | null>(null);
   const [snackBarType, setSnackBarType] = useState<SnackbarType | null>(null);
 

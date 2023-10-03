@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { ColorThemeProps, Theme } from "../theme";
+import { ColorThemeProps } from "../theme";
 import { useBottomMenu } from "../hooks/useBottomMenu";
 import React, { useEffect, useState } from "react";
 import bsvCoin from "../assets/bsv-coin.svg";
@@ -25,6 +25,7 @@ import { BSV_DECIMAL_CONVERSION } from "../utils/constants";
 import { validate } from "bitcoin-address-validation";
 import { formatUSD } from "../utils/format";
 import { sleep } from "../utils/sleep";
+import { useTheme } from "../hooks/useTheme";
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -76,12 +77,8 @@ const Icon = styled.img`
 
 type PageState = "main" | "receive" | "send";
 
-export type BsvWalletProps = {
-  theme: Theme;
-};
-
-export const BsvWallet = (props: BsvWalletProps) => {
-  const { theme } = props;
+export const BsvWallet = () => {
+  const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>("main");
   const [satSendAmount, setSatSendAmount] = useState(0);

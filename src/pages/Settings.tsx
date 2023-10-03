@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { ColorThemeProps, Theme } from "../theme";
+import { ColorThemeProps } from "../theme";
 import { useBottomMenu } from "../hooks/useBottomMenu";
 import { Text } from "../components/Reusable";
 import { useEffect, useState } from "react";
@@ -7,6 +7,7 @@ import { Button } from "../components/Button";
 import { SpeedBump } from "../components/SpeedBump";
 import { storage } from "../utils/storage";
 import { Show } from "../components/Show";
+import { useTheme } from "../hooks/useTheme";
 
 const Content = styled.div`
   display: flex;
@@ -25,11 +26,8 @@ const TitleText = styled.h1<ColorThemeProps>`
   text-align: center;
 `;
 
-export type SettingsProps = {
-  theme: Theme;
-};
-export const Settings = (props: SettingsProps) => {
-  const { theme } = props;
+export const Settings = () => {
+  const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
 

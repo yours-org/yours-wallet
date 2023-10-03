@@ -15,7 +15,7 @@ import {
 import { useOrds } from "../hooks/useOrds";
 import { GP_BASE_URL } from "../utils/constants";
 import { Show } from "../components/Show";
-import { ColorThemeProps, Theme } from "../theme";
+import { ColorThemeProps } from "../theme";
 import { BackButton } from "../components/BackButton";
 import { QrCode } from "../components/QrCode";
 import { useSnackbar } from "../hooks/useSnackbar";
@@ -23,6 +23,7 @@ import { PageLoader } from "../components/PageLoader";
 import validate from "bitcoin-address-validation";
 import { Input } from "../components/Input";
 import { sleep } from "../utils/sleep";
+import { useTheme } from "../hooks/useTheme";
 
 type OrdinalDivProps = ColorThemeProps & { url: string; selected?: boolean };
 
@@ -62,12 +63,8 @@ const OneSatLogo = styled.img`
 
 type PageState = "main" | "receive" | "transfer";
 
-export type OrdWalletProps = {
-  theme: Theme;
-};
-
-export const OrdWallet = (props: OrdWalletProps) => {
-  const { theme } = props;
+export const OrdWallet = () => {
+  const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>("main");
   const {

@@ -13,13 +13,13 @@ export const ThemeContext = createContext<ThemeContextProps | undefined>(
 
 interface ThemeProviderProps {
   children: React.ReactNode;
-  userTheme?: Theme;
 }
 
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({
-  children,
-  userTheme,
-}) => {
+export const ThemeProvider: React.FC<ThemeProviderProps> = (
+  props: ThemeProviderProps
+) => {
+  const { children } = props;
+  const userTheme: Theme = false || defaultTheme; // TODO: In place of false, we need to call or look for a specific inscription pattern and set the user theme (just do in useEffect?)
   const [theme, setTheme] = useState<Theme>(userTheme || defaultTheme);
 
   useEffect(() => {
