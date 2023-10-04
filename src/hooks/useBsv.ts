@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useKeys } from "./useKeys";
 import * as bsv from "bsv";
 import { UTXO, useWhatsOnChain } from "./useWhatsOnChain";
-import { storage } from "../utils/storage";
 
 type SendBsvResponse = {
   txid?: string;
@@ -102,7 +101,6 @@ export const useBsv = () => {
 
   useEffect(() => {
     if (!bsvAddress) return;
-    storage.set({ appState: { bsvAddress } });
     balance();
     rate();
     // eslint-disable-next-line react-hooks/exhaustive-deps

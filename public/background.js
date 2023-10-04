@@ -3,16 +3,16 @@
 console.log("Panda Wallet Background Script Running!");
 
 let responseCallbackForConnectRequest;
-let responseCallbackForSendBsvrequest;
+let responseCallbackForSendBsvRequest;
 let responseCallbackForTransferOrdinalRequest;
 let popupWindowId = null;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log(message);
-
   switch (message.action) {
     case "connect":
       return processConnectRequest(sendResponse);
+    case "isConnected":
+      return processIsConnectedRequest(sendResponse);
     case "userDecision":
       return processUserDecision(message);
     case "getBsvAddress":
@@ -35,7 +35,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 const processConnectRequest = (sendResponse) => {
-  responseCallbackForConnectRequest = sendResponse; // Store the callback for later
+  responseCallbackForConnectRequest = sendResponse;
   chrome.windows.create(
     {
       url: chrome.runtime.getURL("index.html"),
@@ -48,90 +48,125 @@ const processConnectRequest = (sendResponse) => {
     }
   );
 
-  return true; // Indicates that we'll respond asynchronously
+  return true;
+};
+
+const processIsConnectedRequest = (sendResponse) => {
+  try {
+    const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
+    chrome.storage.local.get(["appState", "lastActiveTime"], (result) => {
+      const currentTime = Date.now();
+      const lastActiveTime = result.lastActiveTime;
+
+      sendResponse({
+        type: "isConnected",
+        success: true,
+        data:
+          !result?.appState?.isLocked &&
+          currentTime - lastActiveTime < INACTIVITY_LIMIT,
+      });
+    });
+  } catch (error) {
+    sendResponse({
+      type: "isConnected",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+
+  return true;
 };
 
 const processUserDecision = (message) => {
-  if (responseCallbackForConnectRequest) {
-    if (message.decision === "confirmed") {
+  try {
+    if (responseCallbackForConnectRequest) {
       responseCallbackForConnectRequest({
         type: "connect",
         success: true,
-        data: "User confirmed connection",
+        data:
+          message.decision === "confirmed"
+            ? "User confirmed connection!"
+            : "User canceled connection",
       });
-    } else {
-      responseCallbackForConnectRequest({
-        type: "connect",
-        success: false,
-        error: "User canceled connection",
-      });
+
+      responseCallbackForConnectRequest = null;
+      popupWindowId = null;
     }
-    responseCallbackForConnectRequest = null; // Reset callback
-    popupWindowId = null; // Reset the stored window ID
+  } catch (error) {
+    responseCallbackForConnectRequest({
+      type: "connect",
+      success: false,
+      error: JSON.stringify(error),
+    });
   }
-  return true; // To indicate we've handled the decision
+
+  return true;
 };
 
 const processGetBsvAddress = (sendResponse) => {
-  chrome.storage.local.get(["appState"], (result) => {
-    if (!result?.appState?.isLocked && result.appState.bsvAddress) {
+  try {
+    chrome.storage.local.get(["appState"], (result) => {
       sendResponse({
         type: "getBsvAddress",
         success: true,
-        data: result.appState.bsvAddress,
+        data: result?.appState?.bsvAddress,
       });
-    } else {
-      sendResponse({
-        type: "getBsvAddress",
-        success: false,
-        error: "You must connect first. Wallet locked!",
-      });
-    }
-  });
+    });
+  } catch (error) {
+    sendResponse({
+      type: "getBsvAddress",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+
   return true;
 };
 
 const processGetOrdAddress = (sendResponse) => {
-  chrome.storage.local.get(["appState"], (result) => {
-    if (!result?.appState?.isLocked && result.appState.ordAddress) {
+  try {
+    chrome.storage.local.get(["appState"], (result) => {
       sendResponse({
         type: "getOrdAddress",
         success: true,
-        data: result.appState.ordAddress,
+        data: result?.appState?.ordAddress,
       });
-    } else {
-      sendResponse({
-        type: "getOrdAddress",
-        success: false,
-        error: "You must connect first. Wallet locked!",
-      });
-    }
-  });
+    });
+  } catch (error) {
+    sendResponse({
+      type: "getOrdAddress",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+
   return true;
 };
 
 const processGetOrdinals = (sendResponse) => {
-  chrome.storage.local.get(["appState"], (result) => {
-    if (!result?.appState?.isLocked && result.appState.ordinals) {
+  try {
+    chrome.storage.local.get(["appState"], (result) => {
       sendResponse({
         type: "getOrdinals",
         success: true,
-        data: result.appState.ordinals,
+        data: result?.appState?.ordinals ?? [],
       });
-    } else {
-      sendResponse({
-        type: "getOrdinals",
-        success: false,
-        error: "You must connect first. Wallet locked!",
-      });
-    }
-  });
+    });
+  } catch (error) {
+    sendResponse({
+      type: "getOrdinals",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+
   return true;
 };
 
 const processSendBsv = (sendResponse, message) => {
-  responseCallbackForSendBsvrequest = sendResponse;
-  if (message.params) {
+  if (!message.params) throw Error("Must provide valid params!");
+  try {
+    responseCallbackForSendBsvRequest = sendResponse;
     chrome.storage.local
       .set({
         sendBsv: message.params,
@@ -149,19 +184,21 @@ const processSendBsv = (sendResponse, message) => {
           }
         );
       });
-  } else {
+  } catch (error) {
     sendResponse({
       type: "sendBsv",
       success: false,
-      error: "You must connect first. Wallet locked!",
+      error: JSON.stringify(error),
     });
   }
+
   return true;
 };
 
 const processTransferOrdinal = (sendResponse, message) => {
-  responseCallbackForTransferOrdinalRequest = sendResponse;
-  if (message.params) {
+  if (!message.params) throw Error("Must provide valid params!");
+  try {
+    responseCallbackForTransferOrdinalRequest = sendResponse;
     chrome.storage.local
       .set({
         transferOrdinal: message.params,
@@ -179,57 +216,59 @@ const processTransferOrdinal = (sendResponse, message) => {
           }
         );
       });
-  } else {
+  } catch (error) {
     sendResponse({
       type: "transferOrdinal",
       success: false,
-      error: "You must connect first. Wallet locked!",
+      error: JSON.stringify(error),
     });
   }
+
   return true;
 };
 
 const processSendBsvResult = (message) => {
-  if (responseCallbackForSendBsvrequest) {
-    if (message.txid) {
-      responseCallbackForSendBsvrequest({
-        type: "sendBsv",
-        success: true,
-        data: message.txid,
-      });
-    } else {
-      responseCallbackForSendBsvrequest({
-        type: "sendBsv",
-        success: false,
-        error: "Could not get a valid txid",
-      });
-    }
-    responseCallbackForSendBsvrequest = null; // Reset callback
-    popupWindowId = null; // Reset the stored window ID
+  if (!responseCallbackForSendBsvRequest) throw Error("Missing callback!");
+  try {
+    responseCallbackForSendBsvRequest({
+      type: "sendBsv",
+      success: true,
+      data: message?.txid,
+    });
+
+    responseCallbackForSendBsvRequest = null;
+    popupWindowId = null;
     chrome.storage.local.remove("sendBsv");
+  } catch (error) {
+    responseCallbackForSendBsvRequest({
+      type: "sendBsv",
+      success: false,
+      error: JSON.stringify(error),
+    });
   }
 
   return true;
 };
 
 const processTransferOrdinalResult = (message) => {
-  if (responseCallbackForTransferOrdinalRequest) {
-    if (message.txid) {
-      responseCallbackForTransferOrdinalRequest({
-        type: "transferOrdinal",
-        success: true,
-        data: message.txid,
-      });
-    } else {
-      responseCallbackForTransferOrdinalRequest({
-        type: "transferOrdinal",
-        success: false,
-        error: "Could not get a valid txid",
-      });
-    }
-    responseCallbackForTransferOrdinalRequest = null; // Reset callback
-    popupWindowId = null; // Reset the stored window ID
+  if (!responseCallbackForTransferOrdinalRequest)
+    throw Error("Missing callback!");
+  try {
+    responseCallbackForTransferOrdinalRequest({
+      type: "transferOrdinal",
+      success: true,
+      data: message?.txid,
+    });
+
+    responseCallbackForTransferOrdinalRequest = null;
+    popupWindowId = null;
     chrome.storage.local.remove("transferOrdinal");
+  } catch (error) {
+    responseCallbackForTransferOrdinalRequest({
+      type: "transferOrdinal",
+      success: false,
+      error: JSON.stringify(error),
+    });
   }
 
   return true;
@@ -237,35 +276,34 @@ const processTransferOrdinalResult = (message) => {
 
 chrome.windows.onRemoved.addListener((closedWindowId) => {
   if (closedWindowId === popupWindowId) {
-    // The popup was closed by the user. Send a "canceled" response.
     if (responseCallbackForConnectRequest) {
       responseCallbackForConnectRequest({
         type: "connect",
-        success: false,
-        error: "User closed the popup",
+        success: true,
+        data: "User dismissed the request!",
       });
-      responseCallbackForConnectRequest = null; // Reset callback
+      responseCallbackForConnectRequest = null;
     }
 
-    if (responseCallbackForSendBsvrequest) {
-      responseCallbackForSendBsvrequest({
+    if (responseCallbackForSendBsvRequest) {
+      responseCallbackForSendBsvRequest({
         type: "sendBsv",
-        success: false,
-        error: "Could not get a valid txid",
+        success: true,
+        data: "User dismissed the request!",
       });
-      responseCallbackForSendBsvrequest = null; // Reset callback
+      responseCallbackForSendBsvRequest = null;
       chrome.storage.local.remove("sendBsv");
     }
 
     if (responseCallbackForTransferOrdinalRequest) {
       responseCallbackForTransferOrdinalRequest({
         type: "transferOrdinal",
-        success: false,
-        error: "Could not get a valid txid",
+        success: true,
+        data: "User dismissed the request!",
       });
-      responseCallbackForTransferOrdinalRequest = null; // Reset callback
+      responseCallbackForTransferOrdinalRequest = null;
       chrome.storage.local.remove("transferOrdinal");
     }
-    popupWindowId = null; // Reset the stored ID
+    popupWindowId = null;
   }
 });

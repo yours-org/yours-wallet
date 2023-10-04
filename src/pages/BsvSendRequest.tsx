@@ -17,6 +17,34 @@ import { validate } from "bitcoin-address-validation";
 import { truncate } from "../utils/format";
 import { sleep } from "../utils/sleep";
 import { useTheme } from "../hooks/useTheme";
+import { styled } from "styled-components";
+import { ColorThemeProps } from "../theme";
+import bsvCoin from "../assets/bsv-coin.svg";
+
+const RequestDetailsContainer = styled.div<ColorThemeProps>`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-height: 10rem;
+  overflow-y: scroll;
+  background: ${({ theme }) => theme.darkAccent + "80"};
+  margin: 0.5rem;
+`;
+
+const LineItem = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0.25rem;
+  width: 60%;
+  z-index: 100;
+`;
+
+const Icon = styled.img`
+  width: 1rem;
+  height: 1rem;
+`;
 
 export type BsvSendRequestProps = {
   web3Request: Web3SendBsvRequest;
@@ -114,17 +142,15 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const web3Details = () => {
     return web3Request.map((r, i) => {
       return (
-        <>
-          <Text style={{ margin: "0.5rem" }} theme={theme}>{`${
+        <LineItem key={i}>
+          <Icon src={bsvCoin} />
+          <Text style={{ margin: 0 }} theme={theme}>{`${
             r.satAmount / BSV_DECIMAL_CONVERSION
-          } => ${truncate(r.address, 5, 5)}`}</Text>
-          <Show when={i === web3Request.length - 1}>
-            <Text style={{ margin: "0.5rem" }} theme={theme}>{`Total: ${
-              web3Request.reduce((a, item) => a + item.satAmount, 0) /
-              BSV_DECIMAL_CONVERSION
-            } BSV`}</Text>
-          </Show>
-        </>
+          }`}</Text>
+          <Text style={{ margin: 0 }} theme={theme}>
+            {truncate(r.address, 5, 5)}
+          </Text>
+        </LineItem>
       );
     });
   };
@@ -140,23 +166,26 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Text
             theme={theme}
-            style={{ cursor: "pointer" }}
+            style={{ cursor: "pointer", margin: "0.75rem 0" }}
           >{`Available Balance: ${bsvBalance}`}</Text>
           <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
-            {web3Details()}
+            <RequestDetailsContainer>{web3Details()}</RequestDetailsContainer>
             <Input
               theme={theme}
               placeholder="Enter Wallet Password"
               type="password"
               onChange={(e) => setPasswordConfirm(e.target.value)}
             />
-            <Text theme={theme} style={{ margin: "3rem 0 1rem" }}>
+            <Text theme={theme} style={{ margin: "1rem" }}>
               Double check details before sending.
             </Text>
             <Button
               theme={theme}
               type="primary"
-              label={"Approve"}
+              label={`Approve ${
+                web3Request.reduce((a, item) => a + item.satAmount, 0) /
+                BSV_DECIMAL_CONVERSION
+              } BSV`}
               disabled={isProcessing}
             />
           </FormContainer>

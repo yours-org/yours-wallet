@@ -1,7 +1,6 @@
 import React, { createContext, useState, useEffect, FC } from "react";
 import { storage } from "../utils/storage";
-
-const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
+import { INACTIVITY_LIMIT } from "../utils/constants";
 
 export interface WalletLockContextProps {
   isLocked: boolean;
@@ -26,6 +25,7 @@ export const WalletLockProvider: FC<WalletLockProviderProps> = (
     const timestamp = Date.now();
     const twentyMinutesAgo = timestamp - 20 * 60 * 1000;
     storage.set({ lastActiveTime: twentyMinutesAgo });
+    storage.remove("appState");
     setIsLocked(true);
   };
 
@@ -42,6 +42,7 @@ export const WalletLockProvider: FC<WalletLockProviderProps> = (
 
         if (currentTime - lastActiveTime > INACTIVITY_LIMIT) {
           setIsLocked(true);
+          storage.remove("appState");
         } else {
           setIsLocked(false);
         }

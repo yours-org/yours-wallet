@@ -27,6 +27,7 @@ const createPandaMethod = (type) => {
 
 window.panda = {
   connect: createPandaMethod("connect"),
+  isConnected: createPandaMethod("isConnected"),
   getBsvAddress: createPandaMethod("getBsvAddress"),
   getOrdAddress: createPandaMethod("getOrdAddress"),
   getOrdinals: createPandaMethod("getOrdinals"),
