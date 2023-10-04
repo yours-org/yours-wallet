@@ -69,9 +69,9 @@ const Minor = styled.span<ColorThemeProps>`
   color: ${({ theme }) => theme.white + "80"};
 `;
 
-const Icon = styled.img`
-  width: 1.5rem;
-  height: 1.5rem;
+const Icon = styled.img<{ size?: string }>`
+  width: ${(props) => props.size ?? "1.5rem"};
+  height: ${(props) => props.size ?? "1.5rem"};
   margin: 0 0.5rem 0 0;
 `;
 
@@ -204,7 +204,10 @@ export const BsvWallet = () => {
           getBsvBalance(bsvAddress);
         }}
       />
-      <HeaderText theme={theme}>Only Send BSV</HeaderText>
+      <Icon size={"2.5rem"} src={bsvCoin} />
+      <HeaderText style={{ marginTop: "1rem" }} theme={theme}>
+        Only Send BSV
+      </HeaderText>
       <Text theme={theme} style={{ marginBottom: "1rem" }}>
         Do not send ordinals to this address!
       </Text>

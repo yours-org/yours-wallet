@@ -61,6 +61,12 @@ const OneSatLogo = styled.img`
   margin: 0 0 1rem 0;
 `;
 
+const Icon = styled.img<{ size?: string }>`
+  width: ${(props) => props.size ?? "1.5rem"};
+  height: ${(props) => props.size ?? "1.5rem"};
+  margin: 0 0.5rem 0 0;
+`;
+
 type PageState = "main" | "receive" | "transfer";
 
 export const OrdWallet = () => {
@@ -219,7 +225,10 @@ export const OrdWallet = () => {
           getOrdinals();
         }}
       />
-      <HeaderText theme={theme}>Only Send 1Sat Ordinals</HeaderText>
+      <Icon size={"2.5rem"} src={oneSatLogo} />
+      <HeaderText style={{ marginTop: "1rem" }} theme={theme}>
+        Only Send 1Sat Ordinals
+      </HeaderText>
       <Text theme={theme} style={{ marginBottom: "1rem" }}>
         Do not send BSV to this address!
       </Text>
