@@ -47,7 +47,7 @@ export const useBsv = () => {
 
       const sendAll = totalSats === amount;
       const satsOut = sendAll ? totalSats - feeSats : amount;
-      const inputs = getInputs(utxos, satsOut);
+      const inputs = getInputs(utxos, satsOut, sendAll);
 
       const totalInputSats = inputs.reduce((a, item) => a + item.satoshis, 0);
 
@@ -75,12 +75,13 @@ export const useBsv = () => {
     }
   };
 
-  const getInputs = (utxos: UTXO[], satsOut: number) => {
+  const getInputs = (utxos: UTXO[], satsOut: number, isSendAll: boolean) => {
+    if (isSendAll) return utxos;
     let sum = 0;
     let index = 0;
     let inputs: UTXO[] = [];
 
-    while (sum < satsOut) {
+    while (sum <= satsOut) {
       const utxo = utxos[index];
       sum += utxo.satoshis;
       inputs.push(utxo);

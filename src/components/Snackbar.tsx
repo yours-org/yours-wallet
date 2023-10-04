@@ -20,7 +20,7 @@ export const SnackBarContainer = styled.div<SnackBarColorTheme>`
   margin: 0;
   background-color: ${({ color }) => color};
   color: ${({ theme }) => theme.white};
-  z-index: 100;
+  z-index: 200;
 `;
 
 const Image = styled.img`
