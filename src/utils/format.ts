@@ -13,3 +13,19 @@ export const toHex = (asciiStr: string) => {
   }
   return arr1.join("");
 };
+
+export const truncate = (
+  str: string,
+  startLength: number,
+  endLength: number
+) => {
+  if (typeof str !== "string") {
+    throw new Error("Expected a string");
+  }
+  if (str.length <= startLength + endLength) {
+    return str; // No need to truncate
+  }
+  const startStr = str.substring(0, startLength);
+  const endStr = str.substring(str.length - endLength);
+  return `${startStr}...${endStr}`;
+};

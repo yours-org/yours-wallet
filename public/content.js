@@ -7,11 +7,10 @@ script.src = chrome.runtime.getURL("inject.js");
 (document.head || document.documentElement).appendChild(script);
 
 document.addEventListener("PandaRequest", (e) => {
-  if (e.detail.type === "connect") {
-    chrome.runtime.sendMessage({ action: "connect" }, responseCallback);
-  } else if (e.detail.type === "getAddress") {
-    chrome.runtime.sendMessage({ action: "getAddress" }, responseCallback);
-  }
+  if (!e?.detail?.type) return;
+  const { type, params } = e.detail;
+  // one of type: connect, getBsvAddress, getOrdAddress
+  chrome.runtime.sendMessage({ action: type, params }, responseCallback);
 });
 
 const responseCallback = (response) => {

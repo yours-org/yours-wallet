@@ -6,6 +6,7 @@ import { UTXO, useWhatsOnChain } from "./useWhatsOnChain";
 import { Transaction, Script, PrivateKey } from "bsv";
 import { sendOrdinal } from "../utils/js-1sat-ord";
 import { Keys } from "../utils/keys";
+import { storage } from "../utils/storage";
 
 type OrdinalResponse = {
   id: number;
@@ -104,6 +105,12 @@ type GPInscription = {
   MAP: any;
 };
 
+export type Web3TransferOrdinalRequest = {
+  address: string;
+  origin: string;
+  outpoint: string;
+};
+
 export const useOrds = () => {
   const { ordAddress, retrieveKeys, verifyPassword } = useKeys();
   const { getUxos, getRawTxById, broadcastRawTx } = useWhatsOnChain();
@@ -130,6 +137,7 @@ export const useOrds = () => {
   useEffect(() => {
     if (!ordAddress) return;
     getOrdinals();
+    storage.set({ appState: { ordAddress } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ordAddress]);
 

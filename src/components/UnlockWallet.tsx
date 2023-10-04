@@ -46,7 +46,6 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       setVerificationFailed(false);
       const timestamp = Date.now();
       storage.set({ lastActiveTime: timestamp });
-      setIsProcessing(false);
       onUnlock();
     } else {
       setVerificationFailed(true);

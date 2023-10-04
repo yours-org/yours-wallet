@@ -8,6 +8,7 @@ import { SpeedBump } from "../components/SpeedBump";
 import { storage } from "../utils/storage";
 import { Show } from "../components/Show";
 import { useTheme } from "../hooks/useTheme";
+import { useWalletLockState } from "../hooks/useWalletLockState";
 
 const Content = styled.div`
   display: flex;
@@ -29,6 +30,7 @@ const TitleText = styled.h1<ColorThemeProps>`
 export const Settings = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
+  const { lockWallet } = useWalletLockState();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
 
   const handleSignOut = async () => {
@@ -66,6 +68,12 @@ export const Settings = () => {
           label="Sign Out"
           type="warn"
           onClick={() => setShowSpeedBump(true)}
+        />
+        <Button
+          theme={theme}
+          label="Lock Wallet"
+          type="secondary"
+          onClick={lockWallet}
         />
       </Show>
     </Content>

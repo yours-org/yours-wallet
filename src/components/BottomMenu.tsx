@@ -15,6 +15,7 @@ const Container = styled.div<ColorThemeProps>`
   bottom: 0;
   background: ${({ theme }) => theme.darkAccent};
   color: ${({ theme }) => theme.white + "80"};
+  z-index: 100;
 `;
 
 const Icon = styled.img<{ opacity: number }>`

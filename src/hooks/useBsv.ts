@@ -2,11 +2,17 @@ import { useEffect, useState } from "react";
 import { useKeys } from "./useKeys";
 import * as bsv from "bsv";
 import { UTXO, useWhatsOnChain } from "./useWhatsOnChain";
+import { storage } from "../utils/storage";
 
 type SendBsvResponse = {
   txid?: string;
   error?: string;
 };
+
+export type Web3SendBsvRequest = {
+  satAmount: number;
+  address: string;
+}[];
 
 export const useBsv = () => {
   const [bsvBalance, setBsvBalance] = useState(0);
@@ -17,8 +23,7 @@ export const useBsv = () => {
   const { retrieveKeys, bsvAddress, verifyPassword } = useKeys();
 
   const sendBsv = async (
-    toAddress: string,
-    amount: number,
+    request: Web3SendBsvRequest,
     password: string
   ): Promise<SendBsvResponse> => {
     try {
@@ -32,6 +37,7 @@ export const useBsv = () => {
       const keys = await retrieveKeys(password);
       const paymentPk = bsv.PrivateKey.fromWIF(keys.walletWif);
       const fromAddress = paymentPk.toAddress().toString();
+      const amount = request.reduce((a, r) => a + r.satAmount, 0);
 
       // Format in and outs
       const utxos = await getUxos(fromAddress);
@@ -48,12 +54,14 @@ export const useBsv = () => {
 
       // Build tx
       const bsvTx = bsv.Transaction().from(inputs);
-      bsvTx.to(toAddress, satsOut);
+      request.forEach((req) => {
+        bsvTx.to(req.address, req.satAmount);
+      });
+
       if (!sendAll) {
         const change = totalInputSats - satsOut - feeSats;
         bsvTx.to(fromAddress, change);
       }
-
       // Sign and get raw tx
       bsvTx.sign(paymentPk);
       const txhex = bsvTx.toString();
@@ -94,6 +102,7 @@ export const useBsv = () => {
 
   useEffect(() => {
     if (!bsvAddress) return;
+    storage.set({ appState: { bsvAddress } });
     balance();
     rate();
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,9 +1,9 @@
 const createPandaMethod = (type) => {
-  return async () => {
+  return async (params) => {
     return new Promise((resolve, reject) => {
       // Send request
       const requestEvent = new CustomEvent("PandaRequest", {
-        detail: { type },
+        detail: { type, params },
       });
       document.dispatchEvent(requestEvent);
 
@@ -27,7 +27,9 @@ const createPandaMethod = (type) => {
 
 window.panda = {
   connect: createPandaMethod("connect"),
-  getAddress: createPandaMethod("getAddress"),
+  getBsvAddress: createPandaMethod("getBsvAddress"),
+  getOrdAddress: createPandaMethod("getOrdAddress"),
+  getOrdinals: createPandaMethod("getOrdinals"),
+  sendBsv: createPandaMethod("sendBsv"),
+  transferOrdinal: createPandaMethod("transferOrdinal"),
 };
-
-createPandaMethod();

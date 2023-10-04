@@ -278,7 +278,7 @@ export const OrdWallet = () => {
         <PageLoader theme={theme} message="Loading ordinals..." />
       </Show>
       <Show when={isProcessing && pageState === "transfer"}>
-        <PageLoader theme={theme} message="Sending Ordinal..." />
+        <PageLoader theme={theme} message="Transferring Ordinal..." />
       </Show>
       <Show when={!isProcessing && pageState === "main"}>{main}</Show>
       <Show when={!isProcessing && pageState === "receive"}>{receive}</Show>

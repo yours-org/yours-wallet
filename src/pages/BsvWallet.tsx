@@ -86,6 +86,7 @@ export const BsvWallet = () => {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [successTxId, setSuccessTxId] = useState("");
   const { addSnackbar, message } = useSnackbar();
+
   const {
     bsvAddress,
     bsvBalance,
@@ -95,15 +96,6 @@ export const BsvWallet = () => {
     getBsvBalance,
     exchangeRate,
   } = useBsv();
-
-  useEffect(() => {
-    if (chrome.runtime) {
-      chrome.runtime.sendMessage({
-        action: "userDecision",
-        decision: "confirmed",
-      });
-    }
-  }, []);
 
   useEffect(() => {
     setSelected("bsv");
@@ -159,8 +151,7 @@ export const BsvWallet = () => {
     }
 
     const sendRes = await sendBsv(
-      receiveAddress,
-      satSendAmount,
+      [{ address: receiveAddress, satAmount: satSendAmount }],
       passwordConfirm
     );
     if (!sendRes.txid || sendRes.error) {

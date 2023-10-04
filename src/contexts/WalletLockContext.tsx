@@ -6,6 +6,7 @@ const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 export interface WalletLockContextProps {
   isLocked: boolean;
   setIsLocked: React.Dispatch<React.SetStateAction<boolean>>;
+  lockWallet: () => void;
 }
 
 export const WalletLockContext = createContext<
@@ -20,6 +21,13 @@ export const WalletLockProvider: FC<WalletLockProviderProps> = (
 ) => {
   const { children } = props;
   const [isLocked, setIsLocked] = useState<boolean>(false);
+
+  const lockWallet = () => {
+    const timestamp = Date.now();
+    const twentyMinutesAgo = timestamp - 20 * 60 * 1000;
+    storage.set({ lastActiveTime: twentyMinutesAgo });
+    setIsLocked(true);
+  };
 
   useEffect(() => {
     const checkLockState = () => {
@@ -50,7 +58,7 @@ export const WalletLockProvider: FC<WalletLockProviderProps> = (
   }, []);
 
   return (
-    <WalletLockContext.Provider value={{ isLocked, setIsLocked }}>
+    <WalletLockContext.Provider value={{ isLocked, setIsLocked, lockWallet }}>
       {children}
     </WalletLockContext.Provider>
   );

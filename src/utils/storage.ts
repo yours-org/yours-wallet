@@ -1,7 +1,8 @@
 interface Storage {
   set: (obj: any, callback?: () => void) => void;
   get: (key: string | string[], callback: (result: any) => void) => void;
-  clear: () => Promise<void>; // Modified the clear method to return a Promise
+  remove: (key: string | string[], callback?: () => void) => void;
+  clear: () => Promise<void>;
 }
 
 const mockStorage: Storage = {
@@ -25,6 +26,16 @@ const mockStorage: Storage = {
       });
       callback(result);
     }
+  },
+  remove: (keyOrKeys, callback) => {
+    if (typeof keyOrKeys === "string") {
+      localStorage.removeItem(keyOrKeys);
+    } else if (Array.isArray(keyOrKeys)) {
+      keyOrKeys.forEach((key) => {
+        localStorage.removeItem(key);
+      });
+    }
+    if (callback) callback();
   },
   clear: async () => {
     // Made the clear method asynchronous
