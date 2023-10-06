@@ -15,7 +15,7 @@ const getWif = (seedPhrase: string, isOrd?: boolean) => {
   const seed = bip39.mnemonicToSeedSync(seedPhrase);
   const masterNode = bsv.HDPrivateKey.fromSeed(seed);
 
-  const derivationPath = `m/0'/${isOrd ? "237" : "236"}'/0'/0/0`;
+  const derivationPath = `m/44'/236'/${isOrd ? "1" : "0"}'/0/0`;
   const childNode = masterNode.deriveChild(derivationPath);
 
   if (!childNode.privateKey) return;
