@@ -18,7 +18,6 @@ import {
 import { QrCode } from "../components/QrCode";
 import { Show } from "../components/Show";
 import { useSnackbar } from "../hooks/useSnackbar";
-import { useBsv } from "../hooks/useBsv";
 import { PageLoader } from "../components/PageLoader";
 import { Input } from "../components/Input";
 import { BSV_DECIMAL_CONVERSION } from "../utils/constants";
@@ -26,6 +25,10 @@ import { validate } from "bitcoin-address-validation";
 import { formatUSD } from "../utils/format";
 import { sleep } from "../utils/sleep";
 import { useTheme } from "../hooks/useTheme";
+import { useNavigate } from "react-router-dom";
+import { ThirdPartyAppRequestData } from "../App";
+import { useBsv } from "../hooks/useBsv";
+import { useOrds } from "../hooks/useOrds";
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -39,7 +42,7 @@ const MiddleContainer = styled.div<ColorThemeProps>`
   background-color: ${({ theme }) => theme.darkAccent};
 `;
 
-const PandHeadContainer = styled.div`
+const PandaHeadContainer = styled.div`
   position: absolute;
   top: 10rem;
   right: 2.25rem;
@@ -77,7 +80,13 @@ const Icon = styled.img<{ size?: string }>`
 
 type PageState = "main" | "receive" | "send";
 
-export const BsvWallet = () => {
+export type BsvWalletProps = {
+  thirdPartyAppRequestData: ThirdPartyAppRequestData | undefined;
+};
+
+export const BsvWallet = (props: BsvWalletProps) => {
+  const { thirdPartyAppRequestData } = props;
+  const navigate = useNavigate();
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>("main");
@@ -86,6 +95,7 @@ export const BsvWallet = () => {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [successTxId, setSuccessTxId] = useState("");
   const { addSnackbar, message } = useSnackbar();
+  const { ordPubKey } = useOrds();
 
   const {
     bsvAddress,
@@ -95,7 +105,21 @@ export const BsvWallet = () => {
     sendBsv,
     getBsvBalance,
     exchangeRate,
+    bsvPubKey,
   } = useBsv();
+
+  useEffect(() => {
+    if (thirdPartyAppRequestData && !thirdPartyAppRequestData.isAuthorized) {
+      navigate("/connect");
+    } else {
+      if (!bsvPubKey || !ordPubKey) return;
+      chrome.runtime.sendMessage({
+        action: "userConnectDecision",
+        decision: "approved",
+        pubKeys: { bsvPubKey, ordPubKey },
+      });
+    }
+  }, [bsvPubKey, navigate, ordPubKey, thirdPartyAppRequestData]);
 
   useEffect(() => {
     setSelected("bsv");
@@ -224,9 +248,9 @@ export const BsvWallet = () => {
 
   const main = (
     <MainContent>
-      <PandHeadContainer>
+      <PandaHeadContainer>
         <PandaHead width="1.75rem" />
-      </PandHeadContainer>
+      </PandaHeadContainer>
       <MiddleContainer theme={theme}>
         <BalanceContainer>
           <Icon src={bsvCoin} />

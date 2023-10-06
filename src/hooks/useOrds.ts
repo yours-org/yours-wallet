@@ -111,7 +111,7 @@ export type Web3TransferOrdinalRequest = {
 };
 
 export const useOrds = () => {
-  const { ordAddress, retrieveKeys, verifyPassword } = useKeys();
+  const { ordAddress, retrieveKeys, verifyPassword, ordPubKey } = useKeys();
   const { getUxos, getRawTxById, broadcastRawTx } = useWhatsOnChain();
   const [ordinals, setOrdinals] = useState<OrdinalResponse>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -301,6 +301,7 @@ export const useOrds = () => {
   return {
     ordinals,
     ordAddress,
+    ordPubKey,
     getOrdinals,
     isProcessing,
     transferOrdinal,

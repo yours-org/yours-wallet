@@ -35,6 +35,12 @@ The alpha version of the wallet is open and available to all users. While it has
 
 ## Development
 
+### Wallet Provider API 🚀
+
+Documentation on integrating Panda Wallet into your decentralized web3 application can be [found here](https://panda-wallet.gitbook.io/provider-api/).
+
+### Contributing 🙌
+
 If you'd like to contribute to Panda Wallet's development, follow these steps:
 
 1. **Clone the Repository:** Clone the repo:

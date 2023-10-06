@@ -10,6 +10,12 @@ export const HeaderText = styled.h1<ColorThemeProps>`
   text-align: center;
 `;
 
+export const Divider = styled.hr`
+  width: 80%;
+  opacity: 0.3;
+  margin: 1rem;
+`;
+
 export const Text = styled.p<ColorThemeProps>`
   font-size: 0.9rem;
   color: ${({ theme }) => theme.white + "90"};

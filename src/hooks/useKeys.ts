@@ -17,6 +17,8 @@ export type KeyStorage = {
 export const useKeys = () => {
   const [bsvAddress, setBsvAddress] = useState("");
   const [ordAddress, setOrdAddress] = useState("");
+  const [bsvPubKey, setBsvPubKey] = useState("");
+  const [ordPubKey, setOrdPubKey] = useState("");
   const generateSeedAndStoreEncrypted = (
     password: string,
     mnemonic?: string
@@ -45,6 +47,8 @@ export const useKeys = () => {
             const keys: Keys = JSON.parse(d);
             setBsvAddress(keys.walletAddress);
             setOrdAddress(keys.ordAddress);
+            setBsvPubKey(keys.walletPubKey);
+            setOrdPubKey(keys.ordPubKey);
             if (password) {
               const isVerified = await verifyPassword(password);
               isVerified ? resolve(keys) : reject("Unauthorized!");
@@ -52,6 +56,8 @@ export const useKeys = () => {
               resolve({
                 ordAddress: keys.ordAddress,
                 walletAddress: keys.walletAddress,
+                walletPubKey: keys.walletPubKey,
+                ordPubKey: keys.ordPubKey,
               });
             }
           } catch (error) {
@@ -86,5 +92,7 @@ export const useKeys = () => {
     verifyPassword,
     bsvAddress,
     ordAddress,
+    bsvPubKey,
+    ordPubKey,
   };
 };

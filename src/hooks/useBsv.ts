@@ -19,7 +19,7 @@ export const useBsv = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { getUxos, getBsvBalance, getExchangeRate, broadcastRawTx } =
     useWhatsOnChain();
-  const { retrieveKeys, bsvAddress, verifyPassword } = useKeys();
+  const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey } = useKeys();
 
   const sendBsv = async (
     request: Web3SendBsvRequest,
@@ -110,6 +110,7 @@ export const useBsv = () => {
   return {
     bsvBalance,
     bsvAddress,
+    bsvPubKey,
     isProcessing,
     sendBsv,
     setIsProcessing,

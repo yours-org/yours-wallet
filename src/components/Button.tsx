@@ -62,7 +62,7 @@ export type ButtonProps = {
   label: string;
   type: ButtonStyles;
   theme: Theme;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
 };
 

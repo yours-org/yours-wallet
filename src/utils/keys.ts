@@ -7,6 +7,8 @@ export type Keys = {
   walletAddress: string;
   ordWif: string;
   ordAddress: string;
+  walletPubKey: string;
+  ordPubKey: string;
 };
 
 const getWif = (seedPhrase: string, isOrd?: boolean) => {
@@ -26,12 +28,14 @@ const getWif = (seedPhrase: string, isOrd?: boolean) => {
 export const getKeys = (validMnemonic?: string) => {
   let mnemonic = validMnemonic ?? bip39.generateMnemonic();
   const walletWif = getWif(mnemonic);
-  const walletPk = bsv.PrivateKey.fromWIF(walletWif);
-  const walletAddress = walletPk.toAddress().toString();
+  const walletPrivKey = bsv.PrivateKey.fromWIF(walletWif);
+  const walletPubKey = walletPrivKey.toPublicKey();
+  const walletAddress = walletPubKey.toAddress().toString();
 
   const ordWif = getWif(mnemonic, true);
-  const ordPk = bsv.PrivateKey.fromWIF(ordWif);
-  const ordAddress = bsv.PublicKey.fromPrivateKey(ordPk).toAddress().toString();
+  const ordPrivKey = bsv.PrivateKey.fromWIF(ordWif);
+  const ordPubKey = ordPrivKey.toPublicKey();
+  const ordAddress = ordPubKey.toAddress().toString();
 
   const keys: Keys = {
     mnemonic,
@@ -39,6 +43,8 @@ export const getKeys = (validMnemonic?: string) => {
     walletAddress,
     ordWif,
     ordAddress,
+    walletPubKey: walletPubKey.toString(),
+    ordPubKey: ordPubKey.toString(),
   };
 
   return keys;

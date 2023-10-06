@@ -26,10 +26,12 @@ const createPandaMethod = (type) => {
 };
 
 window.panda = {
+  isReady: true,
   connect: createPandaMethod("connect"),
   isConnected: createPandaMethod("isConnected"),
-  getBsvAddress: createPandaMethod("getBsvAddress"),
-  getOrdAddress: createPandaMethod("getOrdAddress"),
+  getPubKeys: createPandaMethod("getPubKeys"),
+  getAddresses: createPandaMethod("getAddresses"),
+  getBalance: createPandaMethod("getBalance"),
   getOrdinals: createPandaMethod("getOrdinals"),
   sendBsv: createPandaMethod("sendBsv"),
   transferOrdinal: createPandaMethod("transferOrdinal"),

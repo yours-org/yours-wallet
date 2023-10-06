@@ -3,6 +3,8 @@ import { storage } from "../utils/storage";
 import { useWalletLockState } from "../hooks/useWalletLockState";
 import { useBsv } from "../hooks/useBsv";
 import { useOrds } from "../hooks/useOrds";
+import { BSV_DECIMAL_CONVERSION } from "../utils/constants";
+import { formatUSD } from "../utils/format";
 
 export const Web3Context = createContext(undefined);
 
@@ -14,16 +16,38 @@ export const Web3Provider: FC<Web3ProviderProps> = (
 ) => {
   const { children } = props;
   const { isLocked } = useWalletLockState();
-  const { bsvAddress } = useBsv();
-  const { ordAddress, ordinals } = useOrds();
+  const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate } = useBsv();
+  const { ordAddress, ordinals, ordPubKey } = useOrds();
 
   useEffect(() => {
     if (isLocked) {
       storage.remove("appState");
       return;
     }
-    storage.set({ appState: { isLocked, bsvAddress, ordAddress, ordinals } });
-  }, [isLocked, bsvAddress, ordAddress, ordinals]);
+    const balance = {
+      bsv: bsvBalance,
+      sat: Math.round(bsvBalance * BSV_DECIMAL_CONVERSION),
+      usd: formatUSD(bsvBalance * exchangeRate),
+    };
+    storage.set({
+      appState: {
+        isLocked,
+        ordinals,
+        balance,
+        addresses: { bsvAddress, ordAddress },
+        pubKeys: { bsvPubKey, ordPubKey },
+      },
+    });
+  }, [
+    isLocked,
+    bsvAddress,
+    ordAddress,
+    ordinals,
+    bsvPubKey,
+    ordPubKey,
+    bsvBalance,
+    exchangeRate,
+  ]);
 
   return (
     <Web3Context.Provider value={undefined}>{children}</Web3Context.Provider>
