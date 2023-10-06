@@ -1,5 +1,5 @@
 {
-  "version": "0.2.2",
+  "version": "0.2.3",
   "manifest_version": 3,
   "name": "Panda Wallet",
   "description": "A non-custodial and open-source wallet for BSV and 1Sat Ordinals",
