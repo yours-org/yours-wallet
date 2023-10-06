@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Alpha Version: 0.2.0
+Alpha Version: 0.2.1
 
 # Panda Wallet | Non-Custodial Web3 Wallet For BSV
 
@@ -20,18 +20,22 @@ Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV
 
 The alpha version of the wallet is open and available to all users. While it has been tested, it is still new software so use at your own risk. The plan once out of alpha/beta is to launch on the Google Chrome Store.
 
-1. **Download:** First you will need to <a id="raw-url" href="https://github.com/Panda-Wallet/panda-wallet/raw/main/public/builds/pw-0.2.0.zip" download="panda-wallet-0.2.0.zip">Download The Current Build</a>
+1. **Download:** First you will need to <a id="raw-url" href="https://github.com/Panda-Wallet/panda-wallet/raw/main/public/builds/pw-0.2.1.zip" download="panda-wallet-0.2.1.zip">Download The Current Build</a>
    . \*\*Always double check that you are at the official Panda Wallet github repo before downloading anything. https://github.com/Panda-Wallet/panda-wallet.
 
    **SHA256 Checksum:** For extra security you can check the checksum:
 
-   `59d1dedadf8991def590265231fb2ca8f46e1d0338b67015a09553dd5da8279d`
+   `a751399c70b84005a285aa589923c9b7d1213eee9215aa7e1f2cf06ad4127221`
 
    Files can also be found in `public/builds`
 
 2. **Unzip:** Unzip the build zip file then head to `chrome://extensions`
 3. **Load The Build File:** In the top right of Chrome Extensions, enable dev mode, then on the left select "Load unpacked".
 4. **Finish:** If you did this properly, you should now see Panda Wallet available in the list of extensions. You can now manage and pin the extension just like you would any other Chrome extension you have.
+
+> _**Note:**_ The BSV keys use derivation path `m / 44' / 236' / 0' / 0 / 0`
+
+> _**Note:**_ The Ord keys use derivation path `m / 44' / 236' / 1' / 0 / 0`
 
 ## Development
 
