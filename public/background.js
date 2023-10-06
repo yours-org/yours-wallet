@@ -1,10 +1,10 @@
 /* global chrome */
-
 console.log("🐼 Panda Wallet Background Script Running!");
 
 let responseCallbackForConnectRequest;
 let responseCallbackForSendBsvRequest;
 let responseCallbackForTransferOrdinalRequest;
+let responseCallbackForSignMessageRequest;
 let popupWindowId = null;
 
 const launchPopUp = () => {
@@ -54,6 +54,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     "userConnectDecision",
     "sendBsvResult",
     "transferOrdinalResult",
+    "signMessageResult",
   ];
 
   if (noAuthRequired.includes(message.action)) {
@@ -66,6 +67,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processSendBsvResult(message);
       case "transferOrdinalResult":
         return processTransferOrdinalResult(message);
+      case "signMessageResult":
+        return processSignMessageResult(message);
       default:
         break;
     }
@@ -103,6 +106,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processSendBsv(message, sendResponse);
       case "transferOrdinal":
         return processTransferOrdinal(message, sendResponse);
+      case "signMessage":
+        return processSignMessageRequest(message, sendResponse);
       default:
         break;
     }
@@ -332,6 +337,34 @@ const processTransferOrdinal = (message, sendResponse) => {
   }
 };
 
+const processSignMessageRequest = (message, sendResponse) => {
+  if (!message.params) {
+    sendResponse({
+      type: "signMessage",
+      success: false,
+      error: "Must provide valid params!",
+    });
+  }
+  try {
+    responseCallbackForSignMessageRequest = sendResponse;
+    chrome.storage.local
+      .set({
+        signMessageRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+  } catch (error) {
+    sendResponse({
+      type: "signMessage",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+
+  return true;
+};
+
 const processSendBsvResult = (message) => {
   if (!responseCallbackForSendBsvRequest) throw Error("Missing callback!");
   try {
@@ -379,6 +412,33 @@ const processTransferOrdinalResult = (message) => {
   return true;
 };
 
+const processSignMessageResult = (message) => {
+  if (!responseCallbackForSignMessageRequest) throw Error("Missing callback!");
+  try {
+    responseCallbackForSignMessageRequest({
+      type: "signMessage",
+      success: true,
+      data: {
+        address: message?.address,
+        signedMessage: message?.signedMessage,
+        signatureHex: message?.signatureHex,
+      },
+    });
+  } catch (error) {
+    responseCallbackForSignMessageRequest({
+      type: "signMessage",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  } finally {
+    responseCallbackForSignMessageRequest = null;
+    popupWindowId = null;
+    chrome.storage.local.remove(["signMessageRequest", "popupWindowId"]);
+  }
+
+  return true;
+};
+
 chrome.windows.onRemoved.addListener((closedWindowId) => {
   if (closedWindowId === popupWindowId) {
     if (responseCallbackForConnectRequest) {
@@ -388,6 +448,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         data: "User dismissed the request!",
       });
       responseCallbackForConnectRequest = null;
+      chrome.storage.local.remove("connectRequest");
     }
 
     if (responseCallbackForSendBsvRequest) {
@@ -398,6 +459,16 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       });
       responseCallbackForSendBsvRequest = null;
       chrome.storage.local.remove("sendBsv");
+    }
+
+    if (responseCallbackForSignMessageRequest) {
+      responseCallbackForSignMessageRequest({
+        type: "signMessage",
+        success: true,
+        data: "User dismissed the request!",
+      });
+      responseCallbackForSignMessageRequest = null;
+      chrome.storage.local.remove("signMessageRequest");
     }
 
     if (responseCallbackForTransferOrdinalRequest) {

@@ -13,14 +13,15 @@ import { UnlockWallet } from "./components/UnlockWallet";
 import { useWalletLockState } from "./hooks/useWalletLockState";
 import { SnackbarProvider } from "./contexts/SnackbarContext";
 import { useTheme } from "./hooks/useTheme";
-import { BsvSendRequest } from "./pages/BsvSendRequest";
+import { BsvSendRequest } from "./pages/requests/BsvSendRequest";
 import { storage } from "./utils/storage";
 import { useContext, useEffect, useState } from "react";
 import { Web3SendBsvRequest } from "./hooks/useBsv";
 import { Web3TransferOrdinalRequest } from "./hooks/useOrds";
-import { OrdTransferRequest } from "./pages/OrdTransferRequest";
+import { OrdTransferRequest } from "./pages/requests/OrdTransferRequest";
 import { BottomMenuContext } from "./contexts/BottomMenuContext";
-import { Connect } from "./pages/onboarding/Connect";
+import { ConnectRequest } from "./pages/requests/ConnectRequest";
+import { SignMessageRequest } from "./pages/requests/SignMessageRequest";
 
 export type ThirdPartyAppRequestData = {
   appName: string;
@@ -44,6 +45,9 @@ export const App = () => {
   const menuContext = useContext(BottomMenuContext);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
   const [whitelistedDomains, setWhitelistedDomains] = useState<string[]>([]);
+  const [messageToSign, setMessageToSign] = useState<string | undefined>(
+    undefined
+  );
 
   const [thirdPartyAppRequestData, setThirdPartyAppRequestData] = useState<
     ThirdPartyAppRequestData | undefined
@@ -71,6 +75,7 @@ export const App = () => {
         "connectRequest",
         "popupWindowId",
         "whitelist",
+        "signMessageRequest",
       ],
       (result) => {
         const {
@@ -79,6 +84,7 @@ export const App = () => {
           whitelist,
           sendBsv,
           transferOrdinal,
+          signMessageRequest,
         } = result;
 
         if (popupWindowId) setPopupId(popupWindowId);
@@ -100,11 +106,14 @@ export const App = () => {
           setOrdinalTransferRequest(transferOrdinal);
           menuContext?.handleSelect("ords");
         }
+
+        if (signMessageRequest) {
+          setMessageToSign(signMessageRequest.message);
+        }
       }
     );
   }, [isLocked, menuContext]);
 
-  //TODO: I think the routes need to be refactored. Maybe a lot of the show logic should live within whatever main page and then use navigate
   return (
     <Container theme={theme}>
       <SnackbarProvider>
@@ -120,7 +129,7 @@ export const App = () => {
               <Route
                 path="/connect"
                 element={
-                  <Connect
+                  <ConnectRequest
                     thirdPartyAppRequestData={thirdPartyAppRequestData}
                     popupId={popupId}
                     whitelistedDomains={whitelistedDomains}
@@ -132,16 +141,28 @@ export const App = () => {
                 path="/bsv-wallet"
                 element={
                   <Show
-                    when={!!bsvSendRequest}
+                    when={!bsvSendRequest && !messageToSign}
                     whenFalseContent={
-                      <BsvWallet
-                        thirdPartyAppRequestData={thirdPartyAppRequestData}
-                      />
+                      <>
+                        <Show when={!!bsvSendRequest}>
+                          <BsvSendRequest
+                            web3Request={bsvSendRequest as Web3SendBsvRequest}
+                            onResponse={() => setBsvSendRequest(undefined)}
+                          />
+                        </Show>
+                        <Show when={!!messageToSign}>
+                          <SignMessageRequest
+                            messageToSign={messageToSign ?? ""}
+                            popupId={popupId}
+                            onSignature={() => setMessageToSign(undefined)}
+                          />
+                        </Show>
+                      </>
                     }
                   >
-                    <BsvSendRequest
-                      web3Request={bsvSendRequest as Web3SendBsvRequest}
-                      onResponse={() => setBsvSendRequest(undefined)}
+                    <BsvWallet
+                      thirdPartyAppRequestData={thirdPartyAppRequestData}
+                      messageToSign={messageToSign}
                     />
                   </Show>
                 }

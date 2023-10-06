@@ -43,8 +43,8 @@ export const getKeys = (validMnemonic?: string) => {
     walletAddress,
     ordWif,
     ordAddress,
-    walletPubKey: walletPubKey.toString(),
-    ordPubKey: ordPubKey.toString(),
+    walletPubKey: walletPubKey.toString("hex"),
+    ordPubKey: ordPubKey.toString("hex"),
   };
 
   return keys;

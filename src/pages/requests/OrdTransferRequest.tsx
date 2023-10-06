@@ -1,23 +1,23 @@
 import { useEffect, useState } from "react";
-import { Button } from "../components/Button";
+import { Button } from "../../components/Button";
 import {
   ConfirmContent,
   FormContainer,
   HeaderText,
   Text,
-} from "../components/Reusable";
-import { Web3TransferOrdinalRequest, useOrds } from "../hooks/useOrds";
-import { Show } from "../components/Show";
-import { useSnackbar } from "../hooks/useSnackbar";
-import { PageLoader } from "../components/PageLoader";
+} from "../../components/Reusable";
+import { Web3TransferOrdinalRequest, useOrds } from "../../hooks/useOrds";
+import { Show } from "../../components/Show";
+import { useSnackbar } from "../../hooks/useSnackbar";
+import { PageLoader } from "../../components/PageLoader";
 import validate from "bitcoin-address-validation";
-import { sleep } from "../utils/sleep";
-import { useTheme } from "../hooks/useTheme";
-import { ColorThemeProps } from "../theme";
+import { sleep } from "../../utils/sleep";
+import { useTheme } from "../../hooks/useTheme";
+import { ColorThemeProps } from "../../theme";
 import { styled } from "styled-components";
-import { GP_BASE_URL } from "../utils/constants";
-import { truncate } from "../utils/format";
-import { Input } from "../components/Input";
+import { GP_BASE_URL } from "../../utils/constants";
+import { truncate } from "../../utils/format";
+import { Input } from "../../components/Input";
 
 export type OrdTransferRequestProps = {
   web3Request: Web3TransferOrdinalRequest;

@@ -30,13 +30,13 @@ const Icon = styled.img<{ size: string }>`
   border-radius: 0.5rem;
 `;
 
-export type ConnectProps = {
+export type ConnectRequestProps = {
   thirdPartyAppRequestData: ThirdPartyAppRequestData | undefined;
   whitelistedDomains: string[];
   popupId: number | undefined;
   onDecision: () => void;
 };
-export const Connect = (props: ConnectProps) => {
+export const ConnectRequest = (props: ConnectRequestProps) => {
   const { thirdPartyAppRequestData, whitelistedDomains, popupId, onDecision } =
     props;
   const { theme } = useTheme();

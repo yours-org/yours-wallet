@@ -82,10 +82,11 @@ type PageState = "main" | "receive" | "send";
 
 export type BsvWalletProps = {
   thirdPartyAppRequestData: ThirdPartyAppRequestData | undefined;
+  messageToSign?: string;
 };
 
 export const BsvWallet = (props: BsvWalletProps) => {
-  const { thirdPartyAppRequestData } = props;
+  const { thirdPartyAppRequestData, messageToSign } = props;
   const navigate = useNavigate();
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
@@ -109,6 +110,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
   } = useBsv();
 
   useEffect(() => {
+    if (!messageToSign) return;
+  }, [messageToSign]);
+
+  useEffect(() => {
     if (thirdPartyAppRequestData && !thirdPartyAppRequestData.isAuthorized) {
       navigate("/connect");
     } else {
@@ -119,7 +124,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         pubKeys: { bsvPubKey, ordPubKey },
       });
     }
-  }, [bsvPubKey, navigate, ordPubKey, thirdPartyAppRequestData]);
+  }, [bsvPubKey, messageToSign, navigate, ordPubKey, thirdPartyAppRequestData]);
 
   useEffect(() => {
     setSelected("bsv");

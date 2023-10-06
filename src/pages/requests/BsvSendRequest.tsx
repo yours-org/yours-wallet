@@ -1,25 +1,25 @@
-import { useBottomMenu } from "../hooks/useBottomMenu";
+import { useBottomMenu } from "../../hooks/useBottomMenu";
 import React, { useEffect, useState } from "react";
-import { Button } from "../components/Button";
+import { Button } from "../../components/Button";
 import {
   Text,
   HeaderText,
   ConfirmContent,
   FormContainer,
-} from "../components/Reusable";
-import { Show } from "../components/Show";
-import { useSnackbar } from "../hooks/useSnackbar";
-import { Web3SendBsvRequest, useBsv } from "../hooks/useBsv";
-import { PageLoader } from "../components/PageLoader";
-import { Input } from "../components/Input";
-import { BSV_DECIMAL_CONVERSION } from "../utils/constants";
+} from "../../components/Reusable";
+import { Show } from "../../components/Show";
+import { useSnackbar } from "../../hooks/useSnackbar";
+import { Web3SendBsvRequest, useBsv } from "../../hooks/useBsv";
+import { PageLoader } from "../../components/PageLoader";
+import { Input } from "../../components/Input";
+import { BSV_DECIMAL_CONVERSION } from "../../utils/constants";
 import { validate } from "bitcoin-address-validation";
-import { truncate } from "../utils/format";
-import { sleep } from "../utils/sleep";
-import { useTheme } from "../hooks/useTheme";
+import { truncate } from "../../utils/format";
+import { sleep } from "../../utils/sleep";
+import { useTheme } from "../../hooks/useTheme";
 import { styled } from "styled-components";
-import { ColorThemeProps } from "../theme";
-import bsvCoin from "../assets/bsv-coin.svg";
+import { ColorThemeProps } from "../../theme";
+import bsvCoin from "../../assets/bsv-coin.svg";
 
 const RequestDetailsContainer = styled.div<ColorThemeProps>`
   display: flex;

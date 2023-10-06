@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useKeys } from "./useKeys";
 import * as bsv from "bsv";
 import { UTXO, useWhatsOnChain } from "./useWhatsOnChain";
+import { SignMessageResponse } from "../pages/requests/SignMessageRequest";
 
 type SendBsvResponse = {
   txid?: string;
@@ -75,6 +76,49 @@ export const useBsv = () => {
     }
   };
 
+  const signMessage = async (
+    message: string,
+    password: string
+  ): Promise<SignMessageResponse | undefined> => {
+    const isAuthenticated = await verifyPassword(password);
+    if (!isAuthenticated) {
+      return { error: "invalid-password" };
+    }
+    try {
+      const keys = await retrieveKeys(password);
+      const hash = bsv.crypto.Hash.sha256(Buffer.from(message));
+      const privateKey = bsv.PrivateKey.fromWIF(keys.walletWif);
+      const signature = bsv.crypto.ECDSA.sign(hash, privateKey, "big");
+      const address = privateKey.toAddress().toString();
+      return {
+        address,
+        signedMessage: message,
+        signatureHex: signature.toString("hex"),
+      };
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const verifyMessage = (
+    message: string,
+    signatureHex: string,
+    publicKeyHex: string
+  ) => {
+    try {
+      const hash = bsv.crypto.Hash.sha256(Buffer.from(message));
+      const signature = bsv.crypto.Signature.fromDER(
+        Buffer.from(signatureHex, "hex")
+      );
+      const publicKey = bsv.PublicKey.fromHex(publicKeyHex);
+      const verified = bsv.crypto.ECDSA.verify(hash, signature, publicKey);
+      return verified;
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
+  };
+
   const getInputs = (utxos: UTXO[], satsOut: number, isSendAll: boolean) => {
     if (isSendAll) return utxos;
     let sum = 0;
@@ -116,5 +160,7 @@ export const useBsv = () => {
     setIsProcessing,
     getBsvBalance,
     exchangeRate,
+    signMessage,
+    verifyMessage,
   };
 };

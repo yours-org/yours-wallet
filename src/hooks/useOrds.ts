@@ -215,12 +215,9 @@ export const useOrds = () => {
       );
 
       if (broadcastResult?.txid) {
-        console.log("Successfully broadcast:");
-        console.log(broadcastResult);
         return { txid: broadcastResult.txid };
       }
-      console.log("The broadcast failed for rawText:");
-      console.log(broadcastResult?.rawTx);
+
       return { error: "broadcast-failed" };
     } catch (error) {
       console.log(error);
