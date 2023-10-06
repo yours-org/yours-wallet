@@ -89,6 +89,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     switch (message.action) {
+      case "disconnect":
+        return processDisconnect(message, sendResponse);
       case "getPubKeys":
         return processGetPubKeys(sendResponse);
       case "getBalance":
@@ -98,9 +100,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case "getOrdinals":
         return processGetOrdinals(sendResponse);
       case "sendBsv":
-        return processSendBsv(sendResponse, message);
+        return processSendBsv(message, sendResponse);
       case "transferOrdinal":
-        return processTransferOrdinal(sendResponse, message);
+        return processTransferOrdinal(message, sendResponse);
       default:
         break;
     }
@@ -120,6 +122,33 @@ const processConnectRequest = (message, sendResponse, isAuthorized) => {
     });
 
   return true;
+};
+
+const processDisconnect = (message, sendResponse) => {
+  try {
+    chrome.storage.local.get(["whitelist"], (result) => {
+      if (!result.whitelist) throw Error("Already disconnected!");
+      const { params } = message;
+
+      const updatedWhitelist = result.whitelist.filter(
+        (i) => i !== params.domain
+      );
+
+      chrome.storage.local.set({ whitelist: updatedWhitelist }, () => {
+        sendResponse({
+          type: "disconnect",
+          success: true,
+          data: "Successfully disconnected!",
+        });
+      });
+    });
+  } catch (error) {
+    sendResponse({
+      type: "disconnect",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
 };
 
 const processIsConnectedRequest = (message, sendResponse) => {
@@ -251,7 +280,7 @@ const processGetOrdinals = (sendResponse) => {
   }
 };
 
-const processSendBsv = (sendResponse, message) => {
+const processSendBsv = (message, sendResponse) => {
   if (!message.params.data) {
     sendResponse({
       type: "sendBsv",
@@ -277,7 +306,7 @@ const processSendBsv = (sendResponse, message) => {
   }
 };
 
-const processTransferOrdinal = (sendResponse, message) => {
+const processTransferOrdinal = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
       type: "transferOrdinal",
