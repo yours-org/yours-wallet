@@ -95,6 +95,11 @@ Submit your requests to the [Kanban Board](https://github.com/orgs/Panda-Wallet/
 
 **BSV:** `1EqibN8PLLmeY61thwmekx9CjY1xJt6EEq`
 
+## Contact Us
+
+[X](https://twitter.com/wallet_panda) - @wallet_panda
+[Discord](https://discord.gg/qHs6hTkmsf)
+
 ## License
 
 Panda Wallet is released under the [MIT License](https://opensource.org/licenses/MIT)
