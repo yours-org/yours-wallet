@@ -9,13 +9,13 @@ import {
   FormContainer,
   HeaderText,
   MainContent,
+  Ordinal,
   ReceiveContent,
   Text,
 } from "../components/Reusable";
 import { useOrds } from "../hooks/useOrds";
 import { GP_BASE_URL } from "../utils/constants";
 import { Show } from "../components/Show";
-import { ColorThemeProps } from "../theme";
 import { BackButton } from "../components/BackButton";
 import { QrCode } from "../components/QrCode";
 import { useSnackbar } from "../hooks/useSnackbar";
@@ -25,25 +25,12 @@ import { Input } from "../components/Input";
 import { sleep } from "../utils/sleep";
 import { useTheme } from "../hooks/useTheme";
 
-type OrdinalDivProps = ColorThemeProps & { url: string; selected?: boolean };
-
 const OrdinalsList = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
   overflow-y: auto;
-`;
-const Ordinal = styled.div<OrdinalDivProps>`
-  height: 9rem;
-  width: 9rem;
-  background-image: url(${(props) => props.url});
-  background-size: cover;
-  border-radius: 0.5rem;
-  margin: 0.5rem;
-  cursor: pointer;
-  border: ${(props) =>
-    props.selected ? `0.3rem solid ${props.theme.lightAccent}` : undefined};
 `;
 
 const NoInscriptionWrapper = styled.div`
@@ -253,6 +240,12 @@ export const OrdWallet = () => {
       />
       <ConfirmContent>
         <HeaderText theme={theme}>Transfer Ordinal</HeaderText>
+        <Ordinal
+          theme={theme}
+          url={`${GP_BASE_URL}/files/inscriptions/${selectedOrdinal}`}
+          selected={true}
+          size="6rem"
+        />
         <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>
           <Input
             theme={theme}

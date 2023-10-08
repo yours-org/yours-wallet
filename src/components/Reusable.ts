@@ -66,3 +66,21 @@ export const ReceiveContent = styled(MainContent)`
   width: 100%;
   height: calc(100% - 3.75rem);
 `;
+
+export type OrdinalDivProps = ColorThemeProps & {
+  url: string;
+  selected?: boolean;
+  size?: string;
+};
+
+export const Ordinal = styled.div<OrdinalDivProps>`
+  height: ${(props) => props.size ?? "9rem"};
+  width: ${(props) => props.size ?? "9rem"};
+  background-image: url(${(props) => props.url});
+  background-size: cover;
+  border-radius: 0.5rem;
+  margin: 0.5rem;
+  cursor: pointer;
+  border: ${(props) =>
+    props.selected ? `0.3rem solid ${props.theme.lightAccent}` : undefined};
+`;

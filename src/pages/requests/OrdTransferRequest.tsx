@@ -4,6 +4,7 @@ import {
   ConfirmContent,
   FormContainer,
   HeaderText,
+  Ordinal,
   Text,
 } from "../../components/Reusable";
 import { Web3TransferOrdinalRequest, useOrds } from "../../hooks/useOrds";
@@ -13,8 +14,6 @@ import { PageLoader } from "../../components/PageLoader";
 import validate from "bitcoin-address-validation";
 import { sleep } from "../../utils/sleep";
 import { useTheme } from "../../hooks/useTheme";
-import { ColorThemeProps } from "../../theme";
-import { styled } from "styled-components";
 import { GP_BASE_URL } from "../../utils/constants";
 import { truncate } from "../../utils/format";
 import { Input } from "../../components/Input";
@@ -23,20 +22,6 @@ export type OrdTransferRequestProps = {
   web3Request: Web3TransferOrdinalRequest;
   onResponse: () => void;
 };
-
-type OrdinalDivProps = ColorThemeProps & { url: string; selected?: boolean };
-
-const Ordinal = styled.div<OrdinalDivProps>`
-  height: 9rem;
-  width: 9rem;
-  background-image: url(${(props) => props.url});
-  background-size: cover;
-  border-radius: 0.5rem;
-  margin: 0.5rem;
-  cursor: pointer;
-  border: ${(props) =>
-    props.selected ? `0.3rem solid ${props.theme.lightAccent}` : undefined};
-`;
 
 export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   const { web3Request, onResponse } = props;
