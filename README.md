@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Version: 0.3.1-alpha
+Version: 0.3.2-alpha
 
 # Panda Wallet | Non-Custodial Web3 Wallet For BSV
 
@@ -20,12 +20,12 @@ Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV
 
 The alpha version of the wallet is open and available to all users. While it has been tested, it is still new software so use at your own risk. The plan once out of alpha/beta is to launch on the Google Chrome Store.
 
-1. **Download:** First you will need to <a id="raw-url" href="https://github.com/Panda-Wallet/panda-wallet/raw/main/public/builds/pw-0.3.1-alpha.zip" download="panda-wallet-0.3.1-alpha.zip">Download The Current Build</a>
+1. **Download:** First you will need to <a id="raw-url" href="https://github.com/Panda-Wallet/panda-wallet/raw/main/public/builds/pw-0.3.2-alpha.zip" download="panda-wallet-0.3.2-alpha.zip">Download The Current Build</a>
    . \*\*Always double check that you are at the official Panda Wallet github repo before downloading anything. https://github.com/Panda-Wallet/panda-wallet.
 
    **SHA256 Checksum:** For extra security you can check the checksum:
 
-   `1587304d8bd678dc84f0665d758ed215ce4069f6f7c72d995b9d0d4d7554e529`
+   `dd42673aed927f796da51974d68c06e80a7fd09f67bc4370a6d38f7366ad03d1`
 
    Files can also be found in `public/builds`
 
