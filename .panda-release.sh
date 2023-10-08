@@ -11,7 +11,7 @@ CHECKSUM_FILE="public/builds/pw-${VERSION}.256"
 MANIFEST_FILE="public/manifest.json"
 
 # Step 1: Add changes to Git
-git add "$MANIFEST_FILE" "$ZIP_FILE" "$CHECKSUM_FILE"
+git add .
 
 # Step 2: Commit the changes
 git commit -m "Update version to $VERSION"
