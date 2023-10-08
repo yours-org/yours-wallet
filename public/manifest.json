@@ -3,7 +3,7 @@
   "manifest_version": 3,
   "name": "Panda Wallet",
   "description": "A non-custodial and open-source wallet for BSV and 1Sat Ordinals",
-  "permissions": ["storage", "activeTab", "tabs", "windows"],
+  "permissions": ["storage", "activeTab", "tabs"],
   "host_permissions": [
     "https://api.whatsonchain.com/*",
     "https://ordinals.gorillapool.io/*",
@@ -14,9 +14,8 @@
     "default_title": "Panda Wallet"
   },
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
-  },
+    "scripts": ["background.js"]
+  },  
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
@@ -36,5 +35,10 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "panda-wallet-bsv@example.com"
+    }
+  }  
 }
