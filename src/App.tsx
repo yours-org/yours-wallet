@@ -16,12 +16,13 @@ import { useTheme } from "./hooks/useTheme";
 import { BsvSendRequest } from "./pages/requests/BsvSendRequest";
 import { storage } from "./utils/storage";
 import { useContext, useEffect, useState } from "react";
-import { Web3SendBsvRequest } from "./hooks/useBsv";
+import { Web3BroadcastRequest, Web3SendBsvRequest } from "./hooks/useBsv";
 import { Web3TransferOrdinalRequest } from "./hooks/useOrds";
 import { OrdTransferRequest } from "./pages/requests/OrdTransferRequest";
 import { BottomMenuContext } from "./contexts/BottomMenuContext";
 import { ConnectRequest } from "./pages/requests/ConnectRequest";
 import { SignMessageRequest } from "./pages/requests/SignMessageRequest";
+import { BroadcastRequest } from "./pages/requests/BroadcastRequest";
 
 export type ThirdPartyAppRequestData = {
   appName: string;
@@ -48,6 +49,10 @@ export const App = () => {
   const [messageToSign, setMessageToSign] = useState<string | undefined>(
     undefined
   );
+
+  const [broadcastRequest, setBroadcastRequest] = useState<
+    Web3BroadcastRequest | undefined
+  >(undefined);
 
   const [thirdPartyAppRequestData, setThirdPartyAppRequestData] = useState<
     ThirdPartyAppRequestData | undefined
@@ -76,6 +81,7 @@ export const App = () => {
         "popupWindowId",
         "whitelist",
         "signMessageRequest",
+        "broadcastRequest",
       ],
       (result) => {
         const {
@@ -85,6 +91,7 @@ export const App = () => {
           sendBsv,
           transferOrdinal,
           signMessageRequest,
+          broadcastRequest,
         } = result;
 
         if (popupWindowId) setPopupId(popupWindowId);
@@ -109,6 +116,10 @@ export const App = () => {
 
         if (signMessageRequest) {
           setMessageToSign(signMessageRequest.message);
+        }
+
+        if (broadcastRequest) {
+          setBroadcastRequest(broadcastRequest);
         }
       }
     );
@@ -141,7 +152,9 @@ export const App = () => {
                 path="/bsv-wallet"
                 element={
                   <Show
-                    when={!bsvSendRequest && !messageToSign}
+                    when={
+                      !bsvSendRequest && !messageToSign && !broadcastRequest
+                    }
                     whenFalseContent={
                       <>
                         <Show when={!!bsvSendRequest}>
@@ -155,6 +168,13 @@ export const App = () => {
                             messageToSign={messageToSign ?? ""}
                             popupId={popupId}
                             onSignature={() => setMessageToSign(undefined)}
+                          />
+                        </Show>
+                        <Show when={!!broadcastRequest}>
+                          <BroadcastRequest
+                            request={broadcastRequest as Web3BroadcastRequest}
+                            popupId={popupId}
+                            onBroadcast={() => setBroadcastRequest(undefined)}
                           />
                         </Show>
                       </>
