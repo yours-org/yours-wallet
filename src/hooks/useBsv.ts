@@ -14,6 +14,10 @@ export type Web3SendBsvRequest = {
   address: string;
 }[];
 
+export type Web3BroadcastRequest = {
+  rawtx: string;
+};
+
 export const useBsv = () => {
   const [bsvBalance, setBsvBalance] = useState(0);
   const [exchangeRate, setExchangeRate] = useState(0);

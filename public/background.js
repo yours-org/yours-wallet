@@ -5,6 +5,7 @@ let responseCallbackForConnectRequest;
 let responseCallbackForSendBsvRequest;
 let responseCallbackForTransferOrdinalRequest;
 let responseCallbackForSignMessageRequest;
+let responseCallbackForBroadcastRequest;
 let popupWindowId = null;
 
 const launchPopUp = () => {
@@ -55,6 +56,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     "sendBsvResult",
     "transferOrdinalResult",
     "signMessageResult",
+    "broadcastResult",
   ];
 
   if (noAuthRequired.includes(message.action)) {
@@ -69,6 +71,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processTransferOrdinalResult(message);
       case "signMessageResult":
         return processSignMessageResult(message);
+      case "broadcastResult":
+        return processBroadcastResult(message);
       default:
         break;
     }
@@ -108,6 +112,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processTransferOrdinal(message, sendResponse);
       case "signMessage":
         return processSignMessageRequest(message, sendResponse);
+      case "broadcast":
+        return processBroadcastRequest(message, sendResponse);
       default:
         break;
     }
@@ -337,6 +343,32 @@ const processTransferOrdinal = (message, sendResponse) => {
   }
 };
 
+const processBroadcastRequest = (message, sendResponse) => {
+  if (!message.params) {
+    sendResponse({
+      type: "broadcast",
+      success: false,
+      error: "Must provide valid params!",
+    });
+  }
+  try {
+    responseCallbackForBroadcastRequest = sendResponse;
+    chrome.storage.local
+      .set({
+        broadcastRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+  } catch (error) {
+    sendResponse({
+      type: "broadcast",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+};
+
 const processSignMessageRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
@@ -434,6 +466,29 @@ const processSignMessageResult = (message) => {
     responseCallbackForSignMessageRequest = null;
     popupWindowId = null;
     chrome.storage.local.remove(["signMessageRequest", "popupWindowId"]);
+  }
+
+  return true;
+};
+
+const processBroadcastResult = (message) => {
+  if (!responseCallbackForBroadcastRequest) throw Error("Missing callback!");
+  try {
+    responseCallbackForBroadcastRequest({
+      type: "broadcast",
+      success: true,
+      data: message?.txid,
+    });
+  } catch (error) {
+    responseCallbackForBroadcastRequest({
+      type: "broadcast",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  } finally {
+    responseCallbackForBroadcastRequest = null;
+    popupWindowId = null;
+    chrome.storage.local.remove(["broadcastRequest", "popupWindowId"]);
   }
 
   return true;
