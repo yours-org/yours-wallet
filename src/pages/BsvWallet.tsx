@@ -118,11 +118,13 @@ export const BsvWallet = (props: BsvWalletProps) => {
       navigate("/connect");
     } else {
       if (!bsvPubKey || !ordPubKey) return;
-      chrome.runtime.sendMessage({
-        action: "userConnectDecision",
-        decision: "approved",
-        pubKeys: { bsvPubKey, ordPubKey },
-      });
+      if (!window.location.href.includes("localhost")) {
+        chrome.runtime.sendMessage({
+          action: "userConnectDecision",
+          decision: "approved",
+          pubKeys: { bsvPubKey, ordPubKey },
+        });
+      }
     }
   }, [bsvPubKey, messageToSign, navigate, ordPubKey, thirdPartyAppRequestData]);
 

@@ -452,6 +452,7 @@ const processSignMessageResult = (message) => {
       success: true,
       data: {
         address: message?.address,
+        pubKeyHex: message?.pubKeyHex,
         signedMessage: message?.signedMessage,
         signatureHex: message?.signatureHex,
       },

@@ -32,6 +32,7 @@ const RequestDetailsContainer = styled.div<ColorThemeProps>`
 
 export type SignMessageResponse = {
   address?: string;
+  pubKeyHex?: string;
   signedMessage?: string;
   signatureHex?: string;
   error?: string;

@@ -1,5 +1,5 @@
 import * as bip39 from "bip39";
-import * as bsv from "bsv";
+import { ExtendedPrivateKey, PrivateKey } from "bsv-wasm-web";
 
 export type Keys = {
   mnemonic: string;
@@ -13,29 +13,27 @@ export type Keys = {
 
 const getWif = (seedPhrase: string, isOrd?: boolean) => {
   const seed = bip39.mnemonicToSeedSync(seedPhrase);
-  const masterNode = bsv.HDPrivateKey.fromSeed(seed);
+  const masterNode = ExtendedPrivateKey.from_seed(seed);
 
   const derivationPath = `m/44'/236'/${isOrd ? "1" : "0"}'/0/0`;
-  const childNode = masterNode.deriveChild(derivationPath);
-
-  if (!childNode.privateKey) return;
-
-  const wif = childNode.privateKey.toWIF();
+  const childNode = masterNode.derive_from_path(derivationPath);
+  const privateKey = childNode.get_private_key();
+  const wif = privateKey.to_wif();
 
   return wif;
 };
 
 export const getKeys = (validMnemonic?: string) => {
-  let mnemonic = validMnemonic ?? bip39.generateMnemonic();
+  const mnemonic = validMnemonic ?? bip39.generateMnemonic();
   const walletWif = getWif(mnemonic);
-  const walletPrivKey = bsv.PrivateKey.fromWIF(walletWif);
-  const walletPubKey = walletPrivKey.toPublicKey();
-  const walletAddress = walletPubKey.toAddress().toString();
+  const walletPrivKey = PrivateKey.from_wif(walletWif);
+  const walletPubKey = walletPrivKey.to_public_key();
+  const walletAddress = walletPubKey.to_address().to_string();
 
   const ordWif = getWif(mnemonic, true);
-  const ordPrivKey = bsv.PrivateKey.fromWIF(ordWif);
-  const ordPubKey = ordPrivKey.toPublicKey();
-  const ordAddress = ordPubKey.toAddress().toString();
+  const ordPrivKey = PrivateKey.from_wif(ordWif);
+  const ordPubKey = ordPrivKey.to_public_key();
+  const ordAddress = ordPubKey.to_address().to_string();
 
   const keys: Keys = {
     mnemonic,
@@ -43,8 +41,8 @@ export const getKeys = (validMnemonic?: string) => {
     walletAddress,
     ordWif,
     ordAddress,
-    walletPubKey: walletPubKey.toString("hex"),
-    ordPubKey: ordPubKey.toString("hex"),
+    walletPubKey: walletPubKey.to_hex(),
+    ordPubKey: ordPubKey.to_hex(),
   };
 
   return keys;
