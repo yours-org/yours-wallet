@@ -72,7 +72,7 @@ export const useWhatsOnChain = () => {
   };
 
   return {
-    getUxos: getUtxos,
+    getUtxos,
     getBsvBalance,
     getExchangeRate,
     getRawTxById,

@@ -112,7 +112,7 @@ export type Web3TransferOrdinalRequest = {
 
 export const useOrds = () => {
   const { ordAddress, retrieveKeys, verifyPassword, ordPubKey } = useKeys();
-  const { getUxos, broadcastRawTx, getRawTxById } = useWhatsOnChain();
+  const { getUtxos, broadcastRawTx, getRawTxById } = useWhatsOnChain();
   const [ordinals, setOrdinals] = useState<OrdinalResponse>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { bsvWasmInitialized } = useBsvWasm();
@@ -168,7 +168,7 @@ export const useOrds = () => {
       const fundingAndChangeAddress = keys.walletAddress;
       const payWifPk = keys.walletWif;
 
-      const utxos = await getUxos(fundingAndChangeAddress);
+      const utxos = await getUtxos(fundingAndChangeAddress);
 
       const fundingUtxos: UTXO[] = utxos
         .map((utxo: WocUtxo) => {

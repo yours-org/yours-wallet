@@ -35,7 +35,7 @@ export const useBsv = () => {
   const [bsvBalance, setBsvBalance] = useState(0);
   const [exchangeRate, setExchangeRate] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { getUxos, getBsvBalance, getExchangeRate, broadcastRawTx } =
+  const { getUtxos, getBsvBalance, getExchangeRate, broadcastRawTx } =
     useWhatsOnChain();
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey } = useKeys();
   const { bsvWasmInitialized } = useBsvWasm();
@@ -64,7 +64,7 @@ export const useBsv = () => {
       const amount = request.reduce((a, r) => a + r.satAmount, 0);
 
       // Format in and outs
-      const utxos = await getUxos(fromAddress);
+      const utxos = await getUtxos(fromAddress);
 
       const script = P2PKHAddress.from_string(fromAddress)
         .get_locking_script()
