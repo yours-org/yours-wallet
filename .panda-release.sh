@@ -8,7 +8,6 @@ fi
 VERSION="$1"
 ZIP_FILE="public/builds/pw-${VERSION}.zip"
 CHECKSUM_FILE="public/builds/pw-${VERSION}.256"
-MANIFEST_FILE="public/manifest.json"
 
 # Step 1: Add changes to Git
 git add .
