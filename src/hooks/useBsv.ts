@@ -1,8 +1,21 @@
 import { useEffect, useState } from "react";
 import { useKeys } from "./useKeys";
-import * as bsv from "bsv";
-import { UTXO, useWhatsOnChain } from "./useWhatsOnChain";
+import {
+  ECDSA,
+  Hash,
+  P2PKHAddress,
+  PrivateKey,
+  PublicKey,
+  Script,
+  SigHash,
+  Signature,
+  Transaction,
+  TxIn,
+  TxOut,
+} from "bsv-wasm-web";
+import { UTXO, WocUtxo, useWhatsOnChain } from "./useWhatsOnChain";
 import { SignMessageResponse } from "../pages/requests/SignMessageRequest";
+import { useBsvWasm } from "./useBsvWasm";
 
 type SendBsvResponse = {
   txid?: string;
@@ -25,51 +38,116 @@ export const useBsv = () => {
   const { getUxos, getBsvBalance, getExchangeRate, broadcastRawTx } =
     useWhatsOnChain();
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey } = useKeys();
+  const { bsvWasmInitialized } = useBsvWasm();
+
+  useEffect(() => {}, []);
 
   const sendBsv = async (
     request: Web3SendBsvRequest,
     password: string
   ): Promise<SendBsvResponse> => {
     try {
+      if (!bsvWasmInitialized) throw Error("bsv-wasm not initialized!");
       // Gather keys for tx
       setIsProcessing(true);
       const isAuthenticated = await verifyPassword(password);
       if (!isAuthenticated) {
         return { error: "invalid-password" };
       }
+
       const feeSats = 20;
       const keys = await retrieveKeys(password);
-      const paymentPk = bsv.PrivateKey.fromWIF(keys.walletWif);
-      const fromAddress = paymentPk.toAddress().toString();
+      if (!keys?.walletWif || !keys.walletPubKey) throw Error("Undefined key");
+      const paymentPk = PrivateKey.from_wif(keys.walletWif);
+      const pubKey = paymentPk.to_public_key();
+      const fromAddress = pubKey.to_address().to_string();
       const amount = request.reduce((a, r) => a + r.satAmount, 0);
 
       // Format in and outs
       const utxos = await getUxos(fromAddress);
-      const totalSats = utxos.reduce((a, item) => a + item.satoshis, 0);
+
+      const script = P2PKHAddress.from_string(fromAddress)
+        .get_locking_script()
+        .to_asm_string();
+
+      const fundingUtxos = utxos
+        .map((utxo: WocUtxo) => {
+          return {
+            satoshis: utxo.value,
+            vout: utxo.tx_pos,
+            txid: utxo.tx_hash,
+            script,
+          };
+        })
+        .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
+
+      if (!fundingUtxos) throw Error("No Utxos!");
+      const totalSats = fundingUtxos.reduce(
+        (a: number, item: UTXO) => a + item.satoshis,
+        0
+      );
       if (totalSats < amount) {
         return { error: "insufficient-funds" };
       }
 
       const sendAll = totalSats === amount;
       const satsOut = sendAll ? totalSats - feeSats : amount;
-      const inputs = getInputs(utxos, satsOut, sendAll);
+      const inputs = getInputs(fundingUtxos, satsOut, sendAll);
 
       const totalInputSats = inputs.reduce((a, item) => a + item.satoshis, 0);
 
       // Build tx
-      const bsvTx = bsv.Transaction().from(inputs);
+      const tx = new Transaction(1, 0);
+
       request.forEach((req) => {
-        bsvTx.to(req.address, req.satAmount);
+        tx.add_output(
+          new TxOut(
+            BigInt(satsOut),
+            P2PKHAddress.from_string(req.address).get_locking_script()
+          )
+        );
       });
 
       if (!sendAll) {
         const change = totalInputSats - satsOut - feeSats;
-        bsvTx.to(fromAddress, change);
+        tx.add_output(
+          new TxOut(
+            BigInt(change),
+            P2PKHAddress.from_string(fromAddress).get_locking_script()
+          )
+        );
       }
-      // Sign and get raw tx
-      bsvTx.sign(paymentPk);
-      const txhex = bsvTx.toString();
 
+      // build txins from our UTXOs
+      let idx = 0;
+      for (let u of fundingUtxos || []) {
+        const inTx = new TxIn(
+          Buffer.from(u.txid, "hex"),
+          u.vout,
+          Script.from_asm_string("")
+        );
+
+        inTx.set_satoshis(BigInt(u.satoshis));
+        tx.add_input(inTx);
+
+        const sig = tx.sign(
+          paymentPk,
+          SigHash.InputOutputs,
+          idx,
+          Script.from_asm_string(u.script),
+          BigInt(u.satoshis)
+        );
+
+        inTx.set_unlocking_script(
+          Script.from_asm_string(
+            `${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`
+          )
+        );
+        tx.set_input(idx, inTx);
+        idx++;
+      }
+
+      const txhex = tx.to_hex();
       const txid = await broadcastRawTx(txhex);
 
       return { txid };
@@ -90,14 +168,20 @@ export const useBsv = () => {
     }
     try {
       const keys = await retrieveKeys(password);
-      const hash = bsv.crypto.Hash.sha256(Buffer.from(message));
-      const privateKey = bsv.PrivateKey.fromWIF(keys.walletWif);
-      const signature = bsv.crypto.ECDSA.sign(hash, privateKey, "big");
-      const address = privateKey.toAddress().toString();
+      if (!keys?.walletWif) throw Error("Undefined key");
+      const hash = Hash.sha_256(Buffer.from(message)).to_hex();
+      const privateKey = PrivateKey.from_wif(keys.walletWif);
+      const publicKey = privateKey.to_public_key();
+      const address = publicKey.to_address().to_string();
+      const encoder = new TextEncoder();
+      const encodedMessage = encoder.encode(hash);
+      const signature = privateKey.sign_message(encodedMessage);
+
       return {
         address,
+        pubKeyHex: publicKey.to_hex(),
         signedMessage: message,
-        signatureHex: signature.toString("hex"),
+        signatureHex: signature.to_hex(),
       };
     } catch (error) {
       console.log(error);
@@ -110,12 +194,17 @@ export const useBsv = () => {
     publicKeyHex: string
   ) => {
     try {
-      const hash = bsv.crypto.Hash.sha256(Buffer.from(message));
-      const signature = bsv.crypto.Signature.fromDER(
-        Buffer.from(signatureHex, "hex")
+      const hash = Hash.sha_256(Buffer.from(message)).to_hex();
+      const signature = Signature.from_der(Buffer.from(signatureHex, "hex"));
+      const publicKey = PublicKey.from_hex(publicKeyHex);
+      const encoder = new TextEncoder();
+      const encodedMessage = encoder.encode(hash);
+      const verified = ECDSA.verify_digest(
+        encodedMessage,
+        publicKey,
+        signature,
+        0
       );
-      const publicKey = bsv.PublicKey.fromHex(publicKeyHex);
-      const verified = bsv.crypto.ECDSA.verify(hash, signature, publicKey);
       return verified;
     } catch (error) {
       console.error(error);
@@ -140,12 +229,12 @@ export const useBsv = () => {
 
   const balance = async () => {
     const total = await getBsvBalance(bsvAddress);
-    setBsvBalance(total);
+    setBsvBalance(total ?? 0);
   };
 
   const rate = async () => {
     const r = await getExchangeRate();
-    setExchangeRate(r);
+    setExchangeRate(r ?? 0);
   };
 
   useEffect(() => {

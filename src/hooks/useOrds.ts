@@ -2,10 +2,10 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { FEE_PER_BYTE, GP_BASE_URL } from "../utils/constants";
 import { useKeys } from "./useKeys";
-import { UTXO, useWhatsOnChain } from "./useWhatsOnChain";
-import { Transaction, Script, PrivateKey } from "bsv";
-import { sendOrdinal } from "../utils/js-1sat-ord";
-import { Keys } from "../utils/keys";
+import { UTXO, WocUtxo, useWhatsOnChain } from "./useWhatsOnChain";
+import { sendOrdinal } from "js-1sat-ord-web";
+import { P2PKHAddress, PrivateKey, Transaction } from "bsv-wasm-web";
+import { useBsvWasm } from "./useBsvWasm";
 
 type OrdinalResponse = {
   id: number;
@@ -112,9 +112,10 @@ export type Web3TransferOrdinalRequest = {
 
 export const useOrds = () => {
   const { ordAddress, retrieveKeys, verifyPassword, ordPubKey } = useKeys();
-  const { getUxos, getRawTxById, broadcastRawTx } = useWhatsOnChain();
+  const { getUxos, broadcastRawTx, getRawTxById } = useWhatsOnChain();
   const [ordinals, setOrdinals] = useState<OrdinalResponse>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const { bsvWasmInitialized } = useBsvWasm();
 
   const getOrdinals = async () => {
     try {
@@ -145,6 +146,7 @@ export const useOrds = () => {
     password: string
   ): Promise<TransferOrdinalResponse> => {
     try {
+      if (!bsvWasmInitialized) throw Error("bsv-wasm not initialized!");
       setIsProcessing(true);
 
       const isAuthenticated = await verifyPassword(password);
@@ -152,20 +154,41 @@ export const useOrds = () => {
         return { error: "invalid-password" };
       }
 
-      const keys = (await retrieveKeys(password)) as Keys;
+      const keys = await retrieveKeys(password);
+      if (
+        !keys?.ordAddress ||
+        !keys.ordWif ||
+        !keys.walletAddress ||
+        !keys.walletWif
+      ) {
+        throw Error("No keys");
+      }
       const ordinalAddress = keys.ordAddress;
       const ordWifPk = keys.ordWif;
       const fundingAndChangeAddress = keys.walletAddress;
       const payWifPk = keys.walletWif;
 
-      const fundingUtxos = await getUxos(fundingAndChangeAddress);
+      const utxos = await getUxos(fundingAndChangeAddress);
+
+      const fundingUtxos: UTXO[] = utxos
+        .map((utxo: WocUtxo) => {
+          return {
+            satoshis: utxo.value,
+            vout: utxo.tx_pos,
+            txid: utxo.tx_hash,
+            script: P2PKHAddress.from_string(fundingAndChangeAddress)
+              .get_locking_script()
+              .to_asm_string(),
+          } as UTXO;
+        })
+        .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
 
       if (!fundingUtxos || fundingUtxos.length === 0) {
         return { error: "insufficient-funds" };
       }
 
       const ordUtxos = await getOrdinalUtxos(ordinalAddress);
-
+      if (!ordUtxos) throw Error("No ord utxos!");
       const ordUtxo = ordUtxos.find((o) => o.outpoint === outpoint);
 
       if (!ordUtxo) {
@@ -174,40 +197,34 @@ export const useOrds = () => {
 
       if (!ordUtxo.script) {
         const ordRawTx = await getRawTxById(ordUtxo.txid);
-        const tx = new Transaction(ordRawTx);
-        const out = tx.outputs[ordUtxo.vout];
-        const script = out?.script.toHex();
-
+        if (!ordRawTx) throw Error("Could not get raw tx");
+        const tx = Transaction.from_hex(ordRawTx);
+        const out = tx.get_output(ordUtxo.vout);
+        const script = out?.get_script_pub_key();
         if (script) {
-          const scriptObj = new Script(out.script);
-          ordUtxo.script = scriptObj.toASM();
+          ordUtxo.script = script.to_asm_string();
         }
       }
+
       const fundingUtxo = fundingUtxos[0];
+
       if (fundingUtxo && !fundingUtxo.script) {
         const ordRawTx = await getRawTxById(fundingUtxo.txid);
-        const tx = new Transaction(ordRawTx);
-        const out = tx.outputs[ordUtxo.vout];
-        const script = out?.script.toHex();
+        if (!ordRawTx) throw Error("Could not get raw tx");
+        const tx = Transaction.from_hex(ordRawTx);
+        const out = tx.get_output(ordUtxo.vout);
+        const script = out?.get_script_pub_key();
         if (script) {
-          const scriptObj = new Script(out.script);
-          fundingUtxo.script = scriptObj.toASM();
+          fundingUtxo.script = script.to_asm_string();
         }
       }
 
-      const payPrivateKey = PrivateKey.fromWIF(payWifPk);
-      const ordPrivateKey = PrivateKey.fromWIF(ordWifPk);
-
-      const formattedOrdUtxo: UTXO = {
-        satoshis: ordUtxo.satoshis,
-        script: Script.fromASM(ordUtxo.script).toHex(),
-        txid: ordUtxo.txid,
-        vout: ordUtxo.vout,
-      };
+      const payPrivateKey = PrivateKey.from_wif(payWifPk);
+      const ordPrivateKey = PrivateKey.from_wif(ordWifPk);
 
       const broadcastResult = await buildAndBroadcastOrdinalTx(
         fundingUtxo,
-        formattedOrdUtxo,
+        ordUtxo,
         payPrivateKey,
         fundingAndChangeAddress,
         ordPrivateKey,
@@ -230,9 +247,9 @@ export const useOrds = () => {
   const buildAndBroadcastOrdinalTx = async (
     fundingUtxo: UTXO,
     ordUtxo: UTXO,
-    payPrivateKey: Buffer,
+    payPrivateKey: PrivateKey,
     fundingAndChangeAddress: string,
-    ordPrivateKey: Buffer,
+    ordPrivateKey: PrivateKey,
     destination: string
   ): Promise<BuildAndBroadcastResponse | undefined> => {
     const sendRes = await sendOrdinal(
@@ -245,7 +262,7 @@ export const useOrds = () => {
       destination
     );
 
-    const rawTx = sendRes.tx.toString();
+    const rawTx = sendRes.to_hex();
 
     // Broadcasting with WOC for now. Ideally we broadcast with whatever the 1sat indexer is most likely to see first. David Case mentioned an endpoint specifically for the indexer. Should use this when ready.
     const txid = await broadcastRawTx(rawTx);
@@ -259,39 +276,35 @@ export const useOrds = () => {
       return { txid, rawTx };
     }
   };
-
-  const getOrdinalUtxos = async (address: string): Promise<OrdUtxo[]> => {
+  const getOrdinalUtxos = async (
+    address: string
+  ): Promise<OrdUtxo[] | undefined> => {
     try {
+      if (!address) {
+        return [];
+      }
       const r = await axios.get(
         `${GP_BASE_URL}/utxos/address/${address}/inscriptions?limit=100&offset=0&excludeBsv20=false`
       );
 
-      const utxos = (await r.data) as GPInscription[];
+      const utxos = r.data as GPInscription[];
 
       const oUtxos: OrdUtxo[] = [];
       for (const a of utxos) {
         const parts = a.origin.split("_");
-        const imageUrl = `${GP_BASE_URL}/files/inscriptions/${a.origin}`;
-        a.file.url = imageUrl;
 
         oUtxos.push({
           satoshis: 1, // all ord utxos currently 1 satoshi
           txid: a.txid,
           vout: parseInt(parts[1]),
           origin: a.origin,
-          num: a.num,
-          file: a.file,
-          listing: a.listing,
           outpoint: a.outpoint,
-          map: a.MAP,
-          type: a.file.type,
         } as OrdUtxo);
       }
 
       return oUtxos;
-    } catch (e) {
-      console.log(e);
-      return [];
+    } catch (error) {
+      console.log(error);
     }
   };
 
