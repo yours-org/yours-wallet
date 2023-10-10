@@ -64,24 +64,40 @@ export type ButtonProps = {
   theme: Theme;
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
+  isSubmit?: boolean;
 };
 
 export const Button = (props: ButtonProps) => {
-  const { label, type, onClick, disabled, theme } = props;
+  const { label, type, onClick, disabled, theme, isSubmit } = props;
   return (
     <>
       <Show when={type === "primary"}>
-        <Primary theme={theme} disabled={disabled} onClick={onClick}>
+        <Primary
+          theme={theme}
+          disabled={disabled}
+          onClick={onClick}
+          type={isSubmit ? "submit" : "button"}
+        >
           {label}
         </Primary>
       </Show>
       <Show when={type === "secondary"}>
-        <Secondary theme={theme} disabled={disabled} onClick={onClick}>
+        <Secondary
+          theme={theme}
+          disabled={disabled}
+          onClick={onClick}
+          type={isSubmit ? "submit" : "button"}
+        >
           {label}
         </Secondary>
       </Show>
       <Show when={type === "warn"}>
-        <Warn theme={theme} disabled={disabled} onClick={onClick}>
+        <Warn
+          theme={theme}
+          disabled={disabled}
+          onClick={onClick}
+          type={isSubmit ? "submit" : "button"}
+        >
           {label}
         </Warn>
       </Show>
