@@ -81,7 +81,7 @@ export const SignTransactionRequest = (props: SignTransactionRequestProps) => {
     onSignature();
 
     chrome.runtime.sendMessage({
-      action: "signTransactionResult",
+      action: "signTransactionResponse",
       ...signRes,
     });
 
