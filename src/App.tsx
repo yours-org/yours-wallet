@@ -16,13 +16,18 @@ import { useTheme } from "./hooks/useTheme";
 import { BsvSendRequest } from "./pages/requests/BsvSendRequest";
 import { storage } from "./utils/storage";
 import { useContext, useEffect, useState } from "react";
-import { Web3BroadcastRequest, Web3SendBsvRequest } from "./hooks/useBsv";
+import {
+  Web3BroadcastRequest,
+  Web3SendBsvRequest,
+  Web3SignTransactionRequest,
+} from "./hooks/useBsv";
 import { Web3TransferOrdinalRequest } from "./hooks/useOrds";
 import { OrdTransferRequest } from "./pages/requests/OrdTransferRequest";
 import { BottomMenuContext } from "./contexts/BottomMenuContext";
 import { ConnectRequest } from "./pages/requests/ConnectRequest";
 import { SignMessageRequest } from "./pages/requests/SignMessageRequest";
 import { BroadcastRequest } from "./pages/requests/BroadcastRequest";
+import { SignTransactionRequest } from "./pages/requests/SignTransactionRequest";
 
 export type ThirdPartyAppRequestData = {
   appName: string;
@@ -66,6 +71,10 @@ export const App = () => {
     Web3TransferOrdinalRequest | undefined
   >(undefined);
 
+  const [signTransactionRequest, setSignTransactionRequest] = useState<
+    Web3SignTransactionRequest | undefined
+  >(undefined);
+
   useActivityDetector(isLocked);
 
   const handleUnlock = async () => {
@@ -81,6 +90,7 @@ export const App = () => {
         "popupWindowId",
         "whitelist",
         "signMessageRequest",
+        "signTransactionRequest",
         "broadcastRequest",
       ],
       (result) => {
@@ -91,6 +101,7 @@ export const App = () => {
           sendBsv,
           transferOrdinal,
           signMessageRequest,
+          signTransactionRequest,
           broadcastRequest,
         } = result;
 
@@ -116,6 +127,10 @@ export const App = () => {
 
         if (signMessageRequest) {
           setMessageToSign(signMessageRequest.message);
+        }
+
+        if (signTransactionRequest) {
+          setSignTransactionRequest(signTransactionRequest);
         }
 
         if (broadcastRequest) {
@@ -153,7 +168,10 @@ export const App = () => {
                 element={
                   <Show
                     when={
-                      !bsvSendRequest && !messageToSign && !broadcastRequest
+                      !bsvSendRequest &&
+                      !messageToSign &&
+                      !broadcastRequest &&
+                      !signTransactionRequest
                     }
                     whenFalseContent={
                       <>
@@ -168,6 +186,17 @@ export const App = () => {
                             messageToSign={messageToSign ?? ""}
                             popupId={popupId}
                             onSignature={() => setMessageToSign(undefined)}
+                          />
+                        </Show>
+                        <Show when={!!signTransactionRequest}>
+                          <SignTransactionRequest
+                            request={
+                              signTransactionRequest as Web3SignTransactionRequest
+                            }
+                            popupId={popupId}
+                            onSignature={() =>
+                              setSignTransactionRequest(undefined)
+                            }
                           />
                         </Show>
                         <Show when={!!broadcastRequest}>

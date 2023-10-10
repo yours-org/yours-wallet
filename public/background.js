@@ -5,6 +5,7 @@ let responseCallbackForConnectRequest;
 let responseCallbackForSendBsvRequest;
 let responseCallbackForTransferOrdinalRequest;
 let responseCallbackForSignMessageRequest;
+let responseCallbackForSignTransactionRequest;
 let responseCallbackForBroadcastRequest;
 let popupWindowId = null;
 
@@ -56,6 +57,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     "sendBsvResult",
     "transferOrdinalResult",
     "signMessageResult",
+    "signTransactionResult",
     "broadcastResult",
   ];
 
@@ -71,6 +73,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processTransferOrdinalResult(message);
       case "signMessageResult":
         return processSignMessageResult(message);
+      case "signTransactionResult":
+        return processSignTransactionResult(message);
       case "broadcastResult":
         return processBroadcastResult(message);
       default:
@@ -112,6 +116,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processTransferOrdinal(message, sendResponse);
       case "signMessage":
         return processSignMessageRequest(message, sendResponse);
+      case "signTransaction":
+        return processSignTransactionRequest(message, sendResponse);
       case "broadcast":
         return processBroadcastRequest(message, sendResponse);
       default:
@@ -397,6 +403,34 @@ const processSignMessageRequest = (message, sendResponse) => {
   return true;
 };
 
+const processSignTransactionRequest = (message, sendResponse) => {
+  if (!message.params) {
+    sendResponse({
+      type: "signTransaction",
+      success: false,
+      error: "Must provide valid params!",
+    });
+  }
+  try {
+    responseCallbackForSignTransactionRequest = sendResponse;
+    chrome.storage.local
+      .set({
+        signTransactionRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+  } catch (error) {
+    sendResponse({
+      type: "signTransaction",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+
+  return true;
+};
+
 const processSendBsvResult = (message) => {
   if (!responseCallbackForSendBsvRequest) throw Error("Missing callback!");
   try {
@@ -472,6 +506,30 @@ const processSignMessageResult = (message) => {
   return true;
 };
 
+const processSignTransactionResult = (message) => {
+  if (!responseCallbackForSignTransactionRequest)
+    throw Error("Missing callback!");
+  try {
+    responseCallbackForSignTransactionRequest({
+      type: "signTransaction",
+      success: true,
+      data: message?.signatureHex,
+    });
+  } catch (error) {
+    responseCallbackForSignTransactionRequest({
+      type: "signTransaction",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  } finally {
+    responseCallbackForSignTransactionRequest = null;
+    popupWindowId = null;
+    chrome.storage.local.remove(["signTransactionRequest", "popupWindowId"]);
+  }
+
+  return true;
+};
+
 const processBroadcastResult = (message) => {
   if (!responseCallbackForBroadcastRequest) throw Error("Missing callback!");
   try {
@@ -525,6 +583,16 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       });
       responseCallbackForSignMessageRequest = null;
       chrome.storage.local.remove("signMessageRequest");
+    }
+
+    if (responseCallbackForSignTransactionRequest) {
+      responseCallbackForSignTransactionRequest({
+        type: "signTransaction",
+        success: true,
+        data: "User dismissed the request!",
+      });
+      responseCallbackForSignTransactionRequest = null;
+      chrome.storage.local.remove("signTransactionRequest");
     }
 
     if (responseCallbackForTransferOrdinalRequest) {
