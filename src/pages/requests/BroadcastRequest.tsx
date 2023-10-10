@@ -99,6 +99,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
               type="primary"
               label="Broadcast Now"
               disabled={isProcessing}
+              isSubmit
             />
           </FormContainer>
         </ConfirmContent>

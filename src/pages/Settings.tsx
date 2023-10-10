@@ -46,6 +46,11 @@ export const Settings = () => {
     setSelected("settings");
   }, [setSelected]);
 
+  const handleLock = () => {
+    lockWallet();
+    setSelected("bsv");
+  };
+
   return (
     <Content>
       <Show
@@ -73,7 +78,7 @@ export const Settings = () => {
           theme={theme}
           label="Lock Wallet"
           type="secondary"
-          onClick={lockWallet}
+          onClick={handleLock}
         />
       </Show>
     </Content>

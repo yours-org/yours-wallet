@@ -2,7 +2,7 @@ import styled, { keyframes, css } from "styled-components";
 import { Theme } from "../theme";
 import { InputHTMLAttributes } from "react";
 
-const shakeAnimation = keyframes`
+const $shakeAnimation = keyframes`
   10%, 90% {
     transform: translate3d(-1px, 0, 0);
   }
@@ -20,7 +20,7 @@ const shakeAnimation = keyframes`
   }
 `;
 
-const TheInput = styled.input<{ theme: Theme; shake?: string }>`
+const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
   background-color: ${({ theme }) => theme.darkAccent + "60"};
   border-radius: 0.25rem;
   border: 1px solid ${({ theme }) => theme.white + "40"};
@@ -31,9 +31,9 @@ const TheInput = styled.input<{ theme: Theme; shake?: string }>`
   outline: none;
   color: ${({ theme }) => theme.white + "80"};
   animation: ${(props) =>
-    props.shake === "true"
+    props.$shake === "true"
       ? css`
-          ${shakeAnimation} 0.5s cubic-bezier(.36,.07,.19,.97) both
+          ${$shakeAnimation} 0.5s cubic-bezier(.36,.07,.19,.97) both
         `
       : "none"};
 
@@ -73,7 +73,7 @@ export const Input = (props: InputProps) => {
       {...allProps}
       theme={theme}
       onWheel={preventScroll}
-      shake={shake}
+      $shake={shake}
     />
   );
 };

@@ -109,16 +109,18 @@ export const RestoreWallet = () => {
             theme={theme}
             placeholder="Password"
             type="password"
+            value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
           <Input
             theme={theme}
             placeholder="Confirm Password"
             type="password"
+            value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
             style={{ marginBottom: "2rem" }}
           />
-          <Button theme={theme} type="primary" label="Finish" />
+          <Button theme={theme} type="primary" label="Finish" isSubmit />
         </FormContainer>
       </Content>
     </>
@@ -141,7 +143,7 @@ export const RestoreWallet = () => {
           <Text theme={theme} style={{ margin: "3rem 0 1rem" }}>
             Make sure you are in a safe place and no one is watching.
           </Text>
-          <Button theme={theme} type="primary" label="Next" />
+          <Button theme={theme} type="primary" label="Next" isSubmit />
         </FormContainer>
       </Content>
     </>

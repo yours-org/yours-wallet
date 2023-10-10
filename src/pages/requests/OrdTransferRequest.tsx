@@ -123,6 +123,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
               theme={theme}
               placeholder="Password"
               type="password"
+              value={passwordConfirm}
               onChange={(e) => setPasswordConfirm(e.target.value)}
             />
             <Text theme={theme} style={{ margin: "1rem 0 1rem" }}>
@@ -133,6 +134,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
               type="primary"
               label="Approve"
               disabled={isProcessing}
+              isSubmit
             />
           </FormContainer>
         </ConfirmContent>

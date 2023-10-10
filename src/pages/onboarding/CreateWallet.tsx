@@ -121,18 +121,20 @@ export const CreateWallet = () => {
             theme={theme}
             placeholder="Password"
             type="password"
+            value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
           <Input
             theme={theme}
             placeholder="Confirm Password"
             type="password"
+            value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
           <Text theme={theme} style={{ margin: "3rem 0 1rem" }}>
             Make sure you are in a safe place and no one is watching.
           </Text>
-          <Button theme={theme} type="primary" label="Generate Seed" />
+          <Button theme={theme} type="primary" label="Generate Seed" isSubmit />
         </FormContainer>
       </Content>
     </>

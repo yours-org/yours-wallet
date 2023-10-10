@@ -129,6 +129,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
               theme={theme}
               placeholder="Enter Wallet Password"
               type="password"
+              value={passwordConfirm}
               onChange={(e) => setPasswordConfirm(e.target.value)}
             />
             <Button
@@ -136,6 +137,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
               type="primary"
               label="Sign Message"
               disabled={isProcessing}
+              isSubmit
             />
           </FormContainer>
         </ConfirmContent>
