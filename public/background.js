@@ -50,33 +50,34 @@ const authorizeRequest = async (message) => {
   return await verifyAccess(params.domain);
 };
 
+// MESSAGE LISTENER
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const noAuthRequired = [
     "isConnected",
-    "userConnectDecision",
-    "sendBsvResult",
-    "transferOrdinalResult",
-    "signMessageResult",
-    "signTransactionResult",
-    "broadcastResult",
+    "userConnectResponse",
+    "sendBsvResponse",
+    "transferOrdinalResponse",
+    "signMessageResponse",
+    "signTransactionResponse",
+    "broadcastResponse",
   ];
 
   if (noAuthRequired.includes(message.action)) {
     switch (message.action) {
       case "isConnected":
         return processIsConnectedRequest(message, sendResponse);
-      case "userConnectDecision":
-        return processConnectDecision(message);
-      case "sendBsvResult":
-        return processSendBsvResult(message);
-      case "transferOrdinalResult":
-        return processTransferOrdinalResult(message);
-      case "signMessageResult":
-        return processSignMessageResult(message);
-      case "signTransactionResult":
-        return processSignTransactionResult(message);
-      case "broadcastResult":
-        return processBroadcastResult(message);
+      case "userConnectResponse":
+        return processConnectResponse(message);
+      case "sendBsvResponse":
+        return processSendBsvResponse(message);
+      case "transferOrdinalResponse":
+        return processTransferOrdinalResponse(message);
+      case "signMessageResponse":
+        return processSignMessageResponse(message);
+      case "signTransactionResponse":
+        return processSignTransactionResponse(message);
+      case "broadcastResponse":
+        return processBroadcastResponse(message);
       default:
         break;
     }
@@ -101,19 +102,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     switch (message.action) {
       case "disconnect":
-        return processDisconnect(message, sendResponse);
+        return processDisconnectRequest(message, sendResponse);
       case "getPubKeys":
-        return processGetPubKeys(sendResponse);
+        return processGetPubKeysRequest(sendResponse);
       case "getBalance":
-        return processGetBalance(sendResponse);
+        return processGetBalanceRequest(sendResponse);
       case "getAddresses":
-        return processGetAddresses(sendResponse);
+        return processGetAddressesRequest(sendResponse);
       case "getOrdinals":
-        return processGetOrdinals(sendResponse);
+        return processGetOrdinalsRequest(sendResponse);
       case "sendBsv":
-        return processSendBsv(message, sendResponse);
+        return processSendBsvRequest(message, sendResponse);
       case "transferOrdinal":
-        return processTransferOrdinal(message, sendResponse);
+        return processTransferOrdinalRequest(message, sendResponse);
       case "signMessage":
         return processSignMessageRequest(message, sendResponse);
       case "signTransaction":
@@ -128,6 +129,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
+// REQUESTS ***************************************
+
 const processConnectRequest = (message, sendResponse, isAuthorized) => {
   responseCallbackForConnectRequest = sendResponse;
   chrome.storage.local
@@ -141,7 +144,7 @@ const processConnectRequest = (message, sendResponse, isAuthorized) => {
   return true;
 };
 
-const processDisconnect = (message, sendResponse) => {
+const processDisconnectRequest = (message, sendResponse) => {
   try {
     chrome.storage.local.get(["whitelist"], (result) => {
       if (!result.whitelist) throw Error("Already disconnected!");
@@ -198,34 +201,7 @@ const processIsConnectedRequest = (message, sendResponse) => {
   return true;
 };
 
-const processConnectDecision = (message) => {
-  try {
-    if (responseCallbackForConnectRequest) {
-      responseCallbackForConnectRequest({
-        type: "connect",
-        success: true,
-        data:
-          message.decision === "approved"
-            ? message.pubKeys
-            : "User canceled connection",
-      });
-    }
-  } catch (error) {
-    responseCallbackForConnectRequest({
-      type: "connect",
-      success: false,
-      error: JSON.stringify(error),
-    });
-  } finally {
-    responseCallbackForConnectRequest = null;
-    popupWindowId = null;
-    chrome.storage.local.remove("popupWindowId");
-  }
-
-  return true;
-};
-
-const processGetBalance = (sendResponse) => {
+const processGetBalanceRequest = (sendResponse) => {
   try {
     chrome.storage.local.get(["appState"], (result) => {
       sendResponse({
@@ -243,7 +219,7 @@ const processGetBalance = (sendResponse) => {
   }
 };
 
-const processGetPubKeys = (sendResponse) => {
+const processGetPubKeysRequest = (sendResponse) => {
   try {
     chrome.storage.local.get(["appState"], (result) => {
       sendResponse({
@@ -261,7 +237,7 @@ const processGetPubKeys = (sendResponse) => {
   }
 };
 
-const processGetAddresses = (sendResponse) => {
+const processGetAddressesRequest = (sendResponse) => {
   try {
     chrome.storage.local.get(["appState"], (result) => {
       sendResponse({
@@ -279,7 +255,7 @@ const processGetAddresses = (sendResponse) => {
   }
 };
 
-const processGetOrdinals = (sendResponse) => {
+const processGetOrdinalsRequest = (sendResponse) => {
   try {
     chrome.storage.local.get(["appState"], (result) => {
       sendResponse({
@@ -297,7 +273,7 @@ const processGetOrdinals = (sendResponse) => {
   }
 };
 
-const processSendBsv = (message, sendResponse) => {
+const processSendBsvRequest = (message, sendResponse) => {
   if (!message.params.data) {
     sendResponse({
       type: "sendBsv",
@@ -309,7 +285,7 @@ const processSendBsv = (message, sendResponse) => {
     responseCallbackForSendBsvRequest = sendResponse;
     chrome.storage.local
       .set({
-        sendBsv: message.params.data,
+        sendBsvRequest: message.params.data,
       })
       .then(() => {
         launchPopUp();
@@ -323,7 +299,7 @@ const processSendBsv = (message, sendResponse) => {
   }
 };
 
-const processTransferOrdinal = (message, sendResponse) => {
+const processTransferOrdinalRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
       type: "transferOrdinal",
@@ -335,7 +311,7 @@ const processTransferOrdinal = (message, sendResponse) => {
     responseCallbackForTransferOrdinalRequest = sendResponse;
     chrome.storage.local
       .set({
-        transferOrdinal: message.params,
+        transferOrdinalRequest: message.params,
       })
       .then(() => {
         launchPopUp();
@@ -427,11 +403,37 @@ const processSignTransactionRequest = (message, sendResponse) => {
       error: JSON.stringify(error),
     });
   }
+};
+// RESPONSES ********************************
+
+const processConnectResponse = (message) => {
+  try {
+    if (responseCallbackForConnectRequest) {
+      responseCallbackForConnectRequest({
+        type: "connect",
+        success: true,
+        data:
+          message.decision === "approved"
+            ? message.pubKeys
+            : "User canceled connection",
+      });
+    }
+  } catch (error) {
+    responseCallbackForConnectRequest({
+      type: "connect",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  } finally {
+    responseCallbackForConnectRequest = null;
+    popupWindowId = null;
+    chrome.storage.local.remove("popupWindowId");
+  }
 
   return true;
 };
 
-const processSendBsvResult = (message) => {
+const processSendBsvResponse = (message) => {
   if (!responseCallbackForSendBsvRequest) throw Error("Missing callback!");
   try {
     responseCallbackForSendBsvRequest({
@@ -448,13 +450,13 @@ const processSendBsvResult = (message) => {
   } finally {
     responseCallbackForSendBsvRequest = null;
     popupWindowId = null;
-    chrome.storage.local.remove(["sendBsv", "popupWindowId"]);
+    chrome.storage.local.remove(["sendBsvRequest", "popupWindowId"]);
   }
 
   return true;
 };
 
-const processTransferOrdinalResult = (message) => {
+const processTransferOrdinalResponse = (message) => {
   if (!responseCallbackForTransferOrdinalRequest)
     throw Error("Missing callback!");
   try {
@@ -472,13 +474,13 @@ const processTransferOrdinalResult = (message) => {
   } finally {
     responseCallbackForTransferOrdinalRequest = null;
     popupWindowId = null;
-    chrome.storage.local.remove(["transferOrdinal", "popupWindowId"]);
+    chrome.storage.local.remove(["transferOrdinalRequest", "popupWindowId"]);
   }
 
   return true;
 };
 
-const processSignMessageResult = (message) => {
+const processSignMessageResponse = (message) => {
   if (!responseCallbackForSignMessageRequest) throw Error("Missing callback!");
   try {
     responseCallbackForSignMessageRequest({
@@ -506,7 +508,7 @@ const processSignMessageResult = (message) => {
   return true;
 };
 
-const processSignTransactionResult = (message) => {
+const processSignTransactionResponse = (message) => {
   if (!responseCallbackForSignTransactionRequest)
     throw Error("Missing callback!");
   try {
@@ -530,7 +532,7 @@ const processSignTransactionResult = (message) => {
   return true;
 };
 
-const processBroadcastResult = (message) => {
+const processBroadcastResponse = (message) => {
   if (!responseCallbackForBroadcastRequest) throw Error("Missing callback!");
   try {
     responseCallbackForBroadcastRequest({
@@ -553,6 +555,8 @@ const processBroadcastResult = (message) => {
   return true;
 };
 
+// HANDLE WINDOW CLOSE *****************************************
+
 chrome.windows.onRemoved.addListener((closedWindowId) => {
   if (closedWindowId === popupWindowId) {
     if (responseCallbackForConnectRequest) {
@@ -572,7 +576,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         data: "User dismissed the request!",
       });
       responseCallbackForSendBsvRequest = null;
-      chrome.storage.local.remove("sendBsv");
+      chrome.storage.local.remove("sendBsvRequest");
     }
 
     if (responseCallbackForSignMessageRequest) {
@@ -602,7 +606,17 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         data: "User dismissed the request!",
       });
       responseCallbackForTransferOrdinalRequest = null;
-      chrome.storage.local.remove("transferOrdinal");
+      chrome.storage.local.remove("transferOrdinalRequest");
+    }
+
+    if (responseCallbackForBroadcastRequest) {
+      responseCallbackForBroadcastRequest({
+        type: "broadcast",
+        success: true,
+        data: "User dismissed the request!",
+      });
+      responseCallbackForBroadcastRequest = null;
+      chrome.storage.local.remove("broadcastRequest");
     }
     popupWindowId = null;
     chrome.storage.local.remove("popupWindowId");

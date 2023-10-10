@@ -73,7 +73,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     onBroadcast();
 
     chrome.runtime.sendMessage({
-      action: "broadcastResult",
+      action: "broadcastResponse",
       txid,
     });
 
@@ -99,6 +99,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
               type="primary"
               label="Broadcast Now"
               disabled={isProcessing}
+              isSubmit
             />
           </FormContainer>
         </ConfirmContent>

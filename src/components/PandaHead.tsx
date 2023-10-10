@@ -3,7 +3,7 @@ import styled from "styled-components";
 import panda from "../assets/panda.svg";
 
 const PandaImg = styled.img<{
-  rotation: { x: number; y: number };
+  $rotation: { x: number; y: number };
 }>`
   transition: transform 0.1s;
   width: ${(props) => props.width ?? "6.25rem"};
@@ -61,7 +61,7 @@ export const PandaHead = (props: PandaHeadProps) => {
       src={panda}
       width={width}
       alt="Panda Head"
-      rotation={rotation}
+      $rotation={rotation}
       style={{
         transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,
       }}

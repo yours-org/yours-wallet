@@ -222,7 +222,7 @@ export const useOrds = () => {
       const payPrivateKey = PrivateKey.from_wif(payWifPk);
       const ordPrivateKey = PrivateKey.from_wif(ordWifPk);
 
-      const broadcastResult = await buildAndBroadcastOrdinalTx(
+      const broadcastResponse = await buildAndBroadcastOrdinalTx(
         fundingUtxo,
         ordUtxo,
         payPrivateKey,
@@ -231,8 +231,8 @@ export const useOrds = () => {
         destinationAddress
       );
 
-      if (broadcastResult?.txid) {
-        return { txid: broadcastResult.txid };
+      if (broadcastResponse?.txid) {
+        return { txid: broadcastResponse.txid };
       }
 
       return { error: "broadcast-failed" };

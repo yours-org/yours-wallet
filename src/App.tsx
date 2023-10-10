@@ -84,8 +84,8 @@ export const App = () => {
   useEffect(() => {
     storage.get(
       [
-        "sendBsv",
-        "transferOrdinal",
+        "sendBsvRequest",
+        "transferOrdinalRequest",
         "connectRequest",
         "popupWindowId",
         "whitelist",
@@ -98,8 +98,8 @@ export const App = () => {
           popupWindowId,
           connectRequest,
           whitelist,
-          sendBsv,
-          transferOrdinal,
+          sendBsvRequest,
+          transferOrdinalRequest,
           signMessageRequest,
           signTransactionRequest,
           broadcastRequest,
@@ -116,12 +116,12 @@ export const App = () => {
           setWhitelistedDomains(whitelist);
         }
 
-        if (sendBsv) {
-          setBsvSendRequest(sendBsv);
+        if (sendBsvRequest) {
+          setBsvSendRequest(sendBsvRequest);
         }
 
-        if (transferOrdinal) {
-          setOrdinalTransferRequest(transferOrdinal);
+        if (transferOrdinalRequest) {
+          setOrdinalTransferRequest(transferOrdinalRequest);
           menuContext?.handleSelect("ords");
         }
 

@@ -258,6 +258,7 @@ export const OrdWallet = () => {
             theme={theme}
             placeholder="Password"
             type="password"
+            value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
           <Text theme={theme} style={{ margin: "3rem 0 1rem" }}>
@@ -268,6 +269,7 @@ export const OrdWallet = () => {
             type="primary"
             label="Transfer Now"
             disabled={isProcessing}
+            isSubmit
           />
         </FormContainer>
       </ConfirmContent>

@@ -134,7 +134,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     addSnackbar("Transaction Successful!", "success");
     onResponse();
     await chrome.runtime.sendMessage({
-      action: "sendBsvResult",
+      action: "sendBsvResponse",
       txid: sendRes.txid,
     });
   };
@@ -174,6 +174,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
               theme={theme}
               placeholder="Enter Wallet Password"
               type="password"
+              value={passwordConfirm}
               onChange={(e) => setPasswordConfirm(e.target.value)}
             />
             <Text theme={theme} style={{ margin: "1rem" }}>
@@ -187,6 +188,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
                 BSV_DECIMAL_CONVERSION
               } BSV`}
               disabled={isProcessing}
+              isSubmit
             />
           </FormContainer>
         </ConfirmContent>

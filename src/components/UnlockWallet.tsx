@@ -66,6 +66,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           theme={theme}
           placeholder="Password"
           type="password"
+          value={password}
           onChange={(e) => setPassword(e.target.value)}
           style={{ marginBottom: "2rem" }}
           shake={verificationFailed ? "true" : "false"}
@@ -75,6 +76,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           type="primary"
           label={isProcessing ? "Unlocking..." : "Unlock"}
           disabled={isProcessing}
+          isSubmit
         />
       </FormContainer>
     </Container>

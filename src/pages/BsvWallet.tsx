@@ -29,6 +29,7 @@ import { useNavigate } from "react-router-dom";
 import { ThirdPartyAppRequestData } from "../App";
 import { useBsv } from "../hooks/useBsv";
 import { useOrds } from "../hooks/useOrds";
+import switchAsset from "../assets/switch-asset.svg";
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -78,7 +79,15 @@ const Icon = styled.img<{ size?: string }>`
   margin: 0 0.5rem 0 0;
 `;
 
+const InputAmountWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+`;
+
 type PageState = "main" | "receive" | "send";
+type AmountType = "bsv" | "usd";
 
 export type BsvWalletProps = {
   thirdPartyAppRequestData: ThirdPartyAppRequestData | undefined;
@@ -91,9 +100,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>("main");
-  const [satSendAmount, setSatSendAmount] = useState(0);
+  const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
+  const [usdSendAmount, setUsdSendAmount] = useState<number | null>(null);
   const [receiveAddress, setReceiveAddress] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [amountType, setAmountType] = useState<AmountType>("bsv");
   const [successTxId, setSuccessTxId] = useState("");
   const { addSnackbar, message } = useSnackbar();
   const { ordPubKey } = useOrds();
@@ -120,7 +131,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
       if (!bsvPubKey || !ordPubKey) return;
       if (!window.location.href.includes("localhost")) {
         chrome.runtime.sendMessage({
-          action: "userConnectDecision",
+          action: "userConnectResponse",
           decision: "approved",
           pubKeys: { bsvPubKey, ordPubKey },
         });
@@ -143,7 +154,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
   }, [successTxId, message, getBsvBalance, bsvAddress]);
 
   const resetSendState = () => {
-    setSatSendAmount(0);
+    setSatSendAmount(null);
+    setUsdSendAmount(null);
+    setAmountType("bsv");
     setReceiveAddress("");
     setPasswordConfirm("");
     setSuccessTxId("");
@@ -154,6 +167,16 @@ export const BsvWallet = (props: BsvWalletProps) => {
     navigator.clipboard.writeText(bsvAddress).then(() => {
       addSnackbar("Copied!", "success");
     });
+  };
+
+  const toggleAmountType = () => {
+    if (amountType === "bsv") {
+      setAmountType("usd");
+    } else {
+      setAmountType("bsv");
+    }
+    setUsdSendAmount(null);
+    setSatSendAmount(null);
   };
 
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -169,7 +192,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
       return;
     }
 
-    if (!satSendAmount) {
+    if (!satSendAmount && !usdSendAmount) {
       addSnackbar("You must enter an amount.", "info");
       setIsProcessing(false);
       return;
@@ -181,8 +204,15 @@ export const BsvWallet = (props: BsvWalletProps) => {
       return;
     }
 
+    let satAmount = satSendAmount ?? 0;
+    if (amountType === "usd" && usdSendAmount) {
+      satAmount = Math.ceil(
+        (usdSendAmount / exchangeRate) * BSV_DECIMAL_CONVERSION
+      );
+    }
+
     const sendRes = await sendBsv(
-      [{ address: receiveAddress, satAmount: satSendAmount }],
+      [{ address: receiveAddress, satAmount }],
       passwordConfirm
     );
     if (!sendRes.txid || sendRes.error) {
@@ -194,6 +224,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           : "An unknown error has occurred! Try again.";
 
       addSnackbar(message, "error");
+      setPasswordConfirm("");
       return;
     }
 
@@ -203,6 +234,30 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const fillInputWithAllBsv = () => {
     setSatSendAmount(Math.round(bsvBalance * BSV_DECIMAL_CONVERSION));
+  };
+
+  useEffect(() => {
+    const calcValue = () => {
+      return amountType === "bsv"
+        ? satSendAmount
+          ? satSendAmount / BSV_DECIMAL_CONVERSION
+          : undefined
+        : amountType === "usd"
+        ? usdSendAmount
+          ? usdSendAmount
+          : undefined
+        : undefined;
+    };
+
+    calcValue();
+  }, [satSendAmount, usdSendAmount, amountType]);
+
+  const getLabel = () => {
+    return amountType === "bsv" && satSendAmount
+      ? `Send ${(satSendAmount / BSV_DECIMAL_CONVERSION).toFixed(8)}`
+      : amountType === "usd" && usdSendAmount
+      ? `Send ${formatUSD(usdSendAmount)}`
+      : "Enter Send Details";
   };
 
   const formatBalance = (number: number) => {
@@ -307,24 +362,56 @@ export const BsvWallet = (props: BsvWalletProps) => {
             onChange={(e) => setReceiveAddress(e.target.value)}
             value={receiveAddress}
           />
-          <Input
-            theme={theme}
-            placeholder="Enter BSV Amount"
-            type="number"
-            step="0.00000001"
-            value={
-              satSendAmount ? satSendAmount / BSV_DECIMAL_CONVERSION : undefined
-            }
-            onChange={(e) =>
-              setSatSendAmount(
-                Math.round(Number(e.target.value) * BSV_DECIMAL_CONVERSION)
-              )
-            }
-          />
+          <InputAmountWrapper>
+            <Input
+              theme={theme}
+              placeholder={
+                amountType === "bsv" ? "Enter BSV Amount" : "Enter USD Amount"
+              }
+              type="number"
+              step="0.00000001"
+              value={
+                satSendAmount !== null && satSendAmount !== undefined
+                  ? satSendAmount / BSV_DECIMAL_CONVERSION
+                  : usdSendAmount !== null && usdSendAmount !== undefined
+                  ? usdSendAmount
+                  : ""
+              }
+              onChange={(e) => {
+                const inputValue = e.target.value;
+
+                // Check if the input is empty and if so, set the state to null
+                if (inputValue === "") {
+                  setSatSendAmount(null);
+                  setUsdSendAmount(null);
+                } else {
+                  // Existing logic for setting state
+                  if (amountType === "bsv") {
+                    setSatSendAmount(
+                      Math.round(Number(inputValue) * BSV_DECIMAL_CONVERSION)
+                    );
+                  } else {
+                    setUsdSendAmount(Number(inputValue));
+                  }
+                }
+              }}
+            />
+            <Icon
+              src={switchAsset}
+              size="1rem"
+              style={{
+                position: "absolute",
+                right: "2.25rem",
+                cursor: "pointer",
+              }}
+              onClick={toggleAmountType}
+            />
+          </InputAmountWrapper>
           <Input
             theme={theme}
             placeholder="Enter Wallet Password"
             type="password"
+            value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
           <Text theme={theme} style={{ margin: "3rem 0 1rem" }}>
@@ -333,8 +420,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
           <Button
             theme={theme}
             type="primary"
-            label="Send BSV"
-            disabled={isProcessing}
+            label={getLabel()}
+            disabled={isProcessing || (!usdSendAmount && !satSendAmount)}
+            isSubmit
           />
         </FormContainer>
       </ConfirmContent>
