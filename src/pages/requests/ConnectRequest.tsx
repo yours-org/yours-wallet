@@ -59,13 +59,13 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
           whitelist: [...whitelistedDomains, thirdPartyAppRequestData?.domain],
         });
         chrome.runtime.sendMessage({
-          action: "userConnectDecision",
+          action: "userConnectResponse",
           decision: "approved",
           pubKeys: { bsvPubKey, ordPubKey },
         });
       } else {
         chrome.runtime.sendMessage({
-          action: "userConnectDecision",
+          action: "userConnectResponse",
           decision: "declined",
         });
       }

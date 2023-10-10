@@ -73,7 +73,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     onBroadcast();
 
     chrome.runtime.sendMessage({
-      action: "broadcastResult",
+      action: "broadcastResponse",
       txid,
     });
 

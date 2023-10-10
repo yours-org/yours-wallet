@@ -101,7 +101,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
     onSignature();
 
     chrome.runtime.sendMessage({
-      action: "signMessageResult",
+      action: "signMessageResponse",
       ...signRes,
     });
 

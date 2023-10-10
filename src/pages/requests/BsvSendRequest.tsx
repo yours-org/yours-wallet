@@ -134,7 +134,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     addSnackbar("Transaction Successful!", "success");
     onResponse();
     await chrome.runtime.sendMessage({
-      action: "sendBsvResult",
+      action: "sendBsvResponse",
       txid: sendRes.txid,
     });
   };

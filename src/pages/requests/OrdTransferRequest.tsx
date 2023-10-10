@@ -96,7 +96,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     );
     onResponse();
     await chrome.runtime.sendMessage({
-      action: "transferOrdinalResult",
+      action: "transferOrdinalResponse",
       txid: transferRes.txid,
     });
   };

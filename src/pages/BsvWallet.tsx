@@ -120,7 +120,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
       if (!bsvPubKey || !ordPubKey) return;
       if (!window.location.href.includes("localhost")) {
         chrome.runtime.sendMessage({
-          action: "userConnectDecision",
+          action: "userConnectResponse",
           decision: "approved",
           pubKeys: { bsvPubKey, ordPubKey },
         });
