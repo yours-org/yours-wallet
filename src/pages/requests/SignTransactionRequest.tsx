@@ -63,7 +63,6 @@ export const SignTransactionRequest = (props: SignTransactionRequestProps) => {
       return;
     }
 
-    console.log(request);
     const signRes = await signTransaction(passwordConfirm, request);
 
     if (!signRes?.signatureHex) {
