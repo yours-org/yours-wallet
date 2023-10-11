@@ -7,37 +7,53 @@ import { sendOrdinal } from "js-1sat-ord-web";
 import { P2PKHAddress, PrivateKey, Transaction } from "bsv-wasm-web";
 import { useBsvWasm } from "./useBsvWasm";
 
-type OrdinalResponse = {
-  id: number;
-  num: number;
-  txid: string;
-  vout: number;
+
+export interface Ordinal {
+  txid:     string;
+  vout:     number;
   outpoint: string;
-  file: {
-    hash: string;
-    size: number;
-    type: string;
-  };
-  origin: string;
-  height: number;
-  idx: number;
-  lock: string;
-  spend: string;
-  MAP: {
-    [key: string]: string;
-  };
-  B: {
-    hash: string;
-    size: number;
-    type: string;
-  };
-  SIGMA: any[];
-  listing: boolean;
-  price: number;
-  payout: string;
-  script: string;
-  bsv20: boolean;
-}[];
+  satoshis: number;
+  accSats:  string;
+  height:   number;
+  idx:      string;
+  owner:    string;
+  spend:    string;
+  origin:   Origin;
+  data:     Data;
+}
+
+export interface Data {
+  insc:  Insc;
+  types: string[];
+}
+
+export interface Insc {
+  file: File;
+  json: JSON;
+}
+
+export interface File {
+  hash: string;
+  size: number;
+  type: string;
+}
+
+export interface JSON {
+  p:    string;
+  op:   string;
+  amt:  string;
+  tick: string;
+}
+
+export interface Origin {
+  outpoint: string;
+  data:     Data;
+  num:      number;
+}
+
+
+
+type OrdinalResponse = Ordinal[];
 
 type TransferOrdinalResponse = {
   txid?: string;
@@ -89,21 +105,6 @@ export interface OrdUtxo extends UTXO {
   map: OrdSchema;
 }
 
-type GPInscription = {
-  num: number;
-  txid: string;
-  vout: number;
-  file: GPFile;
-  origin: string;
-  outpoint: string;
-  listing: boolean;
-  ordinal?: number;
-  height: number;
-  idx: number;
-  lock: string;
-  MAP: any;
-};
-
 export type Web3TransferOrdinalRequest = {
   address: string;
   origin: string;
@@ -122,7 +123,7 @@ export const useOrds = () => {
       //   setIsProcessing(true); // TODO: set this to true if call is taking more than a second
       //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
       const res = await axios.get(
-        `${GP_BASE_URL}/utxos/address/${ordAddress}/inscriptions?limit=100&offset=0&excludeBsv20=true`
+        `${GP_BASE_URL}/txos/address/${ordAddress}/unspent?limit=100&offset=0&bsv20=false`
       );
 
       const ordList: OrdinalResponse = res.data;
@@ -284,20 +285,19 @@ export const useOrds = () => {
         return [];
       }
       const r = await axios.get(
-        `${GP_BASE_URL}/utxos/address/${address}/inscriptions?limit=100&offset=0&excludeBsv20=false`
+        `${GP_BASE_URL}/txos/address/${address}/unspent?limit=100&offset=0&bsv20=true`
       );
 
-      const utxos = r.data as GPInscription[];
+      const utxos = r.data as OrdinalResponse;
 
       const oUtxos: OrdUtxo[] = [];
       for (const a of utxos) {
-        const parts = a.origin.split("_");
 
         oUtxos.push({
           satoshis: 1, // all ord utxos currently 1 satoshi
           txid: a.txid,
-          vout: parseInt(parts[1]),
-          origin: a.origin,
+          vout: a.vout,
+          origin: a.origin.outpoint,
           outpoint: a.outpoint,
         } as OrdUtxo);
       }

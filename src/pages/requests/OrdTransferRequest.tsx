@@ -14,7 +14,7 @@ import { PageLoader } from "../../components/PageLoader";
 import validate from "bitcoin-address-validation";
 import { sleep } from "../../utils/sleep";
 import { useTheme } from "../../hooks/useTheme";
-import { GP_BASE_URL } from "../../utils/constants";
+import { CONTENT_BASE_URL } from "../../utils/constants";
 import { truncate } from "../../utils/format";
 import { Input } from "../../components/Input";
 
@@ -112,7 +112,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Ordinal
             theme={theme}
-            url={`${GP_BASE_URL}/files/inscriptions/${web3Request.origin}`}
+            url={`${CONTENT_BASE_URL}/${web3Request.origin}`}
             selected={true}
           />
           <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>

@@ -14,7 +14,7 @@ import {
   Text,
 } from "../components/Reusable";
 import { useOrds } from "../hooks/useOrds";
-import { GP_BASE_URL } from "../utils/constants";
+import { CONTENT_BASE_URL } from "../utils/constants";
 import { Show } from "../components/Show";
 import { BackButton } from "../components/BackButton";
 import { QrCode } from "../components/QrCode";
@@ -169,11 +169,11 @@ export const OrdWallet = () => {
             return (
               <Ordinal
                 theme={theme}
-                key={ord.origin}
-                url={`${GP_BASE_URL}/files/inscriptions/${ord.origin}`}
-                selected={selectedOrdinal === ord.origin}
+                key={ord.origin.outpoint}
+                url={`${CONTENT_BASE_URL}/${ord.origin.outpoint}`}
+                selected={selectedOrdinal === ord.origin.outpoint}
                 onClick={() => {
-                  setSelectedOrdinal(ord.origin);
+                  setSelectedOrdinal(ord.origin.outpoint);
                   setOrdinalOutpoint(ord.outpoint);
                 }}
               />
@@ -242,7 +242,7 @@ export const OrdWallet = () => {
         <HeaderText theme={theme}>Transfer Ordinal</HeaderText>
         <Ordinal
           theme={theme}
-          url={`${GP_BASE_URL}/files/inscriptions/${selectedOrdinal}`}
+          url={`${CONTENT_BASE_URL}/${selectedOrdinal}`}
           selected={true}
           size="6rem"
         />
