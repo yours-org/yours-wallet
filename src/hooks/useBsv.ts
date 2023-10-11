@@ -22,6 +22,20 @@ type SendBsvResponse = {
   error?: string;
 };
 
+type SignTransactionResponse = {
+  signatureHex?: string;
+  error?: string;
+};
+
+export type Web3SignTransactionRequest = {
+  rawtx: string;
+  vin: number;
+  sigHashTypeNumber: number;
+  keyType: "bsv" | "ord";
+  outputScript: string;
+  outputSats: bigint;
+};
+
 export type Web3SendBsvRequest = {
   satAmount: number;
   address: string;
@@ -158,6 +172,39 @@ export const useBsv = () => {
     }
   };
 
+  const signTransaction = async (
+    password: string,
+    request: Web3SignTransactionRequest
+  ): Promise<SignTransactionResponse> => {
+    const { keyType, outputSats, outputScript, rawtx, sigHashTypeNumber, vin } =
+      request;
+
+    const isAuthenticated = await verifyPassword(password);
+    if (!isAuthenticated) {
+      return { error: "invalid-password" };
+    }
+    try {
+      const transaction = Transaction.from_hex(rawtx);
+      const keys = await retrieveKeys(password);
+      if (!keys?.walletWif || !keys.ordWif) throw Error("Undefined key");
+      const privateKey = PrivateKey.from_wif(
+        keyType === "bsv" ? keys.walletWif : keys.ordWif
+      );
+      const script = Script.from_hex(outputScript);
+      const sig = transaction.sign(
+        privateKey,
+        sigHashTypeNumber,
+        vin,
+        script,
+        BigInt(outputSats)
+      );
+      return { signatureHex: sig.to_hex() };
+    } catch (error) {
+      console.error("Error signing the transaction: ", error);
+      throw error;
+    }
+  };
+
   const signMessage = async (
     message: string,
     password: string
@@ -255,5 +302,6 @@ export const useBsv = () => {
     exchangeRate,
     signMessage,
     verifyMessage,
+    signTransaction,
   };
 };

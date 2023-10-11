@@ -17,9 +17,9 @@ export const BottomMenuContext = createContext<BottomMenuContextType | null>(
   null
 );
 
-type BottomMenuProviderProps = {
+interface BottomMenuProviderProps {
   children: ReactNode;
-};
+}
 
 export const BottomMenuProvider = (props: BottomMenuProviderProps) => {
   const { children } = props;

@@ -37,5 +37,6 @@ window.panda = {
   sendBsv: createPandaMethod("sendBsv"),
   transferOrdinal: createPandaMethod("transferOrdinal"),
   signMessage: createPandaMethod("signMessage"),
+  signTransaction: createPandaMethod("signTransaction"),
   broadcast: createPandaMethod("broadcast"),
 };

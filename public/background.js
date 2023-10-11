@@ -5,6 +5,7 @@ let responseCallbackForConnectRequest;
 let responseCallbackForSendBsvRequest;
 let responseCallbackForTransferOrdinalRequest;
 let responseCallbackForSignMessageRequest;
+let responseCallbackForSignTransactionRequest;
 let responseCallbackForBroadcastRequest;
 let popupWindowId = null;
 
@@ -57,6 +58,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     "sendBsvResponse",
     "transferOrdinalResponse",
     "signMessageResponse",
+    "signTransactionResponse",
     "broadcastResponse",
   ];
 
@@ -72,6 +74,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processTransferOrdinalResponse(message);
       case "signMessageResponse":
         return processSignMessageResponse(message);
+      case "signTransactionResponse":
+        return processSignTransactionResponse(message);
       case "broadcastResponse":
         return processBroadcastResponse(message);
       default:
@@ -113,6 +117,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processTransferOrdinalRequest(message, sendResponse);
       case "signMessage":
         return processSignMessageRequest(message, sendResponse);
+      case "signTransaction":
+        return processSignTransactionRequest(message, sendResponse);
       case "broadcast":
         return processBroadcastRequest(message, sendResponse);
       default:
@@ -152,15 +158,15 @@ const processDisconnectRequest = (message, sendResponse) => {
         sendResponse({
           type: "disconnect",
           success: true,
-          data: "Successfully disconnected!",
+          data: true,
         });
       });
     });
   } catch (error) {
     sendResponse({
       type: "disconnect",
-      success: false,
-      error: JSON.stringify(error),
+      success: true, // This is true in the catch because we want to return a boolean
+      data: false,
     });
   }
 };
@@ -187,8 +193,8 @@ const processIsConnectedRequest = (message, sendResponse) => {
   } catch (error) {
     sendResponse({
       type: "isConnected",
-      success: false,
-      error: JSON.stringify(error),
+      success: true, // This is true in the catch because we want to return a boolean
+      error: false,
     });
   }
 
@@ -373,6 +379,31 @@ const processSignMessageRequest = (message, sendResponse) => {
   return true;
 };
 
+const processSignTransactionRequest = (message, sendResponse) => {
+  if (!message.params) {
+    sendResponse({
+      type: "signTransaction",
+      success: false,
+      error: "Must provide valid params!",
+    });
+  }
+  try {
+    responseCallbackForSignTransactionRequest = sendResponse;
+    chrome.storage.local
+      .set({
+        signTransactionRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+  } catch (error) {
+    sendResponse({
+      type: "signTransaction",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+};
 // RESPONSES ********************************
 
 const processConnectResponse = (message) => {
@@ -477,6 +508,30 @@ const processSignMessageResponse = (message) => {
   return true;
 };
 
+const processSignTransactionResponse = (message) => {
+  if (!responseCallbackForSignTransactionRequest)
+    throw Error("Missing callback!");
+  try {
+    responseCallbackForSignTransactionRequest({
+      type: "signTransaction",
+      success: true,
+      data: message?.signatureHex,
+    });
+  } catch (error) {
+    responseCallbackForSignTransactionRequest({
+      type: "signTransaction",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  } finally {
+    responseCallbackForSignTransactionRequest = null;
+    popupWindowId = null;
+    chrome.storage.local.remove(["signTransactionRequest", "popupWindowId"]);
+  }
+
+  return true;
+};
+
 const processBroadcastResponse = (message) => {
   if (!responseCallbackForBroadcastRequest) throw Error("Missing callback!");
   try {
@@ -508,7 +563,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       responseCallbackForConnectRequest({
         type: "connect",
         success: true,
-        data: "User dismissed the request!",
+        data: undefined,
       });
       responseCallbackForConnectRequest = null;
       chrome.storage.local.remove("connectRequest");
@@ -518,7 +573,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       responseCallbackForSendBsvRequest({
         type: "sendBsv",
         success: true,
-        data: "User dismissed the request!",
+        data: undefined,
       });
       responseCallbackForSendBsvRequest = null;
       chrome.storage.local.remove("sendBsvRequest");
@@ -528,17 +583,27 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       responseCallbackForSignMessageRequest({
         type: "signMessage",
         success: true,
-        data: "User dismissed the request!",
+        data: undefined,
       });
       responseCallbackForSignMessageRequest = null;
       chrome.storage.local.remove("signMessageRequest");
+    }
+
+    if (responseCallbackForSignTransactionRequest) {
+      responseCallbackForSignTransactionRequest({
+        type: "signTransaction",
+        success: true,
+        data: undefined,
+      });
+      responseCallbackForSignTransactionRequest = null;
+      chrome.storage.local.remove("signTransactionRequest");
     }
 
     if (responseCallbackForTransferOrdinalRequest) {
       responseCallbackForTransferOrdinalRequest({
         type: "transferOrdinal",
         success: true,
-        data: "User dismissed the request!",
+        data: undefined,
       });
       responseCallbackForTransferOrdinalRequest = null;
       chrome.storage.local.remove("transferOrdinalRequest");
@@ -548,7 +613,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       responseCallbackForBroadcastRequest({
         type: "broadcast",
         success: true,
-        data: "User dismissed the request!",
+        data: undefined,
       });
       responseCallbackForBroadcastRequest = null;
       chrome.storage.local.remove("broadcastRequest");
