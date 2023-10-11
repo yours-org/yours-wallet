@@ -22,12 +22,14 @@ import {
   Web3SignTransactionRequest,
 } from "./hooks/useBsv";
 import { Web3TransferOrdinalRequest } from "./hooks/useOrds";
+import { Web3GetSignaturesRequest } from "./hooks/useContracts";
 import { OrdTransferRequest } from "./pages/requests/OrdTransferRequest";
 import { BottomMenuContext } from "./contexts/BottomMenuContext";
 import { ConnectRequest } from "./pages/requests/ConnectRequest";
 import { SignMessageRequest } from "./pages/requests/SignMessageRequest";
 import { BroadcastRequest } from "./pages/requests/BroadcastRequest";
 import { SignTransactionRequest } from "./pages/requests/SignTransactionRequest";
+import { GetSignaturesRequest } from "./pages/requests/GetSignaturesRequest";
 
 export type ThirdPartyAppRequestData = {
   appName: string;
@@ -75,6 +77,10 @@ export const App = () => {
     Web3SignTransactionRequest | undefined
   >(undefined);
 
+  const [getSignaturesRequest, setGetSignaturesRequest] = useState<
+    Web3GetSignaturesRequest | undefined
+  >(undefined);
+
   useActivityDetector(isLocked);
 
   const handleUnlock = async () => {
@@ -92,6 +98,7 @@ export const App = () => {
         "signMessageRequest",
         "signTransactionRequest",
         "broadcastRequest",
+        "getSignaturesRequest",
       ],
       (result) => {
         const {
@@ -103,6 +110,7 @@ export const App = () => {
           signMessageRequest,
           signTransactionRequest,
           broadcastRequest,
+          getSignaturesRequest,
         } = result;
 
         if (popupWindowId) setPopupId(popupWindowId);
@@ -135,6 +143,10 @@ export const App = () => {
 
         if (broadcastRequest) {
           setBroadcastRequest(broadcastRequest);
+        }
+
+        if (getSignaturesRequest) {
+          setGetSignaturesRequest(getSignaturesRequest);
         }
       }
     );
@@ -171,7 +183,8 @@ export const App = () => {
                       !bsvSendRequest &&
                       !messageToSign &&
                       !broadcastRequest &&
-                      !signTransactionRequest
+                      !signTransactionRequest &&
+                      !getSignaturesRequest
                     }
                     whenFalseContent={
                       <>
@@ -204,6 +217,13 @@ export const App = () => {
                             request={broadcastRequest as Web3BroadcastRequest}
                             popupId={popupId}
                             onBroadcast={() => setBroadcastRequest(undefined)}
+                          />
+                        </Show>
+                        <Show when={!!getSignaturesRequest}>
+                          <GetSignaturesRequest
+                            getSigsRequest={getSignaturesRequest as Web3GetSignaturesRequest}
+                            popupId={popupId}
+                            onSignature={() => setGetSignaturesRequest(undefined)}
                           />
                         </Show>
                       </>

@@ -8,7 +8,7 @@ export type SnackbarType = "error" | "info" | "success";
 type SnackbarContextType = {
   message: string | null;
   snackBarType: SnackbarType | null;
-  addSnackbar: (message: string, type: SnackbarType) => void;
+  addSnackbar: (message: string, type: SnackbarType, duration?: number) => void;
 };
 
 export const SnackbarContext = createContext<SnackbarContextType | null>(null);
@@ -23,14 +23,14 @@ export const SnackbarProvider = (props: SnackbarProviderProps) => {
   const [message, setMessage] = useState<string | null>(null);
   const [snackBarType, setSnackBarType] = useState<SnackbarType | null>(null);
 
-  const addSnackbar = (msg: string, type: SnackbarType) => {
+  const addSnackbar = (msg: string, type: SnackbarType, duration?: number) => {
     setMessage(msg);
     setSnackBarType(type);
 
     setTimeout(() => {
       setMessage(null);
       setSnackBarType(null);
-    }, SNACKBAR_TIMEOUT);
+    }, duration || SNACKBAR_TIMEOUT);
   };
 
   return (

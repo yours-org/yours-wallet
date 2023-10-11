@@ -39,4 +39,5 @@ window.panda = {
   signMessage: createPandaMethod("signMessage"),
   signTransaction: createPandaMethod("signTransaction"),
   broadcast: createPandaMethod("broadcast"),
+  getSignatures: createPandaMethod("getSignatures"),
 };
