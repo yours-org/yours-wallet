@@ -158,15 +158,15 @@ const processDisconnectRequest = (message, sendResponse) => {
         sendResponse({
           type: "disconnect",
           success: true,
-          data: "Successfully disconnected!",
+          data: true,
         });
       });
     });
   } catch (error) {
     sendResponse({
       type: "disconnect",
-      success: false,
-      error: JSON.stringify(error),
+      success: true, // This is true in the catch because we want to return a boolean
+      data: false,
     });
   }
 };
@@ -193,8 +193,8 @@ const processIsConnectedRequest = (message, sendResponse) => {
   } catch (error) {
     sendResponse({
       type: "isConnected",
-      success: false,
-      error: JSON.stringify(error),
+      success: true, // This is true in the catch because we want to return a boolean
+      error: false,
     });
   }
 
@@ -563,7 +563,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       responseCallbackForConnectRequest({
         type: "connect",
         success: true,
-        data: "User dismissed the request!",
+        data: undefined,
       });
       responseCallbackForConnectRequest = null;
       chrome.storage.local.remove("connectRequest");
@@ -573,7 +573,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       responseCallbackForSendBsvRequest({
         type: "sendBsv",
         success: true,
-        data: "User dismissed the request!",
+        data: undefined,
       });
       responseCallbackForSendBsvRequest = null;
       chrome.storage.local.remove("sendBsvRequest");
@@ -583,7 +583,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       responseCallbackForSignMessageRequest({
         type: "signMessage",
         success: true,
-        data: "User dismissed the request!",
+        data: undefined,
       });
       responseCallbackForSignMessageRequest = null;
       chrome.storage.local.remove("signMessageRequest");
@@ -593,7 +593,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       responseCallbackForSignTransactionRequest({
         type: "signTransaction",
         success: true,
-        data: "User dismissed the request!",
+        data: undefined,
       });
       responseCallbackForSignTransactionRequest = null;
       chrome.storage.local.remove("signTransactionRequest");
@@ -603,7 +603,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       responseCallbackForTransferOrdinalRequest({
         type: "transferOrdinal",
         success: true,
-        data: "User dismissed the request!",
+        data: undefined,
       });
       responseCallbackForTransferOrdinalRequest = null;
       chrome.storage.local.remove("transferOrdinalRequest");
@@ -613,7 +613,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       responseCallbackForBroadcastRequest({
         type: "broadcast",
         success: true,
-        data: "User dismissed the request!",
+        data: undefined,
       });
       responseCallbackForBroadcastRequest = null;
       chrome.storage.local.remove("broadcastRequest");

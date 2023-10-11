@@ -12,9 +12,9 @@ type SnackbarContextType = {
 
 export const SnackbarContext = createContext<SnackbarContextType | null>(null);
 
-type SnackbarProviderProps = {
+interface SnackbarProviderProps {
   children: ReactNode;
-};
+}
 
 export const SnackbarProvider = (props: SnackbarProviderProps) => {
   const { children } = props;

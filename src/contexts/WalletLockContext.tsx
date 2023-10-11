@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, FC } from "react";
+import React, { createContext, useState, useEffect, ReactNode } from "react";
 import { storage } from "../utils/storage";
 import { INACTIVITY_LIMIT } from "../utils/constants";
 
@@ -13,11 +13,9 @@ export const WalletLockContext = createContext<
 >(undefined);
 
 interface WalletLockProviderProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
-export const WalletLockProvider: FC<WalletLockProviderProps> = (
-  props: WalletLockProviderProps
-) => {
+export const WalletLockProvider = (props: WalletLockProviderProps) => {
   const { children } = props;
   const [isLocked, setIsLocked] = useState<boolean>(false);
 
