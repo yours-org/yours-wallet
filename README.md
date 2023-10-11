@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Version: v0.5.2-alpha
+Version: v0.6.0-alpha
 
 # Panda Wallet | Non-Custodial Web3 Wallet For BSV
 
@@ -20,12 +20,12 @@ Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV
 
 The alpha version of the wallet is open and available to all users. While it has been tested, it is still new software so use at your own risk. The plan once out of alpha/beta is to launch on the Google Chrome Store.
 
-1. **Download:** First you will need to <a id="raw-url" href="https://github.com/Panda-Wallet/panda-wallet/raw/main/public/builds/pw-v0.5.2-alpha.zip" download="panda-wallet-v0.5.2-alpha.zip">Download The Current Build</a>
+1. **Download:** First you will need to <a id="raw-url" href="https://github.com/Panda-Wallet/panda-wallet/raw/main/public/builds/pw-v0.6.0-alpha.zip" download="panda-wallet-v0.6.0-alpha.zip">Download The Current Build</a>
    . \*\*Always double check that you are at the official Panda Wallet github repo before downloading anything. https://github.com/Panda-Wallet/panda-wallet.
 
    **SHA256 Checksum:** For extra security you can check the checksum:
 
-   `776609e25ef0cd96a064150f0c4f26bdfa16280c871d7c582cab61cc5a223aea`
+   `6151d048ba2dc2d453ba5bed3960756db82bef6b1ef28effd8c5bba193b51a78`
 
    Files can also be found in `public/builds`
 
@@ -43,49 +43,11 @@ The alpha version of the wallet is open and available to all users. While it has
 
 Documentation on integrating Panda Wallet into your decentralized web3 application can be [found here](https://panda-wallet.gitbook.io/provider-api/).
 
+You can also check out the live sample app: https://panda-wallet-sample-app.vercel.app/
+
 ### Contributing 🙌
 
-If you'd like to contribute to Panda Wallet's development, follow these steps:
-
-1. **Clone the Repository:** Clone the repo:
-
-   ```bash
-   git clone
-   ```
-
-2. **Install Dependencies:** Navigate to the project's root directory and run:
-
-   ```bash
-   npm install
-   ```
-
-3. **Start the App:** Open a local instance of the app:
-
-   ```bash
-   npm run start
-   ```
-
-4. **Build The Extension:** To create a production build of the app, run:
-
-   ```bash
-   npm run build
-   ```
-
-5. **Run The Extension:** Load the extension into your browser using dev mode:
-
-   1. Navigate to `chrome://extensions` and turn on dev mode.
-   2. Click "Load Unpacked".
-   3. Upload the production `build` folder.
-
-6. **Customize and Contribute:**: Customize the extension or contribute by opening pull requests.
-
-**\*Always Use Prettier for Code Formatting**
-
-Prettier is a powerful code formatter that helps ensure our code remains well-organized and readable. By adhering to Prettier's formatting standards, we can enhance code collaboration and reduce potential errors. Make it a habit to run Prettier before committing any code changes.
-
-**\*If you plan to contribute, please review the PR Guidelines**
-
-[PR Guidelines](PR_GUIDELINES.md)
+If you'd like to contribute to Panda Wallet's development check out [contributing](CONTRIBUTING.md).
 
 ## Issues, Bugs, and Feature Requests
 
