@@ -4,11 +4,6 @@
   "name": "Panda Wallet",
   "description": "A non-custodial and open-source wallet for BSV and 1Sat Ordinals",
   "permissions": ["storage"],
-  "host_permissions": [
-    "https://api.whatsonchain.com/*",
-    "https://ordinals.gorillapool.io/*",
-    "https://arc.gorillapool.io/v1"
-  ],
   "action": {
     "default_popup": "index.html",
     "default_title": "Panda Wallet"
