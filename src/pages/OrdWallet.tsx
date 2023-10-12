@@ -170,7 +170,7 @@ export const OrdWallet = () => {
               <Ordinal
                 theme={theme}
                 key={ord.origin?.outpoint.toString()}
-                url={`${GP_BASE_URL}/content/${ord.origin}`}
+                url={`${GP_BASE_URL}/content/${ord.origin?.outpoint.toString()}`}
                 selected={selectedOrdinal === ord.origin?.outpoint.toString()}
                 onClick={() => {
                   setSelectedOrdinal(ord.origin!.outpoint.toString());

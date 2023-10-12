@@ -151,7 +151,7 @@ export const useOrds = () => {
       //   setIsProcessing(true); // TODO: set this to true if call is taking more than a second
       //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
       const res = await axios.get(
-        `${GP_BASE_URL}/txos/address/${ordAddress}/unspent?limit=100&offset=0`
+        `${GP_BASE_URL}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`
       );
 
       const ordList: OrdinalResponse = res.data;
@@ -313,7 +313,7 @@ export const useOrds = () => {
         return [];
       }
       const r = await axios.get(
-        `${GP_BASE_URL}/txos/address/${ordAddress}/unspent?limit=100&offset=0`
+        `${GP_BASE_URL}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`
       );
 
       const utxos = r.data as OrdinalResponse;
