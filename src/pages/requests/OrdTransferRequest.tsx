@@ -112,7 +112,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Ordinal
             theme={theme}
-            url={`${GP_BASE_URL}/files/inscriptions/${web3Request.origin}`}
+            url={`${GP_BASE_URL}/content/${web3Request.origin}`}
             selected={true}
           />
           <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>

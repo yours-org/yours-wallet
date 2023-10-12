@@ -169,12 +169,12 @@ export const OrdWallet = () => {
             return (
               <Ordinal
                 theme={theme}
-                key={ord.origin}
-                url={`${GP_BASE_URL}/files/inscriptions/${ord.origin}`}
-                selected={selectedOrdinal === ord.origin}
+                key={ord.origin?.outpoint.toString()}
+                url={`${GP_BASE_URL}/content/${ord.origin?.outpoint.toString()}`}
+                selected={selectedOrdinal === ord.origin?.outpoint.toString()}
                 onClick={() => {
-                  setSelectedOrdinal(ord.origin);
-                  setOrdinalOutpoint(ord.outpoint);
+                  setSelectedOrdinal(ord.origin!.outpoint.toString());
+                  setOrdinalOutpoint(ord.outpoint.toString());
                 }}
               />
             );
@@ -242,7 +242,7 @@ export const OrdWallet = () => {
         <HeaderText theme={theme}>Transfer Ordinal</HeaderText>
         <Ordinal
           theme={theme}
-          url={`${GP_BASE_URL}/files/inscriptions/${selectedOrdinal}`}
+          url={`${GP_BASE_URL}/content/${selectedOrdinal}`}
           selected={true}
           size="6rem"
         />

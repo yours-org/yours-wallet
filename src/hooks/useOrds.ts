@@ -6,38 +6,82 @@ import { UTXO, WocUtxo, useWhatsOnChain } from "./useWhatsOnChain";
 import { sendOrdinal } from "js-1sat-ord-web";
 import { P2PKHAddress, PrivateKey, Transaction } from "bsv-wasm-web";
 import { useBsvWasm } from "./useBsvWasm";
+import { Outpoint } from "../utils/outpoint";
 
-type OrdinalResponse = {
-  id: number;
-  num: number;
-  txid: string;
-  vout: number;
-  outpoint: string;
-  file: {
-    hash: string;
-    size: number;
-    type: string;
+export class InscriptionData {
+  type?: string = '';
+  data?: Buffer = Buffer.alloc(0);
+}
+
+export interface Claim {
+  sub: string;
+  type: string;
+  value: string;
+}
+
+export interface Sigma {
+  algorithm: string;
+  address: string;
+  signature: string;
+  vin: number;
+}
+
+export class Origin {
+  outpoint: Outpoint = new Outpoint();
+  data?: TxoData;
+  num?: number;
+  map?: {[key: string]:any};
+  claims?: Claim[]
+}
+
+export enum Bsv20Status {
+  Invalid = -1,
+  Pending = 0,
+  Valid = 1
+}
+
+export class TxoData {
+  types?: string[];
+  insc?: File;
+  map?: {[key: string]:any};
+  b?: File;
+  sigma?: Sigma[];
+  list?: {
+      price: number;
+      payout: string;
   };
-  origin: string;
-  height: number;
-  idx: number;
-  lock: string;
-  spend: string;
-  MAP: {
-    [key: string]: string;
+  bsv20?: {
+      id?:  Outpoint;
+      p: string;
+      op: string;
+      tick?: string;
+      amt: string;
+      status?: Bsv20Status 
   };
-  B: {
-    hash: string;
-    size: number;
-    type: string;
-  };
-  SIGMA: any[];
-  listing: boolean;
-  price: number;
-  payout: string;
-  script: string;
-  bsv20: boolean;
-}[];
+}
+
+export interface Inscription {
+  json?: any;
+  text?: string;
+  words?: string[];
+  file: File;
+}
+export class OrdinalTxo {
+  txid: string = '';
+  vout: number = 0;
+  outpoint: Outpoint = new Outpoint();
+  satoshis: number = 0;
+  accSats: number = 0;
+  owner?: string;
+  script?: string;
+  spend?: string;
+  origin?: Origin;
+  height: number = 0;
+  idx: number = 0;
+  data?: TxoData;
+}
+
+type OrdinalResponse = OrdinalTxo[];
 
 type TransferOrdinalResponse = {
   txid?: string;
@@ -89,21 +133,6 @@ export interface OrdUtxo extends UTXO {
   map: OrdSchema;
 }
 
-type GPInscription = {
-  num: number;
-  txid: string;
-  vout: number;
-  file: GPFile;
-  origin: string;
-  outpoint: string;
-  listing: boolean;
-  ordinal?: number;
-  height: number;
-  idx: number;
-  lock: string;
-  MAP: any;
-};
-
 export type Web3TransferOrdinalRequest = {
   address: string;
   origin: string;
@@ -122,7 +151,7 @@ export const useOrds = () => {
       //   setIsProcessing(true); // TODO: set this to true if call is taking more than a second
       //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
       const res = await axios.get(
-        `${GP_BASE_URL}/utxos/address/${ordAddress}/inscriptions?limit=100&offset=0&excludeBsv20=true`
+        `${GP_BASE_URL}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`
       );
 
       const ordList: OrdinalResponse = res.data;
@@ -284,21 +313,19 @@ export const useOrds = () => {
         return [];
       }
       const r = await axios.get(
-        `${GP_BASE_URL}/utxos/address/${address}/inscriptions?limit=100&offset=0&excludeBsv20=false`
+        `${GP_BASE_URL}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`
       );
 
-      const utxos = r.data as GPInscription[];
+      const utxos = r.data as OrdinalResponse;
 
       const oUtxos: OrdUtxo[] = [];
       for (const a of utxos) {
-        const parts = a.origin.split("_");
-
         oUtxos.push({
           satoshis: 1, // all ord utxos currently 1 satoshi
           txid: a.txid,
-          vout: parseInt(parts[1]),
-          origin: a.origin,
-          outpoint: a.outpoint,
+          vout: a.vout,
+          origin: a.origin?.outpoint.toString(),
+          outpoint: a.outpoint.toString(),
         } as OrdUtxo);
       }
 
