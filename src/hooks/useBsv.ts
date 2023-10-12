@@ -78,7 +78,7 @@ export const useBsv = () => {
       const amount = request.reduce((a, r) => a + r.satAmount, 0);
 
       // Format in and outs
-      const utxos = await getUtxos(fromAddress);
+      const utxos: WocUtxo[] = await getUtxos(fromAddress);
 
       const script = P2PKHAddress.from_string(fromAddress)
         .get_locking_script()
@@ -100,6 +100,7 @@ export const useBsv = () => {
         (a: number, item: UTXO) => a + item.satoshis,
         0
       );
+
       if (totalSats < amount) {
         return { error: "insufficient-funds" };
       }
@@ -132,9 +133,9 @@ export const useBsv = () => {
         );
       }
 
-      // build txins from our UTXOs
+      // build txins from our inputs
       let idx = 0;
-      for (let u of fundingUtxos || []) {
+      for (let u of inputs || []) {
         const inTx = new TxIn(
           Buffer.from(u.txid, "hex"),
           u.vout,
@@ -159,6 +160,13 @@ export const useBsv = () => {
         );
         tx.set_input(idx, inTx);
         idx++;
+      }
+
+      // Fee checker
+      const finalSatsIn = tx.satoshis_in() ?? 0n;
+      const finalSatsOut = tx.satoshis_out() ?? 0n;
+      if (finalSatsIn - finalSatsOut > 500) {
+        return { error: "fee-to-high" };
       }
 
       const txhex = tx.to_hex();
