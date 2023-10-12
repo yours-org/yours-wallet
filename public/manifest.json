@@ -3,7 +3,7 @@
   "manifest_version": 3,
   "name": "Panda Wallet",
   "description": "A non-custodial and open-source wallet for BSV and 1Sat Ordinals",
-  "permissions": ["storage", "activeTab", "tabs", "windows"],
+  "permissions": ["storage"],
   "host_permissions": [
     "https://api.whatsonchain.com/*",
     "https://ordinals.gorillapool.io/*",
