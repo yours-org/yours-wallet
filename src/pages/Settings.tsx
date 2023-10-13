@@ -9,6 +9,8 @@ import { storage } from "../utils/storage";
 import { Show } from "../components/Show";
 import { useTheme } from "../hooks/useTheme";
 import { useWalletLockState } from "../hooks/useWalletLockState";
+import { ToggleSwitch } from "../components/ToggleSwitch";
+import { NetWork, useNetwork } from "../hooks/useNetwork";
 
 const Content = styled.div`
   display: flex;
@@ -32,6 +34,7 @@ export const Settings = () => {
   const { setSelected } = useBottomMenu();
   const { lockWallet } = useWalletLockState();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
+  const { network, updateNetwork } = useNetwork();
 
   const handleSignOut = async () => {
     await storage.clear();
@@ -51,6 +54,10 @@ export const Settings = () => {
     setSelected("bsv");
   };
 
+  const handleNetworkChange = (e: any) => {
+    updateNetwork(e.target.checked ? NetWork.Mainnet : NetWork.Testnet)
+  };
+
   return (
     <Content>
       <Show
@@ -68,6 +75,15 @@ export const Settings = () => {
         <TitleText theme={theme}>⚙️</TitleText>
         <TitleText theme={theme}>My Settings</TitleText>
         <Text theme={theme}>Page is under active development.</Text>
+
+        <ToggleSwitch
+          theme={theme}
+          on={network === NetWork.Mainnet}
+          onChange={handleNetworkChange}
+          label="Network"
+          onLabel="Mainnet"
+          offLabel="Testnet"
+        />
         <Button
           theme={theme}
           label="Sign Out"

@@ -7,6 +7,9 @@ import {
 } from "../utils/crypto";
 import { Keys, getKeys } from "../utils/keys";
 import { storage } from "../utils/storage";
+import { NetWork, useNetwork } from "./useNetwork";
+import { ChainParams, P2PKHAddress } from "bsv-wasm-web";
+import { useBsvWasm } from "./useBsvWasm";
 
 export type KeyStorage = {
   encryptedKeys: string;
@@ -19,6 +22,14 @@ export const useKeys = () => {
   const [ordAddress, setOrdAddress] = useState("");
   const [bsvPubKey, setBsvPubKey] = useState("");
   const [ordPubKey, setOrdPubKey] = useState("");
+  const { network } = useNetwork();
+  const { bsvWasmInitialized } = useBsvWasm();
+
+  const getChainParams = (network: NetWork): ChainParams => {
+    return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
+  }
+
+
   const generateSeedAndStoreEncrypted = (
     password: string,
     mnemonic?: string
@@ -42,20 +53,32 @@ export const useKeys = () => {
         ["encryptedKeys", "passKey", "salt"],
         async (result: KeyStorage) => {
           try {
+            if (!bsvWasmInitialized) throw Error("bsv-wasm not initialized!");
             if (!result.encryptedKeys || !result.passKey) return;
             const d = decrypt(result.encryptedKeys, result.passKey);
             const keys: Keys = JSON.parse(d);
-            setBsvAddress(keys.walletAddress);
-            setOrdAddress(keys.ordAddress);
+
+            const walletAddress = P2PKHAddress.from_string(keys.walletAddress)
+              .set_chain_params(getChainParams(network))
+              .to_string();
+
+            const ordAddress = P2PKHAddress.from_string(keys.ordAddress)
+              .set_chain_params(getChainParams(network))
+              .to_string();
+            setBsvAddress(walletAddress);
+            setOrdAddress(ordAddress);
             setBsvPubKey(keys.walletPubKey);
             setOrdPubKey(keys.ordPubKey);
             if (password) {
               const isVerified = await verifyPassword(password);
-              isVerified ? resolve(keys) : reject("Unauthorized!");
+              isVerified ? resolve(Object.assign({}, keys, {
+                ordAddress,
+                walletAddress,
+              })) : reject("Unauthorized!");
             } else {
               resolve({
-                ordAddress: keys.ordAddress,
-                walletAddress: keys.walletAddress,
+                ordAddress,
+                walletAddress,
                 walletPubKey: keys.walletPubKey,
                 ordPubKey: keys.ordPubKey,
               });
@@ -82,9 +105,10 @@ export const useKeys = () => {
   };
 
   useEffect(() => {
+    if (!bsvWasmInitialized) return
     retrieveKeys();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [bsvWasmInitialized]);
 
   return {
     generateSeedAndStoreEncrypted,

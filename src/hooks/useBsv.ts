@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useKeys } from "./useKeys";
 import {
+  ChainParams,
   ECDSA,
   Hash,
   P2PKHAddress,
@@ -16,6 +17,7 @@ import {
 import { UTXO, WocUtxo, useWhatsOnChain } from "./useWhatsOnChain";
 import { SignMessageResponse } from "../pages/requests/SignMessageRequest";
 import { useBsvWasm } from "./useBsvWasm";
+import { NetWork, useNetwork } from "./useNetwork";
 
 type SendBsvResponse = {
   txid?: string;
@@ -53,8 +55,12 @@ export const useBsv = () => {
     useWhatsOnChain();
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey } = useKeys();
   const { bsvWasmInitialized } = useBsvWasm();
+  const { network } = useNetwork();
+  useEffect(() => { }, []);
 
-  useEffect(() => {}, []);
+  const getChainParams = (network: NetWork): ChainParams => {
+    return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
+  }
 
   const sendBsv = async (
     request: Web3SendBsvRequest,
@@ -74,7 +80,7 @@ export const useBsv = () => {
       if (!keys?.walletWif || !keys.walletPubKey) throw Error("Undefined key");
       const paymentPk = PrivateKey.from_wif(keys.walletWif);
       const pubKey = paymentPk.to_public_key();
-      const fromAddress = pubKey.to_address().to_string();
+      const fromAddress = pubKey.to_address().set_chain_params(getChainParams(network)).to_string();
       const amount = request.reduce((a, r) => a + r.satAmount, 0);
 
       // Format in and outs
@@ -227,7 +233,7 @@ export const useBsv = () => {
       const hash = Hash.sha_256(Buffer.from(message)).to_hex();
       const privateKey = PrivateKey.from_wif(keys.walletWif);
       const publicKey = privateKey.to_public_key();
-      const address = publicKey.to_address().to_string();
+      const address = publicKey.to_address().set_chain_params(getChainParams(network)).to_string();
       const encoder = new TextEncoder();
       const encodedMessage = encoder.encode(hash);
       const signature = privateKey.sign_message(encodedMessage);

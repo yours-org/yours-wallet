@@ -14,7 +14,6 @@ import {
   Text,
 } from "../components/Reusable";
 import { useOrds } from "../hooks/useOrds";
-import { GP_BASE_URL } from "../utils/constants";
 import { Show } from "../components/Show";
 import { BackButton } from "../components/BackButton";
 import { QrCode } from "../components/QrCode";
@@ -67,6 +66,7 @@ export const OrdWallet = () => {
     isProcessing,
     transferOrdinal,
     setIsProcessing,
+    getOrdinalsBaseUrl,
   } = useOrds();
   const [selectedOrdinal, setSelectedOrdinal] = useState("");
   const [ordinalOutpoint, setOrdinalOutpoint] = useState("");
@@ -170,7 +170,7 @@ export const OrdWallet = () => {
               <Ordinal
                 theme={theme}
                 key={ord.origin?.outpoint.toString()}
-                url={`${GP_BASE_URL}/content/${ord.origin?.outpoint.toString()}`}
+                url={`${getOrdinalsBaseUrl()}/content/${ord.origin?.outpoint.toString()}`}
                 selected={selectedOrdinal === ord.origin?.outpoint.toString()}
                 onClick={() => {
                   setSelectedOrdinal(ord.origin!.outpoint.toString());
@@ -242,7 +242,7 @@ export const OrdWallet = () => {
         <HeaderText theme={theme}>Transfer Ordinal</HeaderText>
         <Ordinal
           theme={theme}
-          url={`${GP_BASE_URL}/content/${selectedOrdinal}`}
+          url={`${getOrdinalsBaseUrl()}/content/${selectedOrdinal}`}
           selected={true}
           size="6rem"
         />
