@@ -1,6 +1,6 @@
 import styled from "styled-components";
 import { ChangeEvent } from "react";
-import { Theme } from "../theme";
+import { ColorThemeProps, Theme } from "../theme";
 
 const Label = styled.label`
   display: flex;
@@ -9,45 +9,49 @@ const Label = styled.label`
   cursor: pointer;
 `;
 
-const Switch = styled.div`
+const Switch = styled.div<ColorThemeProps>`
   position: relative;
-  width: 60px;
-  height: 28px;
-  background: #b3b3b3;
-  border-radius: 32px;
-  padding: 4px;
+  width: 2rem;
+  height: 1rem;
+  background: ${({ theme }) => theme.darkAccent + "70"};
+  border-radius: 2rem;
+  padding: 0.25rem;
   transition: 300ms all;
 
   &:before {
     transition: 300ms all;
     content: "";
     position: absolute;
-    width: 28px;
-    height: 28px;
-    border-radius: 35px;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 2.1875rem;
     top: 50%;
-    left: 4px;
-    background: white;
+    left: 0rem;
+    background: ${({ theme }) => theme.white};
     transform: translate(0, -50%);
   }
 `;
 
-const Input = styled.input`
+const Input = styled.input<ColorThemeProps>`
   opacity: 0;
   position: absolute;
 
   &:checked + ${Switch} {
-    background: green;
+    background: ${({ theme }) => theme.primaryButton + "95"};
 
     &:before {
-      transform: translate(32px, -50%);
+      transform: translate(1.25rem, -50%);
     }
   }
 `;
 
+const Text = styled.p<ColorThemeProps>`
+  color: ${({ theme }) => theme.white};
+  font-size: 0.85rem;
+`;
+
 export type ToggleSwitchProps = {
   on: boolean;
-  label: string;
   onLabel: string;
   offLabel: string;
   theme: Theme;
@@ -55,6 +59,8 @@ export type ToggleSwitchProps = {
 };
 
 export const ToggleSwitch = (props: ToggleSwitchProps) => {
+  const { on, onLabel, offLabel, theme } = props;
+
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (props.onChange) {
       props.onChange(e);
@@ -63,11 +69,14 @@ export const ToggleSwitch = (props: ToggleSwitchProps) => {
 
   return (
     <Label>
-      <span>
-        {props.label}: {props.on ? props.onLabel : props.offLabel}
-      </span>
-      <Input checked={props.on} type="checkbox" onChange={handleChange} />
-      <Switch />
+      <Text theme={theme}>{on ? onLabel : offLabel}</Text>
+      <Input
+        checked={on}
+        type="checkbox"
+        onChange={handleChange}
+        theme={theme}
+      />
+      <Switch theme={theme} />
     </Label>
   );
 };
