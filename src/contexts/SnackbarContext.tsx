@@ -1,6 +1,7 @@
 import { ReactNode, createContext, useState } from "react";
 import { Snackbar } from "../components/Snackbar";
 import { useTheme } from "../hooks/useTheme";
+import { SNACKBAR_TIMEOUT } from "../utils/constants";
 
 export type SnackbarType = "error" | "info" | "success";
 
@@ -29,7 +30,7 @@ export const SnackbarProvider = (props: SnackbarProviderProps) => {
     setTimeout(() => {
       setMessage(null);
       setSnackBarType(null);
-    }, 2500);
+    }, SNACKBAR_TIMEOUT);
   };
 
   return (

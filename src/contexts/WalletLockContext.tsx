@@ -39,8 +39,7 @@ export const WalletLockProvider = (props: WalletLockProviderProps) => {
         }
 
         if (currentTime - lastActiveTime > INACTIVITY_LIMIT) {
-          setIsLocked(true);
-          storage.remove("appState");
+          lockWallet();
         } else {
           setIsLocked(false);
         }
