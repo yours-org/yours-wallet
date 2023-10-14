@@ -1,12 +1,13 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
-import { FEE_PER_BYTE, GP_BASE_URL } from "../utils/constants";
+import { FEE_PER_BYTE, GP_BASE_URL, GP_TESTNET_BASE_URL } from "../utils/constants";
 import { useKeys } from "./useKeys";
 import { UTXO, WocUtxo, useWhatsOnChain } from "./useWhatsOnChain";
 import { sendOrdinal } from "js-1sat-ord-web";
 import { P2PKHAddress, PrivateKey, Transaction } from "bsv-wasm-web";
 import { useBsvWasm } from "./useBsvWasm";
 import { Outpoint } from "../utils/outpoint";
+import { NetWork, useNetwork } from "./useNetwork";
 
 export class InscriptionData {
   type?: string = '';
@@ -30,7 +31,7 @@ export class Origin {
   outpoint: Outpoint = new Outpoint();
   data?: TxoData;
   num?: number;
-  map?: {[key: string]:any};
+  map?: { [key: string]: any };
   claims?: Claim[]
 }
 
@@ -43,20 +44,20 @@ export enum Bsv20Status {
 export class TxoData {
   types?: string[];
   insc?: File;
-  map?: {[key: string]:any};
+  map?: { [key: string]: any };
   b?: File;
   sigma?: Sigma[];
   list?: {
-      price: number;
-      payout: string;
+    price: number;
+    payout: string;
   };
   bsv20?: {
-      id?:  Outpoint;
-      p: string;
-      op: string;
-      tick?: string;
-      amt: string;
-      status?: Bsv20Status 
+    id?: Outpoint;
+    p: string;
+    op: string;
+    tick?: string;
+    amt: string;
+    status?: Bsv20Status
   };
 }
 
@@ -145,13 +146,18 @@ export const useOrds = () => {
   const [ordinals, setOrdinals] = useState<OrdinalResponse>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { bsvWasmInitialized } = useBsvWasm();
+  const { network } = useNetwork();
+
+  const getOrdinalsBaseUrl = () => {
+    return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
+  };
 
   const getOrdinals = async () => {
     try {
       //   setIsProcessing(true); // TODO: set this to true if call is taking more than a second
       //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
       const res = await axios.get(
-        `${GP_BASE_URL}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`
+        `${getOrdinalsBaseUrl()}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`
       );
 
       const ordList: OrdinalResponse = res.data;
@@ -313,7 +319,7 @@ export const useOrds = () => {
         return [];
       }
       const r = await axios.get(
-        `${GP_BASE_URL}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`
+        `${getOrdinalsBaseUrl()}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`
       );
 
       const utxos = r.data as OrdinalResponse;
@@ -343,5 +349,6 @@ export const useOrds = () => {
     isProcessing,
     transferOrdinal,
     setIsProcessing,
+    getOrdinalsBaseUrl,
   };
 };

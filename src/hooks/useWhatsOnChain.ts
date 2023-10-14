@@ -1,5 +1,6 @@
 import axios from "axios";
-import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL } from "../utils/constants";
+import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from "../utils/constants";
+import { NetWork, useNetwork } from "./useNetwork";
 
 export type UTXO = {
   satoshis: number;
@@ -16,10 +17,18 @@ export type WocUtxo = {
 };
 
 export const useWhatsOnChain = () => {
+
+  const { network } = useNetwork();
+
+
+  const getBaseUrl = () => {
+    return network === NetWork.Mainnet ? WOC_BASE_URL : WOC_TESTNET_BASE_URL;
+  };
+
   const getBsvBalance = async (address: string) => {
     try {
       const { data } = await axios.get(
-        `${WOC_BASE_URL}/address/${address}/balance`
+        `${getBaseUrl()}/address/${address}/balance`
       );
       const satBalance = data.confirmed + data.unconfirmed;
       const total = satBalance / BSV_DECIMAL_CONVERSION;
@@ -32,7 +41,7 @@ export const useWhatsOnChain = () => {
   const getUtxos = async (fromAddress: string) => {
     try {
       const { data } = await axios.get(
-        `${WOC_BASE_URL}/address/${fromAddress}/unspent`
+        `${getBaseUrl()}/address/${fromAddress}/unspent`
       );
 
       return data;
@@ -43,7 +52,7 @@ export const useWhatsOnChain = () => {
 
   const getExchangeRate = async () => {
     try {
-      const { data } = await axios.get(`${WOC_BASE_URL}/exchangerate`);
+      const { data } = await axios.get(`${getBaseUrl()}/exchangerate`);
       const rate = Number(data.rate.toFixed(2));
       return rate;
     } catch (error) {
@@ -53,7 +62,7 @@ export const useWhatsOnChain = () => {
 
   const getRawTxById = async (txid: string): Promise<string | undefined> => {
     try {
-      const { data } = await axios.get(`${WOC_BASE_URL}/tx/${txid}/hex`);
+      const { data } = await axios.get(`${getBaseUrl()}/tx/${txid}/hex`);
       return data;
     } catch (error) {
       console.log(error);
@@ -62,7 +71,7 @@ export const useWhatsOnChain = () => {
 
   const broadcastRawTx = async (txhex: string): Promise<string | undefined> => {
     try {
-      const { data: txid } = await axios.post(`${WOC_BASE_URL}/tx/raw`, {
+      const { data: txid } = await axios.post(`${getBaseUrl()}/tx/raw`, {
         txhex,
       });
       return txid;
