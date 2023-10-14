@@ -11,13 +11,14 @@ import { useTheme } from "../hooks/useTheme";
 import { useWalletLockState } from "../hooks/useWalletLockState";
 import { ToggleSwitch } from "../components/ToggleSwitch";
 import { NetWork, useNetwork } from "../hooks/useNetwork";
+import { useSnackbar } from "../hooks/useSnackbar";
+import { SNACKBAR_TIMEOUT } from "../utils/constants";
 
 const Content = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
-  position: relative;
 `;
 
 const TitleText = styled.h1<ColorThemeProps>`
@@ -29,12 +30,19 @@ const TitleText = styled.h1<ColorThemeProps>`
   text-align: center;
 `;
 
+const SwitchWrapper = styled.div`
+  position: absolute;
+  top: 1rem;
+  right: 2rem;
+`;
+
 export const Settings = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const { lockWallet } = useWalletLockState();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { network, updateNetwork } = useNetwork();
+  const { addSnackbar } = useSnackbar();
 
   const handleSignOut = async () => {
     await storage.clear();
@@ -51,15 +59,31 @@ export const Settings = () => {
 
   const handleLock = () => {
     lockWallet();
-    setSelected("bsv");
+    // setSelected("bsv");
   };
 
   const handleNetworkChange = (e: any) => {
-    updateNetwork(e.target.checked ? NetWork.Mainnet : NetWork.Testnet)
+    const network = e.target.checked ? NetWork.Mainnet : NetWork.Testnet;
+    updateNetwork(network);
+
+    // The provider relies on appState in local storage to accurately return addresses. This is an easy way to handle making sure the state is always up to date.
+    addSnackbar(`Switching to ${network}`, "info");
+    setTimeout(() => {
+      window.location.reload();
+    }, SNACKBAR_TIMEOUT - 500);
   };
 
   return (
     <Content>
+      <SwitchWrapper>
+        <ToggleSwitch
+          theme={theme}
+          on={network === NetWork.Mainnet}
+          onChange={handleNetworkChange}
+          onLabel="Mainnet"
+          offLabel="Testnet"
+        />
+      </SwitchWrapper>
       <Show
         when={!showSpeedBump}
         whenFalseContent={
@@ -75,15 +99,6 @@ export const Settings = () => {
         <TitleText theme={theme}>⚙️</TitleText>
         <TitleText theme={theme}>My Settings</TitleText>
         <Text theme={theme}>Page is under active development.</Text>
-
-        <ToggleSwitch
-          theme={theme}
-          on={network === NetWork.Mainnet}
-          onChange={handleNetworkChange}
-          label="Network"
-          onLabel="Mainnet"
-          offLabel="Testnet"
-        />
         <Button
           theme={theme}
           label="Sign Out"
