@@ -14,7 +14,6 @@ import { PageLoader } from "../../components/PageLoader";
 import validate from "bitcoin-address-validation";
 import { sleep } from "../../utils/sleep";
 import { useTheme } from "../../hooks/useTheme";
-import { GP_BASE_URL } from "../../utils/constants";
 import { truncate } from "../../utils/format";
 import { Input } from "../../components/Input";
 
@@ -32,6 +31,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     isProcessing,
     transferOrdinal,
     setIsProcessing,
+    getOrdinalsBaseUrl
   } = useOrds();
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [successTxId, setSuccessTxId] = useState("");
@@ -112,7 +112,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Ordinal
             theme={theme}
-            url={`${GP_BASE_URL}/content/${web3Request.origin}`}
+            url={`${getOrdinalsBaseUrl()}/content/${web3Request.origin}`}
             selected={true}
           />
           <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>
