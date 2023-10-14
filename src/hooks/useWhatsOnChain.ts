@@ -1,7 +1,7 @@
 import axios from "axios";
 import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from "../utils/constants";
-import { NetWork, useNetwork } from "./useNetwork";
-
+import { NetWork } from "../utils/network";
+import { useNetwork } from "./useNetwork";
 export type UTXO = {
   satoshis: number;
   vout: number;

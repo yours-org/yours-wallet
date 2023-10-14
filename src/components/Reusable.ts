@@ -1,4 +1,4 @@
-import styled from "styled-components";
+import styled, {css} from "styled-components";
 import { ColorThemeProps } from "../theme";
 
 export const HeaderText = styled.h1<ColorThemeProps>`
@@ -25,6 +25,22 @@ export const Text = styled.p<ColorThemeProps>`
   text-align: center;
   width: 80%;
 `;
+
+
+export const Badge = styled.button<{ $primary?: boolean; }>`
+  background: transparent;
+  border-radius: 0.5rem;
+  border: none;
+  color: ${({ theme }) => theme.white + "90"};
+  margin: 0.5em 1em;
+  padding: 0.25em 1em;
+  ${props => css`
+    background: #BF4F74;
+    color: white;
+  `}
+`;
+
+
 
 export const ConfirmContent = styled.div`
   display: flex;

@@ -7,10 +7,10 @@ import {
 } from "../utils/crypto";
 import { Keys, getKeys } from "../utils/keys";
 import { storage } from "../utils/storage";
-import { NetWork, useNetwork } from "./useNetwork";
 import { ChainParams, P2PKHAddress } from "bsv-wasm-web";
 import { useBsvWasm } from "./useBsvWasm";
-
+import { NetWork } from "../utils/network";
+import { useNetwork } from "./useNetwork";
 export type KeyStorage = {
   encryptedKeys: string;
   passKey: string;

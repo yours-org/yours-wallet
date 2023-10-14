@@ -1,14 +1,8 @@
 import { useEffect, useState } from "react";
 import { storage } from "../utils/storage";
+import { NetWork, NetWorkStorage } from "../utils/network";
 
-export type NetWorkStorage = {
-  network: NetWork;
-};
 
-export const enum NetWork {
-  Mainnet = "mainnet",
-  Testnet = "testnet",
-}
 
 export const useNetwork = () => {
   const [network, setNetwork] = useState(NetWork.Mainnet);
@@ -35,13 +29,6 @@ export const useNetwork = () => {
     });
   };
 
-  const updateNetwork = (n: NetWork): void => {
-    storage.set({
-      network: n
-    });
-    setNetwork(n)
-  };
-
 
   useEffect(() => {
     retrieveNetwork();
@@ -49,8 +36,7 @@ export const useNetwork = () => {
   }, []);
 
   return {
-    retrieveNetwork,
     network,
-    updateNetwork
+    setNetwork
   };
 };
