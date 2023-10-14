@@ -46,7 +46,7 @@ const Container = styled.div<ColorThemeProps>`
   position: relative;
 `;
 export const App = () => {
-  const { isLocked, setIsLocked } = useWalletLockState();
+  const { isLocked } = useWalletLockState();
   const { theme } = useTheme();
   const menuContext = useContext(BottomMenuContext);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
@@ -78,7 +78,7 @@ export const App = () => {
   useActivityDetector(isLocked);
 
   const handleUnlock = async () => {
-    setIsLocked(false);
+    window.location.reload();
   };
 
   useEffect(() => {
