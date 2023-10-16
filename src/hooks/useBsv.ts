@@ -17,7 +17,8 @@ import {
 import { UTXO, WocUtxo, useWhatsOnChain } from "./useWhatsOnChain";
 import { SignMessageResponse } from "../pages/requests/SignMessageRequest";
 import { useBsvWasm } from "./useBsvWasm";
-import { NetWork, useNetwork } from "./useNetwork";
+import { NetWork } from "../utils/network";
+import { useNetwork } from "./useNetwork";
 
 type SendBsvResponse = {
   txid?: string;
@@ -51,11 +52,12 @@ export const useBsv = () => {
   const [bsvBalance, setBsvBalance] = useState(0);
   const [exchangeRate, setExchangeRate] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { getUtxos, getBsvBalance, getExchangeRate, broadcastRawTx } =
-    useWhatsOnChain();
+
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey } = useKeys();
   const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
+  const { getUtxos, getBsvBalance, getExchangeRate, broadcastRawTx } =
+  useWhatsOnChain();
   useEffect(() => { }, []);
 
   const getChainParams = (network: NetWork): ChainParams => {

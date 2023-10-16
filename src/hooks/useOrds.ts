@@ -7,8 +7,8 @@ import { sendOrdinal } from "js-1sat-ord-web";
 import { P2PKHAddress, PrivateKey, Transaction } from "bsv-wasm-web";
 import { useBsvWasm } from "./useBsvWasm";
 import { Outpoint } from "../utils/outpoint";
-import { NetWork, useNetwork } from "./useNetwork";
-
+import { NetWork } from "../utils/network";
+import { useNetwork } from "./useNetwork";
 export class InscriptionData {
   type?: string = '';
   data?: Buffer = Buffer.alloc(0);
@@ -142,12 +142,12 @@ export type Web3TransferOrdinalRequest = {
 
 export const useOrds = () => {
   const { ordAddress, retrieveKeys, verifyPassword, ordPubKey } = useKeys();
-  const { getUtxos, broadcastRawTx, getRawTxById } = useWhatsOnChain();
+
   const [ordinals, setOrdinals] = useState<OrdinalResponse>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
-
+  const { getUtxos, broadcastRawTx, getRawTxById } = useWhatsOnChain();
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
   };

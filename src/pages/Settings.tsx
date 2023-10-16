@@ -10,9 +10,10 @@ import { Show } from "../components/Show";
 import { useTheme } from "../hooks/useTheme";
 import { useWalletLockState } from "../hooks/useWalletLockState";
 import { ToggleSwitch } from "../components/ToggleSwitch";
-import { NetWork, useNetwork } from "../hooks/useNetwork";
 import { useSnackbar } from "../hooks/useSnackbar";
 import { SNACKBAR_TIMEOUT } from "../utils/constants";
+import { useWeb3Context } from "../hooks/useWeb3Context";
+import { NetWork } from "../utils/network";
 
 const Content = styled.div`
   display: flex;
@@ -41,8 +42,8 @@ export const Settings = () => {
   const { setSelected } = useBottomMenu();
   const { lockWallet } = useWalletLockState();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
-  const { network, updateNetwork } = useNetwork();
   const { addSnackbar } = useSnackbar();
+  const { network, updateNetwork } = useWeb3Context();
 
   const handleSignOut = async () => {
     await storage.clear();
