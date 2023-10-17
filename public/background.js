@@ -7,6 +7,7 @@ let responseCallbackForTransferOrdinalRequest;
 let responseCallbackForSignMessageRequest;
 let responseCallbackForSignTransactionRequest;
 let responseCallbackForBroadcastRequest;
+let responseCallbackForGetSignaturesRequest;
 let popupWindowId = null;
 
 const launchPopUp = () => {
@@ -60,6 +61,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     "signMessageResponse",
     "signTransactionResponse",
     "broadcastResponse",
+    "getSignaturesResponse",
   ];
 
   if (noAuthRequired.includes(message.action)) {
@@ -78,6 +80,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processSignTransactionResponse(message);
       case "broadcastResponse":
         return processBroadcastResponse(message);
+      case "getSignaturesResponse":
+        return processGetSignaturesResponse(message);
       default:
         break;
     }
@@ -121,6 +125,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processSignTransactionRequest(message, sendResponse);
       case "broadcast":
         return processBroadcastRequest(message, sendResponse);
+      case "getSignatures":
+        return processGetSignaturesRequest(message, sendResponse);
       default:
         break;
     }
@@ -404,6 +410,36 @@ const processSignTransactionRequest = (message, sendResponse) => {
     });
   }
 };
+
+const processGetSignaturesRequest = (message, sendResponse) => {
+  if (!message.params) {
+    sendResponse({
+      type: "getSignatures",
+      success: false,
+      error: "Must provide valid params!",
+    });
+  }
+  try {
+    responseCallbackForGetSignaturesRequest = sendResponse;
+    chrome.storage.local
+      .set({
+        getSignaturesRequest: {
+          txHex: message.params.txHex,
+          sigRequests: message.params.sigRequests,
+        },
+      })
+      .then(() => {
+        launchPopUp();
+      });
+  } catch (error) {
+    sendResponse({
+      type: "getSignatures",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+};
+
 // RESPONSES ********************************
 
 const processConnectResponse = (message) => {
@@ -555,6 +591,30 @@ const processBroadcastResponse = (message) => {
   return true;
 };
 
+const processGetSignaturesResponse = (message) => {
+  if (!responseCallbackForGetSignaturesRequest) throw Error("Missing callback!");
+  try {
+    responseCallbackForGetSignaturesRequest({
+      type: "getSignatures",
+      success: !message?.error,
+      data: message?.sigResponses ?? [],
+      error: message?.error,
+    });
+  } catch (error) {
+    responseCallbackForGetSignaturesRequest({
+      type: "getSignatures",
+      success: false,
+      error: JSON.stringify(error),
+    });
+  } finally {
+    responseCallbackForGetSignaturesRequest = null;
+    popupWindowId = null;
+    chrome.storage.local.remove(["getSignaturesRequest", "popupWindowId"]);
+  }
+
+  return true;
+};
+
 // HANDLE WINDOW CLOSE *****************************************
 
 chrome.windows.onRemoved.addListener((closedWindowId) => {
@@ -562,8 +622,8 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
     if (responseCallbackForConnectRequest) {
       responseCallbackForConnectRequest({
         type: "connect",
-        success: true,
-        data: undefined,
+        success: false,
+        error: "User dismissed the request!",
       });
       responseCallbackForConnectRequest = null;
       chrome.storage.local.remove("connectRequest");
@@ -572,8 +632,8 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
     if (responseCallbackForSendBsvRequest) {
       responseCallbackForSendBsvRequest({
         type: "sendBsv",
-        success: true,
-        data: undefined,
+        success: false,
+        error: "User dismissed the request!",
       });
       responseCallbackForSendBsvRequest = null;
       chrome.storage.local.remove("sendBsvRequest");
@@ -582,8 +642,8 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
     if (responseCallbackForSignMessageRequest) {
       responseCallbackForSignMessageRequest({
         type: "signMessage",
-        success: true,
-        data: undefined,
+        success: false,
+        error: "User dismissed the request!",
       });
       responseCallbackForSignMessageRequest = null;
       chrome.storage.local.remove("signMessageRequest");
@@ -592,8 +652,8 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
     if (responseCallbackForSignTransactionRequest) {
       responseCallbackForSignTransactionRequest({
         type: "signTransaction",
-        success: true,
-        data: undefined,
+        success: false,
+        error: "User dismissed the request!",
       });
       responseCallbackForSignTransactionRequest = null;
       chrome.storage.local.remove("signTransactionRequest");
@@ -602,8 +662,8 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
     if (responseCallbackForTransferOrdinalRequest) {
       responseCallbackForTransferOrdinalRequest({
         type: "transferOrdinal",
-        success: true,
-        data: undefined,
+        success: false,
+        error: "User dismissed the request!",
       });
       responseCallbackForTransferOrdinalRequest = null;
       chrome.storage.local.remove("transferOrdinalRequest");
@@ -612,12 +672,23 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
     if (responseCallbackForBroadcastRequest) {
       responseCallbackForBroadcastRequest({
         type: "broadcast",
-        success: true,
-        data: undefined,
+        success: false,
+        error: "User dismissed the request!",
       });
       responseCallbackForBroadcastRequest = null;
       chrome.storage.local.remove("broadcastRequest");
     }
+
+    if (responseCallbackForGetSignaturesRequest) {
+      responseCallbackForGetSignaturesRequest({
+        type: "getSignatures",
+        success: false,
+        error: "User dismissed the request!",
+      });
+      responseCallbackForGetSignaturesRequest = null;
+      chrome.storage.local.remove("getSignaturesRequest");
+    }
+
     popupWindowId = null;
     chrome.storage.local.remove("popupWindowId");
   }

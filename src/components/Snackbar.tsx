@@ -65,6 +65,7 @@ export const Snackbar = (props: SnackbarProps) => {
           fontWeight: 500,
           fontSize: "1.25rem",
           color: type === "error" ? theme.white : theme.darkAccent,
+          wordWrap: "break-word",
         }}
       >
         {message}

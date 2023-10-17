@@ -65,10 +65,11 @@ export type ButtonProps = {
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
   isSubmit?: boolean;
+  style?: React.CSSProperties;
 };
 
 export const Button = (props: ButtonProps) => {
-  const { label, type, onClick, disabled, theme, isSubmit } = props;
+  const { label, type, onClick, disabled, theme, isSubmit, style } = props;
   return (
     <>
       <Show when={type === "primary"}>
@@ -77,6 +78,7 @@ export const Button = (props: ButtonProps) => {
           disabled={disabled}
           onClick={onClick}
           type={isSubmit ? "submit" : "button"}
+          style={style}
         >
           {label}
         </Primary>
@@ -87,6 +89,7 @@ export const Button = (props: ButtonProps) => {
           disabled={disabled}
           onClick={onClick}
           type={isSubmit ? "submit" : "button"}
+          style={style}
         >
           {label}
         </Secondary>
@@ -97,6 +100,7 @@ export const Button = (props: ButtonProps) => {
           disabled={disabled}
           onClick={onClick}
           type={isSubmit ? "submit" : "button"}
+          style={style}
         >
           {label}
         </Warn>
