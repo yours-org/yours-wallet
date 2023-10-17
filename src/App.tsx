@@ -16,11 +16,7 @@ import { useTheme } from "./hooks/useTheme";
 import { BsvSendRequest } from "./pages/requests/BsvSendRequest";
 import { storage } from "./utils/storage";
 import { useContext, useEffect, useState } from "react";
-import {
-  Web3BroadcastRequest,
-  Web3SendBsvRequest,
-  Web3SignTransactionRequest,
-} from "./hooks/useBsv";
+import { Web3BroadcastRequest, Web3SendBsvRequest } from "./hooks/useBsv";
 import { Web3TransferOrdinalRequest } from "./hooks/useOrds";
 import { Web3GetSignaturesRequest } from "./hooks/useContracts";
 import { OrdTransferRequest } from "./pages/requests/OrdTransferRequest";
@@ -28,7 +24,6 @@ import { BottomMenuContext } from "./contexts/BottomMenuContext";
 import { ConnectRequest } from "./pages/requests/ConnectRequest";
 import { SignMessageRequest } from "./pages/requests/SignMessageRequest";
 import { BroadcastRequest } from "./pages/requests/BroadcastRequest";
-import { SignTransactionRequest } from "./pages/requests/SignTransactionRequest";
 import { GetSignaturesRequest } from "./pages/requests/GetSignaturesRequest";
 
 export type ThirdPartyAppRequestData = {
@@ -73,10 +68,6 @@ export const App = () => {
     Web3TransferOrdinalRequest | undefined
   >(undefined);
 
-  const [signTransactionRequest, setSignTransactionRequest] = useState<
-    Web3SignTransactionRequest | undefined
-  >(undefined);
-
   const [getSignaturesRequest, setGetSignaturesRequest] = useState<
     Web3GetSignaturesRequest | undefined
   >(undefined);
@@ -108,7 +99,6 @@ export const App = () => {
           sendBsvRequest,
           transferOrdinalRequest,
           signMessageRequest,
-          signTransactionRequest,
           broadcastRequest,
           getSignaturesRequest,
         } = result;
@@ -135,10 +125,6 @@ export const App = () => {
 
         if (signMessageRequest) {
           setMessageToSign(signMessageRequest.message);
-        }
-
-        if (signTransactionRequest) {
-          setSignTransactionRequest(signTransactionRequest);
         }
 
         if (broadcastRequest) {
@@ -183,7 +169,6 @@ export const App = () => {
                       !bsvSendRequest &&
                       !messageToSign &&
                       !broadcastRequest &&
-                      !signTransactionRequest &&
                       !getSignaturesRequest
                     }
                     whenFalseContent={
@@ -201,17 +186,6 @@ export const App = () => {
                             onSignature={() => setMessageToSign(undefined)}
                           />
                         </Show>
-                        <Show when={!!signTransactionRequest}>
-                          <SignTransactionRequest
-                            request={
-                              signTransactionRequest as Web3SignTransactionRequest
-                            }
-                            popupId={popupId}
-                            onSignature={() =>
-                              setSignTransactionRequest(undefined)
-                            }
-                          />
-                        </Show>
                         <Show when={!!broadcastRequest}>
                           <BroadcastRequest
                             request={broadcastRequest as Web3BroadcastRequest}
@@ -221,9 +195,13 @@ export const App = () => {
                         </Show>
                         <Show when={!!getSignaturesRequest}>
                           <GetSignaturesRequest
-                            getSigsRequest={getSignaturesRequest as Web3GetSignaturesRequest}
+                            getSigsRequest={
+                              getSignaturesRequest as Web3GetSignaturesRequest
+                            }
                             popupId={popupId}
-                            onSignature={() => setGetSignaturesRequest(undefined)}
+                            onSignature={() =>
+                              setGetSignaturesRequest(undefined)
+                            }
                           />
                         </Show>
                       </>
