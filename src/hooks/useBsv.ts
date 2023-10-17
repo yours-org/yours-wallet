@@ -25,20 +25,6 @@ type SendBsvResponse = {
   error?: string;
 };
 
-type SignTransactionResponse = {
-  signatureHex?: string;
-  error?: string;
-};
-
-export type Web3SignTransactionRequest = {
-  rawtx: string;
-  vin: number;
-  sigHashTypeNumber: number;
-  keyType: "bsv" | "ord";
-  outputScript: string;
-  outputSats: bigint;
-};
-
 export type Web3SendBsvRequest = {
   satAmount: number;
   address: string;
@@ -57,12 +43,13 @@ export const useBsv = () => {
   const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
   const { getUtxos, getBsvBalance, getExchangeRate, broadcastRawTx } =
-  useWhatsOnChain();
-  useEffect(() => { }, []);
+    useWhatsOnChain();
 
   const getChainParams = (network: NetWork): ChainParams => {
-    return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
-  }
+    return network === NetWork.Mainnet
+      ? ChainParams.mainnet()
+      : ChainParams.testnet();
+  };
 
   const sendBsv = async (
     request: Web3SendBsvRequest,
@@ -82,7 +69,10 @@ export const useBsv = () => {
       if (!keys?.walletWif || !keys.walletPubKey) throw Error("Undefined key");
       const paymentPk = PrivateKey.from_wif(keys.walletWif);
       const pubKey = paymentPk.to_public_key();
-      const fromAddress = pubKey.to_address().set_chain_params(getChainParams(network)).to_string();
+      const fromAddress = pubKey
+        .to_address()
+        .set_chain_params(getChainParams(network))
+        .to_string();
       const amount = request.reduce((a, r) => a + r.satAmount, 0);
 
       // Format in and outs
@@ -188,39 +178,6 @@ export const useBsv = () => {
     }
   };
 
-  const signTransaction = async (
-    password: string,
-    request: Web3SignTransactionRequest
-  ): Promise<SignTransactionResponse> => {
-    const { keyType, outputSats, outputScript, rawtx, sigHashTypeNumber, vin } =
-      request;
-
-    const isAuthenticated = await verifyPassword(password);
-    if (!isAuthenticated) {
-      return { error: "invalid-password" };
-    }
-    try {
-      const transaction = Transaction.from_hex(rawtx);
-      const keys = await retrieveKeys(password);
-      if (!keys?.walletWif || !keys.ordWif) throw Error("Undefined key");
-      const privateKey = PrivateKey.from_wif(
-        keyType === "bsv" ? keys.walletWif : keys.ordWif
-      );
-      const script = Script.from_hex(outputScript);
-      const sig = transaction.sign(
-        privateKey,
-        sigHashTypeNumber,
-        vin,
-        script,
-        BigInt(outputSats)
-      );
-      return { signatureHex: sig.to_hex() };
-    } catch (error) {
-      console.error("Error signing the transaction: ", error);
-      throw error;
-    }
-  };
-
   const signMessage = async (
     message: string,
     password: string
@@ -235,7 +192,10 @@ export const useBsv = () => {
       const hash = Hash.sha_256(Buffer.from(message)).to_hex();
       const privateKey = PrivateKey.from_wif(keys.walletWif);
       const publicKey = privateKey.to_public_key();
-      const address = publicKey.to_address().set_chain_params(getChainParams(network)).to_string();
+      const address = publicKey
+        .to_address()
+        .set_chain_params(getChainParams(network))
+        .to_string();
       const encoder = new TextEncoder();
       const encodedMessage = encoder.encode(hash);
       const signature = privateKey.sign_message(encodedMessage);
@@ -318,6 +278,5 @@ export const useBsv = () => {
     exchangeRate,
     signMessage,
     verifyMessage,
-    signTransaction,
   };
 };
