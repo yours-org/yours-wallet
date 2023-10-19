@@ -9,11 +9,10 @@ import {
   FormContainer,
   HeaderText,
   MainContent,
-  Ordinal,
   ReceiveContent,
   Text,
 } from "../components/Reusable";
-import { useOrds } from "../hooks/useOrds";
+import { OrdinalTxo, useOrds } from "../hooks/useOrds";
 import { Show } from "../components/Show";
 import { BackButton } from "../components/BackButton";
 import { QrCode } from "../components/QrCode";
@@ -23,6 +22,7 @@ import validate from "bitcoin-address-validation";
 import { Input } from "../components/Input";
 import { sleep } from "../utils/sleep";
 import { useTheme } from "../hooks/useTheme";
+import { Ordinal } from "../components/Ordinal";
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -68,7 +68,9 @@ export const OrdWallet = () => {
     setIsProcessing,
     getOrdinalsBaseUrl,
   } = useOrds();
-  const [selectedOrdinal, setSelectedOrdinal] = useState("");
+  const [selectedOrdinal, setSelectedOrdinal] = useState<
+    OrdinalTxo | undefined
+  >();
   const [ordinalOutpoint, setOrdinalOutpoint] = useState("");
   const [receiveAddress, setReceiveAddress] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -165,20 +167,26 @@ export const OrdWallet = () => {
         }
       >
         <OrdinalsList>
-          {ordinals.map((ord) => {
-            return (
-              <Ordinal
-                theme={theme}
-                key={ord.origin?.outpoint.toString()}
-                url={`${getOrdinalsBaseUrl()}/content/${ord.origin?.outpoint.toString()}`}
-                selected={selectedOrdinal === ord.origin?.outpoint.toString()}
-                onClick={() => {
-                  setSelectedOrdinal(ord.origin!.outpoint.toString());
-                  setOrdinalOutpoint(ord.outpoint.toString());
-                }}
-              />
-            );
-          })}
+          {ordinals
+            .filter((o) => o.data?.insc?.file.type !== "application/bsv-20")
+            .map((ord) => {
+              return (
+                <Ordinal
+                  theme={theme}
+                  inscription={ord}
+                  key={ord.origin?.outpoint.toString()}
+                  url={`${getOrdinalsBaseUrl()}/content/${ord.outpoint.toString()}`}
+                  selected={
+                    selectedOrdinal?.origin?.outpoint.toString() ===
+                    ord.origin?.outpoint.toString()
+                  }
+                  onClick={() => {
+                    setSelectedOrdinal(ord);
+                    setOrdinalOutpoint(ord.outpoint.toString());
+                  }}
+                />
+              );
+            })}
         </OrdinalsList>
       </Show>
       <ButtonContainer>
@@ -193,7 +201,7 @@ export const OrdWallet = () => {
           type="primary"
           label="Transfer"
           onClick={async () => {
-            if (!selectedOrdinal) {
+            if (!selectedOrdinal?.outpoint.toString()) {
               addSnackbar("You must select an ordinal to transfer!", "info");
               return;
             }
@@ -242,7 +250,8 @@ export const OrdWallet = () => {
         <HeaderText theme={theme}>Transfer Ordinal</HeaderText>
         <Ordinal
           theme={theme}
-          url={`${getOrdinalsBaseUrl()}/content/${selectedOrdinal}`}
+          inscription={selectedOrdinal as OrdinalTxo}
+          url={`${getOrdinalsBaseUrl()}/content/${selectedOrdinal?.outpoint.toString()}`}
           selected={true}
           size="6rem"
         />
