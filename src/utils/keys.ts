@@ -16,7 +16,6 @@ export type Keys = {
 const getWifAndDerivation = (seedPhrase: string, isOrd?: boolean) => {
   const seed = bip39.mnemonicToSeedSync(seedPhrase);
   const masterNode = ExtendedPrivateKey.from_seed(seed);
-
   const derivationPath = `m/44'/236'/${isOrd ? "1" : "0"}'/0/0`;
   const childNode = masterNode.derive_from_path(derivationPath);
   const privateKey = childNode.get_private_key();
@@ -26,6 +25,10 @@ const getWifAndDerivation = (seedPhrase: string, isOrd?: boolean) => {
 };
 
 export const getKeys = (validMnemonic?: string) => {
+  if (validMnemonic) {
+    const isValid = bip39.validateMnemonic(validMnemonic);
+    if (!isValid) throw new Error("Invalid Mnemonic!");
+  }
   const mnemonic = validMnemonic ?? bip39.generateMnemonic();
   const walletWifAndDP = getWifAndDerivation(mnemonic);
   const walletPrivKey = PrivateKey.from_wif(walletWifAndDP.wif);
