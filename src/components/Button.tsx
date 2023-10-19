@@ -50,7 +50,7 @@ const Secondary = styled(Primary)`
 `;
 
 const Warn = styled(Primary)`
-  background-color: ${({ theme }) => theme.errorRed};
+  background-color: ${({ theme }) => theme.errorRed + "95"};
   color: ${({ theme }) => theme.white};
 
   &:disabled {

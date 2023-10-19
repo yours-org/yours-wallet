@@ -13,7 +13,7 @@ const Switch = styled.div<ColorThemeProps>`
   position: relative;
   width: 2rem;
   height: 1rem;
-  background: ${({ theme }) => theme.darkAccent + "70"};
+  background: ${({ theme }) => theme.white + "30"};
   border-radius: 2rem;
   padding: 0.25rem;
   transition: 300ms all;
@@ -45,21 +45,14 @@ const Input = styled.input<ColorThemeProps>`
   }
 `;
 
-const Text = styled.p<ColorThemeProps>`
-  color: ${({ theme }) => theme.white};
-  font-size: 0.85rem;
-`;
-
 export type ToggleSwitchProps = {
   on: boolean;
-  onLabel: string;
-  offLabel: string;
   theme: Theme;
   onChange?: (e: ChangeEvent<HTMLInputElement>) => void;
 };
 
 export const ToggleSwitch = (props: ToggleSwitchProps) => {
-  const { on, onLabel, offLabel, theme } = props;
+  const { on, theme } = props;
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (props.onChange) {
@@ -69,7 +62,6 @@ export const ToggleSwitch = (props: ToggleSwitchProps) => {
 
   return (
     <Label>
-      <Text theme={theme}>{on ? onLabel : offLabel}</Text>
       <Input
         checked={on}
         type="checkbox"
