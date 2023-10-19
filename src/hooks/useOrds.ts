@@ -1,6 +1,10 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
-import { FEE_PER_BYTE, GP_BASE_URL, GP_TESTNET_BASE_URL } from "../utils/constants";
+import {
+  FEE_PER_BYTE,
+  GP_BASE_URL,
+  GP_TESTNET_BASE_URL,
+} from "../utils/constants";
 import { useKeys } from "./useKeys";
 import { UTXO, WocUtxo, useWhatsOnChain } from "./useWhatsOnChain";
 import { sendOrdinal } from "js-1sat-ord-web";
@@ -10,7 +14,7 @@ import { Outpoint } from "../utils/outpoint";
 import { NetWork } from "../utils/network";
 import { useNetwork } from "./useNetwork";
 export class InscriptionData {
-  type?: string = '';
+  type?: string = "";
   data?: Buffer = Buffer.alloc(0);
 }
 
@@ -32,18 +36,28 @@ export class Origin {
   data?: TxoData;
   num?: number;
   map?: { [key: string]: any };
-  claims?: Claim[]
+  claims?: Claim[];
 }
 
 export enum Bsv20Status {
   Invalid = -1,
   Pending = 0,
-  Valid = 1
+  Valid = 1,
 }
+
+export type InscData = {
+  file: {
+    hash: string;
+    size: number;
+    type: string;
+  };
+  text: string;
+  json: any;
+};
 
 export class TxoData {
   types?: string[];
-  insc?: File;
+  insc?: InscData;
   map?: { [key: string]: any };
   b?: File;
   sigma?: Sigma[];
@@ -57,7 +71,7 @@ export class TxoData {
     op: string;
     tick?: string;
     amt: string;
-    status?: Bsv20Status
+    status?: Bsv20Status;
   };
 }
 
@@ -68,7 +82,7 @@ export interface Inscription {
   file: File;
 }
 export class OrdinalTxo {
-  txid: string = '';
+  txid: string = "";
   vout: number = 0;
   outpoint: Outpoint = new Outpoint();
   satoshis: number = 0;

@@ -4,7 +4,6 @@ import {
   ConfirmContent,
   FormContainer,
   HeaderText,
-  Ordinal,
   Text,
 } from "../../components/Reusable";
 import { Web3TransferOrdinalRequest, useOrds } from "../../hooks/useOrds";
@@ -16,6 +15,7 @@ import { sleep } from "../../utils/sleep";
 import { useTheme } from "../../hooks/useTheme";
 import { truncate } from "../../utils/format";
 import { Input } from "../../components/Input";
+import { Ordinal } from "../../components/Ordinal";
 
 export type OrdTransferRequestProps = {
   web3Request: Web3TransferOrdinalRequest;
@@ -31,7 +31,8 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     isProcessing,
     transferOrdinal,
     setIsProcessing,
-    getOrdinalsBaseUrl
+    getOrdinalsBaseUrl,
+    ordinals,
   } = useOrds();
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [successTxId, setSuccessTxId] = useState("");
@@ -111,6 +112,11 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
         <ConfirmContent>
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Ordinal
+            inscription={
+              ordinals.filter(
+                (ord) => ord.outpoint.toString() === web3Request.outpoint
+              )[0]
+            }
             theme={theme}
             url={`${getOrdinalsBaseUrl()}/content/${web3Request.origin}`}
             selected={true}
