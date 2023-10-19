@@ -37,7 +37,7 @@ const SeedContainer = styled.div`
   display: flex;
   justify-content: space-between;
   width: 75%;
-  margin: 0.5rem 0;
+  margin: 0.5rem 0 2rem 0;
 `;
 
 const Column = styled.div`
@@ -77,12 +77,6 @@ export const CreateWallet = () => {
       showMenu();
     };
   }, [hideMenu, showMenu]);
-
-  const handleCopyToClipboard = () => {
-    navigator.clipboard.writeText(seedWords.join(" ")).then(() => {
-      addSnackbar("Copied!", "success");
-    });
-  };
 
   const handleKeyGeneration = async (
     event: React.FormEvent<HTMLFormElement>
@@ -146,8 +140,7 @@ export const CreateWallet = () => {
       <Content>
         <HeaderText theme={theme}>Your recovery phrase</HeaderText>
         <Text theme={theme} style={{ marginBottom: "1rem" }}>
-          Safely store your seed phrase. This is the only way you can recover
-          your account.
+          Safely write down and store your seed phrase in a safe place.
         </Text>
         <SeedContainer>
           <Column>
@@ -167,12 +160,6 @@ export const CreateWallet = () => {
         </SeedContainer>
         <Button
           theme={theme}
-          type="secondary"
-          label="Copy to clipboard"
-          onClick={handleCopyToClipboard}
-        />
-        <Button
-          theme={theme}
           type="primary"
           label="Next"
           onClick={() => {
@@ -190,7 +177,7 @@ export const CreateWallet = () => {
         <PandaHead />
         <HeaderText theme={theme}>Success!</HeaderText>
         <Text theme={theme} style={{ marginBottom: "1rem" }}>
-          Your Panda Wallet is ready to go.
+          Panda Wallet is ready to go.
         </Text>
         <Button
           theme={theme}

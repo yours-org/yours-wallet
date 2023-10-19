@@ -26,9 +26,10 @@ export const useKeys = () => {
   const { bsvWasmInitialized } = useBsvWasm();
 
   const getChainParams = (network: NetWork): ChainParams => {
-    return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
-  }
-
+    return network === NetWork.Mainnet
+      ? ChainParams.mainnet()
+      : ChainParams.testnet();
+  };
 
   const generateSeedAndStoreEncrypted = (
     password: string,
@@ -71,10 +72,14 @@ export const useKeys = () => {
             setOrdPubKey(keys.ordPubKey);
             if (password) {
               const isVerified = await verifyPassword(password);
-              isVerified ? resolve(Object.assign({}, keys, {
-                ordAddress,
-                walletAddress,
-              })) : reject("Unauthorized!");
+              isVerified
+                ? resolve(
+                    Object.assign({}, keys, {
+                      ordAddress,
+                      walletAddress,
+                    })
+                  )
+                : reject("Unauthorized!");
             } else {
               resolve({
                 ordAddress,
@@ -105,7 +110,7 @@ export const useKeys = () => {
   };
 
   useEffect(() => {
-    if (!bsvWasmInitialized) return
+    if (!bsvWasmInitialized) return;
     retrieveKeys();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvWasmInitialized]);

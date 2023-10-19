@@ -18,6 +18,7 @@ import { ColorThemeProps } from "../theme";
 import { BackButton } from "../components/BackButton";
 import x from "../assets/x.svg";
 import { WhitelistedApp } from "../App";
+import { useKeys } from "../hooks/useKeys";
 
 const Content = styled.div`
   display: flex;
@@ -76,6 +77,7 @@ const ScrollableContainer = styled.div`
 `;
 
 type SettingsPage = "main" | "connected-apps";
+type DecisionType = "sign-out" | "export-keys";
 
 export const Settings = () => {
   const { theme } = useTheme();
@@ -86,6 +88,9 @@ export const Settings = () => {
   const { network, updateNetwork } = useWeb3Context();
   const [page, setPage] = useState<SettingsPage>("main");
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
+  const [speedBumpMessage, setSpeedBumpMessage] = useState("");
+  const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
+  const { retrieveKeys } = useKeys();
 
   useEffect(() => {
     const getWhitelist = (): Promise<string[]> => {
@@ -111,8 +116,46 @@ export const Settings = () => {
     setConnectedApps(newList);
   };
 
-  const handleSignOut = async () => {
+  const handleSignOutIntent = () => {
+    setDecisionType("sign-out");
+    setSpeedBumpMessage("Make sure you have your seed phrase backed up!");
+    setShowSpeedBump(true);
+  };
+
+  const handleExportKeysIntent = () => {
+    setDecisionType("export-keys");
+    setSpeedBumpMessage(
+      "Your are about to download your private keys. Make sure you are in a safe place and no one is watching."
+    );
+    setShowSpeedBump(true);
+  };
+
+  const exportKeys = async (password: string) => {
+    const keys = await retrieveKeys(password);
+
+    const keysToExport = {
+      mnemonic: keys.mnemonic,
+      payPk: keys.walletWif,
+      payDerivationPath: keys.walletDerivationPath,
+      ordPk: keys.ordWif,
+      ordDerivationPath: keys.ordDerivationPath,
+    };
+
+    const jsonData = JSON.stringify(keysToExport, null, 2);
+    const blob = new Blob([jsonData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const tempLink = document.createElement("a");
+    tempLink.href = url;
+    tempLink.setAttribute("download", "panda_wallet_keys.json");
+    document.body.appendChild(tempLink);
+    tempLink.click();
+    document.body.removeChild(tempLink);
+    URL.revokeObjectURL(url);
+  };
+
+  const signOut = async () => {
     await storage.clear();
+    setDecisionType(undefined);
     window.location.reload();
   };
 
@@ -135,16 +178,29 @@ export const Settings = () => {
     }, SNACKBAR_TIMEOUT - 500);
   };
 
+  const handleSpeedBumpConfirm = (password?: string) => {
+    if (decisionType === "sign-out") {
+      signOut();
+    }
+
+    if (decisionType === "export-keys" && password) {
+      exportKeys(password);
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+    }
+  };
+
   const main = (
     <Show
       when={!showSpeedBump}
       whenFalseContent={
         <SpeedBump
           theme={theme}
-          message="Make sure you have your seed phrase backed up!"
+          message={speedBumpMessage}
           onCancel={handleCancel}
-          onConfirm={handleSignOut}
+          onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
           showSpeedBump={showSpeedBump}
+          withPassword={decisionType === "export-keys"}
         />
       }
     >
@@ -166,6 +222,11 @@ export const Settings = () => {
         }
       />
       <SettingsRow
+        name="Export Keys"
+        description="Download your seed, private, and public keys"
+        onClick={handleExportKeysIntent}
+      />
+      <SettingsRow
         name="Lock Wallet"
         description="Immediately lock the wallet"
         onClick={lockWallet}
@@ -173,7 +234,7 @@ export const Settings = () => {
       <SettingsRow
         name="Sign Out"
         description="Sign out of Panda Wallet completely"
-        onClick={() => setShowSpeedBump(true)}
+        onClick={handleSignOutIntent}
       />
     </Show>
   );
