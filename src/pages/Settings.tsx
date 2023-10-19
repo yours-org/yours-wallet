@@ -17,6 +17,7 @@ import { ForwardButton } from "../components/ForwardButton";
 import { ColorThemeProps } from "../theme";
 import { BackButton } from "../components/BackButton";
 import x from "../assets/x.svg";
+import { WhitelistedApp } from "../App";
 
 const Content = styled.div`
   display: flex;
@@ -47,12 +48,31 @@ const ConnectedAppText = styled(Text)<ColorThemeProps>`
   text-align: left;
 `;
 
-export const XIcon = styled.img`
+const XIcon = styled.img`
   width: 1.25rem;
   height: 1.25rem;
-  top: 1.5rem;
-  left: 1.5rem;
   cursor: pointer;
+`;
+
+const AppIcon = styled.img`
+  width: 3rem;
+  height: 3rem;
+  margin-right: 1rem;
+`;
+
+const ImageAndDomain = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const ScrollableContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 25rem;
+  overflow-y: auto;
+  width: 100%;
+  padding: 1rem;
 `;
 
 type SettingsPage = "main" | "connected-apps";
@@ -65,7 +85,7 @@ export const Settings = () => {
   const { addSnackbar } = useSnackbar();
   const { network, updateNetwork } = useWeb3Context();
   const [page, setPage] = useState<SettingsPage>("main");
-  const [connectedApps, setConnectedApps] = useState<string[]>([]);
+  const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
 
   useEffect(() => {
     const getWhitelist = (): Promise<string[]> => {
@@ -86,7 +106,7 @@ export const Settings = () => {
   }, []);
 
   const handleRemoveDomain = (domain: string) => {
-    const newList = connectedApps.filter((app) => app !== domain);
+    const newList = connectedApps.filter((app) => app.domain !== domain);
     storage.set({ whitelist: newList });
     setConnectedApps(newList);
   };
@@ -163,18 +183,23 @@ export const Settings = () => {
       <BackButton onClick={() => setPage("main")} />
       <Show
         when={connectedApps.length > 0}
-        whenFalseContent={
-          <ConnectedAppText theme={theme}>No apps connected</ConnectedAppText>
-        }
+        whenFalseContent={<Text theme={theme}>No apps connected</Text>}
       >
-        {connectedApps.map((app) => {
-          return (
-            <ConnectedAppRow theme={theme}>
-              <ConnectedAppText theme={theme}>{app}</ConnectedAppText>
-              <XIcon src={x} onClick={() => handleRemoveDomain(app)} />
-            </ConnectedAppRow>
-          );
-        })}
+        <ScrollableContainer>
+          {connectedApps.map((app, idx) => {
+            return (
+              <ConnectedAppRow key={app.domain + idx} theme={theme}>
+                <ImageAndDomain>
+                  <AppIcon src={app.icon} />
+                  <ConnectedAppText theme={theme}>
+                    {app.domain}
+                  </ConnectedAppText>
+                </ImageAndDomain>
+                <XIcon src={x} onClick={() => handleRemoveDomain(app.domain)} />
+              </ConnectedAppRow>
+            );
+          })}
+        </ScrollableContainer>
       </Show>
     </>
   );

@@ -33,6 +33,11 @@ export type ThirdPartyAppRequestData = {
   isAuthorized: boolean;
 };
 
+export type WhitelistedApp = {
+  domain: string;
+  icon: string;
+};
+
 const Container = styled.div<ColorThemeProps>`
   display: flex;
   align-items: center;
@@ -47,7 +52,7 @@ export const App = () => {
   const { theme } = useTheme();
   const menuContext = useContext(BottomMenuContext);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
-  const [whitelistedDomains, setWhitelistedDomains] = useState<string[]>([]);
+  const [whitelistedApps, setWhitelistedApps] = useState<WhitelistedApp[]>([]);
   const [messageToSign, setMessageToSign] = useState<string | undefined>(
     undefined
   );
@@ -111,7 +116,7 @@ export const App = () => {
         }
 
         if (whitelist) {
-          setWhitelistedDomains(whitelist);
+          setWhitelistedApps(whitelist);
         }
 
         if (sendBsvRequest) {
@@ -156,7 +161,7 @@ export const App = () => {
                   <ConnectRequest
                     thirdPartyAppRequestData={thirdPartyAppRequestData}
                     popupId={popupId}
-                    whitelistedDomains={whitelistedDomains}
+                    whiteListedApps={whitelistedApps}
                     onDecision={() => setThirdPartyAppRequestData(undefined)}
                   />
                 }

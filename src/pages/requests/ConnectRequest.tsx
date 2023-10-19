@@ -6,7 +6,7 @@ import {
   Text,
 } from "../../components/Reusable";
 import { Button } from "../../components/Button";
-import { ThirdPartyAppRequestData } from "../../App";
+import { ThirdPartyAppRequestData, WhitelistedApp } from "../../App";
 import { useTheme } from "../../hooks/useTheme";
 import { useContext, useEffect } from "react";
 import { BottomMenuContext } from "../../contexts/BottomMenuContext";
@@ -32,12 +32,12 @@ const Icon = styled.img<{ size: string }>`
 
 export type ConnectRequestProps = {
   thirdPartyAppRequestData: ThirdPartyAppRequestData | undefined;
-  whitelistedDomains: string[];
+  whiteListedApps: WhitelistedApp[];
   popupId: number | undefined;
   onDecision: () => void;
 };
 export const ConnectRequest = (props: ConnectRequestProps) => {
-  const { thirdPartyAppRequestData, whitelistedDomains, popupId, onDecision } =
+  const { thirdPartyAppRequestData, whiteListedApps, popupId, onDecision } =
     props;
   const { theme } = useTheme();
   const context = useContext(BottomMenuContext);
@@ -56,7 +56,13 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
     if (chrome.runtime) {
       if (approved) {
         storage.set({
-          whitelist: [...whitelistedDomains, thirdPartyAppRequestData?.domain],
+          whitelist: [
+            ...whiteListedApps,
+            {
+              domain: thirdPartyAppRequestData?.domain,
+              icon: thirdPartyAppRequestData?.appIcon,
+            },
+          ],
         });
         chrome.runtime.sendMessage({
           action: "userConnectResponse",
