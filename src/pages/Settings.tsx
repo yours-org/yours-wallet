@@ -132,7 +132,16 @@ export const Settings = () => {
 
   const exportKeys = async (password: string) => {
     const keys = await retrieveKeys(password);
-    const jsonData = JSON.stringify(keys, null, 2);
+
+    const keysToExport = {
+      mnemonic: keys.mnemonic,
+      payPk: keys.walletWif,
+      payDerivationPath: keys.walletDerivationPath,
+      ordPk: keys.ordWif,
+      ordDerivationPath: keys.ordDerivationPath,
+    };
+
+    const jsonData = JSON.stringify(keysToExport, null, 2);
     const blob = new Blob([jsonData], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const tempLink = document.createElement("a");
