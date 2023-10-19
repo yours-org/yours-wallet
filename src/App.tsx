@@ -25,6 +25,7 @@ import { ConnectRequest } from "./pages/requests/ConnectRequest";
 import { SignMessageRequest } from "./pages/requests/SignMessageRequest";
 import { BroadcastRequest } from "./pages/requests/BroadcastRequest";
 import { GetSignaturesRequest } from "./pages/requests/GetSignaturesRequest";
+import { ImportWallet } from "./pages/onboarding/ImportWallet";
 
 export type ThirdPartyAppRequestData = {
   appName: string;
@@ -155,6 +156,7 @@ export const App = () => {
               <Route path="/" element={<Start />} />
               <Route path="/create-wallet" element={<CreateWallet />} />
               <Route path="/restore-wallet" element={<RestoreWallet />} />
+              <Route path="/import-wallet" element={<ImportWallet />} />
               <Route
                 path="/connect"
                 element={

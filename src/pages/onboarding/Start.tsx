@@ -66,7 +66,7 @@ export const Start = () => {
         <Content>
           <PandaHead animated />
           <TitleText theme={theme}>Panda Wallet</TitleText>
-          <Text theme={theme} style={{ marginBottom: "3rem" }}>
+          <Text theme={theme} style={{ marginBottom: "2rem" }}>
             A non-custodial and open-source wallet for BSV and 1Sat Ordinals.
           </Text>
           <Button
@@ -80,6 +80,13 @@ export const Start = () => {
             type="secondary"
             label="Restore Wallet"
             onClick={() => navigate("/restore-wallet")}
+          />
+          <Button
+            theme={theme}
+            type="secondary"
+            label="Import"
+            onClick={() => navigate("/import-wallet")}
+            style={{ margin: "0" }}
           />
           <GithubIcon
             src={gihubIcon}

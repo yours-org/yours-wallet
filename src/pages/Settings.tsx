@@ -59,6 +59,7 @@ const AppIcon = styled.img`
   width: 3rem;
   height: 3rem;
   margin-right: 1rem;
+  border-radius: 0.5rem;
 `;
 
 const ImageAndDomain = styled.div`

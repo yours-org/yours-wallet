@@ -1,5 +1,6 @@
 import * as bip39 from "bip39";
 import { ExtendedPrivateKey, PrivateKey } from "bsv-wasm-web";
+import { WifKeys } from "../hooks/useKeys";
 
 export type Keys = {
   mnemonic: string;
@@ -50,6 +51,27 @@ export const getKeys = (validMnemonic?: string) => {
     ordPubKey: ordPubKey.to_hex(),
     walletDerivationPath: walletWifAndDP.derivationPath,
     ordDerivationPath: ordWifAndDP.derivationPath,
+  };
+
+  return keys;
+};
+
+export const getKeysFromWifs = (wifs: WifKeys) => {
+  const walletPrivKey = PrivateKey.from_wif(wifs.payPk);
+  const walletPubKey = walletPrivKey.to_public_key();
+  const walletAddress = walletPubKey.to_address().to_string();
+
+  const ordPrivKey = PrivateKey.from_wif(wifs.ordPk);
+  const ordPubKey = ordPrivKey.to_public_key();
+  const ordAddress = ordPubKey.to_address().to_string();
+
+  const keys: Partial<Keys> = {
+    walletWif: wifs.payPk,
+    walletAddress,
+    ordWif: wifs.ordPk,
+    ordAddress,
+    walletPubKey: walletPubKey.to_hex(),
+    ordPubKey: ordPubKey.to_hex(),
   };
 
   return keys;

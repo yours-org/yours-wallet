@@ -5,16 +5,22 @@ import {
   encrypt,
   generateRandomSalt,
 } from "../utils/crypto";
-import { Keys, getKeys } from "../utils/keys";
+import { Keys, getKeys, getKeysFromWifs } from "../utils/keys";
 import { storage } from "../utils/storage";
 import { ChainParams, P2PKHAddress } from "bsv-wasm-web";
 import { useBsvWasm } from "./useBsvWasm";
 import { NetWork } from "../utils/network";
 import { useNetwork } from "./useNetwork";
+
 export type KeyStorage = {
   encryptedKeys: string;
   passKey: string;
   salt: string;
+};
+
+export type WifKeys = {
+  payPk: string;
+  ordPk: string;
 };
 
 export const useKeys = () => {
@@ -41,6 +47,18 @@ export const useKeys = () => {
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
     storage.set({ encryptedKeys, passKey, salt });
     return keys.mnemonic;
+  };
+
+  const generateKeysFromWifAndStoreEncrypted = (
+    password: string,
+    wifs: WifKeys
+  ) => {
+    const salt = generateRandomSalt();
+    const passKey = deriveKey(password, salt);
+    const keys = getKeysFromWifs(wifs);
+    const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
+    storage.set({ encryptedKeys, passKey, salt });
+    return keys;
   };
 
   /**
@@ -117,6 +135,7 @@ export const useKeys = () => {
 
   return {
     generateSeedAndStoreEncrypted,
+    generateKeysFromWifAndStoreEncrypted,
     retrieveKeys,
     verifyPassword,
     bsvAddress,
