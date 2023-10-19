@@ -78,7 +78,7 @@ export type OrdinalProps = {
 
 export const Ordinal = (props: OrdinalProps) => {
   const { url, selected, size, inscription, theme, onClick } = props;
-  const contentType = inscription.data?.insc?.file.type;
+  const contentType = inscription.origin?.data?.insc?.file?.type;
 
   const renderContent = () => {
     switch (true) {
@@ -102,7 +102,9 @@ export const Ordinal = (props: OrdinalProps) => {
             theme={theme}
             onClick={onClick}
           >
-            <OrdText theme={theme}>{inscription.data?.insc?.text}</OrdText>
+            <OrdText theme={theme}>
+              {inscription.origin?.data?.insc?.text}
+            </OrdText>
           </TextWrapper>
         );
       case contentType === "application/json":
@@ -115,7 +117,7 @@ export const Ordinal = (props: OrdinalProps) => {
             onClick={onClick}
           >
             <Json theme={theme}>
-              {JSON.stringify(inscription.data?.insc?.json, null, 2)}
+              {JSON.stringify(inscription.origin?.data?.insc?.json, null, 2)}
             </Json>
           </JsonWrapper>
         );

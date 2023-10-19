@@ -168,14 +168,16 @@ export const OrdWallet = () => {
       >
         <OrdinalsList>
           {ordinals
-            .filter((o) => o.data?.insc?.file.type !== "application/bsv-20")
+            .filter(
+              (o) => o.origin?.data?.insc?.file.type !== "application/bsv-20"
+            )
             .map((ord) => {
               return (
                 <Ordinal
                   theme={theme}
                   inscription={ord}
                   key={ord.origin?.outpoint.toString()}
-                  url={`${getOrdinalsBaseUrl()}/content/${ord.outpoint.toString()}`}
+                  url={`${getOrdinalsBaseUrl()}/content/${ord.origin?.outpoint.toString()}`}
                   selected={
                     selectedOrdinal?.origin?.outpoint.toString() ===
                     ord.origin?.outpoint.toString()
@@ -253,7 +255,6 @@ export const OrdWallet = () => {
           inscription={selectedOrdinal as OrdinalTxo}
           url={`${getOrdinalsBaseUrl()}/content/${selectedOrdinal?.outpoint.toString()}`}
           selected={true}
-          size="6rem"
         />
         <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>
           <Input
@@ -270,7 +271,7 @@ export const OrdWallet = () => {
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
-          <Text theme={theme} style={{ margin: "3rem 0 1rem" }}>
+          <Text theme={theme} style={{ margin: "1rem 0 0 0" }}>
             Double check details before sending.
           </Text>
           <Button
