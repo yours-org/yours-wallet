@@ -35,7 +35,7 @@ const verifyAccess = async (requestingDomain) => {
         return;
       }
 
-      if (whitelist.includes(requestingDomain)) {
+      if (whitelist.map((i) => i.domain).includes(requestingDomain)) {
         resolve(true);
       } else {
         resolve(false);
@@ -152,7 +152,7 @@ const processDisconnectRequest = (message, sendResponse) => {
       const { params } = message;
 
       const updatedWhitelist = result.whitelist.filter(
-        (i) => i !== params.domain
+        (i) => i.domain !== params.domain
       );
 
       chrome.storage.local.set({ whitelist: updatedWhitelist }, () => {
@@ -187,7 +187,9 @@ const processIsConnectedRequest = (message, sendResponse) => {
           data:
             !result?.appState?.isLocked &&
             currentTime - lastActiveTime < INACTIVITY_LIMIT &&
-            result.whitelist?.includes(message.params.domain),
+            result.whitelist
+              ?.map((i) => i.domain)
+              .includes(message.params.domain),
         });
       }
     );

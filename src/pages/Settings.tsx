@@ -1,9 +1,6 @@
 import styled from "styled-components";
-import { ColorThemeProps } from "../theme";
 import { useBottomMenu } from "../hooks/useBottomMenu";
-import { Text } from "../components/Reusable";
 import { useEffect, useState } from "react";
-import { Button } from "../components/Button";
 import { SpeedBump } from "../components/SpeedBump";
 import { storage } from "../utils/storage";
 import { Show } from "../components/Show";
@@ -14,6 +11,13 @@ import { useSnackbar } from "../hooks/useSnackbar";
 import { SNACKBAR_TIMEOUT } from "../utils/constants";
 import { useWeb3Context } from "../hooks/useWeb3Context";
 import { NetWork } from "../utils/network";
+import { SettingsRow } from "../components/SettingsRow";
+import { HeaderText, Text } from "../components/Reusable";
+import { ForwardButton } from "../components/ForwardButton";
+import { ColorThemeProps } from "../theme";
+import { BackButton } from "../components/BackButton";
+import x from "../assets/x.svg";
+import { WhitelistedApp } from "../App";
 
 const Content = styled.div`
   display: flex;
@@ -22,20 +26,56 @@ const Content = styled.div`
   width: 100%;
 `;
 
-const TitleText = styled.h1<ColorThemeProps>`
-  font-size: 2rem;
-  color: ${({ theme }) => theme.white};
-  font-family: Arial, Helvetica, sans-serif;
-  font-weight: 600;
-  margin: 0.25rem 0;
-  text-align: center;
-`;
-
-const SwitchWrapper = styled.div`
+const HeaderWrapper = styled.div`
   position: absolute;
   top: 1rem;
-  right: 2rem;
 `;
+
+const ConnectedAppRow = styled.div<ColorThemeProps>`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: ${({ theme }) => theme.darkAccent};
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin: 0.25rem;
+  width: 80%;
+`;
+
+const ConnectedAppText = styled(Text)<ColorThemeProps>`
+  color: ${({ theme }) => theme.white};
+  margin: 0;
+  text-align: left;
+`;
+
+const XIcon = styled.img`
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+`;
+
+const AppIcon = styled.img`
+  width: 3rem;
+  height: 3rem;
+  margin-right: 1rem;
+`;
+
+const ImageAndDomain = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const ScrollableContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 25rem;
+  overflow-y: auto;
+  width: 100%;
+  padding: 1rem;
+`;
+
+type SettingsPage = "main" | "connected-apps";
 
 export const Settings = () => {
   const { theme } = useTheme();
@@ -44,6 +84,32 @@ export const Settings = () => {
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { addSnackbar } = useSnackbar();
   const { network, updateNetwork } = useWeb3Context();
+  const [page, setPage] = useState<SettingsPage>("main");
+  const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
+
+  useEffect(() => {
+    const getWhitelist = (): Promise<string[]> => {
+      return new Promise((resolve, reject) => {
+        storage.get(["whitelist"], async (result) => {
+          try {
+            const { whitelist } = result;
+            setConnectedApps(whitelist ?? []);
+            resolve(whitelist ?? []);
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
+    };
+
+    getWhitelist();
+  }, []);
+
+  const handleRemoveDomain = (domain: string) => {
+    const newList = connectedApps.filter((app) => app.domain !== domain);
+    storage.set({ whitelist: newList });
+    setConnectedApps(newList);
+  };
 
   const handleSignOut = async () => {
     await storage.clear();
@@ -58,13 +124,8 @@ export const Settings = () => {
     setSelected("settings");
   }, [setSelected]);
 
-  const handleLock = () => {
-    lockWallet();
-    // setSelected("bsv");
-  };
-
   const handleNetworkChange = (e: any) => {
-    const network = e.target.checked ? NetWork.Mainnet : NetWork.Testnet;
+    const network = e.target.checked ? NetWork.Testnet : NetWork.Mainnet;
     updateNetwork(network);
 
     // The provider relies on appState in local storage to accurately return addresses. This is an easy way to handle making sure the state is always up to date.
@@ -74,45 +135,84 @@ export const Settings = () => {
     }, SNACKBAR_TIMEOUT - 500);
   };
 
-  return (
-    <Content>
-      <SwitchWrapper>
-        <ToggleSwitch
+  const main = (
+    <Show
+      when={!showSpeedBump}
+      whenFalseContent={
+        <SpeedBump
           theme={theme}
-          on={network === NetWork.Mainnet}
-          onChange={handleNetworkChange}
-          onLabel="Mainnet"
-          offLabel="Testnet"
+          message="Make sure you have your seed phrase backed up!"
+          onCancel={handleCancel}
+          onConfirm={handleSignOut}
+          showSpeedBump={showSpeedBump}
         />
-      </SwitchWrapper>
-      <Show
-        when={!showSpeedBump}
-        whenFalseContent={
-          <SpeedBump
+      }
+    >
+      <SettingsRow
+        name="Connected Apps"
+        description="Manage the apps you are connected to"
+        onClick={() => setPage("connected-apps")}
+        jsxElement={<ForwardButton />}
+      />
+      <SettingsRow
+        name="Testnet Mode"
+        description="Applies to balances and app connections"
+        jsxElement={
+          <ToggleSwitch
             theme={theme}
-            message="Make sure you have your seed phrase backed up!"
-            onCancel={handleCancel}
-            onConfirm={handleSignOut}
-            showSpeedBump={showSpeedBump}
+            on={network === NetWork.Testnet}
+            onChange={handleNetworkChange}
           />
         }
+      />
+      <SettingsRow
+        name="Lock Wallet"
+        description="Immediately lock the wallet"
+        onClick={lockWallet}
+      />
+      <SettingsRow
+        name="Sign Out"
+        description="Sign out of Panda Wallet completely"
+        onClick={() => setShowSpeedBump(true)}
+      />
+    </Show>
+  );
+
+  const connectedAppsPage = (
+    <>
+      <BackButton onClick={() => setPage("main")} />
+      <Show
+        when={connectedApps.length > 0}
+        whenFalseContent={<Text theme={theme}>No apps connected</Text>}
       >
-        <TitleText theme={theme}>⚙️</TitleText>
-        <TitleText theme={theme}>My Settings</TitleText>
-        <Text theme={theme}>Page is under active development.</Text>
-        <Button
-          theme={theme}
-          label="Sign Out"
-          type="warn"
-          onClick={() => setShowSpeedBump(true)}
-        />
-        <Button
-          theme={theme}
-          label="Lock Wallet"
-          type="secondary"
-          onClick={handleLock}
-        />
+        <ScrollableContainer>
+          {connectedApps.map((app, idx) => {
+            return (
+              <ConnectedAppRow key={app.domain + idx} theme={theme}>
+                <ImageAndDomain>
+                  <AppIcon src={app.icon} />
+                  <ConnectedAppText theme={theme}>
+                    {app.domain}
+                  </ConnectedAppText>
+                </ImageAndDomain>
+                <XIcon src={x} onClick={() => handleRemoveDomain(app.domain)} />
+              </ConnectedAppRow>
+            );
+          })}
+        </ScrollableContainer>
       </Show>
+    </>
+  );
+
+  return (
+    <Content>
+      <HeaderWrapper>
+        <HeaderText style={{ fontSize: "1.25rem" }} theme={theme}>
+          {page === "connected-apps" ? "Connected Apps" : "Settings"}
+        </HeaderText>
+      </HeaderWrapper>
+      <Show when={page === "main"}>{main}</Show>
+      <Show when={page === "connected-apps"}>{connectedAppsPage}</Show>
     </Content>
   );
 };
