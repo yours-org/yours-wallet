@@ -98,16 +98,20 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
 
     addSnackbar("Successfully Signed!", "success");
     setSignature(signRes.signatureHex);
-    onSignature();
+
+    setTimeout(() => {
+      onSignature();
+      if (!signRes.signatureHex && popupId) chrome.windows.remove(popupId);
+      storage.remove("signMessageRequest");
+      navigate("/bsv-wallet");
+    }, 2000);
 
     chrome.runtime.sendMessage({
       action: "signMessageResponse",
       ...signRes,
     });
 
-    if (!signRes.signatureHex && popupId) chrome.windows.remove(popupId);
-    storage.remove("signMessageRequest");
-    navigate("/bsv-wallet");
+    setIsProcessing(false);
   };
 
   return (
