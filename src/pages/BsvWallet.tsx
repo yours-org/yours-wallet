@@ -92,10 +92,11 @@ type AmountType = "bsv" | "usd";
 export type BsvWalletProps = {
   thirdPartyAppRequestData: ThirdPartyAppRequestData | undefined;
   messageToSign?: string;
+  popupId?: number;
 };
 
 export const BsvWallet = (props: BsvWalletProps) => {
-  const { thirdPartyAppRequestData, messageToSign } = props;
+  const { thirdPartyAppRequestData, messageToSign, popupId } = props;
   const navigate = useNavigate();
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
@@ -135,9 +136,21 @@ export const BsvWallet = (props: BsvWalletProps) => {
           decision: "approved",
           pubKeys: { bsvPubKey, ordPubKey },
         });
+
+        // We don't want the window to stay open after a successful connection. The 1ms timeout is used because of some weirdness with how chrome.sendMessage() works
+        setTimeout(() => {
+          if (popupId) chrome.windows.remove(popupId);
+        }, 10);
       }
     }
-  }, [bsvPubKey, messageToSign, navigate, ordPubKey, thirdPartyAppRequestData]);
+  }, [
+    bsvPubKey,
+    messageToSign,
+    navigate,
+    ordPubKey,
+    popupId,
+    thirdPartyAppRequestData,
+  ]);
 
   useEffect(() => {
     setSelected("bsv");
