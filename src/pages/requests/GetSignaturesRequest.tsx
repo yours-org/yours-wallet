@@ -14,7 +14,11 @@ import { Input } from "../../components/Input";
 import { sleep } from "../../utils/sleep";
 import { useTheme } from "../../hooks/useTheme";
 import { DefaultTheme, styled } from "styled-components";
-import { SignatureResponse, Web3GetSignaturesRequest, useContracts } from "../../hooks/useContracts";
+import {
+  SignatureResponse,
+  Web3GetSignaturesRequest,
+  useContracts,
+} from "../../hooks/useContracts";
 import { storage } from "../../utils/storage";
 import { useNavigate } from "react-router-dom";
 import { P2PKHAddress, Transaction } from "bsv-wasm-web";
@@ -51,38 +55,65 @@ const TxOutputsContainer = styled.div`
   align-items: center;
 `;
 
-
-const InputContent = (props: { idx: number, tag: string, addr: string | string[], sats: number, theme?: DefaultTheme | undefined }) => {
+const InputContent = (props: {
+  idx: number;
+  tag: string;
+  addr: string | string[];
+  sats: number;
+  theme?: DefaultTheme | undefined;
+}) => {
   return (
-    <div style={{ color: props.theme?.color || 'white' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.2rem' }}>
+    <div style={{ color: props.theme?.color || "white" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          paddingTop: "0.2rem",
+        }}
+      >
         <span>#{props.idx}</span>
         <span>{props.tag}</span>
         <span>{props.sats} sats</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
         <div>Signer:</div>
-        <div style={{ overflowX: 'scroll', padding: '0.5rem 0 0.5rem 0.5rem' }}>{props.addr}</div>
+        <div style={{ overflowX: "scroll", padding: "0.5rem 0 0.5rem 0.5rem" }}>
+          {props.addr}
+        </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-const OutputContent = (props: { idx: number, tag: string, addr: string | string[], sats: number, theme?: DefaultTheme | undefined }) => {
+const OutputContent = (props: {
+  idx: number;
+  tag: string;
+  addr: string | string[];
+  sats: number;
+  theme?: DefaultTheme | undefined;
+}) => {
   return (
-    <div style={{ color: props.theme?.color || 'white' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.2rem' }}>
+    <div style={{ color: props.theme?.color || "white" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          paddingTop: "0.2rem",
+        }}
+      >
         <span>#{props.idx}</span>
         <span>{props.tag}</span>
         <span>{props.sats} sats</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
         <div>Payee:</div>
-        <div style={{ overflowX: 'scroll', padding: '0.5rem 0 0.5rem 0.5rem' }}>{props.addr}</div>
+        <div style={{ overflowX: "scroll", padding: "0.5rem 0 0.5rem 0.5rem" }}>
+          {props.addr}
+        </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
 const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
   const { theme } = useTheme();
@@ -106,7 +137,7 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
           label="Details"
           // disabled={isProcessing}
           onClick={() => setShowDetail(!showDetail)}
-          style={{ marginTop: '0' }}
+          style={{ marginTop: "0" }}
         />
       </Show>
 
@@ -115,55 +146,59 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
           <Text theme={theme} style={{ margin: "0.5rem 0" }}>
             Inputs To Sign
           </Text>
-          {
-            request.sigRequests.map(sigReq => {
-              return (
-                <TxInput>
-                  <InputContent
-                    idx={sigReq.inputIndex}
-                    tag={sigReq.scriptHex ? 'nonStandard' : 'P2PKH'}
-                    addr={[sigReq.address].flat().join(', ')}
-                    sats={sigReq.satoshis}
-                    theme={theme}
-                  />
-                </TxInput>
-              )
-            })
-          }
+          {request.sigRequests.map((sigReq) => {
+            return (
+              <TxInput>
+                <InputContent
+                  idx={sigReq.inputIndex}
+                  tag={sigReq.scriptHex ? "nonStandard" : "P2PKH"}
+                  addr={[sigReq.address].flat().join(", ")}
+                  sats={sigReq.satoshis}
+                  theme={theme}
+                />
+              </TxInput>
+            );
+          })}
         </TxInputsContainer>
         <TxOutputsContainer>
           <Text theme={theme} style={{ margin: "0.5rem 0" }}>
             Outputs
           </Text>
-          {
-            tx ?
-              [...Array(tx.get_noutputs()).keys()].map((idx: number) => {
-                const output = tx.get_output(idx);
-                const asm = output!.get_script_pub_key().to_asm_string();
-                const pubkeyHash = (/^OP_DUP OP_HASH160 ([0-9a-fA-F]{40}) OP_EQUALVERIFY OP_CHECKSIG$/.exec(asm) || [])[1];
-                const isP2PKH = !!pubkeyHash;
-                const toAddr = pubkeyHash ? P2PKHAddress.from_pubkey_hash(Uint8Array.from(Buffer.from(pubkeyHash, 'hex'))).to_string() : 'Unknown Address';
+          {tx ? (
+            [...Array(tx.get_noutputs()).keys()].map((idx: number) => {
+              const output = tx.get_output(idx);
+              const asm = output!.get_script_pub_key().to_asm_string();
+              const pubkeyHash =
+                (/^OP_DUP OP_HASH160 ([0-9a-fA-F]{40}) OP_EQUALVERIFY OP_CHECKSIG$/.exec(
+                  asm
+                ) || [])[1];
+              const isP2PKH = !!pubkeyHash;
+              const toAddr = pubkeyHash
+                ? P2PKHAddress.from_pubkey_hash(
+                    Uint8Array.from(Buffer.from(pubkeyHash, "hex"))
+                  ).to_string()
+                : "Unknown Address";
 
-                return (
-                  <TxOutput>
-                    <OutputContent
-                      idx={idx}
-                      tag={isP2PKH ? 'P2PKH' : 'nonStandard'}
-                      addr={toAddr}
-                      sats={Number(output!.get_satoshis())}
-                      theme={theme}
-                    />
-                  </TxOutput>
-                )
-              })
-              : <>Parsing Tx ...</>
-          }
+              return (
+                <TxOutput>
+                  <OutputContent
+                    idx={idx}
+                    tag={isP2PKH ? "P2PKH" : "nonStandard"}
+                    addr={toAddr}
+                    sats={Number(output!.get_satoshis())}
+                    theme={theme}
+                  />
+                </TxOutput>
+              );
+            })
+          ) : (
+            <>Parsing Tx ...</>
+          )}
         </TxOutputsContainer>
       </Show>
-
     </TxContainer>
-  )
-}
+  );
+};
 
 export type GetSignaturesResponse = {
   sigResponses?: SignatureResponse[];
@@ -184,7 +219,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const navigate = useNavigate();
 
   const { getSigsRequest, onSignature, popupId } = props;
-  const [getSigsResponse, setGetSigsRespons] = useState<any>(undefined);
+  const [getSigsResponse, setGetSigsResponse] = useState<any>(undefined);
   const { isProcessing, setIsProcessing, getSignatures } = useContracts();
 
   useEffect(() => {
@@ -201,7 +236,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
 
   const resetSendState = () => {
     setPasswordConfirm("");
-    setGetSigsRespons(undefined);
+    setGetSigsResponse(undefined);
     setIsProcessing(false);
   };
 
@@ -219,17 +254,16 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     const getSigsRes = await getSignatures(getSigsRequest, passwordConfirm);
 
     if (getSigsRes?.error) {
-
       const message =
         getSigsRes.error.message === "invalid-password"
           ? "Invalid Password!"
           : getSigsRes.error.message === "unknown-address"
-            ? "Unknown Address: " + (getSigsRes.error.cause ?? '')
-              : "An unknown error has occurred! Try again.";
+          ? "Unknown Address: " + (getSigsRes.error.cause ?? "")
+          : "An unknown error has occurred! Try again.";
 
       addSnackbar(message, "error", 5000);
 
-      if (getSigsRes.error.message === 'invalid-password') {
+      if (getSigsRes.error.message === "invalid-password") {
         // could try again only if the password is wrong
         setIsProcessing(false);
         return;
@@ -240,20 +274,26 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       addSnackbar("Successfully Signed!", "success");
     }
 
-    setGetSigsRespons(getSigsRes.sigResponses);
-    onSignature();
+    setGetSigsResponse(getSigsRes.sigResponses);
+
+    setTimeout(() => {
+      onSignature();
+      if (!getSigsRes && popupId) chrome.windows.remove(popupId);
+      storage.remove("getSignaturesRequest");
+      navigate("/bsv-wallet");
+    }, 2000);
 
     chrome.runtime.sendMessage({
       action: "getSignaturesResponse",
       ...getSigsRes,
     });
 
-    if (!getSigsRes && popupId) chrome.windows.remove(popupId);
-    storage.remove("getSignaturesRequest");
-    navigate("/bsv-wallet");
+    setIsProcessing(false);
   };
 
-  const rejectSigning = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+  const rejectSigning = async (
+    e: React.MouseEvent<HTMLButtonElement, MouseEvent>
+  ) => {
     e.preventDefault();
     if (popupId) chrome.windows.remove(popupId);
     storage.remove("getSignaturesRequest");
@@ -291,7 +331,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
               label="Cancel"
               disabled={isProcessing}
               onClick={rejectSigning}
-              style={{ marginTop: '0' }}
+              style={{ marginTop: "0" }}
             />
           </FormContainer>
         </ConfirmContent>

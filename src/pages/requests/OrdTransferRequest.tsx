@@ -95,8 +95,11 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
       "Transfer Successful! It may continue to show in your wallet until the tx is confirmed.",
       "success"
     );
-    onResponse();
-    await chrome.runtime.sendMessage({
+    setTimeout(async () => {
+      onResponse();
+    }, 2000);
+
+    chrome.runtime.sendMessage({
       action: "transferOrdinalResponse",
       txid: transferRes.txid,
     });

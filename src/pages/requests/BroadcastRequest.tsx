@@ -70,16 +70,21 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
 
     addSnackbar("Successfully broadcasted the tx!", "success");
     setTxid(txid);
-    onBroadcast();
+
+    setTimeout(() => {
+      onBroadcast();
+
+      if (!txid && popupId) chrome.windows.remove(popupId);
+      storage.remove("broadcastRequest");
+      navigate("/bsv-wallet");
+    }, 2000);
 
     chrome.runtime.sendMessage({
       action: "broadcastResponse",
       txid,
     });
 
-    if (!txid && popupId) chrome.windows.remove(popupId);
-    storage.remove("broadcastRequest");
-    navigate("/bsv-wallet");
+    setIsProcessing(false);
   };
 
   return (

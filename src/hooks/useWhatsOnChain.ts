@@ -1,5 +1,9 @@
 import axios from "axios";
-import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from "../utils/constants";
+import {
+  BSV_DECIMAL_CONVERSION,
+  WOC_BASE_URL,
+  WOC_TESTNET_BASE_URL,
+} from "../utils/constants";
 import { NetWork } from "../utils/network";
 import { useNetwork } from "./useNetwork";
 export type UTXO = {
@@ -17,9 +21,16 @@ export type WocUtxo = {
 };
 
 export const useWhatsOnChain = () => {
-
   const { network } = useNetwork();
-
+  const apiKey = process.env.REACT_APP_WOC_API_KEY;
+  const config =
+    network === NetWork.Mainnet
+      ? {
+          headers: {
+            "woc-api-key": apiKey,
+          },
+        }
+      : undefined;
 
   const getBaseUrl = () => {
     return network === NetWork.Mainnet ? WOC_BASE_URL : WOC_TESTNET_BASE_URL;
@@ -28,7 +39,8 @@ export const useWhatsOnChain = () => {
   const getBsvBalance = async (address: string) => {
     try {
       const { data } = await axios.get(
-        `${getBaseUrl()}/address/${address}/balance`
+        `${getBaseUrl()}/address/${address}/balance`,
+        config
       );
       const satBalance = data.confirmed + data.unconfirmed;
       const total = satBalance / BSV_DECIMAL_CONVERSION;
@@ -41,7 +53,8 @@ export const useWhatsOnChain = () => {
   const getUtxos = async (fromAddress: string) => {
     try {
       const { data } = await axios.get(
-        `${getBaseUrl()}/address/${fromAddress}/unspent`
+        `${getBaseUrl()}/address/${fromAddress}/unspent`,
+        config
       );
 
       return data;
@@ -52,7 +65,7 @@ export const useWhatsOnChain = () => {
 
   const getExchangeRate = async () => {
     try {
-      const { data } = await axios.get(`${getBaseUrl()}/exchangerate`);
+      const { data } = await axios.get(`${getBaseUrl()}/exchangerate`, config);
       const rate = Number(data.rate.toFixed(2));
       return rate;
     } catch (error) {
@@ -62,7 +75,10 @@ export const useWhatsOnChain = () => {
 
   const getRawTxById = async (txid: string): Promise<string | undefined> => {
     try {
-      const { data } = await axios.get(`${getBaseUrl()}/tx/${txid}/hex`);
+      const { data } = await axios.get(
+        `${getBaseUrl()}/tx/${txid}/hex`,
+        config
+      );
       return data;
     } catch (error) {
       console.log(error);
@@ -71,9 +87,11 @@ export const useWhatsOnChain = () => {
 
   const broadcastRawTx = async (txhex: string): Promise<string | undefined> => {
     try {
-      const { data: txid } = await axios.post(`${getBaseUrl()}/tx/raw`, {
-        txhex,
-      });
+      const { data: txid } = await axios.post(
+        `${getBaseUrl()}/tx/raw`,
+        { txhex },
+        config
+      );
       return txid;
     } catch (error) {
       console.log(error);
