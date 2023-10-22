@@ -67,6 +67,12 @@ export const Json = styled.pre<ColorThemeProps>`
   word-break: break-word;
 `;
 
+export const OrdWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+`;
+
 export type OrdinalProps = {
   theme: Theme;
   url: string;
@@ -138,5 +144,12 @@ export const Ordinal = (props: OrdinalProps) => {
     }
   };
 
-  return renderContent();
+  return (
+    <OrdWrapper>
+      {renderContent()}
+      <Text theme={theme} style={{ margin: "0.25rem 0 0 0" }}>
+        {`#${inscription.origin?.num}`}
+      </Text>
+    </OrdWrapper>
+  );
 };
