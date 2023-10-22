@@ -2,6 +2,7 @@ import styled from "styled-components";
 import { ColorThemeProps, Theme } from "../theme";
 import { OrdinalTxo } from "../hooks/useOrds";
 import { Text } from "./Reusable";
+import { Show } from "./Show";
 
 export type OrdinalDivProps = ColorThemeProps & {
   url: string;
@@ -67,7 +68,7 @@ export const Json = styled.pre<ColorThemeProps>`
   word-break: break-word;
 `;
 
-export const OrdWrapper = styled.div`
+export const FlexWrapper = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -76,6 +77,7 @@ export const OrdWrapper = styled.div`
 export type OrdinalProps = {
   theme: Theme;
   url: string;
+  isTransfer?: boolean;
   selected?: boolean;
   size?: string;
   inscription: OrdinalTxo;
@@ -83,7 +85,8 @@ export type OrdinalProps = {
 };
 
 export const Ordinal = (props: OrdinalProps) => {
-  const { url, selected, size, inscription, theme, onClick } = props;
+  const { url, selected, isTransfer, size, inscription, theme, onClick } =
+    props;
   const contentType = inscription.origin?.data?.insc?.file?.type;
 
   const renderContent = () => {
@@ -145,11 +148,13 @@ export const Ordinal = (props: OrdinalProps) => {
   };
 
   return (
-    <OrdWrapper>
+    <FlexWrapper>
       {renderContent()}
-      <Text theme={theme} style={{ margin: "0.25rem 0 0 0" }}>
-        {`#${inscription.origin?.num}`}
-      </Text>
-    </OrdWrapper>
+      <Show when={!isTransfer}>
+        <Text theme={theme} style={{ margin: "0.25rem 0" }}>
+          {`#${inscription.origin?.num}`}
+        </Text>
+      </Show>
+    </FlexWrapper>
   );
 };

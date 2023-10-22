@@ -53,6 +53,11 @@ const Icon = styled.img<{ size?: string }>`
   margin: 0 0.5rem 0 0;
 `;
 
+const TransferWrapper = styled.div`
+  margin-top: -2rem;
+  width: 100%;
+`;
+
 type PageState = "main" | "receive" | "transfer";
 
 export const OrdWallet = () => {
@@ -241,7 +246,7 @@ export const OrdWallet = () => {
   );
 
   const transfer = (
-    <>
+    <TransferWrapper>
       <BackButton
         onClick={() => {
           setPageState("main");
@@ -249,12 +254,21 @@ export const OrdWallet = () => {
         }}
       />
       <ConfirmContent>
-        <HeaderText theme={theme}>Transfer Ordinal</HeaderText>
+        <HeaderText style={{ fontSize: "1.35rem" }} theme={theme}>{`${
+          selectedOrdinal?.origin?.data?.map?.name ??
+          selectedOrdinal?.origin?.data?.map?.subTypeData?.name ??
+          "Transfer Ordinal"
+        }`}</HeaderText>
+        <Text
+          style={{ margin: 0 }}
+          theme={theme}
+        >{`#${selectedOrdinal?.origin?.num}`}</Text>
         <Ordinal
           theme={theme}
           inscription={selectedOrdinal as OrdinalTxo}
-          url={`${getOrdinalsBaseUrl()}/content/${selectedOrdinal?.outpoint.toString()}`}
-          selected={true}
+          url={`${getOrdinalsBaseUrl()}/content/${selectedOrdinal?.origin?.outpoint.toString()}`}
+          selected
+          isTransfer
         />
         <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>
           <Input
@@ -283,7 +297,7 @@ export const OrdWallet = () => {
           />
         </FormContainer>
       </ConfirmContent>
-    </>
+    </TransferWrapper>
   );
 
   return (
