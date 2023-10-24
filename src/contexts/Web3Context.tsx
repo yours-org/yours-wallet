@@ -2,13 +2,14 @@ import React, { createContext, useEffect } from "react";
 import { storage } from "../utils/storage";
 import { useWalletLockState } from "../hooks/useWalletLockState";
 import { useBsv } from "../hooks/useBsv";
-import { useOrds } from "../hooks/useOrds";
+import { OrdinalResponse, useOrds } from "../hooks/useOrds";
 import { BSV_DECIMAL_CONVERSION } from "../utils/constants";
 import { useNetwork } from "../hooks/useNetwork";
 import { NetWork } from "../utils/network";
 
 export interface Web3ContextProps {
   network: NetWork;
+  ordinals: OrdinalResponse;
   updateNetwork: (n: NetWork) => void;
 }
 
@@ -67,7 +68,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   ]);
 
   return (
-    <Web3Context.Provider value={{ network, updateNetwork }}>
+    <Web3Context.Provider value={{ network, updateNetwork, ordinals }}>
       {children}
     </Web3Context.Provider>
   );
