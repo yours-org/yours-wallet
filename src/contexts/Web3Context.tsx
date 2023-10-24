@@ -55,9 +55,10 @@ export const Web3Provider = (props: Web3ProviderProps) => {
         network,
         addresses: { bsvAddress, ordAddress },
         pubKeys: { bsvPubKey, ordPubKey },
-        socialProfile,
       },
     });
+
+    storage.set({ socialProfile });
   }, [
     isLocked,
     bsvAddress,

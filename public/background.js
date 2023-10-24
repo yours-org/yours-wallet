@@ -415,11 +415,11 @@ const processGetSignaturesRequest = (message, sendResponse) => {
 
 const processGetSocialProfileRequest = (sendResponse) => {
   try {
-    chrome.storage.local.get(["appState"], (result) => {
+    chrome.storage.local.get(["socialProfile"], (result) => {
       sendResponse({
         type: "getSocialProfile",
         success: true,
-        data: result?.appState?.socialProfile,
+        data: result?.socialProfile,
       });
     });
   } catch (error) {

@@ -14,22 +14,24 @@ export const useSocialProfile = () => {
   });
 
   useEffect(() => {
-    storage.get("appState", (result) => {
-      const { appState } = result;
-      if (appState?.socialProfile) {
-        setSocialProfile(appState.socialProfile);
+    storage.get(["socialProfile"], (result) => {
+      if (result?.socialProfile) {
+        setSocialProfile(result.socialProfile);
       }
     });
   }, []);
 
   useEffect(() => {
     if (!socialProfile) return;
-    storage.get("appState", (result) => {
-      const { appState } = result;
-      if (appState && !window.location.href.includes("localhost")) {
-        appState.socialProfile.displayName = socialProfile.displayName;
-        appState.socialProfile.avatar = socialProfile.avatar;
-        storage.set({ appState });
+    storage.get(["socialProfile"], (result) => {
+      if (
+        result?.socialProfile &&
+        !window.location.href.includes("localhost")
+      ) {
+        const sp = result.socialProfile;
+        sp.displayName = socialProfile.displayName;
+        sp.avatar = socialProfile.avatar;
+        storage.set({ socialProfile: sp });
       }
     });
   }, [socialProfile]);
