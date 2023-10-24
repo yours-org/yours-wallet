@@ -10,7 +10,7 @@ const Container = styled.div<{ color: string; $clickable: string }>`
   justify-content: space-between;
   background-color: ${(props) => props.color};
   width: 80%;
-  padding: 0.75rem;
+  padding: 0.5rem;
   border-radius: 0.5rem;
   margin: 0.25rem;
   cursor: ${(props) => (props.$clickable === "true" ? "pointer" : "default")};
