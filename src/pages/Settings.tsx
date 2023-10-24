@@ -97,10 +97,14 @@ export const Settings = () => {
   const [speedBumpMessage, setSpeedBumpMessage] = useState("");
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const { retrieveKeys } = useKeys();
-  const { socialProfile, setSocialProfile } = useSocialProfile();
+  const { socialProfile, storeSocialProfile } = useSocialProfile();
 
-  const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState("");
-  const [enteredSocialAvatar, setEnteredSocialAvatar] = useState("");
+  const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState(
+    socialProfile.displayName
+  );
+  const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(
+    socialProfile?.avatar
+  );
 
   useEffect(() => {
     const getWhitelist = (): Promise<string[]> => {
@@ -141,7 +145,7 @@ export const Settings = () => {
   };
 
   const handleSocialProfileSave = () => {
-    setSocialProfile({
+    storeSocialProfile({
       displayName: enteredSocialDisplayName,
       avatar: enteredSocialAvatar,
     });

@@ -8,36 +8,42 @@ export type SocialProfile = {
 };
 
 export const useSocialProfile = () => {
-  const [socialProfile, setSocialProfile] = useState<
-    SocialProfile | undefined
-  >();
+  const [socialProfile, setSocialProfile] = useState<SocialProfile>({
+    displayName: "Panda Wallet",
+    avatar: HOSTED_PANDA_IMAGE,
+  });
 
   useEffect(() => {
-    storage.get(["socialProfile"], (result) => {
-      if (
-        result?.socialProfile &&
-        !window.location.href.includes("localhost")
-      ) {
-        setSocialProfile(result.socialProfile);
-      }
-    });
+    const getSocialProfile = (): Promise<string[]> => {
+      return new Promise((resolve, reject) => {
+        storage.get(["socialProfile"], async (result) => {
+          try {
+            if (
+              result?.socialProfile &&
+              !window.location.href.includes("localhost")
+            ) {
+              setSocialProfile(result.socialProfile);
+            }
+            resolve(result.socialProfile);
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
+    };
+
+    getSocialProfile();
   }, []);
 
-  useEffect(() => {
+  const storeSocialProfile = (profile: SocialProfile) => {
     storage.set({
-      socialProfile: {
-        displayName: socialProfile?.displayName
-          ? socialProfile.displayName
-          : "Panda Wallet",
-        avatar: socialProfile?.avatar
-          ? socialProfile.avatar
-          : HOSTED_PANDA_IMAGE,
-      },
+      socialProfile: profile,
     });
-  }, [socialProfile]);
+    setSocialProfile(profile);
+  };
 
   return {
     socialProfile,
-    setSocialProfile,
+    storeSocialProfile,
   };
 };
