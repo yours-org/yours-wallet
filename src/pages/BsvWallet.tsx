@@ -4,7 +4,6 @@ import { useBottomMenu } from "../hooks/useBottomMenu";
 import React, { useEffect, useState } from "react";
 import bsvCoin from "../assets/bsv-coin.svg";
 import { Button } from "../components/Button";
-import { PandaHead } from "../components/PandaHead";
 import { BackButton } from "../components/BackButton";
 import {
   Text,
@@ -30,6 +29,7 @@ import { ThirdPartyAppRequestData } from "../App";
 import { useBsv } from "../hooks/useBsv";
 import { useOrds } from "../hooks/useOrds";
 import switchAsset from "../assets/switch-asset.svg";
+import { useProfile } from "../hooks/useProfile";
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -43,11 +43,16 @@ const MiddleContainer = styled.div<ColorThemeProps>`
   background-color: ${({ theme }) => theme.darkAccent};
 `;
 
-const PandaHeadContainer = styled.div`
+const ProfileImageContainer = styled.div`
   position: absolute;
   top: 10rem;
   right: 2.25rem;
-  opacity: 0.5;
+`;
+
+const ProfileImage = styled.img`
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 100%;
 `;
 
 const BalanceContainer = styled.div`
@@ -109,6 +114,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [successTxId, setSuccessTxId] = useState("");
   const { addSnackbar, message } = useSnackbar();
   const { ordPubKey } = useOrds();
+  const { profile } = useProfile();
 
   const {
     bsvAddress,
@@ -325,9 +331,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const main = (
     <MainContent>
-      <PandaHeadContainer>
-        <PandaHead width="1.75rem" />
-      </PandaHeadContainer>
+      <ProfileImageContainer>
+        <ProfileImage src={profile.avatar} />
+      </ProfileImageContainer>
       <MiddleContainer theme={theme}>
         <BalanceContainer>
           <Icon src={bsvCoin} />

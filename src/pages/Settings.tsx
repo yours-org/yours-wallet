@@ -19,12 +19,16 @@ import { BackButton } from "../components/BackButton";
 import x from "../assets/x.svg";
 import { WhitelistedApp } from "../App";
 import { useKeys } from "../hooks/useKeys";
+import { Input } from "../components/Input";
+import { useProfile } from "../hooks/useProfile";
+import { Button } from "../components/Button";
 
 const Content = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
+  margin-top: -2rem;
 `;
 
 const HeaderWrapper = styled.div`
@@ -43,9 +47,10 @@ const ConnectedAppRow = styled.div<ColorThemeProps>`
   width: 80%;
 `;
 
-const ConnectedAppText = styled(Text)<ColorThemeProps>`
+const SettingsText = styled(Text)<ColorThemeProps>`
   color: ${({ theme }) => theme.white};
   margin: 0;
+  font-weight: 600;
   text-align: left;
 `;
 
@@ -77,7 +82,7 @@ const ScrollableContainer = styled.div`
   padding: 1rem;
 `;
 
-type SettingsPage = "main" | "connected-apps";
+type SettingsPage = "main" | "connected-apps" | "social-profile";
 type DecisionType = "sign-out" | "export-keys";
 
 export const Settings = () => {
@@ -92,6 +97,11 @@ export const Settings = () => {
   const [speedBumpMessage, setSpeedBumpMessage] = useState("");
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const { retrieveKeys } = useKeys();
+  const { profile, setProfile } = useProfile();
+  const [socialDisplayName, setSocialDisplayName] = useState(
+    profile.displayName
+  );
+  const [socialAvatar, setSocialAvatar] = useState(profile.avatar);
 
   useEffect(() => {
     const getWhitelist = (): Promise<string[]> => {
@@ -129,6 +139,11 @@ export const Settings = () => {
       "Your are about to download your private keys. Make sure you are in a safe place and no one is watching."
     );
     setShowSpeedBump(true);
+  };
+
+  const handleSocialProfileSave = () => {
+    setProfile({ displayName: socialDisplayName, avatar: socialAvatar });
+    setPage("main");
   };
 
   const exportKeys = async (password: string) => {
@@ -212,6 +227,12 @@ export const Settings = () => {
         jsxElement={<ForwardButton />}
       />
       <SettingsRow
+        name="Social Profile"
+        description="Set your display name and avatar"
+        onClick={() => setPage("social-profile")}
+        jsxElement={<ForwardButton />}
+      />
+      <SettingsRow
         name="Testnet Mode"
         description="Applies to balances and app connections"
         jsxElement={
@@ -253,9 +274,7 @@ export const Settings = () => {
               <ConnectedAppRow key={app.domain + idx} theme={theme}>
                 <ImageAndDomain>
                   <AppIcon src={app.icon} />
-                  <ConnectedAppText theme={theme}>
-                    {app.domain}
-                  </ConnectedAppText>
+                  <SettingsText theme={theme}>{app.domain}</SettingsText>
                 </ImageAndDomain>
                 <XIcon src={x} onClick={() => handleRemoveDomain(app.domain)} />
               </ConnectedAppRow>
@@ -266,15 +285,49 @@ export const Settings = () => {
     </>
   );
 
+  const socialProfile = (
+    <>
+      <BackButton onClick={() => setPage("main")} />
+      <SettingsText theme={theme}>Display Name</SettingsText>
+      <Input
+        theme={theme}
+        placeholder="Display Name"
+        type="text"
+        onChange={(e) => setSocialDisplayName(e.target.value)}
+        value={socialDisplayName}
+      />
+      <SettingsText theme={theme}>Avatar</SettingsText>
+      <Input
+        theme={theme}
+        placeholder="Avatar Url"
+        type="text"
+        onChange={(e) => setSocialAvatar(e.target.value)}
+        value={socialAvatar}
+      />
+      <Button
+        theme={theme}
+        type="primary"
+        label="Save"
+        style={{ marginTop: "1rem" }}
+        onClick={handleSocialProfileSave}
+      />
+    </>
+  );
+
   return (
     <Content>
       <HeaderWrapper>
         <HeaderText style={{ fontSize: "1.25rem" }} theme={theme}>
-          {page === "connected-apps" ? "Connected Apps" : "Settings"}
+          {page === "connected-apps"
+            ? "Connected Apps"
+            : page === "social-profile"
+            ? "Social Profile"
+            : "Settings"}
         </HeaderText>
       </HeaderWrapper>
       <Show when={page === "main"}>{main}</Show>
       <Show when={page === "connected-apps"}>{connectedAppsPage}</Show>
+      <Show when={page === "social-profile"}>{socialProfile}</Show>
     </Content>
   );
 };
