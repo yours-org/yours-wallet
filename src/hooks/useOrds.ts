@@ -96,7 +96,7 @@ export class OrdinalTxo {
   data?: TxoData;
 }
 
-type OrdinalResponse = OrdinalTxo[];
+export type OrdinalResponse = OrdinalTxo[];
 
 type TransferOrdinalResponse = {
   txid?: string;
