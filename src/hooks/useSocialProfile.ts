@@ -8,7 +8,7 @@ export type SocialProfile = {
 };
 
 export const useSocialProfile = () => {
-  const [profile, setProfile] = useState<SocialProfile>({
+  const [socialProfile, setSocialProfile] = useState<SocialProfile>({
     displayName: "Panda Wallet",
     avatar: HOSTED_PANDA_IMAGE,
   });
@@ -16,26 +16,26 @@ export const useSocialProfile = () => {
   useEffect(() => {
     storage.get("appState", (result) => {
       const { appState } = result;
-      if (appState?.profile) {
-        setProfile(appState.profile);
+      if (appState?.socialProfile) {
+        setSocialProfile(appState.socialProfile);
       }
     });
   }, []);
 
   useEffect(() => {
-    if (!profile) return;
+    if (!socialProfile) return;
     storage.get("appState", (result) => {
       const { appState } = result;
       if (appState && !window.location.href.includes("localhost")) {
-        appState.profile.displayName = profile.displayName;
-        appState.profile.avatar = profile.avatar;
+        appState.socialProfile.displayName = socialProfile.displayName;
+        appState.socialProfile.avatar = socialProfile.avatar;
         storage.set({ appState });
       }
     });
-  }, [profile]);
+  }, [socialProfile]);
 
   return {
-    profile,
-    setProfile,
+    socialProfile,
+    setSocialProfile,
   };
 };

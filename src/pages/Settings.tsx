@@ -20,7 +20,7 @@ import x from "../assets/x.svg";
 import { WhitelistedApp } from "../App";
 import { useKeys } from "../hooks/useKeys";
 import { Input } from "../components/Input";
-import { useSocialProfile } from "../hooks/useProfile";
+import { useSocialProfile } from "../hooks/useSocialProfile";
 import { Button } from "../components/Button";
 
 const Content = styled.div`
@@ -97,11 +97,11 @@ export const Settings = () => {
   const [speedBumpMessage, setSpeedBumpMessage] = useState("");
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const { retrieveKeys } = useKeys();
-  const { profile, setProfile } = useSocialProfile();
+  const { socialProfile, setSocialProfile } = useSocialProfile();
   const [socialDisplayName, setSocialDisplayName] = useState(
-    profile.displayName
+    socialProfile.displayName
   );
-  const [socialAvatar, setSocialAvatar] = useState(profile.avatar);
+  const [socialAvatar, setSocialAvatar] = useState(socialProfile.avatar);
 
   useEffect(() => {
     const getWhitelist = (): Promise<string[]> => {
@@ -142,7 +142,7 @@ export const Settings = () => {
   };
 
   const handleSocialProfileSave = () => {
-    setProfile({ displayName: socialDisplayName, avatar: socialAvatar });
+    setSocialProfile({ displayName: socialDisplayName, avatar: socialAvatar });
     setPage("main");
   };
 
@@ -285,7 +285,7 @@ export const Settings = () => {
     </>
   );
 
-  const socialProfile = (
+  const socialProfilePage = (
     <>
       <BackButton onClick={() => setPage("main")} />
       <SettingsText theme={theme}>Display Name</SettingsText>
@@ -327,7 +327,7 @@ export const Settings = () => {
       </HeaderWrapper>
       <Show when={page === "main"}>{main}</Show>
       <Show when={page === "connected-apps"}>{connectedAppsPage}</Show>
-      <Show when={page === "social-profile"}>{socialProfile}</Show>
+      <Show when={page === "social-profile"}>{socialProfilePage}</Show>
     </Content>
   );
 };

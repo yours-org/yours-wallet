@@ -122,8 +122,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processBroadcastRequest(message, sendResponse);
       case "getSignatures":
         return processGetSignaturesRequest(message, sendResponse);
-      case "getProfile":
-        return processGetProfileRequest(sendResponse);
+      case "getSocialProfile":
+        return processGetSocialProfileRequest(sendResponse);
       default:
         break;
     }
@@ -413,18 +413,18 @@ const processGetSignaturesRequest = (message, sendResponse) => {
   }
 };
 
-const processGetProfileRequest = (sendResponse) => {
+const processGetSocialProfileRequest = (sendResponse) => {
   try {
     chrome.storage.local.get(["appState"], (result) => {
       sendResponse({
-        type: "getProfile",
+        type: "getSocialProfile",
         success: true,
-        data: result?.appState?.profile,
+        data: result?.appState?.socialProfile,
       });
     });
   } catch (error) {
     sendResponse({
-      type: "getProfile",
+      type: "getSocialProfile",
       success: false,
       error: JSON.stringify(error),
     });
