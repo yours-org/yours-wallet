@@ -29,7 +29,7 @@ import { ThirdPartyAppRequestData } from "../App";
 import { useBsv } from "../hooks/useBsv";
 import { useOrds } from "../hooks/useOrds";
 import switchAsset from "../assets/switch-asset.svg";
-import { useProfile } from "../hooks/useProfile";
+import { useSocialProfile } from "../hooks/useProfile";
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -114,7 +114,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [successTxId, setSuccessTxId] = useState("");
   const { addSnackbar, message } = useSnackbar();
   const { ordPubKey } = useOrds();
-  const { profile } = useProfile();
+  const { profile } = useSocialProfile();
 
   const {
     bsvAddress,

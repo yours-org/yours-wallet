@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { HOSTED_PANDA_IMAGE } from "../utils/constants";
 import { storage } from "../utils/storage";
 
-export type UserProfile = {
+export type SocialProfile = {
   displayName: string;
   avatar: string;
 };
 
-export const useProfile = () => {
-  const [profile, setProfile] = useState<UserProfile>({
+export const useSocialProfile = () => {
+  const [profile, setProfile] = useState<SocialProfile>({
     displayName: "Panda Wallet",
     avatar: HOSTED_PANDA_IMAGE,
   });

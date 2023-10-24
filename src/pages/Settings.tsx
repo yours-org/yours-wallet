@@ -20,7 +20,7 @@ import x from "../assets/x.svg";
 import { WhitelistedApp } from "../App";
 import { useKeys } from "../hooks/useKeys";
 import { Input } from "../components/Input";
-import { useProfile } from "../hooks/useProfile";
+import { useSocialProfile } from "../hooks/useProfile";
 import { Button } from "../components/Button";
 
 const Content = styled.div`
@@ -97,7 +97,7 @@ export const Settings = () => {
   const [speedBumpMessage, setSpeedBumpMessage] = useState("");
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const { retrieveKeys } = useKeys();
-  const { profile, setProfile } = useProfile();
+  const { profile, setProfile } = useSocialProfile();
   const [socialDisplayName, setSocialDisplayName] = useState(
     profile.displayName
   );

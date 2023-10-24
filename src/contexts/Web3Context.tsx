@@ -6,7 +6,7 @@ import { OrdinalResponse, useOrds } from "../hooks/useOrds";
 import { BSV_DECIMAL_CONVERSION } from "../utils/constants";
 import { useNetwork } from "../hooks/useNetwork";
 import { NetWork } from "../utils/network";
-import { useProfile } from "../hooks/useProfile";
+import { useSocialProfile } from "../hooks/useProfile";
 
 export interface Web3ContextProps {
   network: NetWork;
@@ -27,7 +27,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate } = useBsv();
   const { ordAddress, ordinals, ordPubKey } = useOrds();
   const { network, setNetwork } = useNetwork();
-  const { profile } = useProfile();
+  const { profile } = useSocialProfile();
 
   const updateNetwork = (n: NetWork): void => {
     storage.set({
