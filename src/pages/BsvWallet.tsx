@@ -19,7 +19,7 @@ import { Show } from "../components/Show";
 import { useSnackbar } from "../hooks/useSnackbar";
 import { PageLoader } from "../components/PageLoader";
 import { Input } from "../components/Input";
-import { BSV_DECIMAL_CONVERSION } from "../utils/constants";
+import { BSV_DECIMAL_CONVERSION, HOSTED_PANDA_IMAGE } from "../utils/constants";
 import { validate } from "bitcoin-address-validation";
 import { formatUSD } from "../utils/format";
 import { sleep } from "../utils/sleep";
@@ -332,7 +332,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const main = (
     <MainContent>
       <ProfileImageContainer>
-        <ProfileImage src={socialProfile.avatar} />
+        <ProfileImage
+          src={
+            socialProfile?.avatar ? socialProfile.avatar : HOSTED_PANDA_IMAGE
+          }
+        />
       </ProfileImageContainer>
       <MiddleContainer theme={theme}>
         <BalanceContainer>

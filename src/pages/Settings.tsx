@@ -98,10 +98,9 @@ export const Settings = () => {
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const { retrieveKeys } = useKeys();
   const { socialProfile, setSocialProfile } = useSocialProfile();
-  const [socialDisplayName, setSocialDisplayName] = useState(
-    socialProfile.displayName
-  );
-  const [socialAvatar, setSocialAvatar] = useState(socialProfile.avatar);
+
+  const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState("");
+  const [enteredSocialAvatar, setEnteredSocialAvatar] = useState("");
 
   useEffect(() => {
     const getWhitelist = (): Promise<string[]> => {
@@ -142,9 +141,18 @@ export const Settings = () => {
   };
 
   const handleSocialProfileSave = () => {
-    setSocialProfile({ displayName: socialDisplayName, avatar: socialAvatar });
+    setSocialProfile({
+      displayName: enteredSocialDisplayName,
+      avatar: enteredSocialAvatar,
+    });
     setPage("main");
   };
+
+  useEffect(() => {
+    if (!socialProfile) return;
+    setEnteredSocialDisplayName(socialProfile.displayName);
+    setEnteredSocialAvatar(socialProfile.avatar);
+  }, [socialProfile]);
 
   const exportKeys = async (password: string) => {
     const keys = await retrieveKeys(password);
@@ -293,16 +301,16 @@ export const Settings = () => {
         theme={theme}
         placeholder="Display Name"
         type="text"
-        onChange={(e) => setSocialDisplayName(e.target.value)}
-        value={socialDisplayName}
+        onChange={(e) => setEnteredSocialDisplayName(e.target.value)}
+        value={enteredSocialDisplayName}
       />
       <SettingsText theme={theme}>Avatar</SettingsText>
       <Input
         theme={theme}
         placeholder="Avatar Url"
         type="text"
-        onChange={(e) => setSocialAvatar(e.target.value)}
-        value={socialAvatar}
+        onChange={(e) => setEnteredSocialAvatar(e.target.value)}
+        value={enteredSocialAvatar}
       />
       <Button
         theme={theme}

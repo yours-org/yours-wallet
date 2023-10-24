@@ -176,10 +176,10 @@ const processDisconnectRequest = (message, sendResponse) => {
 
 const processIsConnectedRequest = (message, sendResponse) => {
   try {
-    const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
     chrome.storage.local.get(
       ["appState", "lastActiveTime", "whitelist"],
       (result) => {
+        const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
         const currentTime = Date.now();
         const lastActiveTime = result.lastActiveTime;
 
@@ -414,12 +414,16 @@ const processGetSignaturesRequest = (message, sendResponse) => {
 };
 
 const processGetSocialProfileRequest = (sendResponse) => {
+  const HOSTED_PANDA_IMAGE = "https://i.ibb.co/3fLL5X2/Panda-Wallet-Logo.png";
   try {
     chrome.storage.local.get(["socialProfile"], (result) => {
       sendResponse({
         type: "getSocialProfile",
         success: true,
-        data: result?.socialProfile,
+        data: result?.socialProfile ?? {
+          displayName: "Panda Wallet",
+          avatar: HOSTED_PANDA_IMAGE,
+        },
       });
     });
   } catch (error) {
