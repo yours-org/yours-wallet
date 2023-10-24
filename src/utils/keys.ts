@@ -45,7 +45,7 @@ export const getKeys = (validMnemonic?: string) => {
     mnemonic,
     walletWif: walletWifAndDP.wif,
     walletAddress,
-    ordWif: walletWifAndDP.wif,
+    ordWif: ordWifAndDP.wif,
     ordAddress,
     walletPubKey: walletPubKey.to_hex(),
     ordPubKey: ordPubKey.to_hex(),
