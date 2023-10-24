@@ -32,7 +32,7 @@ const TextWrapper = styled(OrdinalWrapper)`
 `;
 
 const OrdText = styled(Text)`
-  color: ${(props) => props.theme.primaryButton + "95"};
+  color: ${(props) => props.theme.primaryButton};
   text-align: center;
   width: 100%;
   margin: 0;
@@ -62,7 +62,7 @@ const JsonWrapper = styled.div<OrdinalDivProps>`
 export const Json = styled.pre<ColorThemeProps>`
   font-family: "DM Mono", monospace;
   font-size: 0.65rem;
-  color: ${(props) => props.theme.primaryButton + "95"};
+  color: ${(props) => props.theme.primaryButton};
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;

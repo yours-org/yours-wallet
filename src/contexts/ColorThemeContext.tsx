@@ -1,5 +1,5 @@
 // ThemeContext.tsx
-import React, { ReactNode, createContext, useEffect, useState } from "react";
+import React, { ReactNode, createContext, useState } from "react";
 import { Theme, defaultTheme } from "../theme";
 
 export interface ThemeContextProps {
@@ -17,12 +17,7 @@ interface ThemeProviderProps {
 
 export const ThemeProvider = (props: ThemeProviderProps) => {
   const { children } = props;
-  const userTheme: Theme = false || defaultTheme; // TODO: In place of false, we need to call or look for a specific inscription pattern and set the user theme (just do in useEffect?)
-  const [theme, setTheme] = useState<Theme>(userTheme || defaultTheme);
-
-  useEffect(() => {
-    if (userTheme) setTheme(userTheme);
-  }, [userTheme]);
+  const [theme, setTheme] = useState<Theme>(defaultTheme);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
