@@ -463,7 +463,7 @@ export const OrdWallet = () => {
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
           <Text theme={theme} style={{ margin: "1rem 0 0 0" }}>
-            Double check details before listing.
+            Confirm global orderbook listing
           </Text>
           <Button
             theme={theme}
