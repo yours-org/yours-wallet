@@ -4,11 +4,21 @@ import {
   FEE_PER_BYTE,
   GP_BASE_URL,
   GP_TESTNET_BASE_URL,
+  O_LOCK_PREFIX,
+  O_LOCK_SUFFIX,
 } from "../utils/constants";
 import { useKeys } from "./useKeys";
 import { UTXO, WocUtxo, useWhatsOnChain } from "./useWhatsOnChain";
 import { sendOrdinal } from "js-1sat-ord-web";
-import { P2PKHAddress, PrivateKey, Transaction } from "bsv-wasm-web";
+import {
+  P2PKHAddress,
+  PrivateKey,
+  Script,
+  SigHash,
+  Transaction,
+  TxIn,
+  TxOut,
+} from "bsv-wasm-web";
 import { useBsvWasm } from "./useBsvWasm";
 import { Outpoint } from "../utils/outpoint";
 import { NetWork } from "../utils/network";
@@ -98,7 +108,7 @@ export class OrdinalTxo {
 
 export type OrdinalResponse = OrdinalTxo[];
 
-type TransferOrdinalResponse = {
+export type OrdOperationResponse = {
   txid?: string;
   error?: string;
 };
@@ -154,14 +164,22 @@ export type Web3TransferOrdinalRequest = {
   outpoint: string;
 };
 
+export type ListOrdinal = {
+  outpoint: string;
+  price: number;
+  password: string;
+};
+
 export const useOrds = () => {
-  const { ordAddress, retrieveKeys, verifyPassword, ordPubKey } = useKeys();
+  const { ordAddress, retrieveKeys, verifyPassword, ordPubKey, bsvAddress } =
+    useKeys();
 
   const [ordinals, setOrdinals] = useState<OrdinalResponse>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
-  const { getUtxos, broadcastRawTx, getRawTxById } = useWhatsOnChain();
+  const { getUtxos, broadcastRawTx, getRawTxById, getSuitableUtxo } =
+    useWhatsOnChain();
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
   };
@@ -193,7 +211,7 @@ export const useOrds = () => {
     destinationAddress: string,
     outpoint: string,
     password: string
-  ): Promise<TransferOrdinalResponse> => {
+  ): Promise<OrdOperationResponse> => {
     try {
       if (!bsvWasmInitialized) throw Error("bsv-wasm not initialized!");
       setIsProcessing(true);
@@ -355,6 +373,331 @@ export const useOrds = () => {
     }
   };
 
+  const getUtxoByOutpoint = async (outpoint: string): Promise<OrdinalTxo> => {
+    try {
+      const { data } = await axios.get(
+        `${getOrdinalsBaseUrl()}/api/txos/${outpoint}?script=true`
+      );
+      const ordUtxo = data;
+
+      ordUtxo.script = Script.from_bytes(
+        Buffer.from(ordUtxo.script, "base64")
+      ).to_asm_string();
+
+      return ordUtxo;
+    } catch (e) {
+      throw new Error(JSON.stringify(e));
+    }
+  };
+
+  const listOrdinalOnGlobalOrderbook = async (
+    listing: ListOrdinal
+  ): Promise<OrdOperationResponse> => {
+    try {
+      const { outpoint, price, password } = listing;
+      if (!bsvWasmInitialized) throw Error("bsv-wasm not initialized!");
+      setIsProcessing(true);
+
+      const isAuthenticated = await verifyPassword(password);
+      if (!isAuthenticated) {
+        return { error: "invalid-password" };
+      }
+      const keys = await retrieveKeys(password);
+
+      if (!keys.walletWif || !keys.ordWif) return { error: "no-keys" };
+
+      const fundingAndChangeAddress = bsvAddress;
+      const paymentPk = PrivateKey.from_wif(keys.walletWif);
+      const ordPk = PrivateKey.from_wif(keys.ordWif);
+
+      const paymentUtxos = await getUtxos(fundingAndChangeAddress);
+
+      if (!paymentUtxos.length) {
+        throw new Error("Could not retrieve paymentUtxos");
+      }
+
+      const totalSats = paymentUtxos.reduce(
+        (a: number, utxo: WocUtxo) => a + utxo.value,
+        0
+      );
+
+      if (totalSats < 1000) {
+        return { error: "insufficient-funds" };
+      }
+
+      const paymentUtxo = getSuitableUtxo(paymentUtxos, 1000);
+
+      const ordUtxo = await getUtxoByOutpoint(outpoint);
+
+      if (!ordUtxo) return { error: "no-ord-utxo" };
+
+      const rawTx = await listOrdinal(
+        paymentUtxo,
+        ordUtxo,
+        paymentPk,
+        fundingAndChangeAddress,
+        ordPk,
+        ordAddress,
+        fundingAndChangeAddress,
+        Number(price)
+      );
+
+      const txid = await broadcastRawTx(rawTx);
+      if (!txid) return { error: "broadcast-error" };
+      return { txid };
+    } catch (error) {
+      console.log(error);
+      return { error: JSON.stringify(error) };
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const createChangeOutput = (
+    tx: Transaction,
+    changeAddress: string,
+    paymentSatoshis: number
+  ) => {
+    const SAT_FEE_PER_BYTE = 0.065;
+    const changeaddr = P2PKHAddress.from_string(changeAddress);
+    const changeScript = changeaddr.get_locking_script();
+    const emptyOut = new TxOut(BigInt(1), changeScript);
+    const fee = Math.ceil(
+      SAT_FEE_PER_BYTE * (tx.get_size() + emptyOut.to_bytes().byteLength)
+    );
+    const change = paymentSatoshis - fee;
+    const changeOut = new TxOut(BigInt(change), changeScript);
+    return changeOut;
+  };
+
+  const listOrdinal = async (
+    paymentUtxo: WocUtxo,
+    ordinal: OrdinalTxo,
+    paymentPk: PrivateKey,
+    changeAddress: string,
+    ordPk: PrivateKey,
+    ordAddress: string,
+    payoutAddress: string,
+    satoshisPayout: number
+  ) => {
+    const tx = new Transaction(1, 0);
+    const t = ordinal.txid;
+    const txBuf = Buffer.from(t, "hex");
+    const ordIn = new TxIn(txBuf, ordinal.vout, Script.from_asm_string(""));
+    tx.add_input(ordIn);
+
+    let utxoIn = new TxIn(
+      Buffer.from(paymentUtxo.tx_hash, "hex"),
+      paymentUtxo.tx_pos,
+      Script.from_asm_string("")
+    );
+
+    tx.add_input(utxoIn);
+
+    const payoutDestinationAddress = P2PKHAddress.from_string(payoutAddress);
+    const payOutput = new TxOut(
+      BigInt(satoshisPayout),
+      payoutDestinationAddress.get_locking_script()
+    );
+
+    const destinationAddress = P2PKHAddress.from_string(ordAddress);
+    const addressHex = destinationAddress
+      .get_locking_script()
+      .to_asm_string()
+      .split(" ")[2];
+
+    const ordLockScript = `${Script.from_hex(
+      O_LOCK_PREFIX
+    ).to_asm_string()} ${addressHex} ${payOutput.to_hex()} ${Script.from_hex(
+      O_LOCK_SUFFIX
+    ).to_asm_string()}`;
+
+    const satOut = new TxOut(BigInt(1), Script.from_asm_string(ordLockScript));
+    tx.add_output(satOut);
+
+    const changeOut = createChangeOutput(tx, changeAddress, paymentUtxo.value);
+    tx.add_output(changeOut);
+
+    if (!ordinal.script) {
+      const ordRawTxHex = await getRawTxById(ordinal.txid);
+      if (!ordRawTxHex) throw new Error("Could not get raw hex");
+      const tx = Transaction.from_hex(ordRawTxHex);
+      const out = tx.get_output(ordinal.vout);
+      ordinal.satoshis = Number(out?.get_satoshis());
+
+      const script = out?.get_script_pub_key();
+      if (script) {
+        ordinal.script = script.to_asm_string();
+      }
+    }
+
+    if (!ordinal.script) throw new Error("Script not found");
+
+    const sig = tx.sign(
+      ordPk,
+      SigHash.ALL | SigHash.FORKID,
+      0,
+      Script.from_asm_string(ordinal.script),
+      BigInt(ordinal.satoshis)
+    );
+
+    ordIn.set_unlocking_script(
+      Script.from_asm_string(
+        `${sig.to_hex()} ${ordPk.to_public_key().to_hex()}`
+      )
+    );
+
+    tx.set_input(0, ordIn);
+
+    const sig2 = tx.sign(
+      paymentPk,
+      SigHash.ALL | SigHash.FORKID,
+      1,
+      Script.from_asm_string(
+        P2PKHAddress.from_string(payoutAddress)
+          .get_locking_script()
+          .to_asm_string()
+      ),
+      BigInt(paymentUtxo.value)
+    );
+
+    utxoIn.set_unlocking_script(
+      Script.from_asm_string(
+        `${sig2.to_hex()} ${paymentPk.to_public_key().to_hex()}`
+      )
+    );
+    tx.set_input(1, utxoIn);
+    return tx.to_hex();
+  };
+
+  const getMarketData = async (outpoint: string) => {
+    try {
+      const res = await axios.get(
+        `${getOrdinalsBaseUrl()}/api/inscriptions/${outpoint}?script=true`
+      );
+      const data = res.data as OrdinalTxo;
+      if (!data?.script || !data.origin?.outpoint.toString())
+        throw new Error("Could not get listing script");
+      return { script: data.script, origin: data.origin.outpoint.toString() };
+    } catch (error) {
+      throw new Error(`Error getting market data: ${JSON.stringify(error)}`);
+    }
+  };
+
+  const cancelGlobalOrderbookListing = async (
+    outpoint: string,
+    password: string
+  ): Promise<OrdOperationResponse> => {
+    try {
+      if (!bsvWasmInitialized) throw Error("bsv-wasm not initialized!");
+      setIsProcessing(true);
+
+      const isAuthenticated = await verifyPassword(password);
+      if (!isAuthenticated) {
+        return { error: "invalid-password" };
+      }
+      const keys = await retrieveKeys(password);
+
+      if (!keys.walletWif || !keys.ordWif) return { error: "no-keys" };
+      const fundingAndChangeAddress = bsvAddress;
+
+      const paymentUtxos = await getUtxos(fundingAndChangeAddress);
+
+      if (!paymentUtxos.length) {
+        throw new Error("Could not retrieve paymentUtxos");
+      }
+
+      const paymentUtxo = getSuitableUtxo(paymentUtxos, 1000);
+
+      const paymentPk = PrivateKey.from_wif(keys.walletWif);
+      const ordinalPk = PrivateKey.from_wif(keys.ordWif);
+
+      const listingTxid = outpoint.split("_")[0];
+      if (!listingTxid) {
+        throw new Error("No listing txid");
+      }
+
+      const cancelTx = new Transaction(1, 0);
+
+      const { script } = await getMarketData(outpoint);
+
+      const ordIn = new TxIn(
+        Buffer.from(listingTxid, "hex"),
+        0,
+        Script.from_asm_string("")
+      );
+      cancelTx.add_input(ordIn);
+
+      let utxoIn = new TxIn(
+        Buffer.from(paymentUtxo.tx_hash, "hex"),
+        paymentUtxo.tx_pos,
+        Script.from_asm_string("")
+      );
+      cancelTx.add_input(utxoIn);
+
+      const destinationAddress = P2PKHAddress.from_string(ordAddress);
+      const satOut = new TxOut(
+        BigInt(1),
+        destinationAddress.get_locking_script()
+      );
+      cancelTx.add_output(satOut);
+
+      const changeOut = createChangeOutput(
+        cancelTx,
+        fundingAndChangeAddress,
+        paymentUtxo.value
+      );
+      cancelTx.add_output(changeOut);
+
+      // sign listing to cancel
+      const sig = cancelTx.sign(
+        ordinalPk,
+        SigHash.SINGLE | SigHash.ANYONECANPAY | SigHash.FORKID,
+        0,
+        Script.from_bytes(Buffer.from(script, "base64")),
+        BigInt(1)
+      );
+
+      ordIn.set_unlocking_script(
+        Script.from_asm_string(
+          `${sig.to_hex()} ${ordinalPk.to_public_key().to_hex()} OP_1`
+        )
+      );
+
+      cancelTx.set_input(0, ordIn);
+
+      const sig2 = cancelTx.sign(
+        paymentPk,
+        SigHash.ALL | SigHash.FORKID,
+        1,
+        Script.from_asm_string(
+          P2PKHAddress.from_string(fundingAndChangeAddress)
+            .get_locking_script()
+            .to_asm_string()
+        ),
+        BigInt(paymentUtxo.value)
+      );
+
+      utxoIn.set_unlocking_script(
+        Script.from_asm_string(
+          `${sig2.to_hex()} ${paymentPk.to_public_key().to_hex()}`
+        )
+      );
+
+      cancelTx.set_input(1, utxoIn);
+      const rawTx = cancelTx.to_hex();
+
+      const txid = await broadcastRawTx(rawTx);
+      if (!txid) return { error: "broadcast-error" };
+      return { txid };
+    } catch (error) {
+      console.log(error);
+      return { error: JSON.stringify(error) };
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return {
     ordinals,
     ordAddress,
@@ -364,5 +707,7 @@ export const useOrds = () => {
     transferOrdinal,
     setIsProcessing,
     getOrdinalsBaseUrl,
+    listOrdinalOnGlobalOrderbook,
+    cancelGlobalOrderbookListing,
   };
 };

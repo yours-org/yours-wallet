@@ -50,7 +50,7 @@ export const useWhatsOnChain = () => {
     }
   };
 
-  const getUtxos = async (fromAddress: string) => {
+  const getUtxos = async (fromAddress: string): Promise<WocUtxo[]> => {
     try {
       const { data } = await axios.get(
         `${getBaseUrl()}/address/${fromAddress}/unspent`,
@@ -60,6 +60,7 @@ export const useWhatsOnChain = () => {
       return data;
     } catch (error) {
       console.log(error);
+      return [];
     }
   };
 
@@ -98,11 +99,23 @@ export const useWhatsOnChain = () => {
     }
   };
 
+  const getSuitableUtxo = (utxos: WocUtxo[], minimum: number) => {
+    const suitableUtxos = utxos.filter((utxo) => utxo.value > minimum);
+
+    if (suitableUtxos.length === 0) {
+      throw new Error("No UTXO large enough for this transaction");
+    }
+    // Select a random UTXO from the suitable ones
+    const randomIndex = Math.floor(Math.random() * suitableUtxos.length);
+    return suitableUtxos[randomIndex];
+  };
+
   return {
     getUtxos,
     getBsvBalance,
     getExchangeRate,
     getRawTxById,
     broadcastRawTx,
+    getSuitableUtxo,
   };
 };
