@@ -204,7 +204,7 @@ export const useBsv = () => {
         address,
         pubKeyHex: publicKey.to_hex(),
         signedMessage: message,
-        signatureHex: signature.to_hex(),
+        signatureHex: signature.to_der_hex(),
       };
     } catch (error) {
       console.log(error);
