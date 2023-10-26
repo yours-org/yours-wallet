@@ -4,6 +4,8 @@
 
 Version: v1.1.2
 
+<a href="https://chrome.google.com/webstore/detail/panda-wallet/mlbnicldlpdimbjdcncnklfempedeipj" target="_blank"><button href='https://google.com' type="button" style="background-color: #A2FF86; color: #000; font-size: 1rem; font-weight: 700; border: 1px solid #000; padding: 10px 20px; border-radius: 5px;">🐼 Download Chrome Extension</button></a>
+
 # Panda Wallet | Non-Custodial Web3 Wallet For BSV
 
 Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV) and [1Sat Ordinals](https://docs.1satordinals.com/). This wallet allows users to have full control over their funds, providing security and independence in managing their assets.
@@ -16,42 +18,27 @@ Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV
 - 🟡 **1Sat Ordinals:** Full support for sending and transferring 1Sat Ordinals.
 - 🔐 **Secure:** Open Source and audited by the community.
 
-## Getting Started
-
-The wallet is open and available to all users. Once we've launched to the chrome store, these steps will not be required.
-
-1. **Download:** First you will need to <a id="raw-url" href="https://github.com/Panda-Wallet/panda-wallet/raw/main/public/builds/pw-v1.1.2.zip" download="panda-wallet-v1.1.2.zip">Download The Current Build</a>
-   . \*\*Always double check that you are at the official Panda Wallet github repo before downloading anything. https://github.com/Panda-Wallet/panda-wallet.
-
-   **SHA256 Checksum:** For extra security you can check the checksum:
-
-   `2e85ffaccb1f63cbce3d3ba87ae8cd6ca6103f29e4361ee5bbbfd939a410fc3c`
-
-   Files can also be found in `public/builds`
-
-2. **Unzip:** Unzip the build zip file then head to `chrome://extensions`
-3. **Load The Build File:** In the top right of Chrome Extensions, enable dev mode, then on the left select "Load unpacked".
-4. **Finish:** If you did this properly, you should now see Panda Wallet available in the list of extensions. You can now manage and pin the extension just like you would any other Chrome extension you have.
-
-> _**Note:**_ The BSV keys use derivation path `m / 44' / 236' / 0' / 0 / 0`
-
-> _**Note:**_ The Ord keys use derivation path `m / 44' / 236' / 1' / 0 / 0`
-
 ## Development
 
-### Wallet Provider API 🚀
+#### Wallet Provider API 🚀
 
 Documentation on integrating Panda Wallet into your decentralized web3 application can be [found here](https://panda-wallet.gitbook.io/provider-api/).
 
 You can also check out the live sample app: https://panda-wallet-sample-app.vercel.app/
 
-### Contributing 🙌
+#### Contributing 🙌
 
 If you'd like to contribute to Panda Wallet's development check out [contributing](CONTRIBUTING.md).
 
+## Wallet Derivation Paths
+
+> _**Note:**_ The BSV keys use derivation path `m / 44' / 236' / 0' / 0 / 0`
+
+> _**Note:**_ The Ord keys use derivation path `m / 44' / 236' / 1' / 0 / 0`
+
 ## Issues, Bugs, and Feature Requests
 
-Submit your requests to the [Kanban Board](https://github.com/orgs/Panda-Wallet/projects/1)
+[Create an issue](https://github.com/Panda-Wallet/panda-wallet/issues) and track the [Kanban Board](https://github.com/orgs/Panda-Wallet/projects/1)
 
 ## Support The Project
 
