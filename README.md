@@ -4,7 +4,7 @@
 
 Version: v1.1.2
 
-<a href="https://chrome.google.com/webstore/detail/panda-wallet/mlbnicldlpdimbjdcncnklfempedeipj" target="_blank"><button href='https://google.com' type="button" style="background-color: #A2FF86; color: #000; font-size: 1rem; font-weight: 700; border: 1px solid #000; padding: 10px 20px; border-radius: 5px;">🐼 Download Chrome Extension 🐼 </button></a>
+<a href="https://chrome.google.com/webstore/detail/panda-wallet/mlbnicldlpdimbjdcncnklfempedeipj" target="_blank">🐼 Download Chrome Extension 🐼</a>
 
 # Panda Wallet | Non-Custodial Web3 Wallet For BSV
 
