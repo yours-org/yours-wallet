@@ -50,7 +50,6 @@ export const useTokens = () => {
 
             const tokenInfos = result[key];
 
-            console.log("retrieveTokens", tokenInfos)
             setTokens(tokenInfos);
             resolve(tokenInfos);
           } catch (error) {

@@ -237,6 +237,23 @@ export const useOrds = () => {
     }
   };
 
+  const submitTx = async (txid: string) => {
+
+    try {
+      let res = await axios.post(
+        `${getOrdinalsBaseUrl()}/api/tx/${txid}/submit`
+      );
+
+      if(res.status !== 0) {
+        console.error("submitTx failed: ", txid)
+      }
+  
+    } catch (error) {
+      console.error("submitTx failed: ", txid, error)
+    }
+    
+  }
+
   const buildAndBroadcastOrdinalTx = async (
     fundingUtxo: UTXO,
     ordUtxo: UTXO,
@@ -266,6 +283,7 @@ export const useOrds = () => {
 
     // const { txid } = data as GPArcResponse;
     if (txid) {
+      await submitTx(txid);
       return { txid, rawTx };
     }
   };
@@ -508,6 +526,7 @@ export const useOrds = () => {
       const txid = await broadcastRawTx(txhex);
 
       if (txid) {
+        await submitTx(txid);
         return { txid };
       }
       return { error: "broadcast-transaction-failed" };

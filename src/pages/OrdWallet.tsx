@@ -399,12 +399,14 @@ export const OrdWallet = () => {
             theme={theme}
             placeholder="Receive Address"
             type="text"
+            name="address"
             onChange={(e) => setReceiveAddress(e.target.value)}
             value={receiveAddress}
           />
           <Input
             theme={theme}
             placeholder="Password"
+            name="password"
             type="password"
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
@@ -450,46 +452,52 @@ export const OrdWallet = () => {
           <Text
             theme={theme}
             style={{ cursor: "pointer" }}
-          >{`Available Balance: ${(
-            showAmount(token.all.confirmed, token.dec)
+          >{`Available Balance: ${showAmount(
+            token.all.confirmed,
+            token.dec
           ).toString()}`}</Text>
           <FormContainer noValidate onSubmit={(e) => handleSendBSV20(e)}>
             <Input
               theme={theme}
+              name="address"
               placeholder="Receive Address"
               type="text"
               onChange={(e) => setReceiveAddress(e.target.value)}
               value={receiveAddress}
             />
-            <InputAmountWrapper>
-              <Input
-                theme={theme}
-                placeholder="Enter Token Amount"
-                type="number"
-                step={"1"}
-                value={tokenSendAmount !== null ? showAmount(tokenSendAmount, token.dec) : ""}
-                onChange={(e) => {
-                  const inputValue = e.target.value;
-    
-                  if (inputValue === "") {
-                    setTokenSendAmount(null);
-                  } else {
-                    const amtStr = normalize(inputValue, token.dec);
+            <Input
+              name="amt"
+              theme={theme}
+              placeholder="Enter Token Amount"
+              type="number"
+              step={"1"}
+              value={
+                tokenSendAmount !== null
+                  ? showAmount(tokenSendAmount, token.dec)
+                  : ""
+              }
+              onChange={(e) => {
+                const inputValue = e.target.value;
 
-                    const amt = BigInt(amtStr);
-                    setTokenSendAmount(amt);
-                    if( amt > token.all.confirmed) {
-                      setTimeout(() => {
-                        setTokenSendAmount(token.all.confirmed);
-                      }, 500);
-                    }
+                if (inputValue === "") {
+                  setTokenSendAmount(null);
+                } else {
+                  const amtStr = normalize(inputValue, token.dec);
+
+                  const amt = BigInt(amtStr);
+                  setTokenSendAmount(amt);
+                  if (amt > token.all.confirmed) {
+                    setTimeout(() => {
+                      setTokenSendAmount(token.all.confirmed);
+                    }, 500);
                   }
-                }}
-              />
-            </InputAmountWrapper>
+                }
+              }}
+            />
             <Input
               theme={theme}
-              placeholder="Enter Wallet Password"
+              name="password"
+              placeholder="Password"
               type="password"
               value={passwordConfirm}
               onChange={(e) => setPasswordConfirm(e.target.value)}
