@@ -33,13 +33,13 @@ const RequestDetailsContainer = styled.div<ColorThemeProps>`
 export type SignMessageResponse = {
   address?: string;
   pubKeyHex?: string;
-  signedMessage?: string;
+  signedMessage?: string | Uint8Array;
   signatureHex?: string;
   error?: string;
 };
 
 export type SignMessageRequestProps = {
-  messageToSign: string;
+  messageToSign: string | Uint8Array;
   popupId: number | undefined;
   onSignature: () => void;
 };

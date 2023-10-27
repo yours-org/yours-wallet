@@ -179,7 +179,7 @@ export const useBsv = () => {
   };
 
   const signMessage = async (
-    message: string,
+    message: string | Uint8Array,
     password: string
   ): Promise<SignMessageResponse | undefined> => {
     const isAuthenticated = await verifyPassword(password);
@@ -189,16 +189,17 @@ export const useBsv = () => {
     try {
       const keys = await retrieveKeys(password);
       if (!keys?.walletWif) throw Error("Undefined key");
-      const hash = Hash.sha_256(Buffer.from(message)).to_hex();
+
       const privateKey = PrivateKey.from_wif(keys.walletWif);
       const publicKey = privateKey.to_public_key();
       const address = publicKey
         .to_address()
         .set_chain_params(getChainParams(network))
         .to_string();
-      const encoder = new TextEncoder();
-      const encodedMessage = encoder.encode(hash);
-      const signature = privateKey.sign_message(encodedMessage);
+
+      const signature = privateKey.sign_message(typeof message == 'string' ?
+        Hash.sha_256(Buffer.from(message)).to_bytes() :
+        message);
 
       return {
         address,
