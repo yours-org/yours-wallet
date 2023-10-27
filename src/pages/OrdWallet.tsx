@@ -11,7 +11,12 @@ import {
   ReceiveContent,
   Text,
 } from "../components/Reusable";
-import { BSV20, useOrds } from "../hooks/useOrds";
+import {
+  ListOrdinal,
+  OrdOperationResponse,
+  useOrds,
+  BSV20,
+} from "../hooks/useOrds";
 import { Show } from "../components/Show";
 import { BackButton } from "../components/BackButton";
 import { QrCode } from "../components/QrCode";
@@ -26,6 +31,7 @@ import Tabs from "../components/Tabs";
 import { OrdinalTxo } from "../hooks/ordTypes";
 import { normalize, showAmount } from "../utils/ordi";
 import { BSV20Item } from "../components/BSV20Item";
+import { BSV_DECIMAL_CONVERSION } from "../utils/constants";
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -65,7 +71,7 @@ const Icon = styled.img<{ size?: string }>`
   margin: 0 0.5rem 0 0;
 `;
 
-const TransferWrapper = styled.div`
+const ContentWrapper = styled.div`
   margin-top: -2rem;
   width: 100%;
 `;
@@ -81,8 +87,13 @@ export const OrdButtonContainer = styled(ButtonContainer)`
   margin: 0.5rem 0 0.5rem 0;
 `;
 
-
-type PageState = "main" | "receive" | "transfer" | "sendBSV20";
+type PageState =
+  | "main"
+  | "receive"
+  | "transfer"
+  | "list"
+  | "cancel"
+  | "sendBSV20";
 
 export const OrdWallet = () => {
   const { theme } = useTheme();
@@ -98,6 +109,8 @@ export const OrdWallet = () => {
     setIsProcessing,
     getOrdinalsBaseUrl,
     sendBSV20,
+    listOrdinalOnGlobalOrderbook,
+    cancelGlobalOrderbookListing,
   } = useOrds();
   const [selectedOrdinal, setSelectedOrdinal] = useState<
     OrdinalTxo | undefined
@@ -106,9 +119,9 @@ export const OrdWallet = () => {
   const [ordinalOutpoint, setOrdinalOutpoint] = useState("");
   const [receiveAddress, setReceiveAddress] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [bsvListAmount, setBsvListAmount] = useState<number | undefined>();
   const [successTxId, setSuccessTxId] = useState("");
   const { addSnackbar, message } = useSnackbar();
-  // bsv20 state
 
   const [token, setToken] = useState<BSV20 | null>(null);
   const [tokenSendAmount, setTokenSendAmount] = useState<bigint | null>(null);
@@ -131,7 +144,22 @@ export const OrdWallet = () => {
     setReceiveAddress("");
     setPasswordConfirm("");
     setSuccessTxId("");
+    setBsvListAmount(undefined);
     setIsProcessing(false);
+  };
+
+  const getErrorMessage = (response: OrdOperationResponse) => {
+    return response.error === "invalid-password"
+      ? "Invalid Password!"
+      : response.error === "no-keys"
+      ? "No keys were found!"
+      : response.error === "insufficient-funds"
+      ? "Insufficient Funds!"
+      : response.error === "no-ord-utxo"
+      ? "Could not locate the ordinal!"
+      : response.error === "broadcast-error"
+      ? "There was an error broadcasting the tx!"
+      : "An unknown error has occurred! Try again.";
   };
 
   const handleTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -158,22 +186,81 @@ export const OrdWallet = () => {
     );
 
     if (!transferRes.txid || transferRes.error) {
-      const message =
-        transferRes.error === "invalid-password"
-          ? "Invalid Password!"
-          : transferRes.error === "insufficient-funds"
-          ? "Insufficient Funds!"
-          : transferRes.error === "no-ord-utxo"
-          ? "Could not locate the ordinal!"
-          : "An unknown error has occurred! Try again.";
-
-      addSnackbar(message, "error");
+      const errorMessage = getErrorMessage(transferRes);
+      addSnackbar(errorMessage, "error");
       return;
     }
 
     setSuccessTxId(transferRes.txid);
     addSnackbar(
       "Transfer Successful! It may continue to show in your wallet until the tx is confirmed.",
+      "success"
+    );
+  };
+
+  const handleListOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsProcessing(true);
+
+    await sleep(25);
+    if (!passwordConfirm) {
+      addSnackbar("You must enter a password!", "error");
+      setIsProcessing(false);
+      return;
+    }
+
+    if (Number(bsvListAmount) < 0.00000001) {
+      addSnackbar("Must be more than 1 sat", "error");
+      setIsProcessing(false);
+      return;
+    }
+
+    const listing: ListOrdinal = {
+      outpoint: ordinalOutpoint,
+      password: passwordConfirm,
+      price: Math.ceil(bsvListAmount! * BSV_DECIMAL_CONVERSION),
+    };
+
+    const listRes = await listOrdinalOnGlobalOrderbook(listing);
+
+    if (!listRes.txid || listRes.error) {
+      const errorMessage = getErrorMessage(listRes);
+      addSnackbar(errorMessage, "error");
+      return;
+    }
+
+    setSuccessTxId(listRes.txid);
+    addSnackbar(
+      "Listing Successful! It may continue to show in your wallet as unlisted until the tx is confirmed.",
+      "success"
+    );
+  };
+
+  const handleCancelListing = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsProcessing(true);
+
+    await sleep(25);
+    if (!passwordConfirm) {
+      addSnackbar("You must enter a password!", "error");
+      setIsProcessing(false);
+      return;
+    }
+
+    const cancelRes = await cancelGlobalOrderbookListing(
+      ordinalOutpoint,
+      passwordConfirm
+    );
+
+    if (!cancelRes.txid || cancelRes.error) {
+      const errorMessage = getErrorMessage(cancelRes);
+      addSnackbar(errorMessage, "error");
+      return;
+    }
+
+    setSuccessTxId(cancelRes.txid);
+    addSnackbar(
+      "Successfully canceled the listing! It may continue to show as listed until the tx is confirmed.",
       "success"
     );
   };
@@ -207,8 +294,6 @@ export const OrdWallet = () => {
       passwordConfirm
     );
 
-    console.log("sendBSV20Res", sendBSV20Res);
-
     if (!sendBSV20Res.txid || sendBSV20Res.error) {
       const message =
         sendBSV20Res.error === "invalid-password"
@@ -236,69 +321,32 @@ export const OrdWallet = () => {
     });
   };
 
-  const nft = (
+  const transferAndListButtons = (
     <>
-      <Show
-        when={ordinals.length > 0}
-        whenFalseContent={
-          <NoInscriptionWrapper>
-            <OneSatLogo src={oneSatLogo} />
-            <Text
-              style={{
-                color: theme.white,
-                fontSize: "1rem",
-              }}
-            >
-              You have no 1Sat Ordinals. NGMI 😬
-            </Text>
-          </NoInscriptionWrapper>
-        }
-      >
-        <OrdinalsList>
-          {ordinals
-            .filter(
-              (o) => o.origin?.data?.insc?.file.type !== "application/bsv-20"
-            )
-            .map((ord) => {
-              return (
-                <Ordinal
-                  theme={theme}
-                  inscription={ord}
-                  key={ord.origin?.outpoint.toString()}
-                  url={`${getOrdinalsBaseUrl()}/content/${ord.origin?.outpoint.toString()}`}
-                  selected={
-                    selectedOrdinal?.origin?.outpoint.toString() ===
-                    ord.origin?.outpoint.toString()
-                  }
-                  onClick={() => {
-                    setSelectedOrdinal(ord);
-                    setOrdinalOutpoint(ord.outpoint.toString());
-                  }}
-                />
-              );
-            })}
-        </OrdinalsList>
-      </Show>
-      <OrdButtonContainer>
-        <Button
-          theme={theme}
-          type="primary"
-          label="Receive"
-          onClick={() => setPageState("receive")}
-        />
-        <Button
-          theme={theme}
-          type="primary"
-          label="Transfer"
-          onClick={async () => {
-            if (!selectedOrdinal?.outpoint.toString()) {
-              addSnackbar("You must select an ordinal to transfer!", "info");
-              return;
-            }
-            setPageState("transfer");
-          }}
-        />
-      </OrdButtonContainer>
+      <Button
+        theme={theme}
+        type="primary"
+        label="Transfer"
+        onClick={async () => {
+          if (!selectedOrdinal?.outpoint.toString()) {
+            addSnackbar("You must select an ordinal to transfer!", "info");
+            return;
+          }
+          setPageState("transfer");
+        }}
+      />
+      <Button
+        theme={theme}
+        type="primary"
+        label="List"
+        onClick={async () => {
+          if (!selectedOrdinal?.outpoint.toString()) {
+            addSnackbar("You must select an ordinal to list!", "info");
+            return;
+          }
+          setPageState("list");
+        }}
+      />
     </>
   );
 
@@ -368,7 +416,7 @@ export const OrdWallet = () => {
   );
 
   const transfer = (
-    <TransferWrapper>
+    <ContentWrapper>
       <BackButton
         onClick={() => {
           setPageState("main");
@@ -421,7 +469,121 @@ export const OrdWallet = () => {
           />
         </FormContainer>
       </ConfirmContent>
-    </TransferWrapper>
+    </ContentWrapper>
+  );
+
+  const cancel = (
+    <ContentWrapper>
+      <BackButton
+        onClick={() => {
+          setPageState("main");
+          resetSendState();
+        }}
+      />
+      <ConfirmContent>
+        <HeaderText style={{ fontSize: "1.35rem" }} theme={theme}>
+          {"Cancel Listing"}
+        </HeaderText>
+        <Text
+          style={{ margin: 0 }}
+          theme={theme}
+        >{`#${selectedOrdinal?.origin?.num}`}</Text>
+        <Ordinal
+          theme={theme}
+          inscription={selectedOrdinal as OrdinalTxo}
+          url={`${getOrdinalsBaseUrl()}/content/${selectedOrdinal?.origin?.outpoint.toString()}`}
+          selected
+          isTransfer
+        />
+        <FormContainer noValidate onSubmit={(e) => handleCancelListing(e)}>
+          <Input
+            theme={theme}
+            placeholder="Password"
+            type="password"
+            value={passwordConfirm}
+            onChange={(e) => setPasswordConfirm(e.target.value)}
+          />
+          <Button
+            theme={theme}
+            type="primary"
+            label="Cancel Now"
+            disabled={isProcessing}
+            isSubmit
+          />
+        </FormContainer>
+      </ConfirmContent>
+    </ContentWrapper>
+  );
+
+  const nft = (
+    <>
+      <Show
+        when={ordinals.length > 0}
+        whenFalseContent={
+          <NoInscriptionWrapper>
+            <OneSatLogo src={oneSatLogo} />
+            <Text
+              style={{
+                color: theme.white,
+                fontSize: "1rem",
+              }}
+            >
+              You have no 1Sat Ordinals. NGMI 😬
+            </Text>
+          </NoInscriptionWrapper>
+        }
+      >
+        <OrdinalsList>
+          {ordinals
+            .filter(
+              (o) => o.origin?.data?.insc?.file.type !== "application/bsv-20"
+            )
+            .map((ord) => {
+              return (
+                <Ordinal
+                  theme={theme}
+                  inscription={ord}
+                  key={ord.origin?.outpoint.toString()}
+                  url={`${getOrdinalsBaseUrl()}/content/${ord.origin?.outpoint.toString()}`}
+                  selected={
+                    selectedOrdinal?.origin?.outpoint.toString() ===
+                    ord.origin?.outpoint.toString()
+                  }
+                  onClick={() => {
+                    setSelectedOrdinal(ord);
+                    setOrdinalOutpoint(ord.outpoint.toString());
+                  }}
+                />
+              );
+            })}
+        </OrdinalsList>
+      </Show>
+      <OrdButtonContainer>
+        <Button
+          theme={theme}
+          type="primary"
+          label="Receive"
+          onClick={() => setPageState("receive")}
+        />
+        <Show
+          when={!!selectedOrdinal?.data?.list}
+          whenFalseContent={transferAndListButtons}
+        >
+          <Button
+            theme={theme}
+            type="warn"
+            label="Cancel Listing"
+            onClick={async () => {
+              if (!selectedOrdinal?.outpoint.toString()) {
+                addSnackbar("You must select an ordinal to transfer!", "info");
+                return;
+              }
+              setPageState("cancel");
+            }}
+          />
+        </Show>
+      </OrdButtonContainer>
+    </>
   );
 
   const main = (
@@ -518,13 +680,79 @@ export const OrdWallet = () => {
     </Show>
   );
 
+  const list = (
+    <ContentWrapper>
+      <BackButton
+        onClick={() => {
+          setPageState("main");
+          resetSendState();
+        }}
+      />
+      <ConfirmContent>
+        <HeaderText style={{ fontSize: "1.35rem" }} theme={theme}>{`List ${
+          selectedOrdinal?.origin?.data?.map?.name ??
+          selectedOrdinal?.origin?.data?.map?.subTypeData?.name ??
+          "List Ordinal"
+        }`}</HeaderText>
+        <Text
+          style={{ margin: 0 }}
+          theme={theme}
+        >{`#${selectedOrdinal?.origin?.num}`}</Text>
+        <Ordinal
+          theme={theme}
+          inscription={selectedOrdinal as OrdinalTxo}
+          url={`${getOrdinalsBaseUrl()}/content/${selectedOrdinal?.origin?.outpoint.toString()}`}
+          selected
+          isTransfer
+        />
+        <FormContainer noValidate onSubmit={(e) => handleListOrdinal(e)}>
+          <Input
+            theme={theme}
+            placeholder="Enter BSV Amount"
+            type="number"
+            step="0.00000001"
+            onChange={(e) => setBsvListAmount(Number(e.target.value))}
+            value={
+              bsvListAmount !== null && bsvListAmount !== undefined
+                ? bsvListAmount
+                : ""
+            }
+          />
+          <Input
+            theme={theme}
+            placeholder="Password"
+            type="password"
+            value={passwordConfirm}
+            onChange={(e) => setPasswordConfirm(e.target.value)}
+          />
+          <Text theme={theme} style={{ margin: "1rem 0 0 0" }}>
+            Confirm global orderbook listing
+          </Text>
+          <Button
+            theme={theme}
+            type="primary"
+            label="List Now"
+            disabled={isProcessing}
+            isSubmit
+          />
+        </FormContainer>
+      </ConfirmContent>
+    </ContentWrapper>
+  );
+
   return (
     <>
       <Show when={isProcessing && pageState === "main"}>
         <PageLoader theme={theme} message="Loading ordinals..." />
       </Show>
       <Show when={isProcessing && pageState === "transfer"}>
-        <PageLoader theme={theme} message="Transferring Ordinal..." />
+        <PageLoader theme={theme} message="Transferring ordinal..." />
+      </Show>
+      <Show when={isProcessing && pageState === "list"}>
+        <PageLoader theme={theme} message="Listing ordinal..." />
+      </Show>
+      <Show when={isProcessing && pageState === "cancel"}>
+        <PageLoader theme={theme} message="Cancelling listing..." />
       </Show>
       <Show when={isProcessing && pageState === "sendBSV20"}>
         <PageLoader theme={theme} message="Sending BSV20..." />
@@ -535,6 +763,8 @@ export const OrdWallet = () => {
       <Show when={!isProcessing && pageState === "sendBSV20"}>
         {sendBSV20View}
       </Show>
+      <Show when={!isProcessing && pageState === "list"}>{list}</Show>
+      <Show when={!isProcessing && pageState === "cancel"}>{cancel}</Show>
     </>
   );
 };
