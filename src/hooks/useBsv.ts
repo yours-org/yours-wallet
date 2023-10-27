@@ -179,8 +179,9 @@ export const useBsv = () => {
   };
 
   const signMessage = async (
-    message: string | Uint8Array,
-    password: string
+    message: string,
+    password: string,
+    encoding: "utf8" | "hex" | "base64" = "utf8",
   ): Promise<SignMessageResponse | undefined> => {
     const isAuthenticated = await verifyPassword(password);
     if (!isAuthenticated) {
@@ -197,9 +198,8 @@ export const useBsv = () => {
         .set_chain_params(getChainParams(network))
         .to_string();
 
-      const signature = privateKey.sign_message(typeof message == 'string' ?
-        Hash.sha_256(Buffer.from(message)).to_bytes() :
-        message);
+      const msgBuf = Buffer.from(message, encoding)
+      const signature = privateKey.sign_message(msgBuf);
 
       return {
         address,

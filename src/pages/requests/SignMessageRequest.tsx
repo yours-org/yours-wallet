@@ -33,19 +33,20 @@ const RequestDetailsContainer = styled.div<ColorThemeProps>`
 export type SignMessageResponse = {
   address?: string;
   pubKeyHex?: string;
-  signedMessage?: string | Uint8Array;
+  signedMessage?: string;
   signatureHex?: string;
   error?: string;
 };
 
 export type SignMessageRequestProps = {
-  messageToSign: string | Uint8Array;
+  messageToSign: string;
+  encoding?: "utf8" | "hex" | "base64";
   popupId: number | undefined;
   onSignature: () => void;
 };
 
 export const SignMessageRequest = (props: SignMessageRequestProps) => {
-  const { messageToSign, onSignature, popupId } = props;
+  const { messageToSign, encoding, onSignature, popupId } = props;
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -84,7 +85,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       return;
     }
 
-    const signRes = await signMessage(messageToSign, passwordConfirm);
+    const signRes = await signMessage(messageToSign, passwordConfirm, encoding);
     if (!signRes?.signatureHex) {
       const message =
         signRes?.error === "invalid-password"
