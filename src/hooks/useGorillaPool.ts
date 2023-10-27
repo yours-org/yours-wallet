@@ -3,7 +3,6 @@ import { GP_BASE_URL, GP_TESTNET_BASE_URL } from "../utils/constants";
 import { NetWork } from "../utils/network";
 import { useNetwork } from "./useNetwork";
 import { BSV20 } from "./useOrds";
-import { Script } from "bsv-wasm-web";
 import { useTokens } from "./useTokens";
 import { isBSV20v2 } from "../utils/ordi";
 import { OrdinalResponse, OrdinalTxo } from "./ordTypes";
@@ -78,12 +77,9 @@ export const useGorillaPool = () => {
       const { data } = await axios.get(
         `${getOrdinalsBaseUrl()}/api/txos/${outpoint}?script=true`
       );
-      const ordUtxo = data;
-
-      ordUtxo.script = Script.from_bytes(
-        Buffer.from(ordUtxo.script, "base64")
-      ).to_asm_string();
-
+      const ordUtxo: OrdinalTxo = data;
+      if (!ordUtxo.script) throw Error("No script when fetching by outpoint");
+      ordUtxo.script = Buffer.from(ordUtxo.script, "base64").toString("hex");
       return ordUtxo;
     } catch (e) {
       throw new Error(JSON.stringify(e));
