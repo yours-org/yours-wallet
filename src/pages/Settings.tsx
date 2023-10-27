@@ -22,6 +22,7 @@ import { useKeys } from "../hooks/useKeys";
 import { Input } from "../components/Input";
 import { useSocialProfile } from "../hooks/useSocialProfile";
 import { Button } from "../components/Button";
+import { QrCode } from "../components/QrCode";
 
 const Content = styled.div`
   display: flex;
@@ -77,13 +78,22 @@ const ScrollableContainer = styled.div`
   flex-direction: column;
   align-items: center;
   height: 25rem;
-  overflow-y: auto;
+  overflow-y: scroll;
   width: 100%;
   padding: 1rem;
 `;
 
-type SettingsPage = "main" | "connected-apps" | "social-profile";
-type DecisionType = "sign-out" | "export-keys";
+const ExportKeysAsQrCodeContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 1rem;
+`;
+
+type SettingsPage = "main" | "connected-apps" | "social-profile" | "export-keys-qr";
+type DecisionType = "sign-out" | "export-keys" | "export-keys-qr-code";
 
 export const Settings = () => {
   const { theme } = useTheme();
@@ -98,6 +108,8 @@ export const Settings = () => {
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const { retrieveKeys } = useKeys();
   const { socialProfile, storeSocialProfile } = useSocialProfile();
+  const [exportKeysQrData,setExportKeysAsQrData] = useState(""); 
+  const [shouldVisibleExportedKeys,setShouldVisibleExportedKeys] = useState(false);
 
   const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState(
     socialProfile.displayName
@@ -144,6 +156,14 @@ export const Settings = () => {
     setShowSpeedBump(true);
   };
 
+  const handleExportKeysAsQrCodeIntent = () => {
+    setDecisionType("export-keys-qr-code");
+    setSpeedBumpMessage(
+      "Your are about to make your private keys visible in QR code format. Make sure you are in a safe place and no one is watching."
+    );
+    setShowSpeedBump(true);
+  };
+
   const handleSocialProfileSave = () => {
     storeSocialProfile({
       displayName: enteredSocialDisplayName,
@@ -181,6 +201,28 @@ export const Settings = () => {
     URL.revokeObjectURL(url);
   };
 
+  const exportKeysAsQrCode = async (password: string) => {
+    const keys = await retrieveKeys(password);
+
+    const keysToExport = {
+      mnemonic: keys.mnemonic,
+      payPk: keys.walletWif,
+      payDerivationPath: keys.walletDerivationPath,
+      ordPk: keys.ordWif,
+      ordDerivationPath: keys.ordDerivationPath,
+    };
+
+    const jsonData = JSON.stringify(keysToExport, null, 2);
+    setExportKeysAsQrData(jsonData);
+    
+    setPage("export-keys-qr");
+    setShouldVisibleExportedKeys(true);
+    setTimeout(()=>{
+         setShouldVisibleExportedKeys(false);
+    },10000)
+    
+  };
+
   const signOut = async () => {
     await storage.clear();
     setDecisionType(undefined);
@@ -216,7 +258,13 @@ export const Settings = () => {
       setDecisionType(undefined);
       setShowSpeedBump(false);
     }
+    if (decisionType === "export-keys-qr-code" && password) {
+      exportKeysAsQrCode(password);
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+    }
   };
+
 
   const main = (
     <Show
@@ -228,48 +276,55 @@ export const Settings = () => {
           onCancel={handleCancel}
           onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
           showSpeedBump={showSpeedBump}
-          withPassword={decisionType === "export-keys"}
+          withPassword={decisionType === "export-keys" || decisionType === "export-keys-qr-code"}
         />
       }
     >
+    <ScrollableContainer>
       <SettingsRow
-        name="Connected Apps"
-        description="Manage the apps you are connected to"
-        onClick={() => setPage("connected-apps")}
-        jsxElement={<ForwardButton />}
-      />
-      <SettingsRow
-        name="Social Profile"
-        description="Set your display name and avatar"
-        onClick={() => setPage("social-profile")}
-        jsxElement={<ForwardButton />}
-      />
-      <SettingsRow
-        name="Testnet Mode"
-        description="Applies to balances and app connections"
-        jsxElement={
-          <ToggleSwitch
-            theme={theme}
-            on={network === NetWork.Testnet}
-            onChange={handleNetworkChange}
-          />
-        }
-      />
-      <SettingsRow
-        name="Export Keys"
-        description="Download your seed, private, and public keys"
-        onClick={handleExportKeysIntent}
-      />
-      <SettingsRow
-        name="Lock Wallet"
-        description="Immediately lock the wallet"
-        onClick={lockWallet}
-      />
-      <SettingsRow
-        name="Sign Out"
-        description="Sign out of Panda Wallet completely"
-        onClick={handleSignOutIntent}
-      />
+          name="Connected Apps"
+          description="Manage the apps you are connected to"
+          onClick={() => setPage("connected-apps")}
+          jsxElement={<ForwardButton />}
+        />
+        <SettingsRow
+          name="Social Profile"
+          description="Set your display name and avatar"
+          onClick={() => setPage("social-profile")}
+          jsxElement={<ForwardButton />}
+        />
+        <SettingsRow
+          name="Testnet Mode"
+          description="Applies to balances and app connections"
+          jsxElement={
+            <ToggleSwitch
+              theme={theme}
+              on={network === NetWork.Testnet}
+              onChange={handleNetworkChange}
+            />
+          }
+        />
+        <SettingsRow
+          name="Export Keys"
+          description="Download your seed, private, and public keys"
+          onClick={handleExportKeysIntent}
+        />
+        <SettingsRow
+          name="Export Keys as QR code"
+          description="Show your payment and ordinal private keypairs as QR code for wallets to scan & import"
+          onClick={handleExportKeysAsQrCodeIntent}
+        />
+        <SettingsRow
+          name="Lock Wallet"
+          description="Immediately lock the wallet"
+          onClick={lockWallet}
+        />
+        <SettingsRow
+          name="Sign Out"
+          description="Sign out of Panda Wallet completely"
+          onClick={handleSignOutIntent}
+        />
+      </ScrollableContainer>
     </Show>
   );
 
@@ -293,6 +348,21 @@ export const Settings = () => {
             );
           })}
         </ScrollableContainer>
+      </Show>
+    </>
+  );
+
+  const exportKeysAsQrCodePage = (
+    <>
+      <BackButton onClick={() => setPage("main")} />
+      <Show
+        when={shouldVisibleExportedKeys}
+        whenFalseContent={<Text theme={theme}>Timed out. Please try again</Text>}
+      >
+        <ExportKeysAsQrCodeContainer>
+            <QrCode address={exportKeysQrData}/>
+        </ExportKeysAsQrCodeContainer>
+
       </Show>
     </>
   );
@@ -340,6 +410,7 @@ export const Settings = () => {
       <Show when={page === "main"}>{main}</Show>
       <Show when={page === "connected-apps"}>{connectedAppsPage}</Show>
       <Show when={page === "social-profile"}>{socialProfilePage}</Show>
+      <Show when={page === "export-keys-qr"}>{exportKeysAsQrCodePage}</Show>
     </Content>
   );
 };
