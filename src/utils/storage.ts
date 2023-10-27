@@ -8,7 +8,11 @@ interface Storage {
 const mockStorage: Storage = {
   set: (obj, callback) => {
     Object.keys(obj).forEach((key) => {
-      localStorage.setItem(key, obj[key]);
+      if (typeof obj[key] === 'object') {
+        localStorage.setItem(key, JSON.stringify(obj[key]));
+      } else {
+        localStorage.setItem(key, obj[key]);
+      }
     });
     if (callback) callback();
   },
@@ -18,11 +22,33 @@ const mockStorage: Storage = {
 
     if (typeof keyOrKeys === "string") {
       const value = localStorage.getItem(keyOrKeys);
-      result[keyOrKeys] = value;
+      if (typeof value === 'string') {
+        if ((value.startsWith("\"") && value.startsWith("\""))
+          || (value.startsWith("{") && value.startsWith("}"))) {
+          result[keyOrKeys] = JSON.parse(value);
+        } else {
+          result[keyOrKeys] = value;
+        }
+      } else {
+        result[keyOrKeys] = value;
+      }
+
+
       callback(result);
     } else if (Array.isArray(keyOrKeys)) {
       keyOrKeys.forEach((key) => {
-        result[key] = localStorage.getItem(key);
+
+        const value = localStorage.getItem(key);
+        if (typeof value === 'string') {
+          if ((value.startsWith("[") && value.endsWith("]"))
+            || (value.startsWith("{") && value.endsWith("}"))) {
+            result[key] = JSON.parse(value);
+          } else {
+            result[key] = value;
+          }
+        } else {
+          result[key] = value;
+        }
       });
       callback(result);
     }

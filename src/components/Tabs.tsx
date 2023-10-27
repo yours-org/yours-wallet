@@ -1,4 +1,4 @@
-import React, { Component, ReactNode, useState } from "react";
+import React from "react";
 import styled from "styled-components";
 import { PropsWithChildren } from "react";
 import { ColorThemeProps, Theme } from "../theme";
@@ -50,17 +50,10 @@ const TabButton = styled.button<ColorThemeProps & { selected: boolean }>`
   }
 `;
 
-const TabList = styled.div<ColorThemeProps & { breakPoint: string }>`
+const TabList = styled.div<ColorThemeProps>`
   display: flex;
   flex-direction: row;
   width: 100%;
-  @media (max-width: ${(props) => props.breakPoint}) {
-    flex-direction: column;
-    & > div,
-    & > div > button {
-      width: 100%;
-    }
-  }
 `;
 
 const Content = styled.div`
@@ -74,17 +67,17 @@ const Content = styled.div`
 
 export type TabsProps = PropsWithChildren<{
   theme: Theme;
-  tabBreak: string;
+  tabIndex: number;
+  selectTab:  React.Dispatch<React.SetStateAction<number>>,
 }>;
 
 const TabsComponent = (props: TabsProps) => {
-  const [tabIndex, selectTab] = useState(0);
 
-  const { children, tabBreak } = props;
+  const { children, tabIndex, selectTab } = props;
 
   return (
     <TabsWrapper>
-      <TabList theme={props.theme} breakPoint={tabBreak} role="tablist">
+      <TabList theme={props.theme} role="tablist">
         {React.Children.map(children, (child, index) => {
           if (!React.isValidElement(child)) return;
 
@@ -113,5 +106,4 @@ const TabsComponent = (props: TabsProps) => {
 };
 
 export const Tabs = Object.assign(TabsComponent, { Panel: TabPanel });
-
 export default Tabs;

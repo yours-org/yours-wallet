@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import {
   BSV_DECIMAL_CONVERSION,
   WOC_BASE_URL,
@@ -85,7 +85,7 @@ export const useWhatsOnChain = () => {
     }
   };
 
-  const broadcastRawTx = async (txhex: string): Promise<string | undefined> => {
+  const broadcastRawTx = async (txhex: string): Promise<any> => {
     try {
       const { data: txid } = await axios.post(
         `${getBaseUrl()}/tx/raw`,
@@ -94,7 +94,12 @@ export const useWhatsOnChain = () => {
       );
       return txid;
     } catch (error) {
-      console.log(error);
+      if (axios.isAxiosError(error) && error.response)  {
+        // Access to config, request, and response
+        console.error("broadcast rawtx failed:", error.response.data);
+      } else {
+        console.error("broadcast rawtx failed:", error);
+      }
     }
   };
 

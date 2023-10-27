@@ -8,95 +8,15 @@ import {
 import { useKeys } from "./useKeys";
 import { UTXO, WocUtxo, useWhatsOnChain } from "./useWhatsOnChain";
 import { sendOrdinal } from "js-1sat-ord-web";
-import { P2PKHAddress, PrivateKey, Transaction } from "bsv-wasm-web";
 import { useBsvWasm } from "./useBsvWasm";
-import { Outpoint } from "../utils/outpoint";
 import { NetWork } from "../utils/network";
 import { useNetwork } from "./useNetwork";
-export class InscriptionData {
-  type?: string = "";
-  data?: Buffer = Buffer.alloc(0);
-}
 
-export interface Claim {
-  sub: string;
-  type: string;
-  value: string;
-}
+import { OrdUtxo, OrdinalResponse } from "./ordTypes";
+import { P2PKHAddress, Transaction, TxIn, Script, TxOut, PrivateKey, SigHash } from "bsv-wasm-web";
+import { createTransferP2PKH, createTransferV2P2PKH, getAmtv1, getAmtv2, isBSV20v2 } from "../utils/ordi";
+import { useTokens } from "./useTokens";
 
-export interface Sigma {
-  algorithm: string;
-  address: string;
-  signature: string;
-  vin: number;
-}
-
-export class Origin {
-  outpoint: Outpoint = new Outpoint();
-  data?: TxoData;
-  num?: number;
-  map?: { [key: string]: any };
-  claims?: Claim[];
-}
-
-export enum Bsv20Status {
-  Invalid = -1,
-  Pending = 0,
-  Valid = 1,
-}
-
-export type InscData = {
-  file: {
-    hash: string;
-    size: number;
-    type: string;
-  };
-  text: string;
-  json: any;
-};
-
-export class TxoData {
-  types?: string[];
-  insc?: InscData;
-  map?: { [key: string]: any };
-  b?: File;
-  sigma?: Sigma[];
-  list?: {
-    price: number;
-    payout: string;
-  };
-  bsv20?: {
-    id?: Outpoint;
-    p: string;
-    op: string;
-    tick?: string;
-    amt: string;
-    status?: Bsv20Status;
-  };
-}
-
-export interface Inscription {
-  json?: any;
-  text?: string;
-  words?: string[];
-  file: File;
-}
-export class OrdinalTxo {
-  txid: string = "";
-  vout: number = 0;
-  outpoint: Outpoint = new Outpoint();
-  satoshis: number = 0;
-  accSats: number = 0;
-  owner?: string;
-  script?: string;
-  spend?: string;
-  origin?: Origin;
-  height: number = 0;
-  idx: number = 0;
-  data?: TxoData;
-}
-
-export type OrdinalResponse = OrdinalTxo[];
 
 type TransferOrdinalResponse = {
   txid?: string;
@@ -107,8 +27,6 @@ export type BuildAndBroadcastResponse = {
   txid: string;
   rawTx: string;
 };
-
-export type MapSubType = "collection" | "collectionItem";
 
 export type GPArcResponse = {
   blockHash: string;
@@ -121,32 +39,20 @@ export type GPArcResponse = {
   txid: string;
 };
 
-export interface OrdSchema {
-  app: string;
-  type: string;
-  name: string;
-  subType?: MapSubType;
-  subTypeData?: any;
-  royalties?: string;
-  previewUrl?: string;
+
+export interface BSV20 {
+  tick: string;
+  dec: number;
+  all: Balance;
+  listed: Balance;
 }
 
-type GPFile = {
-  hash: string;
-  size: number;
-  type: string;
-  url: string;
-};
-
-export interface OrdUtxo extends UTXO {
-  type: string;
-  origin: string;
-  outpoint: string;
-  listing: boolean;
-  num: number;
-  file: GPFile;
-  map: OrdSchema;
+export interface Balance {
+  confirmed: bigint;
+  pending: bigint;
 }
+
+
 
 export type Web3TransferOrdinalRequest = {
   address: string;
@@ -158,10 +64,12 @@ export const useOrds = () => {
   const { ordAddress, retrieveKeys, verifyPassword, ordPubKey } = useKeys();
 
   const [ordinals, setOrdinals] = useState<OrdinalResponse>([]);
+  const [bsv20s, setBSV20s] = useState<Array<BSV20>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
   const { getUtxos, broadcastRawTx, getRawTxById } = useWhatsOnChain();
+  const { cacheTokenInfos, getTokenDecimals } = useTokens();
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
   };
@@ -170,18 +78,54 @@ export const useOrds = () => {
     try {
       //   setIsProcessing(true); // TODO: set this to true if call is taking more than a second
       //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
-      const res = await axios.get(
+      let res = await axios.get(
         `${getOrdinalsBaseUrl()}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`
       );
 
       const ordList: OrdinalResponse = res.data;
       setOrdinals(ordList);
+
+      res = await axios.get(
+        `${getOrdinalsBaseUrl()}/api/bsv20/${ordAddress}/balance`
+      );
+
+      const bsv20List: Array<BSV20> = res.data.map((b: {
+        "all": {
+          "confirmed": string,
+          "pending": string
+        },
+        "listed": {
+          "confirmed": string,
+          "pending": string
+        },
+        "tick": string,
+      }) => {
+        return {
+          tick: b.tick,
+          dec: getTokenDecimals(b.tick),
+          all: {
+            confirmed: BigInt(b.all.confirmed),
+            pending: BigInt(b.all.pending),
+          },
+          listed: {
+            confirmed: BigInt(b.all.confirmed),
+            pending: BigInt(b.all.pending),
+          }
+        }
+      });
+
+      await cacheTokenInfos(bsv20List.map(bsv20 => bsv20.tick));
+
+      setBSV20s(bsv20List.filter(o => o.all.confirmed > 0n));
+
     } catch (error) {
-      console.log(error);
+      console.error("getOrdinals failed:", error);
     } finally {
       setIsProcessing(false);
     }
   };
+
+
 
   useEffect(() => {
     if (!ordAddress) return;
@@ -286,7 +230,7 @@ export const useOrds = () => {
 
       return { error: "broadcast-failed" };
     } catch (error) {
-      console.log(error);
+      console.error("transferOrdinal failed:", error);
       return { error: JSON.stringify(error) };
     } finally {
       setIsProcessing(false);
@@ -351,11 +295,234 @@ export const useOrds = () => {
 
       return oUtxos;
     } catch (error) {
-      console.log(error);
+      console.error("getOrdinalUtxos failed:", error);
     }
   };
 
+
+  const fetchUTXOByOutpoint = (outpoint: string): Promise<UTXO | null> => {
+    return axios
+      .get(`${getOrdinalsBaseUrl()}/api/txos/${outpoint}?script=true`)
+      .then(function (response) {
+        // handle success
+        const script = Buffer.from(
+          response.data.script,
+          'base64'
+        ).toString('hex')
+        return {
+          txid: response.data.txid,
+          vout: response.data.vout,
+          satoshis: 1,
+          script,
+        }
+      })
+      .catch(function (error) {
+        console.error("fetchUTXOByOutpoint failed:", error);
+        return null
+      })
+  }
+
+  const getBSV20Utxos = async (
+    tick: string,
+    address: string
+  ): Promise<UTXO[] | undefined> => {
+    try {
+      if (!address) {
+        return [];
+      }
+
+      const url = isBSV20v2(tick) ?
+        `${getOrdinalsBaseUrl()}/api/bsv20/${address}/id/${tick}` :
+        `${getOrdinalsBaseUrl()}/api/bsv20/${address}/tick/${tick}`
+
+      const r = await axios.get(url);
+
+      if (!Array.isArray(r.data)) {
+        return [];
+      }
+
+      const utxos = await Promise.all(
+        r.data.map((utxo: any) => {
+          return fetchUTXOByOutpoint(utxo.outpoint)
+        }).filter(u => u !== null)
+      )
+
+      return utxos as Array<UTXO>
+
+    } catch (error) {
+      console.error("getBSV20Utxos", error);
+      return [];
+    }
+  };
+
+  const sendBSV20 = async (tick: string,
+    destinationAddress: string,
+    amount: bigint,
+    password: string) => {
+    try {
+      if (!bsvWasmInitialized) throw Error("bsv-wasm not initialized!");
+      setIsProcessing(true);
+
+      const isAuthenticated = await verifyPassword(password);
+      if (!isAuthenticated) {
+        return { error: "invalid-password" };
+      }
+
+      const keys = await retrieveKeys(password);
+      if (
+        !keys?.ordAddress ||
+        !keys.ordWif ||
+        !keys.walletAddress ||
+        !keys.walletWif
+      ) {
+        throw Error("No keys");
+      }
+      const ordinalAddress = keys.ordAddress;
+      const ordWifPk = keys.ordWif;
+      const fundingAndChangeAddress = keys.walletAddress;
+      const payWifPk = keys.walletWif;
+
+      const paymentPk = PrivateKey.from_wif(payWifPk);
+      const ordPk = PrivateKey.from_wif(ordWifPk);
+
+      const utxos = await getUtxos(fundingAndChangeAddress);
+
+      const fundingUtxos: UTXO[] = utxos
+        .map((utxo: WocUtxo) => {
+          return {
+            satoshis: utxo.value,
+            vout: utxo.tx_pos,
+            txid: utxo.tx_hash,
+            script: P2PKHAddress.from_string(fundingAndChangeAddress)
+              .get_locking_script()
+              .to_hex(),
+          } as UTXO;
+        })
+        .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
+
+      if (!fundingUtxos || fundingUtxos.length === 0) {
+        return { error: "insufficient-funds" };
+      }
+
+      const bsv20Utxos = await getBSV20Utxos(tick, ordinalAddress);
+
+      if (!bsv20Utxos || bsv20Utxos.length === 0) throw Error("no-bsv20-utxo");
+
+      const isV2 = isBSV20v2(tick);
+
+      const tokenTotalAmt = bsv20Utxos.reduce((a, item) => {
+        return a + (isV2 ? getAmtv2(Script.from_hex(item.script)) : getAmtv1(Script.from_hex(item.script)))
+      }, 0n);
+
+      const tokenChangeAmt = tokenTotalAmt - amount;
+
+      const tx = new Transaction(1, 0);
+      tx.add_output(new TxOut(1n,
+        isV2 ? createTransferV2P2PKH(destinationAddress, tick, amount)
+          : createTransferP2PKH(destinationAddress, tick, amount)))
+
+
+      if (tokenChangeAmt > 0n) {
+        tx.add_output(new TxOut(1n,
+          isV2 ? createTransferV2P2PKH(ordinalAddress, tick, tokenChangeAmt)
+            : createTransferP2PKH(ordinalAddress, tick, tokenChangeAmt)))
+      }
+
+      const totalInputSats = fundingUtxos.reduce((a, item) => a + item.satoshis, 0);
+      const feeSats = 30;
+      const change = totalInputSats - 1 - feeSats;
+
+      if (change > 0) {
+        tx.add_output(
+          new TxOut(
+            BigInt(change),
+            P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script()
+          )
+        );
+      }
+      let idx = 0;
+      for (let u of bsv20Utxos || []) {
+        const inTx = new TxIn(
+          Buffer.from(u.txid, "hex"),
+          u.vout,
+          Script.from_asm_string("")
+        );
+        inTx.set_satoshis(BigInt(u.satoshis));
+        inTx.set_locking_script(Script.from_hex(u.script))
+        tx.add_input(inTx)
+
+        const sig = tx.sign(
+          ordPk,
+          SigHash.InputOutputs,
+          idx,
+          Script.from_hex(u.script),
+          BigInt(u.satoshis)
+        );
+
+        inTx.set_unlocking_script(
+          Script.from_asm_string(
+            `${sig.to_hex()} ${ordPk.to_public_key().to_hex()}`
+          )
+        );
+
+        tx.set_input(idx, inTx);
+        idx++;
+      }
+
+      for (let u of fundingUtxos || []) {
+        const inTx = new TxIn(
+          Buffer.from(u.txid, "hex"),
+          u.vout,
+          Script.from_asm_string("")
+        );
+        inTx.set_satoshis(BigInt(u.satoshis));
+        inTx.set_locking_script(Script.from_hex(u.script))
+        tx.add_input(inTx)
+
+        const sig = tx.sign(
+          paymentPk,
+          SigHash.InputOutputs,
+          idx,
+          Script.from_hex(u.script),
+          BigInt(u.satoshis)
+        );
+
+        inTx.set_unlocking_script(
+          Script.from_asm_string(
+            `${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`
+          )
+        );
+
+        tx.set_input(idx, inTx);
+        idx++;
+      }
+
+      // Fee checker
+      const finalSatsIn = tx.satoshis_in() ?? 0n;
+      const finalSatsOut = tx.satoshis_out() ?? 0n;
+      if (finalSatsIn - finalSatsOut > 500) {
+        return { error: "fee-to-high" };
+      }
+
+      const txhex = tx.to_hex();
+      const txid = await broadcastRawTx(txhex);
+
+      if (txid) {
+        return { txid };
+      }
+      return { error: "broadcast-transaction-failed" };
+    } catch (error: any) {
+      console.error("sendBSV20 failed:", error);
+      return { error: error.message ?? "unknown" };
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+
+
   return {
+    bsv20s,
     ordinals,
     ordAddress,
     ordPubKey,
@@ -364,5 +531,6 @@ export const useOrds = () => {
     transferOrdinal,
     setIsProcessing,
     getOrdinalsBaseUrl,
+    sendBSV20,
   };
 };
