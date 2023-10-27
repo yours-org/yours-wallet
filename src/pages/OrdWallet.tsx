@@ -23,6 +23,7 @@ import { Input } from "../components/Input";
 import { sleep } from "../utils/sleep";
 import { useTheme } from "../hooks/useTheme";
 import { Ordinal } from "../components/Ordinal";
+import Tabs from "../components/Tabs";
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -153,8 +154,8 @@ export const OrdWallet = () => {
     });
   };
 
-  const main = (
-    <MainContent>
+  const nft = (
+    <>
       <Show
         when={ordinals.length > 0}
         whenFalseContent={
@@ -216,7 +217,30 @@ export const OrdWallet = () => {
           }}
         />
       </ButtonContainer>
-    </MainContent>
+    </>
+  );
+
+  const ft = (
+    <>
+      <Show
+        when={ordinals.length > 0}
+        whenFalseContent={
+          <NoInscriptionWrapper>
+            <OneSatLogo src={oneSatLogo} />
+            <Text
+              style={{
+                color: theme.white,
+                fontSize: "1rem",
+              }}
+            >
+              You have no BSV-20 tokens. NGMI 😬
+            </Text>
+          </NoInscriptionWrapper>
+        }
+      >
+      </Show>
+      
+    </>
   );
 
   const receive = (
@@ -298,6 +322,17 @@ export const OrdWallet = () => {
         </FormContainer>
       </ConfirmContent>
     </TransferWrapper>
+  );
+
+  const main =  (
+    <Tabs theme={theme} tabBreak="700px">
+      <Tabs.Panel theme={theme} label='NFT'>
+        {nft}
+      </Tabs.Panel>
+      <Tabs.Panel theme={theme} label='FT'>
+        {ft}
+      </Tabs.Panel>
+    </Tabs>
   );
 
   return (
