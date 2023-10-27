@@ -1,4 +1,3 @@
-import axios from "axios";
 import { useEffect, useState } from "react";
 import {
   FEE_PER_BYTE,
@@ -23,6 +22,7 @@ import { useBsvWasm } from "./useBsvWasm";
 import { Outpoint } from "../utils/outpoint";
 import { NetWork } from "../utils/network";
 import { useNetwork } from "./useNetwork";
+import { useGorillaPool } from "./useGorillaPool";
 export class InscriptionData {
   type?: string = "";
   data?: Buffer = Buffer.alloc(0);
@@ -178,8 +178,13 @@ export const useOrds = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
-  const { getUtxos, broadcastRawTx, getRawTxById, getSuitableUtxo } =
-    useWhatsOnChain();
+  const { getUtxos, getRawTxById, getSuitableUtxo } = useWhatsOnChain();
+  const {
+    getOrdUtxos,
+    broadcastWithGorillaPool,
+    getUtxoByOutpoint,
+    getMarketData,
+  } = useGorillaPool();
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
   };
@@ -188,11 +193,7 @@ export const useOrds = () => {
     try {
       //   setIsProcessing(true); // TODO: set this to true if call is taking more than a second
       //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
-      const res = await axios.get(
-        `${getOrdinalsBaseUrl()}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`
-      );
-
-      const ordList: OrdinalResponse = res.data;
+      const ordList = await getOrdUtxos(ordAddress);
       setOrdinals(ordList);
     } catch (error) {
       console.log(error);
@@ -331,18 +332,14 @@ export const useOrds = () => {
 
     const rawTx = sendRes.to_hex();
 
-    // Broadcasting with WOC for now. Ideally we broadcast with whatever the 1sat indexer is most likely to see first. David Case mentioned an endpoint specifically for the indexer. Should use this when ready.
-    const txid = await broadcastRawTx(rawTx);
+    console.log(rawTx);
+    const { txid } = await broadcastWithGorillaPool(rawTx);
 
-    // const { data } = await axios.post(`${GORILLA_POOL_ARC_URL}/tx`, {
-    //   rawTx,
-    // });
-
-    // const { txid } = data as GPArcResponse;
     if (txid) {
       return { txid, rawTx };
     }
   };
+
   const getOrdinalUtxos = async (
     address: string
   ): Promise<OrdUtxo[] | undefined> => {
@@ -350,11 +347,7 @@ export const useOrds = () => {
       if (!address) {
         return [];
       }
-      const r = await axios.get(
-        `${getOrdinalsBaseUrl()}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`
-      );
-
-      const utxos = r.data as OrdinalResponse;
+      const utxos = await getOrdUtxos(ordAddress);
 
       const oUtxos: OrdUtxo[] = [];
       for (const a of utxos) {
@@ -370,23 +363,6 @@ export const useOrds = () => {
       return oUtxos;
     } catch (error) {
       console.log(error);
-    }
-  };
-
-  const getUtxoByOutpoint = async (outpoint: string): Promise<OrdinalTxo> => {
-    try {
-      const { data } = await axios.get(
-        `${getOrdinalsBaseUrl()}/api/txos/${outpoint}?script=true`
-      );
-      const ordUtxo = data;
-
-      ordUtxo.script = Script.from_bytes(
-        Buffer.from(ordUtxo.script, "base64")
-      ).to_asm_string();
-
-      return ordUtxo;
-    } catch (e) {
-      throw new Error(JSON.stringify(e));
     }
   };
 
@@ -442,7 +418,7 @@ export const useOrds = () => {
         Number(price)
       );
 
-      const txid = await broadcastRawTx(rawTx);
+      const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: "broadcast-error" };
       return { txid };
     } catch (error) {
@@ -570,20 +546,6 @@ export const useOrds = () => {
     return tx.to_hex();
   };
 
-  const getMarketData = async (outpoint: string) => {
-    try {
-      const res = await axios.get(
-        `${getOrdinalsBaseUrl()}/api/inscriptions/${outpoint}?script=true`
-      );
-      const data = res.data as OrdinalTxo;
-      if (!data?.script || !data.origin?.outpoint.toString())
-        throw new Error("Could not get listing script");
-      return { script: data.script, origin: data.origin.outpoint.toString() };
-    } catch (error) {
-      throw new Error(`Error getting market data: ${JSON.stringify(error)}`);
-    }
-  };
-
   const cancelGlobalOrderbookListing = async (
     outpoint: string,
     password: string
@@ -687,7 +649,7 @@ export const useOrds = () => {
       cancelTx.set_input(1, utxoIn);
       const rawTx = cancelTx.to_hex();
 
-      const txid = await broadcastRawTx(rawTx);
+      const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: "broadcast-error" };
       return { txid };
     } catch (error) {
