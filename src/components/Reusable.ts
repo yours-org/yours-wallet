@@ -62,8 +62,9 @@ export const ButtonContainer = styled.div`
   align-items: center;
   justify-content: space-around;
   width: 100%;
-  margin: 0.5rem 0 0.5rem 0;
+  margin: 1rem 0 2.5rem 0;
 `;
+
 
 export const MainContent = styled.div`
   display: flex;

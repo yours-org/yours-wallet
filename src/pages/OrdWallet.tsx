@@ -77,12 +77,10 @@ const TransferBSV20Header = styled(HeaderText)`
   text-overflow: ellipsis;
 `;
 
-const InputAmountWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
+export const OrdButtonContainer = styled(ButtonContainer)`
+  margin: 0.5rem 0 0.5rem 0;
 `;
+
 
 type PageState = "main" | "receive" | "transfer" | "sendBSV20";
 
@@ -281,7 +279,7 @@ export const OrdWallet = () => {
             })}
         </OrdinalsList>
       </Show>
-      <ButtonContainer>
+      <OrdButtonContainer>
         <Button
           theme={theme}
           type="primary"
@@ -300,7 +298,7 @@ export const OrdWallet = () => {
             setPageState("transfer");
           }}
         />
-      </ButtonContainer>
+      </OrdButtonContainer>
     </>
   );
 
