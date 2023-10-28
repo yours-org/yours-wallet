@@ -2,8 +2,10 @@ import axios from "axios";
 import { GP_BASE_URL, GP_TESTNET_BASE_URL } from "../utils/constants";
 import { NetWork } from "../utils/network";
 import { useNetwork } from "./useNetwork";
-import { OrdinalResponse, OrdinalTxo } from "./useOrds";
-import { Script } from "bsv-wasm-web";
+import { BSV20 } from "./useOrds";
+import { useTokens } from "./useTokens";
+import { isBSV20v2 } from "../utils/ordi";
+import { OrdinalResponse, OrdinalTxo } from "./ordTypes";
 
 type GorillaPoolErrorMessage = {
   message: string;
@@ -16,6 +18,7 @@ export type GorillaPoolBroadcastResponse = {
 
 export const useGorillaPool = () => {
   const { network } = useNetwork();
+  const { getTokenDecimals } = useTokens();
 
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
@@ -55,17 +58,28 @@ export const useGorillaPool = () => {
     }
   };
 
+  const submitTx = async (txid: string) => {
+    try {
+      let res = await axios.post(
+        `${getOrdinalsBaseUrl()}/api/tx/${txid}/submit`
+      );
+
+      if (res.status !== 0) {
+        console.error("submitTx failed: ", txid);
+      }
+    } catch (error) {
+      console.error("submitTx failed: ", txid, error);
+    }
+  };
+
   const getUtxoByOutpoint = async (outpoint: string): Promise<OrdinalTxo> => {
     try {
       const { data } = await axios.get(
         `${getOrdinalsBaseUrl()}/api/txos/${outpoint}?script=true`
       );
-      const ordUtxo = data;
-
-      ordUtxo.script = Script.from_bytes(
-        Buffer.from(ordUtxo.script, "base64")
-      ).to_asm_string();
-
+      const ordUtxo: OrdinalTxo = data;
+      if (!ordUtxo.script) throw Error("No script when fetching by outpoint");
+      ordUtxo.script = Buffer.from(ordUtxo.script, "base64").toString("hex");
       return ordUtxo;
     } catch (e) {
       throw new Error(JSON.stringify(e));
@@ -86,10 +100,82 @@ export const useGorillaPool = () => {
     }
   };
 
+  const getBsv20Balances = async (ordAddress: string) => {
+    const res = await axios.get(
+      `${getOrdinalsBaseUrl()}/api/bsv20/${ordAddress}/balance`
+    );
+
+    const bsv20List: Array<BSV20> = res.data.map(
+      (b: {
+        all: {
+          confirmed: string;
+          pending: string;
+        };
+        listed: {
+          confirmed: string;
+          pending: string;
+        };
+        tick: string;
+      }) => {
+        return {
+          tick: b.tick,
+          dec: getTokenDecimals(b.tick),
+          all: {
+            confirmed: BigInt(b.all.confirmed),
+            pending: BigInt(b.all.pending),
+          },
+          listed: {
+            confirmed: BigInt(b.all.confirmed),
+            pending: BigInt(b.all.pending),
+          },
+        };
+      }
+    );
+
+    return bsv20List;
+  };
+
+  const getBSV20Utxos = async (
+    tick: string,
+    address: string
+  ): Promise<OrdinalTxo[] | undefined> => {
+    try {
+      if (!address) {
+        return [];
+      }
+
+      const url = isBSV20v2(tick)
+        ? `${getOrdinalsBaseUrl()}/api/bsv20/${address}/id/${tick}`
+        : `${getOrdinalsBaseUrl()}/api/bsv20/${address}/tick/${tick}`;
+
+      const r = await axios.get(url);
+
+      if (!Array.isArray(r.data)) {
+        return [];
+      }
+
+      const utxos = await Promise.all(
+        r.data
+          .map((utxo: any) => {
+            return getUtxoByOutpoint(utxo.outpoint);
+          })
+          .filter((u) => u !== null)
+      );
+
+      return utxos as OrdinalTxo[];
+    } catch (error) {
+      console.error("getBSV20Utxos", error);
+      return [];
+    }
+  };
+
   return {
     getOrdUtxos,
     broadcastWithGorillaPool,
     getUtxoByOutpoint,
     getMarketData,
+    getBsv20Balances,
+    getBSV20Utxos,
+    submitTx,
   };
 };

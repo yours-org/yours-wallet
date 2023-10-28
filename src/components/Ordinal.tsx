@@ -1,6 +1,6 @@
 import styled from "styled-components";
 import { ColorThemeProps, Theme } from "../theme";
-import { OrdinalTxo } from "../hooks/useOrds";
+import { OrdinalTxo } from "../hooks/ordTypes";
 import { Text } from "./Reusable";
 import { Show } from "./Show";
 
