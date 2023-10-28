@@ -1,9 +1,8 @@
-
 export type NetWorkStorage = {
-    network: NetWork;
+  network: NetWork;
 };
 
 export const enum NetWork {
-    Mainnet = "mainnet",
-    Testnet = "testnet",
+  Mainnet = "mainnet",
+  Testnet = "testnet",
 }

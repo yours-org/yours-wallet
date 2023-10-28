@@ -65,6 +65,7 @@ export const ButtonContainer = styled.div`
   margin: 1rem 0 2.5rem 0;
 `;
 
+
 export const MainContent = styled.div`
   display: flex;
   flex-direction: column;

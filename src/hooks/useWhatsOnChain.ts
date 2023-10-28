@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import {
   BSV_DECIMAL_CONVERSION,
   WOC_BASE_URL,
@@ -50,7 +50,7 @@ export const useWhatsOnChain = () => {
     }
   };
 
-  const getUtxos = async (fromAddress: string) => {
+  const getUtxos = async (fromAddress: string): Promise<WocUtxo[]> => {
     try {
       const { data } = await axios.get(
         `${getBaseUrl()}/address/${fromAddress}/unspent`,
@@ -60,6 +60,7 @@ export const useWhatsOnChain = () => {
       return data;
     } catch (error) {
       console.log(error);
+      return [];
     }
   };
 
@@ -85,7 +86,7 @@ export const useWhatsOnChain = () => {
     }
   };
 
-  const broadcastRawTx = async (txhex: string): Promise<string | undefined> => {
+  const broadcastRawTx = async (txhex: string): Promise<any> => {
     try {
       const { data: txid } = await axios.post(
         `${getBaseUrl()}/tx/raw`,
@@ -94,8 +95,24 @@ export const useWhatsOnChain = () => {
       );
       return txid;
     } catch (error) {
-      console.log(error);
+      if (axios.isAxiosError(error) && error.response) {
+        // Access to config, request, and response
+        console.error("broadcast rawtx failed:", error.response.data);
+      } else {
+        console.error("broadcast rawtx failed:", error);
+      }
     }
+  };
+
+  const getSuitableUtxo = (utxos: WocUtxo[], minimum: number) => {
+    const suitableUtxos = utxos.filter((utxo) => utxo.value > minimum);
+
+    if (suitableUtxos.length === 0) {
+      throw new Error("No UTXO large enough for this transaction");
+    }
+    // Select a random UTXO from the suitable ones
+    const randomIndex = Math.floor(Math.random() * suitableUtxos.length);
+    return suitableUtxos[randomIndex];
   };
 
   return {
@@ -104,5 +121,6 @@ export const useWhatsOnChain = () => {
     getExchangeRate,
     getRawTxById,
     broadcastRawTx,
+    getSuitableUtxo,
   };
 };
