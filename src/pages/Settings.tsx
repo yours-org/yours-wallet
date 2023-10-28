@@ -28,8 +28,10 @@ const Content = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content : center;
   width: 100%;
   margin-top: -2rem;
+  height : 100%
 `;
 
 const HeaderWrapper = styled.div`
@@ -92,7 +94,7 @@ const ExportKeysAsQrCodeContainer = styled.div`
   padding: 1rem;
 `;
 
-type SettingsPage = "main" | "connected-apps" | "social-profile" | "export-keys-qr";
+type SettingsPage = "main" | "connected-apps" | "social-profile" | "export-keys-options" | "export-keys-qr";
 type DecisionType = "sign-out" | "export-keys" | "export-keys-qr-code";
 
 export const Settings = () => {
@@ -151,7 +153,7 @@ export const Settings = () => {
   const handleExportKeysIntent = () => {
     setDecisionType("export-keys");
     setSpeedBumpMessage(
-      "Your are about to download your private keys. Make sure you are in a safe place and no one is watching."
+      "You are about to download your private keys. Make sure you are in a safe place and no one is watching."
     );
     setShowSpeedBump(true);
   };
@@ -159,7 +161,7 @@ export const Settings = () => {
   const handleExportKeysAsQrCodeIntent = () => {
     setDecisionType("export-keys-qr-code");
     setSpeedBumpMessage(
-      "Your are about to make your private keys visible in QR code format. Make sure you are in a safe place and no one is watching."
+      "You are about to make your private keys visible in QR code format. Make sure you are in a safe place and no one is watching."
     );
     setShowSpeedBump(true);
   };
@@ -267,21 +269,8 @@ export const Settings = () => {
 
 
   const main = (
-    <Show
-      when={!showSpeedBump}
-      whenFalseContent={
-        <SpeedBump
-          theme={theme}
-          message={speedBumpMessage}
-          onCancel={handleCancel}
-          onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
-          showSpeedBump={showSpeedBump}
-          withPassword={decisionType === "export-keys" || decisionType === "export-keys-qr-code"}
-        />
-      }
-    >
-    <ScrollableContainer>
-      <SettingsRow
+    <>
+        <SettingsRow
           name="Connected Apps"
           description="Manage the apps you are connected to"
           onClick={() => setPage("connected-apps")}
@@ -306,14 +295,11 @@ export const Settings = () => {
         />
         <SettingsRow
           name="Export Keys"
-          description="Download your seed, private, and public keys"
-          onClick={handleExportKeysIntent}
+          description="Download keys or export as QR code"
+          onClick={() => setPage("export-keys-options")}
+          jsxElement={<ForwardButton />}
         />
-        <SettingsRow
-          name="Export Keys as QR code"
-          description="Show your payment and ordinal private keypairs as QR code for wallets to scan & import"
-          onClick={handleExportKeysAsQrCodeIntent}
-        />
+
         <SettingsRow
           name="Lock Wallet"
           description="Immediately lock the wallet"
@@ -324,8 +310,7 @@ export const Settings = () => {
           description="Sign out of Panda Wallet completely"
           onClick={handleSignOutIntent}
         />
-      </ScrollableContainer>
-    </Show>
+    </>
   );
 
   const connectedAppsPage = (
@@ -367,6 +352,36 @@ export const Settings = () => {
     </>
   );
 
+
+  const exportKeyOptionsPage = (
+    <Show
+      when={!showSpeedBump}
+      whenFalseContent={
+        <SpeedBump
+          theme={theme}
+          message={speedBumpMessage}
+          onCancel={handleCancel}
+          onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
+          showSpeedBump={showSpeedBump}
+          withPassword={decisionType === "export-keys" || decisionType === "export-keys-qr-code"}
+        />
+      }
+    >
+      <BackButton onClick={() => setPage("main")} />
+      <SettingsRow
+          name="Download Keys"
+          description="Download your seed, private, and public keys"
+          onClick={handleExportKeysIntent}
+        />
+      <SettingsRow
+          name="Export Keys as QR code"
+          description="Show your keys (private,public & seed) as QR code for wallets to scan & import"
+          onClick={handleExportKeysAsQrCodeIntent}
+          jsxElement={<ForwardButton />}
+      />
+    </Show>
+  );
+
   const socialProfilePage = (
     <>
       <BackButton onClick={() => setPage("main")} />
@@ -404,12 +419,17 @@ export const Settings = () => {
             ? "Connected Apps"
             : page === "social-profile"
             ? "Social Profile"
+            : page === "export-keys-options"
+            ? "Export Keys"
+            : page === "export-keys-qr"
+            ? "Exported QR code"
             : "Settings"}
         </HeaderText>
       </HeaderWrapper>
       <Show when={page === "main"}>{main}</Show>
       <Show when={page === "connected-apps"}>{connectedAppsPage}</Show>
       <Show when={page === "social-profile"}>{socialProfilePage}</Show>
+      <Show when={page === "export-keys-options"}>{exportKeyOptionsPage}</Show>
       <Show when={page === "export-keys-qr"}>{exportKeysAsQrCodePage}</Show>
     </Content>
   );
