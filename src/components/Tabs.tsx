@@ -20,7 +20,7 @@ const TabContent = styled.div`
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: calc(100%);
+  height: calc(98%);
 `;
 
 const TabsWrapper = styled.div`
@@ -32,21 +32,36 @@ const TabsWrapper = styled.div`
 
 const TabButton = styled.button<ColorThemeProps & { selected: boolean }>`
   flex: 1;
-  height: 2.75rem;
+  height: 3rem;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1rem;
-  cursor: default;
-  background: transparent;
+  margin: 0.25rem;
+  cursor: pointer;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+  color: ${(props) => props.theme.white};
+  font-size: 1rem;
+  font-weight: 500;
+  background: ${(props) =>
+    props.selected ? props.theme.darkAccent : props.theme.darkAccent + "60"};
   outline: none;
   transition: border-color 0.2s ease-in;
   border: none;
-  border-bottom: 0.1rem solid ${(props) => (props.selected ? "blue" : "#fff")};
+  border-bottom: 0.15rem solid
+    ${(props) =>
+      props.selected
+        ? props.theme.primaryButton
+        : props.theme.primaryButton + "30"};
   &:hover,
   &:focus,
   &:active {
-    border-bottom: 0.1rem solid ${(props) => (props.selected ? "blue" : "#eee")};
+    border-bottom: 0.15rem solid
+      ${(props) =>
+        props.selected
+          ? props.theme.primaryButton
+          : props.theme.primaryButton + "30"};
   }
 `;
 
@@ -68,11 +83,10 @@ const Content = styled.div`
 export type TabsProps = PropsWithChildren<{
   theme: Theme;
   tabIndex: number;
-  selectTab:  React.Dispatch<React.SetStateAction<number>>,
+  selectTab: React.Dispatch<React.SetStateAction<number>>;
 }>;
 
 const TabsComponent = (props: TabsProps) => {
-
   const { children, tabIndex, selectTab } = props;
 
   return (

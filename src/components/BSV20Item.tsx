@@ -15,31 +15,15 @@ const Container = styled.div<{ color: string; $clickable: string }>`
   cursor: ${(props) => (props.$clickable === "true" ? "pointer" : "default")};
 `;
 
-
-
-const Content = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-`;
-
 const Tick = styled(HeaderText)`
   font-size: 1rem;
-  text-align: left;
-  width: 100%;
-  overflow: hidden;
-  max-width: 10rem;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 `;
 
-const Description = styled(Text)`
-  font-size: 0.75rem;
-  text-align: left;
-  width: 100%;
-  margin: 0;
+const Amount = styled(Text)`
+  font-size: 1rem;
+  margin: 0 1rem;
+  text-align: right;
 `;
-
 
 export type BSV20ItemProps = {
   theme: Theme;
@@ -49,13 +33,13 @@ export type BSV20ItemProps = {
   onClick?: () => void;
 };
 
-
 export const BSV20Item = (props: BSV20ItemProps) => {
   const { tick, amount, theme, onClick } = props;
 
   const [containerColor, setContainerColor] = useState(theme.darkAccent);
 
-  return (<Container
+  return (
+    <Container
       color={containerColor}
       onMouseEnter={() =>
         onClick ? setContainerColor(theme.darkAccent + "99") : undefined
@@ -64,9 +48,8 @@ export const BSV20Item = (props: BSV20ItemProps) => {
       onClick={onClick}
       $clickable={onClick ? "true" : "false"}
     >
-      <Content>
-        <Tick theme={theme}>{tick}</Tick>
-        <Description theme={theme}>{amount}</Description>
-      </Content>
-    </Container>)
+      <Tick theme={theme}>{tick}</Tick>
+      <Amount theme={theme}>{amount}</Amount>
+    </Container>
+  );
 };
