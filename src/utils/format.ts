@@ -29,3 +29,19 @@ export const truncate = (
   const endStr = str.substring(str.length - endLength);
   return `${startStr}...${endStr}`;
 };
+
+export const formatNumberWithCommasAndDecimals = (
+  number: number,
+  decimalPlaces: number = 2
+): string => {
+  if (isNaN(number)) {
+    return "Invalid Number";
+  }
+
+  const options: Intl.NumberFormatOptions = {
+    minimumFractionDigits: decimalPlaces,
+    maximumFractionDigits: decimalPlaces,
+  };
+
+  return number.toLocaleString(undefined, options);
+};

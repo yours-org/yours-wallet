@@ -39,6 +39,7 @@ const OrdinalsList = styled.div`
   justify-content: center;
   flex-wrap: wrap;
   overflow-y: auto;
+  margin-top: 0.5rem;
 `;
 
 const BSV20List = styled.div`
@@ -48,6 +49,7 @@ const BSV20List = styled.div`
   flex-wrap: wrap;
   overflow-y: auto;
   width: 100%;
+  margin-top: 0.5rem;
 `;
 
 const NoInscriptionWrapper = styled.div`
@@ -321,6 +323,18 @@ export const OrdWallet = () => {
     });
   };
 
+  const userSelectedAmount = (inputValue: string, token: BSV20) => {
+    const amtStr = normalize(inputValue, token.dec);
+
+    const amt = BigInt(amtStr);
+    setTokenSendAmount(amt);
+    if (amt > token.all.confirmed) {
+      setTimeout(() => {
+        setTokenSendAmount(token.all.confirmed);
+      }, 500);
+    }
+  };
+
   const transferAndListButtons = (
     <>
       <Button
@@ -591,7 +605,7 @@ export const OrdWallet = () => {
       <Tabs.Panel theme={theme} label="NFT">
         {nft}
       </Tabs.Panel>
-      <Tabs.Panel theme={theme} label="Tokens">
+      <Tabs.Panel theme={theme} label="Token">
         {ft}
       </Tabs.Panel>
     </Tabs>
@@ -612,6 +626,9 @@ export const OrdWallet = () => {
           <Text
             theme={theme}
             style={{ cursor: "pointer" }}
+            onClick={() =>
+              userSelectedAmount(String(Number(token.all.confirmed)), token)
+            }
           >{`Available Balance: ${showAmount(
             token.all.confirmed,
             token.dec
@@ -642,15 +659,7 @@ export const OrdWallet = () => {
                 if (inputValue === "") {
                   setTokenSendAmount(null);
                 } else {
-                  const amtStr = normalize(inputValue, token.dec);
-
-                  const amt = BigInt(amtStr);
-                  setTokenSendAmount(amt);
-                  if (amt > token.all.confirmed) {
-                    setTimeout(() => {
-                      setTokenSendAmount(token.all.confirmed);
-                    }, 500);
-                  }
+                  userSelectedAmount(inputValue, token);
                 }
               }}
             />
