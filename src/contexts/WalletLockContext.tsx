@@ -1,6 +1,6 @@
-import React, { createContext, useState, useEffect, ReactNode } from "react";
-import { storage } from "../utils/storage";
-import { INACTIVITY_LIMIT } from "../utils/constants";
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import { storage } from '../utils/storage';
+import { INACTIVITY_LIMIT } from '../utils/constants';
 
 export interface WalletLockContextProps {
   isLocked: boolean;
@@ -8,9 +8,7 @@ export interface WalletLockContextProps {
   lockWallet: () => void;
 }
 
-export const WalletLockContext = createContext<
-  WalletLockContextProps | undefined
->(undefined);
+export const WalletLockContext = createContext<WalletLockContextProps | undefined>(undefined);
 
 interface WalletLockProviderProps {
   children: ReactNode;
@@ -23,13 +21,13 @@ export const WalletLockProvider = (props: WalletLockProviderProps) => {
     const timestamp = Date.now();
     const twentyMinutesAgo = timestamp - 20 * 60 * 1000;
     storage.set({ lastActiveTime: twentyMinutesAgo });
-    storage.remove("appState");
+    storage.remove('appState');
     setIsLocked(true);
   };
 
   useEffect(() => {
     const checkLockState = () => {
-      storage.get(["lastActiveTime", "encryptedKeys"], (result) => {
+      storage.get(['lastActiveTime', 'encryptedKeys'], (result) => {
         const currentTime = Date.now();
         const lastActiveTime = result.lastActiveTime;
 
@@ -56,8 +54,6 @@ export const WalletLockProvider = (props: WalletLockProviderProps) => {
   }, []);
 
   return (
-    <WalletLockContext.Provider value={{ isLocked, setIsLocked, lockWallet }}>
-      {children}
-    </WalletLockContext.Provider>
+    <WalletLockContext.Provider value={{ isLocked, setIsLocked, lockWallet }}>{children}</WalletLockContext.Provider>
   );
 };

@@ -1,6 +1,6 @@
-import styled, { keyframes, css } from "styled-components";
-import { Theme } from "../theme";
-import { InputHTMLAttributes } from "react";
+import styled, { keyframes, css } from 'styled-components';
+import { Theme } from '../theme';
+import { InputHTMLAttributes } from 'react';
 
 const $shakeAnimation = keyframes`
   10%, 90% {
@@ -21,34 +21,34 @@ const $shakeAnimation = keyframes`
 `;
 
 const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
-  background-color: ${({ theme }) => theme.darkAccent + "60"};
+  background-color: ${({ theme }) => theme.darkAccent + '60'};
   border-radius: 0.25rem;
-  border: 1px solid ${({ theme }) => theme.white + "40"};
+  border: 1px solid ${({ theme }) => theme.white + '40'};
   width: 80%;
   height: 2rem;
   padding-left: 0.5rem;
   margin: 0.5rem;
   outline: none;
-  color: ${({ theme }) => theme.white + "80"};
+  color: ${({ theme }) => theme.white + '80'};
   animation: ${(props) =>
-    props.$shake === "true"
+    props.$shake === 'true'
       ? css`
           ${$shakeAnimation} 0.5s cubic-bezier(.36,.07,.19,.97) both
         `
-      : "none"};
+      : 'none'};
 
-  &[type="number"]::-webkit-inner-spin-button,
-  &[type="number"]::-webkit-outer-spin-button {
+  &[type='number']::-webkit-inner-spin-button,
+  &[type='number']::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
   }
 
-  &[type="number"] {
+  &[type='number'] {
     -moz-appearance: textfield; /* Firefox */
   }
 
   &::placeholder {
-    color: ${({ theme }) => theme.white + "80"};
+    color: ${({ theme }) => theme.white + '80'};
   }
 `;
 
@@ -58,7 +58,7 @@ export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
 };
 
 export const Input = (props: InputProps) => {
-  const { shake = "false", theme, ...allProps } = props;
+  const { shake = 'false', theme, ...allProps } = props;
 
   const preventScroll = (e: any) => {
     e.target.blur();
@@ -68,12 +68,5 @@ export const Input = (props: InputProps) => {
     }, 0);
   };
 
-  return (
-    <TheInput
-      {...allProps}
-      theme={theme}
-      onWheel={preventScroll}
-      $shake={shake}
-    />
-  );
+  return <TheInput {...allProps} theme={theme} onWheel={preventScroll} $shake={shake} />;
 };

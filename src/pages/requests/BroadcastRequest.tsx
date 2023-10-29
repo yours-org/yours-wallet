@@ -1,21 +1,16 @@
-import { useBottomMenu } from "../../hooks/useBottomMenu";
-import React, { useEffect, useState } from "react";
-import { Button } from "../../components/Button";
-import {
-  Text,
-  HeaderText,
-  ConfirmContent,
-  FormContainer,
-} from "../../components/Reusable";
-import { Show } from "../../components/Show";
-import { useSnackbar } from "../../hooks/useSnackbar";
-import { PageLoader } from "../../components/PageLoader";
-import { sleep } from "../../utils/sleep";
-import { useTheme } from "../../hooks/useTheme";
-import { Web3BroadcastRequest, useBsv } from "../../hooks/useBsv";
-import { storage } from "../../utils/storage";
-import { useNavigate } from "react-router-dom";
-import { useWhatsOnChain } from "../../hooks/useWhatsOnChain";
+import { useBottomMenu } from '../../hooks/useBottomMenu';
+import React, { useEffect, useState } from 'react';
+import { Button } from '../../components/Button';
+import { Text, HeaderText, ConfirmContent, FormContainer } from '../../components/Reusable';
+import { Show } from '../../components/Show';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { PageLoader } from '../../components/PageLoader';
+import { sleep } from '../../utils/sleep';
+import { useTheme } from '../../hooks/useTheme';
+import { Web3BroadcastRequest, useBsv } from '../../hooks/useBsv';
+import { storage } from '../../utils/storage';
+import { useNavigate } from 'react-router-dom';
+import { useWhatsOnChain } from '../../hooks/useWhatsOnChain';
 
 export type BroadcastResponse = {
   txid: string;
@@ -31,7 +26,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const { request, onBroadcast, popupId } = props;
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
-  const [txid, setTxid] = useState("");
+  const [txid, setTxid] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const navigate = useNavigate();
 
@@ -39,7 +34,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const { isProcessing, setIsProcessing } = useBsv();
 
   useEffect(() => {
-    setSelected("bsv");
+    setSelected('bsv');
   }, [setSelected]);
 
   useEffect(() => {
@@ -52,7 +47,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   }, [message, txid]);
 
   const resetSendState = () => {
-    setTxid("");
+    setTxid('');
     setIsProcessing(false);
   };
 
@@ -63,24 +58,24 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
 
     const txid = await broadcastRawTx(request.rawtx);
     if (!txid) {
-      addSnackbar("Error broadcasting the raw tx!", "error");
+      addSnackbar('Error broadcasting the raw tx!', 'error');
       setIsProcessing(false);
       return;
     }
 
-    addSnackbar("Successfully broadcasted the tx!", "success");
+    addSnackbar('Successfully broadcasted the tx!', 'success');
     setTxid(txid);
 
     setTimeout(() => {
       onBroadcast();
 
       if (!txid && popupId) chrome.windows.remove(popupId);
-      storage.remove("broadcastRequest");
-      navigate("/bsv-wallet");
+      storage.remove('broadcastRequest');
+      navigate('/bsv-wallet');
     }, 2000);
 
     chrome.runtime.sendMessage({
-      action: "broadcastResponse",
+      action: 'broadcastResponse',
       txid,
     });
 
@@ -95,17 +90,11 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       <Show when={!isProcessing && !!request}>
         <ConfirmContent>
           <HeaderText theme={theme}>Broadcast Raw Tx</HeaderText>
-          <Text theme={theme} style={{ margin: "0.75rem 0" }}>
+          <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             The app is requesting to broadcast a transaction.
           </Text>
           <FormContainer noValidate onSubmit={(e) => handleBroadcast(e)}>
-            <Button
-              theme={theme}
-              type="primary"
-              label="Broadcast Now"
-              disabled={isProcessing}
-              isSubmit
-            />
+            <Button theme={theme} type="primary" label="Broadcast Now" disabled={isProcessing} isSubmit />
           </FormContainer>
         </ConfirmContent>
       </Show>

@@ -1,5 +1,5 @@
 /* global chrome */
-console.log("🐼 Panda Wallet Background Script Running!");
+console.log('🐼 Panda Wallet Background Script Running!');
 
 let responseCallbackForConnectRequest;
 let responseCallbackForSendBsvRequest;
@@ -12,8 +12,8 @@ let popupWindowId = null;
 const launchPopUp = () => {
   chrome.windows.create(
     {
-      url: chrome.runtime.getURL("index.html"),
-      type: "popup",
+      url: chrome.runtime.getURL('index.html'),
+      type: 'popup',
       width: 360,
       height: 567,
     },
@@ -22,13 +22,13 @@ const launchPopUp = () => {
       chrome.storage.local.set({
         popupWindowId,
       });
-    }
+    },
   );
 };
 
 const verifyAccess = async (requestingDomain) => {
   return new Promise((resolve) => {
-    chrome.storage.local.get(["whitelist"], (result) => {
+    chrome.storage.local.get(['whitelist'], (result) => {
       const { whitelist } = result;
       if (!whitelist) {
         resolve(false);
@@ -53,31 +53,31 @@ const authorizeRequest = async (message) => {
 // MESSAGE LISTENER
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const noAuthRequired = [
-    "isConnected",
-    "userConnectResponse",
-    "sendBsvResponse",
-    "transferOrdinalResponse",
-    "signMessageResponse",
-    "signTransactionResponse",
-    "broadcastResponse",
-    "getSignaturesResponse",
+    'isConnected',
+    'userConnectResponse',
+    'sendBsvResponse',
+    'transferOrdinalResponse',
+    'signMessageResponse',
+    'signTransactionResponse',
+    'broadcastResponse',
+    'getSignaturesResponse',
   ];
 
   if (noAuthRequired.includes(message.action)) {
     switch (message.action) {
-      case "isConnected":
+      case 'isConnected':
         return processIsConnectedRequest(message, sendResponse);
-      case "userConnectResponse":
+      case 'userConnectResponse':
         return processConnectResponse(message);
-      case "sendBsvResponse":
+      case 'sendBsvResponse':
         return processSendBsvResponse(message);
-      case "transferOrdinalResponse":
+      case 'transferOrdinalResponse':
         return processTransferOrdinalResponse(message);
-      case "signMessageResponse":
+      case 'signMessageResponse':
         return processSignMessageResponse(message);
-      case "broadcastResponse":
+      case 'broadcastResponse':
         return processBroadcastResponse(message);
-      case "getSignaturesResponse":
+      case 'getSignaturesResponse':
         return processGetSignaturesResponse(message);
       default:
         break;
@@ -88,7 +88,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // We need to authorize access for these endpoints
   authorizeRequest(message).then((isAuthorized) => {
-    if (message.action === "connect") {
+    if (message.action === 'connect') {
       return processConnectRequest(message, sendResponse, isAuthorized);
     }
 
@@ -96,33 +96,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({
         type: message.action,
         success: false,
-        error: "Unauthorized!",
+        error: 'Unauthorized!',
       });
       return;
     }
 
     switch (message.action) {
-      case "disconnect":
+      case 'disconnect':
         return processDisconnectRequest(message, sendResponse);
-      case "getPubKeys":
+      case 'getPubKeys':
         return processGetPubKeysRequest(sendResponse);
-      case "getBalance":
+      case 'getBalance':
         return processGetBalanceRequest(sendResponse);
-      case "getAddresses":
+      case 'getAddresses':
         return processGetAddressesRequest(sendResponse);
-      case "getOrdinals":
+      case 'getOrdinals':
         return processGetOrdinalsRequest(sendResponse);
-      case "sendBsv":
+      case 'sendBsv':
         return processSendBsvRequest(message, sendResponse);
-      case "transferOrdinal":
+      case 'transferOrdinal':
         return processTransferOrdinalRequest(message, sendResponse);
-      case "signMessage":
+      case 'signMessage':
         return processSignMessageRequest(message, sendResponse);
-      case "broadcast":
+      case 'broadcast':
         return processBroadcastRequest(message, sendResponse);
-      case "getSignatures":
+      case 'getSignatures':
         return processGetSignaturesRequest(message, sendResponse);
-      case "getSocialProfile":
+      case 'getSocialProfile':
         return processGetSocialProfileRequest(sendResponse);
       default:
         break;
@@ -149,17 +149,15 @@ const processConnectRequest = (message, sendResponse, isAuthorized) => {
 
 const processDisconnectRequest = (message, sendResponse) => {
   try {
-    chrome.storage.local.get(["whitelist"], (result) => {
-      if (!result.whitelist) throw Error("Already disconnected!");
+    chrome.storage.local.get(['whitelist'], (result) => {
+      if (!result.whitelist) throw Error('Already disconnected!');
       const { params } = message;
 
-      const updatedWhitelist = result.whitelist.filter(
-        (i) => i.domain !== params.domain
-      );
+      const updatedWhitelist = result.whitelist.filter((i) => i.domain !== params.domain);
 
       chrome.storage.local.set({ whitelist: updatedWhitelist }, () => {
         sendResponse({
-          type: "disconnect",
+          type: 'disconnect',
           success: true,
           data: true,
         });
@@ -167,7 +165,7 @@ const processDisconnectRequest = (message, sendResponse) => {
     });
   } catch (error) {
     sendResponse({
-      type: "disconnect",
+      type: 'disconnect',
       success: true, // This is true in the catch because we want to return a boolean
       data: false,
     });
@@ -176,28 +174,23 @@ const processDisconnectRequest = (message, sendResponse) => {
 
 const processIsConnectedRequest = (message, sendResponse) => {
   try {
-    chrome.storage.local.get(
-      ["appState", "lastActiveTime", "whitelist"],
-      (result) => {
-        const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
-        const currentTime = Date.now();
-        const lastActiveTime = result.lastActiveTime;
+    chrome.storage.local.get(['appState', 'lastActiveTime', 'whitelist'], (result) => {
+      const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
+      const currentTime = Date.now();
+      const lastActiveTime = result.lastActiveTime;
 
-        sendResponse({
-          type: "isConnected",
-          success: true,
-          data:
-            !result?.appState?.isLocked &&
-            currentTime - lastActiveTime < INACTIVITY_LIMIT &&
-            result.whitelist
-              ?.map((i) => i.domain)
-              .includes(message.params.domain),
-        });
-      }
-    );
+      sendResponse({
+        type: 'isConnected',
+        success: true,
+        data:
+          !result?.appState?.isLocked &&
+          currentTime - lastActiveTime < INACTIVITY_LIMIT &&
+          result.whitelist?.map((i) => i.domain).includes(message.params.domain),
+      });
+    });
   } catch (error) {
     sendResponse({
-      type: "isConnected",
+      type: 'isConnected',
       success: true, // This is true in the catch because we want to return a boolean
       error: false,
     });
@@ -208,16 +201,16 @@ const processIsConnectedRequest = (message, sendResponse) => {
 
 const processGetBalanceRequest = (sendResponse) => {
   try {
-    chrome.storage.local.get(["appState"], (result) => {
+    chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
-        type: "getBalance",
+        type: 'getBalance',
         success: true,
         data: result?.appState?.balance,
       });
     });
   } catch (error) {
     sendResponse({
-      type: "getBalance",
+      type: 'getBalance',
       success: false,
       error: JSON.stringify(error),
     });
@@ -226,16 +219,16 @@ const processGetBalanceRequest = (sendResponse) => {
 
 const processGetPubKeysRequest = (sendResponse) => {
   try {
-    chrome.storage.local.get(["appState"], (result) => {
+    chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
-        type: "getPubKeys",
+        type: 'getPubKeys',
         success: true,
         data: result?.appState?.pubKeys,
       });
     });
   } catch (error) {
     sendResponse({
-      type: "getPubKeys",
+      type: 'getPubKeys',
       success: false,
       error: JSON.stringify(error),
     });
@@ -244,16 +237,16 @@ const processGetPubKeysRequest = (sendResponse) => {
 
 const processGetAddressesRequest = (sendResponse) => {
   try {
-    chrome.storage.local.get(["appState"], (result) => {
+    chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
-        type: "getAddresses",
+        type: 'getAddresses',
         success: true,
         data: result?.appState?.addresses,
       });
     });
   } catch (error) {
     sendResponse({
-      type: "getAddresses",
+      type: 'getAddresses',
       success: false,
       error: JSON.stringify(error),
     });
@@ -262,16 +255,16 @@ const processGetAddressesRequest = (sendResponse) => {
 
 const processGetOrdinalsRequest = (sendResponse) => {
   try {
-    chrome.storage.local.get(["appState"], (result) => {
+    chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
-        type: "getOrdinals",
+        type: 'getOrdinals',
         success: true,
         data: result?.appState?.ordinals ?? [],
       });
     });
   } catch (error) {
     sendResponse({
-      type: "getOrdinals",
+      type: 'getOrdinals',
       success: false,
       error: JSON.stringify(error),
     });
@@ -281,9 +274,9 @@ const processGetOrdinalsRequest = (sendResponse) => {
 const processSendBsvRequest = (message, sendResponse) => {
   if (!message.params.data) {
     sendResponse({
-      type: "sendBsv",
+      type: 'sendBsv',
       success: false,
-      error: "Must provide valid params!",
+      error: 'Must provide valid params!',
     });
   }
   try {
@@ -297,7 +290,7 @@ const processSendBsvRequest = (message, sendResponse) => {
       });
   } catch (error) {
     sendResponse({
-      type: "sendBsv",
+      type: 'sendBsv',
       success: false,
       error: JSON.stringify(error),
     });
@@ -307,9 +300,9 @@ const processSendBsvRequest = (message, sendResponse) => {
 const processTransferOrdinalRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
-      type: "transferOrdinal",
+      type: 'transferOrdinal',
       success: false,
-      error: "Must provide valid params!",
+      error: 'Must provide valid params!',
     });
   }
   try {
@@ -323,7 +316,7 @@ const processTransferOrdinalRequest = (message, sendResponse) => {
       });
   } catch (error) {
     sendResponse({
-      type: "transferOrdinal",
+      type: 'transferOrdinal',
       success: false,
       error: JSON.stringify(error),
     });
@@ -333,9 +326,9 @@ const processTransferOrdinalRequest = (message, sendResponse) => {
 const processBroadcastRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
-      type: "broadcast",
+      type: 'broadcast',
       success: false,
-      error: "Must provide valid params!",
+      error: 'Must provide valid params!',
     });
   }
   try {
@@ -349,7 +342,7 @@ const processBroadcastRequest = (message, sendResponse) => {
       });
   } catch (error) {
     sendResponse({
-      type: "broadcast",
+      type: 'broadcast',
       success: false,
       error: JSON.stringify(error),
     });
@@ -359,9 +352,9 @@ const processBroadcastRequest = (message, sendResponse) => {
 const processSignMessageRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
-      type: "signMessage",
+      type: 'signMessage',
       success: false,
-      error: "Must provide valid params!",
+      error: 'Must provide valid params!',
     });
   }
   try {
@@ -375,7 +368,7 @@ const processSignMessageRequest = (message, sendResponse) => {
       });
   } catch (error) {
     sendResponse({
-      type: "signMessage",
+      type: 'signMessage',
       success: false,
       error: JSON.stringify(error),
     });
@@ -387,9 +380,9 @@ const processSignMessageRequest = (message, sendResponse) => {
 const processGetSignaturesRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
-      type: "getSignatures",
+      type: 'getSignatures',
       success: false,
-      error: "Must provide valid params!",
+      error: 'Must provide valid params!',
     });
   }
   try {
@@ -406,7 +399,7 @@ const processGetSignaturesRequest = (message, sendResponse) => {
       });
   } catch (error) {
     sendResponse({
-      type: "getSignatures",
+      type: 'getSignatures',
       success: false,
       error: JSON.stringify(error),
     });
@@ -414,21 +407,21 @@ const processGetSignaturesRequest = (message, sendResponse) => {
 };
 
 const processGetSocialProfileRequest = (sendResponse) => {
-  const HOSTED_PANDA_IMAGE = "https://i.ibb.co/3fLL5X2/Panda-Wallet-Logo.png";
+  const HOSTED_PANDA_IMAGE = 'https://i.ibb.co/3fLL5X2/Panda-Wallet-Logo.png';
   try {
-    chrome.storage.local.get(["socialProfile"], (result) => {
+    chrome.storage.local.get(['socialProfile'], (result) => {
       sendResponse({
-        type: "getSocialProfile",
+        type: 'getSocialProfile',
         success: true,
         data: result?.socialProfile ?? {
-          displayName: "Panda Wallet",
+          displayName: 'Panda Wallet',
           avatar: HOSTED_PANDA_IMAGE,
         },
       });
     });
   } catch (error) {
     sendResponse({
-      type: "getSocialProfile",
+      type: 'getSocialProfile',
       success: false,
       error: JSON.stringify(error),
     });
@@ -441,81 +434,77 @@ const processConnectResponse = (message) => {
   try {
     if (responseCallbackForConnectRequest) {
       responseCallbackForConnectRequest({
-        type: "connect",
+        type: 'connect',
         success: true,
-        data:
-          message.decision === "approved"
-            ? message.pubKeys
-            : "User canceled connection",
+        data: message.decision === 'approved' ? message.pubKeys : 'User canceled connection',
       });
     }
   } catch (error) {
     responseCallbackForConnectRequest({
-      type: "connect",
+      type: 'connect',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForConnectRequest = null;
     popupWindowId = null;
-    chrome.storage.local.remove("popupWindowId");
+    chrome.storage.local.remove('popupWindowId');
   }
 
   return true;
 };
 
 const processSendBsvResponse = (message) => {
-  if (!responseCallbackForSendBsvRequest) throw Error("Missing callback!");
+  if (!responseCallbackForSendBsvRequest) throw Error('Missing callback!');
   try {
     responseCallbackForSendBsvRequest({
-      type: "sendBsv",
+      type: 'sendBsv',
       success: true,
       data: message?.txid,
     });
   } catch (error) {
     responseCallbackForSendBsvRequest({
-      type: "sendBsv",
+      type: 'sendBsv',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForSendBsvRequest = null;
     popupWindowId = null;
-    chrome.storage.local.remove(["sendBsvRequest", "popupWindowId"]);
+    chrome.storage.local.remove(['sendBsvRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
 const processTransferOrdinalResponse = (message) => {
-  if (!responseCallbackForTransferOrdinalRequest)
-    throw Error("Missing callback!");
+  if (!responseCallbackForTransferOrdinalRequest) throw Error('Missing callback!');
   try {
     responseCallbackForTransferOrdinalRequest({
-      type: "transferOrdinal",
+      type: 'transferOrdinal',
       success: true,
       data: message?.txid,
     });
   } catch (error) {
     responseCallbackForTransferOrdinalRequest({
-      type: "transferOrdinal",
+      type: 'transferOrdinal',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForTransferOrdinalRequest = null;
     popupWindowId = null;
-    chrome.storage.local.remove(["transferOrdinalRequest", "popupWindowId"]);
+    chrome.storage.local.remove(['transferOrdinalRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
 const processSignMessageResponse = (message) => {
-  if (!responseCallbackForSignMessageRequest) throw Error("Missing callback!");
+  if (!responseCallbackForSignMessageRequest) throw Error('Missing callback!');
   try {
     responseCallbackForSignMessageRequest({
-      type: "signMessage",
+      type: 'signMessage',
       success: true,
       data: {
         address: message?.address,
@@ -526,62 +515,61 @@ const processSignMessageResponse = (message) => {
     });
   } catch (error) {
     responseCallbackForSignMessageRequest({
-      type: "signMessage",
+      type: 'signMessage',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForSignMessageRequest = null;
     popupWindowId = null;
-    chrome.storage.local.remove(["signMessageRequest", "popupWindowId"]);
+    chrome.storage.local.remove(['signMessageRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
 const processBroadcastResponse = (message) => {
-  if (!responseCallbackForBroadcastRequest) throw Error("Missing callback!");
+  if (!responseCallbackForBroadcastRequest) throw Error('Missing callback!');
   try {
     responseCallbackForBroadcastRequest({
-      type: "broadcast",
+      type: 'broadcast',
       success: true,
       data: message?.txid,
     });
   } catch (error) {
     responseCallbackForBroadcastRequest({
-      type: "broadcast",
+      type: 'broadcast',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForBroadcastRequest = null;
     popupWindowId = null;
-    chrome.storage.local.remove(["broadcastRequest", "popupWindowId"]);
+    chrome.storage.local.remove(['broadcastRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
 const processGetSignaturesResponse = (message) => {
-  if (!responseCallbackForGetSignaturesRequest)
-    throw Error("Missing callback!");
+  if (!responseCallbackForGetSignaturesRequest) throw Error('Missing callback!');
   try {
     responseCallbackForGetSignaturesRequest({
-      type: "getSignatures",
+      type: 'getSignatures',
       success: !message?.error,
       data: message?.sigResponses ?? [],
       error: message?.error,
     });
   } catch (error) {
     responseCallbackForGetSignaturesRequest({
-      type: "getSignatures",
+      type: 'getSignatures',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForGetSignaturesRequest = null;
     popupWindowId = null;
-    chrome.storage.local.remove(["getSignaturesRequest", "popupWindowId"]);
+    chrome.storage.local.remove(['getSignaturesRequest', 'popupWindowId']);
   }
 
   return true;
@@ -593,65 +581,65 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
   if (closedWindowId === popupWindowId) {
     if (responseCallbackForConnectRequest) {
       responseCallbackForConnectRequest({
-        type: "connect",
+        type: 'connect',
         success: false,
-        error: "User dismissed the request!",
+        error: 'User dismissed the request!',
       });
       responseCallbackForConnectRequest = null;
-      chrome.storage.local.remove("connectRequest");
+      chrome.storage.local.remove('connectRequest');
     }
 
     if (responseCallbackForSendBsvRequest) {
       responseCallbackForSendBsvRequest({
-        type: "sendBsv",
+        type: 'sendBsv',
         success: false,
-        error: "User dismissed the request!",
+        error: 'User dismissed the request!',
       });
       responseCallbackForSendBsvRequest = null;
-      chrome.storage.local.remove("sendBsvRequest");
+      chrome.storage.local.remove('sendBsvRequest');
     }
 
     if (responseCallbackForSignMessageRequest) {
       responseCallbackForSignMessageRequest({
-        type: "signMessage",
+        type: 'signMessage',
         success: false,
-        error: "User dismissed the request!",
+        error: 'User dismissed the request!',
       });
       responseCallbackForSignMessageRequest = null;
-      chrome.storage.local.remove("signMessageRequest");
+      chrome.storage.local.remove('signMessageRequest');
     }
 
     if (responseCallbackForTransferOrdinalRequest) {
       responseCallbackForTransferOrdinalRequest({
-        type: "transferOrdinal",
+        type: 'transferOrdinal',
         success: false,
-        error: "User dismissed the request!",
+        error: 'User dismissed the request!',
       });
       responseCallbackForTransferOrdinalRequest = null;
-      chrome.storage.local.remove("transferOrdinalRequest");
+      chrome.storage.local.remove('transferOrdinalRequest');
     }
 
     if (responseCallbackForBroadcastRequest) {
       responseCallbackForBroadcastRequest({
-        type: "broadcast",
+        type: 'broadcast',
         success: false,
-        error: "User dismissed the request!",
+        error: 'User dismissed the request!',
       });
       responseCallbackForBroadcastRequest = null;
-      chrome.storage.local.remove("broadcastRequest");
+      chrome.storage.local.remove('broadcastRequest');
     }
 
     if (responseCallbackForGetSignaturesRequest) {
       responseCallbackForGetSignaturesRequest({
-        type: "getSignatures",
+        type: 'getSignatures',
         success: false,
-        error: "User dismissed the request!",
+        error: 'User dismissed the request!',
       });
       responseCallbackForGetSignaturesRequest = null;
-      chrome.storage.local.remove("getSignaturesRequest");
+      chrome.storage.local.remove('getSignaturesRequest');
     }
 
     popupWindowId = null;
-    chrome.storage.local.remove("popupWindowId");
+    chrome.storage.local.remove('popupWindowId');
   }
 });

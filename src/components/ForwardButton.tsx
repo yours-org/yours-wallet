@@ -1,5 +1,5 @@
-import styled from "styled-components";
-import arrow from "../assets/right-arrow.svg";
+import styled from 'styled-components';
+import arrow from '../assets/right-arrow.svg';
 
 export const Image = styled.img`
   width: 1.25rem;

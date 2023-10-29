@@ -1,7 +1,7 @@
 export const formatUSD = (value: number): string => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
   }).format(value);
 };
 
@@ -11,16 +11,12 @@ export const toHex = (asciiStr: string) => {
     const hex = Number(asciiStr.charCodeAt(n)).toString(16);
     arr1.push(hex);
   }
-  return arr1.join("");
+  return arr1.join('');
 };
 
-export const truncate = (
-  str: string,
-  startLength: number,
-  endLength: number
-) => {
-  if (typeof str !== "string") {
-    throw new Error("Expected a string");
+export const truncate = (str: string, startLength: number, endLength: number) => {
+  if (typeof str !== 'string') {
+    throw new Error('Expected a string');
   }
   if (str.length <= startLength + endLength) {
     return str; // No need to truncate
@@ -30,12 +26,9 @@ export const truncate = (
   return `${startStr}...${endStr}`;
 };
 
-export const formatNumberWithCommasAndDecimals = (
-  number: number,
-  decimalPlaces: number = 2
-): string => {
+export const formatNumberWithCommasAndDecimals = (number: number, decimalPlaces: number = 2): string => {
   if (isNaN(number)) {
-    return "Invalid Number";
+    return 'Invalid Number';
   }
 
   const options: Intl.NumberFormatOptions = {

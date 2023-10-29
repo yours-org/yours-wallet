@@ -1,19 +1,14 @@
-import { styled } from "styled-components";
-import {
-  ButtonContainer,
-  Divider,
-  HeaderText,
-  Text,
-} from "../../components/Reusable";
-import { Button } from "../../components/Button";
-import { ThirdPartyAppRequestData, WhitelistedApp } from "../../App";
-import { useTheme } from "../../hooks/useTheme";
-import { useContext, useEffect } from "react";
-import { BottomMenuContext } from "../../contexts/BottomMenuContext";
-import { storage } from "../../utils/storage";
-import { useNavigate } from "react-router-dom";
-import { useBsv } from "../../hooks/useBsv";
-import { useOrds } from "../../hooks/useOrds";
+import { styled } from 'styled-components';
+import { ButtonContainer, Divider, HeaderText, Text } from '../../components/Reusable';
+import { Button } from '../../components/Button';
+import { ThirdPartyAppRequestData, WhitelistedApp } from '../../App';
+import { useTheme } from '../../hooks/useTheme';
+import { useContext, useEffect } from 'react';
+import { BottomMenuContext } from '../../contexts/BottomMenuContext';
+import { storage } from '../../utils/storage';
+import { useNavigate } from 'react-router-dom';
+import { useBsv } from '../../hooks/useBsv';
+import { useOrds } from '../../hooks/useOrds';
 
 const Container = styled.div`
   display: flex;
@@ -37,8 +32,7 @@ export type ConnectRequestProps = {
   onDecision: () => void;
 };
 export const ConnectRequest = (props: ConnectRequestProps) => {
-  const { thirdPartyAppRequestData, whiteListedApps, popupId, onDecision } =
-    props;
+  const { thirdPartyAppRequestData, whiteListedApps, popupId, onDecision } = props;
   const { theme } = useTheme();
   const context = useContext(BottomMenuContext);
   const navigate = useNavigate();
@@ -65,40 +59,39 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
           ],
         });
         chrome.runtime.sendMessage({
-          action: "userConnectResponse",
-          decision: "approved",
+          action: 'userConnectResponse',
+          decision: 'approved',
           pubKeys: { bsvPubKey, ordPubKey },
         });
       } else {
         chrome.runtime.sendMessage({
-          action: "userConnectResponse",
-          decision: "declined",
+          action: 'userConnectResponse',
+          decision: 'declined',
         });
       }
 
       if (!approved && popupId) chrome.windows.remove(popupId);
-      storage.remove("connectRequest");
-      navigate("/bsv-wallet");
+      storage.remove('connectRequest');
+      navigate('/bsv-wallet');
     }
   };
 
   return (
     <Container>
       <Icon size="5rem" src={thirdPartyAppRequestData?.appIcon} />
-      <HeaderText theme={theme} style={{ width: "90%" }}>
+      <HeaderText theme={theme} style={{ width: '90%' }}>
         {thirdPartyAppRequestData?.appName}
       </HeaderText>
-      <Text theme={theme} style={{ marginBottom: "1rem" }}>
+      <Text theme={theme} style={{ marginBottom: '1rem' }}>
         {thirdPartyAppRequestData?.domain}
       </Text>
       <Divider />
       <Text style={{ color: theme.white, margin: 0 }}>
-        The app is requesting to view your wallet balance and request approval
-        for transactions.
+        The app is requesting to view your wallet balance and request approval for transactions.
       </Text>
 
       <Divider />
-      <ButtonContainer style={{ position: "absolute", bottom: 0 }}>
+      <ButtonContainer style={{ position: 'absolute', bottom: 0 }}>
         <Button
           theme={theme}
           type="warn"

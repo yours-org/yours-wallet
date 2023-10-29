@@ -1,4 +1,4 @@
-import { Outpoint } from "../utils/outpoint";
+import { Outpoint } from '../utils/outpoint';
 
 export interface Claim {
   sub: string;
@@ -64,7 +64,7 @@ export interface Inscription {
   file: File;
 }
 export class OrdinalTxo {
-  txid: string = "";
+  txid: string = '';
   vout: number = 0;
   outpoint: Outpoint = new Outpoint();
   satoshis: number = 0;
@@ -80,7 +80,7 @@ export class OrdinalTxo {
 
 export type OrdinalResponse = OrdinalTxo[];
 
-export type MapSubType = "collection" | "collectionItem";
+export type MapSubType = 'collection' | 'collectionItem';
 
 export interface OrdSchema {
   app: string;

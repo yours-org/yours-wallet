@@ -1,4 +1,4 @@
-import { PropsWithChildren } from "react";
+import { PropsWithChildren } from 'react';
 
 export type ShowProps = PropsWithChildren<{
   /** If true, will show children of the component.  If false, children of component will be hidden */

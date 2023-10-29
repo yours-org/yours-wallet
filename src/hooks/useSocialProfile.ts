@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { storage } from "../utils/storage";
-import { HOSTED_PANDA_IMAGE } from "../utils/constants";
+import { useEffect, useState } from 'react';
+import { storage } from '../utils/storage';
+import { HOSTED_PANDA_IMAGE } from '../utils/constants';
 
 export type SocialProfile = {
   displayName: string;
@@ -9,19 +9,16 @@ export type SocialProfile = {
 
 export const useSocialProfile = () => {
   const [socialProfile, setSocialProfile] = useState<SocialProfile>({
-    displayName: "Panda Wallet",
+    displayName: 'Panda Wallet',
     avatar: HOSTED_PANDA_IMAGE,
   });
 
   useEffect(() => {
     const getSocialProfile = (): Promise<string[]> => {
       return new Promise((resolve, reject) => {
-        storage.get(["socialProfile"], async (result) => {
+        storage.get(['socialProfile'], async (result) => {
           try {
-            if (
-              result?.socialProfile &&
-              !window.location.href.includes("localhost")
-            ) {
+            if (result?.socialProfile && !window.location.href.includes('localhost')) {
               setSocialProfile(result.socialProfile);
             }
             resolve(result.socialProfile);

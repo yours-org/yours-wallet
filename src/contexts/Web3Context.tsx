@@ -1,12 +1,12 @@
-import React, { createContext, useEffect } from "react";
-import { storage } from "../utils/storage";
-import { useWalletLockState } from "../hooks/useWalletLockState";
-import { useBsv } from "../hooks/useBsv";
-import { useOrds } from "../hooks/useOrds";
-import { BSV_DECIMAL_CONVERSION } from "../utils/constants";
-import { useNetwork } from "../hooks/useNetwork";
-import { NetWork } from "../utils/network";
-import { OrdinalResponse } from "../hooks/ordTypes";
+import React, { createContext, useEffect } from 'react';
+import { storage } from '../utils/storage';
+import { useWalletLockState } from '../hooks/useWalletLockState';
+import { useBsv } from '../hooks/useBsv';
+import { useOrds } from '../hooks/useOrds';
+import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
+import { useNetwork } from '../hooks/useNetwork';
+import { NetWork } from '../utils/network';
+import { OrdinalResponse } from '../hooks/ordTypes';
 
 export interface Web3ContextProps {
   network: NetWork;
@@ -14,9 +14,7 @@ export interface Web3ContextProps {
   updateNetwork: (n: NetWork) => void;
 }
 
-export const Web3Context = createContext<Web3ContextProps | undefined>(
-  undefined
-);
+export const Web3Context = createContext<Web3ContextProps | undefined>(undefined);
 
 interface Web3ProviderProps {
   children: React.ReactNode;
@@ -37,7 +35,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
 
   useEffect(() => {
     if (isLocked) {
-      storage.remove("appState");
+      storage.remove('appState');
       return;
     }
     const balance = {
@@ -56,21 +54,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
         pubKeys: { bsvPubKey, ordPubKey },
       },
     });
-  }, [
-    isLocked,
-    bsvAddress,
-    ordAddress,
-    ordinals,
-    bsvPubKey,
-    ordPubKey,
-    bsvBalance,
-    exchangeRate,
-    network,
-  ]);
+  }, [isLocked, bsvAddress, ordAddress, ordinals, bsvPubKey, ordPubKey, bsvBalance, exchangeRate, network]);
 
-  return (
-    <Web3Context.Provider value={{ network, updateNetwork, ordinals }}>
-      {children}
-    </Web3Context.Provider>
-  );
+  return <Web3Context.Provider value={{ network, updateNetwork, ordinals }}>{children}</Web3Context.Provider>;
 };

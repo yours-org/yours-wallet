@@ -1,14 +1,14 @@
-import { FormContainer, HeaderText } from "./Reusable";
-import { Button } from "./Button";
-import { ColorThemeProps } from "../theme";
-import { styled } from "styled-components";
-import { Input } from "./Input";
-import { useState } from "react";
-import { useKeys } from "../hooks/useKeys";
-import { storage } from "../utils/storage";
-import { PandaHead } from "./PandaHead";
-import { sleep } from "../utils/sleep";
-import { useTheme } from "../hooks/useTheme";
+import { FormContainer, HeaderText } from './Reusable';
+import { Button } from './Button';
+import { ColorThemeProps } from '../theme';
+import { styled } from 'styled-components';
+import { Input } from './Input';
+import { useState } from 'react';
+import { useKeys } from '../hooks/useKeys';
+import { storage } from '../utils/storage';
+import { PandaHead } from './PandaHead';
+import { sleep } from '../utils/sleep';
+import { useTheme } from '../hooks/useTheme';
 
 const Container = styled.div<ColorThemeProps>`
   display: flex;
@@ -31,7 +31,7 @@ export type UnlockWalletProps = {
 export const UnlockWallet = (props: UnlockWalletProps) => {
   const { onUnlock } = props;
   const { theme } = useTheme();
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
 
@@ -49,7 +49,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       onUnlock();
     } else {
       setVerificationFailed(true);
-      setPassword("");
+      setPassword('');
       setTimeout(() => {
         setVerificationFailed(false);
         setIsProcessing(false);
@@ -68,13 +68,13 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          style={{ marginBottom: "2rem" }}
-          shake={verificationFailed ? "true" : "false"}
+          style={{ marginBottom: '2rem' }}
+          shake={verificationFailed ? 'true' : 'false'}
         />
         <Button
           theme={theme}
           type="primary"
-          label={isProcessing ? "Unlocking..." : "Unlock"}
+          label={isProcessing ? 'Unlocking...' : 'Unlock'}
           disabled={isProcessing}
           isSubmit
         />

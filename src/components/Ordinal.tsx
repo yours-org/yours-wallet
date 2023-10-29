@@ -1,8 +1,8 @@
-import styled from "styled-components";
-import { ColorThemeProps, Theme } from "../theme";
-import { OrdinalTxo } from "../hooks/ordTypes";
-import { Text } from "./Reusable";
-import { Show } from "./Show";
+import styled from 'styled-components';
+import { ColorThemeProps, Theme } from '../theme';
+import { OrdinalTxo } from '../hooks/ordTypes';
+import { Text } from './Reusable';
+import { Show } from './Show';
 
 export type OrdinalDivProps = ColorThemeProps & {
   url: string;
@@ -11,15 +11,14 @@ export type OrdinalDivProps = ColorThemeProps & {
 };
 
 const OrdinalWrapper = styled.div<OrdinalDivProps>`
-  height: ${(props) => props.size ?? "9rem"};
-  width: ${(props) => props.size ?? "9rem"};
+  height: ${(props) => props.size ?? '9rem'};
+  width: ${(props) => props.size ?? '9rem'};
   background-image: url(${(props) => props.url});
   background-size: cover;
   border-radius: 0.5rem;
   margin: 0.5rem;
   cursor: pointer;
-  border: ${(props) =>
-    props.selected ? `0.3rem solid ${props.theme.lightAccent}` : undefined};
+  border: ${(props) => (props.selected ? `0.3rem solid ${props.theme.lightAccent}` : undefined)};
 `;
 
 const TextWrapper = styled(OrdinalWrapper)`
@@ -47,20 +46,19 @@ const JsonWrapper = styled.div<OrdinalDivProps>`
   display: flex;
   align-items: center;
   justify-content: center;
-  height: ${(props) => props.size ?? "9rem"};
-  width: ${(props) => props.size ?? "9rem"};
+  height: ${(props) => props.size ?? '9rem'};
+  width: ${(props) => props.size ?? '9rem'};
   border-radius: 0.5rem;
   position: relative;
   background-color: ${(props) => props.theme.darkAccent};
   margin: 0.5rem;
   cursor: pointer;
-  border: ${(props) =>
-    props.selected ? `0.3rem solid ${props.theme.lightAccent}` : undefined};
+  border: ${(props) => (props.selected ? `0.3rem solid ${props.theme.lightAccent}` : undefined)};
   overflow: auto;
 `;
 
 export const Json = styled.pre<ColorThemeProps>`
-  font-family: "DM Mono", monospace;
+  font-family: 'DM Mono', monospace;
   font-size: 0.65rem;
   color: ${(props) => props.theme.primaryButton};
   margin: 0;
@@ -85,13 +83,12 @@ export type OrdinalProps = {
 };
 
 export const Ordinal = (props: OrdinalProps) => {
-  const { url, selected, isTransfer, size, inscription, theme, onClick } =
-    props;
+  const { url, selected, isTransfer, size, inscription, theme, onClick } = props;
   const contentType = inscription.origin?.data?.insc?.file?.type;
 
   const renderContent = () => {
     switch (true) {
-      case contentType?.startsWith("image/"):
+      case contentType?.startsWith('image/'):
         return (
           <OrdinalWrapper
             size={size}
@@ -102,46 +99,22 @@ export const Ordinal = (props: OrdinalProps) => {
             onClick={onClick}
           />
         );
-      case contentType === "text/plain":
+      case contentType === 'text/plain':
         return (
-          <TextWrapper
-            size={size}
-            selected={selected}
-            url={url}
-            theme={theme}
-            onClick={onClick}
-          >
-            <OrdText theme={theme}>
-              {inscription.origin?.data?.insc?.text}
-            </OrdText>
+          <TextWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
+            <OrdText theme={theme}>{inscription.origin?.data?.insc?.text}</OrdText>
           </TextWrapper>
         );
-      case contentType === "application/json":
+      case contentType === 'application/json':
         return (
-          <JsonWrapper
-            size={size}
-            selected={selected}
-            url={url}
-            theme={theme}
-            onClick={onClick}
-          >
-            <Json theme={theme}>
-              {JSON.stringify(inscription.origin?.data?.insc?.json, null, 2)}
-            </Json>
+          <JsonWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
+            <Json theme={theme}>{JSON.stringify(inscription.origin?.data?.insc?.json, null, 2)}</Json>
           </JsonWrapper>
         );
       default:
         return (
-          <TextWrapper
-            size={size}
-            selected={selected}
-            url={url}
-            theme={theme}
-            onClick={onClick}
-          >
-            <UnsupportedText theme={theme}>
-              😩 Unsupported File Type
-            </UnsupportedText>
+          <TextWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
+            <UnsupportedText theme={theme}>😩 Unsupported File Type</UnsupportedText>
           </TextWrapper>
         );
     }
@@ -151,7 +124,7 @@ export const Ordinal = (props: OrdinalProps) => {
     <FlexWrapper>
       {renderContent()}
       <Show when={!isTransfer}>
-        <Text theme={theme} style={{ margin: "0.25rem 0" }}>
+        <Text theme={theme} style={{ margin: '0.25rem 0' }}>
           {`#${inscription.origin?.num}`}
         </Text>
       </Show>

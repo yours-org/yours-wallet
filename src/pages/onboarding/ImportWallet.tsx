@@ -1,18 +1,18 @@
-import styled from "styled-components";
-import { useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
-import { useSnackbar } from "../../hooks/useSnackbar";
-import { BackButton } from "../../components/BackButton";
-import { Text, HeaderText } from "../../components/Reusable";
-import { Input } from "../../components/Input";
-import { Button } from "../../components/Button";
-import { PandaHead } from "../../components/PandaHead";
-import { WifKeys, useKeys } from "../../hooks/useKeys";
-import { useBottomMenu } from "../../hooks/useBottomMenu";
-import { PageLoader } from "../../components/PageLoader";
-import { Show } from "../../components/Show";
-import { sleep } from "../../utils/sleep";
-import { useTheme } from "../../hooks/useTheme";
+import styled from 'styled-components';
+import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { BackButton } from '../../components/BackButton';
+import { Text, HeaderText } from '../../components/Reusable';
+import { Input } from '../../components/Input';
+import { Button } from '../../components/Button';
+import { PandaHead } from '../../components/PandaHead';
+import { WifKeys, useKeys } from '../../hooks/useKeys';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { PageLoader } from '../../components/PageLoader';
+import { Show } from '../../components/Show';
+import { sleep } from '../../utils/sleep';
+import { useTheme } from '../../hooks/useTheme';
 
 const Content = styled.div`
   display: flex;
@@ -35,11 +35,11 @@ const FormContainer = styled.form`
 export const ImportWallet = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const [password, setPassword] = useState("");
-  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [step, setStep] = useState(1);
-  const [payPk, setPayPk] = useState("");
-  const [ordPk, setOrdPk] = useState("");
+  const [payPk, setPayPk] = useState('');
+  const [ordPk, setOrdPk] = useState('');
 
   const { addSnackbar } = useSnackbar();
   const { generateKeysFromWifAndStoreEncrypted } = useKeys();
@@ -61,17 +61,17 @@ export const ImportWallet = () => {
       setLoading(true);
       if (password.length < 8) {
         setLoading(false);
-        addSnackbar("The password must be at least 8 characters!", "error");
+        addSnackbar('The password must be at least 8 characters!', 'error');
         return;
       }
 
       if (password !== passwordConfirm) {
-        addSnackbar("The passwords do not match!", "error");
+        addSnackbar('The passwords do not match!', 'error');
         return;
       }
 
       if (!payPk || !ordPk) {
-        addSnackbar("Both payPk and ordPk WIFs are required!", "error");
+        addSnackbar('Both payPk and ordPk WIFs are required!', 'error');
         return;
       }
 
@@ -82,7 +82,7 @@ export const ImportWallet = () => {
         ordPk,
       });
       if (!keys) {
-        addSnackbar("An error occurred while restoring the wallet!", "error");
+        addSnackbar('An error occurred while restoring the wallet!', 'error');
         return;
       }
 
@@ -100,35 +100,35 @@ export const ImportWallet = () => {
 
   const handleFileRead = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && file.type === "application/json") {
+    if (file && file.type === 'application/json') {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const text = e.target?.result as string;
         try {
           const jsonData = JSON.parse(text) as WifKeys;
           if (!jsonData.payPk || !jsonData.ordPk) {
-            addSnackbar("Invalid 1Sat Ord Wallet format!", "error");
+            addSnackbar('Invalid 1Sat Ord Wallet format!', 'error');
             return;
           }
           setPayPk(jsonData.payPk);
           setOrdPk(jsonData.ordPk);
           setStep(2);
         } catch (error) {
-          console.error("Error parsing JSON file", error);
-          addSnackbar("Error parsing JSON file!", "error");
+          console.error('Error parsing JSON file', error);
+          addSnackbar('Error parsing JSON file!', 'error');
           return;
         }
       };
       reader.readAsText(file);
     } else {
-      console.error("Unsupported file type. Please upload a JSON file.");
-      addSnackbar("Unsupported file type. Please upload a JSON file.", "error");
+      console.error('Unsupported file type. Please upload a JSON file.');
+      addSnackbar('Unsupported file type. Please upload a JSON file.', 'error');
     }
   };
 
   const passwordStep = (
     <>
-      <BackButton onClick={() => navigate("/")} />
+      <BackButton onClick={() => navigate('/')} />
       <Content>
         <HeaderText theme={theme}>Create a password</HeaderText>
         <Text theme={theme}>This is used to unlock your wallet.</Text>
@@ -146,7 +146,7 @@ export const ImportWallet = () => {
             type="password"
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
-            style={{ marginBottom: "2rem" }}
+            style={{ marginBottom: '2rem' }}
           />
           <Button theme={theme} type="primary" label="Finish" isSubmit />
         </FormContainer>
@@ -156,12 +156,11 @@ export const ImportWallet = () => {
 
   const enterWifsStep = (
     <>
-      <BackButton onClick={() => navigate("/")} />
+      <BackButton onClick={() => navigate('/')} />
       <Content>
         <HeaderText theme={theme}>Import a WIF Wallet</HeaderText>
-        <Text style={{ margin: "1rem" }} theme={theme}>
-          Input assets directly from your WIF private keys or import a 1Sat JSON
-          Wallet.
+        <Text style={{ margin: '1rem' }} theme={theme}>
+          Input assets directly from your WIF private keys or import a 1Sat JSON Wallet.
         </Text>
         <FormContainer onSubmit={() => setStep(2)}>
           <Input
@@ -178,12 +177,12 @@ export const ImportWallet = () => {
             value={ordPk}
             onChange={(e) => setOrdPk(e.target.value)}
           />
-          <Text theme={theme} style={{ margin: "1rem 0 1rem" }}>
+          <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
             Make sure you are in a safe place and no one is watching.
           </Text>
           <Button theme={theme} type="primary" label="Next" isSubmit />
         </FormContainer>
-        <Text style={{ margin: "1rem" }} theme={theme}>
+        <Text style={{ margin: '1rem' }} theme={theme}>
           ------ OR ------
         </Text>
         <Button
@@ -197,7 +196,7 @@ export const ImportWallet = () => {
           type="file"
           ref={hiddenFileInput}
           onChange={handleFileRead}
-          style={{ display: "none" }}
+          style={{ display: 'none' }}
           accept="application/json"
         />
       </Content>
@@ -209,15 +208,10 @@ export const ImportWallet = () => {
       <Content>
         <PandaHead />
         <HeaderText theme={theme}>Success!</HeaderText>
-        <Text theme={theme} style={{ marginBottom: "1rem" }}>
+        <Text theme={theme} style={{ marginBottom: '1rem' }}>
           Your wallet has been imported.
         </Text>
-        <Button
-          theme={theme}
-          type="primary"
-          label="Enter"
-          onClick={() => navigate("/bsv-wallet")}
-        />
+        <Button theme={theme} type="primary" label="Enter" onClick={() => navigate('/bsv-wallet')} />
       </Content>
     </>
   );

@@ -1,11 +1,7 @@
-import axios, { AxiosError } from "axios";
-import {
-  BSV_DECIMAL_CONVERSION,
-  WOC_BASE_URL,
-  WOC_TESTNET_BASE_URL,
-} from "../utils/constants";
-import { NetWork } from "../utils/network";
-import { useNetwork } from "./useNetwork";
+import axios from 'axios';
+import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from '../utils/constants';
+import { NetWork } from '../utils/network';
+import { useNetwork } from './useNetwork';
 export type UTXO = {
   satoshis: number;
   vout: number;
@@ -27,7 +23,7 @@ export const useWhatsOnChain = () => {
     network === NetWork.Mainnet
       ? {
           headers: {
-            "woc-api-key": apiKey,
+            'woc-api-key': apiKey,
           },
         }
       : undefined;
@@ -38,10 +34,7 @@ export const useWhatsOnChain = () => {
 
   const getBsvBalance = async (address: string) => {
     try {
-      const { data } = await axios.get(
-        `${getBaseUrl()}/address/${address}/balance`,
-        config
-      );
+      const { data } = await axios.get(`${getBaseUrl()}/address/${address}/balance`, config);
       const satBalance = data.confirmed + data.unconfirmed;
       const total = satBalance / BSV_DECIMAL_CONVERSION;
       return total;
@@ -52,10 +45,7 @@ export const useWhatsOnChain = () => {
 
   const getUtxos = async (fromAddress: string): Promise<WocUtxo[]> => {
     try {
-      const { data } = await axios.get(
-        `${getBaseUrl()}/address/${fromAddress}/unspent`,
-        config
-      );
+      const { data } = await axios.get(`${getBaseUrl()}/address/${fromAddress}/unspent`, config);
 
       return data;
     } catch (error) {
@@ -76,10 +66,7 @@ export const useWhatsOnChain = () => {
 
   const getRawTxById = async (txid: string): Promise<string | undefined> => {
     try {
-      const { data } = await axios.get(
-        `${getBaseUrl()}/tx/${txid}/hex`,
-        config
-      );
+      const { data } = await axios.get(`${getBaseUrl()}/tx/${txid}/hex`, config);
       return data;
     } catch (error) {
       console.log(error);
@@ -88,18 +75,14 @@ export const useWhatsOnChain = () => {
 
   const broadcastRawTx = async (txhex: string): Promise<any> => {
     try {
-      const { data: txid } = await axios.post(
-        `${getBaseUrl()}/tx/raw`,
-        { txhex },
-        config
-      );
+      const { data: txid } = await axios.post(`${getBaseUrl()}/tx/raw`, { txhex }, config);
       return txid;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
         // Access to config, request, and response
-        console.error("broadcast rawtx failed:", error.response.data);
+        console.error('broadcast rawtx failed:', error.response.data);
       } else {
-        console.error("broadcast rawtx failed:", error);
+        console.error('broadcast rawtx failed:', error);
       }
     }
   };
@@ -108,7 +91,7 @@ export const useWhatsOnChain = () => {
     const suitableUtxos = utxos.filter((utxo) => utxo.value > minimum);
 
     if (suitableUtxos.length === 0) {
-      throw new Error("No UTXO large enough for this transaction");
+      throw new Error('No UTXO large enough for this transaction');
     }
     // Select a random UTXO from the suitable ones
     const randomIndex = Math.floor(Math.random() * suitableUtxos.length);

@@ -1,11 +1,11 @@
-import axios from "axios";
-import { GP_BASE_URL, GP_TESTNET_BASE_URL } from "../utils/constants";
-import { NetWork } from "../utils/network";
-import { useNetwork } from "./useNetwork";
-import { BSV20 } from "./useOrds";
-import { useTokens } from "./useTokens";
-import { isBSV20v2 } from "../utils/ordi";
-import { OrdinalResponse, OrdinalTxo } from "./ordTypes";
+import axios from 'axios';
+import { GP_BASE_URL, GP_TESTNET_BASE_URL } from '../utils/constants';
+import { NetWork } from '../utils/network';
+import { useNetwork } from './useNetwork';
+import { BSV20 } from './useOrds';
+import { useTokens } from './useTokens';
+import { isBSV20v2 } from '../utils/ordi';
+import { OrdinalResponse, OrdinalTxo } from './ordTypes';
 
 type GorillaPoolErrorMessage = {
   message: string;
@@ -27,7 +27,7 @@ export const useGorillaPool = () => {
   const getOrdUtxos = async (ordAddress: string): Promise<OrdinalResponse> => {
     try {
       const { data } = await axios.get<OrdinalTxo[]>(
-        `${getOrdinalsBaseUrl()}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`
+        `${getOrdinalsBaseUrl()}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`,
       );
       return data;
     } catch (error) {
@@ -36,18 +36,13 @@ export const useGorillaPool = () => {
     }
   };
 
-  const broadcastWithGorillaPool = async (
-    txhex: string
-  ): Promise<GorillaPoolBroadcastResponse> => {
+  const broadcastWithGorillaPool = async (txhex: string): Promise<GorillaPoolBroadcastResponse> => {
     try {
-      const encoded = Buffer.from(txhex, "hex").toString("base64");
-      const res = await axios.post<string | GorillaPoolErrorMessage>(
-        `${getOrdinalsBaseUrl()}/api/tx`,
-        {
-          rawtx: encoded,
-        }
-      );
-      if (res.status === 200 && typeof res.data === "string") {
+      const encoded = Buffer.from(txhex, 'hex').toString('base64');
+      const res = await axios.post<string | GorillaPoolErrorMessage>(`${getOrdinalsBaseUrl()}/api/tx`, {
+        rawtx: encoded,
+      });
+      if (res.status === 200 && typeof res.data === 'string') {
         return { txid: res.data };
       } else {
         return res.data as GorillaPoolErrorMessage;
@@ -60,26 +55,22 @@ export const useGorillaPool = () => {
 
   const submitTx = async (txid: string) => {
     try {
-      let res = await axios.post(
-        `${getOrdinalsBaseUrl()}/api/tx/${txid}/submit`
-      );
+      let res = await axios.post(`${getOrdinalsBaseUrl()}/api/tx/${txid}/submit`);
 
       if (res.status !== 0) {
-        console.error("submitTx failed: ", txid);
+        console.error('submitTx failed: ', txid);
       }
     } catch (error) {
-      console.error("submitTx failed: ", txid, error);
+      console.error('submitTx failed: ', txid, error);
     }
   };
 
   const getUtxoByOutpoint = async (outpoint: string): Promise<OrdinalTxo> => {
     try {
-      const { data } = await axios.get(
-        `${getOrdinalsBaseUrl()}/api/txos/${outpoint}?script=true`
-      );
+      const { data } = await axios.get(`${getOrdinalsBaseUrl()}/api/txos/${outpoint}?script=true`);
       const ordUtxo: OrdinalTxo = data;
-      if (!ordUtxo.script) throw Error("No script when fetching by outpoint");
-      ordUtxo.script = Buffer.from(ordUtxo.script, "base64").toString("hex");
+      if (!ordUtxo.script) throw Error('No script when fetching by outpoint');
+      ordUtxo.script = Buffer.from(ordUtxo.script, 'base64').toString('hex');
       return ordUtxo;
     } catch (e) {
       throw new Error(JSON.stringify(e));
@@ -88,12 +79,9 @@ export const useGorillaPool = () => {
 
   const getMarketData = async (outpoint: string) => {
     try {
-      const res = await axios.get(
-        `${getOrdinalsBaseUrl()}/api/inscriptions/${outpoint}?script=true`
-      );
+      const res = await axios.get(`${getOrdinalsBaseUrl()}/api/inscriptions/${outpoint}?script=true`);
       const data = res.data as OrdinalTxo;
-      if (!data?.script || !data.origin?.outpoint.toString())
-        throw new Error("Could not get listing script");
+      if (!data?.script || !data.origin?.outpoint.toString()) throw new Error('Could not get listing script');
       return { script: data.script, origin: data.origin.outpoint.toString() };
     } catch (error) {
       throw new Error(`Error getting market data: ${JSON.stringify(error)}`);
@@ -101,9 +89,7 @@ export const useGorillaPool = () => {
   };
 
   const getBsv20Balances = async (ordAddress: string) => {
-    const res = await axios.get(
-      `${getOrdinalsBaseUrl()}/api/bsv20/${ordAddress}/balance`
-    );
+    const res = await axios.get(`${getOrdinalsBaseUrl()}/api/bsv20/${ordAddress}/balance`);
 
     const bsv20List: Array<BSV20> = res.data.map(
       (b: {
@@ -129,16 +115,13 @@ export const useGorillaPool = () => {
             pending: BigInt(b.all.pending),
           },
         };
-      }
+      },
     );
 
     return bsv20List;
   };
 
-  const getBSV20Utxos = async (
-    tick: string,
-    address: string
-  ): Promise<OrdinalTxo[] | undefined> => {
+  const getBSV20Utxos = async (tick: string, address: string): Promise<OrdinalTxo[] | undefined> => {
     try {
       if (!address) {
         return [];
@@ -159,12 +142,12 @@ export const useGorillaPool = () => {
           .map((utxo: any) => {
             return getUtxoByOutpoint(utxo.outpoint);
           })
-          .filter((u) => u !== null)
+          .filter((u) => u !== null),
       );
 
       return utxos as OrdinalTxo[];
     } catch (error) {
-      console.error("getBSV20Utxos", error);
+      console.error('getBSV20Utxos', error);
       return [];
     }
   };

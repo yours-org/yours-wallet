@@ -1,0 +1,7 @@
+#!/bin/sh
+npx prettier --check .
+result=$?
+if [ $result -ne 0 ]; then
+  echo "Prettier check failed. Please run 'npm run format' to format your code."
+  exit 1
+fi

@@ -1,27 +1,27 @@
-import styled from "styled-components";
-import { useBottomMenu } from "../hooks/useBottomMenu";
-import { useEffect, useState } from "react";
-import { SpeedBump } from "../components/SpeedBump";
-import { storage } from "../utils/storage";
-import { Show } from "../components/Show";
-import { useTheme } from "../hooks/useTheme";
-import { useWalletLockState } from "../hooks/useWalletLockState";
-import { ToggleSwitch } from "../components/ToggleSwitch";
-import { useSnackbar } from "../hooks/useSnackbar";
-import { SNACKBAR_TIMEOUT } from "../utils/constants";
-import { useWeb3Context } from "../hooks/useWeb3Context";
-import { NetWork } from "../utils/network";
-import { SettingsRow } from "../components/SettingsRow";
-import { HeaderText, Text } from "../components/Reusable";
-import { ForwardButton } from "../components/ForwardButton";
-import { ColorThemeProps } from "../theme";
-import { BackButton } from "../components/BackButton";
-import x from "../assets/x.svg";
-import { WhitelistedApp } from "../App";
-import { useKeys } from "../hooks/useKeys";
-import { Input } from "../components/Input";
-import { useSocialProfile } from "../hooks/useSocialProfile";
-import { Button } from "../components/Button";
+import styled from 'styled-components';
+import { useBottomMenu } from '../hooks/useBottomMenu';
+import { useEffect, useState } from 'react';
+import { SpeedBump } from '../components/SpeedBump';
+import { storage } from '../utils/storage';
+import { Show } from '../components/Show';
+import { useTheme } from '../hooks/useTheme';
+import { useWalletLockState } from '../hooks/useWalletLockState';
+import { ToggleSwitch } from '../components/ToggleSwitch';
+import { useSnackbar } from '../hooks/useSnackbar';
+import { SNACKBAR_TIMEOUT } from '../utils/constants';
+import { useWeb3Context } from '../hooks/useWeb3Context';
+import { NetWork } from '../utils/network';
+import { SettingsRow } from '../components/SettingsRow';
+import { HeaderText, Text } from '../components/Reusable';
+import { ForwardButton } from '../components/ForwardButton';
+import { ColorThemeProps } from '../theme';
+import { BackButton } from '../components/BackButton';
+import x from '../assets/x.svg';
+import { WhitelistedApp } from '../App';
+import { useKeys } from '../hooks/useKeys';
+import { Input } from '../components/Input';
+import { useSocialProfile } from '../hooks/useSocialProfile';
+import { Button } from '../components/Button';
 
 const Content = styled.div`
   display: flex;
@@ -82,8 +82,8 @@ const ScrollableContainer = styled.div`
   padding: 1rem;
 `;
 
-type SettingsPage = "main" | "connected-apps" | "social-profile";
-type DecisionType = "sign-out" | "export-keys";
+type SettingsPage = 'main' | 'connected-apps' | 'social-profile';
+type DecisionType = 'sign-out' | 'export-keys';
 
 export const Settings = () => {
   const { theme } = useTheme();
@@ -92,24 +92,20 @@ export const Settings = () => {
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { addSnackbar } = useSnackbar();
   const { network, updateNetwork } = useWeb3Context();
-  const [page, setPage] = useState<SettingsPage>("main");
+  const [page, setPage] = useState<SettingsPage>('main');
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
-  const [speedBumpMessage, setSpeedBumpMessage] = useState("");
+  const [speedBumpMessage, setSpeedBumpMessage] = useState('');
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const { retrieveKeys } = useKeys();
   const { socialProfile, storeSocialProfile } = useSocialProfile();
 
-  const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState(
-    socialProfile.displayName
-  );
-  const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(
-    socialProfile?.avatar
-  );
+  const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState(socialProfile.displayName);
+  const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(socialProfile?.avatar);
 
   useEffect(() => {
     const getWhitelist = (): Promise<string[]> => {
       return new Promise((resolve, reject) => {
-        storage.get(["whitelist"], async (result) => {
+        storage.get(['whitelist'], async (result) => {
           try {
             const { whitelist } = result;
             setConnectedApps(whitelist ?? []);
@@ -131,15 +127,15 @@ export const Settings = () => {
   };
 
   const handleSignOutIntent = () => {
-    setDecisionType("sign-out");
-    setSpeedBumpMessage("Make sure you have your seed phrase backed up!");
+    setDecisionType('sign-out');
+    setSpeedBumpMessage('Make sure you have your seed phrase backed up!');
     setShowSpeedBump(true);
   };
 
   const handleExportKeysIntent = () => {
-    setDecisionType("export-keys");
+    setDecisionType('export-keys');
     setSpeedBumpMessage(
-      "Your are about to download your private keys. Make sure you are in a safe place and no one is watching."
+      'Your are about to download your private keys. Make sure you are in a safe place and no one is watching.',
     );
     setShowSpeedBump(true);
   };
@@ -149,7 +145,7 @@ export const Settings = () => {
       displayName: enteredSocialDisplayName,
       avatar: enteredSocialAvatar,
     });
-    setPage("main");
+    setPage('main');
   };
 
   useEffect(() => {
@@ -170,11 +166,11 @@ export const Settings = () => {
     };
 
     const jsonData = JSON.stringify(keysToExport, null, 2);
-    const blob = new Blob([jsonData], { type: "application/json" });
+    const blob = new Blob([jsonData], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const tempLink = document.createElement("a");
+    const tempLink = document.createElement('a');
     tempLink.href = url;
-    tempLink.setAttribute("download", "panda_wallet_keys.json");
+    tempLink.setAttribute('download', 'panda_wallet_keys.json');
     document.body.appendChild(tempLink);
     tempLink.click();
     document.body.removeChild(tempLink);
@@ -192,7 +188,7 @@ export const Settings = () => {
   };
 
   useEffect(() => {
-    setSelected("settings");
+    setSelected('settings');
   }, [setSelected]);
 
   const handleNetworkChange = (e: any) => {
@@ -200,18 +196,18 @@ export const Settings = () => {
     updateNetwork(network);
 
     // The provider relies on appState in local storage to accurately return addresses. This is an easy way to handle making sure the state is always up to date.
-    addSnackbar(`Switching to ${network}`, "info");
+    addSnackbar(`Switching to ${network}`, 'info');
     setTimeout(() => {
       window.location.reload();
     }, SNACKBAR_TIMEOUT - 500);
   };
 
   const handleSpeedBumpConfirm = (password?: string) => {
-    if (decisionType === "sign-out") {
+    if (decisionType === 'sign-out') {
       signOut();
     }
 
-    if (decisionType === "export-keys" && password) {
+    if (decisionType === 'export-keys' && password) {
       exportKeys(password);
       setDecisionType(undefined);
       setShowSpeedBump(false);
@@ -228,58 +224,41 @@ export const Settings = () => {
           onCancel={handleCancel}
           onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
           showSpeedBump={showSpeedBump}
-          withPassword={decisionType === "export-keys"}
+          withPassword={decisionType === 'export-keys'}
         />
       }
     >
       <SettingsRow
         name="Connected Apps"
         description="Manage the apps you are connected to"
-        onClick={() => setPage("connected-apps")}
+        onClick={() => setPage('connected-apps')}
         jsxElement={<ForwardButton />}
       />
       <SettingsRow
         name="Social Profile"
         description="Set your display name and avatar"
-        onClick={() => setPage("social-profile")}
+        onClick={() => setPage('social-profile')}
         jsxElement={<ForwardButton />}
       />
       <SettingsRow
         name="Testnet Mode"
         description="Applies to balances and app connections"
-        jsxElement={
-          <ToggleSwitch
-            theme={theme}
-            on={network === NetWork.Testnet}
-            onChange={handleNetworkChange}
-          />
-        }
+        jsxElement={<ToggleSwitch theme={theme} on={network === NetWork.Testnet} onChange={handleNetworkChange} />}
       />
       <SettingsRow
         name="Export Keys"
         description="Download your seed, private, and public keys"
         onClick={handleExportKeysIntent}
       />
-      <SettingsRow
-        name="Lock Wallet"
-        description="Immediately lock the wallet"
-        onClick={lockWallet}
-      />
-      <SettingsRow
-        name="Sign Out"
-        description="Sign out of Panda Wallet completely"
-        onClick={handleSignOutIntent}
-      />
+      <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={lockWallet} />
+      <SettingsRow name="Sign Out" description="Sign out of Panda Wallet completely" onClick={handleSignOutIntent} />
     </Show>
   );
 
   const connectedAppsPage = (
     <>
-      <BackButton onClick={() => setPage("main")} />
-      <Show
-        when={connectedApps.length > 0}
-        whenFalseContent={<Text theme={theme}>No apps connected</Text>}
-      >
+      <BackButton onClick={() => setPage('main')} />
+      <Show when={connectedApps.length > 0} whenFalseContent={<Text theme={theme}>No apps connected</Text>}>
         <ScrollableContainer>
           {connectedApps.map((app, idx) => {
             return (
@@ -299,7 +278,7 @@ export const Settings = () => {
 
   const socialProfilePage = (
     <>
-      <BackButton onClick={() => setPage("main")} />
+      <BackButton onClick={() => setPage('main')} />
       <SettingsText theme={theme}>Display Name</SettingsText>
       <Input
         theme={theme}
@@ -320,7 +299,7 @@ export const Settings = () => {
         theme={theme}
         type="primary"
         label="Save"
-        style={{ marginTop: "1rem" }}
+        style={{ marginTop: '1rem' }}
         onClick={handleSocialProfileSave}
       />
     </>
@@ -329,17 +308,13 @@ export const Settings = () => {
   return (
     <Content>
       <HeaderWrapper>
-        <HeaderText style={{ fontSize: "1.25rem" }} theme={theme}>
-          {page === "connected-apps"
-            ? "Connected Apps"
-            : page === "social-profile"
-            ? "Social Profile"
-            : "Settings"}
+        <HeaderText style={{ fontSize: '1.25rem' }} theme={theme}>
+          {page === 'connected-apps' ? 'Connected Apps' : page === 'social-profile' ? 'Social Profile' : 'Settings'}
         </HeaderText>
       </HeaderWrapper>
-      <Show when={page === "main"}>{main}</Show>
-      <Show when={page === "connected-apps"}>{connectedAppsPage}</Show>
-      <Show when={page === "social-profile"}>{socialProfilePage}</Show>
+      <Show when={page === 'main'}>{main}</Show>
+      <Show when={page === 'connected-apps'}>{connectedAppsPage}</Show>
+      <Show when={page === 'social-profile'}>{socialProfilePage}</Show>
     </Content>
   );
 };
