@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useKeys } from "./useKeys";
 import {
+  BSM,
   ChainParams,
   ECDSA,
-  Hash,
   P2PKHAddress,
   PrivateKey,
   PublicKey,
@@ -199,13 +199,13 @@ export const useBsv = () => {
         .to_string();
 
       const msgBuf = Buffer.from(message, encoding)
-      const signature = privateKey.sign_message(msgBuf);
-
+      const signature = BSM.sign_message(privateKey, msgBuf)
+      // const signature = privateKey.sign_message(msgBuf);
       return {
         address,
         pubKeyHex: publicKey.to_hex(),
         signedMessage: message,
-        signatureHex: signature.to_hex(),
+        signatureHex: signature.to_compact_hex(),
       };
     } catch (error) {
       console.log(error);
@@ -215,21 +215,23 @@ export const useBsv = () => {
   const verifyMessage = (
     message: string,
     signatureHex: string,
-    publicKeyHex: string
+    publicKeyHex: string,
+    encoding: "utf8" | "hex" | "base64" = "utf8",
   ) => {
     try {
-      const hash = Hash.sha_256(Buffer.from(message)).to_hex();
-      const signature = Signature.from_der(Buffer.from(signatureHex, "hex"));
+      const msgBuf = Buffer.from(message, encoding);
       const publicKey = PublicKey.from_hex(publicKeyHex);
-      const encoder = new TextEncoder();
-      const encodedMessage = encoder.encode(hash);
-      const verified = ECDSA.verify_digest(
-        encodedMessage,
-        publicKey,
-        signature,
-        0
+      const signature = Signature.from_compact_bytes(
+        Buffer.from(signatureHex, "hex")
       );
-      return verified;
+      const address = publicKey
+        .to_address()
+        .set_chain_params(getChainParams(network));
+        
+      return address.verify_bitcoin_message(
+        msgBuf,
+        signature
+      );
     } catch (error) {
       console.error(error);
       return false;
