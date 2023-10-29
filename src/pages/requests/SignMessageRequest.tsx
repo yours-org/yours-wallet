@@ -15,7 +15,7 @@ import { sleep } from "../../utils/sleep";
 import { useTheme } from "../../hooks/useTheme";
 import { styled } from "styled-components";
 import { ColorThemeProps } from "../../theme";
-import { useBsv } from "../../hooks/useBsv";
+import { Web3SignMessageRequest, useBsv } from "../../hooks/useBsv";
 import { storage } from "../../utils/storage";
 import { useNavigate } from "react-router-dom";
 
@@ -39,14 +39,13 @@ export type SignMessageResponse = {
 };
 
 export type SignMessageRequestProps = {
-  messageToSign: string;
-  encoding?: "utf8" | "hex" | "base64";
+  messageToSign: Web3SignMessageRequest;
   popupId: number | undefined;
   onSignature: () => void;
 };
 
 export const SignMessageRequest = (props: SignMessageRequestProps) => {
-  const { messageToSign, encoding, onSignature, popupId } = props;
+  const { messageToSign, onSignature, popupId } = props;
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -85,7 +84,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       return;
     }
 
-    const signRes = await signMessage(messageToSign, passwordConfirm, encoding);
+    const signRes = await signMessage(messageToSign, passwordConfirm);
     if (!signRes?.signatureHex) {
       const message =
         signRes?.error === "invalid-password"
@@ -128,7 +127,11 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
           </Text>
           <FormContainer noValidate onSubmit={(e) => handleSigning(e)}>
             <RequestDetailsContainer>
-              {<Text style={{ color: theme.white }}>{messageToSign}</Text>}
+              {
+                <Text style={{ color: theme.white }}>
+                  {messageToSign.message}
+                </Text>
+              }
             </RequestDetailsContainer>
             <Input
               theme={theme}

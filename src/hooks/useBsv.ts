@@ -3,7 +3,6 @@ import { useKeys } from "./useKeys";
 import {
   BSM,
   ChainParams,
-  ECDSA,
   P2PKHAddress,
   PrivateKey,
   PublicKey,
@@ -32,6 +31,11 @@ export type Web3SendBsvRequest = {
 
 export type Web3BroadcastRequest = {
   rawtx: string;
+};
+
+export type Web3SignMessageRequest = {
+  message: string;
+  encoding?: "utf8" | "hex" | "base64";
 };
 
 export const useBsv = () => {
@@ -179,9 +183,8 @@ export const useBsv = () => {
   };
 
   const signMessage = async (
-    message: string,
-    password: string,
-    encoding: "utf8" | "hex" | "base64" = "utf8",
+    messageToSign: Web3SignMessageRequest,
+    password: string
   ): Promise<SignMessageResponse | undefined> => {
     const isAuthenticated = await verifyPassword(password);
     if (!isAuthenticated) {
@@ -198,13 +201,13 @@ export const useBsv = () => {
         .set_chain_params(getChainParams(network))
         .to_string();
 
-      const msgBuf = Buffer.from(message, encoding)
-      const signature = BSM.sign_message(privateKey, msgBuf)
+      const msgBuf = Buffer.from(messageToSign.message, messageToSign.encoding);
+      const signature = BSM.sign_message(privateKey, msgBuf);
       // const signature = privateKey.sign_message(msgBuf);
       return {
         address,
         pubKeyHex: publicKey.to_hex(),
-        signedMessage: message,
+        signedMessage: messageToSign.message,
         signatureHex: signature.to_compact_hex(),
       };
     } catch (error) {
@@ -216,7 +219,7 @@ export const useBsv = () => {
     message: string,
     signatureHex: string,
     publicKeyHex: string,
-    encoding: "utf8" | "hex" | "base64" = "utf8",
+    encoding: "utf8" | "hex" | "base64" = "utf8"
   ) => {
     try {
       const msgBuf = Buffer.from(message, encoding);
@@ -227,11 +230,8 @@ export const useBsv = () => {
       const address = publicKey
         .to_address()
         .set_chain_params(getChainParams(network));
-        
-      return address.verify_bitcoin_message(
-        msgBuf,
-        signature
-      );
+
+      return address.verify_bitcoin_message(msgBuf, signature);
     } catch (error) {
       console.error(error);
       return false;
