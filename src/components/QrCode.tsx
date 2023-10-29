@@ -10,7 +10,7 @@ const QrImage = styled.img`
 
 export type QrCodeProps = {
   address: string;
-  onClick: () => void;
+  onClick?: () => void;
 };
 
 export const QrCode = (props: QrCodeProps) => {
