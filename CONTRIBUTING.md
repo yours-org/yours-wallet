@@ -1,42 +1,67 @@
-## Contributing
+## Contributing to Panda Wallet
 
-If you'd like to contribute to Panda Wallet's development, follow these steps:
+Thank you for your interest in contributing to Panda Wallet! Your contributions are what move the project forward. Please follow these steps to set up your development environment and ensure that your code adheres to our formatting standards.
 
-1. **Clone the Repository:** Clone the repo:
+## Getting Started
 
-   ```bash
-   git clone
-   ```
+1. **Fork the Repository:** Click the "Fork" button at the top right of this repository on GitHub to create a copy of the repository under your own GitHub account.
 
-2. **Install Dependencies:** Navigate to the project's root directory and run:
+2. **Clone Your Fork:** Clone the repository from your GitHub account to your local machine.
 
-   ```bash
-   npm install
-   ```
+```bash
+git clone https://github.com/your-username/your-repo.git
+cd your-repo
+```
 
-3. **Start the App:** Open a local instance of the app:
+3. **Install Dependencies:** Install the projects dependencies using npm.
 
-   ```bash
-   npm run start
-   ```
+```bash
+npm install
+```
 
-4. **Build The Extension:** To create a production build of the app, run:
+4. **Setup Husky Hooks:** Run the setup script to enable Husky hooks and configure pre-commit hooks for code formatting. This script will also make the pre-commit hook executable.
 
-   ```bash
-   npm run build
-   ```
+```bash
+./setup.sh
+```
 
-5. **Run The Extension:** Load the extension into your browser using dev mode:
+5. **Create a Branch:** Create a new branch for your work. Please ensure that your branch includes the issue number and a description like so:
 
-   1. Navigate to `chrome://extensions` and turn on dev mode.
-   2. Click "Load Unpacked".
-   3. Upload the production `build` folder.
+```bash
+git checkout -b feat/75-add-new-card-component
+```
 
-6. **Customize and Contribute:**: Customize the extension or contribute by opening pull requests.
+6. **Build the App:** Save your changes then create a production build of the app to ensure it compiles correctly.
 
-**\*Always Use Prettier for Code Formatting**
+```bash
+npm run build
+```
 
-Prettier is a powerful code formatter that helps ensure our code remains well-organized and readable. By adhering to Prettier's formatting standards, we can enhance code collaboration and reduce potential errors. Make it a habit to run Prettier before committing any code changes.
+7. **Run The Extension:** Load the extension into your browser using dev mode and ensure your changes look good in the chrome environment:
+
+   - Navigate to `chrome://extensions` and turn on dev mode.
+   - Click "Load Unpacked".
+   - Upload the production `build` folder that was just created.
+   - Launch the extension and ensure your changes look good.
+
+8. **Commit Your Changes:** Assuming everything above checks out, commit your changes. Husky will automatically run Prettier to format your code, ensuring it meets our formatting standards.
+
+```bash
+git add .
+git commit -m "Your descriptive commit message"
+```
+
+9. **Push Changes:** Push the branch to your GitHub fork.
+
+```bash
+git push origin my-feature
+```
+
+10. **Create a Pull Request:**: Navigate to your forked repository on GitHub, and you should see an option to create a pull request and merge into `Panda-Wallet:main`. Click it, fill out the pull request template, and submit your changes for review.
+
+11. **Code Review:** Your changes will be reviewed, and you may be asked to make further adjustments. Once the changes are approved, they will be merged into the main project.
+
+12. **Celebrate:** 🎉 Congratulations, you've contributed to Panda Wallet!
 
 **\*If you plan to contribute, please review the PR Guidelines**
 
