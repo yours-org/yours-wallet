@@ -1,7 +1,7 @@
-import React from "react";
-import styled from "styled-components";
-import { PropsWithChildren } from "react";
-import { ColorThemeProps, Theme } from "../theme";
+import React from 'react';
+import styled from 'styled-components';
+import { PropsWithChildren } from 'react';
+import { ColorThemeProps, Theme } from '../theme';
 
 export type TabPanelProps = PropsWithChildren<{
   label: string;
@@ -44,24 +44,17 @@ const TabButton = styled.button<ColorThemeProps & { selected: boolean }>`
   color: ${(props) => props.theme.white};
   font-size: 1rem;
   font-weight: 500;
-  background: ${(props) =>
-    props.selected ? props.theme.darkAccent : props.theme.darkAccent + "60"};
+  background: ${(props) => (props.selected ? props.theme.darkAccent : props.theme.darkAccent + '60')};
   outline: none;
   transition: border-color 0.2s ease-in;
   border: none;
   border-bottom: 0.15rem solid
-    ${(props) =>
-      props.selected
-        ? props.theme.primaryButton
-        : props.theme.primaryButton + "30"};
+    ${(props) => (props.selected ? props.theme.primaryButton : props.theme.primaryButton + '30')};
   &:hover,
   &:focus,
   &:active {
     border-bottom: 0.15rem solid
-      ${(props) =>
-        props.selected
-          ? props.theme.primaryButton
-          : props.theme.primaryButton + "30"};
+      ${(props) => (props.selected ? props.theme.primaryButton : props.theme.primaryButton + '30')};
   }
 `;
 
@@ -101,7 +94,7 @@ const TabsComponent = (props: TabsProps) => {
               theme={props.theme}
               role="tab"
               selected={tabIndex === index}
-              aria-selected={tabIndex === index ? "true" : "false"}
+              aria-selected={tabIndex === index ? 'true' : 'false'}
               onClick={() => selectTab(index)}
             >
               {label}
@@ -110,11 +103,7 @@ const TabsComponent = (props: TabsProps) => {
         })}
       </TabList>
 
-      <Content>
-        {React.Children.map(children, (comp, index) =>
-          tabIndex === index ? comp : undefined
-        )}
-      </Content>
+      <Content>{React.Children.map(children, (comp, index) => (tabIndex === index ? comp : undefined))}</Content>
     </TabsWrapper>
   );
 };

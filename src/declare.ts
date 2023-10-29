@@ -1,2 +1,2 @@
-declare module "bsv";
-declare module "bitcore-mnemonic";
+declare module 'bsv';
+declare module 'bitcore-mnemonic';

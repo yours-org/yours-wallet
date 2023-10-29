@@ -1,19 +1,19 @@
-import styled from "styled-components";
-import { ColorThemeProps } from "../../theme";
-import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { useSnackbar } from "../../hooks/useSnackbar";
-import { BackButton } from "../../components/BackButton";
-import { Text, HeaderText } from "../../components/Reusable";
-import { Input } from "../../components/Input";
-import { Button } from "../../components/Button";
-import { PandaHead } from "../../components/PandaHead";
-import { useKeys } from "../../hooks/useKeys";
-import { useBottomMenu } from "../../hooks/useBottomMenu";
-import { PageLoader } from "../../components/PageLoader";
-import { Show } from "../../components/Show";
-import { sleep } from "../../utils/sleep";
-import { useTheme } from "../../hooks/useTheme";
+import styled from 'styled-components';
+import { ColorThemeProps } from '../../theme';
+import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { BackButton } from '../../components/BackButton';
+import { Text, HeaderText } from '../../components/Reusable';
+import { Input } from '../../components/Input';
+import { Button } from '../../components/Button';
+import { PandaHead } from '../../components/PandaHead';
+import { useKeys } from '../../hooks/useKeys';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { PageLoader } from '../../components/PageLoader';
+import { Show } from '../../components/Show';
+import { sleep } from '../../utils/sleep';
+import { useTheme } from '../../hooks/useTheme';
 
 const Content = styled.div`
   display: flex;
@@ -60,8 +60,8 @@ const SeedPill = styled.div<ColorThemeProps>`
 export const CreateWallet = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const [password, setPassword] = useState("");
-  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [step, setStep] = useState(1);
   const [seedWords, setSeedWords] = useState<string[]>([]);
 
@@ -78,27 +78,25 @@ export const CreateWallet = () => {
     };
   }, [hideMenu, showMenu]);
 
-  const handleKeyGeneration = async (
-    event: React.FormEvent<HTMLFormElement>
-  ) => {
+  const handleKeyGeneration = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
     if (password.length < 8) {
       setLoading(false);
-      addSnackbar("The password must be at least 8 characters!", "error");
+      addSnackbar('The password must be at least 8 characters!', 'error');
       return;
     }
 
     if (password !== passwordConfirm) {
       setLoading(false);
-      addSnackbar("The passwords do not match!", "error");
+      addSnackbar('The passwords do not match!', 'error');
       return;
     }
 
     // Some artificial delay for the loader
     await sleep(50);
     const mnemonic = generateSeedAndStoreEncrypted(password);
-    setSeedWords(mnemonic.split(" "));
+    setSeedWords(mnemonic.split(' '));
 
     setLoading(false);
     setStep(2);
@@ -106,7 +104,7 @@ export const CreateWallet = () => {
 
   const passwordStep = (
     <>
-      <BackButton onClick={() => navigate("/")} />
+      <BackButton onClick={() => navigate('/')} />
       <Content>
         <HeaderText theme={theme}>Create a password</HeaderText>
         <Text theme={theme}>This is used to unlock your wallet.</Text>
@@ -125,7 +123,7 @@ export const CreateWallet = () => {
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
-          <Text theme={theme} style={{ margin: "3rem 0 1rem" }}>
+          <Text theme={theme} style={{ margin: '3rem 0 1rem' }}>
             Make sure you are in a safe place and no one is watching.
           </Text>
           <Button theme={theme} type="primary" label="Generate Seed" isSubmit />
@@ -139,7 +137,7 @@ export const CreateWallet = () => {
       <BackButton onClick={() => setStep(1)} />
       <Content>
         <HeaderText theme={theme}>Your recovery phrase</HeaderText>
-        <Text theme={theme} style={{ marginBottom: "1rem" }}>
+        <Text theme={theme} style={{ marginBottom: '1rem' }}>
           Safely write down and store your seed phrase in a safe place.
         </Text>
         <SeedContainer>
@@ -176,15 +174,10 @@ export const CreateWallet = () => {
       <Content>
         <PandaHead />
         <HeaderText theme={theme}>Success!</HeaderText>
-        <Text theme={theme} style={{ marginBottom: "1rem" }}>
+        <Text theme={theme} style={{ marginBottom: '1rem' }}>
           Panda Wallet is ready to go.
         </Text>
-        <Button
-          theme={theme}
-          type="primary"
-          label="Enter"
-          onClick={() => navigate("/bsv-wallet")}
-        />
+        <Button theme={theme} type="primary" label="Enter" onClick={() => navigate('/bsv-wallet')} />
       </Content>
     </>
   );

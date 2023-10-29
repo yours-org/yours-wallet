@@ -1,14 +1,14 @@
-import { ButtonContainer, HeaderText, Text } from "./Reusable";
-import { Button } from "./Button";
-import { Show } from "./Show";
-import { ColorThemeProps, Theme } from "../theme";
-import { styled } from "styled-components";
-import { Input } from "./Input";
-import { useState } from "react";
-import { sleep } from "../utils/sleep";
-import { useSnackbar } from "../hooks/useSnackbar";
-import { useKeys } from "../hooks/useKeys";
-import { PageLoader } from "./PageLoader";
+import { ButtonContainer, HeaderText, Text } from './Reusable';
+import { Button } from './Button';
+import { Show } from './Show';
+import { ColorThemeProps, Theme } from '../theme';
+import { styled } from 'styled-components';
+import { Input } from './Input';
+import { useState } from 'react';
+import { sleep } from '../utils/sleep';
+import { useSnackbar } from '../hooks/useSnackbar';
+import { useKeys } from '../hooks/useKeys';
+import { PageLoader } from './PageLoader';
 
 const Container = styled.div<ColorThemeProps>`
   display: flex;
@@ -34,16 +34,9 @@ export type SpeedBumpProps = {
 };
 
 export const SpeedBump = (props: SpeedBumpProps) => {
-  const {
-    message,
-    onCancel,
-    onConfirm,
-    showSpeedBump,
-    theme,
-    withPassword = false,
-  } = props;
+  const { message, onCancel, onConfirm, showSpeedBump, theme, withPassword = false } = props;
 
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const { addSnackbar } = useSnackbar();
   const { verifyPassword } = useKeys();
@@ -58,13 +51,13 @@ export const SpeedBump = (props: SpeedBumpProps) => {
       await sleep(25);
 
       if (!password) {
-        addSnackbar("You must enter a password!", "error");
+        addSnackbar('You must enter a password!', 'error');
         return;
       }
 
       const isVerified = await verifyPassword(password);
       if (!isVerified) {
-        addSnackbar("Invalid password!", "error");
+        addSnackbar('Invalid password!', 'error');
         return;
       }
 
@@ -73,7 +66,7 @@ export const SpeedBump = (props: SpeedBumpProps) => {
       console.log(error);
     } finally {
       setIsProcessing(false);
-      setPassword("");
+      setPassword('');
     }
   };
 
@@ -91,18 +84,8 @@ export const SpeedBump = (props: SpeedBumpProps) => {
         />
       </Show>
       <ButtonContainer>
-        <Button
-          theme={theme}
-          type="warn"
-          label="Confirm"
-          onClick={handleConfirm}
-        />
-        <Button
-          theme={theme}
-          type="primary"
-          label="Cancel"
-          onClick={onCancel}
-        />
+        <Button theme={theme} type="warn" label="Confirm" onClick={handleConfirm} />
+        <Button theme={theme} type="primary" label="Cancel" onClick={onCancel} />
       </ButtonContainer>
     </>
   );

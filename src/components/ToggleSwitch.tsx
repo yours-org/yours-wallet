@@ -1,6 +1,6 @@
-import styled from "styled-components";
-import { ChangeEvent } from "react";
-import { ColorThemeProps, Theme } from "../theme";
+import styled from 'styled-components';
+import { ChangeEvent } from 'react';
+import { ColorThemeProps, Theme } from '../theme';
 
 const Label = styled.label`
   display: flex;
@@ -13,14 +13,14 @@ const Switch = styled.div<ColorThemeProps>`
   position: relative;
   width: 2rem;
   height: 1rem;
-  background: ${({ theme }) => theme.white + "30"};
+  background: ${({ theme }) => theme.white + '30'};
   border-radius: 2rem;
   padding: 0.25rem;
   transition: 300ms all;
 
   &:before {
     transition: 300ms all;
-    content: "";
+    content: '';
     position: absolute;
     width: 1.25rem;
     height: 1.25rem;
@@ -37,7 +37,7 @@ const Input = styled.input<ColorThemeProps>`
   position: absolute;
 
   &:checked + ${Switch} {
-    background: ${({ theme }) => theme.primaryButton + "95"};
+    background: ${({ theme }) => theme.primaryButton + '95'};
 
     &:before {
       transform: translate(1.25rem, -50%);
@@ -62,12 +62,7 @@ export const ToggleSwitch = (props: ToggleSwitchProps) => {
 
   return (
     <Label>
-      <Input
-        checked={on}
-        type="checkbox"
-        onChange={handleChange}
-        theme={theme}
-      />
+      <Input checked={on} type="checkbox" onChange={handleChange} theme={theme} />
       <Switch theme={theme} />
     </Label>
   );

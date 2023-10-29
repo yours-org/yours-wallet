@@ -1,8 +1,8 @@
-import { styled } from "styled-components";
-import { useTheme } from "../hooks/useTheme";
-import { HeaderText, Text } from "./Reusable";
-import { useState } from "react";
-import { Show } from "./Show";
+import { styled } from 'styled-components';
+import { useTheme } from '../hooks/useTheme';
+import { HeaderText, Text } from './Reusable';
+import { useState } from 'react';
+import { Show } from './Show';
 
 const Container = styled.div<{ color: string; $clickable: string }>`
   display: flex;
@@ -13,7 +13,7 @@ const Container = styled.div<{ color: string; $clickable: string }>`
   padding: 0.5rem;
   border-radius: 0.5rem;
   margin: 0.25rem;
-  cursor: ${(props) => (props.$clickable === "true" ? "pointer" : "default")};
+  cursor: ${(props) => (props.$clickable === 'true' ? 'pointer' : 'default')};
 `;
 
 const Content = styled.div`
@@ -50,12 +50,10 @@ export const SettingsRow = (props: SettingsRowProp) => {
   return (
     <Container
       color={containerColor}
-      onMouseEnter={() =>
-        onClick ? setContainerColor(theme.darkAccent + "99") : undefined
-      }
+      onMouseEnter={() => (onClick ? setContainerColor(theme.darkAccent + '99') : undefined)}
       onMouseLeave={() => setContainerColor(theme.darkAccent)}
       onClick={onClick}
-      $clickable={onClick ? "true" : "false"}
+      $clickable={onClick ? 'true' : 'false'}
     >
       <Content>
         <SettingName theme={theme}>{name}</SettingName>

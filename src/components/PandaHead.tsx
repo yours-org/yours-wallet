@@ -1,13 +1,13 @@
-import { useState, useRef, useEffect } from "react";
-import styled from "styled-components";
-import panda from "../assets/panda.svg";
+import { useState, useRef, useEffect } from 'react';
+import styled from 'styled-components';
+import panda from '../assets/panda.svg';
 
 const PandaImg = styled.img<{
   $rotation: { x: number; y: number };
 }>`
   transition: transform 0.1s;
-  width: ${(props) => props.width ?? "6.25rem"};
-  height: ${(props) => props.width ?? "6.25rem"};
+  width: ${(props) => props.width ?? '6.25rem'};
+  height: ${(props) => props.width ?? '6.25rem'};
 `;
 
 interface Rotation {
@@ -32,8 +32,7 @@ export const PandaHead = (props: PandaHeadProps) => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!imgRef.current) return;
 
-      const { left, top, width, height } =
-        imgRef.current.getBoundingClientRect();
+      const { left, top, width, height } = imgRef.current.getBoundingClientRect();
       const centerX = left + width / 2;
       const centerY = top + height / 2;
 
@@ -48,10 +47,10 @@ export const PandaHead = (props: PandaHeadProps) => {
       });
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener('mousemove', handleMouseMove);
 
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener('mousemove', handleMouseMove);
     };
   }, [animated]);
 

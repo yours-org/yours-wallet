@@ -1,8 +1,8 @@
-import styled from "styled-components";
-import { ColorThemeProps, Theme } from "../theme";
-import { Show } from "./Show";
+import styled from 'styled-components';
+import { ColorThemeProps, Theme } from '../theme';
+import { Show } from './Show';
 
-export type ButtonStyles = "primary" | "secondary" | "warn";
+export type ButtonStyles = 'primary' | 'secondary' | 'warn';
 
 const Primary = styled.button<ColorThemeProps>`
   width: 80%;
@@ -22,7 +22,7 @@ const Primary = styled.button<ColorThemeProps>`
   &:disabled {
     cursor: not-allowed;
     opacity: 0.6;
-    background-color: ${({ theme }) => theme.primaryButton + "40"};
+    background-color: ${({ theme }) => theme.primaryButton + '40'};
   }
 
   &:hover {
@@ -41,7 +41,7 @@ const Secondary = styled(Primary)`
 
   &:disabled {
     background: transparent;
-    color: ${({ theme }) => theme.white + "40"};
+    color: ${({ theme }) => theme.white + '40'};
   }
 
   &:hover {
@@ -50,11 +50,11 @@ const Secondary = styled(Primary)`
 `;
 
 const Warn = styled(Primary)`
-  background-color: ${({ theme }) => theme.errorRed + "95"};
+  background-color: ${({ theme }) => theme.errorRed + '95'};
   color: ${({ theme }) => theme.white};
 
   &:disabled {
-    background-color: ${({ theme }) => theme.errorRed + "40"};
+    background-color: ${({ theme }) => theme.errorRed + '40'};
   }
 `;
 
@@ -72,36 +72,30 @@ export const Button = (props: ButtonProps) => {
   const { label, type, onClick, disabled, theme, isSubmit, style } = props;
   return (
     <>
-      <Show when={type === "primary"}>
+      <Show when={type === 'primary'}>
         <Primary
           theme={theme}
           disabled={disabled}
           onClick={onClick}
-          type={isSubmit ? "submit" : "button"}
+          type={isSubmit ? 'submit' : 'button'}
           style={style}
         >
           {label}
         </Primary>
       </Show>
-      <Show when={type === "secondary"}>
+      <Show when={type === 'secondary'}>
         <Secondary
           theme={theme}
           disabled={disabled}
           onClick={onClick}
-          type={isSubmit ? "submit" : "button"}
+          type={isSubmit ? 'submit' : 'button'}
           style={style}
         >
           {label}
         </Secondary>
       </Show>
-      <Show when={type === "warn"}>
-        <Warn
-          theme={theme}
-          disabled={disabled}
-          onClick={onClick}
-          type={isSubmit ? "submit" : "button"}
-          style={style}
-        >
+      <Show when={type === 'warn'}>
+        <Warn theme={theme} disabled={disabled} onClick={onClick} type={isSubmit ? 'submit' : 'button'} style={style}>
           {label}
         </Warn>
       </Show>

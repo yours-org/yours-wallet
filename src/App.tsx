@@ -1,35 +1,31 @@
-import styled from "styled-components";
-import { Start } from "./pages/onboarding/Start";
-import { MemoryRouter as Router, Routes, Route } from "react-router-dom";
-import { ColorThemeProps } from "./theme";
-import { CreateWallet } from "./pages/onboarding/CreateWallet";
-import { Settings } from "./pages/Settings";
-import { BsvWallet } from "./pages/BsvWallet";
-import { OrdWallet } from "./pages/OrdWallet";
-import { RestoreWallet } from "./pages/onboarding/RestoreWallet";
-import { useActivityDetector } from "./hooks/useActivityDetector";
-import { Show } from "./components/Show";
-import { UnlockWallet } from "./components/UnlockWallet";
-import { useWalletLockState } from "./hooks/useWalletLockState";
-import { SnackbarProvider } from "./contexts/SnackbarContext";
-import { useTheme } from "./hooks/useTheme";
-import { BsvSendRequest } from "./pages/requests/BsvSendRequest";
-import { storage } from "./utils/storage";
-import { useContext, useEffect, useState } from "react";
-import {
-  Web3BroadcastRequest,
-  Web3SendBsvRequest,
-  Web3SignMessageRequest,
-} from "./hooks/useBsv";
-import { Web3TransferOrdinalRequest } from "./hooks/useOrds";
-import { Web3GetSignaturesRequest } from "./hooks/useContracts";
-import { OrdTransferRequest } from "./pages/requests/OrdTransferRequest";
-import { BottomMenuContext } from "./contexts/BottomMenuContext";
-import { ConnectRequest } from "./pages/requests/ConnectRequest";
-import { SignMessageRequest } from "./pages/requests/SignMessageRequest";
-import { BroadcastRequest } from "./pages/requests/BroadcastRequest";
-import { GetSignaturesRequest } from "./pages/requests/GetSignaturesRequest";
-import { ImportWallet } from "./pages/onboarding/ImportWallet";
+import styled from 'styled-components';
+import { Start } from './pages/onboarding/Start';
+import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
+import { ColorThemeProps } from './theme';
+import { CreateWallet } from './pages/onboarding/CreateWallet';
+import { Settings } from './pages/Settings';
+import { BsvWallet } from './pages/BsvWallet';
+import { OrdWallet } from './pages/OrdWallet';
+import { RestoreWallet } from './pages/onboarding/RestoreWallet';
+import { useActivityDetector } from './hooks/useActivityDetector';
+import { Show } from './components/Show';
+import { UnlockWallet } from './components/UnlockWallet';
+import { useWalletLockState } from './hooks/useWalletLockState';
+import { SnackbarProvider } from './contexts/SnackbarContext';
+import { useTheme } from './hooks/useTheme';
+import { BsvSendRequest } from './pages/requests/BsvSendRequest';
+import { storage } from './utils/storage';
+import { useContext, useEffect, useState } from 'react';
+import { Web3BroadcastRequest, Web3SendBsvRequest, Web3SignMessageRequest } from './hooks/useBsv';
+import { Web3TransferOrdinalRequest } from './hooks/useOrds';
+import { Web3GetSignaturesRequest } from './hooks/useContracts';
+import { OrdTransferRequest } from './pages/requests/OrdTransferRequest';
+import { BottomMenuContext } from './contexts/BottomMenuContext';
+import { ConnectRequest } from './pages/requests/ConnectRequest';
+import { SignMessageRequest } from './pages/requests/SignMessageRequest';
+import { BroadcastRequest } from './pages/requests/BroadcastRequest';
+import { GetSignaturesRequest } from './pages/requests/GetSignaturesRequest';
+import { ImportWallet } from './pages/onboarding/ImportWallet';
 
 export type ThirdPartyAppRequestData = {
   appName: string;
@@ -58,29 +54,21 @@ export const App = () => {
   const menuContext = useContext(BottomMenuContext);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
   const [whitelistedApps, setWhitelistedApps] = useState<WhitelistedApp[]>([]);
-  const [messageToSign, setMessageToSign] = useState<
-    Web3SignMessageRequest | undefined
-  >(undefined);
+  const [messageToSign, setMessageToSign] = useState<Web3SignMessageRequest | undefined>(undefined);
 
-  const [broadcastRequest, setBroadcastRequest] = useState<
-    Web3BroadcastRequest | undefined
-  >(undefined);
+  const [broadcastRequest, setBroadcastRequest] = useState<Web3BroadcastRequest | undefined>(undefined);
 
-  const [thirdPartyAppRequestData, setThirdPartyAppRequestData] = useState<
-    ThirdPartyAppRequestData | undefined
-  >(undefined);
+  const [thirdPartyAppRequestData, setThirdPartyAppRequestData] = useState<ThirdPartyAppRequestData | undefined>(
+    undefined,
+  );
 
-  const [bsvSendRequest, setBsvSendRequest] = useState<
-    Web3SendBsvRequest | undefined
-  >(undefined);
+  const [bsvSendRequest, setBsvSendRequest] = useState<Web3SendBsvRequest | undefined>(undefined);
 
-  const [ordinalTransferRequest, setOrdinalTransferRequest] = useState<
-    Web3TransferOrdinalRequest | undefined
-  >(undefined);
+  const [ordinalTransferRequest, setOrdinalTransferRequest] = useState<Web3TransferOrdinalRequest | undefined>(
+    undefined,
+  );
 
-  const [getSignaturesRequest, setGetSignaturesRequest] = useState<
-    Web3GetSignaturesRequest | undefined
-  >(undefined);
+  const [getSignaturesRequest, setGetSignaturesRequest] = useState<Web3GetSignaturesRequest | undefined>(undefined);
 
   useActivityDetector(isLocked);
 
@@ -91,15 +79,15 @@ export const App = () => {
   useEffect(() => {
     storage.get(
       [
-        "sendBsvRequest",
-        "transferOrdinalRequest",
-        "connectRequest",
-        "popupWindowId",
-        "whitelist",
-        "signMessageRequest",
-        "signTransactionRequest",
-        "broadcastRequest",
-        "getSignaturesRequest",
+        'sendBsvRequest',
+        'transferOrdinalRequest',
+        'connectRequest',
+        'popupWindowId',
+        'whitelist',
+        'signMessageRequest',
+        'signTransactionRequest',
+        'broadcastRequest',
+        'getSignaturesRequest',
       ],
       (result) => {
         const {
@@ -130,7 +118,7 @@ export const App = () => {
 
         if (transferOrdinalRequest) {
           setOrdinalTransferRequest(transferOrdinalRequest);
-          menuContext?.handleSelect("ords");
+          menuContext?.handleSelect('ords');
         }
 
         if (signMessageRequest) {
@@ -144,17 +132,14 @@ export const App = () => {
         if (getSignaturesRequest) {
           setGetSignaturesRequest(getSignaturesRequest);
         }
-      }
+      },
     );
   }, [isLocked, menuContext]);
 
   return (
     <Container theme={theme}>
       <SnackbarProvider>
-        <Show
-          when={!isLocked}
-          whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}
-        >
+        <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
           <Router>
             <Routes>
               <Route path="/" element={<Start />} />
@@ -176,12 +161,7 @@ export const App = () => {
                 path="/bsv-wallet"
                 element={
                   <Show
-                    when={
-                      !bsvSendRequest &&
-                      !messageToSign &&
-                      !broadcastRequest &&
-                      !getSignaturesRequest
-                    }
+                    when={!bsvSendRequest && !messageToSign && !broadcastRequest && !getSignaturesRequest}
                     whenFalseContent={
                       <>
                         <Show when={!!bsvSendRequest}>
@@ -192,9 +172,7 @@ export const App = () => {
                         </Show>
                         <Show when={!!messageToSign}>
                           <SignMessageRequest
-                            messageToSign={
-                              messageToSign as Web3SignMessageRequest
-                            }
+                            messageToSign={messageToSign as Web3SignMessageRequest}
                             popupId={popupId}
                             onSignature={() => setMessageToSign(undefined)}
                           />
@@ -208,13 +186,9 @@ export const App = () => {
                         </Show>
                         <Show when={!!getSignaturesRequest}>
                           <GetSignaturesRequest
-                            getSigsRequest={
-                              getSignaturesRequest as Web3GetSignaturesRequest
-                            }
+                            getSigsRequest={getSignaturesRequest as Web3GetSignaturesRequest}
                             popupId={popupId}
-                            onSignature={() =>
-                              setGetSignaturesRequest(undefined)
-                            }
+                            onSignature={() => setGetSignaturesRequest(undefined)}
                           />
                         </Show>
                       </>
@@ -231,14 +205,9 @@ export const App = () => {
               <Route
                 path="/ord-wallet"
                 element={
-                  <Show
-                    when={!!ordinalTransferRequest}
-                    whenFalseContent={<OrdWallet />}
-                  >
+                  <Show when={!!ordinalTransferRequest} whenFalseContent={<OrdWallet />}>
                     <OrdTransferRequest
-                      web3Request={
-                        ordinalTransferRequest as Web3TransferOrdinalRequest
-                      }
+                      web3Request={ordinalTransferRequest as Web3TransferOrdinalRequest}
                       onResponse={() => setOrdinalTransferRequest(undefined)}
                     />
                   </Show>

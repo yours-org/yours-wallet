@@ -1,19 +1,19 @@
-import styled from "styled-components";
-import { ColorThemeProps } from "../../theme";
-import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { useSnackbar } from "../../hooks/useSnackbar";
-import { BackButton } from "../../components/BackButton";
-import { Text, HeaderText } from "../../components/Reusable";
-import { Input } from "../../components/Input";
-import { Button } from "../../components/Button";
-import { PandaHead } from "../../components/PandaHead";
-import { useKeys } from "../../hooks/useKeys";
-import { useBottomMenu } from "../../hooks/useBottomMenu";
-import { PageLoader } from "../../components/PageLoader";
-import { Show } from "../../components/Show";
-import { sleep } from "../../utils/sleep";
-import { useTheme } from "../../hooks/useTheme";
+import styled from 'styled-components';
+import { ColorThemeProps } from '../../theme';
+import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { BackButton } from '../../components/BackButton';
+import { Text, HeaderText } from '../../components/Reusable';
+import { Input } from '../../components/Input';
+import { Button } from '../../components/Button';
+import { PandaHead } from '../../components/PandaHead';
+import { useKeys } from '../../hooks/useKeys';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { PageLoader } from '../../components/PageLoader';
+import { Show } from '../../components/Show';
+import { sleep } from '../../utils/sleep';
+import { useTheme } from '../../hooks/useTheme';
 
 const Content = styled.div`
   display: flex;
@@ -36,27 +36,27 @@ const FormContainer = styled.form`
 const SeedInput = styled.textarea<ColorThemeProps>`
   background-color: ${({ theme }) => theme.darkAccent};
   border-radius: 0.25rem;
-  border: 1px solid ${({ theme }) => theme.white + "50"};
+  border: 1px solid ${({ theme }) => theme.white + '50'};
   width: 80%;
   height: 7rem;
   padding: 1rem;
   margin: 0.5rem;
   outline: none;
-  color: ${({ theme }) => theme.white + "80"};
+  color: ${({ theme }) => theme.white + '80'};
   resize: none;
 
   &::placeholder {
-    color: ${({ theme }) => theme.white + "80"};
+    color: ${({ theme }) => theme.white + '80'};
   }
 `;
 
 export const RestoreWallet = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const [password, setPassword] = useState("");
-  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [step, setStep] = useState(1);
-  const [seedWords, setSeedWords] = useState<string>("");
+  const [seedWords, setSeedWords] = useState<string>('');
 
   const { addSnackbar } = useSnackbar();
   const { generateSeedAndStoreEncrypted } = useKeys();
@@ -76,13 +76,13 @@ export const RestoreWallet = () => {
     setLoading(true);
     if (password.length < 8) {
       setLoading(false);
-      addSnackbar("The password must be at least 8 characters!", "error");
+      addSnackbar('The password must be at least 8 characters!', 'error');
       return;
     }
 
     if (password !== passwordConfirm) {
       setLoading(false);
-      addSnackbar("The passwords do not match!", "error");
+      addSnackbar('The passwords do not match!', 'error');
       return;
     }
 
@@ -90,7 +90,7 @@ export const RestoreWallet = () => {
     await sleep(50);
     const mnemonic = generateSeedAndStoreEncrypted(password, seedWords);
     if (!mnemonic) {
-      addSnackbar("An error occurred while restoring the wallet!", "error");
+      addSnackbar('An error occurred while restoring the wallet!', 'error');
       return;
     }
 
@@ -100,7 +100,7 @@ export const RestoreWallet = () => {
 
   const passwordStep = (
     <>
-      <BackButton onClick={() => navigate("/")} />
+      <BackButton onClick={() => navigate('/')} />
       <Content>
         <HeaderText theme={theme}>Create a password</HeaderText>
         <Text theme={theme}>This is used to unlock your wallet.</Text>
@@ -118,7 +118,7 @@ export const RestoreWallet = () => {
             type="password"
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
-            style={{ marginBottom: "2rem" }}
+            style={{ marginBottom: '2rem' }}
           />
           <Button theme={theme} type="primary" label="Finish" isSubmit />
         </FormContainer>
@@ -128,19 +128,17 @@ export const RestoreWallet = () => {
 
   const enterSeedStep = (
     <>
-      <BackButton onClick={() => navigate("/")} />
+      <BackButton onClick={() => navigate('/')} />
       <Content>
         <HeaderText theme={theme}>Restore a wallet</HeaderText>
-        <Text theme={theme}>
-          Only input a seed phrase previously generated from Panda Wallet.
-        </Text>
+        <Text theme={theme}>Only input a seed phrase previously generated from Panda Wallet.</Text>
         <FormContainer onSubmit={() => setStep(2)}>
           <SeedInput
             theme={theme}
             placeholder="Enter secret recovery words"
             onChange={(e) => setSeedWords(e.target.value)}
           />
-          <Text theme={theme} style={{ margin: "3rem 0 1rem" }}>
+          <Text theme={theme} style={{ margin: '3rem 0 1rem' }}>
             Make sure you are in a safe place and no one is watching.
           </Text>
           <Button theme={theme} type="primary" label="Next" isSubmit />
@@ -154,15 +152,10 @@ export const RestoreWallet = () => {
       <Content>
         <PandaHead />
         <HeaderText theme={theme}>Success!</HeaderText>
-        <Text theme={theme} style={{ marginBottom: "1rem" }}>
+        <Text theme={theme} style={{ marginBottom: '1rem' }}>
           Your Panda Wallet has been restored.
         </Text>
-        <Button
-          theme={theme}
-          type="primary"
-          label="Enter"
-          onClick={() => navigate("/bsv-wallet")}
-        />
+        <Button theme={theme} type="primary" label="Enter" onClick={() => navigate('/bsv-wallet')} />
       </Content>
     </>
   );

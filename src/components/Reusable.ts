@@ -1,5 +1,5 @@
-import styled, { css } from "styled-components";
-import { ColorThemeProps } from "../theme";
+import styled, { css } from 'styled-components';
+import { ColorThemeProps } from '../theme';
 
 export const HeaderText = styled.h1<ColorThemeProps>`
   font-size: 1.75rem;
@@ -18,7 +18,7 @@ export const Divider = styled.hr`
 
 export const Text = styled.p<ColorThemeProps>`
   font-size: 0.9rem;
-  color: ${({ theme }) => theme.white + "90"};
+  color: ${({ theme }) => theme.white + '90'};
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 400;
   margin: 0.5rem 0 2rem 0;
@@ -30,7 +30,7 @@ export const Badge = styled.button<{ $primary?: boolean }>`
   background: transparent;
   border-radius: 0.5rem;
   border: none;
-  color: ${({ theme }) => theme.white + "90"};
+  color: ${({ theme }) => theme.white + '90'};
   margin: 0.5em 1em;
   padding: 0.25em 1em;
   ${(props) => css`
@@ -64,7 +64,6 @@ export const ButtonContainer = styled.div`
   width: 100%;
   margin: 1rem 0 2.5rem 0;
 `;
-
 
 export const MainContent = styled.div`
   display: flex;

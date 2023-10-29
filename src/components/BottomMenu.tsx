@@ -1,11 +1,11 @@
-import { styled } from "styled-components";
-import { ColorThemeProps, Theme } from "../theme";
-import coins from "../assets/coins.svg";
-import nfts from "../assets/items.svg";
-import settings from "../assets/settings.svg";
-import { MenuItems } from "../contexts/BottomMenuContext";
-import { Badge } from "./Reusable";
-import { NetWork } from "../utils/network";
+import { styled } from 'styled-components';
+import { ColorThemeProps, Theme } from '../theme';
+import coins from '../assets/coins.svg';
+import nfts from '../assets/items.svg';
+import settings from '../assets/settings.svg';
+import { MenuItems } from '../contexts/BottomMenuContext';
+import { Badge } from './Reusable';
+import { NetWork } from '../utils/network';
 
 const Container = styled.div<ColorThemeProps>`
   display: flex;
@@ -16,7 +16,7 @@ const Container = styled.div<ColorThemeProps>`
   position: absolute;
   bottom: 0;
   background: ${({ theme }) => theme.darkAccent};
-  color: ${({ theme }) => theme.white + "80"};
+  color: ${({ theme }) => theme.white + '80'};
   z-index: 100;
 `;
 
@@ -59,14 +59,8 @@ const Menu = (props: MenuProps) => {
     <MenuContainer>
       {props.badge ? (
         <>
-          <Icon
-            src={props.src}
-            onClick={props.onClick}
-            opacity={props.opacity}
-          />
-          <Badge style={{ position: "absolute", marginTop: "-0.5rem" }}>
-            {props.badge}
-          </Badge>
+          <Icon src={props.src} onClick={props.onClick} opacity={props.opacity} />
+          <Badge style={{ position: 'absolute', marginTop: '-0.5rem' }}>{props.badge}</Badge>
         </>
       ) : (
         <Icon src={props.src} onClick={props.onClick} opacity={props.opacity} />
@@ -80,24 +74,14 @@ export const BottomMenu = (props: BottomMenuProps) => {
 
   return (
     <Container theme={theme}>
-      <Menu
-        theme={theme}
-        src={coins}
-        onClick={() => handleSelect("bsv")}
-        opacity={selected === "bsv" ? 1 : 0.4}
-      />
-      <Menu
-        theme={theme}
-        src={nfts}
-        onClick={() => handleSelect("ords")}
-        opacity={selected === "ords" ? 1 : 0.4}
-      />
+      <Menu theme={theme} src={coins} onClick={() => handleSelect('bsv')} opacity={selected === 'bsv' ? 1 : 0.4} />
+      <Menu theme={theme} src={nfts} onClick={() => handleSelect('ords')} opacity={selected === 'ords' ? 1 : 0.4} />
       <Menu
         theme={theme}
         src={settings}
-        onClick={() => handleSelect("settings")}
-        opacity={selected === "settings" ? 1 : 0.4}
-        badge={props.network === NetWork.Testnet ? "testnet" : undefined}
+        onClick={() => handleSelect('settings')}
+        opacity={selected === 'settings' ? 1 : 0.4}
+        badge={props.network === NetWork.Testnet ? 'testnet' : undefined}
       />
     </Container>
   );

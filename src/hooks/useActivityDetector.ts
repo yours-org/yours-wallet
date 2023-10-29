@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { storage } from "../utils/storage";
+import { useEffect } from 'react';
+import { storage } from '../utils/storage';
 
 export const useActivityDetector = (isWalletLocked: boolean) => {
   useEffect(() => {
@@ -10,10 +10,10 @@ export const useActivityDetector = (isWalletLocked: boolean) => {
       storage.set({ lastActiveTime: timestamp });
     };
 
-    document.addEventListener("mousemove", handleActivity);
+    document.addEventListener('mousemove', handleActivity);
 
     return () => {
-      document.removeEventListener("mousemove", handleActivity);
+      document.removeEventListener('mousemove', handleActivity);
     };
   }, [isWalletLocked]);
 };

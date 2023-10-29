@@ -1,6 +1,6 @@
-import * as bip39 from "bip39";
-import { ExtendedPrivateKey, PrivateKey } from "bsv-wasm-web";
-import { WifKeys } from "../hooks/useKeys";
+import * as bip39 from 'bip39';
+import { ExtendedPrivateKey, PrivateKey } from 'bsv-wasm-web';
+import { WifKeys } from '../hooks/useKeys';
 
 export type Keys = {
   mnemonic: string;
@@ -17,7 +17,7 @@ export type Keys = {
 const getWifAndDerivation = (seedPhrase: string, isOrd?: boolean) => {
   const seed = bip39.mnemonicToSeedSync(seedPhrase);
   const masterNode = ExtendedPrivateKey.from_seed(seed);
-  const derivationPath = `m/44'/236'/${isOrd ? "1" : "0"}'/0/0`;
+  const derivationPath = `m/44'/236'/${isOrd ? '1' : '0'}'/0/0`;
   const childNode = masterNode.derive_from_path(derivationPath);
   const privateKey = childNode.get_private_key();
   const wif = privateKey.to_wif();
@@ -28,7 +28,7 @@ const getWifAndDerivation = (seedPhrase: string, isOrd?: boolean) => {
 export const getKeys = (validMnemonic?: string) => {
   if (validMnemonic) {
     const isValid = bip39.validateMnemonic(validMnemonic);
-    if (!isValid) throw new Error("Invalid Mnemonic!");
+    if (!isValid) throw new Error('Invalid Mnemonic!');
   }
   const mnemonic = validMnemonic ?? bip39.generateMnemonic();
   const walletWifAndDP = getWifAndDerivation(mnemonic);

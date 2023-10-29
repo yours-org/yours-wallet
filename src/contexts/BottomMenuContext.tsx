@@ -1,9 +1,9 @@
-import { ReactNode, createContext, useState } from "react";
-import { BottomMenu } from "../components/BottomMenu";
-import { useTheme } from "../hooks/useTheme";
-import { useWeb3Context } from "../hooks/useWeb3Context";
+import { ReactNode, createContext, useState } from 'react';
+import { BottomMenu } from '../components/BottomMenu';
+import { useTheme } from '../hooks/useTheme';
+import { useWeb3Context } from '../hooks/useWeb3Context';
 
-export type MenuItems = "bsv" | "ords" | "settings";
+export type MenuItems = 'bsv' | 'ords' | 'settings';
 
 type BottomMenuContextType = {
   selected: MenuItems | null;
@@ -14,9 +14,7 @@ type BottomMenuContextType = {
   isVisible: boolean;
 };
 
-export const BottomMenuContext = createContext<BottomMenuContextType | null>(
-  null
-);
+export const BottomMenuContext = createContext<BottomMenuContextType | null>(null);
 
 interface BottomMenuProviderProps {
   children: ReactNode;
@@ -52,14 +50,7 @@ export const BottomMenuProvider = (props: BottomMenuProviderProps) => {
         setSelected,
       }}
     >
-      {isVisible && (
-        <BottomMenu
-          theme={theme}
-          network={network}
-          handleSelect={handleSelect}
-          selected={selected}
-        />
-      )}
+      {isVisible && <BottomMenu theme={theme} network={network} handleSelect={handleSelect} selected={selected} />}
       {children}
     </BottomMenuContext.Provider>
   );

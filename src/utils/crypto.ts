@@ -1,4 +1,4 @@
-import CryptoJS from "crypto-js";
+import CryptoJS from 'crypto-js';
 
 export const deriveKey = (password: string, salt: string) => {
   const key = CryptoJS.PBKDF2(password, salt, {
@@ -28,8 +28,7 @@ export const encrypt = (textToEncrypt: string, password: string): string => {
   });
 
   // We concatenate the salt and the IV before the ciphertext
-  const saltedCiphertext =
-    salt.toString() + iv.toString() + ciphertext.toString();
+  const saltedCiphertext = salt.toString() + iv.toString() + ciphertext.toString();
 
   return saltedCiphertext;
 };

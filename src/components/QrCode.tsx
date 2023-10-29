@@ -1,6 +1,6 @@
-import * as qr from "qrcode";
-import { useEffect, useState } from "react";
-import { styled } from "styled-components";
+import * as qr from 'qrcode';
+import { useEffect, useState } from 'react';
+import { styled } from 'styled-components';
 
 const QrImage = styled.img`
   width: 10rem;
@@ -10,7 +10,7 @@ const QrImage = styled.img`
 
 export type QrCodeProps = {
   address: string;
-  onClick ?: () => void;
+  onClick?: () => void;
 };
 
 export const QrCode = (props: QrCodeProps) => {
@@ -28,9 +28,5 @@ export const QrCode = (props: QrCodeProps) => {
     });
   }, [address]);
 
-  return (
-    <>
-      {qrUrl && <QrImage src={qrUrl} alt="Bitcoin QR Code" onClick={onClick} />}
-    </>
-  );
+  return <>{qrUrl && <QrImage src={qrUrl} alt="Bitcoin QR Code" onClick={onClick} />}</>;
 };

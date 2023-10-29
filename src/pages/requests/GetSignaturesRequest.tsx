@@ -1,28 +1,19 @@
-import { useBottomMenu } from "../../hooks/useBottomMenu";
-import React, { useEffect, useState } from "react";
-import { Button } from "../../components/Button";
-import {
-  Text,
-  HeaderText,
-  ConfirmContent,
-  FormContainer,
-} from "../../components/Reusable";
-import { Show } from "../../components/Show";
-import { useSnackbar } from "../../hooks/useSnackbar";
-import { PageLoader } from "../../components/PageLoader";
-import { Input } from "../../components/Input";
-import { sleep } from "../../utils/sleep";
-import { useTheme } from "../../hooks/useTheme";
-import { DefaultTheme, styled } from "styled-components";
-import {
-  SignatureResponse,
-  Web3GetSignaturesRequest,
-  useContracts,
-} from "../../hooks/useContracts";
-import { storage } from "../../utils/storage";
-import { useNavigate } from "react-router-dom";
-import { P2PKHAddress, Transaction } from "bsv-wasm-web";
-import { useBsvWasm } from "../../hooks/useBsvWasm";
+import { useBottomMenu } from '../../hooks/useBottomMenu';
+import React, { useEffect, useState } from 'react';
+import { Button } from '../../components/Button';
+import { Text, HeaderText, ConfirmContent, FormContainer } from '../../components/Reusable';
+import { Show } from '../../components/Show';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { PageLoader } from '../../components/PageLoader';
+import { Input } from '../../components/Input';
+import { sleep } from '../../utils/sleep';
+import { useTheme } from '../../hooks/useTheme';
+import { DefaultTheme, styled } from 'styled-components';
+import { SignatureResponse, Web3GetSignaturesRequest, useContracts } from '../../hooks/useContracts';
+import { storage } from '../../utils/storage';
+import { useNavigate } from 'react-router-dom';
+import { P2PKHAddress, Transaction } from 'bsv-wasm-web';
+import { useBsvWasm } from '../../hooks/useBsvWasm';
 
 const TxInput = styled.div`
   border: 1px solid yellow;
@@ -63,23 +54,21 @@ const InputContent = (props: {
   theme?: DefaultTheme | undefined;
 }) => {
   return (
-    <div style={{ color: props.theme?.color || "white" }}>
+    <div style={{ color: props.theme?.color || 'white' }}>
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          paddingTop: "0.2rem",
+          display: 'flex',
+          justifyContent: 'space-between',
+          paddingTop: '0.2rem',
         }}
       >
         <span>#{props.idx}</span>
         <span>{props.tag}</span>
         <span>{props.sats} sats</span>
       </div>
-      <div style={{ display: "flex", alignItems: "center" }}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
         <div>Signer:</div>
-        <div style={{ overflowX: "scroll", padding: "0.5rem 0 0.5rem 0.5rem" }}>
-          {props.addr}
-        </div>
+        <div style={{ overflowX: 'scroll', padding: '0.5rem 0 0.5rem 0.5rem' }}>{props.addr}</div>
       </div>
     </div>
   );
@@ -93,23 +82,21 @@ const OutputContent = (props: {
   theme?: DefaultTheme | undefined;
 }) => {
   return (
-    <div style={{ color: props.theme?.color || "white" }}>
+    <div style={{ color: props.theme?.color || 'white' }}>
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          paddingTop: "0.2rem",
+          display: 'flex',
+          justifyContent: 'space-between',
+          paddingTop: '0.2rem',
         }}
       >
         <span>#{props.idx}</span>
         <span>{props.tag}</span>
         <span>{props.sats} sats</span>
       </div>
-      <div style={{ display: "flex", alignItems: "center" }}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
         <div>Payee:</div>
-        <div style={{ overflowX: "scroll", padding: "0.5rem 0 0.5rem 0.5rem" }}>
-          {props.addr}
-        </div>
+        <div style={{ overflowX: 'scroll', padding: '0.5rem 0 0.5rem 0.5rem' }}>{props.addr}</div>
       </div>
     </div>
   );
@@ -137,13 +124,13 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
           label="Details"
           // disabled={isProcessing}
           onClick={() => setShowDetail(!showDetail)}
-          style={{ marginTop: "0" }}
+          style={{ marginTop: '0' }}
         />
       </Show>
 
       <Show when={showDetail}>
         <TxInputsContainer>
-          <Text theme={theme} style={{ margin: "0.5rem 0" }}>
+          <Text theme={theme} style={{ margin: '0.5rem 0' }}>
             Inputs To Sign
           </Text>
           {request.sigRequests.map((sigReq) => {
@@ -151,8 +138,8 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
               <TxInput>
                 <InputContent
                   idx={sigReq.inputIndex}
-                  tag={sigReq.scriptHex ? "nonStandard" : "P2PKH"}
-                  addr={[sigReq.address].flat().join(", ")}
+                  tag={sigReq.scriptHex ? 'nonStandard' : 'P2PKH'}
+                  addr={[sigReq.address].flat().join(', ')}
                   sats={sigReq.satoshis}
                   theme={theme}
                 />
@@ -161,29 +148,25 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
           })}
         </TxInputsContainer>
         <TxOutputsContainer>
-          <Text theme={theme} style={{ margin: "0.5rem 0" }}>
+          <Text theme={theme} style={{ margin: '0.5rem 0' }}>
             Outputs
           </Text>
           {tx ? (
             [...Array(tx.get_noutputs()).keys()].map((idx: number) => {
               const output = tx.get_output(idx);
               const asm = output!.get_script_pub_key().to_asm_string();
-              const pubkeyHash =
-                (/^OP_DUP OP_HASH160 ([0-9a-fA-F]{40}) OP_EQUALVERIFY OP_CHECKSIG$/.exec(
-                  asm
-                ) || [])[1];
+              const pubkeyHash = (/^OP_DUP OP_HASH160 ([0-9a-fA-F]{40}) OP_EQUALVERIFY OP_CHECKSIG$/.exec(asm) ||
+                [])[1];
               const isP2PKH = !!pubkeyHash;
               const toAddr = pubkeyHash
-                ? P2PKHAddress.from_pubkey_hash(
-                    Uint8Array.from(Buffer.from(pubkeyHash, "hex"))
-                  ).to_string()
-                : "Unknown Address";
+                ? P2PKHAddress.from_pubkey_hash(Uint8Array.from(Buffer.from(pubkeyHash, 'hex'))).to_string()
+                : 'Unknown Address';
 
               return (
                 <TxOutput>
                   <OutputContent
                     idx={idx}
-                    tag={isP2PKH ? "P2PKH" : "nonStandard"}
+                    tag={isP2PKH ? 'P2PKH' : 'nonStandard'}
                     addr={toAddr}
                     sats={Number(output!.get_satoshis())}
                     theme={theme}
@@ -214,7 +197,7 @@ export type GetSignaturesRequestProps = {
 export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
-  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const navigate = useNavigate();
 
@@ -223,7 +206,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { isProcessing, setIsProcessing, getSignatures } = useContracts();
 
   useEffect(() => {
-    setSelected("bsv");
+    setSelected('bsv');
   }, [setSelected]);
 
   useEffect(() => {
@@ -235,7 +218,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   }, [message, getSigsResponse]);
 
   const resetSendState = () => {
-    setPasswordConfirm("");
+    setPasswordConfirm('');
     setGetSigsResponse(undefined);
     setIsProcessing(false);
   };
@@ -246,7 +229,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     await sleep(25);
 
     if (!passwordConfirm) {
-      addSnackbar("You must enter a password!", "error");
+      addSnackbar('You must enter a password!', 'error');
       setIsProcessing(false);
       return;
     }
@@ -255,15 +238,15 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
 
     if (getSigsRes?.error) {
       const message =
-        getSigsRes.error.message === "invalid-password"
-          ? "Invalid Password!"
-          : getSigsRes.error.message === "unknown-address"
-          ? "Unknown Address: " + (getSigsRes.error.cause ?? "")
-          : "An unknown error has occurred! Try again.";
+        getSigsRes.error.message === 'invalid-password'
+          ? 'Invalid Password!'
+          : getSigsRes.error.message === 'unknown-address'
+          ? 'Unknown Address: ' + (getSigsRes.error.cause ?? '')
+          : 'An unknown error has occurred! Try again.';
 
-      addSnackbar(message, "error", 5000);
+      addSnackbar(message, 'error', 5000);
 
-      if (getSigsRes.error.message === "invalid-password") {
+      if (getSigsRes.error.message === 'invalid-password') {
         // could try again only if the password is wrong
         setIsProcessing(false);
         return;
@@ -271,7 +254,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     }
 
     if (getSigsRes?.sigResponses) {
-      addSnackbar("Successfully Signed!", "success");
+      addSnackbar('Successfully Signed!', 'success');
     }
 
     setGetSigsResponse(getSigsRes.sigResponses);
@@ -279,24 +262,22 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     setTimeout(() => {
       onSignature();
       if (!getSigsRes && popupId) chrome.windows.remove(popupId);
-      storage.remove("getSignaturesRequest");
-      navigate("/bsv-wallet");
+      storage.remove('getSignaturesRequest');
+      navigate('/bsv-wallet');
     }, 2000);
 
     chrome.runtime.sendMessage({
-      action: "getSignaturesResponse",
+      action: 'getSignaturesResponse',
       ...getSigsRes,
     });
 
     setIsProcessing(false);
   };
 
-  const rejectSigning = async (
-    e: React.MouseEvent<HTMLButtonElement, MouseEvent>
-  ) => {
+  const rejectSigning = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     e.preventDefault();
     if (popupId) chrome.windows.remove(popupId);
-    storage.remove("getSignaturesRequest");
+    storage.remove('getSignaturesRequest');
   };
 
   return (
@@ -307,7 +288,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       <Show when={!isProcessing && !!getSigsRequest}>
         <ConfirmContent>
           <HeaderText theme={theme}>Sign Transaction</HeaderText>
-          <Text theme={theme} style={{ margin: "0.75rem 0" }}>
+          <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             The app is requesting signatures for a transaction.
           </Text>
           <FormContainer noValidate onSubmit={(e) => handleSigning(e)}>
@@ -318,20 +299,14 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
               type="password"
               onChange={(e) => setPasswordConfirm(e.target.value)}
             />
-            <Button
-              theme={theme}
-              type="primary"
-              label="Sign the transaction"
-              isSubmit
-              disabled={isProcessing}
-            />
+            <Button theme={theme} type="primary" label="Sign the transaction" isSubmit disabled={isProcessing} />
             <Button
               theme={theme}
               type="secondary"
               label="Cancel"
               disabled={isProcessing}
               onClick={rejectSigning}
-              style={{ marginTop: "0" }}
+              style={{ marginTop: '0' }}
             />
           </FormContainer>
         </ConfirmContent>

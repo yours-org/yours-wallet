@@ -2,7 +2,7 @@ const createPandaMethod = (type) => {
   return async (params) => {
     return new Promise((resolve, reject) => {
       // Send request
-      const requestEvent = new CustomEvent("PandaRequest", {
+      const requestEvent = new CustomEvent('PandaRequest', {
         detail: { type, params },
       });
       document.dispatchEvent(requestEvent);
@@ -16,28 +16,28 @@ const createPandaMethod = (type) => {
             reject(e.detail.error);
           }
 
-          document.removeEventListener("PandaResponse", onResponse);
+          document.removeEventListener('PandaResponse', onResponse);
         }
       }
 
-      document.addEventListener("PandaResponse", onResponse, { once: true });
+      document.addEventListener('PandaResponse', onResponse, { once: true });
     });
   };
 };
 
 window.panda = {
   isReady: true,
-  connect: createPandaMethod("connect"),
-  disconnect: createPandaMethod("disconnect"),
-  isConnected: createPandaMethod("isConnected"),
-  getPubKeys: createPandaMethod("getPubKeys"),
-  getAddresses: createPandaMethod("getAddresses"),
-  getBalance: createPandaMethod("getBalance"),
-  getOrdinals: createPandaMethod("getOrdinals"),
-  sendBsv: createPandaMethod("sendBsv"),
-  transferOrdinal: createPandaMethod("transferOrdinal"),
-  signMessage: createPandaMethod("signMessage"),
-  broadcast: createPandaMethod("broadcast"),
-  getSignatures: createPandaMethod("getSignatures"),
-  getSocialProfile: createPandaMethod("getSocialProfile"),
+  connect: createPandaMethod('connect'),
+  disconnect: createPandaMethod('disconnect'),
+  isConnected: createPandaMethod('isConnected'),
+  getPubKeys: createPandaMethod('getPubKeys'),
+  getAddresses: createPandaMethod('getAddresses'),
+  getBalance: createPandaMethod('getBalance'),
+  getOrdinals: createPandaMethod('getOrdinals'),
+  sendBsv: createPandaMethod('sendBsv'),
+  transferOrdinal: createPandaMethod('transferOrdinal'),
+  signMessage: createPandaMethod('signMessage'),
+  broadcast: createPandaMethod('broadcast'),
+  getSignatures: createPandaMethod('getSignatures'),
+  getSocialProfile: createPandaMethod('getSocialProfile'),
 };

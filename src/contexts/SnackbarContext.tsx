@@ -1,9 +1,9 @@
-import { ReactNode, createContext, useState } from "react";
-import { Snackbar } from "../components/Snackbar";
-import { useTheme } from "../hooks/useTheme";
-import { SNACKBAR_TIMEOUT } from "../utils/constants";
+import { ReactNode, createContext, useState } from 'react';
+import { Snackbar } from '../components/Snackbar';
+import { useTheme } from '../hooks/useTheme';
+import { SNACKBAR_TIMEOUT } from '../utils/constants';
 
-export type SnackbarType = "error" | "info" | "success";
+export type SnackbarType = 'error' | 'info' | 'success';
 
 type SnackbarContextType = {
   message: string | null;
@@ -35,9 +35,7 @@ export const SnackbarProvider = (props: SnackbarProviderProps) => {
 
   return (
     <SnackbarContext.Provider value={{ message, snackBarType, addSnackbar }}>
-      {message && (
-        <Snackbar theme={theme} message={message} type={snackBarType} />
-      )}
+      {message && <Snackbar theme={theme} message={message} type={snackBarType} />}
       {children}
     </SnackbarContext.Provider>
   );

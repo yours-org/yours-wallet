@@ -1,10 +1,10 @@
-import styled from "styled-components";
-import { Text } from "./Reusable";
-import { SnackbarType } from "../contexts/SnackbarContext";
-import { ColorThemeProps, Theme } from "../theme";
-import errorIcon from "../assets/error.svg";
-import infoIcon from "../assets/info.svg";
-import successIcon from "../assets/success.svg";
+import styled from 'styled-components';
+import { Text } from './Reusable';
+import { SnackbarType } from '../contexts/SnackbarContext';
+import { ColorThemeProps, Theme } from '../theme';
+import errorIcon from '../assets/error.svg';
+import infoIcon from '../assets/info.svg';
+import successIcon from '../assets/success.svg';
 
 type SnackBarColorTheme = ColorThemeProps & { color: string };
 
@@ -41,31 +41,17 @@ export const Snackbar = (props: SnackbarProps) => {
   const { message, type, theme } = props;
   return (
     <SnackBarContainer
-      color={
-        type === "error"
-          ? theme.errorRed
-          : type === "info"
-          ? theme.lightAccent
-          : theme.primaryButton
-      }
+      color={type === 'error' ? theme.errorRed : type === 'info' ? theme.lightAccent : theme.primaryButton}
     >
-      <Image
-        src={
-          type === "error"
-            ? errorIcon
-            : type === "info"
-            ? infoIcon
-            : successIcon
-        }
-      />
+      <Image src={type === 'error' ? errorIcon : type === 'info' ? infoIcon : successIcon} />
       <Text
         theme={theme}
         style={{
           margin: 0,
           fontWeight: 500,
-          fontSize: "1.25rem",
-          color: type === "error" ? theme.white : theme.darkAccent,
-          wordWrap: "break-word",
+          fontSize: '1.25rem',
+          color: type === 'error' ? theme.white : theme.darkAccent,
+          wordWrap: 'break-word',
         }}
       >
         {message}

@@ -1,6 +1,6 @@
-import styled, { keyframes } from "styled-components";
-import { ColorThemeProps, Theme } from "../theme";
-import { Text } from "./Reusable";
+import styled, { keyframes } from 'styled-components';
+import { ColorThemeProps, Theme } from '../theme';
+import { Text } from './Reusable';
 
 const spin = keyframes`
   0% { transform: rotate(0deg); }
@@ -20,7 +20,7 @@ export const LoaderContainer = styled.div`
 `;
 
 export const Loader = styled.div<ColorThemeProps>`
-  border: 0.5rem solid ${({ theme }) => theme.white + "50"};
+  border: 0.5rem solid ${({ theme }) => theme.white + '50'};
   border-top: 0.5rem solid ${({ theme }) => theme.lightAccent};
   border-radius: 50%;
   width: 2rem;
@@ -37,7 +37,7 @@ export const PageLoader = (props: PageLoaderProps) => {
   const { message, theme } = props;
   return (
     <LoaderContainer>
-      <Text theme={theme} style={{ fontSize: "1rem", color: theme.white }}>
+      <Text theme={theme} style={{ fontSize: '1rem', color: theme.white }}>
         {message}
       </Text>
       <Loader theme={theme} />
