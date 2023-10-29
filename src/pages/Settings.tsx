@@ -29,8 +29,8 @@ const Content = styled.div`
   flex-direction: column;
   align-items: center;
   width: 100%;
-  margin-top: 8rem;
-  height: 100%;
+  height: calc(75%);
+  overflow-y: scroll;
 `;
 
 const HeaderWrapper = styled.div`
@@ -91,6 +91,14 @@ const ExportKeysAsQrCodeContainer = styled.div`
   justify-content: center;
   width: 100%;
   padding: 1rem;
+`;
+
+const PageWrapper = styled.div<{ marginTop: string }>`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: ${(props) => props.marginTop};
+  width: 100%;
 `;
 
 type SettingsPage = 'main' | 'connected-apps' | 'social-profile' | 'export-keys-options' | 'export-keys-qr';
@@ -293,7 +301,7 @@ export const Settings = () => {
   );
 
   const connectedAppsPage = (
-    <>
+    <PageWrapper marginTop={connectedApps.length === 0 ? '10rem' : '-1rem'}>
       <BackButton onClick={() => setPage('main')} />
       <Show when={connectedApps.length > 0} whenFalseContent={<Text theme={theme}>No apps connected</Text>}>
         <ScrollableContainer>
@@ -310,7 +318,7 @@ export const Settings = () => {
           })}
         </ScrollableContainer>
       </Show>
-    </>
+    </PageWrapper>
   );
 
   const exportKeysAsQrCodePage = (
@@ -325,19 +333,7 @@ export const Settings = () => {
   );
 
   const exportKeyOptionsPage = (
-    <Show
-      when={!showSpeedBump}
-      whenFalseContent={
-        <SpeedBump
-          theme={theme}
-          message={speedBumpMessage}
-          onCancel={handleCancel}
-          onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
-          showSpeedBump={showSpeedBump}
-          withPassword={decisionType === 'export-keys' || decisionType === 'export-keys-qr-code'}
-        />
-      }
-    >
+    <>
       <BackButton onClick={() => setPage('main')} />
       <SettingsRow
         name="Download Keys"
@@ -349,11 +345,11 @@ export const Settings = () => {
         description="Display private keys as QR code for mobile import"
         onClick={handleExportKeysAsQrCodeIntent}
       />
-    </Show>
+    </>
   );
 
   const socialProfilePage = (
-    <>
+    <PageWrapper marginTop="5rem">
       <BackButton onClick={() => setPage('main')} />
       <SettingsText theme={theme}>Display Name</SettingsText>
       <Input
@@ -378,29 +374,43 @@ export const Settings = () => {
         style={{ marginTop: '1rem' }}
         onClick={handleSocialProfileSave}
       />
-    </>
+    </PageWrapper>
   );
 
   return (
-    <Content>
-      <HeaderWrapper>
-        <HeaderText style={{ fontSize: '1.25rem' }} theme={theme}>
-          {page === 'connected-apps'
-            ? 'Connected Apps'
-            : page === 'social-profile'
-            ? 'Social Profile'
-            : page === 'export-keys-options'
-            ? 'Export Keys'
-            : page === 'export-keys-qr'
-            ? 'Exported QR code'
-            : 'Settings'}
-        </HeaderText>
-      </HeaderWrapper>
-      <Show when={page === 'main'}>{main}</Show>
-      <Show when={page === 'connected-apps'}>{connectedAppsPage}</Show>
-      <Show when={page === 'social-profile'}>{socialProfilePage}</Show>
-      <Show when={page === 'export-keys-options'}>{exportKeyOptionsPage}</Show>
-      <Show when={page === 'export-keys-qr'}>{exportKeysAsQrCodePage}</Show>
-    </Content>
+    <Show
+      when={!showSpeedBump}
+      whenFalseContent={
+        <SpeedBump
+          theme={theme}
+          message={speedBumpMessage}
+          onCancel={handleCancel}
+          onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
+          showSpeedBump={showSpeedBump}
+          withPassword={decisionType === 'export-keys' || decisionType === 'export-keys-qr-code'}
+        />
+      }
+    >
+      <Content>
+        <HeaderWrapper>
+          <HeaderText style={{ fontSize: '1.25rem' }} theme={theme}>
+            {page === 'connected-apps'
+              ? 'Connected Apps'
+              : page === 'social-profile'
+              ? 'Social Profile'
+              : page === 'export-keys-options'
+              ? 'Export Keys'
+              : page === 'export-keys-qr'
+              ? 'Exported QR code'
+              : 'Settings'}
+          </HeaderText>
+        </HeaderWrapper>
+        <Show when={page === 'main'}>{main}</Show>
+        <Show when={page === 'connected-apps'}>{connectedAppsPage}</Show>
+        <Show when={page === 'social-profile'}>{socialProfilePage}</Show>
+        <Show when={page === 'export-keys-options'}>{exportKeyOptionsPage}</Show>
+        <Show when={page === 'export-keys-qr'}>{exportKeysAsQrCodePage}</Show>
+      </Content>
+    </Show>
   );
 };
