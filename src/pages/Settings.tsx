@@ -28,10 +28,9 @@ const Content = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content : center;
   width: 100%;
-  margin-top: -2rem;
-  height : 100%
+  margin-top: 8rem;
+  height: 100%;
 `;
 
 const HeaderWrapper = styled.div`
@@ -94,7 +93,12 @@ const ExportKeysAsQrCodeContainer = styled.div`
   padding: 1rem;
 `;
 
-type SettingsPage = "main" | "connected-apps" | "social-profile" | "export-keys-options" | "export-keys-qr";
+type SettingsPage =
+  | "main"
+  | "connected-apps"
+  | "social-profile"
+  | "export-keys-options"
+  | "export-keys-qr";
 type DecisionType = "sign-out" | "export-keys" | "export-keys-qr-code";
 
 export const Settings = () => {
@@ -110,8 +114,9 @@ export const Settings = () => {
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const { retrieveKeys } = useKeys();
   const { socialProfile, storeSocialProfile } = useSocialProfile();
-  const [exportKeysQrData,setExportKeysAsQrData] = useState(""); 
-  const [shouldVisibleExportedKeys,setShouldVisibleExportedKeys] = useState(false);
+  const [exportKeysQrData, setExportKeysAsQrData] = useState("");
+  const [shouldVisibleExportedKeys, setShouldVisibleExportedKeys] =
+    useState(false);
 
   const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState(
     socialProfile.displayName
@@ -216,13 +221,12 @@ export const Settings = () => {
 
     const jsonData = JSON.stringify(keysToExport, null, 2);
     setExportKeysAsQrData(jsonData);
-    
+
     setPage("export-keys-qr");
     setShouldVisibleExportedKeys(true);
-    setTimeout(()=>{
-         setShouldVisibleExportedKeys(false);
-    },10000)
-    
+    setTimeout(() => {
+      setShouldVisibleExportedKeys(false);
+    }, 10000);
   };
 
   const signOut = async () => {
@@ -267,49 +271,48 @@ export const Settings = () => {
     }
   };
 
-
   const main = (
     <>
-        <SettingsRow
-          name="Connected Apps"
-          description="Manage the apps you are connected to"
-          onClick={() => setPage("connected-apps")}
-          jsxElement={<ForwardButton />}
-        />
-        <SettingsRow
-          name="Social Profile"
-          description="Set your display name and avatar"
-          onClick={() => setPage("social-profile")}
-          jsxElement={<ForwardButton />}
-        />
-        <SettingsRow
-          name="Testnet Mode"
-          description="Applies to balances and app connections"
-          jsxElement={
-            <ToggleSwitch
-              theme={theme}
-              on={network === NetWork.Testnet}
-              onChange={handleNetworkChange}
-            />
-          }
-        />
-        <SettingsRow
-          name="Export Keys"
-          description="Download keys or export as QR code"
-          onClick={() => setPage("export-keys-options")}
-          jsxElement={<ForwardButton />}
-        />
+      <SettingsRow
+        name="Connected Apps"
+        description="Manage the apps you are connected to"
+        onClick={() => setPage("connected-apps")}
+        jsxElement={<ForwardButton />}
+      />
+      <SettingsRow
+        name="Social Profile"
+        description="Set your display name and avatar"
+        onClick={() => setPage("social-profile")}
+        jsxElement={<ForwardButton />}
+      />
+      <SettingsRow
+        name="Testnet Mode"
+        description="Applies to balances and app connections"
+        jsxElement={
+          <ToggleSwitch
+            theme={theme}
+            on={network === NetWork.Testnet}
+            onChange={handleNetworkChange}
+          />
+        }
+      />
+      <SettingsRow
+        name="Export Keys"
+        description="Download keys or export as QR code"
+        onClick={() => setPage("export-keys-options")}
+        jsxElement={<ForwardButton />}
+      />
 
-        <SettingsRow
-          name="Lock Wallet"
-          description="Immediately lock the wallet"
-          onClick={lockWallet}
-        />
-        <SettingsRow
-          name="Sign Out"
-          description="Sign out of Panda Wallet completely"
-          onClick={handleSignOutIntent}
-        />
+      <SettingsRow
+        name="Lock Wallet"
+        description="Immediately lock the wallet"
+        onClick={lockWallet}
+      />
+      <SettingsRow
+        name="Sign Out"
+        description="Sign out of Panda Wallet completely"
+        onClick={handleSignOutIntent}
+      />
     </>
   );
 
@@ -342,16 +345,16 @@ export const Settings = () => {
       <BackButton onClick={() => setPage("main")} />
       <Show
         when={shouldVisibleExportedKeys}
-        whenFalseContent={<Text theme={theme}>Timed out. Please try again</Text>}
+        whenFalseContent={
+          <Text theme={theme}>Timed out. Please try again</Text>
+        }
       >
         <ExportKeysAsQrCodeContainer>
-            <QrCode address={exportKeysQrData}/>
+          <QrCode address={exportKeysQrData} />
         </ExportKeysAsQrCodeContainer>
-
       </Show>
     </>
   );
-
 
   const exportKeyOptionsPage = (
     <Show
@@ -363,21 +366,23 @@ export const Settings = () => {
           onCancel={handleCancel}
           onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
           showSpeedBump={showSpeedBump}
-          withPassword={decisionType === "export-keys" || decisionType === "export-keys-qr-code"}
+          withPassword={
+            decisionType === "export-keys" ||
+            decisionType === "export-keys-qr-code"
+          }
         />
       }
     >
       <BackButton onClick={() => setPage("main")} />
       <SettingsRow
-          name="Download Keys"
-          description="Download your seed, private, and public keys"
-          onClick={handleExportKeysIntent}
-        />
+        name="Download Keys"
+        description="Download your seed, private, and public keys"
+        onClick={handleExportKeysIntent}
+      />
       <SettingsRow
-          name="Export Keys as QR code"
-          description="Show your keys (private,public & seed) as QR code for wallets to scan & import"
-          onClick={handleExportKeysAsQrCodeIntent}
-          jsxElement={<ForwardButton />}
+        name="Export Keys as QR code"
+        description="Display private keys as QR code for mobile import"
+        onClick={handleExportKeysAsQrCodeIntent}
       />
     </Show>
   );
