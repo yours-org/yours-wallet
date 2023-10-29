@@ -15,7 +15,7 @@ import { sleep } from "../../utils/sleep";
 import { useTheme } from "../../hooks/useTheme";
 import { styled } from "styled-components";
 import { ColorThemeProps } from "../../theme";
-import { useBsv } from "../../hooks/useBsv";
+import { Web3SignMessageRequest, useBsv } from "../../hooks/useBsv";
 import { storage } from "../../utils/storage";
 import { useNavigate } from "react-router-dom";
 
@@ -39,7 +39,7 @@ export type SignMessageResponse = {
 };
 
 export type SignMessageRequestProps = {
-  messageToSign: string;
+  messageToSign: Web3SignMessageRequest;
   popupId: number | undefined;
   onSignature: () => void;
 };
@@ -127,7 +127,11 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
           </Text>
           <FormContainer noValidate onSubmit={(e) => handleSigning(e)}>
             <RequestDetailsContainer>
-              {<Text style={{ color: theme.white }}>{messageToSign}</Text>}
+              {
+                <Text style={{ color: theme.white }}>
+                  {messageToSign.message}
+                </Text>
+              }
             </RequestDetailsContainer>
             <Input
               theme={theme}

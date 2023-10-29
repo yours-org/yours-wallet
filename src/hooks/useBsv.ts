@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useKeys } from "./useKeys";
 import {
+  BSM,
   ChainParams,
-  ECDSA,
-  Hash,
   P2PKHAddress,
   PrivateKey,
   PublicKey,
@@ -32,6 +31,11 @@ export type Web3SendBsvRequest = {
 
 export type Web3BroadcastRequest = {
   rawtx: string;
+};
+
+export type Web3SignMessageRequest = {
+  message: string;
+  encoding?: "utf8" | "hex" | "base64";
 };
 
 export const useBsv = () => {
@@ -179,7 +183,7 @@ export const useBsv = () => {
   };
 
   const signMessage = async (
-    message: string,
+    messageToSign: Web3SignMessageRequest,
     password: string
   ): Promise<SignMessageResponse | undefined> => {
     const isAuthenticated = await verifyPassword(password);
@@ -189,22 +193,22 @@ export const useBsv = () => {
     try {
       const keys = await retrieveKeys(password);
       if (!keys?.walletWif) throw Error("Undefined key");
-      const hash = Hash.sha_256(Buffer.from(message)).to_hex();
+
       const privateKey = PrivateKey.from_wif(keys.walletWif);
       const publicKey = privateKey.to_public_key();
       const address = publicKey
         .to_address()
         .set_chain_params(getChainParams(network))
         .to_string();
-      const encoder = new TextEncoder();
-      const encodedMessage = encoder.encode(hash);
-      const signature = privateKey.sign_message(encodedMessage);
 
+      const msgBuf = Buffer.from(messageToSign.message, messageToSign.encoding);
+      const signature = BSM.sign_message(privateKey, msgBuf);
+      // const signature = privateKey.sign_message(msgBuf);
       return {
         address,
         pubKeyHex: publicKey.to_hex(),
-        signedMessage: message,
-        signatureHex: signature.to_hex(),
+        signedMessage: messageToSign.message,
+        signatureHex: signature.to_compact_hex(),
       };
     } catch (error) {
       console.log(error);
@@ -214,21 +218,20 @@ export const useBsv = () => {
   const verifyMessage = (
     message: string,
     signatureHex: string,
-    publicKeyHex: string
+    publicKeyHex: string,
+    encoding: "utf8" | "hex" | "base64" = "utf8"
   ) => {
     try {
-      const hash = Hash.sha_256(Buffer.from(message)).to_hex();
-      const signature = Signature.from_der(Buffer.from(signatureHex, "hex"));
+      const msgBuf = Buffer.from(message, encoding);
       const publicKey = PublicKey.from_hex(publicKeyHex);
-      const encoder = new TextEncoder();
-      const encodedMessage = encoder.encode(hash);
-      const verified = ECDSA.verify_digest(
-        encodedMessage,
-        publicKey,
-        signature,
-        0
+      const signature = Signature.from_compact_bytes(
+        Buffer.from(signatureHex, "hex")
       );
-      return verified;
+      const address = publicKey
+        .to_address()
+        .set_chain_params(getChainParams(network));
+
+      return address.verify_bitcoin_message(msgBuf, signature);
     } catch (error) {
       console.error(error);
       return false;

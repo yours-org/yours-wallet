@@ -16,7 +16,11 @@ import { useTheme } from "./hooks/useTheme";
 import { BsvSendRequest } from "./pages/requests/BsvSendRequest";
 import { storage } from "./utils/storage";
 import { useContext, useEffect, useState } from "react";
-import { Web3BroadcastRequest, Web3SendBsvRequest } from "./hooks/useBsv";
+import {
+  Web3BroadcastRequest,
+  Web3SendBsvRequest,
+  Web3SignMessageRequest,
+} from "./hooks/useBsv";
 import { Web3TransferOrdinalRequest } from "./hooks/useOrds";
 import { Web3GetSignaturesRequest } from "./hooks/useContracts";
 import { OrdTransferRequest } from "./pages/requests/OrdTransferRequest";
@@ -54,9 +58,9 @@ export const App = () => {
   const menuContext = useContext(BottomMenuContext);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
   const [whitelistedApps, setWhitelistedApps] = useState<WhitelistedApp[]>([]);
-  const [messageToSign, setMessageToSign] = useState<string | undefined>(
-    undefined
-  );
+  const [messageToSign, setMessageToSign] = useState<
+    Web3SignMessageRequest | undefined
+  >(undefined);
 
   const [broadcastRequest, setBroadcastRequest] = useState<
     Web3BroadcastRequest | undefined
@@ -130,7 +134,7 @@ export const App = () => {
         }
 
         if (signMessageRequest) {
-          setMessageToSign(signMessageRequest.message);
+          setMessageToSign(signMessageRequest);
         }
 
         if (broadcastRequest) {
@@ -188,7 +192,9 @@ export const App = () => {
                         </Show>
                         <Show when={!!messageToSign}>
                           <SignMessageRequest
-                            messageToSign={messageToSign ?? ""}
+                            messageToSign={
+                              messageToSign as Web3SignMessageRequest
+                            }
                             popupId={popupId}
                             onSignature={() => setMessageToSign(undefined)}
                           />
@@ -216,7 +222,7 @@ export const App = () => {
                   >
                     <BsvWallet
                       thirdPartyAppRequestData={thirdPartyAppRequestData}
-                      messageToSign={messageToSign}
+                      messageToSign={messageToSign?.message}
                       popupId={popupId}
                     />
                   </Show>
