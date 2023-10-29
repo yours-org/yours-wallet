@@ -1,7 +1,8 @@
 import { styled } from 'styled-components';
 import { ColorThemeProps, Theme } from '../theme';
 import coins from '../assets/coins.svg';
-import nfts from '../assets/items.svg';
+import apps from '../assets/items.svg';
+import tokens from '../assets/tokens.svg';
 import settings from '../assets/settings.svg';
 import { MenuItems } from '../contexts/BottomMenuContext';
 import { Badge } from './Reusable';
@@ -75,7 +76,8 @@ export const BottomMenu = (props: BottomMenuProps) => {
   return (
     <Container theme={theme}>
       <Menu theme={theme} src={coins} onClick={() => handleSelect('bsv')} opacity={selected === 'bsv' ? 1 : 0.4} />
-      <Menu theme={theme} src={nfts} onClick={() => handleSelect('ords')} opacity={selected === 'ords' ? 1 : 0.4} />
+      <Menu theme={theme} src={tokens} onClick={() => handleSelect('ords')} opacity={selected === 'ords' ? 1 : 0.4} />
+      <Menu theme={theme} src={apps} onClick={() => handleSelect('apps')} opacity={selected === 'apps' ? 1 : 0.4} />
       <Menu
         theme={theme}
         src={settings}
