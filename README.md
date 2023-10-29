@@ -42,7 +42,7 @@ If you'd like to contribute to Panda Wallet's development check out [contributin
 
 ## Support The Project
 
-**BSV:** `1EqibN8PLLmeY61thwmekx9CjY1xJt6EEq`
+**BSV:** `13y7VtdVEbB7rhiQcHpXxj9SqKp2iSU9Ud`
 
 ## Contact Us
 
