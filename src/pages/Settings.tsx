@@ -22,13 +22,15 @@ import { useKeys } from '../hooks/useKeys';
 import { Input } from '../components/Input';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { Button } from '../components/Button';
+import { QrCode } from '../components/QrCode';
 
 const Content = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
-  margin-top: -2rem;
+  margin-top: 8rem;
+  height: 100%;
 `;
 
 const HeaderWrapper = styled.div`
@@ -77,13 +79,22 @@ const ScrollableContainer = styled.div`
   flex-direction: column;
   align-items: center;
   height: 25rem;
-  overflow-y: auto;
+  overflow-y: scroll;
   width: 100%;
   padding: 1rem;
 `;
 
-type SettingsPage = 'main' | 'connected-apps' | 'social-profile';
-type DecisionType = 'sign-out' | 'export-keys';
+const ExportKeysAsQrCodeContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 1rem;
+`;
+
+type SettingsPage = 'main' | 'connected-apps' | 'social-profile' | 'export-keys-options' | 'export-keys-qr';
+type DecisionType = 'sign-out' | 'export-keys' | 'export-keys-qr-code';
 
 export const Settings = () => {
   const { theme } = useTheme();
@@ -98,6 +109,8 @@ export const Settings = () => {
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const { retrieveKeys } = useKeys();
   const { socialProfile, storeSocialProfile } = useSocialProfile();
+  const [exportKeysQrData, setExportKeysAsQrData] = useState('');
+  const [shouldVisibleExportedKeys, setShouldVisibleExportedKeys] = useState(false);
 
   const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState(socialProfile.displayName);
   const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(socialProfile?.avatar);
@@ -135,7 +148,15 @@ export const Settings = () => {
   const handleExportKeysIntent = () => {
     setDecisionType('export-keys');
     setSpeedBumpMessage(
-      'Your are about to download your private keys. Make sure you are in a safe place and no one is watching.',
+      'You are about to download your private keys. Make sure you are in a safe place and no one is watching.',
+    );
+    setShowSpeedBump(true);
+  };
+
+  const handleExportKeysAsQrCodeIntent = () => {
+    setDecisionType('export-keys-qr-code');
+    setSpeedBumpMessage(
+      'You are about to make your private keys visible in QR code format. Make sure you are in a safe place and no one is watching.',
     );
     setShowSpeedBump(true);
   };
@@ -177,6 +198,27 @@ export const Settings = () => {
     URL.revokeObjectURL(url);
   };
 
+  const exportKeysAsQrCode = async (password: string) => {
+    const keys = await retrieveKeys(password);
+
+    const keysToExport = {
+      mnemonic: keys.mnemonic,
+      payPk: keys.walletWif,
+      payDerivationPath: keys.walletDerivationPath,
+      ordPk: keys.ordWif,
+      ordDerivationPath: keys.ordDerivationPath,
+    };
+
+    const jsonData = JSON.stringify(keysToExport, null, 2);
+    setExportKeysAsQrData(jsonData);
+
+    setPage('export-keys-qr');
+    setShouldVisibleExportedKeys(true);
+    setTimeout(() => {
+      setShouldVisibleExportedKeys(false);
+    }, 10000);
+  };
+
   const signOut = async () => {
     await storage.clear();
     setDecisionType(undefined);
@@ -212,22 +254,15 @@ export const Settings = () => {
       setDecisionType(undefined);
       setShowSpeedBump(false);
     }
+    if (decisionType === 'export-keys-qr-code' && password) {
+      exportKeysAsQrCode(password);
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+    }
   };
 
   const main = (
-    <Show
-      when={!showSpeedBump}
-      whenFalseContent={
-        <SpeedBump
-          theme={theme}
-          message={speedBumpMessage}
-          onCancel={handleCancel}
-          onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
-          showSpeedBump={showSpeedBump}
-          withPassword={decisionType === 'export-keys'}
-        />
-      }
-    >
+    <>
       <SettingsRow
         name="Connected Apps"
         description="Manage the apps you are connected to"
@@ -247,12 +282,14 @@ export const Settings = () => {
       />
       <SettingsRow
         name="Export Keys"
-        description="Download your seed, private, and public keys"
-        onClick={handleExportKeysIntent}
+        description="Download keys or export as QR code"
+        onClick={() => setPage('export-keys-options')}
+        jsxElement={<ForwardButton />}
       />
+
       <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={lockWallet} />
       <SettingsRow name="Sign Out" description="Sign out of Panda Wallet completely" onClick={handleSignOutIntent} />
-    </Show>
+    </>
   );
 
   const connectedAppsPage = (
@@ -274,6 +311,45 @@ export const Settings = () => {
         </ScrollableContainer>
       </Show>
     </>
+  );
+
+  const exportKeysAsQrCodePage = (
+    <>
+      <BackButton onClick={() => setPage('main')} />
+      <Show when={shouldVisibleExportedKeys} whenFalseContent={<Text theme={theme}>Timed out. Please try again</Text>}>
+        <ExportKeysAsQrCodeContainer>
+          <QrCode address={exportKeysQrData} />
+        </ExportKeysAsQrCodeContainer>
+      </Show>
+    </>
+  );
+
+  const exportKeyOptionsPage = (
+    <Show
+      when={!showSpeedBump}
+      whenFalseContent={
+        <SpeedBump
+          theme={theme}
+          message={speedBumpMessage}
+          onCancel={handleCancel}
+          onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
+          showSpeedBump={showSpeedBump}
+          withPassword={decisionType === 'export-keys' || decisionType === 'export-keys-qr-code'}
+        />
+      }
+    >
+      <BackButton onClick={() => setPage('main')} />
+      <SettingsRow
+        name="Download Keys"
+        description="Download your seed, private, and public keys"
+        onClick={handleExportKeysIntent}
+      />
+      <SettingsRow
+        name="Export Keys as QR code"
+        description="Display private keys as QR code for mobile import"
+        onClick={handleExportKeysAsQrCodeIntent}
+      />
+    </Show>
   );
 
   const socialProfilePage = (
@@ -309,12 +385,22 @@ export const Settings = () => {
     <Content>
       <HeaderWrapper>
         <HeaderText style={{ fontSize: '1.25rem' }} theme={theme}>
-          {page === 'connected-apps' ? 'Connected Apps' : page === 'social-profile' ? 'Social Profile' : 'Settings'}
+          {page === 'connected-apps'
+            ? 'Connected Apps'
+            : page === 'social-profile'
+            ? 'Social Profile'
+            : page === 'export-keys-options'
+            ? 'Export Keys'
+            : page === 'export-keys-qr'
+            ? 'Exported QR code'
+            : 'Settings'}
         </HeaderText>
       </HeaderWrapper>
       <Show when={page === 'main'}>{main}</Show>
       <Show when={page === 'connected-apps'}>{connectedAppsPage}</Show>
       <Show when={page === 'social-profile'}>{socialProfilePage}</Show>
+      <Show when={page === 'export-keys-options'}>{exportKeyOptionsPage}</Show>
+      <Show when={page === 'export-keys-qr'}>{exportKeysAsQrCodePage}</Show>
     </Content>
   );
 };
