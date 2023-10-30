@@ -11,8 +11,10 @@ import { PandaHead } from '../components/PandaHead';
 import { Button } from '../components/Button';
 import { useBsv } from '../hooks/useBsv';
 import { Input } from '../components/Input';
-import { BSV_DECIMAL_CONVERSION, PANDA_DEV_WALLET } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, PANDA_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
 import { BsvSendRequest } from './requests/BsvSendRequest';
+import { ColorThemeProps } from '../theme';
+import externalLink from '../assets/external-link.svg';
 
 const Content = styled.div`
   display: flex;
@@ -50,9 +52,56 @@ const ButtonsWrapper = styled.div`
   width: 90%;
 `;
 
-type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks';
+const ScrollableContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 25rem;
+  overflow-y: scroll;
+  width: 100%;
+  padding: 1rem;
+`;
 
-export const Apps = () => {
+const DiscoverAppsRow = styled.div<ColorThemeProps>`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: ${({ theme }) => theme.darkAccent};
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  margin: 0.25rem;
+  width: 80%;
+  cursor: pointer;
+`;
+
+const ImageAndDomain = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const AppIcon = styled.img`
+  width: 3rem;
+  height: 3rem;
+  margin-right: 1rem;
+  border-radius: 0.5rem;
+`;
+
+const DiscoverAppsText = styled(Text)<ColorThemeProps>`
+  color: ${({ theme }) => theme.white};
+  margin: 0;
+  font-weight: 600;
+  text-align: left;
+`;
+
+const ExternalLinkIcon = styled.img`
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+`;
+
+type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps';
+
+export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const { exchangeRate } = useBsv();
@@ -81,12 +130,51 @@ export const Apps = () => {
   const main = (
     <>
       <AppsRow
-        name="Sponsor Panda Wallet"
-        description="Fund the project's open source developers"
+        name="Make a Difference 🙏"
+        description="Fund Panda Wallet's open source developers"
         onClick={() => setPage('sponsor')}
         jsxElement={<ForwardButton />}
       />
+      <AppsRow
+        name="Discover Apps 🤩"
+        description="Meet the apps using Panda Wallet"
+        onClick={() => setPage('discover-apps')}
+        jsxElement={<ForwardButton />}
+      />
+      <AppsRow
+        name="Integrate Panda Wallet 🛠"
+        description="The tools you need to integrate Panda Wallet"
+        onClick={() => window.open(PROVIDER_DOCS_URL, '_blank')}
+        jsxElement={<ExternalLinkIcon src={externalLink} />}
+      />
     </>
+  );
+
+  const discoverAppsPage = (
+    <PageWrapper $marginTop={featuredApps.length === 0 ? '10rem' : '0'}>
+      <BackButton onClick={() => setPage('main')} />
+      <Show when={featuredApps.length > 0} whenFalseContent={<Text theme={theme}>No apps</Text>}>
+        <Text theme={theme} style={{ marginBottom: 0 }}>
+          If your app has integrated Panda Wallet but is not listed,{' '}
+          <a href="https://twitter.com/wallet_panda" style={{ color: theme.white }}>
+            let us know!
+          </a>
+        </Text>
+        <ScrollableContainer>
+          {featuredApps.map((app, idx) => {
+            return (
+              <DiscoverAppsRow key={app.name + idx} theme={theme} onClick={() => window.open(app.link, '_blank')}>
+                <ImageAndDomain>
+                  <AppIcon src={app.icon} />
+                  <DiscoverAppsText theme={theme}>{app.name}</DiscoverAppsText>
+                </ImageAndDomain>
+                <ExternalLinkIcon src={externalLink} />
+              </DiscoverAppsRow>
+            );
+          })}
+        </ScrollableContainer>
+      </Show>
+    </PageWrapper>
   );
 
   const generateButtons = (amounts: string[]) => {
@@ -170,12 +258,17 @@ export const Apps = () => {
     <Content>
       <HeaderWrapper>
         <HeaderText style={{ fontSize: '1.25rem' }} theme={theme}>
-          {page === 'sponsor' || page === 'sponsor-thanks' ? '' : 'Apps & Tools'}
+          {page === 'sponsor' || page === 'sponsor-thanks'
+            ? ''
+            : page === 'discover-apps'
+            ? 'Discover Apps'
+            : 'Apps & Tools'}
         </HeaderText>
       </HeaderWrapper>
       <Show when={page === 'main'}>{main}</Show>
       <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show>
       <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show>
+      <Show when={page === 'discover-apps'}>{discoverAppsPage}</Show>
       <Show when={page === 'sponsor' && didSubmit}>
         <BsvSendRequest
           web3Request={[{ address: PANDA_DEV_WALLET, satAmount }]}

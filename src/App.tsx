@@ -26,7 +26,7 @@ import { SignMessageRequest } from './pages/requests/SignMessageRequest';
 import { BroadcastRequest } from './pages/requests/BroadcastRequest';
 import { GetSignaturesRequest } from './pages/requests/GetSignaturesRequest';
 import { ImportWallet } from './pages/onboarding/ImportWallet';
-import { Apps } from './pages/Apps';
+import { AppsAndTools } from './pages/AppsAndTools';
 
 export type ThirdPartyAppRequestData = {
   appName: string;
@@ -215,7 +215,7 @@ export const App = () => {
                 }
               />
               <Route path="/ord-wallet" element={<OrdWallet />} />
-              <Route path="/apps" element={<Apps />} />
+              <Route path="/apps" element={<AppsAndTools />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </Router>

@@ -12,6 +12,7 @@ export const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 export const SNACKBAR_TIMEOUT = 2.5 * 1000; // 2.5 seconds
 export const HOSTED_PANDA_IMAGE = 'https://i.ibb.co/3fLL5X2/Panda-Wallet-Logo.png';
 export const PANDA_DEV_WALLET = '13y7VtdVEbB7rhiQcHpXxj9SqKp2iSU9Ud';
+export const PROVIDER_DOCS_URL = 'https://panda-wallet.gitbook.io/provider-api/intro/introduction';
 
 export const O_LOCK_PREFIX =
   '2097dfd76851bf465e8f715593b217714858bbe9570ff3bd5e33840a34e20ff0262102ba79df5f8ae7604a9830f03c7933028186aede0675a16f025dc4f8be8eec0382201008ce7480da41702918d1ec8e6849ba32b4d65b1e40dc669c31a1e6306b266c0000';
@@ -20,4 +21,18 @@ export const O_LOCK_SUFFIX =
 
 export const whiteListedColorThemeCollections = [
   '1faa3f6a9cf372cc80c812fdd3d2c08dbba15bcd6a5bf636eda4780daf64f98b_0', // Midnight Mint
+];
+
+// Featured 3rd party integrations
+export const featuredApps = [
+  {
+    icon: 'https://pbs.twimg.com/profile_images/1555622553799892993/m0C6BWiv_400x400.jpg',
+    name: 'Haste Arcade',
+    link: 'https://hastearcade.com',
+  },
+  {
+    icon: 'https://pbs.twimg.com/profile_images/1222666970203471873/zn3OPLG0_400x400.jpg',
+    name: 'sCrypt',
+    link: 'https://docs.scrypt.io/tokens/tutorials/ordinal-lock/#use-panda-wallet',
+  },
 ];
