@@ -44,7 +44,7 @@ const ConnectedAppRow = styled.div<ColorThemeProps>`
   justify-content: space-between;
   background-color: ${({ theme }) => theme.darkAccent};
   border-radius: 0.5rem;
-  padding: 1rem;
+  padding: 0.5rem;
   margin: 0.25rem;
   width: 80%;
 `;
@@ -93,11 +93,11 @@ const ExportKeysAsQrCodeContainer = styled.div`
   padding: 1rem;
 `;
 
-const PageWrapper = styled.div<{ marginTop: string }>`
+const PageWrapper = styled.div<{ $marginTop: string }>`
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: ${(props) => props.marginTop};
+  margin-top: ${(props) => props.$marginTop};
   width: 100%;
 `;
 
@@ -301,7 +301,7 @@ export const Settings = () => {
   );
 
   const connectedAppsPage = (
-    <PageWrapper marginTop={connectedApps.length === 0 ? '10rem' : '-1rem'}>
+    <PageWrapper $marginTop={connectedApps.length === 0 ? '10rem' : '-1rem'}>
       <BackButton onClick={() => setPage('main')} />
       <Show when={connectedApps.length > 0} whenFalseContent={<Text theme={theme}>No apps connected</Text>}>
         <ScrollableContainer>
@@ -349,7 +349,7 @@ export const Settings = () => {
   );
 
   const socialProfilePage = (
-    <PageWrapper marginTop="5rem">
+    <PageWrapper $marginTop="5rem">
       <BackButton onClick={() => setPage('main')} />
       <SettingsText theme={theme}>Display Name</SettingsText>
       <Input

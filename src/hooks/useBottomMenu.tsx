@@ -18,6 +18,8 @@ export const useBottomMenu = () => {
       ? navigate('/ord-wallet')
       : context.selected === 'settings'
       ? navigate('/settings')
+      : context.selected === 'apps'
+      ? navigate('/apps')
       : undefined;
   }, [context, context.selected, navigate]);
 

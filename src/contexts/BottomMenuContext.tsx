@@ -3,7 +3,7 @@ import { BottomMenu } from '../components/BottomMenu';
 import { useTheme } from '../hooks/useTheme';
 import { useWeb3Context } from '../hooks/useWeb3Context';
 
-export type MenuItems = 'bsv' | 'ords' | 'settings';
+export type MenuItems = 'bsv' | 'ords' | 'apps' | 'settings';
 
 type BottomMenuContextType = {
   selected: MenuItems | null;
