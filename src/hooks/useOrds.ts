@@ -493,7 +493,7 @@ export const useOrds = () => {
 
       const script = out?.get_script_pub_key();
       if (script) {
-        ordinal.script = script.to_asm_string();
+        ordinal.script = script.to_hex();
       }
     }
 
@@ -503,7 +503,7 @@ export const useOrds = () => {
       ordPk,
       SigHash.ALL | SigHash.FORKID,
       0,
-      Script.from_asm_string(ordinal.script),
+      Script.from_hex(ordinal.script),
       BigInt(ordinal.satoshis),
     );
 
