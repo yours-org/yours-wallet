@@ -44,7 +44,7 @@ const ConnectedAppRow = styled.div<ColorThemeProps>`
   justify-content: space-between;
   background-color: ${({ theme }) => theme.darkAccent};
   border-radius: 0.5rem;
-  padding: 1rem;
+  padding: 0.5rem;
   margin: 0.25rem;
   width: 80%;
 `;
