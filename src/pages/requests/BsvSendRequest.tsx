@@ -43,11 +43,12 @@ const Icon = styled.img`
 
 export type BsvSendRequestProps = {
   web3Request: Web3SendBsvRequest;
+  requestWithinApp?: boolean;
   onResponse: () => void;
 };
 
 export const BsvSendRequest = (props: BsvSendRequestProps) => {
-  const { web3Request, onResponse } = props;
+  const { web3Request, requestWithinApp, onResponse } = props;
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -57,8 +58,9 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, getBsvBalance } = useBsv();
 
   useEffect(() => {
+    if (requestWithinApp) return;
     setSelected('bsv');
-  }, [setSelected]);
+  }, [requestWithinApp, setSelected]);
 
   useEffect(() => {
     if (!successTxId) return;
@@ -127,10 +129,13 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       onResponse();
     }, 2000);
 
-    chrome.runtime.sendMessage({
-      action: 'sendBsvResponse',
-      txid: sendRes.txid,
-    });
+    // This should only get called if it's from the provider.
+    if (!requestWithinApp) {
+      chrome.runtime.sendMessage({
+        action: 'sendBsvResponse',
+        txid: sendRes.txid,
+      });
+    }
   };
 
   const web3Details = () => {
@@ -152,7 +157,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       <Show when={isProcessing}>
         <PageLoader theme={theme} message="Sending BSV..." />
       </Show>
-
       <Show when={!isProcessing && !!web3Request}>
         <ConfirmContent>
           <HeaderText theme={theme}>Approve Request</HeaderText>

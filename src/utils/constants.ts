@@ -11,6 +11,7 @@ export const FEE_PER_BYTE = 0.02;
 export const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 export const SNACKBAR_TIMEOUT = 2.5 * 1000; // 2.5 seconds
 export const HOSTED_PANDA_IMAGE = 'https://i.ibb.co/3fLL5X2/Panda-Wallet-Logo.png';
+export const PANDA_DEV_WALLET = '13y7VtdVEbB7rhiQcHpXxj9SqKp2iSU9Ud';
 
 export const O_LOCK_PREFIX =
   '2097dfd76851bf465e8f715593b217714858bbe9570ff3bd5e33840a34e20ff0262102ba79df5f8ae7604a9830f03c7933028186aede0675a16f025dc4f8be8eec0382201008ce7480da41702918d1ec8e6849ba32b4d65b1e40dc669c31a1e6306b266c0000';
