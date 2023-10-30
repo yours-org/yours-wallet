@@ -114,9 +114,9 @@ export const Apps = () => {
     <PageWrapper $marginTop={'0'}>
       <BackButton onClick={() => setPage('main')} />
       <PandaHead width="3rem" />
-      <HeaderText theme={theme}>Fund Development</HeaderText>
+      <HeaderText theme={theme}>Fund Developers</HeaderText>
       <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
-        Panda Wallet is built by open-source contributors and relies on sponsors to fund on-going development.
+        Panda Wallet is an open-source initiative and relies on tips and sponsorships to sustain its development.
       </Text>
       <Show
         when={otherIsSelected}
@@ -145,7 +145,7 @@ export const Apps = () => {
         </ButtonsWrapper>
       </Show>
       <Text theme={theme} style={{ width: '95%', margin: '2rem 0 0 0' }}>
-        Give Monthly through Panda Wallet's transparent Open Collective.
+        Give Monthly through Panda Wallet's transparent Open Collective (Coming Soon).
       </Text>
       <Button
         theme={theme}
