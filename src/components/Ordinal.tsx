@@ -124,7 +124,11 @@ export const Ordinal = (props: OrdinalProps) => {
     <FlexWrapper>
       {renderContent()}
       <Show when={!isTransfer}>
-        <Text theme={theme} style={{ margin: '0.25rem 0' }}>
+        <Text
+          theme={theme}
+          style={{ margin: '0.25rem 0', cursor: 'pointer' }}
+          onClick={() => window.open(url, '_blank')}
+        >
           {`#${inscription.origin?.num}`}
         </Text>
       </Show>

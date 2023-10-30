@@ -156,7 +156,7 @@ export const AppsAndTools = () => {
       <Show when={featuredApps.length > 0} whenFalseContent={<Text theme={theme}>No apps</Text>}>
         <Text theme={theme} style={{ marginBottom: 0 }}>
           If your app has integrated Panda Wallet but is not listed,{' '}
-          <a href="https://twitter.com/wallet_panda" style={{ color: theme.white }}>
+          <a href="https://twitter.com/wallet_panda" rel="noreferrer" target="_blank" style={{ color: theme.white }}>
             let us know!
           </a>
         </Text>
