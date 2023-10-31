@@ -313,59 +313,66 @@ const processGetExchangeRate = (sendResponse) => {
   });
 };
 
-const processGetPaymentUtxos = (message, sendResponse) => {
-  chrome.storage.local.get(['appState'], async (result) => {
-    const { network } = result.appState;
-    if (!network || !message?.params) {
-      sendResponse({
-        type: 'getPaymentUtxos',
-        success: false,
-        error: 'Unknown network or address!',
-      });
-      return;
+const processGetPaymentUtxos = async (message, sendResponse) => {
+  if (!message?.params) {
+    sendResponse({
+      type: 'getPaymentUtxos',
+      success: false,
+      error: 'Unknown network or address!',
+    });
+    return;
+  }
+  try {
+    const requestOptions = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ addresses: message.params.addresses }),
+    };
+    const res = await fetch(
+      `${WOC_BASE_URL}/${message.params.network === 'testnet' ? 'test' : 'main'}/addresses/unspent`,
+      requestOptions,
+    );
+    if (!res.ok) {
+      throw new Error(`Fetch error: ${res.status} - ${res.statusText}`);
     }
-    try {
-      const requestOptions = {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(message.params),
-      };
-      const res = await fetch(
-        `${WOC_BASE_URL}/${network === 'mainnet' ? 'main' : 'test'}/addresses/unspent`,
-        requestOptions,
+
+    const items = await res.json();
+
+    let utxoData = [];
+    for (const i of items) {
+      const scriptRes = await fetch(
+        `${WOC_BASE_URL}/${message.params.network === 'testnet' ? 'test' : 'main'}/address/${i.address}/info`,
       );
-      if (!res.ok) {
-        throw new Error(`Fetch error: ${res.status} - ${res.statusText}`);
+      if (res.ok) {
+        const info = await scriptRes.json();
+        utxoData.push({
+          address: i.address,
+          utxos: i.unspent.map((u) => {
+            return {
+              txid: u.tx_hash,
+              vout: u.tx_pos,
+              satoshis: u.value,
+              script: info.scriptPubKey,
+            };
+          }),
+        });
       }
-
-      const items = await res.json();
-
-      sendResponse({
-        type: 'getPaymentUtxos',
-        success: true,
-        data: items.map((i) => {
-          return {
-            address: i.address,
-            utxos: i.unspent.map((u) => {
-              return {
-                txid: u.tx_hash,
-                vout: u.tx_pos,
-                satoshis: u.value,
-              };
-            }),
-          };
-        }),
-      });
-    } catch (error) {
-      sendResponse({
-        type: 'getPaymentUtxos',
-        success: false,
-        error: JSON.stringify(error),
-      });
     }
-  });
+
+    sendResponse({
+      type: 'getPaymentUtxos',
+      success: true,
+      data: utxoData,
+    });
+  } catch (error) {
+    sendResponse({
+      type: 'getPaymentUtxos',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
 };
 
 const processSendBsvRequest = (message, sendResponse) => {
