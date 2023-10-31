@@ -1,6 +1,8 @@
 /* global chrome */
 console.log('🐼 Panda Wallet Background Script Running!');
 
+const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv';
+
 let responseCallbackForConnectRequest;
 let responseCallbackForSendBsvRequest;
 let responseCallbackForTransferOrdinalRequest;
@@ -124,6 +126,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processGetSignaturesRequest(message, sendResponse);
       case 'getSocialProfile':
         return processGetSocialProfileRequest(sendResponse);
+      case 'getPaymentUtxos':
+        return processGetPaymentUtxos(message, sendResponse);
+      case 'getExchangeRate':
+        return processGetExchangeRate(sendResponse);
       default:
         break;
     }
@@ -269,6 +275,97 @@ const processGetOrdinalsRequest = (sendResponse) => {
       error: JSON.stringify(error),
     });
   }
+};
+
+const processGetExchangeRate = (sendResponse) => {
+  chrome.storage.local.get(['exchangeRateCache'], async (data) => {
+    try {
+      const { exchangeRateCache } = data;
+      if (exchangeRateCache?.rate && Date.now() - exchangeRateCache.timestamp < 5 * 60 * 1000) {
+        sendResponse({
+          type: 'getExchangeRate',
+          success: true,
+          data: Number(exchangeRateCache.rate.toFixed(2)),
+        });
+        sendResponse();
+      } else {
+        const res = await fetch(`${WOC_BASE_URL}/main/exchangerate`);
+        if (!res.ok) {
+          throw new Error(`Fetch error: ${res.status} - ${res.statusText}`);
+        }
+        const data = await res.json();
+        const rate = data.rate;
+        const currentTime = Date.now();
+        chrome.storage.local.set({ exchangeRateCache: { rate, timestamp: currentTime } });
+        sendResponse({
+          type: 'getExchangeRate',
+          success: true,
+          data: Number(rate.toFixed(2)),
+        });
+      }
+    } catch (error) {
+      sendResponse({
+        type: 'getExchangeRate',
+        success: false,
+        error: JSON.stringify(error),
+      });
+    }
+  });
+};
+
+const processGetPaymentUtxos = (message, sendResponse) => {
+  chrome.storage.local.get(['appState'], async (result) => {
+    const { network } = result.appState;
+    if (!network || !message?.params) {
+      sendResponse({
+        type: 'getPaymentUtxos',
+        success: false,
+        error: 'Unknown network or address!',
+      });
+      return;
+    }
+    try {
+      const requestOptions = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message.params),
+      };
+      const res = await fetch(
+        `${WOC_BASE_URL}/${network === 'mainnet' ? 'main' : 'test'}/addresses/unspent`,
+        requestOptions,
+      );
+      if (!res.ok) {
+        throw new Error(`Fetch error: ${res.status} - ${res.statusText}`);
+      }
+
+      const items = await res.json();
+
+      sendResponse({
+        type: 'getPaymentUtxos',
+        success: true,
+        data: items.map((i) => {
+          return {
+            address: i.address,
+            utxos: i.unspent.map((u) => {
+              return {
+                txid: u.tx_hash,
+                vout: u.tx_pos,
+                satoshis: u.value,
+              };
+            }),
+          };
+        }),
+      });
+    } catch (error) {
+      sendResponse({
+        type: 'getPaymentUtxos',
+        success: false,
+        error: JSON.stringify(error),
+      });
+    }
+  });
 };
 
 const processSendBsvRequest = (message, sendResponse) => {
