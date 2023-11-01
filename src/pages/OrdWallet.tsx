@@ -135,6 +135,7 @@ export const OrdWallet = () => {
     setSuccessTxId('');
     setBsvListAmount(undefined);
     setIsProcessing(false);
+    setSelectedOrdinal(undefined);
   };
 
   const getErrorMessage = (response: OrdOperationResponse) => {
@@ -177,7 +178,7 @@ export const OrdWallet = () => {
     }
 
     setSuccessTxId(transferRes.txid);
-    addSnackbar('Transfer Successful! It may continue to show in your wallet until the tx is confirmed.', 'success');
+    addSnackbar('Transfer Successful!', 'success');
   };
 
   const handleListOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -212,10 +213,7 @@ export const OrdWallet = () => {
     }
 
     setSuccessTxId(listRes.txid);
-    addSnackbar(
-      'Listing Successful! It may continue to show in your wallet as unlisted until the tx is confirmed.',
-      'success',
-    );
+    addSnackbar('Listing Successful!', 'success');
   };
 
   const handleCancelListing = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -238,10 +236,7 @@ export const OrdWallet = () => {
     }
 
     setSuccessTxId(cancelRes.txid);
-    addSnackbar(
-      'Successfully canceled the listing! It may continue to show as listed until the tx is confirmed.',
-      'success',
-    );
+    addSnackbar('Successfully canceled the listing!', 'success');
   };
 
   const handleSendBSV20 = async (e: React.FormEvent<HTMLFormElement>) => {
