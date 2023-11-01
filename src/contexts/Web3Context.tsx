@@ -22,9 +22,18 @@ interface Web3ProviderProps {
 export const Web3Provider = (props: Web3ProviderProps) => {
   const { children } = props;
   const { isLocked } = useWalletLockState();
-  const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate } = useBsv();
+  const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance } = useBsv();
   const { ordAddress, ordinals, ordPubKey } = useOrds();
   const { network, setNetwork } = useNetwork();
+
+  useEffect(() => {
+    // Here we are pulling in any new Utxos unaccounted for.
+    if (!bsvAddress) return;
+    setTimeout(() => {
+      updateBsvBalance(true);
+    }, 1500);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bsvAddress]);
 
   const updateNetwork = (n: NetWork): void => {
     storage.set({

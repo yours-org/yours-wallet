@@ -3,6 +3,7 @@ import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from '../u
 import { NetWork } from '../utils/network';
 import { useNetwork } from './useNetwork';
 import { storage } from '../utils/storage';
+import { P2PKHAddress } from 'bsv-wasm-web';
 export type UTXO = {
   satoshis: number;
   vout: number;
@@ -33,44 +34,43 @@ export const useWhatsOnChain = () => {
     return network === NetWork.Mainnet ? WOC_BASE_URL : WOC_TESTNET_BASE_URL;
   };
 
-  const getBsvBalance = async (address: string): Promise<number | undefined> => {
-    return new Promise((resolve, reject) => {
-      storage.get(['cachedBalance'], async ({ cachedBalance }) => {
-        try {
-          if (
-            cachedBalance?.amount !== null &&
-            cachedBalance?.amount !== undefined &&
-            Date.now() - cachedBalance.timestamp < 5000
-          ) {
-            resolve(Number(cachedBalance.amount));
-          } else {
-            const res = await axios.get(`${getBaseUrl()}/address/${address}/balance`, config);
-            if (!res.data) {
-              throw new Error('Could not fetch balance from WOC!');
-            }
-            const satBalance = res.data.confirmed + res.data.unconfirmed;
-            const total = satBalance / BSV_DECIMAL_CONVERSION;
-            const currentTime = Date.now();
-            storage.set({ cachedBalance: { amount: total, timestamp: currentTime } });
-            resolve(total);
-          }
-        } catch (error) {
-          console.log(error);
-          reject(error);
-        }
-      });
-    });
+  const getBsvBalance = async (address: string, pullFresh?: boolean): Promise<number | undefined> => {
+    const utxos = await getUtxos(address, pullFresh);
+    if (!utxos) return 0;
+
+    const sats = utxos.reduce((a, item) => a + item.satoshis, 0);
+    const bsvTotal = sats / BSV_DECIMAL_CONVERSION;
+    return bsvTotal;
   };
 
-  const getUtxos = async (fromAddress: string): Promise<WocUtxo[]> => {
-    try {
-      const { data } = await axios.get(`${getBaseUrl()}/address/${fromAddress}/unspent`, config);
+  const getUtxos = async (fromAddress: string, pullFresh?: boolean): Promise<UTXO[]> => {
+    return new Promise((resolve) => {
+      try {
+        storage.get(['paymentUtxos'], async ({ paymentUtxos }) => {
+          if (!pullFresh && paymentUtxos?.length > 0) {
+            resolve(paymentUtxos);
+            return;
+          }
 
-      return data;
-    } catch (error) {
-      console.log(error);
-      return [];
-    }
+          const { data } = await axios.get(`${getBaseUrl()}/address/${fromAddress}/unspent`, config);
+          const utxos: UTXO[] = data
+            .map((utxo: WocUtxo) => {
+              return {
+                satoshis: utxo.value,
+                vout: utxo.tx_pos,
+                txid: utxo.tx_hash,
+                script: P2PKHAddress.from_string(fromAddress).get_locking_script().to_asm_string(),
+              } as UTXO;
+            })
+            .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
+          storage.set({ paymentUtxos: utxos });
+          resolve(utxos);
+        });
+      } catch (error) {
+        console.log(error);
+        return [];
+      }
+    });
   };
 
   const getExchangeRate = async (): Promise<number | undefined> => {
@@ -107,7 +107,7 @@ export const useWhatsOnChain = () => {
     }
   };
 
-  const broadcastRawTx = async (txhex: string): Promise<any> => {
+  const broadcastRawTx = async (txhex: string): Promise<string | undefined> => {
     try {
       const { data: txid } = await axios.post(`${getBaseUrl()}/tx/raw`, { txhex }, config);
       return txid;
@@ -121,8 +121,8 @@ export const useWhatsOnChain = () => {
     }
   };
 
-  const getSuitableUtxo = (utxos: WocUtxo[], minimum: number) => {
-    const suitableUtxos = utxos.filter((utxo) => utxo.value > minimum);
+  const getSuitableUtxo = (utxos: UTXO[], minimum: number) => {
+    const suitableUtxos = utxos.filter((utxo) => utxo.satoshis > minimum);
 
     if (suitableUtxos.length === 0) {
       throw new Error('No UTXO large enough for this transaction');

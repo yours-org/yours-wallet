@@ -13,11 +13,12 @@ import {
   TxIn,
   TxOut,
 } from 'bsv-wasm-web';
-import { UTXO, WocUtxo, useWhatsOnChain } from './useWhatsOnChain';
+import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
 import { SignMessageResponse } from '../pages/requests/SignMessageRequest';
 import { useBsvWasm } from './useBsvWasm';
 import { NetWork } from '../utils/network';
 import { useNetwork } from './useNetwork';
+import { storage } from '../utils/storage';
 
 type SendBsvResponse = {
   txid?: string;
@@ -52,6 +53,12 @@ export const useBsv = () => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
   };
 
+  useEffect(() => {
+    if (!bsvAddress) return;
+    getUtxos(bsvAddress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bsvAddress]);
+
   const sendBsv = async (request: Web3SendBsvRequest, password: string): Promise<SendBsvResponse> => {
     try {
       if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
@@ -71,16 +78,16 @@ export const useBsv = () => {
       const amount = request.reduce((a, r) => a + r.satAmount, 0);
 
       // Format in and outs
-      const utxos: WocUtxo[] = await getUtxos(fromAddress);
+      const utxos = await getUtxos(fromAddress);
 
       const script = P2PKHAddress.from_string(fromAddress).get_locking_script().to_asm_string();
 
       const fundingUtxos = utxos
-        .map((utxo: WocUtxo) => {
+        .map((utxo: UTXO) => {
           return {
-            satoshis: utxo.value,
-            vout: utxo.tx_pos,
-            txid: utxo.tx_hash,
+            satoshis: utxo.satoshis,
+            vout: utxo.vout,
+            txid: utxo.txid,
             script,
           };
         })
@@ -135,7 +142,9 @@ export const useBsv = () => {
 
       const txhex = tx.to_hex();
       const txid = await broadcastRawTx(txhex);
-
+      if (txid) {
+        storage.set({ paymentUtxos: utxos.filter((item) => !inputs.includes(item)) }); // remove the spent utxos and update local storage
+      }
       return { txid };
     } catch (error: any) {
       return { error: error.message ?? 'unknown' };
@@ -208,8 +217,8 @@ export const useBsv = () => {
     return inputs;
   };
 
-  const balance = async () => {
-    const total = await getBsvBalance(bsvAddress);
+  const updateBsvBalance = async (pullFresh?: boolean) => {
+    const total = await getBsvBalance(bsvAddress, pullFresh);
     setBsvBalance(total ?? 0);
   };
 
@@ -220,7 +229,7 @@ export const useBsv = () => {
 
   useEffect(() => {
     if (!bsvAddress) return;
-    balance();
+    updateBsvBalance();
     rate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress]);
@@ -232,7 +241,7 @@ export const useBsv = () => {
     isProcessing,
     sendBsv,
     setIsProcessing,
-    getBsvBalance,
+    updateBsvBalance,
     exchangeRate,
     signMessage,
     verifyMessage,

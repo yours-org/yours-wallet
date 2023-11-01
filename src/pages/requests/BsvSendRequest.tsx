@@ -55,7 +55,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
 
-  const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, getBsvBalance } = useBsv();
+  const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, updateBsvBalance } = useBsv();
 
   useEffect(() => {
     if (requestWithinApp) return;
@@ -66,10 +66,10 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     if (!successTxId) return;
     if (!message && bsvAddress) {
       resetSendState();
-      getBsvBalance(bsvAddress);
+      updateBsvBalance(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successTxId, message, getBsvBalance, bsvAddress]);
+  }, [successTxId, message, updateBsvBalance, bsvAddress]);
 
   const resetSendState = () => {
     setPasswordConfirm('');

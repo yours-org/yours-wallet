@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FEE_PER_BYTE, GP_BASE_URL, GP_TESTNET_BASE_URL, O_LOCK_PREFIX, O_LOCK_SUFFIX } from '../utils/constants';
 import { useKeys } from './useKeys';
-import { UTXO, WocUtxo, useWhatsOnChain } from './useWhatsOnChain';
+import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
 import { sendOrdinal } from 'js-1sat-ord-web';
 import { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useBsvWasm } from './useBsvWasm';
@@ -12,6 +12,7 @@ import { useGorillaPool } from './useGorillaPool';
 import { OrdinalResponse, OrdinalTxo } from './ordTypes';
 import { createTransferP2PKH, createTransferV2P2PKH, getAmtv1, getAmtv2, isBSV20v2 } from '../utils/ordi';
 import { useTokens } from './useTokens';
+import { storage } from '../utils/storage';
 
 export class InscriptionData {
   type?: string = '';
@@ -128,18 +129,7 @@ export const useOrds = () => {
       const fundingAndChangeAddress = keys.walletAddress;
       const payWifPk = keys.walletWif;
 
-      const utxos = await getUtxos(fundingAndChangeAddress);
-
-      const fundingUtxos: UTXO[] = utxos
-        .map((utxo: WocUtxo) => {
-          return {
-            satoshis: utxo.value,
-            vout: utxo.tx_pos,
-            txid: utxo.tx_hash,
-            script: P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_asm_string(),
-          } as UTXO;
-        })
-        .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
+      const fundingUtxos = await getUtxos(fundingAndChangeAddress);
 
       if (!fundingUtxos || fundingUtxos.length === 0) {
         return { error: 'insufficient-funds' };
@@ -164,12 +154,12 @@ export const useOrds = () => {
         }
       }
 
-      const fundingUtxo = fundingUtxos[0];
+      const fundingUtxo = getSuitableUtxo(fundingUtxos, 1000);
 
-      if (fundingUtxo && !fundingUtxo.script) {
-        const ordRawTx = await getRawTxById(fundingUtxo.txid);
-        if (!ordRawTx) throw Error('Could not get raw tx');
-        const tx = Transaction.from_hex(ordRawTx);
+      if (!fundingUtxo?.script) {
+        const fundingRawTx = await getRawTxById(fundingUtxo.txid);
+        if (!fundingRawTx) throw Error('Could not get raw tx');
+        const tx = Transaction.from_hex(fundingRawTx);
         const out = tx.get_output(ordUtxo.vout);
         const script = out?.get_script_pub_key();
         if (script) {
@@ -177,19 +167,21 @@ export const useOrds = () => {
         }
       }
 
+      if (!fundingUtxo.script || !ordUtxo.script) throw Error('Missing scripts!');
+
       const payPrivateKey = PrivateKey.from_wif(payWifPk);
       const ordPrivateKey = PrivateKey.from_wif(ordWifPk);
 
-      const formattedUtxo: UTXO = {
+      const formattedOrdUtxo: UTXO = {
         satoshis: ordUtxo.satoshis,
-        script: ordUtxo.script!,
+        script: ordUtxo.script,
         txid: ordUtxo.txid,
         vout: ordUtxo.vout,
       };
 
       const broadcastResponse = await buildAndBroadcastOrdinalTx(
         fundingUtxo,
-        formattedUtxo,
+        formattedOrdUtxo,
         payPrivateKey,
         fundingAndChangeAddress,
         ordPrivateKey,
@@ -197,6 +189,7 @@ export const useOrds = () => {
       );
 
       if (broadcastResponse?.txid) {
+        storage.set({ paymentUtxos: fundingUtxos.filter((u) => u.txid !== fundingUtxo.txid) }); // remove the spent utxo and update local storage
         return { txid: broadcastResponse.txid };
       }
 
@@ -270,22 +263,13 @@ export const useOrds = () => {
       const paymentPk = PrivateKey.from_wif(payWifPk);
       const ordPk = PrivateKey.from_wif(ordWifPk);
 
-      const utxos = await getUtxos(fundingAndChangeAddress);
-
-      const fundingUtxos: UTXO[] = utxos
-        .map((utxo: WocUtxo) => {
-          return {
-            satoshis: utxo.value,
-            vout: utxo.tx_pos,
-            txid: utxo.tx_hash,
-            script: P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex(),
-          } as UTXO;
-        })
-        .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
+      const fundingUtxos = await getUtxos(fundingAndChangeAddress);
 
       if (!fundingUtxos || fundingUtxos.length === 0) {
         return { error: 'insufficient-funds' };
       }
+
+      const fundingUtxo = getSuitableUtxo(fundingUtxos, 1000);
 
       const bsv20Utxos = await getBSV20Utxos(tick, ordinalAddress);
 
@@ -320,7 +304,7 @@ export const useOrds = () => {
         );
       }
 
-      const totalInputSats = fundingUtxos.reduce((a, item) => a + item.satoshis, 0);
+      const totalInputSats = fundingUtxo.satoshis;
       const feeSats = 30;
       const change = totalInputSats - 1 - feeSats;
 
@@ -329,6 +313,7 @@ export const useOrds = () => {
           new TxOut(BigInt(change), P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script()),
         );
       }
+
       let idx = 0;
       for (let u of bsv20Utxos || []) {
         const inTx = new TxIn(Buffer.from(u.txid, 'hex'), u.vout, Script.from_asm_string(''));
@@ -344,19 +329,21 @@ export const useOrds = () => {
         idx++;
       }
 
-      for (let u of fundingUtxos || []) {
-        const inTx = new TxIn(Buffer.from(u.txid, 'hex'), u.vout, Script.from_asm_string(''));
-        inTx.set_satoshis(BigInt(u.satoshis));
-        inTx.set_locking_script(Script.from_hex(u.script));
-        tx.add_input(inTx);
+      const inTx = new TxIn(Buffer.from(fundingUtxo.txid, 'hex'), fundingUtxo.vout, Script.from_asm_string(''));
+      inTx.set_satoshis(BigInt(fundingUtxo.satoshis));
+      inTx.set_locking_script(Script.from_asm_string(fundingUtxo.script));
+      tx.add_input(inTx);
 
-        const sig = tx.sign(paymentPk, SigHash.InputOutputs, idx, Script.from_hex(u.script), BigInt(u.satoshis));
+      const sig = tx.sign(
+        paymentPk,
+        SigHash.InputOutputs,
+        idx,
+        Script.from_asm_string(fundingUtxo.script),
+        BigInt(fundingUtxo.satoshis),
+      );
 
-        inTx.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
-
-        tx.set_input(idx, inTx);
-        idx++;
-      }
+      inTx.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
+      tx.set_input(idx, inTx);
 
       // Fee checker
       const finalSatsIn = tx.satoshis_in() ?? 0n;
@@ -368,7 +355,7 @@ export const useOrds = () => {
       const txhex = tx.to_hex();
       const { txid } = await broadcastWithGorillaPool(txhex);
       if (!txid) return { error: 'broadcast-transaction-failed' };
-
+      storage.set({ paymentUtxos: fundingUtxos.filter((u) => u.txid !== fundingUtxo.txid) }); // remove the spent utxo and update local storage
       return { txid };
     } catch (error: any) {
       console.error('sendBSV20 failed:', error);
@@ -403,7 +390,7 @@ export const useOrds = () => {
         throw new Error('Could not retrieve paymentUtxos');
       }
 
-      const totalSats = paymentUtxos.reduce((a: number, utxo: WocUtxo) => a + utxo.value, 0);
+      const totalSats = paymentUtxos.reduce((a: number, utxo: UTXO) => a + utxo.satoshis, 0);
 
       if (totalSats < 1000) {
         return { error: 'insufficient-funds' };
@@ -428,6 +415,7 @@ export const useOrds = () => {
 
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
+      storage.set({ paymentUtxos: paymentUtxos.filter((u) => u.txid !== paymentUtxo.txid) }); // remove the spent utxo and update local storage
       return { txid };
     } catch (error) {
       console.log(error);
@@ -449,7 +437,7 @@ export const useOrds = () => {
   };
 
   const listOrdinal = async (
-    paymentUtxo: WocUtxo,
+    paymentUtxo: UTXO,
     ordinal: OrdinalTxo,
     paymentPk: PrivateKey,
     changeAddress: string,
@@ -464,7 +452,7 @@ export const useOrds = () => {
     const ordIn = new TxIn(txBuf, ordinal.vout, Script.from_asm_string(''));
     tx.add_input(ordIn);
 
-    let utxoIn = new TxIn(Buffer.from(paymentUtxo.tx_hash, 'hex'), paymentUtxo.tx_pos, Script.from_asm_string(''));
+    let utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_asm_string(''));
 
     tx.add_input(utxoIn);
 
@@ -481,7 +469,7 @@ export const useOrds = () => {
     const satOut = new TxOut(BigInt(1), Script.from_asm_string(ordLockScript));
     tx.add_output(satOut);
 
-    const changeOut = createChangeOutput(tx, changeAddress, paymentUtxo.value);
+    const changeOut = createChangeOutput(tx, changeAddress, paymentUtxo.satoshis);
     tx.add_output(changeOut);
 
     if (!ordinal.script) {
@@ -516,7 +504,7 @@ export const useOrds = () => {
       SigHash.ALL | SigHash.FORKID,
       1,
       Script.from_asm_string(P2PKHAddress.from_string(payoutAddress).get_locking_script().to_asm_string()),
-      BigInt(paymentUtxo.value),
+      BigInt(paymentUtxo.satoshis),
     );
 
     utxoIn.set_unlocking_script(Script.from_asm_string(`${sig2.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
@@ -561,14 +549,14 @@ export const useOrds = () => {
       const ordIn = new TxIn(Buffer.from(listingTxid, 'hex'), 0, Script.from_asm_string(''));
       cancelTx.add_input(ordIn);
 
-      let utxoIn = new TxIn(Buffer.from(paymentUtxo.tx_hash, 'hex'), paymentUtxo.tx_pos, Script.from_asm_string(''));
+      let utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_asm_string(''));
       cancelTx.add_input(utxoIn);
 
       const destinationAddress = P2PKHAddress.from_string(ordAddress);
       const satOut = new TxOut(BigInt(1), destinationAddress.get_locking_script());
       cancelTx.add_output(satOut);
 
-      const changeOut = createChangeOutput(cancelTx, fundingAndChangeAddress, paymentUtxo.value);
+      const changeOut = createChangeOutput(cancelTx, fundingAndChangeAddress, paymentUtxo.satoshis);
       cancelTx.add_output(changeOut);
 
       // sign listing to cancel
@@ -589,7 +577,7 @@ export const useOrds = () => {
         SigHash.ALL | SigHash.FORKID,
         1,
         Script.from_asm_string(P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_asm_string()),
-        BigInt(paymentUtxo.value),
+        BigInt(paymentUtxo.satoshis),
       );
 
       utxoIn.set_unlocking_script(Script.from_asm_string(`${sig2.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
@@ -599,6 +587,7 @@ export const useOrds = () => {
 
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
+      storage.set({ paymentUtxos: paymentUtxos.filter((item) => item.txid !== paymentUtxo.txid) }); // remove the spent utxo and update local storage
       return { txid };
     } catch (error) {
       console.log(error);

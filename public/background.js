@@ -127,7 +127,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'getSocialProfile':
         return processGetSocialProfileRequest(sendResponse);
       case 'getPaymentUtxos':
-        return processGetPaymentUtxos(message, sendResponse);
+        return processGetPaymentUtxos(sendResponse);
       case 'getExchangeRate':
         return processGetExchangeRate(sendResponse);
       default:
@@ -313,58 +313,14 @@ const processGetExchangeRate = (sendResponse) => {
   });
 };
 
-const processGetPaymentUtxos = async (message, sendResponse) => {
-  if (!message?.params) {
-    sendResponse({
-      type: 'getPaymentUtxos',
-      success: false,
-      error: 'Unknown network or address!',
-    });
-    return;
-  }
+const processGetPaymentUtxos = async (sendResponse) => {
   try {
-    const requestOptions = {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ addresses: message.params.addresses }),
-    };
-    const res = await fetch(
-      `${WOC_BASE_URL}/${message.params.network === 'testnet' ? 'test' : 'main'}/addresses/unspent`,
-      requestOptions,
-    );
-    if (!res.ok) {
-      throw new Error(`Fetch error: ${res.status} - ${res.statusText}`);
-    }
-
-    const items = await res.json();
-
-    let utxoData = [];
-    for (const i of items) {
-      const scriptRes = await fetch(
-        `${WOC_BASE_URL}/${message.params.network === 'testnet' ? 'test' : 'main'}/address/${i.address}/info`,
-      );
-      if (res.ok) {
-        const info = await scriptRes.json();
-        utxoData.push({
-          address: i.address,
-          utxos: i.unspent.map((u) => {
-            return {
-              txid: u.tx_hash,
-              vout: u.tx_pos,
-              satoshis: u.value,
-              script: info.scriptPubKey,
-            };
-          }),
-        });
-      }
-    }
-
-    sendResponse({
-      type: 'getPaymentUtxos',
-      success: true,
-      data: utxoData,
+    chrome.storage.local.get(['paymentUtxos'], ({ paymentUtxos }) => {
+      sendResponse({
+        type: 'getPaymentUtxos',
+        success: true,
+        data: paymentUtxos.length > 0 ? paymentUtxos : [],
+      });
     });
   } catch (error) {
     sendResponse({
