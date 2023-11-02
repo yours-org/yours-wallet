@@ -9,6 +9,7 @@ import { isBSV20v2 } from '../utils/ordi';
 export type TokenStorage = {
   tick: string;
   decimals: number;
+  sym?: string,
   max: string;
   lim?: string;
   txid: string;
@@ -77,7 +78,7 @@ export const useTokens = () => {
 
                 const { txid, vout } = r.data;
 
-                const { amt, dec, op } = r.data.data.insc.json;
+                const { amt, dec, op, sym } = r.data.data.insc.json;
                 if (op !== 'deploy+mint') {
                   return null;
                 }
@@ -86,6 +87,7 @@ export const useTokens = () => {
                   tick,
                   decimals: parseInt(dec || '0'),
                   max: amt,
+                  sym,
                   txid,
                   vout,
                   version: 2,
@@ -156,10 +158,16 @@ export const useTokens = () => {
     return tokenInfo?.decimals || 0;
   };
 
+  const getTokenSym = (tick: string) => {
+    const tokenInfo = tokens.find((t) => t.tick === tick);
+    return tokenInfo?.sym || tick;
+  };
+
   return {
     tokens,
     cacheTokenInfos,
     getTokenInfo,
     getTokenDecimals,
+    getTokenSym,
   };
 };
