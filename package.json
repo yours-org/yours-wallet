@@ -17,8 +17,8 @@
     "bip39": "^3.1.0",
     "bitcoin-address-validation": "^2.2.3",
     "browserify": "^17.0.0",
-    "bsv-wasm": "^2.0.1",
-    "bsv-wasm-web": "^2.0.1",
+    "bsv-wasm": "file:./bsv/bsv-wasm",
+    "bsv-wasm-web": "file:./bsv/bsv-wasm-web",
     "buffer": "^6.0.3",
     "crypto-js": "^4.1.1",
     "js-1sat-ord-web": "^0.0.27",
@@ -36,7 +36,8 @@
     "web-vitals": "^2.1.4"
   },
   "overrides": {
-    "bsv-wasm": "$bsv-wasm-web"
+    "bsv-wasm": "$bsv-wasm",
+    "bsv-wasm-web": "$bsv-wasm-web"
   },
   "scripts": {
     "start": "react-app-rewired start",
