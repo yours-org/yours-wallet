@@ -14,6 +14,7 @@ import { PageLoader } from '../../components/PageLoader';
 import { Show } from '../../components/Show';
 import { sleep } from '../../utils/sleep';
 import { useTheme } from '../../hooks/useTheme';
+import { ToggleSwitch } from '../../components/ToggleSwitch';
 
 const Content = styled.div`
   display: flex;
@@ -33,12 +34,12 @@ const FormContainer = styled.form`
   background: none;
 `;
 
-const SeedInput = styled.textarea<ColorThemeProps>`
+const SeedInput = styled.textarea<ColorThemeProps & { $isExpert: boolean }>`
   background-color: ${({ theme }) => theme.darkAccent};
   border-radius: 0.25rem;
   border: 1px solid ${({ theme }) => theme.white + '50'};
   width: 80%;
-  height: 7rem;
+  height: ${(props) => (props.$isExpert ? '4rem' : '6rem')};
   padding: 1rem;
   margin: 0.5rem;
   outline: none;
@@ -48,6 +49,13 @@ const SeedInput = styled.textarea<ColorThemeProps>`
   &::placeholder {
     color: ${({ theme }) => theme.white + '80'};
   }
+`;
+
+const ExpertImportWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 90%;
 `;
 
 export const RestoreWallet = () => {
@@ -62,6 +70,9 @@ export const RestoreWallet = () => {
   const { generateSeedAndStoreEncrypted } = useKeys();
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
+  const [isExpertImport, setIsExpertImport] = useState(false);
+  const [walletDerivation, setWalletDerivation] = useState<string | null>(null);
+  const [ordDerivation, setOrdDerivation] = useState<string | null>(null);
 
   useEffect(() => {
     hideMenu();
@@ -70,6 +81,10 @@ export const RestoreWallet = () => {
       showMenu();
     };
   }, [hideMenu, showMenu]);
+
+  const handleExpertToggle = () => {
+    setIsExpertImport(!isExpertImport);
+  };
 
   const handleRestore = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -88,7 +103,7 @@ export const RestoreWallet = () => {
 
     // Some artificial delay for the loader
     await sleep(50);
-    const mnemonic = generateSeedAndStoreEncrypted(password, seedWords);
+    const mnemonic = generateSeedAndStoreEncrypted(password, seedWords, walletDerivation, ordDerivation);
     if (!mnemonic) {
       addSnackbar('An error occurred while restoring the wallet!', 'error');
       return;
@@ -131,13 +146,40 @@ export const RestoreWallet = () => {
       <BackButton onClick={() => navigate('/')} />
       <Content>
         <HeaderText theme={theme}>Restore a wallet</HeaderText>
-        <Text theme={theme}>Only input a seed phrase previously generated from Panda Wallet.</Text>
+        <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
+          Enter a seed phrase and use custom derivation paths to import a wallet from anywhere!
+        </Text>
         <FormContainer onSubmit={() => setStep(2)}>
           <SeedInput
             theme={theme}
             placeholder="Enter secret recovery words"
             onChange={(e) => setSeedWords(e.target.value)}
+            $isExpert={isExpertImport}
           />
+          <Show when={isExpertImport}>
+            <Input
+              theme={theme}
+              placeholder="Wallet Derivation ex. m/44'/236'/0'/0/0"
+              type="text"
+              value={walletDerivation ?? ''}
+              onChange={(e) => setWalletDerivation(e.target.value)}
+              style={{ margin: '0.1rem', width: '85%' }}
+            />
+            <Input
+              theme={theme}
+              placeholder="Ordinal Derivation ex. m/44'/236'/1'/0/0"
+              type="text"
+              value={ordDerivation ?? ''}
+              onChange={(e) => setOrdDerivation(e.target.value)}
+              style={{ margin: '0.1rem 0 1rem', width: '85%' }}
+            />
+          </Show>
+          <ExpertImportWrapper>
+            <ToggleSwitch theme={theme} on={isExpertImport} onChange={handleExpertToggle} />
+            <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
+              Use custom derivation paths for wallets like RelayX, SimplyCash, etc
+            </Text>
+          </ExpertImportWrapper>
           <Text theme={theme} style={{ margin: '3rem 0 1rem' }}>
             Make sure you are in a safe place and no one is watching.
           </Text>

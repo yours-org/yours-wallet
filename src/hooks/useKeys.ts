@@ -32,10 +32,15 @@ export const useKeys = () => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
   };
 
-  const generateSeedAndStoreEncrypted = (password: string, mnemonic?: string) => {
+  const generateSeedAndStoreEncrypted = (
+    password: string,
+    mnemonic?: string,
+    walletDerivation: string | null = null,
+    ordDerivation: string | null = null,
+  ) => {
     const salt = generateRandomSalt();
     const passKey = deriveKey(password, salt);
-    const keys = getKeys(mnemonic);
+    const keys = getKeys(mnemonic, walletDerivation, ordDerivation);
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
     storage.set({ encryptedKeys, passKey, salt });
     return keys.mnemonic;

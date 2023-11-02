@@ -14,10 +14,10 @@ export type Keys = {
   ordDerivationPath: string;
 };
 
-const getWifAndDerivation = (seedPhrase: string, isOrd?: boolean) => {
+const getWifAndDerivation = (seedPhrase: string, isOrd?: boolean, derivation: string | null = null) => {
   const seed = bip39.mnemonicToSeedSync(seedPhrase);
   const masterNode = ExtendedPrivateKey.from_seed(seed);
-  const derivationPath = `m/44'/236'/${isOrd ? '1' : '0'}'/0/0`;
+  const derivationPath = derivation ? derivation : isOrd ? `m/44'/236'/1'/0/0` : `m/44'/236'/0'/0/0`;
   const childNode = masterNode.derive_from_path(derivationPath);
   const privateKey = childNode.get_private_key();
   const wif = privateKey.to_wif();
@@ -25,18 +25,22 @@ const getWifAndDerivation = (seedPhrase: string, isOrd?: boolean) => {
   return { wif, derivationPath };
 };
 
-export const getKeys = (validMnemonic?: string) => {
+export const getKeys = (
+  validMnemonic?: string,
+  walletDerivation: string | null = null,
+  ordDerivation: string | null = null,
+) => {
   if (validMnemonic) {
     const isValid = bip39.validateMnemonic(validMnemonic);
     if (!isValid) throw new Error('Invalid Mnemonic!');
   }
   const mnemonic = validMnemonic ?? bip39.generateMnemonic();
-  const walletWifAndDP = getWifAndDerivation(mnemonic);
+  const walletWifAndDP = getWifAndDerivation(mnemonic, false, walletDerivation);
   const walletPrivKey = PrivateKey.from_wif(walletWifAndDP.wif);
   const walletPubKey = walletPrivKey.to_public_key();
   const walletAddress = walletPubKey.to_address().to_string();
 
-  const ordWifAndDP = getWifAndDerivation(mnemonic, true);
+  const ordWifAndDP = getWifAndDerivation(mnemonic, true, ordDerivation);
   const ordPrivKey = PrivateKey.from_wif(ordWifAndDP.wif);
   const ordPubKey = ordPrivKey.to_public_key();
   const ordAddress = ordPubKey.to_address().to_string();
