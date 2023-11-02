@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { FEE_PER_BYTE, GP_BASE_URL, GP_TESTNET_BASE_URL, O_LOCK_PREFIX, O_LOCK_SUFFIX } from '../utils/constants';
+import {
+  FEE_PER_BYTE,
+  GP_BASE_URL,
+  GP_TESTNET_BASE_URL,
+  O_LOCK_PREFIX,
+  O_LOCK_SUFFIX,
+  P2PKH_INPUT_SIZE,
+} from '../utils/constants';
 import { useKeys } from './useKeys';
 import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
 import { sendOrdinal } from 'js-1sat-ord-web';
@@ -64,6 +71,13 @@ export type ListOrdinal = {
   password: string;
 };
 
+export type PurchaseOrdinal = {
+  outpoint: string;
+  password: string;
+  marketplaceRate: number;
+  marketplaceAddress: string;
+};
+
 export const useOrds = () => {
   const { ordAddress, retrieveKeys, verifyPassword, ordPubKey, bsvAddress } = useKeys();
 
@@ -73,7 +87,7 @@ export const useOrds = () => {
   const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
   const { cacheTokenInfos } = useTokens();
-  const { getUtxos, getRawTxById, getSuitableUtxo } = useWhatsOnChain();
+  const { getUtxos, getRawTxById, getSuitableUtxo, getInputs } = useWhatsOnChain();
   const { getOrdUtxos, broadcastWithGorillaPool, getUtxoByOutpoint, getMarketData, getBsv20Balances, getBSV20Utxos } =
     useGorillaPool();
   const getOrdinalsBaseUrl = () => {
@@ -597,6 +611,157 @@ export const useOrds = () => {
     }
   };
 
+  const calculateFee = (numPaymentUtxos: number, purchaseTx: Transaction) => {
+    const byteSize = Math.ceil(P2PKH_INPUT_SIZE * numPaymentUtxos + purchaseTx.to_bytes().byteLength);
+    return Math.ceil(byteSize * FEE_PER_BYTE);
+  };
+
+  const purchaseGlobalOrderbookListing = async (purchaseOrdinal: PurchaseOrdinal) => {
+    try {
+      const { marketplaceAddress, marketplaceRate, outpoint, password } = purchaseOrdinal;
+      if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
+      setIsProcessing(true);
+
+      const isAuthenticated = await verifyPassword(password);
+      if (!isAuthenticated) {
+        return { error: 'invalid-password' };
+      }
+      const keys = await retrieveKeys(password);
+
+      if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
+      const fundingAndChangeAddress = bsvAddress;
+
+      const fundingUtxos = await getUtxos(fundingAndChangeAddress);
+
+      if (!fundingUtxos.length) {
+        throw new Error('Could not retrieve funding UTXOs');
+      }
+
+      const payPk = PrivateKey.from_wif(keys.walletWif);
+      const res = await getUtxoByOutpoint(outpoint);
+      const { vout, txid } = res;
+      const price = Number(res.data?.list?.price);
+      const payout = res.data?.list?.payout;
+
+      const { script } = await getMarketData(outpoint);
+
+      if (!txid || !price || !payout || !script) throw Error('Missing information!');
+
+      const purchaseTx = new Transaction(1, 0);
+
+      const neededAmount = fundingUtxos.reduce((a, r) => a + r.satoshis, 0) + P2PKH_INPUT_SIZE * fundingUtxos.length;
+      if (price * (1 + marketplaceRate) >= neededAmount) {
+        return { error: 'insufficient-funds' };
+      }
+      const listingInput = new TxIn(Buffer.from(txid, 'hex'), vout, Script.from_asm_string(''));
+      purchaseTx.add_input(listingInput);
+
+      // output 0
+      const buyerOutput = new TxOut(BigInt(1), P2PKHAddress.from_string(ordAddress).get_locking_script());
+      purchaseTx.add_output(buyerOutput);
+
+      // output 1
+      const payOutput = TxOut.from_hex(Buffer.from(payout, 'base64').toString('hex'));
+      purchaseTx.add_output(payOutput);
+
+      // output 2 - change
+      const dummyChangeOutput = new TxOut(
+        BigInt(0),
+        P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script(),
+      );
+      purchaseTx.add_output(dummyChangeOutput);
+
+      // output 3 - marketFee
+      const dummyMarketFeeOutput = new TxOut(
+        BigInt(0),
+        P2PKHAddress.from_string(marketplaceAddress).get_locking_script(),
+      );
+      purchaseTx.add_output(dummyMarketFeeOutput);
+
+      let preimage = purchaseTx.sighash_preimage(
+        SigHash.InputOutput,
+        0,
+        Script.from_bytes(Buffer.from(script, 'base64')),
+        BigInt(1), //TODO: use amount from listing
+      );
+
+      listingInput.set_unlocking_script(
+        Script.from_asm_string(
+          `${purchaseTx.get_output(0)!.to_hex()} ${purchaseTx.get_output(2)!.to_hex()}${purchaseTx
+            .get_output(3)!
+            .to_hex()} ${Buffer.from(preimage).toString('hex')} OP_0`,
+        ),
+      );
+      purchaseTx.set_input(0, listingInput);
+
+      let marketFee = Math.ceil(price * marketplaceRate);
+      let fee = calculateFee(1, purchaseTx);
+      let satsNeeded = fee + price + marketFee;
+      const inputs = getInputs(fundingUtxos, satsNeeded, false);
+      const satsCollected = inputs.reduce((a, r) => a + r.satoshis, 0);
+      const changeAmt = Math.ceil(satsCollected - satsNeeded);
+
+      const changeOutput = new TxOut(
+        BigInt(changeAmt),
+        P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script(),
+      );
+
+      purchaseTx.set_output(2, changeOutput);
+
+      // add output 3 - market fee
+      const marketFeeOutput = new TxOut(
+        BigInt(marketFee),
+        P2PKHAddress.from_string(marketplaceAddress).get_locking_script(),
+      );
+      purchaseTx.set_output(3, marketFeeOutput);
+
+      preimage = purchaseTx.sighash_preimage(
+        SigHash.InputOutputs,
+        0,
+        Script.from_bytes(Buffer.from(script, 'base64')),
+        BigInt(1),
+      );
+
+      listingInput.set_unlocking_script(
+        Script.from_asm_string(
+          `${purchaseTx.get_output(0)!.to_hex()} ${purchaseTx.get_output(2)!.to_hex()}${purchaseTx
+            .get_output(3)!
+            .to_hex()} ${Buffer.from(preimage).toString('hex')} OP_0`,
+        ),
+      );
+      purchaseTx.set_input(0, listingInput);
+
+      inputs.forEach((utxo, idx) => {
+        const fundingInput = new TxIn(Buffer.from(utxo.txid, 'hex'), utxo.vout, Script.from_asm_string(utxo.script));
+        purchaseTx.add_input(fundingInput);
+
+        const sig = purchaseTx.sign(
+          payPk,
+          SigHash.InputsOutputs,
+          1 + idx,
+          Script.from_asm_string(utxo.script),
+          BigInt(utxo.satoshis),
+        );
+
+        fundingInput.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${payPk.to_public_key().to_hex()}`));
+
+        purchaseTx.set_input(1 + idx, fundingInput);
+      });
+
+      const rawTx = purchaseTx.to_hex();
+
+      const broadcastRes = await broadcastWithGorillaPool(rawTx);
+      if (!broadcastRes.txid) return { error: 'broadcast-error' };
+      storage.set({ paymentUtxos: fundingUtxos.filter((item) => !inputs.includes(item)) });
+      return { txid };
+    } catch (error) {
+      console.log(error);
+      return { error: JSON.stringify(error) };
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return {
     bsv20s,
     ordinals,
@@ -610,5 +775,6 @@ export const useOrds = () => {
     sendBSV20,
     listOrdinalOnGlobalOrderbook,
     cancelGlobalOrderbookListing,
+    purchaseGlobalOrderbookListing,
   };
 };

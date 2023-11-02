@@ -132,6 +132,21 @@ export const useWhatsOnChain = () => {
     return suitableUtxos[randomIndex];
   };
 
+  const getInputs = (utxos: UTXO[], satsOut: number, isSendAll: boolean) => {
+    if (isSendAll) return utxos;
+    let sum = 0;
+    let index = 0;
+    let inputs: UTXO[] = [];
+
+    while (sum <= satsOut) {
+      const utxo = utxos[index];
+      sum += utxo.satoshis;
+      inputs.push(utxo);
+      index++;
+    }
+    return inputs;
+  };
+
   return {
     getUtxos,
     getBsvBalance,
@@ -139,5 +154,6 @@ export const useWhatsOnChain = () => {
     getRawTxById,
     broadcastRawTx,
     getSuitableUtxo,
+    getInputs,
   };
 };
