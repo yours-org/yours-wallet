@@ -81,7 +81,7 @@ export const useKeys = () => {
           setBsvPubKey(keys.walletPubKey);
           setOrdPubKey(keys.ordPubKey);
           if (!isPasswordRequired || password) {
-            const isVerified = await verifyPassword(password ?? '');
+            const isVerified = !isPasswordRequired || (await verifyPassword(password ?? ''));
             isVerified
               ? resolve(
                   Object.assign({}, keys, {

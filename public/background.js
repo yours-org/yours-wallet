@@ -6,6 +6,7 @@ const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv';
 let responseCallbackForConnectRequest;
 let responseCallbackForSendBsvRequest;
 let responseCallbackForTransferOrdinalRequest;
+let responseCallbackForPurchaseOrdinalRequest;
 let responseCallbackForSignMessageRequest;
 let responseCallbackForBroadcastRequest;
 let responseCallbackForGetSignaturesRequest;
@@ -59,6 +60,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     'userConnectResponse',
     'sendBsvResponse',
     'transferOrdinalResponse',
+    'purchaseOrdinalResponse',
     'signMessageResponse',
     'signTransactionResponse',
     'broadcastResponse',
@@ -75,6 +77,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processSendBsvResponse(message);
       case 'transferOrdinalResponse':
         return processTransferOrdinalResponse(message);
+      case 'purchaseOrdinalResponse':
+        return processPurchaseOrdinalResponse(message);
       case 'signMessageResponse':
         return processSignMessageResponse(message);
       case 'broadcastResponse':
@@ -118,6 +122,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processSendBsvRequest(message, sendResponse);
       case 'transferOrdinal':
         return processTransferOrdinalRequest(message, sendResponse);
+      case 'purchaseOrdinal':
+        return processPurchaseOrdinalRequest(message, sendResponse);
       case 'signMessage':
         return processSignMessageRequest(message, sendResponse);
       case 'broadcast':
@@ -383,6 +389,32 @@ const processTransferOrdinalRequest = (message, sendResponse) => {
   }
 };
 
+const processPurchaseOrdinalRequest = (message, sendResponse) => {
+  if (!message.params) {
+    sendResponse({
+      type: 'purchaseOrdinal',
+      success: false,
+      error: 'Must provide valid params!',
+    });
+  }
+  try {
+    responseCallbackForPurchaseOrdinalRequest = sendResponse;
+    chrome.storage.local
+      .set({
+        purchaseOrdinalRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+  } catch (error) {
+    sendResponse({
+      type: 'purchaseOrdinal',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+};
+
 const processBroadcastRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
@@ -560,6 +592,29 @@ const processTransferOrdinalResponse = (message) => {
   return true;
 };
 
+const processPurchaseOrdinalResponse = (message) => {
+  if (!responseCallbackForPurchaseOrdinalRequest) throw Error('Missing callback!');
+  try {
+    responseCallbackForPurchaseOrdinalRequest({
+      type: 'purchaseOrdinal',
+      success: true,
+      data: message?.txid,
+    });
+  } catch (error) {
+    responseCallbackForPurchaseOrdinalRequest({
+      type: 'purchaseOrdinal',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  } finally {
+    responseCallbackForPurchaseOrdinalRequest = null;
+    popupWindowId = null;
+    chrome.storage.local.remove(['purchaseOrdinalRequest', 'popupWindowId']);
+  }
+
+  return true;
+};
+
 const processSignMessageResponse = (message) => {
   if (!responseCallbackForSignMessageRequest) throw Error('Missing callback!');
   try {
@@ -677,6 +732,16 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       });
       responseCallbackForTransferOrdinalRequest = null;
       chrome.storage.local.remove('transferOrdinalRequest');
+    }
+
+    if (responseCallbackForPurchaseOrdinalRequest) {
+      responseCallbackForPurchaseOrdinalRequest({
+        type: 'purchaseOrdinal',
+        success: false,
+        error: 'User dismissed the request!',
+      });
+      responseCallbackForPurchaseOrdinalRequest = null;
+      chrome.storage.local.remove('purchaseOrdinalRequest');
     }
 
     if (responseCallbackForBroadcastRequest) {
