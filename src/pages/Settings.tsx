@@ -354,6 +354,8 @@ export const Settings = () => {
     </>
   );
 
+  console.log(isPasswordRequired);
+
   const preferencesPage = (
     <>
       <BackButton onClick={() => setPage('main')} />

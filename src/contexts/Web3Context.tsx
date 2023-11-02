@@ -39,24 +39,6 @@ export const Web3Provider = (props: Web3ProviderProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress]);
 
-  useEffect(() => {
-    // Here we are pulling in any new Utxos unaccounted for.
-    if (!bsvAddress) return;
-    setTimeout(() => {
-      updateBsvBalance(true);
-    }, 1500);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bsvAddress]);
-
-  useEffect(() => {
-    // Here we are pulling in any new Utxos unaccounted for.
-    if (!bsvAddress) return;
-    setTimeout(() => {
-      updateBsvBalance(true);
-    }, 1500);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bsvAddress]);
-
   const updateNetwork = (n: NetWork): void => {
     storage.set({
       network: n,

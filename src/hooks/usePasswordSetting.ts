@@ -6,10 +6,13 @@ export const usePasswordSetting = () => {
 
   const retrieveUserPasswordSetting = (): Promise<boolean> => {
     return new Promise((resolve, reject) => {
-      storage.get(['isPasswordRequired'], async ({ isPasswordRequired }) => {
+      storage.get(['isPasswordRequired'], async (res) => {
         try {
           const isRequired =
-            isPasswordRequired === 'true' || isPasswordRequired === undefined || isPasswordRequired === null;
+            res.isPasswordRequired === 'true' ||
+            res.isPasswordRequired === true ||
+            res.isPasswordRequired === undefined ||
+            res.isPasswordRequired === null;
           setIsPasswordRequired(isRequired);
           resolve(isRequired);
         } catch (error) {
