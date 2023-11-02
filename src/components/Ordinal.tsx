@@ -15,6 +15,8 @@ const OrdinalWrapper = styled.div<OrdinalDivProps>`
   width: ${(props) => props.size ?? '9rem'};
   background-image: url(${(props) => props.url});
   background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   border-radius: 0.5rem;
   margin: 0.5rem;
   cursor: pointer;

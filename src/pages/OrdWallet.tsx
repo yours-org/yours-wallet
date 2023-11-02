@@ -109,7 +109,7 @@ export const OrdWallet = () => {
   const [ordinalOutpoint, setOrdinalOutpoint] = useState('');
   const [receiveAddress, setReceiveAddress] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [bsvListAmount, setBsvListAmount] = useState<number | undefined>();
+  const [bsvListAmount, setBsvListAmount] = useState<number | null>();
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const { isPasswordRequired } = useWeb3Context();
@@ -642,7 +642,16 @@ export const OrdWallet = () => {
             placeholder="Enter BSV Amount"
             type="number"
             step="0.00000001"
-            onChange={(e) => setBsvListAmount(Number(e.target.value))}
+            onChange={(e) => {
+              const inputValue = e.target.value;
+
+              // Check if the input is empty and if so, set the state to null
+              if (inputValue === '') {
+                setBsvListAmount(null);
+              } else {
+                setBsvListAmount(Number(inputValue));
+              }
+            }}
             value={bsvListAmount !== null && bsvListAmount !== undefined ? bsvListAmount : ''}
           />
           <Show when={isPasswordRequired}>

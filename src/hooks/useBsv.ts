@@ -47,7 +47,7 @@ export const useBsv = () => {
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey } = useKeys();
   const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
-  const { getUtxos, getBsvBalance, getExchangeRate, broadcastRawTx } = useWhatsOnChain();
+  const { getUtxos, getBsvBalance, getExchangeRate, broadcastRawTx, getInputs } = useWhatsOnChain();
 
   const getChainParams = (network: NetWork): ChainParams => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
@@ -200,21 +200,6 @@ export const useBsv = () => {
       console.error(error);
       return false;
     }
-  };
-
-  const getInputs = (utxos: UTXO[], satsOut: number, isSendAll: boolean) => {
-    if (isSendAll) return utxos;
-    let sum = 0;
-    let index = 0;
-    let inputs: UTXO[] = [];
-
-    while (sum <= satsOut) {
-      const utxo = utxos[index];
-      sum += utxo.satoshis;
-      inputs.push(utxo);
-      index++;
-    }
-    return inputs;
   };
 
   const updateBsvBalance = async (pullFresh?: boolean) => {

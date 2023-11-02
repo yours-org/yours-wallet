@@ -42,4 +42,5 @@ window.panda = {
   getSocialProfile: createPandaMethod('getSocialProfile'),
   getPaymentUtxos: createPandaMethod('getPaymentUtxos'),
   getExchangeRate: createPandaMethod('getExchangeRate'),
+  purchaseOrdinal: createPandaMethod('purchaseOrdinal'),
 };

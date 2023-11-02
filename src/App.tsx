@@ -27,6 +27,7 @@ import { BroadcastRequest } from './pages/requests/BroadcastRequest';
 import { GetSignaturesRequest } from './pages/requests/GetSignaturesRequest';
 import { ImportWallet } from './pages/onboarding/ImportWallet';
 import { AppsAndTools } from './pages/AppsAndTools';
+import { OrdPurchaseRequest, Web3PurchaseOrdinalRequest } from './pages/requests/OrdPurchaseRequest';
 
 export type ThirdPartyAppRequestData = {
   appName: string;
@@ -69,6 +70,10 @@ export const App = () => {
     undefined,
   );
 
+  const [ordinalPurchaseRequest, setOrdinalPurchaseRequest] = useState<Web3PurchaseOrdinalRequest | undefined>(
+    undefined,
+  );
+
   const [getSignaturesRequest, setGetSignaturesRequest] = useState<Web3GetSignaturesRequest | undefined>(undefined);
 
   useActivityDetector(isLocked);
@@ -82,6 +87,7 @@ export const App = () => {
       [
         'sendBsvRequest',
         'transferOrdinalRequest',
+        'purchaseOrdinalRequest',
         'connectRequest',
         'popupWindowId',
         'whitelist',
@@ -97,6 +103,7 @@ export const App = () => {
           whitelist,
           sendBsvRequest,
           transferOrdinalRequest,
+          purchaseOrdinalRequest,
           signMessageRequest,
           broadcastRequest,
           getSignaturesRequest,
@@ -119,6 +126,11 @@ export const App = () => {
 
         if (transferOrdinalRequest) {
           setOrdinalTransferRequest(transferOrdinalRequest);
+          menuContext?.handleSelect('ords');
+        }
+
+        if (purchaseOrdinalRequest) {
+          setOrdinalPurchaseRequest(purchaseOrdinalRequest);
           menuContext?.handleSelect('ords');
         }
 
@@ -206,11 +218,26 @@ export const App = () => {
               <Route
                 path="/ord-wallet"
                 element={
-                  <Show when={!!ordinalTransferRequest} whenFalseContent={<OrdWallet />}>
-                    <OrdTransferRequest
-                      web3Request={ordinalTransferRequest as Web3TransferOrdinalRequest}
-                      onResponse={() => setOrdinalTransferRequest(undefined)}
-                    />
+                  <Show
+                    when={!ordinalTransferRequest && !ordinalPurchaseRequest}
+                    whenFalseContent={
+                      <>
+                        <Show when={!!ordinalPurchaseRequest}>
+                          <OrdPurchaseRequest
+                            web3Request={ordinalPurchaseRequest as Web3PurchaseOrdinalRequest}
+                            onResponse={() => setOrdinalPurchaseRequest(undefined)}
+                          />
+                        </Show>
+                        <Show when={!!ordinalTransferRequest}>
+                          <OrdTransferRequest
+                            web3Request={ordinalTransferRequest as Web3TransferOrdinalRequest}
+                            onResponse={() => setOrdinalTransferRequest(undefined)}
+                          />
+                        </Show>
+                      </>
+                    }
+                  >
+                    <OrdWallet />
                   </Show>
                 }
               />
