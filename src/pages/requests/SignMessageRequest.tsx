@@ -13,6 +13,7 @@ import { ColorThemeProps } from '../../theme';
 import { Web3SignMessageRequest, useBsv } from '../../hooks/useBsv';
 import { storage } from '../../utils/storage';
 import { useNavigate } from 'react-router-dom';
+import { useWeb3Context } from '../../hooks/useWeb3Context';
 
 const RequestDetailsContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -47,6 +48,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
   const [signature, setSignature] = useState<string | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
   const navigate = useNavigate();
+  const { isPasswordRequired } = useWeb3Context();
 
   const { isProcessing, setIsProcessing, signMessage } = useBsv();
 
@@ -73,7 +75,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    if (!passwordConfirm) {
+    if (!passwordConfirm && isPasswordRequired) {
       addSnackbar('You must enter a password!', 'error');
       setIsProcessing(false);
       return;
@@ -122,13 +124,15 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
             <RequestDetailsContainer>
               {<Text style={{ color: theme.white }}>{messageToSign.message}</Text>}
             </RequestDetailsContainer>
-            <Input
-              theme={theme}
-              placeholder="Enter Wallet Password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
+            <Show when={isPasswordRequired}>
+              <Input
+                theme={theme}
+                placeholder="Enter Wallet Password"
+                type="password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+              />
+            </Show>
             <Button theme={theme} type="primary" label="Sign Message" disabled={isProcessing} isSubmit />
           </FormContainer>
         </ConfirmContent>

@@ -6,6 +6,7 @@ import { ChainParams, P2PKHAddress } from 'bsv-wasm-web';
 import { useBsvWasm } from './useBsvWasm';
 import { NetWork } from '../utils/network';
 import { useNetwork } from './useNetwork';
+import { usePasswordSetting } from './usePasswordSetting';
 
 export type KeyStorage = {
   encryptedKeys: string;
@@ -24,6 +25,7 @@ export const useKeys = () => {
   const [bsvPubKey, setBsvPubKey] = useState('');
   const [ordPubKey, setOrdPubKey] = useState('');
   const { network } = useNetwork();
+  const { isPasswordRequired } = usePasswordSetting();
   const { bsvWasmInitialized } = useBsvWasm();
 
   const getChainParams = (network: NetWork): ChainParams => {
@@ -73,8 +75,8 @@ export const useKeys = () => {
           setOrdAddress(ordAddress);
           setBsvPubKey(keys.walletPubKey);
           setOrdPubKey(keys.ordPubKey);
-          if (password) {
-            const isVerified = await verifyPassword(password);
+          if (!isPasswordRequired || password) {
+            const isVerified = await verifyPassword(password ?? '');
             isVerified
               ? resolve(
                   Object.assign({}, keys, {
@@ -100,6 +102,7 @@ export const useKeys = () => {
 
   const verifyPassword = (password: string): Promise<boolean> => {
     return new Promise((resolve, reject) => {
+      if (!isPasswordRequired) resolve(true);
       storage.get(['salt', 'passKey'], (result: KeyStorage) => {
         try {
           const derivedKey = deriveKey(password, result.salt);

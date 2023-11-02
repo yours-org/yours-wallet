@@ -14,6 +14,7 @@ import { storage } from '../../utils/storage';
 import { useNavigate } from 'react-router-dom';
 import { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import { useBsvWasm } from '../../hooks/useBsvWasm';
+import { useWeb3Context } from '../../hooks/useWeb3Context';
 
 const TxInput = styled.div`
   border: 1px solid yellow;
@@ -200,6 +201,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const navigate = useNavigate();
+  const { isPasswordRequired } = useWeb3Context();
 
   const { getSigsRequest, onSignature, popupId } = props;
   const [getSigsResponse, setGetSigsResponse] = useState<any>(undefined);
@@ -228,7 +230,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    if (!passwordConfirm) {
+    if (!passwordConfirm && isPasswordRequired) {
       addSnackbar('You must enter a password!', 'error');
       setIsProcessing(false);
       return;
@@ -293,12 +295,14 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
           </Text>
           <FormContainer noValidate onSubmit={(e) => handleSigning(e)}>
             <TxViewer request={getSigsRequest} />
-            <Input
-              theme={theme}
-              placeholder="Enter Wallet Password"
-              type="password"
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
+            <Show when={isPasswordRequired}>
+              <Input
+                theme={theme}
+                placeholder="Enter Wallet Password"
+                type="password"
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+              />
+            </Show>
             <Button theme={theme} type="primary" label="Sign the transaction" isSubmit disabled={isProcessing} />
             <Button
               theme={theme}

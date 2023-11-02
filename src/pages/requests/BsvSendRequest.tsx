@@ -15,6 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { styled } from 'styled-components';
 import { ColorThemeProps } from '../../theme';
 import bsvCoin from '../../assets/bsv-coin.svg';
+import { useWeb3Context } from '../../hooks/useWeb3Context';
 
 const RequestDetailsContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -54,7 +55,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-
+  const { isPasswordRequired } = useWeb3Context();
   const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, updateBsvBalance } = useBsv();
 
   useEffect(() => {
@@ -101,7 +102,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       return;
     }
 
-    if (!passwordConfirm) {
+    if (!passwordConfirm && isPasswordRequired) {
       addSnackbar('You must enter a password!', 'error');
       setIsProcessing(false);
       return;
@@ -166,13 +167,15 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           >{`Available Balance: ${bsvBalance}`}</Text>
           <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
             <RequestDetailsContainer>{web3Details()}</RequestDetailsContainer>
-            <Input
-              theme={theme}
-              placeholder="Enter Wallet Password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
+            <Show when={isPasswordRequired}>
+              <Input
+                theme={theme}
+                placeholder="Enter Wallet Password"
+                type="password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+              />
+            </Show>
             <Text theme={theme} style={{ margin: '1rem' }}>
               Double check details before sending.
             </Text>
