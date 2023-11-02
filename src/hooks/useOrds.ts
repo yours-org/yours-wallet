@@ -42,6 +42,7 @@ export type GPArcResponse = {
 
 export interface BSV20 {
   tick: string;
+  sym?: string;
   dec: number;
   all: Balance;
   listed: Balance;

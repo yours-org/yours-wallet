@@ -18,7 +18,7 @@ export type GorillaPoolBroadcastResponse = {
 
 export const useGorillaPool = () => {
   const { network } = useNetwork();
-  const { getTokenDecimals } = useTokens();
+  const { getTokenDecimals, getTokenSym } = useTokens();
 
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
@@ -103,8 +103,11 @@ export const useGorillaPool = () => {
         };
         tick: string;
       }) => {
+
+
         return {
           tick: b.tick,
+          sym: getTokenSym(b.tick),
           dec: getTokenDecimals(b.tick),
           all: {
             confirmed: BigInt(b.all.confirmed),

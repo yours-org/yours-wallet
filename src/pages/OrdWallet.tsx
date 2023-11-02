@@ -355,7 +355,7 @@ export const OrdWallet = () => {
             return (
               <BSV20Item
                 theme={theme}
-                tick={b.tick}
+                tick={b.sym || b.tick}
                 amount={showAmount(b.all.confirmed, b.dec)}
                 key={b.tick}
                 selected={false}
@@ -560,7 +560,7 @@ export const OrdWallet = () => {
       />
       {token ? (
         <ConfirmContent>
-          <TransferBSV20Header theme={theme}>Send {token.tick}</TransferBSV20Header>
+          <TransferBSV20Header theme={theme}>Send {token.sym || token.tick}</TransferBSV20Header>
           <Text
             theme={theme}
             style={{ cursor: 'pointer' }}
