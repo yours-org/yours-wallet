@@ -98,7 +98,6 @@ export const useOrds = () => {
     try {
       //   setIsProcessing(true); // TODO: set this to true if call is taking more than a second
       //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
-
       const ordList = await getOrdUtxos(ordAddress);
       setOrdinals(ordList);
 
