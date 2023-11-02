@@ -53,6 +53,7 @@ const ProfileImage = styled.img`
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 100%;
+  cursor: pointer;
 `;
 
 const BalanceContainer = styled.div`
@@ -116,7 +117,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { ordPubKey } = useOrds();
   const { socialProfile } = useSocialProfile();
 
-  const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, getBsvBalance, exchangeRate, bsvPubKey } =
+  const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, updateBsvBalance, exchangeRate, bsvPubKey } =
     useBsv();
 
   useEffect(() => {
@@ -135,7 +136,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           pubKeys: { bsvPubKey, ordPubKey },
         });
 
-        // We don't want the window to stay open after a successful connection. The 1ms timeout is used because of some weirdness with how chrome.sendMessage() works
+        // We don't want the window to stay open after a successful connection. The 10ms timeout is used because of some weirdness with how chrome.sendMessage() works
         setTimeout(() => {
           if (popupId) chrome.windows.remove(popupId);
         }, 10);
@@ -152,6 +153,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
     if (!message && bsvAddress) {
       resetSendState();
       setPageState('main');
+      setTimeout(() => {
+        updateBsvBalance(true);
+      }, 1000);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, bsvAddress]);
@@ -282,7 +286,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
       <BackButton
         onClick={() => {
           setPageState('main');
-          getBsvBalance(bsvAddress);
+          updateBsvBalance(true);
         }}
       />
       <Icon size={'2.5rem'} src={bsvCoin} />
@@ -302,7 +306,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const main = (
     <MainContent>
       <ProfileImageContainer>
-        <ProfileImage src={socialProfile?.avatar ? socialProfile.avatar : HOSTED_PANDA_IMAGE} />
+        <ProfileImage
+          title="Refresh balance"
+          src={socialProfile?.avatar ? socialProfile.avatar : HOSTED_PANDA_IMAGE}
+          onClick={() => updateBsvBalance(true)}
+        />
       </ProfileImageContainer>
       <MiddleContainer theme={theme}>
         <BalanceContainer>

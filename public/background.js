@@ -1,6 +1,8 @@
 /* global chrome */
 console.log('🐼 Panda Wallet Background Script Running!');
 
+const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv';
+
 let responseCallbackForConnectRequest;
 let responseCallbackForSendBsvRequest;
 let responseCallbackForTransferOrdinalRequest;
@@ -124,6 +126,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processGetSignaturesRequest(message, sendResponse);
       case 'getSocialProfile':
         return processGetSocialProfileRequest(sendResponse);
+      case 'getPaymentUtxos':
+        return processGetPaymentUtxos(sendResponse);
+      case 'getExchangeRate':
+        return processGetExchangeRate(sendResponse);
       default:
         break;
     }
@@ -265,6 +271,60 @@ const processGetOrdinalsRequest = (sendResponse) => {
   } catch (error) {
     sendResponse({
       type: 'getOrdinals',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+};
+
+const processGetExchangeRate = (sendResponse) => {
+  chrome.storage.local.get(['exchangeRateCache'], async (data) => {
+    try {
+      const { exchangeRateCache } = data;
+      if (exchangeRateCache?.rate && Date.now() - exchangeRateCache.timestamp < 5 * 60 * 1000) {
+        sendResponse({
+          type: 'getExchangeRate',
+          success: true,
+          data: Number(exchangeRateCache.rate.toFixed(2)),
+        });
+        sendResponse();
+      } else {
+        const res = await fetch(`${WOC_BASE_URL}/main/exchangerate`);
+        if (!res.ok) {
+          throw new Error(`Fetch error: ${res.status} - ${res.statusText}`);
+        }
+        const data = await res.json();
+        const rate = data.rate;
+        const currentTime = Date.now();
+        chrome.storage.local.set({ exchangeRateCache: { rate, timestamp: currentTime } });
+        sendResponse({
+          type: 'getExchangeRate',
+          success: true,
+          data: Number(rate.toFixed(2)),
+        });
+      }
+    } catch (error) {
+      sendResponse({
+        type: 'getExchangeRate',
+        success: false,
+        error: JSON.stringify(error),
+      });
+    }
+  });
+};
+
+const processGetPaymentUtxos = async (sendResponse) => {
+  try {
+    chrome.storage.local.get(['paymentUtxos'], ({ paymentUtxos }) => {
+      sendResponse({
+        type: 'getPaymentUtxos',
+        success: true,
+        data: paymentUtxos.length > 0 ? paymentUtxos : [],
+      });
+    });
+  } catch (error) {
+    sendResponse({
+      type: 'getPaymentUtxos',
       success: false,
       error: JSON.stringify(error),
     });

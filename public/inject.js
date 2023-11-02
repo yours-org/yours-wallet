@@ -40,4 +40,6 @@ window.panda = {
   broadcast: createPandaMethod('broadcast'),
   getSignatures: createPandaMethod('getSignatures'),
   getSocialProfile: createPandaMethod('getSocialProfile'),
+  getPaymentUtxos: createPandaMethod('getPaymentUtxos'),
+  getExchangeRate: createPandaMethod('getExchangeRate'),
 };
