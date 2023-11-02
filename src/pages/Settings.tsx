@@ -101,7 +101,13 @@ const PageWrapper = styled.div<{ $marginTop: string }>`
   width: 100%;
 `;
 
-type SettingsPage = 'main' | 'connected-apps' | 'social-profile' | 'export-keys-options' | 'export-keys-qr';
+type SettingsPage =
+  | 'main'
+  | 'connected-apps'
+  | 'social-profile'
+  | 'export-keys-options'
+  | 'export-keys-qr'
+  | 'preferences';
 type DecisionType = 'sign-out' | 'export-keys' | 'export-keys-qr-code';
 
 export const Settings = () => {
@@ -110,7 +116,7 @@ export const Settings = () => {
   const { lockWallet } = useWalletLockState();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { addSnackbar } = useSnackbar();
-  const { network, updateNetwork } = useWeb3Context();
+  const { network, updateNetwork, isPasswordRequired, updatePasswordRequirement } = useWeb3Context();
   const [page, setPage] = useState<SettingsPage>('main');
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
@@ -278,9 +284,9 @@ export const Settings = () => {
         jsxElement={<ForwardButton />}
       />
       <SettingsRow
-        name="Social Profile"
-        description="Set your display name and avatar"
-        onClick={() => setPage('social-profile')}
+        name="Preferences"
+        description="Manage your wallet preferences"
+        onClick={() => setPage('preferences')}
         jsxElement={<ForwardButton />}
       />
       <SettingsRow
@@ -348,9 +354,32 @@ export const Settings = () => {
     </>
   );
 
+  const preferencesPage = (
+    <>
+      <BackButton onClick={() => setPage('main')} />
+      <SettingsRow
+        name="Social Profile"
+        description="Set your display name and avatar"
+        onClick={() => setPage('social-profile')}
+        jsxElement={<ForwardButton />}
+      />
+      <SettingsRow
+        name="Require Password"
+        description="Require a password for sending assets?"
+        jsxElement={
+          <ToggleSwitch
+            theme={theme}
+            on={isPasswordRequired}
+            onChange={() => updatePasswordRequirement(!isPasswordRequired)}
+          />
+        }
+      />
+    </>
+  );
+
   const socialProfilePage = (
     <PageWrapper $marginTop="5rem">
-      <BackButton onClick={() => setPage('main')} />
+      <BackButton onClick={() => setPage('preferences')} />
       <SettingsText theme={theme}>Display Name</SettingsText>
       <Input
         theme={theme}
@@ -398,6 +427,8 @@ export const Settings = () => {
               ? 'Connected Apps'
               : page === 'social-profile'
               ? 'Social Profile'
+              : page === 'preferences'
+              ? 'Preferences'
               : page === 'export-keys-options'
               ? 'Export Keys'
               : page === 'export-keys-qr'
@@ -407,6 +438,7 @@ export const Settings = () => {
         </HeaderWrapper>
         <Show when={page === 'main'}>{main}</Show>
         <Show when={page === 'connected-apps'}>{connectedAppsPage}</Show>
+        <Show when={page === 'preferences'}>{preferencesPage}</Show>
         <Show when={page === 'social-profile'}>{socialProfilePage}</Show>
         <Show when={page === 'export-keys-options'}>{exportKeyOptionsPage}</Show>
         <Show when={page === 'export-keys-qr'}>{exportKeysAsQrCodePage}</Show>

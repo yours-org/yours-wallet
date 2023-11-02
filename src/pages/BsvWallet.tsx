@@ -30,6 +30,7 @@ import { useBsv } from '../hooks/useBsv';
 import { useOrds } from '../hooks/useOrds';
 import switchAsset from '../assets/switch-asset.svg';
 import { useSocialProfile } from '../hooks/useSocialProfile';
+import { useWeb3Context } from '../hooks/useWeb3Context';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -116,6 +117,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { addSnackbar, message } = useSnackbar();
   const { ordPubKey } = useOrds();
   const { socialProfile } = useSocialProfile();
+  const { isPasswordRequired } = useWeb3Context();
 
   const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, updateBsvBalance, exchangeRate, bsvPubKey } =
     useBsv();
@@ -202,7 +204,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
       return;
     }
 
-    if (!passwordConfirm) {
+    if (!passwordConfirm && isPasswordRequired) {
       addSnackbar('You must enter a password!', 'error');
       setIsProcessing(false);
       return;
@@ -291,10 +293,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
       />
       <Icon size={'2.5rem'} src={bsvCoin} />
       <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
-        Only Send BSV
+        BSV Address
       </HeaderText>
-      <Text theme={theme} style={{ marginBottom: '1rem' }}>
-        Do not send ordinals to this address!
+      <Text style={{ marginBottom: '1.25rem', fontSize: '1rem', fontWeight: 700, color: theme.errorRed }}>
+        Do not send 1Sat Ordinals or BSV20 to this address!
       </Text>
       <QrCode address={bsvAddress} onClick={handleCopyToClipboard} />
       <Text theme={theme} style={{ marginTop: '1.5rem', cursor: 'pointer' }} onClick={handleCopyToClipboard}>
@@ -392,13 +394,15 @@ export const BsvWallet = (props: BsvWalletProps) => {
               onClick={toggleAmountType}
             />
           </InputAmountWrapper>
-          <Input
-            theme={theme}
-            placeholder="Enter Wallet Password"
-            type="password"
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-          />
+          <Show when={isPasswordRequired}>
+            <Input
+              theme={theme}
+              placeholder="Enter Wallet Password"
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+            />
+          </Show>
           <Text theme={theme} style={{ margin: '3rem 0 1rem' }}>
             Double check details before sending.
           </Text>

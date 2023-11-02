@@ -27,6 +27,7 @@ import { OrdinalTxo } from '../hooks/ordTypes';
 import { normalize, showAmount } from '../utils/ordi';
 import { BSV20Item } from '../components/BSV20Item';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
+import { useWeb3Context } from '../hooks/useWeb3Context';
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -111,6 +112,7 @@ export const OrdWallet = () => {
   const [bsvListAmount, setBsvListAmount] = useState<number | undefined>();
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
+  const { isPasswordRequired } = useWeb3Context();
 
   const [token, setToken] = useState<BSV20 | null>(null);
   const [tokenSendAmount, setTokenSendAmount] = useState<bigint | null>(null);
@@ -163,7 +165,7 @@ export const OrdWallet = () => {
       return;
     }
 
-    if (!passwordConfirm) {
+    if (!passwordConfirm && isPasswordRequired) {
       addSnackbar('You must enter a password!', 'error');
       setIsProcessing(false);
       return;
@@ -186,7 +188,7 @@ export const OrdWallet = () => {
     setIsProcessing(true);
 
     await sleep(25);
-    if (!passwordConfirm) {
+    if (!passwordConfirm && isPasswordRequired) {
       addSnackbar('You must enter a password!', 'error');
       setIsProcessing(false);
       return;
@@ -221,7 +223,7 @@ export const OrdWallet = () => {
     setIsProcessing(true);
 
     await sleep(25);
-    if (!passwordConfirm) {
+    if (!passwordConfirm && isPasswordRequired) {
       addSnackbar('You must enter a password!', 'error');
       setIsProcessing(false);
       return;
@@ -250,7 +252,7 @@ export const OrdWallet = () => {
       return;
     }
 
-    if (!passwordConfirm) {
+    if (!passwordConfirm && isPasswordRequired) {
       addSnackbar('You must enter a password!', 'error');
       setIsProcessing(false);
       return;
@@ -305,6 +307,7 @@ export const OrdWallet = () => {
         theme={theme}
         type="primary"
         label="Transfer"
+        disabled={ordinals.length === 0 || !selectedOrdinal}
         onClick={async () => {
           if (!selectedOrdinal?.outpoint.toString()) {
             addSnackbar('You must select an ordinal to transfer!', 'info');
@@ -317,6 +320,7 @@ export const OrdWallet = () => {
         theme={theme}
         type="primary"
         label="List"
+        disabled={ordinals.length === 0 || !selectedOrdinal}
         onClick={async () => {
           if (!selectedOrdinal?.outpoint.toString()) {
             addSnackbar('You must select an ordinal to list!', 'info');
@@ -364,6 +368,9 @@ export const OrdWallet = () => {
           })}
         </BSV20List>
       </Show>
+      <OrdButtonContainer>
+        <Button theme={theme} type="primary" label="Receive" onClick={() => setPageState('receive')} />
+      </OrdButtonContainer>
     </>
   );
 
@@ -376,10 +383,10 @@ export const OrdWallet = () => {
         }}
       />
       <Icon size={'2.5rem'} src={oneSatLogo} />
-      <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
-        Only Send 1Sat Ordinals
+      <HeaderText style={{ marginTop: '1rem', fontSize: '2rem' }} theme={theme}>
+        Ordinals & BSV20
       </HeaderText>
-      <Text theme={theme} style={{ marginBottom: '1rem' }}>
+      <Text style={{ marginBottom: '1.25rem', fontSize: '1rem', fontWeight: 700, color: theme.errorRed }}>
         Do not send BSV to this address!
       </Text>
       <QrCode address={ordAddress} onClick={handleCopyToClipboard} />
@@ -420,14 +427,16 @@ export const OrdWallet = () => {
             onChange={(e) => setReceiveAddress(e.target.value)}
             value={receiveAddress}
           />
-          <Input
-            theme={theme}
-            placeholder="Password"
-            name="password"
-            type="password"
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-          />
+          <Show when={isPasswordRequired}>
+            <Input
+              theme={theme}
+              placeholder="Password"
+              name="password"
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+            />
+          </Show>
           <Text theme={theme} style={{ margin: '1rem 0 0 0' }}>
             Double check details before sending.
           </Text>
@@ -458,13 +467,15 @@ export const OrdWallet = () => {
           isTransfer
         />
         <FormContainer noValidate onSubmit={(e) => handleCancelListing(e)}>
-          <Input
-            theme={theme}
-            placeholder="Password"
-            type="password"
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-          />
+          <Show when={isPasswordRequired}>
+            <Input
+              theme={theme}
+              placeholder="Password"
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+            />
+          </Show>
           <Button theme={theme} type="primary" label="Cancel Now" disabled={isProcessing} isSubmit />
         </FormContainer>
       </ConfirmContent>
@@ -581,14 +592,16 @@ export const OrdWallet = () => {
                 }
               }}
             />
-            <Input
-              theme={theme}
-              name="password"
-              placeholder="Password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
+            <Show when={isPasswordRequired}>
+              <Input
+                theme={theme}
+                name="password"
+                placeholder="Password"
+                type="password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+              />
+            </Show>
             <Text theme={theme} style={{ margin: '1rem 0 0 0' }}>
               Double check details before sending.
             </Text>
@@ -632,13 +645,15 @@ export const OrdWallet = () => {
             onChange={(e) => setBsvListAmount(Number(e.target.value))}
             value={bsvListAmount !== null && bsvListAmount !== undefined ? bsvListAmount : ''}
           />
-          <Input
-            theme={theme}
-            placeholder="Password"
-            type="password"
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-          />
+          <Show when={isPasswordRequired}>
+            <Input
+              theme={theme}
+              placeholder="Password"
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+            />
+          </Show>
           <Text theme={theme} style={{ margin: '1rem 0 0 0' }}>
             Confirm global orderbook listing
           </Text>

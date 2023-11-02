@@ -7,11 +7,14 @@ import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { useNetwork } from '../hooks/useNetwork';
 import { NetWork } from '../utils/network';
 import { OrdinalResponse } from '../hooks/ordTypes';
+import { usePasswordSetting } from '../hooks/usePasswordSetting';
 
 export interface Web3ContextProps {
   network: NetWork;
   ordinals: OrdinalResponse;
+  isPasswordRequired: boolean;
   updateNetwork: (n: NetWork) => void;
+  updatePasswordRequirement: (passwordSetting: boolean) => void;
 }
 
 export const Web3Context = createContext<Web3ContextProps | undefined>(undefined);
@@ -25,6 +28,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance } = useBsv();
   const { ordAddress, ordinals, ordPubKey } = useOrds();
   const { network, setNetwork } = useNetwork();
+  const { isPasswordRequired, setIsPasswordRequired } = usePasswordSetting();
 
   useEffect(() => {
     // Here we are pulling in any new Utxos unaccounted for.
@@ -40,6 +44,11 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       network: n,
     });
     setNetwork(n);
+  };
+
+  const updatePasswordRequirement = (isRequired: boolean): void => {
+    storage.set({ isPasswordRequired: isRequired });
+    setIsPasswordRequired(isRequired);
   };
 
   useEffect(() => {
@@ -59,11 +68,27 @@ export const Web3Provider = (props: Web3ProviderProps) => {
         ordinals,
         balance,
         network,
+        isPasswordRequired,
         addresses: { bsvAddress, ordAddress },
         pubKeys: { bsvPubKey, ordPubKey },
       },
     });
-  }, [isLocked, bsvAddress, ordAddress, ordinals, bsvPubKey, ordPubKey, bsvBalance, exchangeRate, network]);
+  }, [
+    isLocked,
+    bsvAddress,
+    ordAddress,
+    ordinals,
+    bsvPubKey,
+    ordPubKey,
+    bsvBalance,
+    exchangeRate,
+    network,
+    isPasswordRequired,
+  ]);
 
-  return <Web3Context.Provider value={{ network, updateNetwork, ordinals }}>{children}</Web3Context.Provider>;
+  return (
+    <Web3Context.Provider value={{ network, updateNetwork, ordinals, updatePasswordRequirement, isPasswordRequired }}>
+      {children}
+    </Web3Context.Provider>
+  );
 };

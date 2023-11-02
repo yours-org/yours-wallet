@@ -11,6 +11,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { truncate } from '../../utils/format';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
+import { useWeb3Context } from '../../hooks/useWeb3Context';
 
 export type OrdTransferRequestProps = {
   web3Request: Web3TransferOrdinalRequest;
@@ -25,6 +26,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
+  const { isPasswordRequired } = useWeb3Context();
 
   useEffect(() => {
     if (!successTxId) return;
@@ -52,7 +54,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
       return;
     }
 
-    if (!passwordConfirm) {
+    if (!passwordConfirm && isPasswordRequired) {
       addSnackbar('You must enter a password!', 'error');
       setIsProcessing(false);
       return;
@@ -105,13 +107,15 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
             <Text theme={theme} style={{ margin: '1rem 0' }}>
               {`Transfer to: ${truncate(web3Request.address, 5, 5)}`}
             </Text>
-            <Input
-              theme={theme}
-              placeholder="Password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
+            <Show when={isPasswordRequired}>
+              <Input
+                theme={theme}
+                placeholder="Password"
+                type="password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+              />
+            </Show>
             <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
               Double check details before sending.
             </Text>
