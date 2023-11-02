@@ -1,0 +1,11 @@
+{
+  "name": "bsv-wasm",
+  "version": "2.0.2",
+  "files": [
+    "bsv_wasm_bg.wasm",
+    "bsv_wasm.js",
+    "bsv_wasm.d.ts"
+  ],
+  "main": "bsv_wasm.js",
+  "types": "bsv_wasm.d.ts"
+}
