@@ -10,6 +10,7 @@ export const BSV_DECIMAL_CONVERSION = 100000000;
 export const FEE_PER_BYTE = 0.02;
 export const GLOBAL_ORDERBOOK_MARKET_RATE = 0.05;
 export const P2PKH_INPUT_SIZE = 148;
+export const P2PKH_OUTPUT_SIZE = 34;
 export const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 export const SNACKBAR_TIMEOUT = 2.5 * 1000; // 2.5 seconds
 export const HOSTED_PANDA_IMAGE = 'https://i.ibb.co/3fLL5X2/Panda-Wallet-Logo.png';

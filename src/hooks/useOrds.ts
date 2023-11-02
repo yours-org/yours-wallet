@@ -6,6 +6,7 @@ import {
   O_LOCK_PREFIX,
   O_LOCK_SUFFIX,
   P2PKH_INPUT_SIZE,
+  P2PKH_OUTPUT_SIZE,
 } from '../utils/constants';
 import { useKeys } from './useKeys';
 import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
@@ -88,7 +89,7 @@ export const useOrds = () => {
   const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
   const { cacheTokenInfos } = useTokens();
-  const { getUtxos, getRawTxById, getSuitableUtxo, getInputs } = useWhatsOnChain();
+  const { getUtxos, getRawTxById, getSuitableUtxo } = useWhatsOnChain();
   const { getOrdUtxos, broadcastWithGorillaPool, getUtxoByOutpoint, getMarketData, getBsv20Balances, getBSV20Utxos } =
     useGorillaPool();
   const getOrdinalsBaseUrl = () => {
@@ -638,31 +639,29 @@ export const useOrds = () => {
       }
 
       const payPk = PrivateKey.from_wif(keys.walletWif);
-      const res = await getUtxoByOutpoint(outpoint);
-      const { vout, txid } = res;
-      const price = Number(res.data?.list?.price);
-      const payout = res.data?.list?.payout;
+      const listing = await getUtxoByOutpoint(outpoint);
+      const price = Number(listing.data?.list?.price);
+      const payout = listing.data?.list?.payout;
 
-      const { script } = await getMarketData(outpoint);
-
-      if (!txid || !price || !payout || !script) throw Error('Missing information!');
+      if (!price || !payout) throw Error('Missing information!');
+      let satsIn = 0;
+      let satsOut = 0;
 
       const purchaseTx = new Transaction(1, 0);
 
-      const neededAmount = fundingUtxos.reduce((a, r) => a + r.satoshis, 0) + P2PKH_INPUT_SIZE * fundingUtxos.length;
-      if (price * (1 + marketplaceRate) >= neededAmount) {
-        return { error: 'insufficient-funds' };
-      }
-      const listingInput = new TxIn(Buffer.from(txid, 'hex'), vout, Script.from_asm_string(''));
+      const listingInput = new TxIn(Buffer.from(listing.txid, 'hex'), listing.vout, Script.from_asm_string(''));
       purchaseTx.add_input(listingInput);
+      satsIn += listing.satoshis;
 
       // output 0
       const buyerOutput = new TxOut(BigInt(1), P2PKHAddress.from_string(ordAddress).get_locking_script());
       purchaseTx.add_output(buyerOutput);
+      satsOut += 1;
 
       // output 1
       const payOutput = TxOut.from_hex(Buffer.from(payout, 'base64').toString('hex'));
       purchaseTx.add_output(payOutput);
+      satsOut += price;
 
       // output 2 - change
       const dummyChangeOutput = new TxOut(
@@ -672,16 +671,19 @@ export const useOrds = () => {
       purchaseTx.add_output(dummyChangeOutput);
 
       // output 3 - marketFee
+      let marketFee = Math.ceil(price * marketplaceRate);
       const dummyMarketFeeOutput = new TxOut(
-        BigInt(0),
+        BigInt(marketFee),
         P2PKHAddress.from_string(marketplaceAddress).get_locking_script(),
       );
       purchaseTx.add_output(dummyMarketFeeOutput);
+      satsOut += marketFee;
 
+      let listingScript = listing.script!;
       let preimage = purchaseTx.sighash_preimage(
         SigHash.InputOutput,
         0,
-        Script.from_bytes(Buffer.from(script, 'base64')),
+        Script.from_bytes(Buffer.from(listingScript, 'hex')),
         BigInt(1), //TODO: use amount from listing
       );
 
@@ -694,13 +696,23 @@ export const useOrds = () => {
       );
       purchaseTx.set_input(0, listingInput);
 
-      let marketFee = Math.ceil(price * marketplaceRate);
-      let fee = calculateFee(1, purchaseTx);
-      let satsNeeded = fee + price + marketFee;
-      const inputs = getInputs(fundingUtxos, satsNeeded, false);
-      const satsCollected = inputs.reduce((a, r) => a + r.satoshis, 0);
-      const changeAmt = Math.ceil(satsCollected - satsNeeded);
+      let size = purchaseTx.to_bytes().length + P2PKH_INPUT_SIZE + P2PKH_OUTPUT_SIZE;
+      let fee = Math.ceil(size * FEE_PER_BYTE);
+      let inputs: UTXO[] = [];
+      while (satsIn < satsOut + fee) {
+        const utxo = fundingUtxos.pop();
+        if (!utxo) {
+          return { error: 'insufficient-funds' };
+        }
+        const fundingInput = new TxIn(Buffer.from(utxo.txid, 'hex'), utxo.vout, Script.from_asm_string(utxo.script));
+        purchaseTx.add_input(fundingInput);
+        inputs.push(utxo);
+        satsIn += utxo.satoshis;
+        size += P2PKH_INPUT_SIZE;
+        fee = Math.ceil(size * FEE_PER_BYTE);
+      }
 
+      let changeAmt = satsIn - (satsOut + fee);
       const changeOutput = new TxOut(
         BigInt(changeAmt),
         P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script(),
@@ -708,17 +720,10 @@ export const useOrds = () => {
 
       purchaseTx.set_output(2, changeOutput);
 
-      // add output 3 - market fee
-      const marketFeeOutput = new TxOut(
-        BigInt(marketFee),
-        P2PKHAddress.from_string(marketplaceAddress).get_locking_script(),
-      );
-      purchaseTx.set_output(3, marketFeeOutput);
-
       preimage = purchaseTx.sighash_preimage(
         SigHash.InputOutputs,
         0,
-        Script.from_bytes(Buffer.from(script, 'base64')),
+        Script.from_bytes(Buffer.from(listingScript, 'hex')),
         BigInt(1),
       );
 
@@ -732,12 +737,10 @@ export const useOrds = () => {
       purchaseTx.set_input(0, listingInput);
 
       inputs.forEach((utxo, idx) => {
-        const fundingInput = new TxIn(Buffer.from(utxo.txid, 'hex'), utxo.vout, Script.from_asm_string(utxo.script));
-        purchaseTx.add_input(fundingInput);
-
+        const fundingInput = purchaseTx.get_input(idx + 1)!;
         const sig = purchaseTx.sign(
           payPk,
-          SigHash.InputsOutputs,
+          SigHash.InputOutputs,
           1 + idx,
           Script.from_asm_string(utxo.script),
           BigInt(utxo.satoshis),
@@ -749,10 +752,18 @@ export const useOrds = () => {
       });
 
       const rawTx = purchaseTx.to_hex();
-
+      const txid = purchaseTx.get_id_hex();
+      if (changeAmt > 0) {
+        fundingUtxos.push({
+          txid,
+          vout: 2,
+          satoshis: changeAmt,
+          script: P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_asm_string(),
+        });
+      }
       const broadcastRes = await broadcastWithGorillaPool(rawTx);
       if (!broadcastRes.txid) return { error: 'broadcast-error' };
-      storage.set({ paymentUtxos: fundingUtxos.filter((item) => !inputs.includes(item)) });
+      storage.set({ paymentUtxos: fundingUtxos });
       return { txid };
     } catch (error) {
       console.log(error);

@@ -42,7 +42,16 @@ export function transaction_from_compact_bytes(a: number, b: number, c: number):
 export function transaction_from_compact_hex(a: number, b: number, c: number): void;
 export function transaction_is_coinbase(a: number): number;
 export function transaction_sign(a: number, b: number, c: number, d: number, e: number, f: number, g: number): void;
-export function transaction_sign_with_k(a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number): void;
+export function transaction_sign_with_k(
+  a: number,
+  b: number,
+  c: number,
+  d: number,
+  e: number,
+  f: number,
+  g: number,
+  h: number,
+): void;
 export function transaction_sighash_preimage(a: number, b: number, c: number, d: number, e: number, f: number): void;
 export function transaction_verify(a: number, b: number, c: number): number;
 export function __wbg_extendedprivatekey_free(a: number): void;
@@ -126,13 +135,39 @@ export function script_get_script_length(a: number): number;
 export function script_to_hex(a: number, b: number): void;
 export function script_remove_codeseparators(a: number): void;
 export function ecdh_derive_shared_key(a: number, b: number, c: number): void;
-export function ecdsa_private_key_from_signature_k(a: number, b: number, c: number, d: number, e: number, f: number, g: number): void;
+export function ecdsa_private_key_from_signature_k(
+  a: number,
+  b: number,
+  c: number,
+  d: number,
+  e: number,
+  f: number,
+  g: number,
+): void;
 export function ecdsa_sign_with_random_k(a: number, b: number, c: number, d: number, e: number, f: number): void;
 export function ecdsa_sign_with_deterministic_k(a: number, b: number, c: number, d: number, e: number, f: number): void;
 export function ecdsa_sign_with_k(a: number, b: number, c: number, d: number, e: number, f: number): void;
 export function ecdsa_verify_digest(a: number, b: number, c: number, d: number, e: number, f: number): void;
-export function aes_encrypt(a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number): void;
-export function aes_decrypt(a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number): void;
+export function aes_encrypt(
+  a: number,
+  b: number,
+  c: number,
+  d: number,
+  e: number,
+  f: number,
+  g: number,
+  h: number,
+): void;
+export function aes_decrypt(
+  a: number,
+  b: number,
+  c: number,
+  d: number,
+  e: number,
+  f: number,
+  g: number,
+  h: number,
+): void;
 export function __wbg_ecdh_free(a: number): void;
 export function __wbg_ecdsa_free(a: number): void;
 export function __wbg_aes_free(a: number): void;

@@ -9,7 +9,7 @@ import { isBSV20v2 } from '../utils/ordi';
 export type TokenStorage = {
   tick: string;
   decimals: number;
-  sym?: string,
+  sym?: string;
   max: string;
   lim?: string;
   txid: string;
