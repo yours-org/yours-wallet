@@ -280,7 +280,7 @@ export const OrdWallet = () => {
     }
 
     setSuccessTxId(sendBSV20Res.txid);
-    addSnackbar('Token sent Successful! It may continue to show in your wallet until the tx is confirmed.', 'success');
+    addSnackbar('Tokens Sent!', 'success');
   };
 
   const handleCopyToClipboard = () => {

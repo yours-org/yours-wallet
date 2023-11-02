@@ -77,7 +77,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     }
 
     setSuccessTxId(transferRes.txid);
-    addSnackbar('Transfer Successful! It may continue to show in your wallet until the tx is confirmed.', 'success');
+    addSnackbar('Transfer Successful!', 'success');
     setTimeout(async () => {
       onResponse();
     }, 2000);
