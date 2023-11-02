@@ -103,8 +103,6 @@ export const useGorillaPool = () => {
         };
         tick: string;
       }) => {
-
-
         return {
           tick: b.tick,
           sym: getTokenSym(b.tick),
