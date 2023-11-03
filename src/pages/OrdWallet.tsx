@@ -35,6 +35,7 @@ const OrdinalsList = styled.div`
   justify-content: center;
   flex-wrap: wrap;
   overflow-y: auto;
+  width: 100%;
   margin-top: 0.5rem;
 `;
 
