@@ -29,7 +29,7 @@ type SendBsvResponse = {
 export type Web3SendBsvRequest = {
   satAmount: number;
   address?: string;
-  data?: ArrayBuffer[];
+  data?: string[]; // hex string array
   script?: string;
 }[];
 
@@ -119,7 +119,8 @@ export const useBsv = () => {
         } else if (req.script) {
           outScript = Script.from_hex(req.script);
         } else if ((req.data || []).length > 0) {
-          let asm = `OP_FALSE OP_RETURN ${req.data?.map((d) => Buffer.from(d).toString('hex')).join(' ')}`;
+          let asm = `OP_FALSE OP_RETURN ${req.data?.join(' ')}`;
+          console.log('data', req.data, asm);
           outScript = Script.from_asm_string(asm);
         } else {
           throw Error('Invalid request');
