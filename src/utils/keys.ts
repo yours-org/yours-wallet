@@ -18,7 +18,7 @@ export type Keys = {
   lockDerivationPath: string;
 };
 
-type DerivationTags = 'wallet' | 'ord' | 'locking';
+export type DerivationTags = 'wallet' | 'ord' | 'locking';
 
 const getWifAndDerivation = (seedPhrase: string, derivationPath: string) => {
   const seed = bip39.mnemonicToSeedSync(seedPhrase);

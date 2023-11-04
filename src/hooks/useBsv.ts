@@ -19,6 +19,7 @@ import { useBsvWasm } from './useBsvWasm';
 import { NetWork } from '../utils/network';
 import { useNetwork } from './useNetwork';
 import { storage } from '../utils/storage';
+import { DerivationTags, Keys } from '../utils/keys';
 
 type SendBsvResponse = {
   txid?: string;
@@ -37,6 +38,7 @@ export type Web3BroadcastRequest = {
 export type Web3SignMessageRequest = {
   message: string;
   encoding?: 'utf8' | 'hex' | 'base64';
+  keyType?: DerivationTags;
 };
 
 export const useBsv = () => {
@@ -153,30 +155,52 @@ export const useBsv = () => {
     }
   };
 
+  const getRequestedWif = (keys: Keys, keyType: DerivationTags) => {
+    let wif = keys.walletWif;
+    if (keyType) {
+      if (
+        (keyType !== 'locking' && keyType !== 'ord' && keyType !== 'wallet') ||
+        (keyType === 'locking' && !keys.lockingWif) ||
+        (keyType === 'ord' && !keys.ordWif) ||
+        (keyType === 'wallet' && !keys.walletWif)
+      ) {
+        return { error: 'key-type' };
+      }
+
+      wif = (keyType === 'ord' ? keys.ordWif : keyType === 'locking' ? keys.lockingWif : keys.walletWif) as string; // safely cast here with above if checks
+    }
+    return { wif };
+  };
+
   const signMessage = async (
     messageToSign: Web3SignMessageRequest,
     password: string,
   ): Promise<SignMessageResponse | undefined> => {
+    const { message, encoding, keyType } = messageToSign;
     const isAuthenticated = await verifyPassword(password);
     if (!isAuthenticated) {
       return { error: 'invalid-password' };
     }
     try {
-      const keys = await retrieveKeys(password);
+      const keys = (await retrieveKeys(password)) as Keys;
       if (!keys?.walletWif) throw Error('Undefined key');
-
-      const privateKey = PrivateKey.from_wif(keys.walletWif);
+      const res = getRequestedWif(keys, keyType ?? 'wallet');
+      if (res.error || !res.wif) {
+        return res;
+      }
+      const privateKey = PrivateKey.from_wif(res.wif);
       const publicKey = privateKey.to_public_key();
       const address = publicKey.to_address().set_chain_params(getChainParams(network)).to_string();
 
-      const msgBuf = Buffer.from(messageToSign.message, messageToSign.encoding);
+      const msgBuf = Buffer.from(message, encoding);
       const signature = BSM.sign_message(privateKey, msgBuf);
       // const signature = privateKey.sign_message(msgBuf);
       return {
         address,
         pubKeyHex: publicKey.to_hex(),
-        signedMessage: messageToSign.message,
+        signedMessage: message,
         signatureHex: signature.to_compact_hex(),
+        keyType: keyType ?? 'wallet',
       };
     } catch (error) {
       console.log(error);
