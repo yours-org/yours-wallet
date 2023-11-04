@@ -1,20 +1,20 @@
-import { useBottomMenu } from '../../hooks/useBottomMenu';
-import React, { useEffect, useState } from 'react';
-import { Button } from '../../components/Button';
-import { Text, HeaderText, ConfirmContent, FormContainer } from '../../components/Reusable';
-import { Show } from '../../components/Show';
-import { useSnackbar } from '../../hooks/useSnackbar';
-import { PageLoader } from '../../components/PageLoader';
-import { Input } from '../../components/Input';
-import { sleep } from '../../utils/sleep';
-import { useTheme } from '../../hooks/useTheme';
-import { DefaultTheme, styled } from 'styled-components';
-import { SignatureResponse, Web3GetSignaturesRequest, useContracts } from '../../hooks/useContracts';
-import { storage } from '../../utils/storage';
-import { useNavigate } from 'react-router-dom';
 import { P2PKHAddress, Transaction } from 'bsv-wasm-web';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { DefaultTheme, styled } from 'styled-components';
+import { Button } from '../../components/Button';
+import { Input } from '../../components/Input';
+import { PageLoader } from '../../components/PageLoader';
+import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
+import { Show } from '../../components/Show';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useBsvWasm } from '../../hooks/useBsvWasm';
+import { SignatureResponse, Web3GetSignaturesRequest, useContracts } from '../../hooks/useContracts';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { sleep } from '../../utils/sleep';
+import { storage } from '../../utils/storage';
 
 const TxInput = styled.div`
   border: 1px solid yellow;
@@ -32,7 +32,8 @@ const TxOutput = styled.div`
 
 const TxContainer = styled.div`
   max-height: 10rem;
-  overflow-y: scroll;
+  overflow-y: auto;
+  overflow-x: hidden;
 `;
 
 const TxInputsContainer = styled.div`

@@ -1,19 +1,19 @@
-import { useBottomMenu } from '../../hooks/useBottomMenu';
 import React, { useEffect, useState } from 'react';
-import { Button } from '../../components/Button';
-import { Text, HeaderText, ConfirmContent, FormContainer } from '../../components/Reusable';
-import { Show } from '../../components/Show';
-import { useSnackbar } from '../../hooks/useSnackbar';
-import { PageLoader } from '../../components/PageLoader';
-import { Input } from '../../components/Input';
-import { sleep } from '../../utils/sleep';
-import { useTheme } from '../../hooks/useTheme';
-import { styled } from 'styled-components';
-import { ColorThemeProps } from '../../theme';
-import { Web3SignMessageRequest, useBsv } from '../../hooks/useBsv';
-import { storage } from '../../utils/storage';
 import { useNavigate } from 'react-router-dom';
+import { styled } from 'styled-components';
+import { Button } from '../../components/Button';
+import { Input } from '../../components/Input';
+import { PageLoader } from '../../components/PageLoader';
+import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
+import { Show } from '../../components/Show';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { Web3SignMessageRequest, useBsv } from '../../hooks/useBsv';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { ColorThemeProps } from '../../theme';
+import { sleep } from '../../utils/sleep';
+import { storage } from '../../utils/storage';
 
 const RequestDetailsContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -21,7 +21,8 @@ const RequestDetailsContainer = styled.div<ColorThemeProps>`
   align-items: center;
   width: 100%;
   max-height: 10rem;
-  overflow-y: scroll;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: ${({ theme }) => theme.darkAccent + '80'};
   margin: 0.5rem;
 `;

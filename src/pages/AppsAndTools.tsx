@@ -1,20 +1,20 @@
-import styled from 'styled-components';
-import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useEffect, useState } from 'react';
-import { Show } from '../components/Show';
-import { useTheme } from '../hooks/useTheme';
-import { SettingsRow as AppsRow } from '../components/SettingsRow';
-import { HeaderText, Text } from '../components/Reusable';
-import { ForwardButton } from '../components/ForwardButton';
+import styled from 'styled-components';
+import externalLink from '../assets/external-link.svg';
 import { BackButton } from '../components/BackButton';
-import { PandaHead } from '../components/PandaHead';
 import { Button } from '../components/Button';
-import { useBsv } from '../hooks/useBsv';
+import { ForwardButton } from '../components/ForwardButton';
 import { Input } from '../components/Input';
+import { PandaHead } from '../components/PandaHead';
+import { HeaderText, Text } from '../components/Reusable';
+import { SettingsRow as AppsRow } from '../components/SettingsRow';
+import { Show } from '../components/Show';
+import { useBottomMenu } from '../hooks/useBottomMenu';
+import { useBsv } from '../hooks/useBsv';
+import { useTheme } from '../hooks/useTheme';
+import { ColorThemeProps } from '../theme';
 import { BSV_DECIMAL_CONVERSION, PANDA_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
 import { BsvSendRequest } from './requests/BsvSendRequest';
-import { ColorThemeProps } from '../theme';
-import externalLink from '../assets/external-link.svg';
 
 const Content = styled.div`
   display: flex;
@@ -22,7 +22,8 @@ const Content = styled.div`
   align-items: center;
   width: 100%;
   height: calc(75%);
-  overflow-y: scroll;
+  overflow-y: auto;
+  overflow-x: hidden;
 `;
 
 const HeaderWrapper = styled.div`
@@ -57,7 +58,8 @@ const ScrollableContainer = styled.div`
   flex-direction: column;
   align-items: center;
   height: 25rem;
-  overflow-y: scroll;
+  overflow-y: auto;
+  overflow-x: hidden;
   width: 100%;
   padding: 1rem;
 `;
