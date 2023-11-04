@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react';
-import { useKeys } from './useKeys';
 import {
   BSM,
   ChainParams,
@@ -13,15 +11,18 @@ import {
   TxIn,
   TxOut,
 } from 'bsv-wasm-web';
-import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
+import { useEffect, useState } from 'react';
 import { SignMessageResponse } from '../pages/requests/SignMessageRequest';
-import { useBsvWasm } from './useBsvWasm';
 import { NetWork } from '../utils/network';
-import { useNetwork } from './useNetwork';
 import { storage } from '../utils/storage';
+import { useBsvWasm } from './useBsvWasm';
+import { useKeys } from './useKeys';
+import { useNetwork } from './useNetwork';
+import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
 
 type SendBsvResponse = {
   txid?: string;
+  rawtx?: string;
   error?: string;
 };
 
@@ -30,6 +31,7 @@ export type Web3SendBsvRequest = {
   address?: string;
   data?: ArrayBuffer[];
   script?: string;
+  skipBroadcast?: boolean | undefined;
 }[];
 
 export type Web3BroadcastRequest = {
@@ -153,12 +155,12 @@ export const useBsv = () => {
         return { error: 'fee-to-high' };
       }
 
-      const txhex = tx.to_hex();
-      const txid = await broadcastRawTx(txhex);
+      const rawtx = tx.to_hex();
+      let txid = await broadcastRawTx(rawtx);
       if (txid) {
         storage.set({ paymentUtxos: utxos.filter((item) => !inputs.includes(item)) }); // remove the spent utxos and update local storage
       }
-      return { txid };
+      return { txid, rawtx };
     } catch (error: any) {
       return { error: error.message ?? 'unknown' };
     } finally {

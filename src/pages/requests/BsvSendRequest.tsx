@@ -83,20 +83,39 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    let validationFail = false;
-    web3Request.forEach((request) => {
-      // TODO: Validate script and/or data (has length)
+    let validationFail = new Map<string, boolean>();
+    validationFail.set('address', false);
+    validationFail.set('script', false);
+    validationFail.set('data', false);
 
-      // if theres a script or data, we don't need to validate the address
-      if (!request.script && !request.data) {
-        if (!request.address || !validate(request.address)) {
-          validationFail = true;
+    web3Request.forEach((request) => {
+      // validate script or data if they are set
+      if (request.script?.length === 0) {
+        validationFail.set('script', true);
+        return;
+      } else if (request.data) {
+        if (request.data.length === 0) {
+          validationFail.set('data', true);
+          return;
         }
       }
+      // otherwise sending to address
+      if (request.address && !validate(request.address)) {
+        validationFail.set('address', true);
+        return;
+      }
     });
+    let validationErrorMessage = '';
+    if (validationFail.get('script')) {
+      validationErrorMessage = 'Found an invalid script.';
+    } else if (validationFail.get('data')) {
+      validationErrorMessage = 'Found an invalid data.';
+    } else if (validationFail.get('address')) {
+      validationErrorMessage = 'Found an invalid receive address.';
+    }
 
-    if (validationFail) {
-      addSnackbar('Found an invalid receive address.', 'error');
+    if (validationErrorMessage) {
+      addSnackbar(validationErrorMessage, 'error');
       setIsProcessing(false);
       return;
     }
@@ -140,6 +159,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       chrome.runtime.sendMessage({
         action: 'sendBsvResponse',
         txid: sendRes.txid,
+        rawtx: sendRes.rawtx,
       });
     }
   };
