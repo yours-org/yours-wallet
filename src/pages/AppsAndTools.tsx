@@ -99,7 +99,7 @@ const ExternalLinkIcon = styled.img`
   cursor: pointer;
 `;
 
-type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps';
+type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unlock';
 
 export const AppsAndTools = () => {
   const { theme } = useTheme();
@@ -136,6 +136,12 @@ export const AppsAndTools = () => {
         jsxElement={<ForwardButton />}
       />
       <AppsRow
+        name="Unlock Coins 🔐"
+        description="Unlock the coins you've locked on Hodlocker"
+        onClick={() => setPage('unlock')}
+        jsxElement={<ForwardButton />}
+      />
+      <AppsRow
         name="Discover Apps 🤩"
         description="Meet the apps using Panda Wallet"
         onClick={() => setPage('discover-apps')}
@@ -148,6 +154,24 @@ export const AppsAndTools = () => {
         jsxElement={<ExternalLinkIcon src={externalLink} />}
       />
     </>
+  );
+
+  const unlockPage = (
+    <PageWrapper $marginTop={'4rem'}>
+      <BackButton onClick={() => setPage('main')} />
+      <HeaderText theme={theme}>🔐 Unlock Coins</HeaderText>
+      <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
+        Unlock coins you've previously locked up!
+      </Text>
+      <Text theme={theme} style={{ margin: '0.25rem', color: theme.white, fontSize: '1rem', fontWeight: 600 }}>
+        Total Locked: 24.333847 BSV
+      </Text>
+      <Text theme={theme} style={{ margin: '0.25rem 0 1rem', color: theme.white, fontSize: '1rem', fontWeight: 600 }}>
+        Unlockable: 4.76543 BSV
+      </Text>
+      <Button theme={theme} type="primary" label="Unlock 4.76543 BSV" onClick={() => console.log('Handle Unlock')} />
+      <Button theme={theme} type="secondary" label="Details" onClick={() => console.log('Handle Show Details')} />
+    </PageWrapper>
   );
 
   const discoverAppsPage = (
@@ -258,7 +282,7 @@ export const AppsAndTools = () => {
     <Content>
       <HeaderWrapper>
         <HeaderText style={{ fontSize: '1.25rem' }} theme={theme}>
-          {page === 'sponsor' || page === 'sponsor-thanks'
+          {page === 'sponsor' || page === 'sponsor-thanks' || page === 'unlock'
             ? ''
             : page === 'discover-apps'
             ? 'Discover Apps'
@@ -268,6 +292,7 @@ export const AppsAndTools = () => {
       <Show when={page === 'main'}>{main}</Show>
       <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show>
       <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show>
+      <Show when={page === 'unlock'}>{unlockPage}</Show>
       <Show when={page === 'discover-apps'}>{discoverAppsPage}</Show>
       <Show when={page === 'sponsor' && didSubmit}>
         <BsvSendRequest

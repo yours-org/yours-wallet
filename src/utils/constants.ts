@@ -29,13 +29,18 @@ export const whiteListedColorThemeCollections = [
 // Featured 3rd party integrations
 export const featuredApps = [
   {
-    icon: 'https://pbs.twimg.com/profile_images/1555622553799892993/m0C6BWiv_400x400.jpg',
-    name: 'Haste Arcade',
-    link: 'https://hastearcade.com',
+    icon: 'https://pbs.twimg.com/profile_images/1469020626912354306/4WA3cIs3_400x400.jpg',
+    name: 'Take It NFT',
+    link: 'https://www.takeitnft.com/marketplace/global',
   },
   {
     icon: 'https://pbs.twimg.com/profile_images/1222666970203471873/zn3OPLG0_400x400.jpg',
     name: 'sCrypt',
     link: 'https://docs.scrypt.io/tokens/tutorials/ordinal-lock/#use-panda-wallet',
+  },
+  {
+    icon: 'https://pbs.twimg.com/profile_images/1555622553799892993/m0C6BWiv_400x400.jpg',
+    name: 'Haste Arcade',
+    link: 'https://hastearcade.com',
   },
 ];
