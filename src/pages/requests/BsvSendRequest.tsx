@@ -85,8 +85,13 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
 
     let validationFail = false;
     web3Request.forEach((request) => {
-      if (!request.address || !validate(request.address)) {
-        validationFail = true;
+      // TODO: Validate script and/or data (has length)
+
+      // if theres a script or data, we don't need to validate the address
+      if (!request.script && !request.data) {
+        if (!request.address || !validate(request.address)) {
+          validationFail = true;
+        }
       }
     });
 
