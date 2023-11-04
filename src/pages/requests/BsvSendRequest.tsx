@@ -1,21 +1,21 @@
-import { useBottomMenu } from '../../hooks/useBottomMenu';
-import React, { useEffect, useState } from 'react';
-import { Button } from '../../components/Button';
-import { Text, HeaderText, ConfirmContent, FormContainer } from '../../components/Reusable';
-import { Show } from '../../components/Show';
-import { useSnackbar } from '../../hooks/useSnackbar';
-import { Web3SendBsvRequest, useBsv } from '../../hooks/useBsv';
-import { PageLoader } from '../../components/PageLoader';
-import { Input } from '../../components/Input';
-import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { validate } from 'bitcoin-address-validation';
+import React, { useEffect, useState } from 'react';
+import { styled } from 'styled-components';
+import bsvCoin from '../../assets/bsv-coin.svg';
+import { Button } from '../../components/Button';
+import { Input } from '../../components/Input';
+import { PageLoader } from '../../components/PageLoader';
+import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
+import { Show } from '../../components/Show';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { Web3SendBsvRequest, useBsv } from '../../hooks/useBsv';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { useTheme } from '../../hooks/useTheme';
+import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { ColorThemeProps } from '../../theme';
+import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
-import { useTheme } from '../../hooks/useTheme';
-import { styled } from 'styled-components';
-import { ColorThemeProps } from '../../theme';
-import bsvCoin from '../../assets/bsv-coin.svg';
-import { useWeb3Context } from '../../hooks/useWeb3Context';
 
 const RequestDetailsContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -23,7 +23,8 @@ const RequestDetailsContainer = styled.div<ColorThemeProps>`
   align-items: center;
   width: 100%;
   max-height: 10rem;
-  overflow-y: scroll;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: ${({ theme }) => theme.darkAccent + '80'};
   margin: 0.5rem;
 `;

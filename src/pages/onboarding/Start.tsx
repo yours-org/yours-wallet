@@ -1,14 +1,14 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { ColorThemeProps } from '../../theme';
+import gihubIcon from '../../assets/github.svg';
 import { Button } from '../../components/Button';
 import { PandaHead } from '../../components/PandaHead';
-import { useNavigate } from 'react-router-dom';
 import { Text } from '../../components/Reusable';
-import { storage } from '../../utils/storage';
-import { useEffect, useState } from 'react';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import gihubIcon from '../../assets/github.svg';
 import { useTheme } from '../../hooks/useTheme';
+import { ColorThemeProps } from '../../theme';
+import { storage } from '../../utils/storage';
 
 const Content = styled.div`
   display: flex;

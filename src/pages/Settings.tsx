@@ -1,28 +1,28 @@
-import styled from 'styled-components';
-import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useEffect, useState } from 'react';
-import { SpeedBump } from '../components/SpeedBump';
-import { storage } from '../utils/storage';
+import styled from 'styled-components';
+import { WhitelistedApp } from '../App';
+import x from '../assets/x.svg';
+import { BackButton } from '../components/BackButton';
+import { Button } from '../components/Button';
+import { ForwardButton } from '../components/ForwardButton';
+import { Input } from '../components/Input';
+import { QrCode } from '../components/QrCode';
+import { HeaderText, Text } from '../components/Reusable';
+import { SettingsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
+import { SpeedBump } from '../components/SpeedBump';
+import { ToggleSwitch } from '../components/ToggleSwitch';
+import { useBottomMenu } from '../hooks/useBottomMenu';
+import { useKeys } from '../hooks/useKeys';
+import { useSnackbar } from '../hooks/useSnackbar';
+import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useWalletLockState } from '../hooks/useWalletLockState';
-import { ToggleSwitch } from '../components/ToggleSwitch';
-import { useSnackbar } from '../hooks/useSnackbar';
-import { SNACKBAR_TIMEOUT } from '../utils/constants';
 import { useWeb3Context } from '../hooks/useWeb3Context';
-import { NetWork } from '../utils/network';
-import { SettingsRow } from '../components/SettingsRow';
-import { HeaderText, Text } from '../components/Reusable';
-import { ForwardButton } from '../components/ForwardButton';
 import { ColorThemeProps } from '../theme';
-import { BackButton } from '../components/BackButton';
-import x from '../assets/x.svg';
-import { WhitelistedApp } from '../App';
-import { useKeys } from '../hooks/useKeys';
-import { Input } from '../components/Input';
-import { useSocialProfile } from '../hooks/useSocialProfile';
-import { Button } from '../components/Button';
-import { QrCode } from '../components/QrCode';
+import { SNACKBAR_TIMEOUT } from '../utils/constants';
+import { NetWork } from '../utils/network';
+import { storage } from '../utils/storage';
 
 const Content = styled.div`
   display: flex;
@@ -30,7 +30,8 @@ const Content = styled.div`
   align-items: center;
   width: 100%;
   height: calc(75%);
-  overflow-y: scroll;
+  overflow-y: auto;
+  overflow-x: hidden;
 `;
 
 const HeaderWrapper = styled.div`
@@ -79,7 +80,8 @@ const ScrollableContainer = styled.div`
   flex-direction: column;
   align-items: center;
   height: 25rem;
-  overflow-y: scroll;
+  overflow-y: auto;
+  overflow-x: hidden;
   width: 100%;
   padding: 1rem;
 `;

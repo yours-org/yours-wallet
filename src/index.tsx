@@ -1,13 +1,13 @@
-import ReactDOM from 'react-dom/client';
-import './index.css';
-import { App } from './App';
 import { Buffer } from 'buffer';
 import process from 'process';
-import { WalletLockProvider } from './contexts/WalletLockContext';
-import { ThemeProvider } from './contexts/ColorThemeContext';
-import { Web3Provider } from './contexts/Web3Context';
-import { BottomMenuProvider } from './contexts/BottomMenuContext';
+import ReactDOM from 'react-dom/client';
 import { styled } from 'styled-components';
+import { App } from './App';
+import { BottomMenuProvider } from './contexts/BottomMenuContext';
+import { ThemeProvider } from './contexts/ColorThemeContext';
+import { WalletLockProvider } from './contexts/WalletLockContext';
+import { Web3Provider } from './contexts/Web3Context';
+import './index.css';
 import { ColorThemeProps } from './theme';
 global.Buffer = Buffer;
 global.process = process;
@@ -17,14 +17,16 @@ const Container = styled.div<ColorThemeProps>`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22.5rem;
-  height: 33.75rem;
+  width: 100%;
+  height: 100%;
   position: relative;
+  padding: 0;
+  height: 33.5rem;
+  width: 22.25rem;
+  margin: auto;
 `;
 
-const root = document.createElement('div');
-root.className = 'container';
-document.body.appendChild(root);
+const root = document.getElementById('root')!;
 const rootDiv = ReactDOM.createRoot(root);
 rootDiv.render(
   <ThemeProvider>
