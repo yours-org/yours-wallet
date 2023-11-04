@@ -31,7 +31,6 @@ export type Web3SendBsvRequest = {
   address?: string;
   data?: ArrayBuffer[];
   script?: string;
-  skipBroadcast?: boolean | undefined;
 }[];
 
 export type Web3BroadcastRequest = {
