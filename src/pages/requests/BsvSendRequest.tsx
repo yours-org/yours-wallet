@@ -146,7 +146,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           <Icon src={bsvCoin} />
           <Text style={{ margin: 0 }} theme={theme}>{`${r.satAmount / BSV_DECIMAL_CONVERSION}`}</Text>
           <Text style={{ margin: 0 }} theme={theme}>
-            {truncate(r.address, 5, 5)}
+            {r.address ? truncate(r.address, 5, 5) : ''}
           </Text>
         </LineItem>
       );
