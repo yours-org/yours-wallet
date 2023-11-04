@@ -27,7 +27,9 @@ type SendBsvResponse = {
 
 export type Web3SendBsvRequest = {
   satAmount: number;
-  address: string;
+  address?: string;
+  data?: ArrayBuffer[];
+  script?: string;
 }[];
 
 export type Web3BroadcastRequest = {
@@ -110,7 +112,18 @@ export const useBsv = () => {
       const tx = new Transaction(1, 0);
 
       request.forEach((req) => {
-        tx.add_output(new TxOut(BigInt(satsOut), P2PKHAddress.from_string(req.address).get_locking_script()));
+        let outScript: Script;
+        if (req.address) {
+          outScript = P2PKHAddress.from_string(req.address).get_locking_script();
+        } else if (req.script) {
+          outScript = Script.from_hex(req.script);
+        } else if ((req.data || []).length > 0) {
+          let asm = `OP_FALSE OP_RETURN ${req.data?.map((d) => Buffer.from(d).toString('hex')).join(' ')}`;
+          outScript = Script.from_asm_string(asm);
+        } else {
+          throw Error('Invalid request');
+        }
+        tx.add_output(new TxOut(BigInt(satsOut), outScript));
       });
 
       if (!sendAll) {
