@@ -36,7 +36,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   const { theme } = useTheme();
   const context = useContext(BottomMenuContext);
   const navigate = useNavigate();
-  const { bsvPubKey } = useBsv();
+  const { bsvPubKey, lockingPubKey } = useBsv();
   const { ordPubKey } = useOrds();
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
         chrome.runtime.sendMessage({
           action: 'userConnectResponse',
           decision: 'approved',
-          pubKeys: { bsvPubKey, ordPubKey },
+          pubKeys: { bsvPubKey, ordPubKey, lockingPubKey },
         });
       } else {
         chrome.runtime.sendMessage({

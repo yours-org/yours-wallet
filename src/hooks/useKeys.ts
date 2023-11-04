@@ -22,8 +22,11 @@ export type WifKeys = {
 export const useKeys = () => {
   const [bsvAddress, setBsvAddress] = useState('');
   const [ordAddress, setOrdAddress] = useState('');
+  const [lockingAddress, setLockingAddress] = useState('');
   const [bsvPubKey, setBsvPubKey] = useState('');
   const [ordPubKey, setOrdPubKey] = useState('');
+  const [lockingPubKey, setLockingPubKey] = useState('');
+
   const { network } = useNetwork();
   const { isPasswordRequired } = usePasswordSetting();
   const { bsvWasmInitialized } = useBsvWasm();
@@ -37,10 +40,11 @@ export const useKeys = () => {
     mnemonic?: string,
     walletDerivation: string | null = null,
     ordDerivation: string | null = null,
+    lockingDerivation: string | null = null,
   ) => {
     const salt = generateRandomSalt();
     const passKey = deriveKey(password, salt);
-    const keys = getKeys(mnemonic, walletDerivation, ordDerivation);
+    const keys = getKeys(mnemonic, walletDerivation, ordDerivation, lockingDerivation);
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
     storage.set({ encryptedKeys, passKey, salt });
     return keys.mnemonic;
@@ -69,31 +73,43 @@ export const useKeys = () => {
           const d = decrypt(result.encryptedKeys, result.passKey);
           const keys: Keys = JSON.parse(d);
 
-          const walletAddress = P2PKHAddress.from_string(keys.walletAddress)
+          const walletAddr = P2PKHAddress.from_string(keys.walletAddress)
             .set_chain_params(getChainParams(network))
             .to_string();
 
-          const ordAddress = P2PKHAddress.from_string(keys.ordAddress)
+          const ordAddr = P2PKHAddress.from_string(keys.ordAddress)
             .set_chain_params(getChainParams(network))
             .to_string();
-          setBsvAddress(walletAddress);
-          setOrdAddress(ordAddress);
+
+          setBsvAddress(walletAddr);
+          setOrdAddress(ordAddr);
           setBsvPubKey(keys.walletPubKey);
           setOrdPubKey(keys.ordPubKey);
+
+          // lockingAddress not available with wif or 1sat import
+          if (keys.lockingAddress) {
+            const lockingAddr = P2PKHAddress.from_string(keys.lockingAddress)
+              .set_chain_params(getChainParams(network))
+              .to_string();
+
+            setLockingAddress(lockingAddr);
+            setLockingPubKey(keys.lockingPubKey);
+          }
+
           if (!isPasswordRequired || password) {
             const isVerified = !isPasswordRequired || (await verifyPassword(password ?? ''));
             isVerified
               ? resolve(
                   Object.assign({}, keys, {
-                    ordAddress,
-                    walletAddress,
+                    ordAddress: ordAddr,
+                    walletAddress: walletAddr,
                   }),
                 )
               : reject('Unauthorized!');
           } else {
             resolve({
-              ordAddress,
-              walletAddress,
+              ordAddress: ordAddr,
+              walletAddress: walletAddr,
               walletPubKey: keys.walletPubKey,
               ordPubKey: keys.ordPubKey,
             });
@@ -132,7 +148,9 @@ export const useKeys = () => {
     verifyPassword,
     bsvAddress,
     ordAddress,
+    lockingAddress,
     bsvPubKey,
     ordPubKey,
+    lockingPubKey,
   };
 };

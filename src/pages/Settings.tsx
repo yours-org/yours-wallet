@@ -198,6 +198,8 @@ export const Settings = () => {
       payDerivationPath: keys.walletDerivationPath,
       ordPk: keys.ordWif,
       ordDerivationPath: keys.ordDerivationPath,
+      lockingPk: keys.lockingWif,
+      lockingDerivationPath: keys.lockDerivationPath,
     };
 
     const jsonData = JSON.stringify(keysToExport, null, 2);
