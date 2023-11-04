@@ -1,14 +1,14 @@
-import { ButtonContainer, HeaderText, Text } from './Reusable';
-import { Button } from './Button';
-import { Show } from './Show';
-import { ColorThemeProps, Theme } from '../theme';
-import { styled } from 'styled-components';
-import { Input } from './Input';
 import { useState } from 'react';
-import { sleep } from '../utils/sleep';
-import { useSnackbar } from '../hooks/useSnackbar';
+import { styled } from 'styled-components';
 import { useKeys } from '../hooks/useKeys';
+import { useSnackbar } from '../hooks/useSnackbar';
+import { ColorThemeProps, Theme } from '../theme';
+import { sleep } from '../utils/sleep';
+import { Button } from './Button';
+import { Input } from './Input';
 import { PageLoader } from './PageLoader';
+import { ButtonContainer, HeaderText, Text } from './Reusable';
+import { Show } from './Show';
 
 const Container = styled.div<ColorThemeProps>`
   display: flex;
@@ -16,8 +16,8 @@ const Container = styled.div<ColorThemeProps>`
   align-items: center;
   justify-content: center;
   text-align: center;
-  width: 22.5rem;
-  height: 33.75rem;
+  width: 100%;
+  height: 100vh;
   margin: 0;
   background-color: ${({ theme }) => theme.darkAccent};
   color: ${({ theme }) => theme.white};
