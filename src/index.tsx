@@ -18,13 +18,15 @@ const Container = styled.div<ColorThemeProps>`
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 100vh
+  height: 100%;
   position: relative;
+  padding: 0;
+  height: 33.5rem;
+  width: 22.25rem;
+  margin: auto;
 `;
 
-const root = document.createElement('div');
-root.className = 'container';
-document.body.appendChild(root);
+const root = document.getElementById('root')!;
 const rootDiv = ReactDOM.createRoot(root);
 rootDiv.render(
   <ThemeProvider>

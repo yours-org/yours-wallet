@@ -71,11 +71,11 @@ export const MainContent = styled.div`
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: calc(100% - 3.75rem);
+  height: calc(100vh - 3.75rem);
 `;
 
 export const ReceiveContent = styled(MainContent)`
   justify-content: center;
   width: 100%;
-  height: calc(100% - 3.75rem);
+  height: calc(100vh - 3.75rem);
 `;
