@@ -44,7 +44,7 @@ export const useBsv = () => {
   const [exchangeRate, setExchangeRate] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey } = useKeys();
+  const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, lockingAddress, lockingPubKey } = useKeys();
   const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
   const { getUtxos, getBsvBalance, getExchangeRate, broadcastRawTx, getInputs } = useWhatsOnChain();
@@ -223,6 +223,8 @@ export const useBsv = () => {
     bsvBalance,
     bsvAddress,
     bsvPubKey,
+    lockingAddress,
+    lockingPubKey,
     isProcessing,
     sendBsv,
     setIsProcessing,

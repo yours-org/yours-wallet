@@ -73,6 +73,7 @@ export const RestoreWallet = () => {
   const [isExpertImport, setIsExpertImport] = useState(false);
   const [walletDerivation, setWalletDerivation] = useState<string | null>(null);
   const [ordDerivation, setOrdDerivation] = useState<string | null>(null);
+  const [lockingDerivation, setLockingDerivation] = useState<string | null>(null);
 
   useEffect(() => {
     hideMenu();
@@ -103,7 +104,13 @@ export const RestoreWallet = () => {
 
     // Some artificial delay for the loader
     await sleep(50);
-    const mnemonic = generateSeedAndStoreEncrypted(password, seedWords, walletDerivation, ordDerivation);
+    const mnemonic = generateSeedAndStoreEncrypted(
+      password,
+      seedWords,
+      walletDerivation,
+      ordDerivation,
+      lockingDerivation,
+    );
     if (!mnemonic) {
       addSnackbar('An error occurred while restoring the wallet!', 'error');
       return;
@@ -171,6 +178,14 @@ export const RestoreWallet = () => {
               type="text"
               value={ordDerivation ?? ''}
               onChange={(e) => setOrdDerivation(e.target.value)}
+              style={{ margin: '0.1rem', width: '85%' }}
+            />
+            <Input
+              theme={theme}
+              placeholder="Locking Derivation ex. m/0'/236'/0'/0/0"
+              type="text"
+              value={lockingDerivation ?? ''}
+              onChange={(e) => setLockingDerivation(e.target.value)}
               style={{ margin: '0.1rem 0 1rem', width: '85%' }}
             />
           </Show>
