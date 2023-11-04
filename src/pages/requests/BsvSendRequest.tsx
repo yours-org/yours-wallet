@@ -101,7 +101,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       return;
     }
 
-    if (!web3Request[0].satAmount) {
+    if (web3Request[0].address && !web3Request[0].satAmount) {
       addSnackbar('No sats supplied', 'info');
       setIsProcessing(false);
       return;
