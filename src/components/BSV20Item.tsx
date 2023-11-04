@@ -2,6 +2,7 @@ import styled from 'styled-components';
 import { Theme } from '../theme';
 import { HeaderText, Text } from './Reusable';
 import { useState } from 'react';
+import { truncate } from '../utils/format';
 
 const Container = styled.div<{ color: string; $clickable: string }>`
   display: flex;
@@ -46,7 +47,7 @@ export const BSV20Item = (props: BSV20ItemProps) => {
       onClick={onClick}
       $clickable={onClick ? 'true' : 'false'}
     >
-      <Tick theme={theme}>{tick}</Tick>
+      <Tick theme={theme}>{tick.length > 6 ? truncate(tick, 3, 3) : tick}</Tick>
       <Amount theme={theme}>{amount}</Amount>
     </Container>
   );
