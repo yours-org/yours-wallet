@@ -119,9 +119,12 @@ export const useBsv = () => {
         } else if (req.script) {
           outScript = Script.from_hex(req.script);
         } else if ((req.data || []).length > 0) {
-          let asm = `OP_FALSE OP_RETURN ${req.data?.join(' ')}`;
-          console.log('data', req.data, asm);
-          outScript = Script.from_asm_string(asm);
+          let asm = `OP_0 OP_RETURN ${req.data?.join(' ')}`;
+          try {
+            outScript = Script.from_asm_string(asm);
+          } catch (e) {
+            throw Error('Invalid data');
+          }
         } else {
           throw Error('Invalid request');
         }
