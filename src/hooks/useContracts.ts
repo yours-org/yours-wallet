@@ -154,68 +154,75 @@ export const useContracts = () => {
   }, []);
 
   const unlock = async (locks: OrdinalTxo[], password: string) => {
-    if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
-    setIsProcessing(true);
+    try {
+      if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
+      setIsProcessing(true);
 
-    const isAuthenticated = await verifyPassword(password);
-    if (!isAuthenticated) {
-      return { error: 'invalid-password' };
+      const isAuthenticated = await verifyPassword(password);
+      if (!isAuthenticated) {
+        return { error: 'invalid-password' };
+      }
+
+      const keys = await retrieveKeys(password);
+      if (!keys.lockingWif || !keys.walletAddress) {
+        throw Error('No keys');
+      }
+      const lockPk = PrivateKey.from_wif(keys.lockingWif);
+      const lockPkh = Hash.hash_160(lockPk.to_public_key().to_bytes()).to_bytes();
+      // const lockAddress = P2PKHAddress.from_string(keys.lockingAddress!);
+      const walletAddress = P2PKHAddress.from_string(keys.walletAddress);
+
+      const tx = new Transaction(1, 0);
+      let satsIn = 0;
+      let size = 0;
+      locks.forEach((lock) => {
+        tx.add_input(new TxIn(Buffer.from(lock.txid, 'hex'), lock.vout, Script.from_asm_string('')));
+        satsIn += lock.satoshis;
+        size += 1500;
+      });
+
+      const fee = Math.ceil(size * FEE_PER_BYTE);
+      if (fee > satsIn) {
+        return { error: 'insufficient-funds' };
+      }
+      const change = satsIn - fee;
+      if (change > DUST) {
+        tx.add_output(new TxOut(BigInt(change), walletAddress.get_locking_script()));
+      }
+
+      locks.forEach((lock, vin) => {
+        const lockScript = Script.from_hex(
+          SCRYPT_PREFIX +
+            Script.from_asm_string(
+              Buffer.from(lockPkh).toString('hex') + ' ' + VarInt.fromNumber(lock.data!.lock!.until).toHex(),
+            ).to_hex() +
+            LOCK_SUFFIX,
+        );
+
+        let preimage = tx.sighash_preimage(
+          SigHash.InputOutputs,
+          vin,
+          lockScript,
+          BigInt(lock.satoshis), //TODO: use amount from listing
+        );
+
+        const sig = tx.sign(lockPk, SigHash.InputOutputs, vin, lockScript, BigInt(lock.satoshis));
+
+        let asm = `${sig.to_hex} ${lockPk.to_public_key().to_hex()} ${Buffer.from(preimage).toString('hex')}`;
+        tx.set_input(vin, new TxIn(Buffer.from(lock.txid, 'hex'), lock.vout, Script.from_asm_string(asm)));
+      });
+
+      const rawTx = tx.to_hex();
+
+      const { txid } = await broadcastWithGorillaPool(rawTx);
+      if (!txid) return { error: 'broadcast-error' };
+      return { txid };
+    } catch (error: any) {
+      console.log(error);
+      return { error: error.message ?? 'unknown' };
+    } finally {
+      setIsProcessing(false);
     }
-
-    const keys = await retrieveKeys(password);
-    if (!keys.lockingWif || !keys.walletAddress) {
-      throw Error('No keys');
-    }
-    const lockPk = PrivateKey.from_wif(keys.lockingWif);
-    const lockPkh = Hash.hash_160(lockPk.to_public_key().to_bytes()).to_bytes();
-    // const lockAddress = P2PKHAddress.from_string(keys.lockingAddress!);
-    const walletAddress = P2PKHAddress.from_string(keys.walletAddress);
-
-    const tx = new Transaction(1, 0);
-    let satsIn = 0;
-    let size = 0;
-    locks.forEach((lock) => {
-      tx.add_input(new TxIn(Buffer.from(lock.txid, 'hex'), lock.vout, Script.from_asm_string('')));
-      satsIn += lock.satoshis;
-      size += 1500;
-    });
-
-    const fee = Math.ceil(size * FEE_PER_BYTE);
-    if (fee > satsIn) {
-      return { error: 'insufficient-funds' };
-    }
-    const change = satsIn - fee;
-    if (change > DUST) {
-      tx.add_output(new TxOut(BigInt(change), walletAddress.get_locking_script()));
-    }
-
-    locks.forEach((lock, vin) => {
-      const lockScript = Script.from_hex(
-        SCRYPT_PREFIX +
-          Script.from_asm_string(
-            Buffer.from(lockPkh).toString('hex') + ' ' + VarInt.fromNumber(lock.data!.lock!.until).toHex(),
-          ).to_hex() +
-          LOCK_SUFFIX,
-      );
-
-      let preimage = tx.sighash_preimage(
-        SigHash.InputOutputs,
-        vin,
-        lockScript,
-        BigInt(lock.satoshis), //TODO: use amount from listing
-      );
-
-      const sig = tx.sign(lockPk, SigHash.InputOutputs, vin, lockScript, BigInt(lock.satoshis));
-
-      let asm = `${sig.to_hex} ${lockPk.to_public_key().to_hex()} ${Buffer.from(preimage).toString('hex')}`;
-      tx.set_input(vin, new TxIn(Buffer.from(lock.txid, 'hex'), lock.vout, Script.from_asm_string(asm)));
-    });
-
-    const rawTx = tx.to_hex();
-
-    const { txid } = await broadcastWithGorillaPool(rawTx);
-    if (!txid) return { error: 'broadcast-error' };
-    return { txid };
   };
 
   return {
