@@ -155,10 +155,12 @@ export const useGorillaPool = () => {
 
   const getLockedUtxos = async (address: string) => {
     try {
+      //TODO: use this instead of test endpoint - `${getOrdinalsBaseUrl()}/api/locks/address/${address}/unspent?limit=100&offset=0`
       const { data } = await axios.get(
-        `${getOrdinalsBaseUrl()}/api/locks/address/${address}/unspent?limit=100&offset=0`,
+        `https://test.ordinals.gorillapool.io/api/locks/address/${address}/unspent?limit=100&offset=0`,
       );
       const lockedUtxos: OrdinalTxo[] = data;
+      console.log(lockedUtxos);
       return lockedUtxos;
     } catch (e) {
       throw new Error(JSON.stringify(e));
