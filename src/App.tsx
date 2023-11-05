@@ -46,11 +46,9 @@ const Container = styled.div<ColorThemeProps>`
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 33.5rem;
+  height: 100%;
   background-color: ${({ theme }) => theme.mainBackground};
   position: relative;
-  max-height: 100vh;
-  overflow: auto;
 `;
 export const App = () => {
   const { isLocked } = useWalletLockState();

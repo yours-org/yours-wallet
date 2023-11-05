@@ -16,9 +16,8 @@ const Container = styled.div<ColorThemeProps>`
   align-items: center;
   justify-content: center;
   text-align: center;
-  width: 100%;
-  height: 100%;
-  min-height: 33.5rem;
+  width: 22.5rem;
+  height: 33.75rem;
   margin: 0;
   background-color: ${({ theme }) => theme.darkAccent};
   color: ${({ theme }) => theme.white};
