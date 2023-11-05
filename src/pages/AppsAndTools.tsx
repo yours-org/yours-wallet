@@ -18,6 +18,12 @@ import { BsvSendRequest } from './requests/BsvSendRequest';
 import { useGorillaPool } from '../hooks/useGorillaPool';
 import { OrdinalTxo } from '../hooks/ordTypes';
 import { useWhatsOnChain } from '../hooks/useWhatsOnChain';
+import { truncate } from '../utils/format';
+import { sleep } from '../utils/sleep';
+import { usePasswordSetting } from '../hooks/usePasswordSetting';
+import { useSnackbar } from '../hooks/useSnackbar';
+import { useContracts } from '../hooks/useContracts';
+import { PageLoader } from '../components/PageLoader';
 
 const Content = styled.div`
   display: flex;
@@ -104,6 +110,24 @@ const ExternalLinkIcon = styled.img`
   cursor: pointer;
 `;
 
+const LockDetailsContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  width: 80%;
+`;
+
+const LockDetailsText = styled(Text)<ColorThemeProps>`
+  margin: 0;
+  color: ${(props) => props.theme.white};
+`;
+
+const LockDetailsHeaderText = styled(LockDetailsText)`
+  font-size: 1rem;
+  font-weight: 600;
+`;
+
 type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unlock';
 
 export const AppsAndTools = () => {
@@ -112,6 +136,9 @@ export const AppsAndTools = () => {
   const { exchangeRate, lockingAddress } = useBsv();
   const { getLockedUtxos } = useGorillaPool();
   const { getChainInfo } = useWhatsOnChain();
+  const { isPasswordRequired } = usePasswordSetting();
+  const { addSnackbar } = useSnackbar();
+  const { unlock, isProcessing, setIsProcessing } = useContracts();
   const [page, setPage] = useState<AppsPage>('main');
   const [otherIsSelected, setOtherIsSelected] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
@@ -121,18 +148,22 @@ export const AppsAndTools = () => {
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
   const [totalLocked, setTotalLocked] = useState(0);
   const [totalUnlockable, setTotalUnlockable] = useState(0);
+  const [showingLockDetails, setShowingLockDetails] = useState(false);
+  const [passwordConfirm, setPasswordConfirm] = useState('');
 
   useEffect(() => {
     const getLockData = async () => {
       if (!lockingAddress) throw Error('Locking address missing!');
       const chainInfo = await getChainInfo();
       const lockedTxos = await getLockedUtxos(lockingAddress);
-      if (chainInfo?.blocks) setCurrentBlockHeight(chainInfo.blocks);
+      const blockHeight = Number(chainInfo?.blocks);
+      if (blockHeight) setCurrentBlockHeight(blockHeight);
       if (lockedTxos.length > 0) setLockedUtxos(lockedTxos);
       const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
       const unlockableTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => {
-        if (utxo.data?.lock?.until && chainInfo?.blocks) {
-          return utxo.data?.lock?.until >= chainInfo?.blocks ? a + utxo.satoshis : 0;
+        const theBlockCoinsUnlock = Number(utxo?.data?.lock?.until);
+        if (blockHeight && theBlockCoinsUnlock) {
+          return theBlockCoinsUnlock <= blockHeight ? a + utxo.satoshis : 0;
         } else {
           return 0;
         }
@@ -144,7 +175,8 @@ export const AppsAndTools = () => {
     if (page === 'unlock' && lockingAddress) {
       getLockData();
     }
-  }, [getChainInfo, getLockedUtxos, lockingAddress, page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockingAddress, page]);
 
   useEffect(() => {
     setSelected('apps');
@@ -160,6 +192,43 @@ export const AppsAndTools = () => {
 
     const satAmount = Math.round((amount / exchangeRate) * BSV_DECIMAL_CONVERSION);
     setSatAmount(satAmount);
+  };
+
+  const toggleShowingLockDetails = () => setShowingLockDetails(!showingLockDetails);
+
+  const handleUnlock = async () => {
+    setIsProcessing(true);
+    await sleep(25);
+
+    if (!totalUnlockable) {
+      addSnackbar('There are no coins to unlock!', 'info');
+      setIsProcessing(false);
+      return;
+    }
+
+    if (!passwordConfirm && isPasswordRequired) {
+      addSnackbar('You must enter a password!', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    const unlockRes = await unlock(lockedUtxos, passwordConfirm);
+    if (!unlockRes.txid || unlockRes.error) {
+      const message =
+        unlockRes.error === 'invalid-password'
+          ? 'Invalid Password!'
+          : unlockRes.error === 'insufficient-funds'
+          ? 'Insufficient Funds!'
+          : unlockRes.error === 'broadcast-error'
+          ? 'There was an error broadcasting the tx!'
+          : 'An unknown error has occurred! Try again.';
+
+      addSnackbar(message, 'error');
+      setPasswordConfirm('');
+      return;
+    }
+
+    addSnackbar('Coins Unlocked Successfully!', 'success');
   };
 
   const main = (
@@ -191,10 +260,24 @@ export const AppsAndTools = () => {
     </>
   );
 
+  const headerLockDetailsRow = (
+    <LockDetailsContainer>
+      <LockDetailsHeaderText style={{ textAlign: 'left' }} theme={theme}>
+        Transaction Id
+      </LockDetailsHeaderText>
+      <LockDetailsHeaderText style={{ textAlign: 'right' }} theme={theme}>
+        Blocks Remaining
+      </LockDetailsHeaderText>
+    </LockDetailsContainer>
+  );
+
   const unlockPage = (
-    <PageWrapper $marginTop={'4rem'}>
+    <PageWrapper $marginTop={'1rem'}>
       <BackButton onClick={() => setPage('main')} />
-      <HeaderText theme={theme}>🔐 Unlock Coins</HeaderText>
+      <HeaderText style={{ fontSize: '2.5rem' }} theme={theme}>
+        🔐
+      </HeaderText>
+      <HeaderText theme={theme}>Unlock Coins</HeaderText>
       <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
         Unlock coins you've previously locked up!
       </Text>
@@ -204,13 +287,42 @@ export const AppsAndTools = () => {
       <Text theme={theme} style={{ margin: '0.25rem 0 1rem', color: theme.white, fontSize: '1rem', fontWeight: 600 }}>
         {`Unlockable: ${totalUnlockable / BSV_DECIMAL_CONVERSION} BSV`}
       </Text>
+      <Show when={isPasswordRequired}>
+        <Input
+          theme={theme}
+          placeholder="Enter Wallet Password"
+          type="password"
+          value={passwordConfirm}
+          onChange={(e) => setPasswordConfirm(e.target.value)}
+        />
+      </Show>
       <Button
         theme={theme}
         type="primary"
         label={`Unlock ${totalUnlockable / BSV_DECIMAL_CONVERSION} BSV`}
-        onClick={() => console.log('Handle Unlock')}
+        onClick={handleUnlock}
       />
-      <Button theme={theme} type="secondary" label="Details" onClick={() => console.log('Handle Show Details')} />
+      <Button
+        theme={theme}
+        type="secondary"
+        label={showingLockDetails ? 'Hide Details' : 'Show Details'}
+        onClick={toggleShowingLockDetails}
+      />
+      <Show when={showingLockDetails}>
+        {headerLockDetailsRow}
+        {lockedUtxos.map((u) => {
+          return (
+            <LockDetailsContainer key={u.txid}>
+              <LockDetailsText style={{ textAlign: 'left' }} theme={theme}>
+                {truncate(u.txid, 4, 4)}
+              </LockDetailsText>
+              <LockDetailsText style={{ textAlign: 'right' }} theme={theme}>{`${
+                Number(u.data?.lock?.until) - currentBlockHeight
+              }`}</LockDetailsText>
+            </LockDetailsContainer>
+          );
+        })}
+      </Show>
     </PageWrapper>
   );
 
@@ -329,10 +441,13 @@ export const AppsAndTools = () => {
             : 'Apps & Tools'}
         </HeaderText>
       </HeaderWrapper>
+      <Show when={isProcessing && page === 'unlock'}>
+        <PageLoader theme={theme} message="Unlocking Coins..." />
+      </Show>
       <Show when={page === 'main'}>{main}</Show>
       <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show>
       <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show>
-      <Show when={page === 'unlock'}>{unlockPage}</Show>
+      <Show when={!isProcessing && page === 'unlock'}>{unlockPage}</Show>
       <Show when={page === 'discover-apps'}>{discoverAppsPage}</Show>
       <Show when={page === 'sponsor' && didSubmit}>
         <BsvSendRequest
