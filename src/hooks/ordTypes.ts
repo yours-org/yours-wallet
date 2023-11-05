@@ -55,6 +55,10 @@ export class TxoData {
     amt: string;
     status?: Bsv20Status;
   };
+  lock?: {
+    address: string;
+    until: number;
+  };
 }
 
 export interface Inscription {
