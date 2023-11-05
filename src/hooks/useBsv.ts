@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react';
-import { useKeys } from './useKeys';
 import {
   BSM,
   ChainParams,
@@ -13,21 +11,27 @@ import {
   TxIn,
   TxOut,
 } from 'bsv-wasm-web';
-import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
+import { useEffect, useState } from 'react';
 import { SignMessageResponse } from '../pages/requests/SignMessageRequest';
-import { useBsvWasm } from './useBsvWasm';
+import { DerivationTags, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
-import { useNetwork } from './useNetwork';
 import { storage } from '../utils/storage';
+import { useBsvWasm } from './useBsvWasm';
+import { useKeys } from './useKeys';
+import { useNetwork } from './useNetwork';
+import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
 
 type SendBsvResponse = {
   txid?: string;
+  rawtx?: string;
   error?: string;
 };
 
 export type Web3SendBsvRequest = {
   satAmount: number;
-  address: string;
+  address?: string;
+  data?: string[]; // hex string array
+  script?: string;
 }[];
 
 export type Web3BroadcastRequest = {
@@ -110,7 +114,22 @@ export const useBsv = () => {
       const tx = new Transaction(1, 0);
 
       request.forEach((req) => {
-        tx.add_output(new TxOut(BigInt(satsOut), P2PKHAddress.from_string(req.address).get_locking_script()));
+        let outScript: Script;
+        if (req.address) {
+          outScript = P2PKHAddress.from_string(req.address).get_locking_script();
+        } else if (req.script) {
+          outScript = Script.from_hex(req.script);
+        } else if ((req.data || []).length > 0) {
+          let asm = `OP_0 OP_RETURN ${req.data?.join(' ')}`;
+          try {
+            outScript = Script.from_asm_string(asm);
+          } catch (e) {
+            throw Error('Invalid data');
+          }
+        } else {
+          throw Error('Invalid request');
+        }
+        tx.add_output(new TxOut(BigInt(satsOut), outScript));
       });
 
       if (!sendAll) {
@@ -140,12 +159,12 @@ export const useBsv = () => {
         return { error: 'fee-to-high' };
       }
 
-      const txhex = tx.to_hex();
-      const txid = await broadcastRawTx(txhex);
+      const rawtx = tx.to_hex();
+      let txid = await broadcastRawTx(rawtx);
       if (txid) {
         storage.set({ paymentUtxos: utxos.filter((item) => !inputs.includes(item)) }); // remove the spent utxos and update local storage
       }
-      return { txid };
+      return { txid, rawtx };
     } catch (error: any) {
       return { error: error.message ?? 'unknown' };
     } finally {
@@ -153,30 +172,51 @@ export const useBsv = () => {
     }
   };
 
+  const getRequestedWif = (keys: Keys, keyType: DerivationTags) => {
+    let wif = keys.walletWif;
+    if (keyType) {
+      if (
+        (keyType !== 'locking' && keyType !== 'ord' && keyType !== 'wallet') ||
+        (keyType === 'locking' && !keys.lockingWif) ||
+        (keyType === 'ord' && !keys.ordWif) ||
+        (keyType === 'wallet' && !keys.walletWif)
+      ) {
+        return { error: 'key-type' };
+      }
+
+      wif = (keyType === 'ord' ? keys.ordWif : keyType === 'locking' ? keys.lockingWif : keys.walletWif) as string; // safely cast here with above if checks
+    }
+    return { wif };
+  };
+
   const signMessage = async (
     messageToSign: Web3SignMessageRequest,
     password: string,
   ): Promise<SignMessageResponse | undefined> => {
+    const { message, encoding } = messageToSign;
     const isAuthenticated = await verifyPassword(password);
     if (!isAuthenticated) {
       return { error: 'invalid-password' };
     }
     try {
-      const keys = await retrieveKeys(password);
-      if (!keys?.walletWif) throw Error('Undefined key');
-
-      const privateKey = PrivateKey.from_wif(keys.walletWif);
+      const keys = (await retrieveKeys(password)) as Keys;
+      const res = getRequestedWif(keys, 'locking'); // We are using locking as the hard coded default for message signing since it's also considered the user's identity. It's effectively the same pattern RelayX uses.
+      if (res.error || !res.wif) {
+        return res;
+      }
+      const privateKey = PrivateKey.from_wif(res.wif);
       const publicKey = privateKey.to_public_key();
       const address = publicKey.to_address().set_chain_params(getChainParams(network)).to_string();
 
-      const msgBuf = Buffer.from(messageToSign.message, messageToSign.encoding);
+      const msgBuf = Buffer.from(message, encoding);
       const signature = BSM.sign_message(privateKey, msgBuf);
       // const signature = privateKey.sign_message(msgBuf);
       return {
         address,
         pubKeyHex: publicKey.to_hex(),
-        signedMessage: messageToSign.message,
+        signedMessage: message,
         signatureHex: signature.to_compact_hex(),
+        keyType: 'locking',
       };
     } catch (error) {
       console.log(error);
