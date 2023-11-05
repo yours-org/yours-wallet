@@ -41,7 +41,6 @@ export type Web3BroadcastRequest = {
 export type Web3SignMessageRequest = {
   message: string;
   encoding?: 'utf8' | 'hex' | 'base64';
-  keyType?: DerivationTags;
 };
 
 export const useBsv = () => {
@@ -194,15 +193,14 @@ export const useBsv = () => {
     messageToSign: Web3SignMessageRequest,
     password: string,
   ): Promise<SignMessageResponse | undefined> => {
-    const { message, encoding, keyType } = messageToSign;
+    const { message, encoding } = messageToSign;
     const isAuthenticated = await verifyPassword(password);
     if (!isAuthenticated) {
       return { error: 'invalid-password' };
     }
     try {
       const keys = (await retrieveKeys(password)) as Keys;
-      if (!keys?.walletWif) throw Error('Undefined key');
-      const res = getRequestedWif(keys, keyType ?? 'wallet');
+      const res = getRequestedWif(keys, 'locking'); // We are using locking as the hard coded default for message signing since it's also considered the user's identity. It's effectively the same pattern RelayX uses.
       if (res.error || !res.wif) {
         return res;
       }
@@ -218,7 +216,7 @@ export const useBsv = () => {
         pubKeyHex: publicKey.to_hex(),
         signedMessage: message,
         signatureHex: signature.to_compact_hex(),
-        keyType: keyType ?? 'wallet',
+        keyType: 'locking',
       };
     } catch (error) {
       console.log(error);
