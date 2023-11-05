@@ -3,7 +3,7 @@ import {
   FEE_PER_BYTE,
   GP_BASE_URL,
   GP_TESTNET_BASE_URL,
-  O_LOCK_PREFIX,
+  SCRYPT_PREFIX,
   O_LOCK_SUFFIX,
   P2PKH_INPUT_SIZE,
   P2PKH_OUTPUT_SIZE,
@@ -478,7 +478,7 @@ export const useOrds = () => {
     const addressHex = destinationAddress.get_locking_script().to_asm_string().split(' ')[2];
 
     const ordLockScript = `${Script.from_hex(
-      O_LOCK_PREFIX,
+      SCRYPT_PREFIX,
     ).to_asm_string()} ${addressHex} ${payOutput.to_hex()} ${Script.from_hex(O_LOCK_SUFFIX).to_asm_string()}`;
 
     const satOut = new TxOut(BigInt(1), Script.from_asm_string(ordLockScript));
