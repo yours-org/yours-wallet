@@ -18,6 +18,18 @@ export type WocUtxo = {
   value: number;
 };
 
+export type ChainInfo = {
+  chain: string;
+  blocks: number;
+  headers: number;
+  bestblockhash: string;
+  difficulty: number;
+  mediantime: number;
+  verificationprogress: number;
+  pruned: boolean;
+  chainwork: string;
+};
+
 export const useWhatsOnChain = () => {
   const { network } = useNetwork();
   const apiKey = process.env.REACT_APP_WOC_API_KEY;
@@ -147,6 +159,15 @@ export const useWhatsOnChain = () => {
     return inputs;
   };
 
+  const getChainInfo = async (): Promise<ChainInfo | undefined> => {
+    try {
+      const { data } = await axios.get(`${getBaseUrl()}/chain/info`, config);
+      return data as ChainInfo;
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   return {
     getUtxos,
     getBsvBalance,
@@ -155,5 +176,6 @@ export const useWhatsOnChain = () => {
     broadcastRawTx,
     getSuitableUtxo,
     getInputs,
+    getChainInfo,
   };
 };
