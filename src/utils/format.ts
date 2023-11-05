@@ -38,3 +38,15 @@ export const formatNumberWithCommasAndDecimals = (number: number, decimalPlaces:
 
   return number.toLocaleString(undefined, options);
 };
+
+export const chunkedStringArray = (array: string[], chunkSize: number) => {
+  if (chunkSize <= 0) {
+    throw new Error('Chunk size must be greater than 0');
+  }
+
+  const result = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    result.push(array.slice(i, i + chunkSize));
+  }
+  return result;
+};
