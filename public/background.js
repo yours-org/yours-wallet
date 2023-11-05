@@ -626,6 +626,7 @@ const processSignMessageResponse = (message) => {
         pubKeyHex: message?.pubKeyHex,
         signedMessage: message?.signedMessage,
         signatureHex: message?.signatureHex,
+        keyType: message?.keyType,
       },
     });
   } catch (error) {

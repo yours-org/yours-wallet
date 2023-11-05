@@ -14,6 +14,7 @@ import { useWeb3Context } from '../../hooks/useWeb3Context';
 import { ColorThemeProps } from '../../theme';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
+import { DerivationTags } from '../../utils/keys';
 
 const RequestDetailsContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -32,6 +33,7 @@ export type SignMessageResponse = {
   pubKeyHex?: string;
   signedMessage?: string;
   signatureHex?: string;
+  keyType?: DerivationTags;
   error?: string;
 };
 
@@ -85,7 +87,11 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
     const signRes = await signMessage(messageToSign, passwordConfirm);
     if (!signRes?.signatureHex) {
       const message =
-        signRes?.error === 'invalid-password' ? 'Invalid Password!' : 'An unknown error has occurred! Try again.';
+        signRes?.error === 'invalid-password'
+          ? 'Invalid Password!'
+          : signRes?.error === 'key-type'
+          ? 'Key type does not exist!'
+          : 'An unknown error has occurred! Try again.';
 
       addSnackbar(message, 'error');
       setIsProcessing(false);

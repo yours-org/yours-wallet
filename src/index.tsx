@@ -17,12 +17,10 @@ const Container = styled.div<ColorThemeProps>`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
+  width: 22.5rem;
+  height: 33.75rem;
   position: relative;
   padding: 0;
-  height: 33.5rem;
-  width: 22.25rem;
   margin: auto;
 `;
 
