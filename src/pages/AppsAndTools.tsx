@@ -5,25 +5,25 @@ import { BackButton } from '../components/BackButton';
 import { Button } from '../components/Button';
 import { ForwardButton } from '../components/ForwardButton';
 import { Input } from '../components/Input';
+import { PageLoader } from '../components/PageLoader';
 import { PandaHead } from '../components/PandaHead';
 import { HeaderText, Text } from '../components/Reusable';
 import { SettingsRow as AppsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
+import { OrdinalTxo } from '../hooks/ordTypes';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useBsv } from '../hooks/useBsv';
-import { useTheme } from '../hooks/useTheme';
-import { ColorThemeProps } from '../theme';
-import { BSV_DECIMAL_CONVERSION, PANDA_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
-import { BsvSendRequest } from './requests/BsvSendRequest';
+import { useContracts } from '../hooks/useContracts';
 import { useGorillaPool } from '../hooks/useGorillaPool';
-import { OrdinalTxo } from '../hooks/ordTypes';
-import { useWhatsOnChain } from '../hooks/useWhatsOnChain';
-import { truncate } from '../utils/format';
-import { sleep } from '../utils/sleep';
 import { usePasswordSetting } from '../hooks/usePasswordSetting';
 import { useSnackbar } from '../hooks/useSnackbar';
-import { useContracts } from '../hooks/useContracts';
-import { PageLoader } from '../components/PageLoader';
+import { useTheme } from '../hooks/useTheme';
+import { useWhatsOnChain } from '../hooks/useWhatsOnChain';
+import { ColorThemeProps } from '../theme';
+import { BSV_DECIMAL_CONVERSION, PANDA_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
+import { truncate } from '../utils/format';
+import { sleep } from '../utils/sleep';
+import { BsvSendRequest } from './requests/BsvSendRequest';
 
 const Content = styled.div`
   display: flex;
@@ -134,7 +134,7 @@ export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const { exchangeRate, lockingAddress } = useBsv();
-  const { getLockedUtxos } = useGorillaPool();
+  const { getLockedUtxos, getSpentTxids } = useGorillaPool();
   const { getChainInfo } = useWhatsOnChain();
   const { isPasswordRequired } = usePasswordSetting();
   const { addSnackbar } = useSnackbar();
@@ -150,15 +150,21 @@ export const AppsAndTools = () => {
   const [totalUnlockable, setTotalUnlockable] = useState(0);
   const [showingLockDetails, setShowingLockDetails] = useState(false);
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [isUnlocking, setIsUnlocking] = useState(false);
 
   useEffect(() => {
     const getLockData = async () => {
+      setIsProcessing(true);
       if (!lockingAddress) throw Error('Locking address missing!');
       const chainInfo = await getChainInfo();
-      const lockedTxos = await getLockedUtxos(lockingAddress);
+      let lockedTxos = await getLockedUtxos(lockingAddress);
       const blockHeight = Number(chainInfo?.blocks);
       if (blockHeight) setCurrentBlockHeight(blockHeight);
       if (lockedTxos.length > 0) setLockedUtxos(lockedTxos);
+      const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
+      const spentTxids = await getSpentTxids(outpoints);
+      console.log(spentTxids);
+      lockedTxos = lockedTxos.filter((txo) => !spentTxids.includes(txo.outpoint.toString()));
       const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
       const unlockableTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => {
         const theBlockCoinsUnlock = Number(utxo?.data?.lock?.until);
@@ -170,6 +176,7 @@ export const AppsAndTools = () => {
       }, 0);
       setTotalLocked(lockTotal);
       setTotalUnlockable(unlockableTotal);
+      setIsProcessing(false);
     };
 
     if (page === 'unlock' && lockingAddress) {
@@ -198,17 +205,20 @@ export const AppsAndTools = () => {
 
   const handleUnlock = async () => {
     setIsProcessing(true);
+    setIsUnlocking(true);
     await sleep(25);
 
     if (!totalUnlockable) {
       addSnackbar('There are no coins to unlock!', 'info');
       setIsProcessing(false);
+      setIsUnlocking(false);
       return;
     }
 
     if (!passwordConfirm && isPasswordRequired) {
       addSnackbar('You must enter a password!', 'error');
       setIsProcessing(false);
+      setIsUnlocking(false);
       return;
     }
 
@@ -225,10 +235,12 @@ export const AppsAndTools = () => {
 
       addSnackbar(message, 'error');
       setPasswordConfirm('');
+      setIsUnlocking(false);
       return;
     }
 
     addSnackbar('Coins Unlocked Successfully!', 'success');
+    setIsUnlocking(false);
   };
 
   const main = (
@@ -263,10 +275,13 @@ export const AppsAndTools = () => {
   const headerLockDetailsRow = (
     <LockDetailsContainer>
       <LockDetailsHeaderText style={{ textAlign: 'left' }} theme={theme}>
-        Transaction Id
+        TxId
       </LockDetailsHeaderText>
       <LockDetailsHeaderText style={{ textAlign: 'right' }} theme={theme}>
-        Blocks Remaining
+        Blocks Left
+      </LockDetailsHeaderText>
+      <LockDetailsHeaderText style={{ textAlign: 'right' }} theme={theme}>
+        Amount
       </LockDetailsHeaderText>
     </LockDetailsContainer>
   );
@@ -305,21 +320,29 @@ export const AppsAndTools = () => {
       <Button
         theme={theme}
         type="secondary"
-        label={showingLockDetails ? 'Hide Details' : 'Show Details'}
+        label={showingLockDetails ? 'Hide Pending' : 'Show Pending'}
         onClick={toggleShowingLockDetails}
       />
       <Show when={showingLockDetails}>
         {headerLockDetailsRow}
         {lockedUtxos.map((u) => {
+          const blocksRemaining = Number(u.data?.lock?.until) - currentBlockHeight;
           return (
-            <LockDetailsContainer key={u.txid}>
-              <LockDetailsText style={{ textAlign: 'left' }} theme={theme}>
-                {truncate(u.txid, 4, 4)}
-              </LockDetailsText>
-              <LockDetailsText style={{ textAlign: 'right' }} theme={theme}>{`${
-                Number(u.data?.lock?.until) - currentBlockHeight
-              }`}</LockDetailsText>
-            </LockDetailsContainer>
+            <Show key={u.txid} when={blocksRemaining > 0}>
+              <LockDetailsContainer key={u.txid}>
+                <LockDetailsText style={{ textAlign: 'left' }} theme={theme}>
+                  {truncate(u.txid, 4, 4)}
+                </LockDetailsText>
+                <LockDetailsText style={{ textAlign: 'center' }} theme={theme}>
+                  {blocksRemaining}
+                </LockDetailsText>
+                <LockDetailsText style={{ textAlign: 'right' }} theme={theme}>
+                  {u.satoshis < 1000
+                    ? `${u.satoshis} ${u.satoshis > 1 ? 'sats' : 'sat'}`
+                    : `${u.satoshis / BSV_DECIMAL_CONVERSION} BSV`}
+                </LockDetailsText>
+              </LockDetailsContainer>
+            </Show>
           );
         })}
       </Show>
@@ -442,7 +465,7 @@ export const AppsAndTools = () => {
         </HeaderText>
       </HeaderWrapper>
       <Show when={isProcessing && page === 'unlock'}>
-        <PageLoader theme={theme} message="Unlocking Coins..." />
+        <PageLoader theme={theme} message={isUnlocking ? 'Unlocking coins...' : 'Gathering info...'} />
       </Show>
       <Show when={page === 'main'}>{main}</Show>
       <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show>

@@ -1,9 +1,9 @@
 import axios from 'axios';
+import { P2PKHAddress } from 'bsv-wasm-web';
 import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from '../utils/constants';
 import { NetWork } from '../utils/network';
-import { useNetwork } from './useNetwork';
 import { storage } from '../utils/storage';
-import { P2PKHAddress } from 'bsv-wasm-web';
+import { useNetwork } from './useNetwork';
 export type UTXO = {
   satoshis: number;
   vout: number;

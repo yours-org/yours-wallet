@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import { useKeys } from './useKeys';
-import { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
-import { useBsvWasm } from './useBsvWasm';
-import { OrdinalTxo } from './ordTypes';
-import { useGorillaPool } from './useGorillaPool';
-import { DUST, FEE_PER_BYTE, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
 import { VarInt } from '@ts-bitcoin/core';
+import { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
+import { useEffect, useState } from 'react';
+import { DUST, FEE_PER_BYTE, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
+import { OrdinalTxo } from './ordTypes';
+import { useBsvWasm } from './useBsvWasm';
+import { useGorillaPool } from './useGorillaPool';
+import { useKeys } from './useKeys';
 
 /**
  * `SignatureRequest` contains required informations for a signer to sign a certain input of a transaction.
