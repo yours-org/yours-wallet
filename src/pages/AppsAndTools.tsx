@@ -15,6 +15,9 @@ import { BSV_DECIMAL_CONVERSION, PANDA_DEV_WALLET, PROVIDER_DOCS_URL, featuredAp
 import { BsvSendRequest } from './requests/BsvSendRequest';
 import { ColorThemeProps } from '../theme';
 import externalLink from '../assets/external-link.svg';
+import { useGorillaPool } from '../hooks/useGorillaPool';
+import { OrdinalTxo } from '../hooks/ordTypes';
+import { useWhatsOnChain } from '../hooks/useWhatsOnChain';
 
 const Content = styled.div`
   display: flex;
@@ -104,12 +107,42 @@ type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unloc
 export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
-  const { exchangeRate } = useBsv();
+  const { exchangeRate, lockingAddress } = useBsv();
+  const { getLockedUtxos } = useGorillaPool();
+  const { getChainInfo } = useWhatsOnChain();
   const [page, setPage] = useState<AppsPage>('main');
   const [otherIsSelected, setOtherIsSelected] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [satAmount, setSatAmount] = useState(0);
   const [didSubmit, setDidSubmit] = useState(false);
+  const [lockedUtxos, setLockedUtxos] = useState<OrdinalTxo[]>([]);
+  const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
+  const [totalLocked, setTotalLocked] = useState(0);
+  const [totalUnlockable, setTotalUnlockable] = useState(0);
+
+  useEffect(() => {
+    const getLockData = async () => {
+      if (!lockingAddress) throw Error('Locking address missing!');
+      const chainInfo = await getChainInfo();
+      const lockedTxos = await getLockedUtxos(lockingAddress);
+      if (chainInfo?.blocks) setCurrentBlockHeight(chainInfo.blocks);
+      if (lockedTxos.length > 0) setLockedUtxos(lockedTxos);
+      const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
+      const unlockableTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => {
+        if (utxo.data?.lock?.until && chainInfo?.blocks) {
+          return utxo.data?.lock?.until >= chainInfo?.blocks ? a + utxo.satoshis : 0;
+        } else {
+          return 0;
+        }
+      }, 0);
+      setTotalLocked(lockTotal);
+      setTotalUnlockable(unlockableTotal);
+    };
+
+    if (page === 'unlock' && lockingAddress) {
+      getLockData();
+    }
+  }, [getChainInfo, getLockedUtxos, lockingAddress, page]);
 
   useEffect(() => {
     setSelected('apps');
@@ -164,12 +197,17 @@ export const AppsAndTools = () => {
         Unlock coins you've previously locked up!
       </Text>
       <Text theme={theme} style={{ margin: '0.25rem', color: theme.white, fontSize: '1rem', fontWeight: 600 }}>
-        Total Locked: 24.333847 BSV
+        {`Total Locked: ${totalLocked / BSV_DECIMAL_CONVERSION} BSV`}
       </Text>
       <Text theme={theme} style={{ margin: '0.25rem 0 1rem', color: theme.white, fontSize: '1rem', fontWeight: 600 }}>
-        Unlockable: 4.76543 BSV
+        {`Unlockable: ${totalUnlockable / BSV_DECIMAL_CONVERSION} BSV`}
       </Text>
-      <Button theme={theme} type="primary" label="Unlock 4.76543 BSV" onClick={() => console.log('Handle Unlock')} />
+      <Button
+        theme={theme}
+        type="primary"
+        label={`Unlock ${totalUnlockable / BSV_DECIMAL_CONVERSION} BSV`}
+        onClick={() => console.log('Handle Unlock')}
+      />
       <Button theme={theme} type="secondary" label="Details" onClick={() => console.log('Handle Show Details')} />
     </PageWrapper>
   );
