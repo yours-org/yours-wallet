@@ -1,11 +1,12 @@
 import axios from 'axios';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL } from '../utils/constants';
+import { chunkedStringArray } from '../utils/format';
 import { NetWork } from '../utils/network';
+import { isBSV20v2 } from '../utils/ordi';
+import { OrdinalResponse, OrdinalTxo } from './ordTypes';
 import { useNetwork } from './useNetwork';
 import { BSV20 } from './useOrds';
 import { useTokens } from './useTokens';
-import { isBSV20v2 } from '../utils/ordi';
-import { OrdinalResponse, OrdinalTxo } from './ordTypes';
 
 type GorillaPoolErrorMessage = {
   message: string;
@@ -15,6 +16,8 @@ export type GorillaPoolBroadcastResponse = {
   txid?: string;
   message?: string;
 };
+
+export type SpentResponse = (string | null)[];
 
 export const useGorillaPool = () => {
   const { network } = useNetwork();
@@ -160,10 +163,32 @@ export const useGorillaPool = () => {
         `https://test.ordinals.gorillapool.io/api/locks/address/${address}/unspent?limit=100&offset=0`,
       );
       const lockedUtxos: OrdinalTxo[] = data;
-      console.log(lockedUtxos);
       return lockedUtxos;
     } catch (e) {
       throw new Error(JSON.stringify(e));
+    }
+  };
+
+  const getSpentTxids = async (outpoints: string[]): Promise<string[]> => {
+    try {
+      const chunks = chunkedStringArray(outpoints, 50);
+      let spentTxids: string[] = [];
+      for (const chunk of chunks) {
+        try {
+          //TODO: updata url to be dynamic for testnet
+          const res = await axios.post(`https://locks.gorillapool.io/api/spends`, chunk);
+          const txids = res.data as SpentResponse;
+          txids.forEach((txid) => {
+            if (txid) {
+              spentTxids.push(txid);
+            }
+          });
+        } catch (error) {}
+      }
+      return spentTxids;
+    } catch (error) {
+      console.log(error);
+      return [];
     }
   };
 
@@ -175,6 +200,7 @@ export const useGorillaPool = () => {
     getBsv20Balances,
     getBSV20Utxos,
     getLockedUtxos,
+    getSpentTxids,
     submitTx,
   };
 };
