@@ -153,6 +153,18 @@ export const useGorillaPool = () => {
     }
   };
 
+  const getLockedUtxos = async (address: string) => {
+    try {
+      const { data } = await axios.get(
+        `${getOrdinalsBaseUrl()}/api/locks/address/${address}/unspent?limit=100&offset=0`,
+      );
+      const lockedUtxos: OrdinalTxo[] = data;
+      return lockedUtxos;
+    } catch (e) {
+      throw new Error(JSON.stringify(e));
+    }
+  };
+
   return {
     getOrdUtxos,
     broadcastWithGorillaPool,
@@ -160,6 +172,7 @@ export const useGorillaPool = () => {
     getMarketData,
     getBsv20Balances,
     getBSV20Utxos,
+    getLockedUtxos,
     submitTx,
   };
 };
