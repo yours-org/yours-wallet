@@ -1,36 +1,36 @@
-import styled from 'styled-components';
-import { ColorThemeProps } from '../theme';
-import { useBottomMenu } from '../hooks/useBottomMenu';
+import { validate } from 'bitcoin-address-validation';
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import styled from 'styled-components';
+import { ThirdPartyAppRequestData } from '../App';
 import bsvCoin from '../assets/bsv-coin.svg';
-import { Button } from '../components/Button';
+import switchAsset from '../assets/switch-asset.svg';
 import { BackButton } from '../components/BackButton';
+import { Button } from '../components/Button';
+import { Input } from '../components/Input';
+import { PageLoader } from '../components/PageLoader';
+import { QrCode } from '../components/QrCode';
 import {
-  Text,
-  HeaderText,
   ButtonContainer,
-  ReceiveContent,
-  MainContent,
   ConfirmContent,
   FormContainer,
+  HeaderText,
+  MainContent,
+  ReceiveContent,
+  Text,
 } from '../components/Reusable';
-import { QrCode } from '../components/QrCode';
 import { Show } from '../components/Show';
-import { useSnackbar } from '../hooks/useSnackbar';
-import { PageLoader } from '../components/PageLoader';
-import { Input } from '../components/Input';
-import { BSV_DECIMAL_CONVERSION, HOSTED_PANDA_IMAGE } from '../utils/constants';
-import { validate } from 'bitcoin-address-validation';
-import { formatUSD } from '../utils/format';
-import { sleep } from '../utils/sleep';
-import { useTheme } from '../hooks/useTheme';
-import { useNavigate } from 'react-router-dom';
-import { ThirdPartyAppRequestData } from '../App';
+import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useBsv } from '../hooks/useBsv';
 import { useOrds } from '../hooks/useOrds';
-import switchAsset from '../assets/switch-asset.svg';
+import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
+import { useTheme } from '../hooks/useTheme';
 import { useWeb3Context } from '../hooks/useWeb3Context';
+import { ColorThemeProps } from '../theme';
+import { BSV_DECIMAL_CONVERSION, HOSTED_PANDA_IMAGE } from '../utils/constants';
+import { formatUSD } from '../utils/format';
+import { sleep } from '../utils/sleep';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;

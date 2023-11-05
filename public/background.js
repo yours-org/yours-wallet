@@ -552,7 +552,7 @@ const processSendBsvResponse = (message) => {
     responseCallbackForSendBsvRequest({
       type: 'sendBsv',
       success: true,
-      data: message?.txid,
+      data: { txid: message.txid, rawtx: message.rawtx },
     });
   } catch (error) {
     responseCallbackForSendBsvRequest({

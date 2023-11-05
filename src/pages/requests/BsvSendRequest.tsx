@@ -84,20 +84,44 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    let validationFail = false;
+    let validationFail = new Map<string, boolean>();
+    validationFail.set('address', false);
+    validationFail.set('script', false);
+    validationFail.set('data', false);
+
     web3Request.forEach((request) => {
-      if (!validate(request.address)) {
-        validationFail = true;
+      // validate script or data if they are set
+      if (request.script?.length === 0) {
+        validationFail.set('script', true);
+        return;
+      } else if (request.data) {
+        if (request.data.length === 0) {
+          validationFail.set('data', true);
+          return;
+        }
+      }
+      // otherwise sending to address
+      if (request.address && !validate(request.address)) {
+        validationFail.set('address', true);
+        return;
       }
     });
+    let validationErrorMessage = '';
+    if (validationFail.get('script')) {
+      validationErrorMessage = 'Found an invalid script.';
+    } else if (validationFail.get('data')) {
+      validationErrorMessage = 'Found an invalid data.';
+    } else if (validationFail.get('address')) {
+      validationErrorMessage = 'Found an invalid receive address.';
+    }
 
-    if (validationFail) {
-      addSnackbar('Found an invalid receive address.', 'error');
+    if (validationErrorMessage) {
+      addSnackbar(validationErrorMessage, 'error');
       setIsProcessing(false);
       return;
     }
 
-    if (!web3Request[0].satAmount) {
+    if (web3Request[0].address && !web3Request[0].satAmount) {
       addSnackbar('No sats supplied', 'info');
       setIsProcessing(false);
       return;
@@ -118,7 +142,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           ? 'Insufficient Funds!'
           : sendRes.error === 'fee-to-high'
           ? 'Miner fee to high!'
-          : 'An unknown error has occurred! Try again.';
+          : 'An unknown error has occurred! Try again.' + sendRes.error;
 
       addSnackbar(message, 'error');
       return;
@@ -136,6 +160,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       chrome.runtime.sendMessage({
         action: 'sendBsvResponse',
         txid: sendRes.txid,
+        rawtx: sendRes.rawtx,
       });
     }
   };
@@ -147,7 +172,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           <Icon src={bsvCoin} />
           <Text style={{ margin: 0 }} theme={theme}>{`${r.satAmount / BSV_DECIMAL_CONVERSION}`}</Text>
           <Text style={{ margin: 0 }} theme={theme}>
-            {truncate(r.address, 5, 5)}
+            {r.address ? truncate(r.address, 5, 5) : ''}
           </Text>
         </LineItem>
       );
