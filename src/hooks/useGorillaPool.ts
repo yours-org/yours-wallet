@@ -17,8 +17,6 @@ export type GorillaPoolBroadcastResponse = {
   message?: string;
 };
 
-export type SpentResponse = (string | null)[];
-
 export const useGorillaPool = () => {
   const { network } = useNetwork();
   const { getTokenDecimals, getTokenSym } = useTokens();
@@ -160,7 +158,7 @@ export const useGorillaPool = () => {
     try {
       //TODO: use this instead of test endpoint - `${getOrdinalsBaseUrl()}/api/locks/address/${address}/unspent?limit=100&offset=0`
       const { data } = await axios.get(
-        `https://test.ordinals.gorillapool.io/api/locks/address/${address}/unspent?limit=100&offset=0`,
+        `https://locks.gorillapool.io/api/locks/address/${address}/unspent?limit=100&offset=0`,
       );
       const lockedUtxos: OrdinalTxo[] = data;
       return lockedUtxos;
@@ -169,26 +167,24 @@ export const useGorillaPool = () => {
     }
   };
 
-  const getSpentTxids = async (outpoints: string[]): Promise<string[]> => {
+  const getSpentTxids = async (outpoints: string[]): Promise<Map<string, string>> => {
     try {
       const chunks = chunkedStringArray(outpoints, 50);
-      let spentTxids: string[] = [];
+      let spentTxids = new Map<string, string>();
       for (const chunk of chunks) {
         try {
           //TODO: updata url to be dynamic for testnet
           const res = await axios.post(`https://locks.gorillapool.io/api/spends`, chunk);
-          const txids = res.data as SpentResponse;
-          txids.forEach((txid) => {
-            if (txid) {
-              spentTxids.push(txid);
-            }
+          const txids = res.data as string[];
+          txids.forEach((txid, i) => {
+            spentTxids.set(chunk[i], txid);
           });
         } catch (error) {}
       }
       return spentTxids;
     } catch (error) {
       console.log(error);
-      return [];
+      return new Map();
     }
   };
 

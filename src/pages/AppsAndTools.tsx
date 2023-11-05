@@ -158,13 +158,21 @@ export const AppsAndTools = () => {
       if (!lockingAddress) throw Error('Locking address missing!');
       const chainInfo = await getChainInfo();
       let lockedTxos = await getLockedUtxos(lockingAddress);
+      console.log(lockedTxos);
       const blockHeight = Number(chainInfo?.blocks);
       if (blockHeight) setCurrentBlockHeight(blockHeight);
-      if (lockedTxos.length > 0) setLockedUtxos(lockedTxos);
       const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
       const spentTxids = await getSpentTxids(outpoints);
       console.log(spentTxids);
-      lockedTxos = lockedTxos.filter((txo) => !spentTxids.includes(txo.outpoint.toString()));
+      lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
+      console.log(lockedTxos);
+      console.log(Number(lockedTxos[0].data?.lock?.until));
+      console.log(blockHeight);
+      lockedTxos = lockedTxos.filter((i) => i.satoshis > 200 && Number(i.data?.lock?.until) <= blockHeight).slice(0, 1);
+
+      console.log(lockedTxos);
+      if (lockedTxos.length > 0) setLockedUtxos(lockedTxos);
+      console.log(lockedTxos[0].outpoint.toString());
       const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
       const unlockableTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => {
         const theBlockCoinsUnlock = Number(utxo?.data?.lock?.until);
@@ -222,7 +230,7 @@ export const AppsAndTools = () => {
       return;
     }
 
-    const unlockRes = await unlock(lockedUtxos, passwordConfirm);
+    const unlockRes = await unlock(lockedUtxos, passwordConfirm, currentBlockHeight);
     if (!unlockRes.txid || unlockRes.error) {
       const message =
         unlockRes.error === 'invalid-password'

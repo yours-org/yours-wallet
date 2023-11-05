@@ -1,11 +1,11 @@
-import { VarInt } from '@ts-bitcoin/core';
-import { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
+import { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
-import { DUST, FEE_PER_BYTE, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
+import { DUST, FEE_PER_BYTE } from '../utils/constants';
 import { OrdinalTxo } from './ordTypes';
 import { useBsvWasm } from './useBsvWasm';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
+import { useWhatsOnChain } from './useWhatsOnChain';
 
 /**
  * `SignatureRequest` contains required informations for a signer to sign a certain input of a transaction.
@@ -62,6 +62,7 @@ export const useContracts = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { retrieveKeys, bsvAddress, ordAddress, verifyPassword } = useKeys();
   const { broadcastWithGorillaPool } = useGorillaPool();
+  const { getRawTxById } = useWhatsOnChain();
   const { bsvWasmInitialized } = useBsvWasm();
 
   /**
@@ -153,7 +154,8 @@ export const useContracts = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const unlock = async (locks: OrdinalTxo[], password: string) => {
+  const unlock = async (locks: OrdinalTxo[], password: string, currentBlockHeight: number) => {
+    console.log(locks);
     try {
       if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
       setIsProcessing(true);
@@ -168,15 +170,18 @@ export const useContracts = () => {
         throw Error('No keys');
       }
       const lockPk = PrivateKey.from_wif(keys.lockingWif);
-      const lockPkh = Hash.hash_160(lockPk.to_public_key().to_bytes()).to_bytes();
+      // const lockPkh = Hash.hash_160(lockPk.to_public_key().to_bytes()).to_bytes();
       // const lockAddress = P2PKHAddress.from_string(keys.lockingAddress!);
       const walletAddress = P2PKHAddress.from_string(keys.walletAddress);
 
       const tx = new Transaction(1, 0);
+      tx.set_nlocktime(currentBlockHeight);
       let satsIn = 0;
       let size = 0;
       locks.forEach((lock) => {
-        tx.add_input(new TxIn(Buffer.from(lock.txid, 'hex'), lock.vout, Script.from_asm_string('')));
+        const txin = new TxIn(Buffer.from(lock.txid, 'hex'), lock.vout, Script.from_asm_string(''));
+        txin?.set_sequence(0);
+        tx.add_input(txin);
         satsIn += lock.satoshis;
         size += 1500;
       });
@@ -190,32 +195,43 @@ export const useContracts = () => {
         tx.add_output(new TxOut(BigInt(change), walletAddress.get_locking_script()));
       }
 
-      locks.forEach((lock, vin) => {
-        const lockScript = Script.from_hex(
-          SCRYPT_PREFIX +
-            Script.from_asm_string(
-              Buffer.from(lockPkh).toString('hex') + ' ' + VarInt.fromNumber(lock.data!.lock!.until).toHex(),
-            ).to_hex() +
-            LOCK_SUFFIX,
-        );
+      for (const [vin, lock] of locks.entries()) {
+        const ordRawTx = await getRawTxById(lock.txid);
+        if (!ordRawTx) throw Error('Could not get raw tx');
+        const tx = Transaction.from_hex(ordRawTx);
+        const out = tx.get_output(lock.vout);
+        lock.script = out?.get_script_pub_key().to_hex();
+      }
 
-        let preimage = tx.sighash_preimage(
-          SigHash.InputOutputs,
-          vin,
-          lockScript,
-          BigInt(lock.satoshis), //TODO: use amount from listing
-        );
+      for (const [vin, lock] of locks.entries()) {
+        // const lockScript = Script.from_hex(
+        //   SCRYPT_PREFIX +
+        //     Script.from_asm_string(
+        //       Buffer.from(lockPkh).toString('hex') +
+        //         ' ' +
+        //         Buffer.from(lock.data!.lock!.until.toString(16), 'hex').reverse().toString('hex'),
+        //     ).to_hex() +
+        //     LOCK_SUFFIX,
+        // );
+        let script = Script.from_hex(lock.script!);
+        let preimage = tx.sighash_preimage(SigHash.InputOutputs, vin, script!, BigInt(lock.satoshis));
 
-        const sig = tx.sign(lockPk, SigHash.InputOutputs, vin, lockScript, BigInt(lock.satoshis));
+        const sig = tx.sign(lockPk, SigHash.InputOutputs, vin, script!, BigInt(lock.satoshis));
 
-        let asm = `${sig.to_hex} ${lockPk.to_public_key().to_hex()} ${Buffer.from(preimage).toString('hex')}`;
-        tx.set_input(vin, new TxIn(Buffer.from(lock.txid, 'hex'), lock.vout, Script.from_asm_string(asm)));
-      });
+        let asm = `${sig.to_hex()} ${lockPk.to_public_key().to_hex()} ${Buffer.from(preimage).toString('hex')}`;
+        const txin = tx.get_input(vin);
+        txin?.set_unlocking_script(Script.from_asm_string(asm));
+        console.log(txin, txin?.get_unlocking_script().to_asm_string());
+        tx.set_input(vin, txin!);
+      }
 
       const rawTx = tx.to_hex();
 
+      console.log(rawTx);
+
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
+      console.log(txid);
       return { txid };
     } catch (error: any) {
       console.log(error);
