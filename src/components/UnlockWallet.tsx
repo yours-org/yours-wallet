@@ -1,14 +1,14 @@
-import { FormContainer, HeaderText } from './Reusable';
-import { Button } from './Button';
-import { ColorThemeProps } from '../theme';
-import { styled } from 'styled-components';
-import { Input } from './Input';
 import { useState } from 'react';
+import { styled } from 'styled-components';
 import { useKeys } from '../hooks/useKeys';
-import { storage } from '../utils/storage';
-import { PandaHead } from './PandaHead';
-import { sleep } from '../utils/sleep';
 import { useTheme } from '../hooks/useTheme';
+import { ColorThemeProps } from '../theme';
+import { sleep } from '../utils/sleep';
+import { storage } from '../utils/storage';
+import { Button } from './Button';
+import { Input } from './Input';
+import { PandaHead } from './PandaHead';
+import { FormContainer, HeaderText } from './Reusable';
 
 const Container = styled.div<ColorThemeProps>`
   display: flex;

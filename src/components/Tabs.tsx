@@ -1,6 +1,5 @@
-import React from 'react';
+import React, { PropsWithChildren } from 'react';
 import styled from 'styled-components';
-import { PropsWithChildren } from 'react';
 import { ColorThemeProps, Theme } from '../theme';
 
 export type TabPanelProps = PropsWithChildren<{
