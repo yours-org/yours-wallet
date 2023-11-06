@@ -1,6 +1,7 @@
-import { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
+import { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
-import { DUST, FEE_PER_BYTE } from '../utils/constants';
+import { DUST, FEE_PER_BYTE, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
+import { storage } from '../utils/storage';
 import { OrdinalTxo } from './ordTypes';
 import { useBsvWasm } from './useBsvWasm';
 import { useGorillaPool } from './useGorillaPool';
@@ -62,7 +63,7 @@ export const useContracts = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { retrieveKeys, bsvAddress, ordAddress, verifyPassword } = useKeys();
   const { broadcastWithGorillaPool } = useGorillaPool();
-  const { getRawTxById } = useWhatsOnChain();
+  const { getUtxos } = useWhatsOnChain();
   const { bsvWasmInitialized } = useBsvWasm();
 
   /**
@@ -155,7 +156,6 @@ export const useContracts = () => {
   }, []);
 
   const unlock = async (locks: OrdinalTxo[], password: string, currentBlockHeight: number) => {
-    console.log(locks);
     try {
       if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
       setIsProcessing(true);
@@ -170,8 +170,7 @@ export const useContracts = () => {
         throw Error('No keys');
       }
       const lockPk = PrivateKey.from_wif(keys.lockingWif);
-      // const lockPkh = Hash.hash_160(lockPk.to_public_key().to_bytes()).to_bytes();
-      // const lockAddress = P2PKHAddress.from_string(keys.lockingAddress!);
+      const lockPkh = Hash.hash_160(lockPk.to_public_key().to_bytes()).to_bytes();
       const walletAddress = P2PKHAddress.from_string(keys.walletAddress);
 
       const tx = new Transaction(1, 0);
@@ -195,25 +194,15 @@ export const useContracts = () => {
         tx.add_output(new TxOut(BigInt(change), walletAddress.get_locking_script()));
       }
 
-      for (const lock of locks) {
-        const ordRawTx = await getRawTxById(lock.txid);
-        if (!ordRawTx) throw Error('Could not get raw tx');
-        const tx = Transaction.from_hex(ordRawTx);
-        const out = tx.get_output(lock.vout);
-        lock.script = out?.get_script_pub_key().to_hex();
-      }
-
       for (const [vin, lock] of locks.entries()) {
-        // const lockScript = Script.from_hex(
-        //   SCRYPT_PREFIX +
-        //     Script.from_asm_string(
-        //       Buffer.from(lockPkh).toString('hex') +
-        //         ' ' +
-        //         Buffer.from(lock.data!.lock!.until.toString(16), 'hex').reverse().toString('hex'),
-        //     ).to_hex() +
-        //     LOCK_SUFFIX,
-        // );
-        let script = Script.from_hex(lock.script!);
+        const fragment = Script.from_asm_string(
+          Buffer.from(lockPkh).toString('hex') +
+            ' ' +
+            Buffer.from(lock.data!.lock!.until.toString(16).padStart(6, '0'), 'hex').reverse().toString('hex'),
+        );
+
+        const script = Script.from_hex(SCRYPT_PREFIX + fragment.to_hex() + LOCK_SUFFIX);
+        // let script = Script.from_hex(lock.script!);
         let preimage = tx.sighash_preimage(SigHash.InputsOutputs, vin, script!, BigInt(lock.satoshis));
 
         const sig = tx.sign(lockPk, SigHash.InputsOutputs, vin, script!, BigInt(lock.satoshis));
@@ -221,16 +210,22 @@ export const useContracts = () => {
         let asm = `${sig.to_hex()} ${lockPk.to_public_key().to_hex()} ${Buffer.from(preimage).toString('hex')}`;
         const txin = tx.get_input(vin);
         txin?.set_unlocking_script(Script.from_asm_string(asm));
-        console.log(txin, txin?.get_unlocking_script().to_asm_string());
         tx.set_input(vin, txin!);
+        console.log(lock.outpoint);
       }
 
       const rawTx = tx.to_hex();
 
-      console.log(rawTx);
-
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
+      const fundingUtxos = await getUtxos(keys.walletAddress);
+      fundingUtxos.push({
+        satoshis: change,
+        script: walletAddress.get_locking_script().to_asm_string(),
+        txid,
+        vout: 0,
+      });
+      storage.set({ paymentUtxos: fundingUtxos });
       console.log(txid);
       return { txid };
     } catch (error: any) {

@@ -163,16 +163,9 @@ export const AppsAndTools = () => {
       if (blockHeight) setCurrentBlockHeight(blockHeight);
       const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
       const spentTxids = await getSpentTxids(outpoints);
-      console.log(spentTxids);
       lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
-      console.log(lockedTxos);
-      console.log(Number(lockedTxos[0].data?.lock?.until));
-      console.log(blockHeight);
-      lockedTxos = lockedTxos.filter((i) => i.satoshis > 200 && Number(i.data?.lock?.until) <= blockHeight).slice(0, 1);
-
-      console.log(lockedTxos);
+      lockedTxos = lockedTxos.filter((i) => Number(i.data?.lock?.until) <= blockHeight);
       if (lockedTxos.length > 0) setLockedUtxos(lockedTxos);
-      console.log(lockedTxos[0].outpoint.toString());
       const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
       const unlockableTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => {
         const theBlockCoinsUnlock = Number(utxo?.data?.lock?.until);
