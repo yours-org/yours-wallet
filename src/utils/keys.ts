@@ -1,6 +1,7 @@
 import * as bip39 from 'bip39';
 import { ExtendedPrivateKey, PrivateKey } from 'bsv-wasm-web';
 import { WifKeys } from '../hooks/useKeys';
+import { DEFAULT_LOCKING_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';
 
 export type Keys = {
   mnemonic: string;
@@ -30,14 +31,7 @@ const getWifAndDerivation = (seedPhrase: string, derivationPath: string) => {
   return { wif, derivationPath };
 };
 
-const generateKeysFromTag = (mnemonic: string, tag: DerivationTags, customDerivation: string | null = null) => {
-  const derivation = customDerivation
-    ? customDerivation
-    : tag === 'locking'
-    ? `m/0'/236'/0'/0/0`
-    : tag === 'ord'
-    ? `m/44'/236'/1'/0/0`
-    : `m/44'/236'/0'/0/0`;
+export const generateKeysFromTag = (mnemonic: string, derivation: string) => {
   const wifAndDp = getWifAndDerivation(mnemonic, derivation);
   const privKey = PrivateKey.from_wif(wifAndDp.wif);
   const pubKey = privKey.to_public_key();
@@ -62,9 +56,9 @@ export const getKeys = (
     if (!isValid) throw new Error('Invalid Mnemonic!');
   }
   const mnemonic = validMnemonic ?? bip39.generateMnemonic();
-  const wallet = generateKeysFromTag(mnemonic, 'wallet', walletDerivation);
-  const ord = generateKeysFromTag(mnemonic, 'ord', ordDerivation);
-  const locking = generateKeysFromTag(mnemonic, 'locking', lockingDerivation);
+  const wallet = generateKeysFromTag(mnemonic, walletDerivation || DEFAULT_WALLET_PATH);
+  const ord = generateKeysFromTag(mnemonic, ordDerivation || DEFAULT_ORD_PATH);
+  const locking = generateKeysFromTag(mnemonic, lockingDerivation || DEFAULT_LOCKING_PATH);
 
   const keys: Keys = {
     mnemonic,

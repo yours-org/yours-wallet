@@ -1,12 +1,16 @@
+import axios from 'axios';
+import { ChainParams, P2PKHAddress, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
+import { DEFAULT_RELAYX_CHANGE_PATH, DEFAULT_RELAYX_ORD_PATH, FEE_PER_BYTE } from '../utils/constants';
 import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto';
-import { Keys, getKeys, getKeysFromWifs } from '../utils/keys';
-import { storage } from '../utils/storage';
-import { ChainParams, P2PKHAddress } from 'bsv-wasm-web';
-import { useBsvWasm } from './useBsvWasm';
+import { Keys, generateKeysFromTag, getKeys, getKeysFromWifs } from '../utils/keys';
 import { NetWork } from '../utils/network';
+import { storage } from '../utils/storage';
+import { useBsvWasm } from './useBsvWasm';
+import { useGorillaPool } from './useGorillaPool';
 import { useNetwork } from './useNetwork';
 import { usePasswordSetting } from './usePasswordSetting';
+import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
 
 export type KeyStorage = {
   encryptedKeys: string;
@@ -30,6 +34,8 @@ export const useKeys = () => {
   const { network } = useNetwork();
   const { isPasswordRequired } = usePasswordSetting();
   const { bsvWasmInitialized } = useBsvWasm();
+  const { getBaseUrl } = useWhatsOnChain();
+  const { broadcastWithGorillaPool } = useGorillaPool();
 
   const getChainParams = (network: NetWork): ChainParams => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
@@ -41,13 +47,56 @@ export const useKeys = () => {
     walletDerivation: string | null = null,
     ordDerivation: string | null = null,
     lockingDerivation: string | null = null,
+    isRelayX = false,
   ) => {
     const salt = generateRandomSalt();
     const passKey = deriveKey(password, salt);
+    if (isRelayX) {
+      ordDerivation = DEFAULT_RELAYX_ORD_PATH;
+    }
     const keys = getKeys(mnemonic, walletDerivation, ordDerivation, lockingDerivation);
+    if (mnemonic && isRelayX) {
+      sweepRelayX(keys);
+    }
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
     storage.set({ encryptedKeys, passKey, salt });
     return keys.mnemonic;
+  };
+
+  const sweepRelayX = async (keys: Keys) => {
+    if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
+    const relayChangeWallet = generateKeysFromTag(keys.mnemonic, DEFAULT_RELAYX_CHANGE_PATH);
+    const { data } = await axios.get<UTXO[]>(`${getBaseUrl()}/address/${relayChangeWallet.address}/unspent`);
+    const utxos = data;
+    if (utxos.length === 0) return;
+    const tx = new Transaction(1, 0);
+    const changeAddress = P2PKHAddress.from_string(relayChangeWallet.address);
+
+    let satsIn = 0;
+    utxos.forEach((utxo: any, vin: number) => {
+      const txin = new TxIn(Buffer.from(utxo.tx_hash, 'hex'), utxo.tx_pos, Script.from_asm_string(''));
+      tx.add_input(txin);
+      satsIn += utxo.value;
+      const sig = tx.sign(
+        relayChangeWallet.privKey,
+        SigHash.Input,
+        vin,
+        changeAddress.get_locking_script(),
+        BigInt(utxo.value),
+      );
+      const asm = `${sig.to_hex()} ${relayChangeWallet.pubKey.to_hex()}`;
+      txin?.set_unlocking_script(Script.from_asm_string(asm));
+      tx.set_input(vin, txin);
+    });
+
+    const size = tx.to_bytes().length + 34;
+    const fee = Math.ceil(size * FEE_PER_BYTE);
+    const changeAmount = satsIn - fee;
+    tx.add_output(new TxOut(BigInt(changeAmount), P2PKHAddress.from_string(keys.walletAddress).get_locking_script()));
+
+    const rawTx = tx.to_hex();
+    const { txid } = await broadcastWithGorillaPool(rawTx);
+    console.log('Change sweep:', txid);
   };
 
   const generateKeysFromWifAndStoreEncrypted = (password: string, wifs: WifKeys) => {

@@ -1,20 +1,20 @@
-import styled from 'styled-components';
-import { ColorThemeProps } from '../../theme';
-import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { useSnackbar } from '../../hooks/useSnackbar';
+import { useNavigate } from 'react-router-dom';
+import styled from 'styled-components';
 import { BackButton } from '../../components/BackButton';
-import { Text, HeaderText } from '../../components/Reusable';
-import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
-import { PandaHead } from '../../components/PandaHead';
-import { useKeys } from '../../hooks/useKeys';
-import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
+import { PandaHead } from '../../components/PandaHead';
+import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
-import { sleep } from '../../utils/sleep';
-import { useTheme } from '../../hooks/useTheme';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { useKeys } from '../../hooks/useKeys';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { useTheme } from '../../hooks/useTheme';
+import { ColorThemeProps } from '../../theme';
+import { sleep } from '../../utils/sleep';
 
 const Content = styled.div`
   display: flex;
@@ -58,6 +58,10 @@ const ExpertImportWrapper = styled.div`
   width: 90%;
 `;
 
+const IsRelayWrapper = styled(ExpertImportWrapper)`
+  margin-bottom: 1rem;
+`;
+
 export const RestoreWallet = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
@@ -71,6 +75,7 @@ export const RestoreWallet = () => {
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
   const [isExpertImport, setIsExpertImport] = useState(false);
+  const [isRelayImport, setIsRelayImport] = useState(false);
   const [walletDerivation, setWalletDerivation] = useState<string | null>(null);
   const [ordDerivation, setOrdDerivation] = useState<string | null>(null);
   const [lockingDerivation, setLockingDerivation] = useState<string | null>(null);
@@ -83,9 +88,8 @@ export const RestoreWallet = () => {
     };
   }, [hideMenu, showMenu]);
 
-  const handleExpertToggle = () => {
-    setIsExpertImport(!isExpertImport);
-  };
+  const handleExpertToggle = () => setIsExpertImport(!isExpertImport);
+  const handleIsRelayToggle = () => setIsRelayImport(!isExpertImport);
 
   const handleRestore = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -110,6 +114,7 @@ export const RestoreWallet = () => {
       walletDerivation,
       ordDerivation,
       lockingDerivation,
+      isRelayImport,
     );
     if (!mnemonic) {
       addSnackbar('An error occurred while restoring the wallet!', 'error');
@@ -189,10 +194,18 @@ export const RestoreWallet = () => {
               style={{ margin: '0.1rem 0 1rem', width: '85%' }}
             />
           </Show>
+          <Show when={!isExpertImport}>
+            <IsRelayWrapper>
+              <ToggleSwitch theme={theme} on={isRelayImport} onChange={handleIsRelayToggle} />
+              <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
+                Enable if restoring a RelayX wallet
+              </Text>
+            </IsRelayWrapper>
+          </Show>
           <ExpertImportWrapper>
             <ToggleSwitch theme={theme} on={isExpertImport} onChange={handleExpertToggle} />
             <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
-              Use custom derivation paths for wallets like RelayX, SimplyCash, etc
+              Use custom derivations
             </Text>
           </ExpertImportWrapper>
           <Text theme={theme} style={{ margin: '3rem 0 1rem' }}>
