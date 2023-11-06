@@ -17,11 +17,12 @@ export const SNACKBAR_TIMEOUT = 2.5 * 1000; // 2.5 seconds
 export const HOSTED_PANDA_IMAGE = 'https://i.ibb.co/3fLL5X2/Panda-Wallet-Logo.png';
 export const PANDA_DEV_WALLET = '13y7VtdVEbB7rhiQcHpXxj9SqKp2iSU9Ud';
 export const PROVIDER_DOCS_URL = 'https://panda-wallet.gitbook.io/provider-api/intro/introduction';
-export const DEFAULT_WALLET_PATH = "m/44'/236'/0'/0/0";
-export const DEFAULT_ORD_PATH = "m/44'/236'/0'/1/0";
+
+export const DEFAULT_WALLET_PATH = "m/44'/236'/0'/1/0";
+export const DEFAULT_ORD_PATH = "m/44'/236'/1'/0/0";
 export const DEFAULT_RELAYX_ORD_PATH = "m/44'/236'/0'/2/0";
-export const DEFAULT_RELAYX_CHANGE_PATH = "m/44'/236'/0'/1/0";
-export const DEFAULT_LOCKING_PATH = "m/0'/236'/0'/0/0";
+export const SWEEP_PATH = "m/44'/236'/0'/0/0";
+export const DEFAULT_IDENTITY_PATH = "m/0'/236'/0'/0/0";
 
 export const SCRYPT_PREFIX =
   '2097dfd76851bf465e8f715593b217714858bbe9570ff3bd5e33840a34e20ff0262102ba79df5f8ae7604a9830f03c7933028186aede0675a16f025dc4f8be8eec0382201008ce7480da41702918d1ec8e6849ba32b4d65b1e40dc669c31a1e6306b266c0000';

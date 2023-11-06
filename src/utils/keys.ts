@@ -1,7 +1,7 @@
 import * as bip39 from 'bip39';
 import { ExtendedPrivateKey, PrivateKey } from 'bsv-wasm-web';
 import { WifKeys } from '../hooks/useKeys';
-import { DEFAULT_LOCKING_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';
+import { DEFAULT_IDENTITY_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';
 
 export type Keys = {
   mnemonic: string;
@@ -58,7 +58,7 @@ export const getKeys = (
   const mnemonic = validMnemonic ?? bip39.generateMnemonic();
   const wallet = generateKeysFromTag(mnemonic, walletDerivation || DEFAULT_WALLET_PATH);
   const ord = generateKeysFromTag(mnemonic, ordDerivation || DEFAULT_ORD_PATH);
-  const locking = generateKeysFromTag(mnemonic, lockingDerivation || DEFAULT_LOCKING_PATH);
+  const locking = generateKeysFromTag(mnemonic, lockingDerivation || DEFAULT_IDENTITY_PATH);
 
   const keys: Keys = {
     mnemonic,
