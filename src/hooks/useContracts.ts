@@ -178,13 +178,13 @@ export const useContracts = () => {
       tx.set_nlocktime(currentBlockHeight);
       let satsIn = 0;
       let size = 0;
-      locks.forEach((lock) => {
+      for (const lock of locks) {
         const txin = new TxIn(Buffer.from(lock.txid, 'hex'), lock.vout, Script.from_asm_string(''));
         txin?.set_sequence(0);
         tx.add_input(txin);
         satsIn += lock.satoshis;
         size += 1500;
-      });
+      }
 
       const fee = Math.ceil(size * FEE_PER_BYTE);
       if (fee > satsIn) {
@@ -195,7 +195,7 @@ export const useContracts = () => {
         tx.add_output(new TxOut(BigInt(change), walletAddress.get_locking_script()));
       }
 
-      for (const [vin, lock] of locks.entries()) {
+      for (const lock of locks) {
         const ordRawTx = await getRawTxById(lock.txid);
         if (!ordRawTx) throw Error('Could not get raw tx');
         const tx = Transaction.from_hex(ordRawTx);
@@ -214,9 +214,9 @@ export const useContracts = () => {
         //     LOCK_SUFFIX,
         // );
         let script = Script.from_hex(lock.script!);
-        let preimage = tx.sighash_preimage(SigHash.InputOutputs, vin, script!, BigInt(lock.satoshis));
+        let preimage = tx.sighash_preimage(SigHash.InputsOutputs, vin, script!, BigInt(lock.satoshis));
 
-        const sig = tx.sign(lockPk, SigHash.InputOutputs, vin, script!, BigInt(lock.satoshis));
+        const sig = tx.sign(lockPk, SigHash.InputsOutputs, vin, script!, BigInt(lock.satoshis));
 
         let asm = `${sig.to_hex()} ${lockPk.to_public_key().to_hex()} ${Buffer.from(preimage).toString('hex')}`;
         const txin = tx.get_input(vin);
