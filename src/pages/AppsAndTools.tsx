@@ -152,32 +152,33 @@ export const AppsAndTools = () => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [isUnlocking, setIsUnlocking] = useState(false);
 
-  useEffect(() => {
-    const getLockData = async () => {
-      setIsProcessing(true);
-      if (!lockingAddress) throw Error('Locking address missing!');
-      const chainInfo = await getChainInfo();
-      let lockedTxos = await getLockedUtxos(lockingAddress);
-      const blockHeight = Number(chainInfo?.blocks);
-      if (blockHeight) setCurrentBlockHeight(blockHeight);
-      const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
-      const spentTxids = await getSpentTxids(outpoints);
-      lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
-      if (lockedTxos.length > 0) setLockedUtxos(lockedTxos);
-      const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
-      const unlockableTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => {
-        const theBlockCoinsUnlock = Number(utxo?.data?.lock?.until);
-        if (blockHeight && theBlockCoinsUnlock) {
-          return theBlockCoinsUnlock <= blockHeight ? a + utxo.satoshis : 0;
-        } else {
-          return 0;
-        }
-      }, 0);
-      setTotalLocked(lockTotal);
-      setTotalUnlockable(unlockableTotal);
-      setIsProcessing(false);
-    };
+  const getLockData = async () => {
+    setIsProcessing(true);
+    if (!lockingAddress) throw Error('Locking address missing!');
+    const chainInfo = await getChainInfo();
+    let lockedTxos = await getLockedUtxos(lockingAddress);
+    const blockHeight = Number(chainInfo?.blocks);
+    if (blockHeight) setCurrentBlockHeight(blockHeight);
+    const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
+    const spentTxids = await getSpentTxids(outpoints);
+    lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
+    if (lockedTxos.length > 0) setLockedUtxos(lockedTxos);
+    const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
 
+    let unlockableTotal = 0;
+    lockedTxos.forEach((txo) => {
+      const theBlockCoinsUnlock = Number(txo?.data?.lock?.until);
+      if (theBlockCoinsUnlock <= blockHeight) {
+        unlockableTotal += txo.satoshis;
+      }
+    });
+
+    setTotalLocked(lockTotal);
+    setTotalUnlockable(unlockableTotal);
+    setIsProcessing(false);
+  };
+
+  useEffect(() => {
     if (page === 'unlock' && lockingAddress) {
       getLockData();
     }
@@ -241,6 +242,7 @@ export const AppsAndTools = () => {
 
     addSnackbar('Coins Unlocked Successfully!', 'success');
     setIsUnlocking(false);
+    setTimeout(getLockData, 2550);
   };
 
   const main = (
@@ -325,24 +327,26 @@ export const AppsAndTools = () => {
       />
       <Show when={showingLockDetails}>
         {headerLockDetailsRow}
-        {lockedUtxos.map((u) => {
-          const blocksRemaining = Number(u.data?.lock?.until) - currentBlockHeight;
-          return (
-            <LockDetailsContainer key={u.txid}>
-              <LockDetailsText style={{ textAlign: 'left' }} theme={theme}>
-                {truncate(u.txid, 4, 4)}
-              </LockDetailsText>
-              <LockDetailsText style={{ textAlign: 'center' }} theme={theme}>
-                {blocksRemaining < 0 ? '0' : blocksRemaining}
-              </LockDetailsText>
-              <LockDetailsText style={{ textAlign: 'right' }} theme={theme}>
-                {u.satoshis < 1000
-                  ? `${u.satoshis} ${u.satoshis > 1 ? 'sats' : 'sat'}`
-                  : `${u.satoshis / BSV_DECIMAL_CONVERSION} BSV`}
-              </LockDetailsText>
-            </LockDetailsContainer>
-          );
-        })}
+        {lockedUtxos
+          .sort((a, b) => Number(a.data?.lock?.until) - Number(b.data?.lock?.until))
+          .map((u) => {
+            const blocksRemaining = Number(u.data?.lock?.until) - currentBlockHeight;
+            return (
+              <LockDetailsContainer key={u.txid}>
+                <LockDetailsText style={{ textAlign: 'left' }} theme={theme}>
+                  {truncate(u.txid, 4, 4)}
+                </LockDetailsText>
+                <LockDetailsText style={{ textAlign: 'center' }} theme={theme}>
+                  {blocksRemaining < 0 ? '0' : blocksRemaining}
+                </LockDetailsText>
+                <LockDetailsText style={{ textAlign: 'right' }} theme={theme}>
+                  {u.satoshis < 1000
+                    ? `${u.satoshis} ${u.satoshis > 1 ? 'sats' : 'sat'}`
+                    : `${u.satoshis / BSV_DECIMAL_CONVERSION} BSV`}
+                </LockDetailsText>
+              </LockDetailsContainer>
+            );
+          })}
       </Show>
     </PageWrapper>
   );
