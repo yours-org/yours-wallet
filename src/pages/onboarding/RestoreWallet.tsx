@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import aymLogo from '../../assets/aym-logo.png';
 import relayXLogo from '../../assets/relayx-logo.png';
 import twetchLogo from '../../assets/twetch-logo.png';
 import { BackButton } from '../../components/BackButton';
@@ -144,6 +145,8 @@ export const RestoreWallet = () => {
       ? 'Restore Relay Wallet'
       : importWallet === 'twetch'
       ? 'Restore Twetch Wallet'
+      : importWallet === 'aym'
+      ? 'Restore Aym Wallet'
       : 'Restore a Wallet';
   };
 
@@ -252,6 +255,9 @@ export const RestoreWallet = () => {
               <Show when={wallet === 'twetch'}>
                 <WalletLogo src={twetchLogo} />
               </Show>
+              <Show when={wallet === 'aym'}>
+                <WalletLogo src={aymLogo} style={{ height: '2rem' }} />
+              </Show>
               <Show when={!wallet}>
                 <WalletText theme={theme}>Other Wallet</WalletText>
               </Show>
@@ -270,7 +276,7 @@ export const RestoreWallet = () => {
         <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
           Select from a wallet type you'd like to restore from.
         </Text>
-        {availableWallets(['relayx', 'twetch', undefined])}
+        {availableWallets(['relayx', 'twetch', 'aym', undefined])}
       </Content>
     </>
   );
