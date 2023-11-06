@@ -1,8 +1,14 @@
-import styled from 'styled-components';
-import { useBottomMenu } from '../hooks/useBottomMenu';
+import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
-import { Button } from '../components/Button';
+import styled from 'styled-components';
 import oneSatLogo from '../assets/1sat-logo.svg';
+import { BSV20Item } from '../components/BSV20Item';
+import { BackButton } from '../components/BackButton';
+import { Button } from '../components/Button';
+import { Input } from '../components/Input';
+import { Ordinal } from '../components/Ordinal';
+import { PageLoader } from '../components/PageLoader';
+import { QrCode } from '../components/QrCode';
 import {
   ButtonContainer,
   ConfirmContent,
@@ -11,23 +17,17 @@ import {
   ReceiveContent,
   Text,
 } from '../components/Reusable';
-import { ListOrdinal, OrdOperationResponse, useOrds, BSV20 } from '../hooks/useOrds';
 import { Show } from '../components/Show';
-import { BackButton } from '../components/BackButton';
-import { QrCode } from '../components/QrCode';
-import { useSnackbar } from '../hooks/useSnackbar';
-import { PageLoader } from '../components/PageLoader';
-import validate from 'bitcoin-address-validation';
-import { Input } from '../components/Input';
-import { sleep } from '../utils/sleep';
-import { useTheme } from '../hooks/useTheme';
-import { Ordinal } from '../components/Ordinal';
 import Tabs from '../components/Tabs';
 import { OrdinalTxo } from '../hooks/ordTypes';
-import { normalize, showAmount } from '../utils/ordi';
-import { BSV20Item } from '../components/BSV20Item';
-import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
+import { useBottomMenu } from '../hooks/useBottomMenu';
+import { BSV20, ListOrdinal, OrdOperationResponse, useOrds } from '../hooks/useOrds';
+import { useSnackbar } from '../hooks/useSnackbar';
+import { useTheme } from '../hooks/useTheme';
 import { useWeb3Context } from '../hooks/useWeb3Context';
+import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
+import { normalize, showAmount } from '../utils/ordi';
+import { sleep } from '../utils/sleep';
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -546,7 +546,7 @@ export const OrdWallet = () => {
       <Tabs.Panel theme={theme} label="NFT">
         {nft}
       </Tabs.Panel>
-      <Tabs.Panel theme={theme} label="Tokens">
+      <Tabs.Panel theme={theme} label="BSV-20">
         {ft}
       </Tabs.Panel>
     </Tabs>
