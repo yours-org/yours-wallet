@@ -274,7 +274,7 @@ export const RestoreWallet = () => {
       <Content>
         <HeaderText theme={theme}>Restore from Wallet</HeaderText>
         <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
-          Select from a wallet type you'd like to restore from.
+          Select from a wallet you'd like to restore from.
         </Text>
         {availableWallets(['relayx', 'twetch', 'aym', undefined])}
       </Content>
