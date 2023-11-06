@@ -163,7 +163,6 @@ export const AppsAndTools = () => {
       const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
       const spentTxids = await getSpentTxids(outpoints);
       lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
-      lockedTxos = lockedTxos.filter((i) => Number(i.data?.lock?.until) <= blockHeight);
       if (lockedTxos.length > 0) setLockedUtxos(lockedTxos);
       const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
       const unlockableTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => {
@@ -222,7 +221,8 @@ export const AppsAndTools = () => {
       return;
     }
 
-    const unlockRes = await unlock(lockedUtxos, passwordConfirm, currentBlockHeight);
+    const txos = lockedUtxos.filter((i) => Number(i.data?.lock?.until) <= currentBlockHeight);
+    const unlockRes = await unlock(txos, passwordConfirm, currentBlockHeight);
     if (!unlockRes.txid || unlockRes.error) {
       const message =
         unlockRes.error === 'invalid-password'
@@ -328,21 +328,19 @@ export const AppsAndTools = () => {
         {lockedUtxos.map((u) => {
           const blocksRemaining = Number(u.data?.lock?.until) - currentBlockHeight;
           return (
-            <Show key={u.txid} when={blocksRemaining > 0}>
-              <LockDetailsContainer key={u.txid}>
-                <LockDetailsText style={{ textAlign: 'left' }} theme={theme}>
-                  {truncate(u.txid, 4, 4)}
-                </LockDetailsText>
-                <LockDetailsText style={{ textAlign: 'center' }} theme={theme}>
-                  {blocksRemaining}
-                </LockDetailsText>
-                <LockDetailsText style={{ textAlign: 'right' }} theme={theme}>
-                  {u.satoshis < 1000
-                    ? `${u.satoshis} ${u.satoshis > 1 ? 'sats' : 'sat'}`
-                    : `${u.satoshis / BSV_DECIMAL_CONVERSION} BSV`}
-                </LockDetailsText>
-              </LockDetailsContainer>
-            </Show>
+            <LockDetailsContainer key={u.txid}>
+              <LockDetailsText style={{ textAlign: 'left' }} theme={theme}>
+                {truncate(u.txid, 4, 4)}
+              </LockDetailsText>
+              <LockDetailsText style={{ textAlign: 'center' }} theme={theme}>
+                {blocksRemaining < 0 ? '0' : blocksRemaining}
+              </LockDetailsText>
+              <LockDetailsText style={{ textAlign: 'right' }} theme={theme}>
+                {u.satoshis < 1000
+                  ? `${u.satoshis} ${u.satoshis > 1 ? 'sats' : 'sat'}`
+                  : `${u.satoshis / BSV_DECIMAL_CONVERSION} BSV`}
+              </LockDetailsText>
+            </LockDetailsContainer>
           );
         })}
       </Show>
