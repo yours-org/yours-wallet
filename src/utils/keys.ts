@@ -24,7 +24,7 @@ export type DerivationTags = 'wallet' | 'ord' | 'locking';
 const getWifAndDerivation = (seedPhrase: string, derivationPath: string) => {
   const seed = bip39.mnemonicToSeedSync(seedPhrase);
   const masterNode = ExtendedPrivateKey.from_seed(seed);
-  const childNode = masterNode.derive_from_path(derivationPath);
+  const childNode = derivationPath === 'm' ? masterNode : masterNode.derive_from_path(derivationPath);
   const privateKey = childNode.get_private_key();
   const wif = privateKey.to_wif();
 

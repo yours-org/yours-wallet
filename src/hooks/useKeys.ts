@@ -1,7 +1,14 @@
 import axios from 'axios';
 import { ChainParams, P2PKHAddress, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
-import { DEFAULT_RELAYX_ORD_PATH, DEFAULT_TWETCH_WALLET_PATH, FEE_PER_BYTE, SWEEP_PATH } from '../utils/constants';
+import {
+  DEFAULT_AYM_ORD_PATH,
+  DEFAULT_AYM_WALLET_PATH,
+  DEFAULT_RELAYX_ORD_PATH,
+  DEFAULT_TWETCH_WALLET_PATH,
+  FEE_PER_BYTE,
+  SWEEP_PATH,
+} from '../utils/constants';
 import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto';
 import { Keys, generateKeysFromTag, getKeys, getKeysFromWifs } from '../utils/keys';
 import { NetWork } from '../utils/network';
@@ -41,7 +48,7 @@ export const useKeys = () => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
   };
 
-  type SupportedWalletImports = 'relayx' | 'twetch';
+  type SupportedWalletImports = 'relayx' | 'twetch' | 'aym';
 
   const generateSeedAndStoreEncrypted = (
     password: string,
@@ -59,6 +66,10 @@ export const useKeys = () => {
         break;
       case 'twetch':
         walletDerivation = DEFAULT_TWETCH_WALLET_PATH;
+        break;
+      case 'aym':
+        walletDerivation = DEFAULT_AYM_WALLET_PATH;
+        ordDerivation = DEFAULT_AYM_ORD_PATH;
         break;
     }
 
