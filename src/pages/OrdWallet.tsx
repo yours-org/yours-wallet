@@ -123,14 +123,20 @@ export const OrdWallet = () => {
   }, [setSelected]);
 
   useEffect(() => {
-    if (!successTxId) return;
-    if (!message && ordAddress) {
-      resetSendState();
-      setPageState('main');
+    if(ordAddress) {
       getOrdinals();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successTxId, message, getOrdinals, ordAddress]);
+  }, [ordAddress]);
+
+  useEffect(() => {
+    if (!successTxId) return;
+    if (!message) {
+      resetSendState();
+      setPageState('main');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [successTxId, message]);
 
   const resetSendState = () => {
     setReceiveAddress('');

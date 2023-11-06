@@ -115,12 +115,6 @@ export const useOrds = () => {
     }
   };
 
-  useEffect(() => {
-    if (!ordAddress) return;
-    getOrdinals();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordAddress]);
-
   const transferOrdinal = async (
     destinationAddress: string,
     outpoint: string,
