@@ -173,6 +173,7 @@ export const useWhatsOnChain = () => {
     getBsvBalance,
     getExchangeRate,
     getRawTxById,
+    getBaseUrl,
     broadcastRawTx,
     getSuitableUtxo,
     getInputs,
