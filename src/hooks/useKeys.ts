@@ -10,7 +10,7 @@ import { useBsvWasm } from './useBsvWasm';
 import { useGorillaPool } from './useGorillaPool';
 import { useNetwork } from './useNetwork';
 import { usePasswordSetting } from './usePasswordSetting';
-import { useWhatsOnChain } from './useWhatsOnChain';
+import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
 
 export type KeyStorage = {
   encryptedKeys: string;
@@ -65,19 +65,26 @@ export const useKeys = () => {
 
   const sweepRelayX = async (keys: Keys) => {
     if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
-    const change = generateKeysFromTag(keys.mnemonic, DEFAULT_RELAYX_CHANGE_PATH);
-    const { data: utxos } = await axios.get(`${getBaseUrl()}/address/${change.address}/unspent`);
+    const relayChangeWallet = generateKeysFromTag(keys.mnemonic, DEFAULT_RELAYX_CHANGE_PATH);
+    const { data } = await axios.get<UTXO[]>(`${getBaseUrl()}/address/${relayChangeWallet.address}/unspent`);
+    const utxos = data;
+    if (utxos.length === 0) return;
     const tx = new Transaction(1, 0);
-    const changeAddress = P2PKHAddress.from_string(change.address);
+    const changeAddress = P2PKHAddress.from_string(relayChangeWallet.address);
 
     let satsIn = 0;
     utxos.forEach((utxo: any, vin: number) => {
       const txin = new TxIn(Buffer.from(utxo.tx_hash, 'hex'), utxo.tx_pos, Script.from_asm_string(''));
       tx.add_input(txin);
       satsIn += utxo.value;
-      const sig = tx.sign(change.privKey, SigHash.Input, vin, changeAddress.get_locking_script(), BigInt(utxo.value));
-      // const changeScript = changeAddress.get_unlocking_script(change.privKey.to_public_key(), sig)
-      const asm = `${sig.to_hex()} ${change.pubKey.to_hex()}`;
+      const sig = tx.sign(
+        relayChangeWallet.privKey,
+        SigHash.Input,
+        vin,
+        changeAddress.get_locking_script(),
+        BigInt(utxo.value),
+      );
+      const asm = `${sig.to_hex()} ${relayChangeWallet.pubKey.to_hex()}`;
       txin?.set_unlocking_script(Script.from_asm_string(asm));
       tx.set_input(vin, txin);
     });
