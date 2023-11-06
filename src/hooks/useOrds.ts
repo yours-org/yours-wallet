@@ -1,6 +1,6 @@
 import { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { sendOrdinal } from 'js-1sat-ord-web';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   FEE_PER_BYTE,
   GP_BASE_URL,
@@ -95,6 +95,12 @@ export const useOrds = () => {
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
   };
+
+  useEffect(() => {
+    if (!ordAddress) return;
+    getOrdinals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordAddress]);
 
   const getOrdinals = async () => {
     try {
