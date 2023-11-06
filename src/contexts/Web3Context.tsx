@@ -26,7 +26,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   const { children } = props;
   const { isLocked } = useWalletLockState();
   const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance, lockingAddress, lockingPubKey } = useBsv();
-  const { ordAddress, ordinals, ordPubKey } = useOrds();
+  const { ordAddress, ordinals, ordPubKey, getOrdinals } = useOrds();
   const { network, setNetwork } = useNetwork();
   const { isPasswordRequired, setIsPasswordRequired } = usePasswordSetting();
 
@@ -36,43 +36,56 @@ export const Web3Provider = (props: Web3ProviderProps) => {
     setTimeout(() => {
       updateBsvBalance(true);
     }, 1500);
+
+
+    if (!ordAddress) return;
+    setTimeout(() => {
+      getOrdinals();
+    }, 1500);
+
+    
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bsvAddress]);
+  }, [bsvAddress, ordAddress]);
 
-  const updateNetwork = (n: NetWork): void => {
-    storage.set({
-      network: n,
-    });
-    setNetwork(n);
-  };
-
-  const updatePasswordRequirement = (isRequired: boolean): void => {
-    storage.set({ isPasswordRequired: isRequired });
-    setIsPasswordRequired(isRequired);
-  };
 
   useEffect(() => {
     if (isLocked) {
       storage.remove('appState');
       return;
     }
-    const balance = {
-      bsv: bsvBalance,
-      sat: Math.round(bsvBalance * BSV_DECIMAL_CONVERSION),
-      usdInCents: Math.round(bsvBalance * exchangeRate * 100),
-    };
 
-    storage.set({
-      appState: {
-        isLocked,
-        ordinals,
-        balance,
-        network,
-        isPasswordRequired,
-        addresses: { bsvAddress, ordAddress, lockingAddress },
-        pubKeys: { bsvPubKey, ordPubKey, lockingPubKey },
+    storage.get(
+      [
+        'popupWindowId',
+      ],
+      (result) => {
+        const {
+          popupWindowId
+        } = result;
+
+        if (popupWindowId) return
+
+        // only update appState when popupWindowId is empty;
+
+        const balance = {
+          bsv: bsvBalance,
+          sat: Math.round(bsvBalance * BSV_DECIMAL_CONVERSION),
+          usdInCents: Math.round(bsvBalance * exchangeRate * 100),
+        };
+
+        storage.set({
+          appState: {
+            isLocked,
+            ordinals,
+            balance,
+            network,
+            isPasswordRequired,
+            addresses: { bsvAddress, ordAddress, lockingAddress },
+            pubKeys: { bsvPubKey, ordPubKey, lockingPubKey },
+          },
+        });
       },
-    });
+    );
   }, [
     isLocked,
     bsvAddress,
@@ -87,6 +100,18 @@ export const Web3Provider = (props: Web3ProviderProps) => {
     lockingAddress,
     lockingPubKey,
   ]);
+
+  const updateNetwork = (n: NetWork): void => {
+    storage.set({
+      network: n,
+    });
+    setNetwork(n);
+  };
+
+  const updatePasswordRequirement = (isRequired: boolean): void => {
+    storage.set({ isPasswordRequired: isRequired });
+    setIsPasswordRequired(isRequired);
+  };
 
   return (
     <Web3Context.Provider value={{ network, updateNetwork, ordinals, updatePasswordRequirement, isPasswordRequired }}>
