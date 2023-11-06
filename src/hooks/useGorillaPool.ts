@@ -1,11 +1,12 @@
 import axios from 'axios';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL } from '../utils/constants';
+import { chunkedStringArray } from '../utils/format';
 import { NetWork } from '../utils/network';
+import { isBSV20v2 } from '../utils/ordi';
+import { OrdinalResponse, OrdinalTxo } from './ordTypes';
 import { useNetwork } from './useNetwork';
 import { BSV20 } from './useOrds';
 import { useTokens } from './useTokens';
-import { isBSV20v2 } from '../utils/ordi';
-import { OrdinalResponse, OrdinalTxo } from './ordTypes';
 
 type GorillaPoolErrorMessage = {
   message: string;
@@ -153,6 +154,40 @@ export const useGorillaPool = () => {
     }
   };
 
+  const getLockedUtxos = async (address: string) => {
+    try {
+      //TODO: use this instead of test endpoint - `${getOrdinalsBaseUrl()}/api/locks/address/${address}/unspent?limit=100&offset=0`
+      const { data } = await axios.get(
+        `https://locks.gorillapool.io/api/locks/address/${address}/unspent?limit=100&offset=0`,
+      );
+      const lockedUtxos: OrdinalTxo[] = data;
+      return lockedUtxos;
+    } catch (e) {
+      throw new Error(JSON.stringify(e));
+    }
+  };
+
+  const getSpentTxids = async (outpoints: string[]): Promise<Map<string, string>> => {
+    try {
+      const chunks = chunkedStringArray(outpoints, 50);
+      let spentTxids = new Map<string, string>();
+      for (const chunk of chunks) {
+        try {
+          //TODO: updata url to be dynamic for testnet
+          const res = await axios.post(`https://locks.gorillapool.io/api/spends`, chunk);
+          const txids = res.data as string[];
+          txids.forEach((txid, i) => {
+            spentTxids.set(chunk[i], txid);
+          });
+        } catch (error) {}
+      }
+      return spentTxids;
+    } catch (error) {
+      console.log(error);
+      return new Map();
+    }
+  };
+
   return {
     getOrdUtxos,
     broadcastWithGorillaPool,
@@ -160,6 +195,8 @@ export const useGorillaPool = () => {
     getMarketData,
     getBsv20Balances,
     getBSV20Utxos,
+    getLockedUtxos,
+    getSpentTxids,
     submitTx,
   };
 };

@@ -1,7 +1,12 @@
+import { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
-import { useKeys } from './useKeys';
-import { PrivateKey, Script, Transaction, TxIn } from 'bsv-wasm-web';
+import { DUST, FEE_PER_BYTE, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
+import { storage } from '../utils/storage';
+import { OrdinalTxo } from './ordTypes';
 import { useBsvWasm } from './useBsvWasm';
+import { useGorillaPool } from './useGorillaPool';
+import { useKeys } from './useKeys';
+import { useWhatsOnChain } from './useWhatsOnChain';
 
 /**
  * `SignatureRequest` contains required informations for a signer to sign a certain input of a transaction.
@@ -57,6 +62,8 @@ const DEFAULT_SIGHASH_TYPE = 65; // SIGHASH_ALL | SIGHASH_FORKID
 export const useContracts = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { retrieveKeys, bsvAddress, ordAddress, verifyPassword } = useKeys();
+  const { broadcastWithGorillaPool } = useGorillaPool();
+  const { getUtxos } = useWhatsOnChain();
   const { bsvWasmInitialized } = useBsvWasm();
 
   /**
@@ -148,9 +155,88 @@ export const useContracts = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const unlock = async (locks: OrdinalTxo[], password: string, currentBlockHeight: number) => {
+    try {
+      if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
+      setIsProcessing(true);
+
+      const isAuthenticated = await verifyPassword(password);
+      if (!isAuthenticated) {
+        return { error: 'invalid-password' };
+      }
+
+      const keys = await retrieveKeys(password);
+      if (!keys.lockingWif || !keys.walletAddress) {
+        throw Error('No keys');
+      }
+      const lockPk = PrivateKey.from_wif(keys.lockingWif);
+      const lockPkh = Hash.hash_160(lockPk.to_public_key().to_bytes()).to_bytes();
+      const walletAddress = P2PKHAddress.from_string(keys.walletAddress);
+
+      const tx = new Transaction(1, 0);
+      tx.set_nlocktime(currentBlockHeight);
+      let satsIn = 0;
+      let size = 0;
+      for (const lock of locks) {
+        const txin = new TxIn(Buffer.from(lock.txid, 'hex'), lock.vout, Script.from_asm_string(''));
+        txin?.set_sequence(0);
+        tx.add_input(txin);
+        satsIn += lock.satoshis;
+        size += 1500;
+      }
+
+      const fee = Math.ceil(size * FEE_PER_BYTE);
+      if (fee > satsIn) {
+        return { error: 'insufficient-funds' };
+      }
+      const change = satsIn - fee;
+      if (change > DUST) {
+        tx.add_output(new TxOut(BigInt(change), walletAddress.get_locking_script()));
+      }
+
+      for (const [vin, lock] of locks.entries()) {
+        const fragment = Script.from_asm_string(
+          Buffer.from(lockPkh).toString('hex') +
+            ' ' +
+            Buffer.from(lock.data!.lock!.until.toString(16).padStart(6, '0'), 'hex').reverse().toString('hex'),
+        );
+
+        const script = Script.from_hex(SCRYPT_PREFIX + fragment.to_hex() + LOCK_SUFFIX);
+        let preimage = tx.sighash_preimage(SigHash.InputsOutputs, vin, script!, BigInt(lock.satoshis));
+
+        const sig = tx.sign(lockPk, SigHash.InputsOutputs, vin, script!, BigInt(lock.satoshis));
+
+        let asm = `${sig.to_hex()} ${lockPk.to_public_key().to_hex()} ${Buffer.from(preimage).toString('hex')}`;
+        const txin = tx.get_input(vin);
+        txin?.set_unlocking_script(Script.from_asm_string(asm));
+        tx.set_input(vin, txin!);
+      }
+
+      const rawTx = tx.to_hex();
+
+      const { txid } = await broadcastWithGorillaPool(rawTx);
+      if (!txid) return { error: 'broadcast-error' };
+      const fundingUtxos = await getUtxos(keys.walletAddress);
+      fundingUtxos.push({
+        satoshis: change,
+        script: walletAddress.get_locking_script().to_asm_string(),
+        txid,
+        vout: 0,
+      });
+      storage.set({ paymentUtxos: fundingUtxos });
+      return { txid };
+    } catch (error: any) {
+      console.log(error);
+      return { error: error.message ?? 'unknown' };
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return {
     isProcessing,
     setIsProcessing,
     getSignatures,
+    unlock,
   };
 };

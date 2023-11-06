@@ -1,9 +1,9 @@
 import axios from 'axios';
+import { P2PKHAddress } from 'bsv-wasm-web';
 import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from '../utils/constants';
 import { NetWork } from '../utils/network';
-import { useNetwork } from './useNetwork';
 import { storage } from '../utils/storage';
-import { P2PKHAddress } from 'bsv-wasm-web';
+import { useNetwork } from './useNetwork';
 export type UTXO = {
   satoshis: number;
   vout: number;
@@ -16,6 +16,18 @@ export type WocUtxo = {
   tx_pos: number;
   tx_hash: string;
   value: number;
+};
+
+export type ChainInfo = {
+  chain: string;
+  blocks: number;
+  headers: number;
+  bestblockhash: string;
+  difficulty: number;
+  mediantime: number;
+  verificationprogress: number;
+  pruned: boolean;
+  chainwork: string;
 };
 
 export const useWhatsOnChain = () => {
@@ -147,6 +159,15 @@ export const useWhatsOnChain = () => {
     return inputs;
   };
 
+  const getChainInfo = async (): Promise<ChainInfo | undefined> => {
+    try {
+      const { data } = await axios.get(`${getBaseUrl()}/chain/info`, config);
+      return data as ChainInfo;
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   return {
     getUtxos,
     getBsvBalance,
@@ -155,5 +176,6 @@ export const useWhatsOnChain = () => {
     broadcastRawTx,
     getSuitableUtxo,
     getInputs,
+    getChainInfo,
   };
 };
