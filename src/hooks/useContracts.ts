@@ -202,7 +202,6 @@ export const useContracts = () => {
         );
 
         const script = Script.from_hex(SCRYPT_PREFIX + fragment.to_hex() + LOCK_SUFFIX);
-        // let script = Script.from_hex(lock.script!);
         let preimage = tx.sighash_preimage(SigHash.InputsOutputs, vin, script!, BigInt(lock.satoshis));
 
         const sig = tx.sign(lockPk, SigHash.InputsOutputs, vin, script!, BigInt(lock.satoshis));
@@ -211,7 +210,6 @@ export const useContracts = () => {
         const txin = tx.get_input(vin);
         txin?.set_unlocking_script(Script.from_asm_string(asm));
         tx.set_input(vin, txin!);
-        console.log(lock.outpoint);
       }
 
       const rawTx = tx.to_hex();
@@ -226,7 +224,6 @@ export const useContracts = () => {
         vout: 0,
       });
       storage.set({ paymentUtxos: fundingUtxos });
-      console.log(txid);
       return { txid };
     } catch (error: any) {
       console.log(error);

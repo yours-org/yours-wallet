@@ -158,7 +158,6 @@ export const AppsAndTools = () => {
       if (!lockingAddress) throw Error('Locking address missing!');
       const chainInfo = await getChainInfo();
       let lockedTxos = await getLockedUtxos(lockingAddress);
-      console.log(lockedTxos);
       const blockHeight = Number(chainInfo?.blocks);
       if (blockHeight) setCurrentBlockHeight(blockHeight);
       const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
