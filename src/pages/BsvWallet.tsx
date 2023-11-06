@@ -1,8 +1,6 @@
 import { validate } from 'bitcoin-address-validation';
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { ThirdPartyAppRequestData } from '../App';
 import bsvCoin from '../assets/bsv-coin.svg';
 import switchAsset from '../assets/switch-asset.svg';
 import { BackButton } from '../components/BackButton';
@@ -22,7 +20,6 @@ import {
 import { Show } from '../components/Show';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useBsv } from '../hooks/useBsv';
-import { useOrds } from '../hooks/useOrds';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
@@ -96,15 +93,9 @@ const InputAmountWrapper = styled.div`
 type PageState = 'main' | 'receive' | 'send';
 type AmountType = 'bsv' | 'usd';
 
-export type BsvWalletProps = {
-  thirdPartyAppRequestData: ThirdPartyAppRequestData | undefined;
-  messageToSign?: string;
-  popupId?: number;
-};
 
-export const BsvWallet = (props: BsvWalletProps) => {
-  const { thirdPartyAppRequestData, messageToSign, popupId } = props;
-  const navigate = useNavigate();
+
+export const BsvWallet = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>('main');
@@ -115,37 +106,15 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [amountType, setAmountType] = useState<AmountType>('bsv');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { ordPubKey } = useOrds();
   const { socialProfile } = useSocialProfile();
   const { isPasswordRequired } = useWeb3Context();
 
-  const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, updateBsvBalance, exchangeRate, bsvPubKey } =
+  const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, updateBsvBalance, exchangeRate } =
     useBsv();
 
-  useEffect(() => {
-    if (!messageToSign) return;
-  }, [messageToSign]);
 
-  useEffect(() => {
-    if (thirdPartyAppRequestData && !thirdPartyAppRequestData.isAuthorized) {
-      navigate('/connect');
-    } else {
-      if (!bsvPubKey || !ordPubKey) return;
-      if (!window.location.href.includes('localhost')) {
-        chrome.runtime.sendMessage({
-          action: 'userConnectResponse',
-          decision: 'approved',
-          pubKeys: { bsvPubKey, ordPubKey },
-        });
 
-        // We don't want the window to stay open after a successful connection. The 10ms timeout is used because of some weirdness with how chrome.sendMessage() works
-        setTimeout(() => {
-          if (popupId) chrome.windows.remove(popupId);
-        }, 10);
-      }
-    }
-  }, [bsvPubKey, messageToSign, navigate, ordPubKey, popupId, thirdPartyAppRequestData]);
-
+  
   useEffect(() => {
     setSelected('bsv');
   }, [setSelected]);

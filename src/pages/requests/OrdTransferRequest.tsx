@@ -98,7 +98,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
         <ConfirmContent>
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Ordinal
-            inscription={ordinals.filter((ord) => ord.outpoint.toString() === web3Request.outpoint)[0]}
+            inscription={ordinals.data.filter((ord) => ord.outpoint.toString() === web3Request.outpoint)[0]}
             theme={theme}
             url={`${getOrdinalsBaseUrl()}/content/${web3Request.origin}`}
             selected={true}

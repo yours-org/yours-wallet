@@ -46,6 +46,26 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
     return () => context.showMenu();
   }, [context]);
 
+
+
+  useEffect(() => {
+    if (!bsvPubKey || !ordPubKey) return;
+      if (!window.location.href.includes('localhost')) {
+        chrome.runtime.sendMessage({
+          action: 'userConnectResponse',
+          decision: 'approved',
+          pubKeys: { bsvPubKey, ordPubKey },
+        });
+        storage.remove('connectRequest');
+        // We don't want the window to stay open after a successful connection. The 10ms timeout is used because of some weirdness with how chrome.sendMessage() works
+        setTimeout(() => {
+          if (popupId) chrome.windows.remove(popupId);
+        }, 10);
+      }
+  }, [bsvPubKey, ordPubKey, popupId, thirdPartyAppRequestData]);
+
+
+
   const handleConnectDecision = async (approved: boolean) => {
     if (chrome.runtime) {
       if (approved) {

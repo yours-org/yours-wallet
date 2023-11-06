@@ -80,11 +80,27 @@ export type PurchaseOrdinal = {
   marketplaceAddress: string;
 };
 
+export interface BSV20Data {
+  initialized: boolean,
+  data: BSV20[]
+}
+
+export interface OrdinalData {
+  initialized: boolean,
+  data: OrdinalTxo[]
+}
+
 export const useOrds = () => {
   const { ordAddress, retrieveKeys, verifyPassword, ordPubKey, bsvAddress } = useKeys();
 
-  const [ordinals, setOrdinals] = useState<OrdinalResponse>([]);
-  const [bsv20s, setBSV20s] = useState<Array<BSV20>>([]);
+  const [ordinals, setOrdinals] = useState<OrdinalData>({
+    initialized: false,
+    data: []
+  });
+  const [bsv20s, setBSV20s] = useState<BSV20Data>({
+    initialized: false,
+    data: []
+  });
   const [isProcessing, setIsProcessing] = useState(false);
   const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
@@ -104,16 +120,23 @@ export const useOrds = () => {
 
   const getOrdinals = async () => {
     try {
-      //   setIsProcessing(true); // TODO: set this to true if call is taking more than a second
+      setIsProcessing(true); // TODO: set this to true if call is taking more than a second
       //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
       const ordList = await getOrdUtxos(ordAddress);
-      setOrdinals(ordList);
+      setOrdinals({
+        initialized: true,
+        data: ordList
+      });
 
       const bsv20List: Array<BSV20> = await getBsv20Balances(ordAddress);
 
       await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.tick));
 
-      setBSV20s(bsv20List.filter((o) => o.all.confirmed > 0n));
+      setBSV20s({
+        initialized: true,
+        data: bsv20List.filter((o) => o.all.confirmed > 0n)
+      });
+
     } catch (error) {
       console.error('getOrdinals failed:', error);
     } finally {

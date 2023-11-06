@@ -208,9 +208,6 @@ export const App = () => {
                     }
                   >
                     <BsvWallet
-                      thirdPartyAppRequestData={thirdPartyAppRequestData}
-                      messageToSign={messageToSign?.message}
-                      popupId={popupId}
                     />
                   </Show>
                 }

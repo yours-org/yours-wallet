@@ -1,8 +1,7 @@
 import React, { createContext, useEffect } from 'react';
-import { OrdinalResponse } from '../hooks/ordTypes';
 import { useBsv } from '../hooks/useBsv';
 import { useNetwork } from '../hooks/useNetwork';
-import { useOrds } from '../hooks/useOrds';
+import { useOrds, BSV20Data, OrdinalData } from '../hooks/useOrds';
 import { usePasswordSetting } from '../hooks/usePasswordSetting';
 import { useWalletLockState } from '../hooks/useWalletLockState';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
@@ -11,7 +10,8 @@ import { storage } from '../utils/storage';
 
 export interface Web3ContextProps {
   network: NetWork;
-  ordinals: OrdinalResponse;
+  ordinals: OrdinalData;
+  bsv20s: BSV20Data;
   isPasswordRequired: boolean;
   updateNetwork: (n: NetWork) => void;
   updatePasswordRequirement: (passwordSetting: boolean) => void;
@@ -25,9 +25,8 @@ interface Web3ProviderProps {
 export const Web3Provider = (props: Web3ProviderProps) => {
   const { children } = props;
   const { isLocked } = useWalletLockState();
-  const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance, identityAddress, identityPubKey } =
-    useBsv();
-  const { ordAddress, ordinals, ordPubKey, getOrdinals } = useOrds();
+  const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance, identityAddress, identityPubKey } = useBsv();
+  const { ordAddress,  ordPubKey, getOrdinals, ordinals, bsv20s } = useOrds();
   const { network, setNetwork } = useNetwork();
   const { isPasswordRequired, setIsPasswordRequired } = usePasswordSetting();
 
@@ -55,7 +54,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
     storage.get(['popupWindowId'], (result) => {
       const { popupWindowId } = result;
 
-      if (popupWindowId) return;
+      if (popupWindowId || !ordinals.initialized) return
 
       // only update appState when popupWindowId is empty;
 
@@ -68,7 +67,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       storage.set({
         appState: {
           isLocked,
-          ordinals,
+          ordinals: ordinals.data,
           balance,
           network,
           isPasswordRequired,
@@ -105,7 +104,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   };
 
   return (
-    <Web3Context.Provider value={{ network, updateNetwork, ordinals, updatePasswordRequirement, isPasswordRequired }}>
+    <Web3Context.Provider value={{ network, updateNetwork, ordinals, bsv20s, updatePasswordRequirement, isPasswordRequired }}>
       {children}
     </Web3Context.Provider>
   );
