@@ -166,10 +166,10 @@ export const useContracts = () => {
       }
 
       const keys = await retrieveKeys(password);
-      if (!keys.lockingWif || !keys.walletAddress) {
+      if (!keys.identityWif || !keys.walletAddress) {
         throw Error('No keys');
       }
-      const lockPk = PrivateKey.from_wif(keys.lockingWif);
+      const lockPk = PrivateKey.from_wif(keys.identityWif);
       const lockPkh = Hash.hash_160(lockPk.to_public_key().to_bytes()).to_bytes();
       const walletAddress = P2PKHAddress.from_string(keys.walletAddress);
 

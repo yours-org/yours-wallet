@@ -48,7 +48,7 @@ export const useBsv = () => {
   const [exchangeRate, setExchangeRate] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, lockingAddress, lockingPubKey } = useKeys();
+  const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, identityAddress, identityPubKey } = useKeys();
   const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
   const { getUtxos, getBsvBalance, getExchangeRate, broadcastRawTx, getInputs } = useWhatsOnChain();
@@ -176,15 +176,15 @@ export const useBsv = () => {
     let wif = keys.walletWif;
     if (keyType) {
       if (
-        (keyType !== 'locking' && keyType !== 'ord' && keyType !== 'wallet') ||
-        (keyType === 'locking' && !keys.lockingWif) ||
+        (keyType !== 'identity' && keyType !== 'ord' && keyType !== 'wallet') ||
+        (keyType === 'identity' && !keys.identityWif) ||
         (keyType === 'ord' && !keys.ordWif) ||
         (keyType === 'wallet' && !keys.walletWif)
       ) {
         return { error: 'key-type' };
       }
 
-      wif = (keyType === 'ord' ? keys.ordWif : keyType === 'locking' ? keys.lockingWif : keys.walletWif) as string; // safely cast here with above if checks
+      wif = (keyType === 'ord' ? keys.ordWif : keyType === 'identity' ? keys.identityWif : keys.walletWif) as string; // safely cast here with above if checks
     }
     return { wif };
   };
@@ -200,7 +200,7 @@ export const useBsv = () => {
     }
     try {
       const keys = (await retrieveKeys(password)) as Keys;
-      const res = getRequestedWif(keys, 'locking'); // We are using locking as the hard coded default for message signing since it's also considered the user's identity. It's effectively the same pattern RelayX uses.
+      const res = getRequestedWif(keys, 'identity');
       if (res.error || !res.wif) {
         return res;
       }
@@ -216,7 +216,7 @@ export const useBsv = () => {
         pubKeyHex: publicKey.to_hex(),
         signedMessage: message,
         signatureHex: signature.to_compact_hex(),
-        keyType: 'locking',
+        keyType: 'identity',
       };
     } catch (error) {
       console.log(error);
@@ -263,8 +263,8 @@ export const useBsv = () => {
     bsvBalance,
     bsvAddress,
     bsvPubKey,
-    lockingAddress,
-    lockingPubKey,
+    identityAddress,
+    identityPubKey,
     isProcessing,
     sendBsv,
     setIsProcessing,

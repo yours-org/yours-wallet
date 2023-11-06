@@ -1,14 +1,14 @@
-import { styled } from 'styled-components';
-import { ButtonContainer, Divider, HeaderText, Text } from '../../components/Reusable';
-import { Button } from '../../components/Button';
-import { ThirdPartyAppRequestData, WhitelistedApp } from '../../App';
-import { useTheme } from '../../hooks/useTheme';
 import { useContext, useEffect } from 'react';
-import { BottomMenuContext } from '../../contexts/BottomMenuContext';
-import { storage } from '../../utils/storage';
 import { useNavigate } from 'react-router-dom';
+import { styled } from 'styled-components';
+import { ThirdPartyAppRequestData, WhitelistedApp } from '../../App';
+import { Button } from '../../components/Button';
+import { ButtonContainer, Divider, HeaderText, Text } from '../../components/Reusable';
+import { BottomMenuContext } from '../../contexts/BottomMenuContext';
 import { useBsv } from '../../hooks/useBsv';
 import { useOrds } from '../../hooks/useOrds';
+import { useTheme } from '../../hooks/useTheme';
+import { storage } from '../../utils/storage';
 
 const Container = styled.div`
   display: flex;
@@ -36,7 +36,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   const { theme } = useTheme();
   const context = useContext(BottomMenuContext);
   const navigate = useNavigate();
-  const { bsvPubKey, lockingPubKey } = useBsv();
+  const { bsvPubKey, identityPubKey } = useBsv();
   const { ordPubKey } = useOrds();
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
         chrome.runtime.sendMessage({
           action: 'userConnectResponse',
           decision: 'approved',
-          pubKeys: { bsvPubKey, ordPubKey, lockingPubKey },
+          pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
         });
       } else {
         chrome.runtime.sendMessage({

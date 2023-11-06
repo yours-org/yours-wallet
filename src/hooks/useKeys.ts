@@ -23,13 +23,15 @@ export type WifKeys = {
   ordPk: string;
 };
 
+export type SupportedWalletImports = 'relayx' | 'twetch';
+
 export const useKeys = () => {
   const [bsvAddress, setBsvAddress] = useState('');
   const [ordAddress, setOrdAddress] = useState('');
-  const [lockingAddress, setLockingAddress] = useState('');
+  const [identityAddress, setIdentityAddress] = useState('');
   const [bsvPubKey, setBsvPubKey] = useState('');
   const [ordPubKey, setOrdPubKey] = useState('');
-  const [lockingPubKey, setLockingPubKey] = useState('');
+  const [identityPubKey, setIdentityPubKey] = useState('');
 
   const { network } = useNetwork();
   const { isPasswordRequired } = usePasswordSetting();
@@ -41,14 +43,12 @@ export const useKeys = () => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
   };
 
-  type SupportedWalletImports = 'relayx' | 'twetch';
-
   const generateSeedAndStoreEncrypted = (
     password: string,
     mnemonic?: string,
     walletDerivation: string | null = null,
     ordDerivation: string | null = null,
-    lockingDerivation: string | null = null,
+    identityDerivation: string | null = null,
     importWallet?: SupportedWalletImports,
   ) => {
     const salt = generateRandomSalt();
@@ -62,7 +62,7 @@ export const useKeys = () => {
         break;
     }
 
-    const keys = getKeys(mnemonic, walletDerivation, ordDerivation, lockingDerivation);
+    const keys = getKeys(mnemonic, walletDerivation, ordDerivation, identityDerivation);
     if (mnemonic) {
       sweepLegacy(keys);
     }
@@ -143,14 +143,14 @@ export const useKeys = () => {
           setBsvPubKey(keys.walletPubKey);
           setOrdPubKey(keys.ordPubKey);
 
-          // lockingAddress not available with wif or 1sat import
-          if (keys.lockingAddress) {
-            const lockingAddr = P2PKHAddress.from_string(keys.lockingAddress)
+          // identity address not available with wif or 1sat import
+          if (keys.identityAddress) {
+            const identityAddr = P2PKHAddress.from_string(keys.identityAddress)
               .set_chain_params(getChainParams(network))
               .to_string();
 
-            setLockingAddress(lockingAddr);
-            setLockingPubKey(keys.lockingPubKey);
+            setIdentityAddress(identityAddr);
+            setIdentityPubKey(keys.identityPubKey);
           }
 
           if (!isPasswordRequired || password) {
@@ -205,9 +205,9 @@ export const useKeys = () => {
     verifyPassword,
     bsvAddress,
     ordAddress,
-    lockingAddress,
+    identityAddress,
     bsvPubKey,
     ordPubKey,
-    lockingPubKey,
+    identityPubKey,
   };
 };

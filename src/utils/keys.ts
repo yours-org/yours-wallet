@@ -13,13 +13,13 @@ export type Keys = {
   ordAddress: string;
   ordPubKey: string;
   ordDerivationPath: string;
-  lockingWif: string;
-  lockingAddress: string;
-  lockingPubKey: string;
-  lockDerivationPath: string;
+  identityWif: string;
+  identityAddress: string;
+  identityPubKey: string;
+  identityDerivationPath: string;
 };
 
-export type DerivationTags = 'wallet' | 'ord' | 'locking';
+export type DerivationTags = 'wallet' | 'ord' | 'identity';
 
 const getWifAndDerivation = (seedPhrase: string, derivationPath: string) => {
   const seed = bip39.mnemonicToSeedSync(seedPhrase);
@@ -49,7 +49,7 @@ export const getKeys = (
   validMnemonic?: string,
   walletDerivation: string | null = null,
   ordDerivation: string | null = null,
-  lockingDerivation: string | null = null,
+  identityDerivation: string | null = null,
 ) => {
   if (validMnemonic) {
     const isValid = bip39.validateMnemonic(validMnemonic);
@@ -58,7 +58,7 @@ export const getKeys = (
   const mnemonic = validMnemonic ?? bip39.generateMnemonic();
   const wallet = generateKeysFromTag(mnemonic, walletDerivation || DEFAULT_WALLET_PATH);
   const ord = generateKeysFromTag(mnemonic, ordDerivation || DEFAULT_ORD_PATH);
-  const locking = generateKeysFromTag(mnemonic, lockingDerivation || DEFAULT_IDENTITY_PATH);
+  const identity = generateKeysFromTag(mnemonic, identityDerivation || DEFAULT_IDENTITY_PATH);
 
   const keys: Keys = {
     mnemonic,
@@ -70,10 +70,10 @@ export const getKeys = (
     ordAddress: ord.address,
     ordPubKey: ord.pubKey.to_hex(),
     ordDerivationPath: ord.derivationPath,
-    lockingWif: locking.wif,
-    lockingAddress: locking.address,
-    lockingPubKey: locking.pubKey.to_hex(),
-    lockDerivationPath: locking.derivationPath,
+    identityWif: identity.wif,
+    identityAddress: identity.address,
+    identityPubKey: identity.pubKey.to_hex(),
+    identityDerivationPath: identity.derivationPath,
   };
 
   return keys;
