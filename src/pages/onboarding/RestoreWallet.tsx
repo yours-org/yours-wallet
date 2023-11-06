@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import aymLogo from '../../assets/aym-logo.png';
+import relayXLogo from '../../assets/relayx-logo.png';
+import twetchLogo from '../../assets/twetch-logo.png';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -9,8 +12,9 @@ import { PandaHead } from '../../components/PandaHead';
 import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
+import { WalletRow } from '../../components/WalletRow';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useKeys } from '../../hooks/useKeys';
+import { SupportedWalletImports, useKeys } from '../../hooks/useKeys';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { ColorThemeProps } from '../../theme';
@@ -58,8 +62,17 @@ const ExpertImportWrapper = styled.div`
   width: 90%;
 `;
 
-const IsRelayWrapper = styled(ExpertImportWrapper)`
-  margin-bottom: 1rem;
+const WalletText = styled(Text)<ColorThemeProps>`
+  color: ${({ theme }) => theme.white};
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-align: center;
+`;
+
+const WalletLogo = styled.img`
+  width: auto;
+  height: 1.5rem;
 `;
 
 export const RestoreWallet = () => {
@@ -69,17 +82,15 @@ export const RestoreWallet = () => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [step, setStep] = useState(1);
   const [seedWords, setSeedWords] = useState<string>('');
-
   const { addSnackbar } = useSnackbar();
   const { generateSeedAndStoreEncrypted } = useKeys();
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
   const [isExpertImport, setIsExpertImport] = useState(false);
-  const [isRelayImport, setIsRelayImport] = useState(false);
+  const [importWallet, setImportWallet] = useState<SupportedWalletImports | undefined>();
   const [walletDerivation, setWalletDerivation] = useState<string | null>(null);
   const [ordDerivation, setOrdDerivation] = useState<string | null>(null);
-  const [lockingDerivation, setLockingDerivation] = useState<string | null>(null);
-
+  const [identityDerivation, setIdentityDerivation] = useState<string | null>(null);
   useEffect(() => {
     hideMenu();
 
@@ -89,7 +100,6 @@ export const RestoreWallet = () => {
   }, [hideMenu, showMenu]);
 
   const handleExpertToggle = () => setIsExpertImport(!isExpertImport);
-  const handleIsRelayToggle = () => setIsRelayImport(!isExpertImport);
 
   const handleRestore = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -113,8 +123,8 @@ export const RestoreWallet = () => {
       seedWords,
       walletDerivation,
       ordDerivation,
-      lockingDerivation,
-      isRelayImport,
+      identityDerivation,
+      importWallet,
     );
     if (!mnemonic) {
       addSnackbar('An error occurred while restoring the wallet!', 'error');
@@ -122,7 +132,28 @@ export const RestoreWallet = () => {
     }
 
     setLoading(false);
-    setStep(3);
+    setStep(4);
+  };
+
+  const handleWalletSelection = (wallet?: SupportedWalletImports) => {
+    setImportWallet(wallet);
+    setStep(2);
+  };
+
+  const getRestoreTitle = () => {
+    return importWallet === 'relayx'
+      ? 'Restore Relay Wallet'
+      : importWallet === 'twetch'
+      ? 'Restore Twetch Wallet'
+      : importWallet === 'aym'
+      ? 'Restore Aym Wallet'
+      : 'Restore a Wallet';
+  };
+
+  const getRestoreDescription = () => {
+    return importWallet
+      ? 'Enter your seed phrase'
+      : 'Enter a seed phrase and use custom derivation paths to import a wallet from anywhere!';
   };
 
   const passwordStep = (
@@ -155,13 +186,13 @@ export const RestoreWallet = () => {
 
   const enterSeedStep = (
     <>
-      <BackButton onClick={() => navigate('/')} />
+      <BackButton onClick={() => setStep(1)} />
       <Content>
-        <HeaderText theme={theme}>Restore a wallet</HeaderText>
+        <HeaderText theme={theme}>{getRestoreTitle()}</HeaderText>
         <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
-          Enter a seed phrase and use custom derivation paths to import a wallet from anywhere!
+          {getRestoreDescription()}
         </Text>
-        <FormContainer onSubmit={() => setStep(2)}>
+        <FormContainer onSubmit={() => setStep(3)}>
           <SeedInput
             theme={theme}
             placeholder="Enter secret recovery words"
@@ -187,32 +218,65 @@ export const RestoreWallet = () => {
             />
             <Input
               theme={theme}
-              placeholder="Locking Derivation ex. m/0'/236'/0'/0/0"
+              placeholder="Identity Derivation ex. m/0'/236'/0'/0/0"
               type="text"
-              value={lockingDerivation ?? ''}
-              onChange={(e) => setLockingDerivation(e.target.value)}
+              value={identityDerivation ?? ''}
+              onChange={(e) => setIdentityDerivation(e.target.value)}
               style={{ margin: '0.1rem 0 1rem', width: '85%' }}
             />
           </Show>
-          <Show when={!isExpertImport}>
-            <IsRelayWrapper>
-              <ToggleSwitch theme={theme} on={isRelayImport} onChange={handleIsRelayToggle} />
+          <Show when={!importWallet}>
+            <ExpertImportWrapper>
+              <ToggleSwitch theme={theme} on={isExpertImport} onChange={handleExpertToggle} />
               <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
-                Enable if restoring a RelayX wallet
+                Use custom derivations
               </Text>
-            </IsRelayWrapper>
+            </ExpertImportWrapper>
           </Show>
-          <ExpertImportWrapper>
-            <ToggleSwitch theme={theme} on={isExpertImport} onChange={handleExpertToggle} />
-            <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
-              Use custom derivations
-            </Text>
-          </ExpertImportWrapper>
           <Text theme={theme} style={{ margin: '3rem 0 1rem' }}>
             Make sure you are in a safe place and no one is watching.
           </Text>
           <Button theme={theme} type="primary" label="Next" isSubmit />
         </FormContainer>
+      </Content>
+    </>
+  );
+
+  const availableWallets = (wallets: (SupportedWalletImports | undefined)[]) => {
+    return wallets.map((wallet) => {
+      return (
+        <WalletRow
+          onClick={() => handleWalletSelection(wallet)}
+          element={
+            <>
+              <Show when={wallet === 'relayx'}>
+                <WalletLogo src={relayXLogo} />
+              </Show>
+              <Show when={wallet === 'twetch'}>
+                <WalletLogo src={twetchLogo} />
+              </Show>
+              <Show when={wallet === 'aym'}>
+                <WalletLogo src={aymLogo} style={{ height: '2rem' }} />
+              </Show>
+              <Show when={!wallet}>
+                <WalletText theme={theme}>Other Wallet</WalletText>
+              </Show>
+            </>
+          }
+        />
+      );
+    });
+  };
+
+  const selectImportWallet = (
+    <>
+      <BackButton onClick={() => navigate('/')} />
+      <Content>
+        <HeaderText theme={theme}>Restore from Wallet</HeaderText>
+        <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
+          Select from a wallet you'd like to restore from.
+        </Text>
+        {availableWallets(['relayx', 'twetch', 'aym', undefined])}
       </Content>
     </>
   );
@@ -235,9 +299,10 @@ export const RestoreWallet = () => {
       <Show when={loading}>
         <PageLoader theme={theme} message="Restoring Wallet..." />
       </Show>
-      <Show when={!loading && step === 1}>{enterSeedStep}</Show>
-      <Show when={!loading && step === 2}>{passwordStep}</Show>
-      <Show when={!loading && step === 3}>{successStep}</Show>
+      <Show when={!loading && step === 1}>{selectImportWallet}</Show>
+      <Show when={!loading && step === 2}>{enterSeedStep}</Show>
+      <Show when={!loading && step === 3}>{passwordStep}</Show>
+      <Show when={!loading && step === 4}>{successStep}</Show>
     </>
   );
 };

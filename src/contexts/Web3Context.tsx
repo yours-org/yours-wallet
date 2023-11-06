@@ -25,7 +25,8 @@ interface Web3ProviderProps {
 export const Web3Provider = (props: Web3ProviderProps) => {
   const { children } = props;
   const { isLocked } = useWalletLockState();
-  const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance, lockingAddress, lockingPubKey } = useBsv();
+  const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance, identityAddress, identityPubKey } =
+    useBsv();
   const { ordAddress, ordinals, ordPubKey, getOrdinals } = useOrds();
   const { network, setNetwork } = useNetwork();
   const { isPasswordRequired, setIsPasswordRequired } = usePasswordSetting();
@@ -71,8 +72,8 @@ export const Web3Provider = (props: Web3ProviderProps) => {
           balance,
           network,
           isPasswordRequired,
-          addresses: { bsvAddress, ordAddress, lockingAddress },
-          pubKeys: { bsvPubKey, ordPubKey, lockingPubKey },
+          addresses: { bsvAddress, ordAddress, identityAddress },
+          pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
         },
       });
     });
@@ -87,8 +88,8 @@ export const Web3Provider = (props: Web3ProviderProps) => {
     exchangeRate,
     network,
     isPasswordRequired,
-    lockingAddress,
-    lockingPubKey,
+    identityAddress,
+    identityPubKey,
   ]);
 
   const updateNetwork = (n: NetWork): void => {

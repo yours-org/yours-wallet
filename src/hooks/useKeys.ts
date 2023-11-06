@@ -1,7 +1,14 @@
 import axios from 'axios';
 import { ChainParams, P2PKHAddress, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
-import { DEFAULT_RELAYX_CHANGE_PATH, DEFAULT_RELAYX_ORD_PATH, FEE_PER_BYTE } from '../utils/constants';
+import {
+  DEFAULT_AYM_ORD_PATH,
+  DEFAULT_AYM_WALLET_PATH,
+  DEFAULT_RELAYX_ORD_PATH,
+  DEFAULT_TWETCH_WALLET_PATH,
+  FEE_PER_BYTE,
+  SWEEP_PATH,
+} from '../utils/constants';
 import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto';
 import { Keys, generateKeysFromTag, getKeys, getKeysFromWifs } from '../utils/keys';
 import { NetWork } from '../utils/network';
@@ -23,13 +30,15 @@ export type WifKeys = {
   ordPk: string;
 };
 
+export type SupportedWalletImports = 'relayx' | 'twetch' | 'aym';
+
 export const useKeys = () => {
   const [bsvAddress, setBsvAddress] = useState('');
   const [ordAddress, setOrdAddress] = useState('');
-  const [lockingAddress, setLockingAddress] = useState('');
+  const [identityAddress, setIdentityAddress] = useState('');
   const [bsvPubKey, setBsvPubKey] = useState('');
   const [ordPubKey, setOrdPubKey] = useState('');
-  const [lockingPubKey, setLockingPubKey] = useState('');
+  const [identityPubKey, setIdentityPubKey] = useState('');
 
   const { network } = useNetwork();
   const { isPasswordRequired } = usePasswordSetting();
@@ -46,31 +55,41 @@ export const useKeys = () => {
     mnemonic?: string,
     walletDerivation: string | null = null,
     ordDerivation: string | null = null,
-    lockingDerivation: string | null = null,
-    isRelayX = false,
+    identityDerivation: string | null = null,
+    importWallet?: SupportedWalletImports,
   ) => {
     const salt = generateRandomSalt();
     const passKey = deriveKey(password, salt);
-    if (isRelayX) {
-      ordDerivation = DEFAULT_RELAYX_ORD_PATH;
+    switch (importWallet) {
+      case 'relayx':
+        ordDerivation = DEFAULT_RELAYX_ORD_PATH;
+        break;
+      case 'twetch':
+        walletDerivation = DEFAULT_TWETCH_WALLET_PATH;
+        break;
+      case 'aym':
+        walletDerivation = DEFAULT_AYM_WALLET_PATH;
+        ordDerivation = DEFAULT_AYM_ORD_PATH;
+        break;
     }
-    const keys = getKeys(mnemonic, walletDerivation, ordDerivation, lockingDerivation);
-    if (mnemonic && isRelayX) {
-      sweepRelayX(keys);
+
+    const keys = getKeys(mnemonic, walletDerivation, ordDerivation, identityDerivation);
+    if (mnemonic) {
+      sweepLegacy(keys);
     }
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
     storage.set({ encryptedKeys, passKey, salt });
     return keys.mnemonic;
   };
 
-  const sweepRelayX = async (keys: Keys) => {
+  const sweepLegacy = async (keys: Keys) => {
     if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
-    const relayChangeWallet = generateKeysFromTag(keys.mnemonic, DEFAULT_RELAYX_CHANGE_PATH);
-    const { data } = await axios.get<UTXO[]>(`${getBaseUrl()}/address/${relayChangeWallet.address}/unspent`);
+    const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
+    const { data } = await axios.get<UTXO[]>(`${getBaseUrl()}/address/${sweepWallet.address}/unspent`);
     const utxos = data;
     if (utxos.length === 0) return;
     const tx = new Transaction(1, 0);
-    const changeAddress = P2PKHAddress.from_string(relayChangeWallet.address);
+    const changeAddress = P2PKHAddress.from_string(sweepWallet.address);
 
     let satsIn = 0;
     utxos.forEach((utxo: any, vin: number) => {
@@ -78,13 +97,13 @@ export const useKeys = () => {
       tx.add_input(txin);
       satsIn += utxo.value;
       const sig = tx.sign(
-        relayChangeWallet.privKey,
+        sweepWallet.privKey,
         SigHash.Input,
         vin,
         changeAddress.get_locking_script(),
         BigInt(utxo.value),
       );
-      const asm = `${sig.to_hex()} ${relayChangeWallet.pubKey.to_hex()}`;
+      const asm = `${sig.to_hex()} ${sweepWallet.pubKey.to_hex()}`;
       txin?.set_unlocking_script(Script.from_asm_string(asm));
       tx.set_input(vin, txin);
     });
@@ -135,14 +154,14 @@ export const useKeys = () => {
           setBsvPubKey(keys.walletPubKey);
           setOrdPubKey(keys.ordPubKey);
 
-          // lockingAddress not available with wif or 1sat import
-          if (keys.lockingAddress) {
-            const lockingAddr = P2PKHAddress.from_string(keys.lockingAddress)
+          // identity address not available with wif or 1sat import
+          if (keys.identityAddress) {
+            const identityAddr = P2PKHAddress.from_string(keys.identityAddress)
               .set_chain_params(getChainParams(network))
               .to_string();
 
-            setLockingAddress(lockingAddr);
-            setLockingPubKey(keys.lockingPubKey);
+            setIdentityAddress(identityAddr);
+            setIdentityPubKey(keys.identityPubKey);
           }
 
           if (!isPasswordRequired || password) {
@@ -197,9 +216,9 @@ export const useKeys = () => {
     verifyPassword,
     bsvAddress,
     ordAddress,
-    lockingAddress,
+    identityAddress,
     bsvPubKey,
     ordPubKey,
-    lockingPubKey,
+    identityPubKey,
   };
 };
