@@ -123,7 +123,7 @@ export const OrdWallet = () => {
   }, [setSelected]);
 
   useEffect(() => {
-    if(ordAddress) {
+    if (ordAddress) {
       getOrdinals();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

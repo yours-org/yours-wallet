@@ -1,26 +1,26 @@
-import { useEffect, useState } from 'react';
+import { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
+import { sendOrdinal } from 'js-1sat-ord-web';
+import { useState } from 'react';
 import {
   FEE_PER_BYTE,
   GP_BASE_URL,
   GP_TESTNET_BASE_URL,
-  SCRYPT_PREFIX,
   O_LOCK_SUFFIX,
   P2PKH_INPUT_SIZE,
   P2PKH_OUTPUT_SIZE,
+  SCRYPT_PREFIX,
 } from '../utils/constants';
-import { useKeys } from './useKeys';
-import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
-import { sendOrdinal } from 'js-1sat-ord-web';
-import { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
-import { useBsvWasm } from './useBsvWasm';
 import { NetWork } from '../utils/network';
-import { useNetwork } from './useNetwork';
+import { useBsvWasm } from './useBsvWasm';
 import { useGorillaPool } from './useGorillaPool';
+import { useKeys } from './useKeys';
+import { useNetwork } from './useNetwork';
+import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
 
-import { OrdinalResponse, OrdinalTxo } from './ordTypes';
 import { createTransferP2PKH, createTransferV2P2PKH, getAmtv1, getAmtv2, isBSV20v2 } from '../utils/ordi';
-import { useTokens } from './useTokens';
 import { storage } from '../utils/storage';
+import { OrdinalResponse, OrdinalTxo } from './ordTypes';
+import { useTokens } from './useTokens';
 
 export class InscriptionData {
   type?: string = '';
@@ -604,11 +604,6 @@ export const useOrds = () => {
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const calculateFee = (numPaymentUtxos: number, purchaseTx: Transaction) => {
-    const byteSize = Math.ceil(P2PKH_INPUT_SIZE * numPaymentUtxos + purchaseTx.to_bytes().byteLength);
-    return Math.ceil(byteSize * FEE_PER_BYTE);
   };
 
   const purchaseGlobalOrderbookListing = async (purchaseOrdinal: PurchaseOrdinal) => {

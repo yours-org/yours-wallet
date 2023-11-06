@@ -37,16 +37,13 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       updateBsvBalance(true);
     }, 1500);
 
-
     if (!ordAddress) return;
     setTimeout(() => {
       getOrdinals();
     }, 1500);
 
-    
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress, ordAddress]);
-
 
   useEffect(() => {
     if (isLocked) {
@@ -54,38 +51,31 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       return;
     }
 
-    storage.get(
-      [
-        'popupWindowId',
-      ],
-      (result) => {
-        const {
-          popupWindowId
-        } = result;
+    storage.get(['popupWindowId'], (result) => {
+      const { popupWindowId } = result;
 
-        if (popupWindowId) return
+      if (popupWindowId) return;
 
-        // only update appState when popupWindowId is empty;
+      // only update appState when popupWindowId is empty;
 
-        const balance = {
-          bsv: bsvBalance,
-          sat: Math.round(bsvBalance * BSV_DECIMAL_CONVERSION),
-          usdInCents: Math.round(bsvBalance * exchangeRate * 100),
-        };
+      const balance = {
+        bsv: bsvBalance,
+        sat: Math.round(bsvBalance * BSV_DECIMAL_CONVERSION),
+        usdInCents: Math.round(bsvBalance * exchangeRate * 100),
+      };
 
-        storage.set({
-          appState: {
-            isLocked,
-            ordinals,
-            balance,
-            network,
-            isPasswordRequired,
-            addresses: { bsvAddress, ordAddress, lockingAddress },
-            pubKeys: { bsvPubKey, ordPubKey, lockingPubKey },
-          },
-        });
-      },
-    );
+      storage.set({
+        appState: {
+          isLocked,
+          ordinals,
+          balance,
+          network,
+          isPasswordRequired,
+          addresses: { bsvAddress, ordAddress, lockingAddress },
+          pubKeys: { bsvPubKey, ordPubKey, lockingPubKey },
+        },
+      });
+    });
   }, [
     isLocked,
     bsvAddress,
