@@ -44,6 +44,7 @@ export const ConfirmContent = styled.div`
   flex-direction: column;
   align-items: center;
   width: 100%;
+  margin-top: -3.75rem;
 `;
 
 export const FormContainer = styled.form`

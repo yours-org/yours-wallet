@@ -1,17 +1,17 @@
+import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
 import { Button } from '../../components/Button';
-import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
-import { Web3TransferOrdinalRequest, useOrds } from '../../hooks/useOrds';
-import { Show } from '../../components/Show';
-import { useSnackbar } from '../../hooks/useSnackbar';
-import { PageLoader } from '../../components/PageLoader';
-import validate from 'bitcoin-address-validation';
-import { sleep } from '../../utils/sleep';
-import { useTheme } from '../../hooks/useTheme';
-import { truncate } from '../../utils/format';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
+import { PageLoader } from '../../components/PageLoader';
+import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
+import { Show } from '../../components/Show';
+import { Web3TransferOrdinalRequest, useOrds } from '../../hooks/useOrds';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { truncate } from '../../utils/format';
+import { sleep } from '../../utils/sleep';
 
 export type OrdTransferRequestProps = {
   web3Request: Web3TransferOrdinalRequest;
@@ -91,7 +91,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   return (
     <>
       <Show when={isProcessing}>
-        <PageLoader theme={theme} message="Transferring Ordinal..." />
+        <PageLoader theme={theme} message="Processing request..." />
       </Show>
 
       <Show when={!isProcessing && !!web3Request}>
@@ -114,9 +114,10 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
                 type="password"
                 value={passwordConfirm}
                 onChange={(e) => setPasswordConfirm(e.target.value)}
+                style={{ margin: '0.25rem' }}
               />
             </Show>
-            <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
+            <Text theme={theme} style={{ margin: '0.5rem 0' }}>
               Double check details before sending.
             </Text>
             <Button theme={theme} type="primary" label="Approve" disabled={isProcessing} isSubmit />
