@@ -71,13 +71,6 @@ export const Start = () => {
           </Text>
           <Button theme={theme} type="primary" label="Create New Wallet" onClick={() => navigate('/create-wallet')} />
           <Button theme={theme} type="secondary" label="Restore Wallet" onClick={() => navigate('/restore-wallet')} />
-          <Button
-            theme={theme}
-            type="secondary"
-            label="Import"
-            onClick={() => navigate('/import-wallet')}
-            style={{ margin: '0' }}
-          />
           <GithubIcon
             src={gihubIcon}
             onClick={() => window.open('https://github.com/Panda-Wallet/panda-wallet', '_blank')}
