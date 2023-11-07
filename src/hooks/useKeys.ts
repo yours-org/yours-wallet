@@ -30,7 +30,7 @@ export type WifKeys = {
   ordPk: string;
 };
 
-export type SupportedWalletImports = 'relayx' | 'twetch' | 'aym';
+export type SupportedWalletImports = 'relayx' | 'twetch' | 'aym' | 'panda' | 'wif';
 
 export const useKeys = () => {
   const [bsvAddress, setBsvAddress] = useState('');

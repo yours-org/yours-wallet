@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import aymLogo from '../../assets/aym-logo.png';
+import pandaLogoWide from '../../assets/panda-logo-wide.png';
 import relayXLogo from '../../assets/relayx-logo.png';
 import twetchLogo from '../../assets/twetch-logo.png';
 import { BackButton } from '../../components/BackButton';
@@ -65,8 +66,8 @@ const ExpertImportWrapper = styled.div`
 const WalletText = styled(Text)<ColorThemeProps>`
   color: ${({ theme }) => theme.white};
   margin: 0;
-  font-weight: 700;
-  font-size: 1.1rem;
+  font-weight: 600;
+  font-size: 1rem;
   text-align: center;
 `;
 
@@ -137,11 +138,17 @@ export const RestoreWallet = () => {
 
   const handleWalletSelection = (wallet?: SupportedWalletImports) => {
     setImportWallet(wallet);
+    if (wallet === 'wif') {
+      navigate('/import-wallet');
+      return;
+    }
     setStep(2);
   };
 
   const getRestoreTitle = () => {
-    return importWallet === 'relayx'
+    return importWallet === 'panda'
+      ? 'Restore Panda Wallet'
+      : importWallet === 'relayx'
       ? 'Restore Relay Wallet'
       : importWallet === 'twetch'
       ? 'Restore Twetch Wallet'
@@ -249,17 +256,23 @@ export const RestoreWallet = () => {
           onClick={() => handleWalletSelection(wallet)}
           element={
             <>
+              <Show when={wallet === 'panda'}>
+                <WalletLogo src={pandaLogoWide} style={{ height: '2.25rem' }} />
+              </Show>
               <Show when={wallet === 'relayx'}>
-                <WalletLogo src={relayXLogo} />
+                <WalletLogo src={relayXLogo} style={{ height: '1,75rem' }} />
               </Show>
               <Show when={wallet === 'twetch'}>
-                <WalletLogo src={twetchLogo} />
+                <WalletLogo src={twetchLogo} style={{ height: '1.25rem' }} />
               </Show>
               <Show when={wallet === 'aym'}>
                 <WalletLogo src={aymLogo} style={{ height: '2rem' }} />
               </Show>
               <Show when={!wallet}>
                 <WalletText theme={theme}>Other Wallet</WalletText>
+              </Show>
+              <Show when={wallet === 'wif'}>
+                <WalletText theme={theme}>WIF (1Sat, SHUA, etc)</WalletText>
               </Show>
             </>
           }
@@ -272,11 +285,11 @@ export const RestoreWallet = () => {
     <>
       <BackButton onClick={() => navigate('/')} />
       <Content>
-        <HeaderText theme={theme}>Restore from Wallet</HeaderText>
+        <HeaderText theme={theme}>Restore a Wallet</HeaderText>
         <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
-          Select from a wallet you'd like to restore from.
+          Select the wallet you'd like to restore from
         </Text>
-        {availableWallets(['relayx', 'twetch', 'aym', undefined])}
+        {availableWallets(['panda', 'relayx', 'twetch', 'aym', undefined, 'wif'])}
       </Content>
     </>
   );

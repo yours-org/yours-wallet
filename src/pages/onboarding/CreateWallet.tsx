@@ -1,19 +1,19 @@
-import styled from 'styled-components';
-import { ColorThemeProps } from '../../theme';
-import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { useSnackbar } from '../../hooks/useSnackbar';
+import { useNavigate } from 'react-router-dom';
+import styled from 'styled-components';
 import { BackButton } from '../../components/BackButton';
-import { Text, HeaderText } from '../../components/Reusable';
-import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
-import { PandaHead } from '../../components/PandaHead';
-import { useKeys } from '../../hooks/useKeys';
-import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
+import { PandaHead } from '../../components/PandaHead';
+import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
-import { sleep } from '../../utils/sleep';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { useKeys } from '../../hooks/useKeys';
+import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
+import { ColorThemeProps } from '../../theme';
+import { sleep } from '../../utils/sleep';
 
 const Content = styled.div`
   display: flex;
@@ -107,7 +107,9 @@ export const CreateWallet = () => {
       <BackButton onClick={() => navigate('/')} />
       <Content>
         <HeaderText theme={theme}>Create a password</HeaderText>
-        <Text theme={theme}>This is used to unlock your wallet.</Text>
+        <Text style={{ marginBottom: '1rem' }} theme={theme}>
+          This is used to unlock your wallet.
+        </Text>
         <FormContainer onSubmit={handleKeyGeneration}>
           <Input
             theme={theme}
@@ -123,7 +125,7 @@ export const CreateWallet = () => {
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
-          <Text theme={theme} style={{ margin: '3rem 0 1rem' }}>
+          <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
             Make sure you are in a safe place and no one is watching.
           </Text>
           <Button theme={theme} type="primary" label="Generate Seed" isSubmit />
