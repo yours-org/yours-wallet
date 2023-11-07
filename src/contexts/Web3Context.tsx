@@ -32,16 +32,18 @@ export const Web3Provider = (props: Web3ProviderProps) => {
 
   useEffect(() => {
     // Here we are pulling in any new Utxos unaccounted for.
-    if (!bsvAddress) return;
-    setTimeout(() => {
-      updateBsvBalance(true);
-    }, 1500);
+    if (bsvAddress){
+      setTimeout(() => {
+        updateBsvBalance(true);
+      }, 1500);
+    }
 
-    if (!ordAddress) return;
-    setTimeout(() => {
-      getOrdinals();
-    }, 1500);
 
+    if (ordAddress) {
+      setTimeout(() => {
+        getOrdinals();
+      }, 1500);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress, ordAddress]);
 
@@ -51,10 +53,8 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       return;
     }
 
-    storage.get(['popupWindowId'], (result) => {
-      const { popupWindowId } = result;
-
-      if (popupWindowId || !ordinals.initialized) return
+    storage.get(['appState'], (result) => {
+      const { appState } = result;
 
       // only update appState when popupWindowId is empty;
 
@@ -67,7 +67,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       storage.set({
         appState: {
           isLocked,
-          ordinals: ordinals.data,
+          ordinals: ordinals.initialized ? ordinals.data : (appState?.ordinals || []),
           balance,
           network,
           isPasswordRequired,
