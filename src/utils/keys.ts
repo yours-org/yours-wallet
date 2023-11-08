@@ -1,7 +1,8 @@
 import * as bip39 from 'bip39';
-import { ExtendedPrivateKey, PrivateKey } from 'bsv-wasm-web';
+import { ExtendedPrivateKey, Hash, PrivateKey } from 'bsv-wasm-web';
 import { WifKeys } from '../hooks/useKeys';
 import { DEFAULT_IDENTITY_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';
+import { Bn, Point } from '@ts-bitcoin/core';
 
 export type Keys = {
   mnemonic: string;
@@ -88,6 +89,18 @@ export const getKeysFromWifs = (wifs: WifKeys) => {
   const ordPubKey = ordPrivKey.to_public_key();
   const ordAddress = ordPubKey.to_address().to_string();
 
+  let identityPrivKey: PrivateKey | undefined;
+  let privBuf = Buffer.concat([Buffer.from(walletPrivKey.to_bytes()), Buffer.from(ordPrivKey.to_bytes())]);
+  while (!identityPrivKey) {
+    privBuf = Buffer.from(Hash.sha_256(privBuf).to_bytes());
+    const bn = new Bn().fromBuffer(privBuf);
+    if (bn.lt(Point.getN())) {
+      identityPrivKey = PrivateKey.from_bytes(bn.toBuffer());
+    }
+  }
+  const identityPubKey = identityPrivKey.to_public_key();
+  const identityAddress = identityPubKey.to_address().to_string();
+
   const keys: Partial<Keys> = {
     walletWif: wifs.payPk,
     walletAddress,
@@ -95,6 +108,9 @@ export const getKeysFromWifs = (wifs: WifKeys) => {
     ordAddress,
     walletPubKey: walletPubKey.to_hex(),
     ordPubKey: ordPubKey.to_hex(),
+    identityWif: identityPrivKey.to_wif(),
+    identityAddress,
+    identityPubKey: identityPubKey.to_hex(),
   };
 
   return keys;
