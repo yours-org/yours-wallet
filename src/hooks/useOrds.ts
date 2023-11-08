@@ -17,7 +17,7 @@ import { useKeys } from './useKeys';
 import { useNetwork } from './useNetwork';
 import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
 
-import { createTransferP2PKH, createTransferV2P2PKH, getAmtv1, getAmtv2, isBSV20v2 } from '../utils/ordi';
+import { createTransferP2PKH, createTransferV2P2PKH, isBSV20v2 } from '../utils/ordi';
 import { storage } from '../utils/storage';
 import { OrdinalResponse, OrdinalTxo } from './ordTypes';
 import { useTokens } from './useTokens';

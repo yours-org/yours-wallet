@@ -253,6 +253,7 @@ export const RestoreWallet = () => {
     return wallets.map((wallet) => {
       return (
         <WalletRow
+          key={window.crypto.randomUUID()}
           onClick={() => handleWalletSelection(wallet)}
           element={
             <>
