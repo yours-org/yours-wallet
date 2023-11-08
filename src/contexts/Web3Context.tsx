@@ -25,19 +25,19 @@ interface Web3ProviderProps {
 export const Web3Provider = (props: Web3ProviderProps) => {
   const { children } = props;
   const { isLocked } = useWalletLockState();
-  const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance, identityAddress, identityPubKey } = useBsv();
-  const { ordAddress,  ordPubKey, getOrdinals, ordinals, bsv20s } = useOrds();
+  const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance, identityAddress, identityPubKey } =
+    useBsv();
+  const { ordAddress, ordPubKey, getOrdinals, ordinals, bsv20s } = useOrds();
   const { network, setNetwork } = useNetwork();
   const { isPasswordRequired, setIsPasswordRequired } = usePasswordSetting();
 
   useEffect(() => {
     // Here we are pulling in any new Utxos unaccounted for.
-    if (bsvAddress){
+    if (bsvAddress) {
       setTimeout(() => {
         updateBsvBalance(true);
       }, 1500);
     }
-
 
     if (ordAddress) {
       setTimeout(() => {
@@ -67,7 +67,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       storage.set({
         appState: {
           isLocked,
-          ordinals: ordinals.initialized ? ordinals.data : (appState?.ordinals || []),
+          ordinals: ordinals.initialized ? ordinals.data : appState?.ordinals || [],
           balance,
           network,
           isPasswordRequired,
@@ -104,7 +104,9 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   };
 
   return (
-    <Web3Context.Provider value={{ network, updateNetwork, ordinals, bsv20s, updatePasswordRequirement, isPasswordRequired }}>
+    <Web3Context.Provider
+      value={{ network, updateNetwork, ordinals, bsv20s, updatePasswordRequirement, isPasswordRequired }}
+    >
       {children}
     </Web3Context.Provider>
   );

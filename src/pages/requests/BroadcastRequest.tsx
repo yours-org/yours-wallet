@@ -47,16 +47,15 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   }, [message, txid]);
 
   useEffect(() => {
-
     const onbeforeunloadFn = () => {
       storage.remove('broadcastRequest');
-    }
+    };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
-    }
-  }, [])
+    };
+  }, []);
 
   const resetSendState = () => {
     setTxid('');
@@ -82,13 +81,12 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
 
     setIsProcessing(false);
     addSnackbar('Successfully broadcasted the tx!', 'success');
-  
+
     storage.remove('broadcastRequest');
     setTimeout(() => {
       onBroadcast();
       if (popupId) chrome.windows.remove(popupId);
     }, 2000);
-
   };
 
   return (

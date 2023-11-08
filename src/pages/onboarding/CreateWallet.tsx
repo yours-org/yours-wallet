@@ -179,9 +179,14 @@ export const CreateWallet = () => {
         <Text theme={theme} style={{ marginBottom: '1rem' }}>
           Panda Wallet is ready to go.
         </Text>
-        <Button theme={theme} type="primary" label="Enter" onClick={() => {
-          window.location.reload();
-        }} />
+        <Button
+          theme={theme}
+          type="primary"
+          label="Enter"
+          onClick={() => {
+            window.location.reload();
+          }}
+        />
       </Content>
     </>
   );

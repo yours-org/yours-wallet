@@ -81,13 +81,13 @@ export type PurchaseOrdinal = {
 };
 
 export interface BSV20Data {
-  initialized: boolean,
-  data: BSV20[]
+  initialized: boolean;
+  data: BSV20[];
 }
 
 export interface OrdinalData {
-  initialized: boolean,
-  data: OrdinalTxo[]
+  initialized: boolean;
+  data: OrdinalTxo[];
 }
 
 export const useOrds = () => {
@@ -95,11 +95,11 @@ export const useOrds = () => {
 
   const [ordinals, setOrdinals] = useState<OrdinalData>({
     initialized: false,
-    data: []
+    data: [],
   });
   const [bsv20s, setBSV20s] = useState<BSV20Data>({
     initialized: false,
-    data: []
+    data: [],
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const { bsvWasmInitialized } = useBsvWasm();
@@ -125,7 +125,7 @@ export const useOrds = () => {
       const ordList = await getOrdUtxos(ordAddress);
       setOrdinals({
         initialized: true,
-        data: ordList
+        data: ordList,
       });
 
       const bsv20List: Array<BSV20> = await getBsv20Balances(ordAddress);
@@ -134,9 +134,8 @@ export const useOrds = () => {
 
       setBSV20s({
         initialized: true,
-        data: bsv20List.filter((o) => o.all.confirmed > 0n)
+        data: bsv20List.filter((o) => o.all.confirmed > 0n),
       });
-
     } catch (error) {
       console.error('getOrdinals failed:', error);
     } finally {

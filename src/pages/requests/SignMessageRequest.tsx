@@ -69,16 +69,15 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
   }, [message, signature]);
 
   useEffect(() => {
-
     const onbeforeunloadFn = () => {
       storage.remove('signMessageRequest');
-    }
+    };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
-    }
-  }, [])
+    };
+  }, []);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -123,7 +122,6 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       storage.remove('signMessageRequest');
       if (popupId) chrome.windows.remove(popupId);
     }, 2000);
-
   };
 
   return (

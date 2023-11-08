@@ -220,16 +220,15 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   }, [message, getSigsResponse]);
 
   useEffect(() => {
-
     const onbeforeunloadFn = () => {
       storage.remove('getSignaturesRequest');
-    }
+    };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
-    }
-  }, [])
+    };
+  }, []);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -267,9 +266,8 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
 
       addSnackbar(message, 'error', 3000);
 
-      return
+      return;
     }
-
 
     setGetSigsResponse(getSigsRes.sigResponses);
     chrome.runtime.sendMessage({
@@ -278,7 +276,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     });
 
     setIsProcessing(false);
-    
+
     addSnackbar('Successfully Signed!', 'success');
 
     setTimeout(() => {
@@ -286,7 +284,6 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       storage.remove('getSignaturesRequest');
       if (popupId) chrome.windows.remove(popupId);
     }, 2000);
-
   };
 
   const rejectSigning = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {

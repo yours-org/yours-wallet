@@ -39,17 +39,16 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, getOrdinals, ordAddress]);
 
-
   useEffect(() => {
     const onbeforeunloadFn = () => {
       storage.remove('transferOrdinalRequest');
-    }
+    };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
-    }
-  }, [])
+    };
+  }, []);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -92,7 +91,6 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
 
     setSuccessTxId(transferRes.txid);
     addSnackbar('Transfer Successful!', 'success');
-
 
     chrome.runtime.sendMessage({
       action: 'transferOrdinalResponse',

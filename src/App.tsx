@@ -208,8 +208,7 @@ export const App = () => {
                       </>
                     }
                   >
-                    <BsvWallet
-                    />
+                    <BsvWallet />
                   </Show>
                 }
               />

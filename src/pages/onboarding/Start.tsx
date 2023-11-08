@@ -51,7 +51,6 @@ export const Start = () => {
   // If the encrypted keys are present, take the user to the wallet page.
   useEffect(() => {
     storage.get(['encryptedKeys', 'connectRequest'], (result) => {
-
       if (result?.connectRequest) {
         setShowStart(false);
         navigate('/connect');

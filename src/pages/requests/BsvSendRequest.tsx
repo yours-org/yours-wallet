@@ -76,18 +76,17 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   }, [successTxId, message, updateBsvBalance, bsvAddress]);
 
   useEffect(() => {
+    if (requestWithinApp) return;
 
-    if(requestWithinApp) return;
-      
     const onbeforeunloadFn = () => {
       storage.remove('sendBsvRequest');
-    }
+    };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
-    }
-  }, [requestWithinApp])
+    };
+  }, [requestWithinApp]);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -186,7 +185,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
 
       if (popupId) chrome.windows.remove(popupId);
     }, 2000);
-
   };
 
   const web3Details = () => {

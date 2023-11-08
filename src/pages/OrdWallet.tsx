@@ -508,8 +508,7 @@ export const OrdWallet = () => {
         }
       >
         <OrdinalsList>
-          {ordinals
-            .data
+          {ordinals.data
             .filter((o) => o.origin?.data?.insc?.file.type !== 'application/bsv-20')
             .map((ord) => {
               return (

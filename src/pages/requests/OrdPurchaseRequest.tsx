@@ -63,16 +63,15 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   }, [successTxId, message, getOrdinals, ordAddress]);
 
   useEffect(() => {
-
     const onbeforeunloadFn = () => {
       storage.remove('purchaseOrdinalRequest');
-    }
+    };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
-    }
-  }, [])
+    };
+  }, []);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -133,7 +132,6 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
       storage.remove('purchaseOrdinalRequest');
       if (popupId) chrome.windows.remove(popupId);
     }, 2000);
-
   };
 
   return (

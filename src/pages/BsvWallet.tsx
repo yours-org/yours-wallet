@@ -93,8 +93,6 @@ const InputAmountWrapper = styled.div`
 type PageState = 'main' | 'receive' | 'send';
 type AmountType = 'bsv' | 'usd';
 
-
-
 export const BsvWallet = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
@@ -109,12 +107,8 @@ export const BsvWallet = () => {
   const { socialProfile } = useSocialProfile();
   const { isPasswordRequired } = useWeb3Context();
 
-  const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, updateBsvBalance, exchangeRate } =
-    useBsv();
+  const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, updateBsvBalance, exchangeRate } = useBsv();
 
-
-
-  
   useEffect(() => {
     setSelected('bsv');
   }, [setSelected]);

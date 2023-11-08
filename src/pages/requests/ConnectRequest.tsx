@@ -37,7 +37,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   const { theme } = useTheme();
   const context = useContext(BottomMenuContext);
   const { addSnackbar } = useSnackbar();
-  const [ isDecided, setIsDecided ] = useState(false);
+  const [isDecided, setIsDecided] = useState(false);
   const { bsvPubKey, identityPubKey } = useBsv();
   const { ordPubKey } = useOrds();
 
@@ -48,10 +48,8 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
     return () => context.showMenu();
   }, [context]);
 
-
-
   useEffect(() => {
-    if(isDecided) return;
+    if (isDecided) return;
     if (thirdPartyAppRequestData && !thirdPartyAppRequestData.isAuthorized) return;
     if (!bsvPubKey || !ordPubKey) return;
     if (!window.location.href.includes('localhost')) {
@@ -68,18 +66,16 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
     }
   }, [bsvPubKey, ordPubKey, popupId, thirdPartyAppRequestData, isDecided]);
 
-
   useEffect(() => {
-
     const onbeforeunloadFn = () => {
       storage.remove('connectRequest');
-    }
+    };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
-    }
-  }, [])
+    };
+  }, []);
 
   const handleConnectDecision = async (approved: boolean) => {
     if (chrome.runtime) {
@@ -99,7 +95,6 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
           pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
         });
         addSnackbar(`Approved`, 'success');
-
       } else {
         chrome.runtime.sendMessage({
           action: 'userConnectResponse',
@@ -107,7 +102,6 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
         });
 
         addSnackbar(`Declined`, 'error');
-
       }
     }
 
