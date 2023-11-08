@@ -201,7 +201,6 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { setSelected } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const navigate = useNavigate();
   const { isPasswordRequired } = useWeb3Context();
 
   const { getSigsRequest, onSignature, popupId } = props;
@@ -220,6 +219,17 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, getSigsResponse]);
 
+  useEffect(() => {
+    const onbeforeunloadFn = () => {
+      storage.remove('getSignaturesRequest');
+    };
+
+    window.addEventListener('beforeunload', onbeforeunloadFn);
+    return () => {
+      window.removeEventListener('beforeunload', onbeforeunloadFn);
+    };
+  }, []);
+
   const resetSendState = () => {
     setPasswordConfirm('');
     setGetSigsResponse(undefined);
@@ -232,7 +242,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     await sleep(25);
 
     if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
+      addSnackbar('You must enter a password!', 'error', 3000);
       setIsProcessing(false);
       return;
     }
@@ -247,34 +257,33 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
           ? 'Unknown Address: ' + (getSigsRes.error.cause ?? '')
           : 'An unknown error has occurred! Try again.';
 
-      addSnackbar(message, 'error', 5000);
+      chrome.runtime.sendMessage({
+        action: 'getSignaturesResponse',
+        ...getSigsRes,
+      });
 
-      if (getSigsRes.error.message === 'invalid-password') {
-        // could try again only if the password is wrong
-        setIsProcessing(false);
-        return;
-      }
-    }
+      setIsProcessing(false);
 
-    if (getSigsRes?.sigResponses) {
-      addSnackbar('Successfully Signed!', 'success');
+      addSnackbar(message, 'error', 3000);
+
+      return;
     }
 
     setGetSigsResponse(getSigsRes.sigResponses);
-
-    setTimeout(() => {
-      onSignature();
-      if (!getSigsRes && popupId) chrome.windows.remove(popupId);
-      storage.remove('getSignaturesRequest');
-      navigate('/bsv-wallet');
-    }, 2000);
-
     chrome.runtime.sendMessage({
       action: 'getSignaturesResponse',
       ...getSigsRes,
     });
 
     setIsProcessing(false);
+
+    addSnackbar('Successfully Signed!', 'success');
+
+    setTimeout(() => {
+      onSignature();
+      storage.remove('getSignaturesRequest');
+      if (popupId) chrome.windows.remove(popupId);
+    }, 2000);
   };
 
   const rejectSigning = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {

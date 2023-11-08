@@ -14,6 +14,7 @@ import { useWeb3Context } from '../../hooks/useWeb3Context';
 import { BSV_DECIMAL_CONVERSION, GLOBAL_ORDERBOOK_MARKET_RATE, PANDA_DEV_WALLET } from '../../utils/constants';
 import { useGorillaPool } from '../../hooks/useGorillaPool';
 import { OrdinalTxo } from '../../hooks/ordTypes';
+import { storage } from '../../utils/storage';
 
 export type Web3PurchaseOrdinalRequest = {
   outpoint: string;
@@ -23,11 +24,12 @@ export type Web3PurchaseOrdinalRequest = {
 
 export type OrdPurchaseRequestProps = {
   web3Request: Web3PurchaseOrdinalRequest;
+  popupId: number | undefined;
   onResponse: () => void;
 };
 
 export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
-  const { web3Request, onResponse } = props;
+  const { web3Request, popupId, onResponse } = props;
   const { theme } = useTheme();
   const { ordAddress, getOrdinals, isProcessing, purchaseGlobalOrderbookListing, setIsProcessing, getOrdinalsBaseUrl } =
     useOrds();
@@ -59,6 +61,17 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, getOrdinals, ordAddress]);
+
+  useEffect(() => {
+    const onbeforeunloadFn = () => {
+      storage.remove('purchaseOrdinalRequest');
+    };
+
+    window.addEventListener('beforeunload', onbeforeunloadFn);
+    return () => {
+      window.removeEventListener('beforeunload', onbeforeunloadFn);
+    };
+  }, []);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -103,19 +116,22 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
           : 'An unknown error has occurred! Try again.';
 
       addSnackbar(message, 'error');
+      setIsProcessing(false);
       return;
     }
-
-    setSuccessTxId(purchaseRes.txid);
-    addSnackbar('Purchase Successful!', 'success');
-    setTimeout(async () => {
-      onResponse();
-    }, 2000);
 
     chrome.runtime.sendMessage({
       action: 'purchaseOrdinalResponse',
       txid: purchaseRes.txid,
     });
+
+    setSuccessTxId(purchaseRes.txid);
+    addSnackbar('Purchase Successful!', 'success');
+    setTimeout(async () => {
+      onResponse();
+      storage.remove('purchaseOrdinalRequest');
+      if (popupId) chrome.windows.remove(popupId);
+    }, 2000);
   };
 
   return (

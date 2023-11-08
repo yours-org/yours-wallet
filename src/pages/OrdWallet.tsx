@@ -314,7 +314,7 @@ export const OrdWallet = () => {
         theme={theme}
         type="primary"
         label="Transfer"
-        disabled={ordinals.length === 0 || !selectedOrdinal}
+        disabled={ordinals.data.length === 0 || !selectedOrdinal}
         onClick={async () => {
           if (!selectedOrdinal?.outpoint.toString()) {
             addSnackbar('You must select an ordinal to transfer!', 'info');
@@ -327,7 +327,7 @@ export const OrdWallet = () => {
         theme={theme}
         type="primary"
         label="List"
-        disabled={ordinals.length === 0 || !selectedOrdinal}
+        disabled={ordinals.data.length === 0 || !selectedOrdinal}
         onClick={async () => {
           if (!selectedOrdinal?.outpoint.toString()) {
             addSnackbar('You must select an ordinal to list!', 'info');
@@ -342,7 +342,7 @@ export const OrdWallet = () => {
   const ft = (
     <>
       <Show
-        when={bsv20s.length > 0}
+        when={bsv20s.initialized && bsv20s.data.length > 0}
         whenFalseContent={
           <NoInscriptionWrapper>
             <OneSatLogo src={oneSatLogo} />
@@ -358,7 +358,7 @@ export const OrdWallet = () => {
         }
       >
         <BSV20List>
-          {bsv20s.map((b) => {
+          {bsv20s.data.map((b) => {
             return (
               <BSV20Item
                 theme={theme}
@@ -492,7 +492,7 @@ export const OrdWallet = () => {
   const nft = (
     <>
       <Show
-        when={ordinals.length > 0}
+        when={ordinals.initialized && ordinals.data.length > 0}
         whenFalseContent={
           <NoInscriptionWrapper>
             <OneSatLogo src={oneSatLogo} />
@@ -508,7 +508,7 @@ export const OrdWallet = () => {
         }
       >
         <OrdinalsList>
-          {ordinals
+          {ordinals.data
             .filter((o) => o.origin?.data?.insc?.file.type !== 'application/bsv-20')
             .map((ord) => {
               return (

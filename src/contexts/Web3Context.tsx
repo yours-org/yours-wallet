@@ -1,8 +1,7 @@
 import React, { createContext, useEffect } from 'react';
-import { OrdinalResponse } from '../hooks/ordTypes';
 import { useBsv } from '../hooks/useBsv';
 import { useNetwork } from '../hooks/useNetwork';
-import { useOrds } from '../hooks/useOrds';
+import { useOrds, BSV20Data, OrdinalData } from '../hooks/useOrds';
 import { usePasswordSetting } from '../hooks/usePasswordSetting';
 import { useWalletLockState } from '../hooks/useWalletLockState';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
@@ -11,7 +10,8 @@ import { storage } from '../utils/storage';
 
 export interface Web3ContextProps {
   network: NetWork;
-  ordinals: OrdinalResponse;
+  ordinals: OrdinalData;
+  bsv20s: BSV20Data;
   isPasswordRequired: boolean;
   updateNetwork: (n: NetWork) => void;
   updatePasswordRequirement: (passwordSetting: boolean) => void;
@@ -27,22 +27,23 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   const { isLocked } = useWalletLockState();
   const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance, identityAddress, identityPubKey } =
     useBsv();
-  const { ordAddress, ordinals, ordPubKey, getOrdinals } = useOrds();
+  const { ordAddress, ordPubKey, getOrdinals, ordinals, bsv20s } = useOrds();
   const { network, setNetwork } = useNetwork();
   const { isPasswordRequired, setIsPasswordRequired } = usePasswordSetting();
 
   useEffect(() => {
     // Here we are pulling in any new Utxos unaccounted for.
-    if (!bsvAddress) return;
-    setTimeout(() => {
-      updateBsvBalance(true);
-    }, 1500);
+    if (bsvAddress) {
+      setTimeout(() => {
+        updateBsvBalance(true);
+      }, 1500);
+    }
 
-    if (!ordAddress) return;
-    setTimeout(() => {
-      getOrdinals();
-    }, 1500);
-
+    if (ordAddress) {
+      setTimeout(() => {
+        getOrdinals();
+      }, 1500);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress, ordAddress]);
 
@@ -52,10 +53,8 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       return;
     }
 
-    storage.get(['popupWindowId'], (result) => {
-      const { popupWindowId } = result;
-
-      if (popupWindowId) return;
+    storage.get(['appState'], (result) => {
+      const { appState } = result;
 
       // only update appState when popupWindowId is empty;
 
@@ -68,7 +67,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       storage.set({
         appState: {
           isLocked,
-          ordinals,
+          ordinals: ordinals.initialized ? ordinals.data : appState?.ordinals || [],
           balance,
           network,
           isPasswordRequired,
@@ -105,7 +104,9 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   };
 
   return (
-    <Web3Context.Provider value={{ network, updateNetwork, ordinals, updatePasswordRequirement, isPasswordRequired }}>
+    <Web3Context.Provider
+      value={{ network, updateNetwork, ordinals, bsv20s, updatePasswordRequirement, isPasswordRequired }}
+    >
       {children}
     </Web3Context.Provider>
   );

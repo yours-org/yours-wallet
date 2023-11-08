@@ -16,6 +16,7 @@ import { ColorThemeProps } from '../../theme';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
+import { storage } from '../../utils/storage';
 
 const RequestDetailsContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -46,11 +47,12 @@ const Icon = styled.img`
 export type BsvSendRequestProps = {
   web3Request: Web3SendBsvRequest;
   requestWithinApp?: boolean;
+  popupId: number | undefined;
   onResponse: () => void;
 };
 
 export const BsvSendRequest = (props: BsvSendRequestProps) => {
-  const { web3Request, requestWithinApp, onResponse } = props;
+  const { web3Request, requestWithinApp, popupId, onResponse } = props;
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -72,6 +74,19 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, updateBsvBalance, bsvAddress]);
+
+  useEffect(() => {
+    if (requestWithinApp) return;
+
+    const onbeforeunloadFn = () => {
+      storage.remove('sendBsvRequest');
+    };
+
+    window.addEventListener('beforeunload', onbeforeunloadFn);
+    return () => {
+      window.removeEventListener('beforeunload', onbeforeunloadFn);
+    };
+  }, [requestWithinApp]);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -145,15 +160,13 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           : 'An unknown error has occurred! Try again.' + sendRes.error;
 
       addSnackbar(message, 'error');
+      setIsProcessing(false);
       return;
     }
 
     setSuccessTxId(sendRes.txid);
     addSnackbar('Transaction Successful!', 'success');
-
-    setTimeout(async () => {
-      onResponse();
-    }, 2000);
+    setIsProcessing(false);
 
     // This should only get called if it's from the provider.
     if (!requestWithinApp) {
@@ -163,6 +176,15 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         rawtx: sendRes.rawtx,
       });
     }
+
+    setTimeout(async () => {
+      onResponse();
+      if (!requestWithinApp) {
+        storage.remove('sendBsvRequest');
+      }
+
+      if (popupId) chrome.windows.remove(popupId);
+    }, 2000);
   };
 
   const web3Details = () => {
