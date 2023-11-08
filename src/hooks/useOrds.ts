@@ -293,7 +293,7 @@ export const useOrds = () => {
       const isV2 = isBSV20v2(tick);
 
       const tokenTotalAmt = bsv20Utxos.reduce((a, item) => {
-        return a + (isV2 ? getAmtv2(Script.from_hex(item.script!)) : getAmtv1(Script.from_hex(item.script!)));
+        return a + BigInt(item.data!.bsv20!.amt);
       }, 0n);
 
       const tokenChangeAmt = tokenTotalAmt - amount;
