@@ -303,7 +303,9 @@ export const RestoreWallet = () => {
         <Text theme={theme} style={{ marginBottom: '1rem' }}>
           Your Panda Wallet has been restored.
         </Text>
-        <Button theme={theme} type="primary" label="Enter" onClick={() => navigate('/bsv-wallet')} />
+        <Button theme={theme} type="primary" label="Enter" onClick={() => {
+           window.location.reload();
+        }} />
       </Content>
     </>
   );

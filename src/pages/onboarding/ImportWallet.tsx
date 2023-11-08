@@ -211,7 +211,9 @@ export const ImportWallet = () => {
         <Text theme={theme} style={{ marginBottom: '1rem' }}>
           Your wallet has been imported.
         </Text>
-        <Button theme={theme} type="primary" label="Enter" onClick={() => navigate('/bsv-wallet')} />
+        <Button theme={theme} type="primary" label="Enter" onClick={() => {
+           window.location.reload();
+        }} />
       </Content>
     </>
   );
