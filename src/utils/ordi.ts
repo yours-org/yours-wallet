@@ -274,14 +274,14 @@ export function toByteString(str: string): string {
 export function showAmount(amt: bigint, dec: number): string {
   const amtStr = amt.toString().replace(/n/, '');
   if (dec === 0) {
-      return amtStr;
+    return amtStr;
   }
   let left = amt / BigInt(Math.pow(10, dec));
   let right = amt % BigInt(Math.pow(10, dec));
   if (right > 0) {
-      return `${left}.${right}`
+    return `${left}.${right}`;
   }
-  return `${left}`
+  return `${left}`;
 }
 
 export function normalize(amt: string, dec: number): string {
