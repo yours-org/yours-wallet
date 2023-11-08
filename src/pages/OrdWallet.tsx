@@ -562,6 +562,7 @@ export const OrdWallet = () => {
     <Show when={token !== null}>
       <BackButton
         onClick={() => {
+          setTokenSendAmount(null);
           setPageState('main');
         }}
       />
@@ -572,7 +573,7 @@ export const OrdWallet = () => {
             theme={theme}
             style={{ cursor: 'pointer' }}
             onClick={() => userSelectedAmount(String(Number(token.all.confirmed)), token)}
-          >{`Available Balance: ${showAmount(token.all.confirmed, token.dec).toString()}`}</Text>
+          >{`Available Balance: ${showAmount(token.all.confirmed, token.dec)}`}</Text>
           <FormContainer noValidate onSubmit={(e) => handleSendBSV20(e)}>
             <Input
               theme={theme}
