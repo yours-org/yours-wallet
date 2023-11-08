@@ -477,6 +477,7 @@ export const AppsAndTools = () => {
       <Show when={page === 'sponsor' && didSubmit}>
         <BsvSendRequest
           web3Request={[{ address: PANDA_DEV_WALLET, satAmount }]}
+          popupId={undefined}
           onResponse={() => {
             setDidSubmit(false);
             setPage('sponsor-thanks');
