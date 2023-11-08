@@ -69,6 +69,17 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   }, [bsvPubKey, ordPubKey, popupId, thirdPartyAppRequestData, isDecided]);
 
 
+  useEffect(() => {
+
+    const onbeforeunloadFn = () => {
+      storage.remove('connectRequest');
+    }
+
+    window.addEventListener('beforeunload', onbeforeunloadFn);
+    return () => {
+      window.removeEventListener('beforeunload', onbeforeunloadFn);
+    }
+  }, [])
 
   const handleConnectDecision = async (approved: boolean) => {
     if (chrome.runtime) {

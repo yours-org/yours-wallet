@@ -46,6 +46,18 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, txid]);
 
+  useEffect(() => {
+
+    const onbeforeunloadFn = () => {
+      storage.remove('broadcastRequest');
+    }
+
+    window.addEventListener('beforeunload', onbeforeunloadFn);
+    return () => {
+      window.removeEventListener('beforeunload', onbeforeunloadFn);
+    }
+  }, [])
+
   const resetSendState = () => {
     setTxid('');
     setIsProcessing(false);
@@ -62,24 +74,21 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       setIsProcessing(false);
       return;
     }
-
-    addSnackbar('Successfully broadcasted the tx!', 'success');
     setTxid(txid);
-
-    setTimeout(() => {
-      onBroadcast();
-
-      if (!txid && popupId) chrome.windows.remove(popupId);
-      storage.remove('broadcastRequest');
-      navigate('/bsv-wallet');
-    }, 2000);
-
     chrome.runtime.sendMessage({
       action: 'broadcastResponse',
       txid,
     });
 
     setIsProcessing(false);
+    addSnackbar('Successfully broadcasted the tx!', 'success');
+  
+    storage.remove('broadcastRequest');
+    setTimeout(() => {
+      onBroadcast();
+      if (popupId) chrome.windows.remove(popupId);
+    }, 2000);
+
   };
 
   return (

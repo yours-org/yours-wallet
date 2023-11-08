@@ -219,6 +219,18 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, getSigsResponse]);
 
+  useEffect(() => {
+
+    const onbeforeunloadFn = () => {
+      storage.remove('getSignaturesRequest');
+    }
+
+    window.addEventListener('beforeunload', onbeforeunloadFn);
+    return () => {
+      window.removeEventListener('beforeunload', onbeforeunloadFn);
+    }
+  }, [])
+
   const resetSendState = () => {
     setPasswordConfirm('');
     setGetSigsResponse(undefined);
