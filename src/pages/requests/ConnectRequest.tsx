@@ -1,5 +1,5 @@
 import { useContext, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { styled } from 'styled-components';
 import { ThirdPartyAppRequestData, WhitelistedApp } from '../../App';
 import { Button } from '../../components/Button';
@@ -9,6 +9,7 @@ import { useBsv } from '../../hooks/useBsv';
 import { useOrds } from '../../hooks/useOrds';
 import { useTheme } from '../../hooks/useTheme';
 import { storage } from '../../utils/storage';
+import { useSnackbar } from '../../hooks/useSnackbar';
 
 const Container = styled.div`
   display: flex;
@@ -35,7 +36,8 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   const { thirdPartyAppRequestData, whiteListedApps, popupId, onDecision } = props;
   const { theme } = useTheme();
   const context = useContext(BottomMenuContext);
-  const navigate = useNavigate();
+  const { addSnackbar } = useSnackbar();
+  const [ isDecided, setIsDecided ] = useState(false);
   const { bsvPubKey, identityPubKey } = useBsv();
   const { ordPubKey } = useOrds();
 
@@ -49,6 +51,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
 
 
   useEffect(() => {
+    if(isDecided) return;
     if (thirdPartyAppRequestData && !thirdPartyAppRequestData.isAuthorized) return;
     if (!bsvPubKey || !ordPubKey) return;
     if (!window.location.href.includes('localhost')) {
@@ -63,7 +66,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
         if (popupId) chrome.windows.remove(popupId);
       }, 10);
     }
-  }, [bsvPubKey, ordPubKey, popupId, thirdPartyAppRequestData]);
+  }, [bsvPubKey, ordPubKey, popupId, thirdPartyAppRequestData, isDecided]);
 
 
 
@@ -84,17 +87,25 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
           decision: 'approved',
           pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
         });
+        addSnackbar(`Approved`, 'success');
+
       } else {
         chrome.runtime.sendMessage({
           action: 'userConnectResponse',
           decision: 'declined',
         });
-      }
 
-      if (!approved && popupId) chrome.windows.remove(popupId);
-      storage.remove('connectRequest');
-      navigate('/bsv-wallet');
+        addSnackbar(`Declined`, 'error');
+
+      }
     }
+
+    setIsDecided(true);
+
+    storage.remove('connectRequest');
+    setTimeout(() => {
+      if (popupId) chrome.windows.remove(popupId);
+    }, 2000);
   };
 
   return (
