@@ -1,9 +1,8 @@
-import { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
+import init, { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
 import { DUST, FEE_PER_BYTE, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
 import { storage } from '../utils/storage';
 import { OrdinalTxo } from './ordTypes';
-import { useBsvWasm } from './useBsvWasm';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
 import { useWhatsOnChain } from './useWhatsOnChain';
@@ -64,7 +63,6 @@ export const useContracts = () => {
   const { retrieveKeys, bsvAddress, ordAddress, verifyPassword } = useKeys();
   const { broadcastWithGorillaPool } = useGorillaPool();
   const { getUtxos } = useWhatsOnChain();
-  const { bsvWasmInitialized } = useBsvWasm();
 
   /**
    *
@@ -77,7 +75,7 @@ export const useContracts = () => {
     password: string,
   ): Promise<{ sigResponses?: SignatureResponse[]; error?: { message: string; cause?: any } }> => {
     try {
-      if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
+      await init();
 
       setIsProcessing(true);
       const isAuthenticated = await verifyPassword(password);
@@ -157,7 +155,7 @@ export const useContracts = () => {
 
   const unlock = async (locks: OrdinalTxo[], password: string, currentBlockHeight: number) => {
     try {
-      if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
+      await init();
       setIsProcessing(true);
 
       const isAuthenticated = await verifyPassword(password);

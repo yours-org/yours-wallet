@@ -1,4 +1,4 @@
-import {
+import init, {
   BSM,
   ChainParams,
   P2PKHAddress,
@@ -13,10 +13,11 @@ import {
 } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
 import { SignMessageResponse } from '../pages/requests/SignMessageRequest';
+import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { DerivationTags, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
-import { useBsvWasm } from './useBsvWasm';
+import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
 import { useNetwork } from './useNetwork';
 import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
@@ -49,9 +50,9 @@ export const useBsv = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, identityAddress, identityPubKey } = useKeys();
-  const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
-  const { getUtxos, getBsvBalance, getExchangeRate, broadcastRawTx, getInputs } = useWhatsOnChain();
+  const { broadcastWithGorillaPool } = useGorillaPool();
+  const { getUtxos, getBsvBalance, getExchangeRate, getInputs } = useWhatsOnChain();
 
   const getChainParams = (network: NetWork): ChainParams => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
@@ -63,18 +64,27 @@ export const useBsv = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress]);
 
-  const sendBsv = async (request: Web3SendBsvRequest, password: string): Promise<SendBsvResponse> => {
+  const sendBsv = async (
+    request: Web3SendBsvRequest,
+    password: string,
+    noApprovalLimit?: number,
+  ): Promise<SendBsvResponse> => {
     try {
-      if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
-      // Gather keys for tx
       setIsProcessing(true);
-      const isAuthenticated = await verifyPassword(password);
-      if (!isAuthenticated) {
-        return { error: 'invalid-password' };
+      await init();
+      const requestSats = request.reduce((a: number, item: { satAmount: number }) => a + item.satAmount, 0);
+      const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
+
+      if (bsvSendAmount > Number(noApprovalLimit)) {
+        const isAuthenticated = await verifyPassword(password);
+        if (!isAuthenticated) {
+          return { error: 'invalid-password' };
+        }
       }
 
       const feeSats = 20;
-      const keys = await retrieveKeys(password);
+      const isBelowNoApprovalLimit = Number(bsvSendAmount) <= Number(noApprovalLimit);
+      const keys = await retrieveKeys(password, isBelowNoApprovalLimit);
       if (!keys?.walletWif || !keys.walletPubKey) throw Error('Undefined key');
       const paymentPk = PrivateKey.from_wif(keys.walletWif);
       const pubKey = paymentPk.to_public_key();
@@ -82,7 +92,7 @@ export const useBsv = () => {
       const amount = request.reduce((a, r) => a + r.satAmount, 0);
 
       // Format in and outs
-      const utxos = await getUtxos(fromAddress);
+      const utxos = await getUtxos(fromAddress, true);
 
       const script = P2PKHAddress.from_string(fromAddress).get_locking_script().to_asm_string();
 
@@ -160,12 +170,13 @@ export const useBsv = () => {
       }
 
       const rawtx = tx.to_hex();
-      let txid = await broadcastRawTx(rawtx);
+      let { txid } = await broadcastWithGorillaPool(rawtx);
       if (txid) {
         storage.set({ paymentUtxos: utxos.filter((item) => !inputs.includes(item)) }); // remove the spent utxos and update local storage
       }
       return { txid, rawtx };
     } catch (error: any) {
+      console.log(error);
       return { error: error.message ?? 'unknown' };
     } finally {
       setIsProcessing(false);

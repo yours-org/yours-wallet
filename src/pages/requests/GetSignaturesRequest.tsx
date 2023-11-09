@@ -1,6 +1,5 @@
-import { P2PKHAddress, Transaction } from 'bsv-wasm-web';
+import init, { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { DefaultTheme, styled } from 'styled-components';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -8,7 +7,6 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useBsvWasm } from '../../hooks/useBsvWasm';
 import { SignatureResponse, Web3GetSignaturesRequest, useContracts } from '../../hooks/useContracts';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
@@ -108,14 +106,15 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
   const { theme } = useTheme();
   const [showDetail, setShowDetail] = useState(false);
   const { request } = props;
-  const { bsvWasmInitialized } = useBsvWasm();
   const [tx, setTx] = useState<Transaction | undefined>(undefined);
 
   useEffect(() => {
-    if (bsvWasmInitialized) {
+    const setTheTx = async () => {
+      await init();
       setTx(Transaction.from_hex(request.txHex));
-    }
-  }, [bsvWasmInitialized, request.txHex]);
+    };
+    setTheTx();
+  }, [request.txHex]);
 
   return (
     <TxContainer>
