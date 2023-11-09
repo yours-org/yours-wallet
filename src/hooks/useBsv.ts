@@ -173,6 +173,16 @@ export const useBsv = () => {
       let { txid } = await broadcastWithGorillaPool(rawtx);
       if (txid) {
         storage.set({ paymentUtxos: utxos.filter((item) => !inputs.includes(item)) }); // remove the spent utxos and update local storage
+
+        if (isBelowNoApprovalLimit) {
+          storage.get(['noApprovalLimit'], ({ noApprovalLimit }) => {
+            storage.set({
+              noApprovalLimit: noApprovalLimit
+                ? Number((noApprovalLimit - amount / BSV_DECIMAL_CONVERSION).toFixed(8))
+                : 0,
+            });
+          });
+        }
       }
       return { txid, rawtx };
     } catch (error: any) {
