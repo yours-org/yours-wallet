@@ -48,6 +48,22 @@ export const useKeys = () => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
   };
 
+  useEffect(() => {
+    (async () => {
+      await init();
+      if (bsvAddress) {
+        const walletAddr = P2PKHAddress.from_string(bsvAddress).set_chain_params(getChainParams(network)).to_string();
+        setBsvAddress(walletAddr);
+      }
+
+      if (ordAddress) {
+        const ordAddr = P2PKHAddress.from_string(ordAddress).set_chain_params(getChainParams(network)).to_string();
+
+        setOrdAddress(ordAddr);
+      }
+    })();
+  }, [bsvAddress, ordAddress, network]);
+
   const generateSeedAndStoreEncrypted = (
     password: string,
     mnemonic?: string,
