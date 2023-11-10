@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ChainParams, P2PKHAddress, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
+import init, { ChainParams, P2PKHAddress, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
 import {
   DEFAULT_AYM_ORD_PATH,
@@ -13,7 +13,6 @@ import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto
 import { Keys, generateKeysFromTag, getKeys, getKeysFromWifs } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
-import { useBsvWasm } from './useBsvWasm';
 import { useGorillaPool } from './useGorillaPool';
 import { useNetwork } from './useNetwork';
 import { usePasswordSetting } from './usePasswordSetting';
@@ -42,7 +41,6 @@ export const useKeys = () => {
 
   const { network } = useNetwork();
   const { isPasswordRequired } = usePasswordSetting();
-  const { bsvWasmInitialized } = useBsvWasm();
   const { getBaseUrl } = useWhatsOnChain();
   const { broadcastWithGorillaPool } = useGorillaPool();
 
@@ -83,7 +81,7 @@ export const useKeys = () => {
   };
 
   const sweepLegacy = async (keys: Keys) => {
-    if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
+    await init();
     const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
     const { data } = await axios.get<UTXO[]>(`${getBaseUrl()}/address/${sweepWallet.address}/unspent`);
     const utxos = data;
@@ -132,11 +130,11 @@ export const useKeys = () => {
    * @param password An optional password can be passed to unlock sensitive information
    * @returns
    */
-  const retrieveKeys = (password?: string): Promise<Keys | Partial<Keys>> => {
+  const retrieveKeys = (password?: string, isBelowNoApprovalLimit?: boolean): Promise<Keys | Partial<Keys>> => {
     return new Promise((resolve, reject) => {
       storage.get(['encryptedKeys', 'passKey', 'salt'], async (result: KeyStorage) => {
         try {
-          if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
+          await init();
           if (!result.encryptedKeys || !result.passKey) return;
           const d = decrypt(result.encryptedKeys, result.passKey);
           const keys: Keys = JSON.parse(d);
@@ -164,8 +162,8 @@ export const useKeys = () => {
             setIdentityPubKey(keys.identityPubKey);
           }
 
-          if (!isPasswordRequired || password) {
-            const isVerified = !isPasswordRequired || (await verifyPassword(password ?? ''));
+          if (!isPasswordRequired || isBelowNoApprovalLimit || password) {
+            const isVerified = isBelowNoApprovalLimit || !isPasswordRequired || (await verifyPassword(password ?? ''));
             isVerified
               ? resolve(
                   Object.assign({}, keys, {
@@ -204,10 +202,9 @@ export const useKeys = () => {
   };
 
   useEffect(() => {
-    if (!bsvWasmInitialized) return;
     retrieveKeys();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bsvWasmInitialized]);
+  }, []);
 
   return {
     generateSeedAndStoreEncrypted,

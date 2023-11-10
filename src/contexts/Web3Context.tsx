@@ -1,7 +1,8 @@
 import React, { createContext, useEffect } from 'react';
+import { useNoApprovalLimitSetting } from '../hooks/useApprovalLimitSetting';
 import { useBsv } from '../hooks/useBsv';
 import { useNetwork } from '../hooks/useNetwork';
-import { useOrds, BSV20Data, OrdinalData } from '../hooks/useOrds';
+import { BSV20Data, OrdinalData, useOrds } from '../hooks/useOrds';
 import { usePasswordSetting } from '../hooks/usePasswordSetting';
 import { useWalletLockState } from '../hooks/useWalletLockState';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
@@ -13,7 +14,9 @@ export interface Web3ContextProps {
   ordinals: OrdinalData;
   bsv20s: BSV20Data;
   isPasswordRequired: boolean;
+  noApprovalLimit: number | undefined;
   updateNetwork: (n: NetWork) => void;
+  updateNoApprovalLimit: (amt: number) => void;
   updatePasswordRequirement: (passwordSetting: boolean) => void;
 }
 
@@ -30,6 +33,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   const { ordAddress, ordPubKey, getOrdinals, ordinals, bsv20s } = useOrds();
   const { network, setNetwork } = useNetwork();
   const { isPasswordRequired, setIsPasswordRequired } = usePasswordSetting();
+  const { noApprovalLimit, setNoAprrovalLimit } = useNoApprovalLimitSetting();
 
   useEffect(() => {
     // Here we are pulling in any new Utxos unaccounted for.
@@ -103,9 +107,23 @@ export const Web3Provider = (props: Web3ProviderProps) => {
     setIsPasswordRequired(isRequired);
   };
 
+  const updateNoApprovalLimit = (amt: number) => {
+    storage.set({ noApprovalLimit: amt });
+    setNoAprrovalLimit(amt);
+  };
+
   return (
     <Web3Context.Provider
-      value={{ network, updateNetwork, ordinals, bsv20s, updatePasswordRequirement, isPasswordRequired }}
+      value={{
+        network,
+        updateNetwork,
+        ordinals,
+        bsv20s,
+        updatePasswordRequirement,
+        isPasswordRequired,
+        noApprovalLimit,
+        updateNoApprovalLimit,
+      }}
     >
       {children}
     </Web3Context.Provider>
