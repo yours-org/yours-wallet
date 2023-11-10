@@ -106,12 +106,21 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
   const { theme } = useTheme();
   const [showDetail, setShowDetail] = useState(false);
   const { request } = props;
-  const [tx, setTx] = useState<Transaction | undefined>(undefined);
+  const [txOutputs, setTxOutputs] = useState<{ asm: string; satoshis: number }[]>([]);
 
   useEffect(() => {
     const setTheTx = async () => {
       await init();
-      setTx(Transaction.from_hex(request.txHex));
+      const tx = Transaction.from_hex(request.txHex);
+      const numOuts = tx.get_noutputs();
+      const outputs: { asm: string; satoshis: number }[] = [];
+      for (let i = 0; i < numOuts; i++) {
+        const output = tx.get_output(i);
+        const asm = output!.get_script_pub_key().to_asm_string();
+        const satoshis = output!.get_satoshis();
+        outputs.push({ asm, satoshis: Number(satoshis) });
+      }
+      setTxOutputs(outputs);
     };
     setTheTx();
   }, [request.txHex]);
@@ -152,10 +161,8 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
           <Text theme={theme} style={{ margin: '0.5rem 0' }}>
             Outputs
           </Text>
-          {tx ? (
-            [...Array(tx.get_noutputs()).keys()].map((idx: number) => {
-              const output = tx.get_output(idx);
-              const asm = output!.get_script_pub_key().to_asm_string();
+          {txOutputs ? (
+            txOutputs.map(({ asm, satoshis }, idx: number) => {
               const pubkeyHash = (/^OP_DUP OP_HASH160 ([0-9a-fA-F]{40}) OP_EQUALVERIFY OP_CHECKSIG$/.exec(asm) ||
                 [])[1];
               const isP2PKH = !!pubkeyHash;
@@ -169,7 +176,7 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
                     idx={idx}
                     tag={isP2PKH ? 'P2PKH' : 'nonStandard'}
                     addr={toAddr}
-                    sats={Number(output!.get_satoshis())}
+                    sats={satoshis}
                     theme={theme}
                   />
                 </TxOutput>
