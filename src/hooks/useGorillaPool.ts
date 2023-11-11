@@ -27,8 +27,6 @@ export const useGorillaPool = () => {
 
   const getOrdUtxos = async (ordAddress: string): Promise<OrdinalResponse> => {
     try {
-      console.log(!isAddressOnRightNetwork(ordAddress), ordAddress);
-
       if (!isAddressOnRightNetwork(ordAddress)) return [];
       const { data } = await axios.get<OrdinalTxo[]>(
         `${getOrdinalsBaseUrl()}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`,
