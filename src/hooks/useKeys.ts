@@ -1,5 +1,5 @@
 import axios from 'axios';
-import init, { ChainParams, P2PKHAddress, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
+import init, { ChainParams, P2PKHAddress, PublicKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
 import {
   DEFAULT_AYM_ORD_PATH,
@@ -47,6 +47,29 @@ export const useKeys = () => {
   const getChainParams = (network: NetWork): ChainParams => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
   };
+
+  useEffect(() => {
+    (async () => {
+      await init();
+      if (bsvPubKey) {
+        const walletAddr = PublicKey.from_hex(bsvPubKey)
+          .to_address()
+          .set_chain_params(getChainParams(network))
+          .to_string();
+
+        setBsvAddress(walletAddr);
+      }
+
+      if (ordPubKey) {
+        const ordAddr = PublicKey.from_hex(ordPubKey)
+          .to_address()
+          .set_chain_params(getChainParams(network))
+          .to_string();
+
+        setOrdAddress(ordAddr);
+      }
+    })();
+  }, [bsvPubKey, ordPubKey, network]);
 
   const generateSeedAndStoreEncrypted = (
     password: string,
