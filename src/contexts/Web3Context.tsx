@@ -64,7 +64,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
 
       const balance = {
         bsv: bsvBalance,
-        sat: Math.round(bsvBalance * BSV_DECIMAL_CONVERSION),
+        satoshis: Math.round(bsvBalance * BSV_DECIMAL_CONVERSION),
         usdInCents: Math.round(bsvBalance * exchangeRate * 100),
       };
 

@@ -16,7 +16,8 @@ import { storage } from '../utils/storage';
 import { useGorillaPool } from './useGorillaPool';
 import { useNetwork } from './useNetwork';
 import { usePasswordSetting } from './usePasswordSetting';
-import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
+import { useWhatsOnChain } from './useWhatsOnChain';
+import { UTXO } from './useBsv';
 
 export type KeyStorage = {
   encryptedKeys: string;
@@ -114,7 +115,7 @@ export const useKeys = () => {
 
     let satsIn = 0;
     utxos.forEach((utxo: any, vin: number) => {
-      const txin = new TxIn(Buffer.from(utxo.tx_hash, 'hex'), utxo.tx_pos, Script.from_asm_string(''));
+      const txin = new TxIn(Buffer.from(utxo.tx_hash, 'hex'), utxo.tx_pos, Script.from_hex(''));
       tx.add_input(txin);
       satsIn += utxo.value;
       const sig = tx.sign(

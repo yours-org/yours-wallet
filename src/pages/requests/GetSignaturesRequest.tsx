@@ -111,7 +111,7 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
   useEffect(() => {
     const setTheTx = async () => {
       await init();
-      const tx = Transaction.from_hex(request.txHex);
+      const tx = Transaction.from_hex(request.rawtx);
       const numOuts = tx.get_noutputs();
       const outputs: { asm: string; satoshis: number }[] = [];
       for (let i = 0; i < numOuts; i++) {
@@ -123,7 +123,7 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
       setTxOutputs(outputs);
     };
     setTheTx();
-  }, [request.txHex]);
+  }, [request.rawtx]);
 
   return (
     <TxContainer>
@@ -148,7 +148,7 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
               <TxInput>
                 <InputContent
                   idx={sigReq.inputIndex}
-                  tag={sigReq.scriptHex ? 'nonStandard' : 'P2PKH'}
+                  tag={sigReq.script ? 'nonStandard' : 'P2PKH'}
                   addr={[sigReq.address].flat().join(', ')}
                   sats={sigReq.satoshis}
                   theme={theme}

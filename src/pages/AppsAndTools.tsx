@@ -476,7 +476,7 @@ export const AppsAndTools = () => {
       <Show when={page === 'discover-apps'}>{discoverAppsPage}</Show>
       <Show when={page === 'sponsor' && didSubmit}>
         <BsvSendRequest
-          web3Request={[{ address: PANDA_DEV_WALLET, satAmount }]}
+          web3Request={[{ address: PANDA_DEV_WALLET, satoshis: satAmount }]}
           popupId={undefined}
           onResponse={() => {
             setDidSubmit(false);

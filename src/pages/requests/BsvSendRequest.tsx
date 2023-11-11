@@ -62,7 +62,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, updateBsvBalance } = useBsv();
   const [hasSent, setHasSent] = useState(false);
 
-  const requestSats = web3Request.reduce((a: number, item: { satAmount: number }) => a + item.satAmount, 0);
+  const requestSats = web3Request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
   const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
 
   // This useEffect handle the instance where the request is below the no approval setting and will immediately process the request.
@@ -145,7 +145,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         return;
       }
 
-      if (web3Request[0].address && !web3Request[0].satAmount) {
+      if (web3Request[0].address && !web3Request[0].satoshis) {
         addSnackbar('No sats supplied', 'info');
         return;
       }
@@ -218,7 +218,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       return (
         <LineItem key={i}>
           <Icon src={bsvCoin} />
-          <Text style={{ margin: 0 }} theme={theme}>{`${r.satAmount / BSV_DECIMAL_CONVERSION}`}</Text>
+          <Text style={{ margin: 0 }} theme={theme}>{`${r.satoshis / BSV_DECIMAL_CONVERSION}`}</Text>
           <Text style={{ margin: 0 }} theme={theme}>
             {r.address ? truncate(r.address, 5, 5) : ''}
           </Text>
@@ -256,7 +256,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
             <Button
               theme={theme}
               type="primary"
-              label={`Approve ${web3Request.reduce((a, item) => a + item.satAmount, 0) / BSV_DECIMAL_CONVERSION} BSV`}
+              label={`Approve ${web3Request.reduce((a, item) => a + item.satoshis, 0) / BSV_DECIMAL_CONVERSION} BSV`}
               disabled={isProcessing}
               isSubmit
             />

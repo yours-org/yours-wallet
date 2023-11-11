@@ -14,12 +14,13 @@ import { NetWork } from '../utils/network';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
 import { useNetwork } from './useNetwork';
-import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
+import { useWhatsOnChain } from './useWhatsOnChain';
 
 import { createTransferP2PKH, createTransferV2P2PKH, isBSV20v2 } from '../utils/ordi';
 import { storage } from '../utils/storage';
 import { OrdinalTxo } from './ordTypes';
 import { useTokens } from './useTokens';
+import { UTXO } from './useBsv';
 
 export class InscriptionData {
   type?: string = '';
@@ -351,7 +352,7 @@ export const useOrds = () => {
 
       let idx = 0;
       for (let u of bsv20Utxos || []) {
-        const inTx = new TxIn(Buffer.from(u.txid, 'hex'), u.vout, Script.from_asm_string(''));
+        const inTx = new TxIn(Buffer.from(u.txid, 'hex'), u.vout, Script.from_hex(''));
         inTx.set_satoshis(BigInt(u.satoshis));
         inTx.set_locking_script(Script.from_hex(u.script!));
         tx.add_input(inTx);
@@ -364,18 +365,13 @@ export const useOrds = () => {
         idx++;
       }
 
-      const inTx = new TxIn(Buffer.from(fundingUtxo.txid, 'hex'), fundingUtxo.vout, Script.from_asm_string(''));
+      const inTx = new TxIn(Buffer.from(fundingUtxo.txid, 'hex'), fundingUtxo.vout, Script.from_hex(''));
       inTx.set_satoshis(BigInt(fundingUtxo.satoshis));
-      inTx.set_locking_script(Script.from_asm_string(fundingUtxo.script));
+      const fundingScript = Script.from_hex(fundingUtxo.script);
+      inTx.set_locking_script(fundingScript);
       tx.add_input(inTx);
 
-      const sig = tx.sign(
-        paymentPk,
-        SigHash.InputOutputs,
-        idx,
-        Script.from_asm_string(fundingUtxo.script),
-        BigInt(fundingUtxo.satoshis),
-      );
+      const sig = tx.sign(paymentPk, SigHash.InputOutputs, idx, fundingScript, BigInt(fundingUtxo.satoshis));
 
       inTx.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
       tx.set_input(idx, inTx);
@@ -484,10 +480,10 @@ export const useOrds = () => {
     const tx = new Transaction(1, 0);
     const t = ordinal.txid;
     const txBuf = Buffer.from(t, 'hex');
-    const ordIn = new TxIn(txBuf, ordinal.vout, Script.from_asm_string(''));
+    const ordIn = new TxIn(txBuf, ordinal.vout, Script.from_hex(''));
     tx.add_input(ordIn);
 
-    let utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_asm_string(''));
+    let utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_hex(''));
 
     tx.add_input(utxoIn);
 
@@ -538,7 +534,7 @@ export const useOrds = () => {
       paymentPk,
       SigHash.ALL | SigHash.FORKID,
       1,
-      Script.from_asm_string(P2PKHAddress.from_string(payoutAddress).get_locking_script().to_asm_string()),
+      P2PKHAddress.from_string(payoutAddress).get_locking_script(),
       BigInt(paymentUtxo.satoshis),
     );
 
@@ -581,10 +577,10 @@ export const useOrds = () => {
 
       const { script } = await getMarketData(outpoint);
 
-      const ordIn = new TxIn(Buffer.from(listingTxid, 'hex'), 0, Script.from_asm_string(''));
+      const ordIn = new TxIn(Buffer.from(listingTxid, 'hex'), 0, Script.from_hex(''));
       cancelTx.add_input(ordIn);
 
-      let utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_asm_string(''));
+      let utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_hex(''));
       cancelTx.add_input(utxoIn);
 
       const destinationAddress = P2PKHAddress.from_string(ordAddress);
@@ -611,7 +607,7 @@ export const useOrds = () => {
         paymentPk,
         SigHash.ALL | SigHash.FORKID,
         1,
-        Script.from_asm_string(P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_asm_string()),
+        P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script(),
         BigInt(paymentUtxo.satoshis),
       );
 
@@ -664,7 +660,7 @@ export const useOrds = () => {
 
       const purchaseTx = new Transaction(1, 0);
 
-      const listingInput = new TxIn(Buffer.from(listing.txid, 'hex'), listing.vout, Script.from_asm_string(''));
+      const listingInput = new TxIn(Buffer.from(listing.txid, 'hex'), listing.vout, Script.from_hex(''));
       purchaseTx.add_input(listingInput);
       satsIn += listing.satoshis;
 
@@ -719,7 +715,7 @@ export const useOrds = () => {
         if (!utxo) {
           return { error: 'insufficient-funds' };
         }
-        const fundingInput = new TxIn(Buffer.from(utxo.txid, 'hex'), utxo.vout, Script.from_asm_string(utxo.script));
+        const fundingInput = new TxIn(Buffer.from(utxo.txid, 'hex'), utxo.vout, Script.from_hex(utxo.script));
         purchaseTx.add_input(fundingInput);
         inputs.push(utxo);
         satsIn += utxo.satoshis;
@@ -757,7 +753,7 @@ export const useOrds = () => {
           payPk,
           SigHash.InputOutputs,
           1 + idx,
-          Script.from_asm_string(utxo.script),
+          Script.from_hex(utxo.script),
           BigInt(utxo.satoshis),
         );
 
