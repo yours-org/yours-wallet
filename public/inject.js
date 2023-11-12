@@ -2,8 +2,9 @@ const createPandaMethod = (type) => {
   return async (params) => {
     return new Promise((resolve, reject) => {
       // Send request
+      const messageId = `${type}-${Date.now()}-${Math.random()}`;
       const requestEvent = new CustomEvent('PandaRequest', {
-        detail: { type, params },
+        detail: { messageId, type, params },
       });
       document.dispatchEvent(requestEvent);
 
@@ -15,12 +16,10 @@ const createPandaMethod = (type) => {
           } else {
             reject(e.detail.error);
           }
-
-          document.removeEventListener('PandaResponse', onResponse);
         }
       }
 
-      document.addEventListener('PandaResponse', onResponse, { once: true });
+      document.addEventListener(messageId, onResponse, { once: true });
     });
   };
 };

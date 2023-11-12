@@ -28,10 +28,12 @@ document.addEventListener('PandaRequest', (e) => {
 
   params.domain = window.location.hostname;
 
-  chrome.runtime.sendMessage({ action: type, params }, responseCallback);
+  chrome.runtime.sendMessage({ action: type, params }, buildResponseCallback(e.detail.messageId));
 });
 
-const responseCallback = (response) => {
-  const responseEvent = new CustomEvent('PandaResponse', { detail: response });
-  document.dispatchEvent(responseEvent);
+const buildResponseCallback = (messageId) => {
+  return (response) => {
+    const responseEvent = new CustomEvent(messageId, { detail: response });
+    document.dispatchEvent(responseEvent);
+  };
 };
