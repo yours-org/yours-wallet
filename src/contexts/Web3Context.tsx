@@ -1,8 +1,8 @@
 import React, { createContext, useEffect } from 'react';
-import { OrdinalResponse } from '../hooks/ordTypes';
+import { useNoApprovalLimitSetting } from '../hooks/useApprovalLimitSetting';
 import { useBsv } from '../hooks/useBsv';
 import { useNetwork } from '../hooks/useNetwork';
-import { useOrds } from '../hooks/useOrds';
+import { BSV20Data, OrdinalData, useOrds } from '../hooks/useOrds';
 import { usePasswordSetting } from '../hooks/usePasswordSetting';
 import { useWalletLockState } from '../hooks/useWalletLockState';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
@@ -11,9 +11,12 @@ import { storage } from '../utils/storage';
 
 export interface Web3ContextProps {
   network: NetWork;
-  ordinals: OrdinalResponse;
+  ordinals: OrdinalData;
+  bsv20s: BSV20Data;
   isPasswordRequired: boolean;
+  noApprovalLimit: number | undefined;
   updateNetwork: (n: NetWork) => void;
+  updateNoApprovalLimit: (amt: number) => void;
   updatePasswordRequirement: (passwordSetting: boolean) => void;
 }
 
@@ -25,23 +28,26 @@ interface Web3ProviderProps {
 export const Web3Provider = (props: Web3ProviderProps) => {
   const { children } = props;
   const { isLocked } = useWalletLockState();
-  const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance, lockingAddress, lockingPubKey } = useBsv();
-  const { ordAddress, ordinals, ordPubKey, getOrdinals } = useOrds();
+  const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance, identityAddress, identityPubKey } =
+    useBsv();
+  const { ordAddress, ordPubKey, getOrdinals, ordinals, bsv20s } = useOrds();
   const { network, setNetwork } = useNetwork();
   const { isPasswordRequired, setIsPasswordRequired } = usePasswordSetting();
+  const { noApprovalLimit, setNoAprrovalLimit } = useNoApprovalLimitSetting();
 
   useEffect(() => {
     // Here we are pulling in any new Utxos unaccounted for.
-    if (!bsvAddress) return;
-    setTimeout(() => {
-      updateBsvBalance(true);
-    }, 1500);
+    if (bsvAddress) {
+      setTimeout(() => {
+        updateBsvBalance(true);
+      }, 1500);
+    }
 
-    if (!ordAddress) return;
-    setTimeout(() => {
-      getOrdinals();
-    }, 1500);
-
+    if (ordAddress) {
+      setTimeout(() => {
+        getOrdinals();
+      }, 1500);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress, ordAddress]);
 
@@ -51,10 +57,8 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       return;
     }
 
-    storage.get(['popupWindowId'], (result) => {
-      const { popupWindowId } = result;
-
-      if (popupWindowId) return;
+    storage.get(['appState'], (result) => {
+      const { appState } = result;
 
       // only update appState when popupWindowId is empty;
 
@@ -67,12 +71,12 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       storage.set({
         appState: {
           isLocked,
-          ordinals,
+          ordinals: ordinals.initialized ? ordinals.data : appState?.ordinals || [],
           balance,
           network,
           isPasswordRequired,
-          addresses: { bsvAddress, ordAddress, lockingAddress },
-          pubKeys: { bsvPubKey, ordPubKey, lockingPubKey },
+          addresses: { bsvAddress, ordAddress, identityAddress },
+          pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
         },
       });
     });
@@ -87,8 +91,8 @@ export const Web3Provider = (props: Web3ProviderProps) => {
     exchangeRate,
     network,
     isPasswordRequired,
-    lockingAddress,
-    lockingPubKey,
+    identityAddress,
+    identityPubKey,
   ]);
 
   const updateNetwork = (n: NetWork): void => {
@@ -103,8 +107,24 @@ export const Web3Provider = (props: Web3ProviderProps) => {
     setIsPasswordRequired(isRequired);
   };
 
+  const updateNoApprovalLimit = (amt: number) => {
+    storage.set({ noApprovalLimit: amt });
+    setNoAprrovalLimit(amt);
+  };
+
   return (
-    <Web3Context.Provider value={{ network, updateNetwork, ordinals, updatePasswordRequirement, isPasswordRequired }}>
+    <Web3Context.Provider
+      value={{
+        network,
+        updateNetwork,
+        ordinals,
+        bsv20s,
+        updatePasswordRequirement,
+        isPasswordRequired,
+        noApprovalLimit,
+        updateNoApprovalLimit,
+      }}
+    >
       {children}
     </Web3Context.Provider>
   );

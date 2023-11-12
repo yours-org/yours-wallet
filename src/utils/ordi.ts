@@ -273,16 +273,15 @@ export function toByteString(str: string): string {
 
 export function showAmount(amt: bigint, dec: number): string {
   const amtStr = amt.toString().replace(/n/, '');
-  const amtNumber = Number(amtStr);
   if (dec === 0) {
-    return amtNumber.toLocaleString();
+    return amtStr;
   }
   let left = amt / BigInt(Math.pow(10, dec));
   let right = amt % BigInt(Math.pow(10, dec));
   if (right > 0) {
-    return `${left.toLocaleString()}.${right.toString().padStart(dec, '0')}`;
+    return `${left}.${right}`;
   }
-  return left.toLocaleString();
+  return `${left}`;
 }
 
 export function normalize(amt: string, dec: number): string {

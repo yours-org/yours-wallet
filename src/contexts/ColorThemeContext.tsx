@@ -27,7 +27,9 @@ export const ThemeProvider = (props: ThemeProviderProps) => {
         setTheme(result.colorTheme);
       }
 
-      const themeOrds = ordinals.filter((ord) =>
+      if (!ordinals.initialized) return;
+
+      const themeOrds = ordinals.data.filter((ord) =>
         whiteListedColorThemeCollections.includes(ord.data?.map?.subTypeData?.collectionId),
       );
 

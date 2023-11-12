@@ -1,4 +1,4 @@
-import { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
+import init, { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { sendOrdinal } from 'js-1sat-ord-web';
 import { useEffect, useState } from 'react';
 import {
@@ -11,15 +11,14 @@ import {
   SCRYPT_PREFIX,
 } from '../utils/constants';
 import { NetWork } from '../utils/network';
-import { useBsvWasm } from './useBsvWasm';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
 import { useNetwork } from './useNetwork';
 import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
 
-import { createTransferP2PKH, createTransferV2P2PKH, getAmtv1, getAmtv2, isBSV20v2 } from '../utils/ordi';
+import { createTransferP2PKH, createTransferV2P2PKH, isBSV20v2 } from '../utils/ordi';
 import { storage } from '../utils/storage';
-import { OrdinalResponse, OrdinalTxo } from './ordTypes';
+import { OrdinalTxo } from './ordTypes';
 import { useTokens } from './useTokens';
 
 export class InscriptionData {
@@ -80,13 +79,28 @@ export type PurchaseOrdinal = {
   marketplaceAddress: string;
 };
 
+export interface BSV20Data {
+  initialized: boolean;
+  data: BSV20[];
+}
+
+export interface OrdinalData {
+  initialized: boolean;
+  data: OrdinalTxo[];
+}
+
 export const useOrds = () => {
   const { ordAddress, retrieveKeys, verifyPassword, ordPubKey, bsvAddress } = useKeys();
 
-  const [ordinals, setOrdinals] = useState<OrdinalResponse>([]);
-  const [bsv20s, setBSV20s] = useState<Array<BSV20>>([]);
+  const [ordinals, setOrdinals] = useState<OrdinalData>({
+    initialized: false,
+    data: [],
+  });
+  const [bsv20s, setBSV20s] = useState<BSV20Data>({
+    initialized: false,
+    data: [],
+  });
   const [isProcessing, setIsProcessing] = useState(false);
-  const { bsvWasmInitialized } = useBsvWasm();
   const { network } = useNetwork();
   const { cacheTokenInfos } = useTokens();
   const { getUtxos, getRawTxById, getSuitableUtxo } = useWhatsOnChain();
@@ -104,16 +118,22 @@ export const useOrds = () => {
 
   const getOrdinals = async () => {
     try {
-      //   setIsProcessing(true); // TODO: set this to true if call is taking more than a second
+      setIsProcessing(true); // TODO: set this to true if call is taking more than a second
       //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
       const ordList = await getOrdUtxos(ordAddress);
-      setOrdinals(ordList);
+      setOrdinals({
+        initialized: true,
+        data: ordList,
+      });
 
       const bsv20List: Array<BSV20> = await getBsv20Balances(ordAddress);
 
       await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.tick));
 
-      setBSV20s(bsv20List.filter((o) => o.all.confirmed > 0n));
+      setBSV20s({
+        initialized: true,
+        data: bsv20List.filter((o) => o.all.confirmed > 0n),
+      });
     } catch (error) {
       console.error('getOrdinals failed:', error);
     } finally {
@@ -127,7 +147,7 @@ export const useOrds = () => {
     password: string,
   ): Promise<OrdOperationResponse> => {
     try {
-      if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
+      await init();
       setIsProcessing(true);
 
       const isAuthenticated = await verifyPassword(password);
@@ -258,8 +278,8 @@ export const useOrds = () => {
 
   const sendBSV20 = async (tick: string, destinationAddress: string, amount: bigint, password: string) => {
     try {
-      if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
       setIsProcessing(true);
+      await init();
 
       const isAuthenticated = await verifyPassword(password);
       if (!isAuthenticated) {
@@ -293,7 +313,7 @@ export const useOrds = () => {
       const isV2 = isBSV20v2(tick);
 
       const tokenTotalAmt = bsv20Utxos.reduce((a, item) => {
-        return a + (isV2 ? getAmtv2(Script.from_hex(item.script!)) : getAmtv1(Script.from_hex(item.script!)));
+        return a + BigInt(item.data!.bsv20!.amt);
       }, 0n);
 
       const tokenChangeAmt = tokenTotalAmt - amount;
@@ -384,8 +404,8 @@ export const useOrds = () => {
     try {
       const { outpoint, price, password } = listing;
 
-      if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
       setIsProcessing(true);
+      await init();
 
       const isAuthenticated = await verifyPassword(password);
       if (!isAuthenticated) {
@@ -529,8 +549,8 @@ export const useOrds = () => {
 
   const cancelGlobalOrderbookListing = async (outpoint: string, password: string): Promise<OrdOperationResponse> => {
     try {
-      if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
       setIsProcessing(true);
+      await init();
 
       const isAuthenticated = await verifyPassword(password);
       if (!isAuthenticated) {
@@ -615,8 +635,8 @@ export const useOrds = () => {
   const purchaseGlobalOrderbookListing = async (purchaseOrdinal: PurchaseOrdinal) => {
     try {
       const { marketplaceAddress, marketplaceRate, outpoint, password } = purchaseOrdinal;
-      if (!bsvWasmInitialized) throw Error('bsv-wasm not initialized!');
       setIsProcessing(true);
+      await init();
 
       const isAuthenticated = await verifyPassword(password);
       if (!isAuthenticated) {

@@ -68,6 +68,17 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, signature]);
 
+  useEffect(() => {
+    const onbeforeunloadFn = () => {
+      storage.remove('signMessageRequest');
+    };
+
+    window.addEventListener('beforeunload', onbeforeunloadFn);
+    return () => {
+      window.removeEventListener('beforeunload', onbeforeunloadFn);
+    };
+  }, []);
+
   const resetSendState = () => {
     setPasswordConfirm('');
     setIsProcessing(false);
@@ -98,22 +109,19 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       return;
     }
 
-    addSnackbar('Successfully Signed!', 'success');
-    setSignature(signRes.signatureHex);
-
-    setTimeout(() => {
-      onSignature();
-      if (!signRes.signatureHex && popupId) chrome.windows.remove(popupId);
-      storage.remove('signMessageRequest');
-      navigate('/bsv-wallet');
-    }, 2000);
-
     chrome.runtime.sendMessage({
       action: 'signMessageResponse',
       ...signRes,
     });
 
+    addSnackbar('Successfully Signed!', 'success');
+    setSignature(signRes.signatureHex);
     setIsProcessing(false);
+    setTimeout(() => {
+      onSignature();
+      storage.remove('signMessageRequest');
+      if (popupId) chrome.windows.remove(popupId);
+    }, 2000);
   };
 
   return (

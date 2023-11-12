@@ -133,7 +133,7 @@ type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unloc
 export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
-  const { exchangeRate, lockingAddress } = useBsv();
+  const { exchangeRate, identityAddress } = useBsv();
   const { getLockedUtxos, getSpentTxids } = useGorillaPool();
   const { getChainInfo } = useWhatsOnChain();
   const { isPasswordRequired } = usePasswordSetting();
@@ -154,9 +154,9 @@ export const AppsAndTools = () => {
 
   const getLockData = async () => {
     setIsProcessing(true);
-    if (!lockingAddress) throw Error('Locking address missing!');
+    if (!identityAddress) throw Error('Identity address missing!');
     const chainInfo = await getChainInfo();
-    let lockedTxos = await getLockedUtxos(lockingAddress);
+    let lockedTxos = await getLockedUtxos(identityAddress);
     const blockHeight = Number(chainInfo?.blocks);
     if (blockHeight) setCurrentBlockHeight(blockHeight);
     const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
@@ -179,11 +179,11 @@ export const AppsAndTools = () => {
   };
 
   useEffect(() => {
-    if (page === 'unlock' && lockingAddress) {
+    if (page === 'unlock' && identityAddress) {
       getLockData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lockingAddress, page]);
+  }, [identityAddress, page]);
 
   useEffect(() => {
     setSelected('apps');
@@ -477,6 +477,7 @@ export const AppsAndTools = () => {
       <Show when={page === 'sponsor' && didSubmit}>
         <BsvSendRequest
           web3Request={[{ address: PANDA_DEV_WALLET, satAmount }]}
+          popupId={undefined}
           onResponse={() => {
             setDidSubmit(false);
             setPage('sponsor-thanks');

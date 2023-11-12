@@ -179,6 +179,7 @@ export const App = () => {
                       <>
                         <Show when={!!bsvSendRequest}>
                           <BsvSendRequest
+                            popupId={popupId}
                             web3Request={bsvSendRequest as Web3SendBsvRequest}
                             onResponse={() => setBsvSendRequest(undefined)}
                           />
@@ -207,11 +208,7 @@ export const App = () => {
                       </>
                     }
                   >
-                    <BsvWallet
-                      thirdPartyAppRequestData={thirdPartyAppRequestData}
-                      messageToSign={messageToSign?.message}
-                      popupId={popupId}
-                    />
+                    <BsvWallet />
                   </Show>
                 }
               />
@@ -224,12 +221,14 @@ export const App = () => {
                       <>
                         <Show when={!!ordinalPurchaseRequest}>
                           <OrdPurchaseRequest
+                            popupId={popupId}
                             web3Request={ordinalPurchaseRequest as Web3PurchaseOrdinalRequest}
                             onResponse={() => setOrdinalPurchaseRequest(undefined)}
                           />
                         </Show>
                         <Show when={!!ordinalTransferRequest}>
                           <OrdTransferRequest
+                            popupId={popupId}
                             web3Request={ordinalTransferRequest as Web3TransferOrdinalRequest}
                             onResponse={() => setOrdinalTransferRequest(undefined)}
                           />

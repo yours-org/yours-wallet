@@ -86,7 +86,7 @@ export type OrdinalProps = {
 
 export const Ordinal = (props: OrdinalProps) => {
   const { url, selected, isTransfer, size, inscription, theme, onClick } = props;
-  const contentType = inscription.origin?.data?.insc?.file?.type;
+  const contentType = inscription?.origin?.data?.insc?.file?.type;
 
   const renderContent = () => {
     switch (true) {
@@ -131,7 +131,7 @@ export const Ordinal = (props: OrdinalProps) => {
           style={{ margin: '0.25rem 0', cursor: 'pointer' }}
           onClick={() => window.open(url, '_blank')}
         >
-          {`#${inscription.origin?.num}`}
+          {`#${inscription?.origin?.num}`}
         </Text>
       </Show>
     </FlexWrapper>

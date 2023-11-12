@@ -118,7 +118,14 @@ export const Settings = () => {
   const { lockWallet } = useWalletLockState();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { addSnackbar } = useSnackbar();
-  const { network, updateNetwork, isPasswordRequired, updatePasswordRequirement } = useWeb3Context();
+  const {
+    network,
+    updateNetwork,
+    isPasswordRequired,
+    updatePasswordRequirement,
+    updateNoApprovalLimit,
+    noApprovalLimit,
+  } = useWeb3Context();
   const [page, setPage] = useState<SettingsPage>('main');
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
@@ -200,8 +207,8 @@ export const Settings = () => {
       payDerivationPath: keys.walletDerivationPath,
       ordPk: keys.ordWif,
       ordDerivationPath: keys.ordDerivationPath,
-      lockingPk: keys.lockingWif,
-      lockingDerivationPath: keys.lockDerivationPath,
+      identityPk: keys.identityWif,
+      identityDerivationPath: keys.identityDerivationPath,
     };
 
     const jsonData = JSON.stringify(keysToExport, null, 2);
@@ -375,6 +382,20 @@ export const Settings = () => {
             theme={theme}
             on={isPasswordRequired}
             onChange={() => updatePasswordRequirement(!isPasswordRequired)}
+          />
+        }
+      />
+      <SettingsRow
+        name="Auto Approve Limit"
+        description="Transactions at or below this BSV amount will be auto approved."
+        jsxElement={
+          <Input
+            theme={theme}
+            placeholder={String(noApprovalLimit)}
+            type="number"
+            onChange={(e) => updateNoApprovalLimit(Number(e.target.value))}
+            value={noApprovalLimit}
+            style={{ width: '5rem', margin: 0 }}
           />
         }
       />

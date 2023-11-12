@@ -1,6 +1,5 @@
-import { P2PKHAddress, Transaction } from 'bsv-wasm-web';
+import init, { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { DefaultTheme, styled } from 'styled-components';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -8,7 +7,6 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useBsvWasm } from '../../hooks/useBsvWasm';
 import { SignatureResponse, Web3GetSignaturesRequest, useContracts } from '../../hooks/useContracts';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
@@ -108,14 +106,24 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
   const { theme } = useTheme();
   const [showDetail, setShowDetail] = useState(false);
   const { request } = props;
-  const { bsvWasmInitialized } = useBsvWasm();
-  const [tx, setTx] = useState<Transaction | undefined>(undefined);
+  const [txOutputs, setTxOutputs] = useState<{ asm: string; satoshis: number }[]>([]);
 
   useEffect(() => {
-    if (bsvWasmInitialized) {
-      setTx(Transaction.from_hex(request.txHex));
-    }
-  }, [bsvWasmInitialized, request.txHex]);
+    const setTheTx = async () => {
+      await init();
+      const tx = Transaction.from_hex(request.txHex);
+      const numOuts = tx.get_noutputs();
+      const outputs: { asm: string; satoshis: number }[] = [];
+      for (let i = 0; i < numOuts; i++) {
+        const output = tx.get_output(i);
+        const asm = output!.get_script_pub_key().to_asm_string();
+        const satoshis = output!.get_satoshis();
+        outputs.push({ asm, satoshis: Number(satoshis) });
+      }
+      setTxOutputs(outputs);
+    };
+    setTheTx();
+  }, [request.txHex]);
 
   return (
     <TxContainer>
@@ -153,10 +161,8 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
           <Text theme={theme} style={{ margin: '0.5rem 0' }}>
             Outputs
           </Text>
-          {tx ? (
-            [...Array(tx.get_noutputs()).keys()].map((idx: number) => {
-              const output = tx.get_output(idx);
-              const asm = output!.get_script_pub_key().to_asm_string();
+          {txOutputs ? (
+            txOutputs.map(({ asm, satoshis }, idx: number) => {
               const pubkeyHash = (/^OP_DUP OP_HASH160 ([0-9a-fA-F]{40}) OP_EQUALVERIFY OP_CHECKSIG$/.exec(asm) ||
                 [])[1];
               const isP2PKH = !!pubkeyHash;
@@ -170,7 +176,7 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
                     idx={idx}
                     tag={isP2PKH ? 'P2PKH' : 'nonStandard'}
                     addr={toAddr}
-                    sats={Number(output!.get_satoshis())}
+                    sats={satoshis}
                     theme={theme}
                   />
                 </TxOutput>
@@ -201,7 +207,6 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { setSelected } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const navigate = useNavigate();
   const { isPasswordRequired } = useWeb3Context();
 
   const { getSigsRequest, onSignature, popupId } = props;
@@ -220,6 +225,17 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, getSigsResponse]);
 
+  useEffect(() => {
+    const onbeforeunloadFn = () => {
+      storage.remove('getSignaturesRequest');
+    };
+
+    window.addEventListener('beforeunload', onbeforeunloadFn);
+    return () => {
+      window.removeEventListener('beforeunload', onbeforeunloadFn);
+    };
+  }, []);
+
   const resetSendState = () => {
     setPasswordConfirm('');
     setGetSigsResponse(undefined);
@@ -232,7 +248,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     await sleep(25);
 
     if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
+      addSnackbar('You must enter a password!', 'error', 3000);
       setIsProcessing(false);
       return;
     }
@@ -247,34 +263,33 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
           ? 'Unknown Address: ' + (getSigsRes.error.cause ?? '')
           : 'An unknown error has occurred! Try again.';
 
-      addSnackbar(message, 'error', 5000);
+      chrome.runtime.sendMessage({
+        action: 'getSignaturesResponse',
+        ...getSigsRes,
+      });
 
-      if (getSigsRes.error.message === 'invalid-password') {
-        // could try again only if the password is wrong
-        setIsProcessing(false);
-        return;
-      }
-    }
+      setIsProcessing(false);
 
-    if (getSigsRes?.sigResponses) {
-      addSnackbar('Successfully Signed!', 'success');
+      addSnackbar(message, 'error', 3000);
+
+      return;
     }
 
     setGetSigsResponse(getSigsRes.sigResponses);
-
-    setTimeout(() => {
-      onSignature();
-      if (!getSigsRes && popupId) chrome.windows.remove(popupId);
-      storage.remove('getSignaturesRequest');
-      navigate('/bsv-wallet');
-    }, 2000);
-
     chrome.runtime.sendMessage({
       action: 'getSignaturesResponse',
       ...getSigsRes,
     });
 
     setIsProcessing(false);
+
+    addSnackbar('Successfully Signed!', 'success');
+
+    setTimeout(() => {
+      onSignature();
+      storage.remove('getSignaturesRequest');
+      if (popupId) chrome.windows.remove(popupId);
+    }, 2000);
   };
 
   const rejectSigning = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {

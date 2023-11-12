@@ -57,8 +57,8 @@ export const useWhatsOnChain = () => {
 
   const getUtxos = async (fromAddress: string, pullFresh?: boolean): Promise<UTXO[]> => {
     return new Promise((resolve) => {
-      try {
-        storage.get(['paymentUtxos'], async ({ paymentUtxos }) => {
+      storage.get(['paymentUtxos'], async ({ paymentUtxos }) => {
+        try {
           if (!pullFresh && paymentUtxos?.length > 0) {
             resolve(paymentUtxos);
             return;
@@ -77,11 +77,11 @@ export const useWhatsOnChain = () => {
             .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
           storage.set({ paymentUtxos: utxos });
           resolve(utxos);
-        });
-      } catch (error) {
-        console.log(error);
-        return [];
-      }
+        } catch (error) {
+          console.log(error);
+          resolve([]);
+        }
+      });
     });
   };
 

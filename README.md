@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Version: v1.4.0
+Version: v1.6.2
 
 <a href="https://chrome.google.com/webstore/detail/panda-wallet/mlbnicldlpdimbjdcncnklfempedeipj" target="_blank">🐼 Download Chrome Extension 🐼</a>
 
@@ -29,12 +29,6 @@ You can also check out the live sample app: https://panda-wallet-sample-app.verc
 #### Contributing 🙌
 
 If you'd like to contribute to Panda Wallet's development check out [contributing](CONTRIBUTING.md).
-
-## Wallet Derivation Paths
-
-> _**Note:**_ The BSV keys use derivation path `m / 44' / 236' / 0' / 0 / 0`
-
-> _**Note:**_ The Ord keys use derivation path `m / 44' / 236' / 1' / 0 / 0`
 
 ## Issues, Bugs, and Feature Requests
 

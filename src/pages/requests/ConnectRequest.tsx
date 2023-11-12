@@ -1,14 +1,15 @@
-import { styled } from 'styled-components';
-import { ButtonContainer, Divider, HeaderText, Text } from '../../components/Reusable';
-import { Button } from '../../components/Button';
-import { ThirdPartyAppRequestData, WhitelistedApp } from '../../App';
-import { useTheme } from '../../hooks/useTheme';
 import { useContext, useEffect } from 'react';
+import { useState } from 'react';
+import { styled } from 'styled-components';
+import { ThirdPartyAppRequestData, WhitelistedApp } from '../../App';
+import { Button } from '../../components/Button';
+import { ButtonContainer, Divider, HeaderText, Text } from '../../components/Reusable';
 import { BottomMenuContext } from '../../contexts/BottomMenuContext';
-import { storage } from '../../utils/storage';
-import { useNavigate } from 'react-router-dom';
 import { useBsv } from '../../hooks/useBsv';
 import { useOrds } from '../../hooks/useOrds';
+import { useTheme } from '../../hooks/useTheme';
+import { storage } from '../../utils/storage';
+import { useSnackbar } from '../../hooks/useSnackbar';
 
 const Container = styled.div`
   display: flex;
@@ -35,8 +36,9 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   const { thirdPartyAppRequestData, whiteListedApps, popupId, onDecision } = props;
   const { theme } = useTheme();
   const context = useContext(BottomMenuContext);
-  const navigate = useNavigate();
-  const { bsvPubKey, lockingPubKey } = useBsv();
+  const { addSnackbar } = useSnackbar();
+  const [isDecided, setIsDecided] = useState(false);
+  const { bsvPubKey, identityPubKey } = useBsv();
   const { ordPubKey } = useOrds();
 
   useEffect(() => {
@@ -45,6 +47,35 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
 
     return () => context.showMenu();
   }, [context]);
+
+  useEffect(() => {
+    if (isDecided) return;
+    if (thirdPartyAppRequestData && !thirdPartyAppRequestData.isAuthorized) return;
+    if (!bsvPubKey || !ordPubKey) return;
+    if (!window.location.href.includes('localhost')) {
+      chrome.runtime.sendMessage({
+        action: 'userConnectResponse',
+        decision: 'approved',
+        pubKeys: { bsvPubKey, ordPubKey },
+      });
+      storage.remove('connectRequest');
+      // We don't want the window to stay open after a successful connection. The 10ms timeout is used because of some weirdness with how chrome.sendMessage() works
+      setTimeout(() => {
+        if (popupId) chrome.windows.remove(popupId);
+      }, 10);
+    }
+  }, [bsvPubKey, ordPubKey, popupId, thirdPartyAppRequestData, isDecided]);
+
+  useEffect(() => {
+    const onbeforeunloadFn = () => {
+      storage.remove('connectRequest');
+    };
+
+    window.addEventListener('beforeunload', onbeforeunloadFn);
+    return () => {
+      window.removeEventListener('beforeunload', onbeforeunloadFn);
+    };
+  }, []);
 
   const handleConnectDecision = async (approved: boolean) => {
     if (chrome.runtime) {
@@ -61,19 +92,25 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
         chrome.runtime.sendMessage({
           action: 'userConnectResponse',
           decision: 'approved',
-          pubKeys: { bsvPubKey, ordPubKey, lockingPubKey },
+          pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
         });
+        addSnackbar(`Approved`, 'success');
       } else {
         chrome.runtime.sendMessage({
           action: 'userConnectResponse',
           decision: 'declined',
         });
-      }
 
-      if (!approved && popupId) chrome.windows.remove(popupId);
-      storage.remove('connectRequest');
-      navigate('/bsv-wallet');
+        addSnackbar(`Declined`, 'error');
+      }
     }
+
+    setIsDecided(true);
+
+    storage.remove('connectRequest');
+    setTimeout(() => {
+      if (popupId) chrome.windows.remove(popupId);
+    }, 2000);
   };
 
   return (
