@@ -1,8 +1,8 @@
 // ThemeContext.tsx
 import React, { ReactNode, createContext, useEffect, useState } from 'react';
+import { useOrds } from '../hooks/useOrds';
 import { Theme, defaultTheme } from '../theme';
 import { whiteListedColorThemeCollections } from '../utils/constants';
-import { useOrds } from '../hooks/useOrds';
 import { storage } from '../utils/storage';
 
 export interface ThemeContextProps {
@@ -30,7 +30,7 @@ export const ThemeProvider = (props: ThemeProviderProps) => {
       if (!ordinals.initialized) return;
 
       const themeOrds = ordinals.data.filter((ord) =>
-        whiteListedColorThemeCollections.includes(ord.data?.map?.subTypeData?.collectionId),
+        whiteListedColorThemeCollections.includes(ord.origin?.data?.map?.subTypeData?.collectionId),
       );
 
       if (themeOrds.length > 0) {
