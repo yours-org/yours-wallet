@@ -39,7 +39,7 @@ export const useKeys = () => {
   const [ordPubKey, setOrdPubKey] = useState('');
   const [identityPubKey, setIdentityPubKey] = useState('');
 
-  const { network } = useNetwork();
+  const { network, isAddressOnRightNetwork } = useNetwork();
   const { isPasswordRequired } = usePasswordSetting();
   const { getBaseUrl } = useWhatsOnChain();
   const { broadcastWithGorillaPool } = useGorillaPool();
@@ -106,6 +106,7 @@ export const useKeys = () => {
   const sweepLegacy = async (keys: Keys) => {
     await init();
     const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
+    if (!isAddressOnRightNetwork(sweepWallet.address)) return;
     const { data } = await axios.get<UTXO[]>(`${getBaseUrl()}/address/${sweepWallet.address}/unspent`);
     const utxos = data;
     if (utxos.length === 0) return;

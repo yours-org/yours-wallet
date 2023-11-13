@@ -18,7 +18,7 @@ export type GorillaPoolBroadcastResponse = {
 };
 
 export const useGorillaPool = () => {
-  const { network } = useNetwork();
+  const { network, isAddressOnRightNetwork } = useNetwork();
   const { getTokenDecimals, getTokenSym } = useTokens();
 
   const getOrdinalsBaseUrl = () => {
@@ -27,6 +27,7 @@ export const useGorillaPool = () => {
 
   const getOrdUtxos = async (ordAddress: string): Promise<OrdinalResponse> => {
     try {
+      if (!isAddressOnRightNetwork(ordAddress)) return [];
       const { data } = await axios.get<OrdinalTxo[]>(
         `${getOrdinalsBaseUrl()}/api/txos/address/${ordAddress}/unspent?limit=100&offset=0`,
       );
@@ -90,6 +91,7 @@ export const useGorillaPool = () => {
   };
 
   const getBsv20Balances = async (ordAddress: string) => {
+    if (!isAddressOnRightNetwork(ordAddress)) return [];
     const res = await axios.get(`${getOrdinalsBaseUrl()}/api/bsv20/${ordAddress}/balance`);
 
     const bsv20List: Array<BSV20> = res.data.map(
@@ -156,6 +158,7 @@ export const useGorillaPool = () => {
 
   const getLockedUtxos = async (address: string) => {
     try {
+      if (!isAddressOnRightNetwork(address)) return [];
       //TODO: use this instead of test endpoint - `${getOrdinalsBaseUrl()}/api/locks/address/${address}/unspent?limit=100&offset=0`
       const { data } = await axios.get(
         `https://locks.gorillapool.io/api/locks/address/${address}/unspent?limit=100&offset=0`,

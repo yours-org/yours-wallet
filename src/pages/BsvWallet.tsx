@@ -118,9 +118,6 @@ export const BsvWallet = () => {
     if (!message && bsvAddress) {
       resetSendState();
       setPageState('main');
-      setTimeout(() => {
-        updateBsvBalance(true);
-      }, 1000);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, bsvAddress]);
@@ -133,6 +130,10 @@ export const BsvWallet = () => {
     setPasswordConfirm('');
     setSuccessTxId('');
     setIsProcessing(false);
+
+    setTimeout(() => {
+      updateBsvBalance(true);
+    }, 500);
   };
 
   const handleCopyToClipboard = () => {

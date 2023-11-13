@@ -31,7 +31,7 @@ export type ChainInfo = {
 };
 
 export const useWhatsOnChain = () => {
-  const { network } = useNetwork();
+  const { network, isAddressOnRightNetwork } = useNetwork();
   const apiKey = process.env.REACT_APP_WOC_API_KEY;
   const config =
     network === NetWork.Mainnet
@@ -56,6 +56,7 @@ export const useWhatsOnChain = () => {
   };
 
   const getUtxos = async (fromAddress: string, pullFresh?: boolean): Promise<UTXO[]> => {
+    if (!isAddressOnRightNetwork(fromAddress)) return [];
     return new Promise((resolve) => {
       storage.get(['paymentUtxos'], async ({ paymentUtxos }) => {
         try {

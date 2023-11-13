@@ -145,6 +145,9 @@ export const OrdWallet = () => {
     setBsvListAmount(undefined);
     setIsProcessing(false);
     setSelectedOrdinal(undefined);
+    setTimeout(() => {
+      getOrdinals();
+    }, 500);
   };
 
   const getErrorMessage = (response: OrdOperationResponse) => {

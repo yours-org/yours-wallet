@@ -99,6 +99,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
     storage.set({
       network: n,
     });
+    storage.set({ paymentUtxos: [] });
     setNetwork(n);
   };
 
