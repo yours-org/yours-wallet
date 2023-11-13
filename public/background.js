@@ -647,6 +647,14 @@ const processSignMessageResponse = (message) => {
 const processBroadcastResponse = (message) => {
   if (!responseCallbackForBroadcastRequest) throw Error('Missing callback!');
   try {
+    if (message?.error) {
+      responseCallbackForBroadcastRequest({
+        type: 'broadcast',
+        success: false,
+        error: message?.error,
+      });
+      return;
+    }
     responseCallbackForBroadcastRequest({
       type: 'broadcast',
       success: true,

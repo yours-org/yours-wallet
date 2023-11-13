@@ -19,8 +19,8 @@ import { useWhatsOnChain } from './useWhatsOnChain';
 import { createTransferP2PKH, createTransferV2P2PKH, isBSV20v2 } from '../utils/ordi';
 import { storage } from '../utils/storage';
 import { OrdinalTxo } from './ordTypes';
-import { useTokens } from './useTokens';
 import { UTXO } from './useBsv';
+import { useTokens } from './useTokens';
 
 export class InscriptionData {
   type?: string = '';
@@ -186,7 +186,7 @@ export const useOrds = () => {
         const out = tx.get_output(ordUtxo.vout);
         const script = out?.get_script_pub_key();
         if (script) {
-          ordUtxo.script = script.to_asm_string();
+          ordUtxo.script = script.to_hex();
         }
       }
 
@@ -199,7 +199,7 @@ export const useOrds = () => {
         const out = tx.get_output(ordUtxo.vout);
         const script = out?.get_script_pub_key();
         if (script) {
-          fundingUtxo.script = script.to_asm_string();
+          fundingUtxo.script = script.to_hex();
         }
       }
 
@@ -246,6 +246,8 @@ export const useOrds = () => {
     ordPrivateKey: PrivateKey,
     destination: string,
   ): Promise<BuildAndBroadcastResponse | undefined> => {
+    fundingUtxo.script = Script.from_hex(fundingUtxo.script).to_asm_string();
+    ordUtxo.script = Script.from_hex(ordUtxo.script).to_asm_string();
     const sendRes = await sendOrdinal(
       fundingUtxo,
       ordUtxo,
@@ -769,7 +771,7 @@ export const useOrds = () => {
           txid,
           vout: 2,
           satoshis: changeAmt,
-          script: P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_asm_string(),
+          script: P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex(),
         });
       }
       const broadcastRes = await broadcastWithGorillaPool(rawTx);

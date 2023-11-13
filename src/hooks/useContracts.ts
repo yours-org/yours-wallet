@@ -217,7 +217,7 @@ export const useContracts = () => {
       const fundingUtxos = await getUtxos(keys.walletAddress);
       fundingUtxos.push({
         satoshis: change,
-        script: walletAddress.get_locking_script().to_asm_string(),
+        script: walletAddress.get_locking_script().to_hex(),
         txid,
         vout: 0,
       });

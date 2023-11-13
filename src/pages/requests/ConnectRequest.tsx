@@ -1,5 +1,4 @@
-import { useContext, useEffect } from 'react';
-import { useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { ThirdPartyAppRequestData, WhitelistedApp } from '../../App';
 import { Button } from '../../components/Button';
@@ -7,9 +6,9 @@ import { ButtonContainer, Divider, HeaderText, Text } from '../../components/Reu
 import { BottomMenuContext } from '../../contexts/BottomMenuContext';
 import { useBsv } from '../../hooks/useBsv';
 import { useOrds } from '../../hooks/useOrds';
+import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { storage } from '../../utils/storage';
-import { useSnackbar } from '../../hooks/useSnackbar';
 
 const Container = styled.div`
   display: flex;
@@ -56,7 +55,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
       chrome.runtime.sendMessage({
         action: 'userConnectResponse',
         decision: 'approved',
-        pubKeys: { bsvPubKey, ordPubKey },
+        pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
       });
       storage.remove('connectRequest');
       // We don't want the window to stay open after a successful connection. The 10ms timeout is used because of some weirdness with how chrome.sendMessage() works
@@ -64,7 +63,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
         if (popupId) chrome.windows.remove(popupId);
       }, 10);
     }
-  }, [bsvPubKey, ordPubKey, popupId, thirdPartyAppRequestData, isDecided]);
+  }, [bsvPubKey, ordPubKey, popupId, thirdPartyAppRequestData, isDecided, identityPubKey]);
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
