@@ -1,16 +1,15 @@
-import { useBottomMenu } from '../../hooks/useBottomMenu';
 import React, { useEffect, useState } from 'react';
 import { Button } from '../../components/Button';
-import { Text, HeaderText, ConfirmContent, FormContainer } from '../../components/Reusable';
-import { Show } from '../../components/Show';
-import { useSnackbar } from '../../hooks/useSnackbar';
 import { PageLoader } from '../../components/PageLoader';
-import { sleep } from '../../utils/sleep';
-import { useTheme } from '../../hooks/useTheme';
+import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
+import { Show } from '../../components/Show';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { Web3BroadcastRequest, useBsv } from '../../hooks/useBsv';
+import { useGorillaPool } from '../../hooks/useGorillaPool';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { useTheme } from '../../hooks/useTheme';
+import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
-import { useNavigate } from 'react-router-dom';
-import { useWhatsOnChain } from '../../hooks/useWhatsOnChain';
 
 export type BroadcastResponse = {
   txid: string;
@@ -28,9 +27,8 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const { setSelected } = useBottomMenu();
   const [txid, setTxid] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const navigate = useNavigate();
 
-  const { broadcastRawTx } = useWhatsOnChain();
+  const { broadcastWithGorillaPool } = useGorillaPool();
   const { isProcessing, setIsProcessing } = useBsv();
 
   useEffect(() => {
@@ -67,10 +65,20 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    const txid = await broadcastRawTx(request.rawtx);
+    const { txid, message } = await broadcastWithGorillaPool(request.rawtx);
     if (!txid) {
       addSnackbar('Error broadcasting the raw tx!', 'error');
       setIsProcessing(false);
+
+      chrome.runtime.sendMessage({
+        action: 'broadcastResponse',
+        error: message ?? 'Unknown error',
+      });
+
+      setTimeout(() => {
+        onBroadcast();
+        if (popupId) chrome.windows.remove(popupId);
+      }, 2000);
       return;
     }
     setTxid(txid);

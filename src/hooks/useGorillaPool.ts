@@ -49,9 +49,9 @@ export const useGorillaPool = () => {
       } else {
         return res.data as GorillaPoolErrorMessage;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.log(error);
-      return { message: JSON.stringify(error) };
+      return { message: JSON.stringify(error.response.data ?? 'Unknown error while broadcasting tx') };
     }
   };
 

@@ -30,9 +30,9 @@ const RequestDetailsContainer = styled.div<ColorThemeProps>`
 
 export type SignMessageResponse = {
   address?: string;
-  pubKeyHex?: string;
-  signedMessage?: string;
-  signatureHex?: string;
+  pubKey?: string;
+  message?: string;
+  sig?: string;
   keyType?: DerivationTags;
   error?: string;
 };
@@ -96,7 +96,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
     }
 
     const signRes = await signMessage(messageToSign, passwordConfirm);
-    if (!signRes?.signatureHex) {
+    if (!signRes?.sig) {
       const message =
         signRes?.error === 'invalid-password'
           ? 'Invalid Password!'
@@ -115,7 +115,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
     });
 
     addSnackbar('Successfully Signed!', 'success');
-    setSignature(signRes.signatureHex);
+    setSignature(signRes.sig);
     setIsProcessing(false);
     setTimeout(() => {
       onSignature();

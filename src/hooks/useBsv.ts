@@ -20,7 +20,14 @@ import { storage } from '../utils/storage';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
 import { useNetwork } from './useNetwork';
-import { UTXO, useWhatsOnChain } from './useWhatsOnChain';
+import { useWhatsOnChain } from './useWhatsOnChain';
+
+export type UTXO = {
+  satoshis: number;
+  vout: number;
+  txid: string;
+  script: string;
+};
 
 type SendBsvResponse = {
   txid?: string;
@@ -29,10 +36,10 @@ type SendBsvResponse = {
 };
 
 export type Web3SendBsvRequest = {
-  satAmount: number;
+  satoshis: number;
   address?: string;
   data?: string[]; // hex string array
-  script?: string;
+  script?: string; // hex string
 }[];
 
 export type Web3BroadcastRequest = {
@@ -72,7 +79,7 @@ export const useBsv = () => {
     try {
       setIsProcessing(true);
       await init();
-      const requestSats = request.reduce((a: number, item: { satAmount: number }) => a + item.satAmount, 0);
+      const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
       const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
 
       if (bsvSendAmount > Number(noApprovalLimit)) {
@@ -89,12 +96,12 @@ export const useBsv = () => {
       const paymentPk = PrivateKey.from_wif(keys.walletWif);
       const pubKey = paymentPk.to_public_key();
       const fromAddress = pubKey.to_address().set_chain_params(getChainParams(network)).to_string();
-      const amount = request.reduce((a, r) => a + r.satAmount, 0);
+      const amount = request.reduce((a, r) => a + r.satoshis, 0);
 
       // Format in and outs
       const utxos = await getUtxos(fromAddress, true);
 
-      const script = P2PKHAddress.from_string(fromAddress).get_locking_script().to_asm_string();
+      const script = P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex();
 
       const fundingUtxos = utxos
         .map((utxo: UTXO) => {
@@ -150,12 +157,12 @@ export const useBsv = () => {
       // build txins from our inputs
       let idx = 0;
       for (let u of inputs || []) {
-        const inTx = new TxIn(Buffer.from(u.txid, 'hex'), u.vout, Script.from_asm_string(''));
+        const inTx = new TxIn(Buffer.from(u.txid, 'hex'), u.vout, Script.from_hex(''));
 
         inTx.set_satoshis(BigInt(u.satoshis));
         tx.add_input(inTx);
 
-        const sig = tx.sign(paymentPk, SigHash.InputOutputs, idx, Script.from_asm_string(u.script), BigInt(u.satoshis));
+        const sig = tx.sign(paymentPk, SigHash.InputOutputs, idx, Script.from_hex(u.script), BigInt(u.satoshis));
 
         inTx.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
         tx.set_input(idx, inTx);
@@ -234,9 +241,9 @@ export const useBsv = () => {
       // const signature = privateKey.sign_message(msgBuf);
       return {
         address,
-        pubKeyHex: publicKey.to_hex(),
-        signedMessage: message,
-        signatureHex: signature.to_compact_hex(),
+        pubKey: publicKey.to_hex(),
+        message: message,
+        sig: signature.to_compact_hex(),
         keyType: 'identity',
       };
     } catch (error) {

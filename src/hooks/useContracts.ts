@@ -11,7 +11,7 @@ import { useWhatsOnChain } from './useWhatsOnChain';
  * `SignatureRequest` contains required informations for a signer to sign a certain input of a transaction.
  */
 export interface SignatureRequest {
-  prevTxId: string;
+  prevTxid: string;
   outputIndex: number;
   /** The index of input to sign. */
   inputIndex: number;
@@ -20,7 +20,7 @@ export interface SignatureRequest {
   /** The address(es) of corresponding private key(s) required to sign the input. */
   address: string | string[];
   /** The previous output script of input, default value is a P2PKH locking script for the `address` if omitted. */
-  scriptHex?: string;
+  script?: string;
   /** The sighash type, default value is `SIGHASH_ALL | SIGHASH_FORKID` if omitted. */
   sigHashType?: number;
   /**
@@ -34,7 +34,7 @@ export interface SignatureRequest {
 
 export type Web3GetSignaturesRequest = {
   /** The raw transaction hex to get signatures from. */
-  txHex: string;
+  rawtx: string;
 
   /** The signature requst informations, see details in `SignatureRequest`. */
   sigRequests: SignatureRequest[];
@@ -49,7 +49,7 @@ export interface SignatureResponse {
   /** The signature.*/
   sig: string;
   /** The public key bound with the `sig`. */
-  publicKey: string;
+  pubKey: string;
   /** The sighash type, default value is `SIGHASH_ALL | SIGHASH_FORKID` if omitted. */
   sigHashType: number;
   /** The index of the OP_CODESEPARATOR to split the previous output script at.*/
@@ -97,17 +97,17 @@ export const useContracts = () => {
         });
       };
 
-      const tx = Transaction.from_hex(request.txHex);
+      const tx = Transaction.from_hex(request.rawtx);
       const sigResponses: SignatureResponse[] = request.sigRequests.flatMap((sigReq) => {
         const privkeys = getPrivKeys(sigReq.address);
 
         return privkeys.map((privKey: PrivateKey) => {
           const addr = privKey.to_public_key().to_address();
-          const script = sigReq.scriptHex ? Script.from_hex(sigReq.scriptHex) : addr.get_locking_script();
+          const script = sigReq.script ? Script.from_hex(sigReq.script) : addr.get_locking_script();
           const txIn =
             tx.get_input(sigReq.inputIndex) ||
-            new TxIn(Buffer.from(sigReq.prevTxId, 'hex'), sigReq.outputIndex, script);
-          txIn.set_prev_tx_id(Buffer.from(sigReq.prevTxId, 'hex'));
+            new TxIn(Buffer.from(sigReq.prevTxid, 'hex'), sigReq.outputIndex, script);
+          txIn.set_prev_tx_id(Buffer.from(sigReq.prevTxid, 'hex'));
           txIn.set_vout(sigReq.outputIndex);
           txIn.set_satoshis(BigInt(sigReq.satoshis));
           txIn.set_locking_script(script);
@@ -128,7 +128,7 @@ export const useContracts = () => {
 
           return {
             sig,
-            publicKey: privKey.to_public_key().to_hex(),
+            pubKey: privKey.to_public_key().to_hex(),
             inputIndex: sigReq.inputIndex,
             sigHashType: sigReq.sigHashType || DEFAULT_SIGHASH_TYPE,
             csIdx: sigReq.csIdx,
@@ -176,7 +176,7 @@ export const useContracts = () => {
       let satsIn = 0;
       let size = 0;
       for (const lock of locks) {
-        const txin = new TxIn(Buffer.from(lock.txid, 'hex'), lock.vout, Script.from_asm_string(''));
+        const txin = new TxIn(Buffer.from(lock.txid, 'hex'), lock.vout, Script.from_hex(''));
         txin?.set_sequence(0);
         tx.add_input(txin);
         satsIn += lock.satoshis;
@@ -217,7 +217,7 @@ export const useContracts = () => {
       const fundingUtxos = await getUtxos(keys.walletAddress);
       fundingUtxos.push({
         satoshis: change,
-        script: walletAddress.get_locking_script().to_asm_string(),
+        script: walletAddress.get_locking_script().to_hex(),
         txid,
         vout: 0,
       });

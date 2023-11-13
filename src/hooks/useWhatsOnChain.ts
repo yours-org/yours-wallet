@@ -4,12 +4,7 @@ import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from '../u
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
 import { useNetwork } from './useNetwork';
-export type UTXO = {
-  satoshis: number;
-  vout: number;
-  txid: string;
-  script: string;
-};
+import { UTXO } from './useBsv';
 
 export type WocUtxo = {
   height: number;
@@ -72,7 +67,7 @@ export const useWhatsOnChain = () => {
                 satoshis: utxo.value,
                 vout: utxo.tx_pos,
                 txid: utxo.tx_hash,
-                script: P2PKHAddress.from_string(fromAddress).get_locking_script().to_asm_string(),
+                script: P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex(),
               } as UTXO;
             })
             .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));

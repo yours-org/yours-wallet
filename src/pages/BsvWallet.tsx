@@ -174,12 +174,12 @@ export const BsvWallet = () => {
       return;
     }
 
-    let satAmount = satSendAmount ?? 0;
+    let satoshis = satSendAmount ?? 0;
     if (amountType === 'usd' && usdSendAmount) {
-      satAmount = Math.ceil((usdSendAmount / exchangeRate) * BSV_DECIMAL_CONVERSION);
+      satoshis = Math.ceil((usdSendAmount / exchangeRate) * BSV_DECIMAL_CONVERSION);
     }
 
-    const sendRes = await sendBsv([{ address: receiveAddress, satAmount }], passwordConfirm);
+    const sendRes = await sendBsv([{ address: receiveAddress, satoshis }], passwordConfirm);
     if (!sendRes.txid || sendRes.error) {
       const message =
         sendRes.error === 'invalid-password'
