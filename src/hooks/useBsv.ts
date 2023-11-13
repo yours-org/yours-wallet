@@ -101,7 +101,7 @@ export const useBsv = () => {
       // Format in and outs
       const utxos = await getUtxos(fromAddress, true);
 
-      const script = P2PKHAddress.from_string(fromAddress).get_locking_script().to_asm_string();
+      const script = P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex();
 
       const fundingUtxos = utxos
         .map((utxo: UTXO) => {

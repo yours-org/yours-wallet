@@ -482,7 +482,7 @@ const processGetSignaturesRequest = (message, sendResponse) => {
     chrome.storage.local
       .set({
         getSignaturesRequest: {
-          txHex: message.params.txHex,
+          rawtx: message.params.rawtx,
           sigRequests: message.params.sigRequests,
         },
       })
@@ -528,7 +528,7 @@ const processConnectResponse = (message) => {
       responseCallbackForConnectRequest({
         type: 'connect',
         success: true,
-        data: message.decision === 'approved' ? message.pubKeys : 'User canceled connection',
+        data: message.decision === 'approved' ? message.pubKeys.identityPubKey : 'User canceled connection',
       });
     }
   } catch (error) {
@@ -623,9 +623,9 @@ const processSignMessageResponse = (message) => {
       success: true,
       data: {
         address: message?.address,
-        pubKeyHex: message?.pubKeyHex,
-        signedMessage: message?.signedMessage,
-        signatureHex: message?.signatureHex,
+        pubKey: message?.pubKey,
+        message: message?.message,
+        sig: message?.sig,
         keyType: message?.keyType,
       },
     });
