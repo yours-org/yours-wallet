@@ -101,8 +101,8 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
         signRes?.error === 'invalid-password'
           ? 'Invalid Password!'
           : signRes?.error === 'key-type'
-          ? 'Key type does not exist!'
-          : 'An unknown error has occurred! Try again.';
+            ? 'Key type does not exist!'
+            : 'An unknown error has occurred! Try again.';
 
       addSnackbar(message, 'error');
       setIsProcessing(false);

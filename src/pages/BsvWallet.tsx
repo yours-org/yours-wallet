@@ -185,10 +185,10 @@ export const BsvWallet = () => {
         sendRes.error === 'invalid-password'
           ? 'Invalid Password!'
           : sendRes.error === 'insufficient-funds'
-          ? 'Insufficient Funds!'
-          : sendRes.error === 'fee-to-high'
-          ? 'Miner fee to high!'
-          : 'An unknown error has occurred! Try again.';
+            ? 'Insufficient Funds!'
+            : sendRes.error === 'fee-to-high'
+              ? 'Miner fee to high!'
+              : 'An unknown error has occurred! Try again.';
 
       addSnackbar(message, 'error');
       setPasswordConfirm('');
@@ -210,10 +210,10 @@ export const BsvWallet = () => {
           ? satSendAmount / BSV_DECIMAL_CONVERSION
           : undefined
         : amountType === 'usd'
-        ? usdSendAmount
           ? usdSendAmount
-          : undefined
-        : undefined;
+            ? usdSendAmount
+            : undefined
+          : undefined;
     };
 
     calcValue();
@@ -223,8 +223,8 @@ export const BsvWallet = () => {
     return amountType === 'bsv' && satSendAmount
       ? `Send ${(satSendAmount / BSV_DECIMAL_CONVERSION).toFixed(8)}`
       : amountType === 'usd' && usdSendAmount
-      ? `Send ${formatUSD(usdSendAmount)}`
-      : 'Enter Send Details';
+        ? `Send ${formatUSD(usdSendAmount)}`
+        : 'Enter Send Details';
   };
 
   const formatBalance = (number: number) => {
@@ -327,8 +327,8 @@ export const BsvWallet = () => {
                 satSendAmount !== null && satSendAmount !== undefined
                   ? satSendAmount / BSV_DECIMAL_CONVERSION
                   : usdSendAmount !== null && usdSendAmount !== undefined
-                  ? usdSendAmount
-                  : ''
+                    ? usdSendAmount
+                    : ''
               }
               onChange={(e) => {
                 const inputValue = e.target.value;

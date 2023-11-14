@@ -229,10 +229,10 @@ export const AppsAndTools = () => {
         unlockRes.error === 'invalid-password'
           ? 'Invalid Password!'
           : unlockRes.error === 'insufficient-funds'
-          ? 'Insufficient Funds!'
-          : unlockRes.error === 'broadcast-error'
-          ? 'There was an error broadcasting the tx!'
-          : 'An unknown error has occurred! Try again.';
+            ? 'Insufficient Funds!'
+            : unlockRes.error === 'broadcast-error'
+              ? 'There was an error broadcasting the tx!'
+              : 'An unknown error has occurred! Try again.';
 
       addSnackbar(message, 'error');
       setPasswordConfirm('');
@@ -462,8 +462,8 @@ export const AppsAndTools = () => {
           {page === 'sponsor' || page === 'sponsor-thanks' || page === 'unlock'
             ? ''
             : page === 'discover-apps'
-            ? 'Discover Apps'
-            : 'Apps & Tools'}
+              ? 'Discover Apps'
+              : 'Apps & Tools'}
         </HeaderText>
       </HeaderWrapper>
       <Show when={isProcessing && page === 'unlock'}>

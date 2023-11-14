@@ -110,10 +110,10 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
         purchaseRes.error === 'invalid-password'
           ? 'Invalid Password!'
           : purchaseRes.error === 'insufficient-funds'
-          ? 'Insufficient Funds!'
-          : purchaseRes.error === 'no-ord-utxo'
-          ? 'Could not locate the ordinal!'
-          : 'An unknown error has occurred! Try again.';
+            ? 'Insufficient Funds!'
+            : purchaseRes.error === 'no-ord-utxo'
+              ? 'Could not locate the ordinal!'
+              : 'An unknown error has occurred! Try again.';
 
       addSnackbar(message, 'error');
       setIsProcessing(false);
