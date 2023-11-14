@@ -451,14 +451,14 @@ export const Settings = () => {
             {page === 'connected-apps'
               ? 'Connected Apps'
               : page === 'social-profile'
-              ? 'Social Profile'
-              : page === 'preferences'
-              ? 'Preferences'
-              : page === 'export-keys-options'
-              ? 'Export Keys'
-              : page === 'export-keys-qr'
-              ? 'Exported QR code'
-              : 'Settings'}
+                ? 'Social Profile'
+                : page === 'preferences'
+                  ? 'Preferences'
+                  : page === 'export-keys-options'
+                    ? 'Export Keys'
+                    : page === 'export-keys-qr'
+                      ? 'Exported QR code'
+                      : 'Settings'}
           </HeaderText>
         </HeaderWrapper>
         <Show when={page === 'main'}>{main}</Show>

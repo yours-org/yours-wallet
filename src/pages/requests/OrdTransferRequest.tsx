@@ -80,10 +80,10 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
         transferRes.error === 'invalid-password'
           ? 'Invalid Password!'
           : transferRes.error === 'insufficient-funds'
-          ? 'Insufficient Funds!'
-          : transferRes.error === 'no-ord-utxo'
-          ? 'Could not locate the ordinal!'
-          : 'An unknown error has occurred! Try again.';
+            ? 'Insufficient Funds!'
+            : transferRes.error === 'no-ord-utxo'
+              ? 'Could not locate the ordinal!'
+              : 'An unknown error has occurred! Try again.';
 
       addSnackbar(message, 'error');
       return;

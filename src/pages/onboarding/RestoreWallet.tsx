@@ -149,12 +149,12 @@ export const RestoreWallet = () => {
     return importWallet === 'panda'
       ? 'Restore Panda Wallet'
       : importWallet === 'relayx'
-      ? 'Restore Relay Wallet'
-      : importWallet === 'twetch'
-      ? 'Restore Twetch Wallet'
-      : importWallet === 'aym'
-      ? 'Restore Aym Wallet'
-      : 'Restore a Wallet';
+        ? 'Restore Relay Wallet'
+        : importWallet === 'twetch'
+          ? 'Restore Twetch Wallet'
+          : importWallet === 'aym'
+            ? 'Restore Aym Wallet'
+            : 'Restore a Wallet';
   };
 
   const getRestoreDescription = () => {
