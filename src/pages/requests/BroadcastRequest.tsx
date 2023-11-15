@@ -29,7 +29,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const { addSnackbar, message } = useSnackbar();
 
   const { broadcastWithGorillaPool } = useGorillaPool();
-  const { isProcessing, setIsProcessing } = useBsv();
+  const { isProcessing, setIsProcessing, updateBsvBalance } = useBsv();
 
   useEffect(() => {
     setSelected('bsv');
@@ -91,7 +91,8 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     addSnackbar('Successfully broadcasted the tx!', 'success');
 
     storage.remove('broadcastRequest');
-    setTimeout(() => {
+    setTimeout(async () => {
+      await updateBsvBalance(true).catch(() => {});
       onBroadcast();
       if (popupId) chrome.windows.remove(popupId);
     }, 2000);
