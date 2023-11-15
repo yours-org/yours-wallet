@@ -29,7 +29,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const { addSnackbar, message } = useSnackbar();
 
   const { broadcastWithGorillaPool } = useGorillaPool();
-  const { isProcessing, setIsProcessing } = useBsv();
+  const { isProcessing, setIsProcessing, updateBsvBalance } = useBsv();
 
   useEffect(() => {
     setSelected('bsv');
@@ -81,6 +81,9 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       }, 2000);
       return;
     }
+    setTimeout(() => {
+      updateBsvBalance(true);
+    }, 2000);
     setTxid(txid);
     chrome.runtime.sendMessage({
       action: 'broadcastResponse',

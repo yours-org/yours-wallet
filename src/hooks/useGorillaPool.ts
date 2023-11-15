@@ -7,7 +7,6 @@ import { OrdinalResponse, OrdinalTxo } from './ordTypes';
 import { useNetwork } from './useNetwork';
 import { BSV20 } from './useOrds';
 import { useTokens } from './useTokens';
-import { useBsv } from './useBsv';
 
 type GorillaPoolErrorMessage = {
   message: string;
@@ -21,7 +20,6 @@ export type GorillaPoolBroadcastResponse = {
 export const useGorillaPool = () => {
   const { network, isAddressOnRightNetwork } = useNetwork();
   const { getTokenDecimals, getTokenSym } = useTokens();
-  const { updateBsvBalance } = useBsv();
 
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
@@ -47,9 +45,6 @@ export const useGorillaPool = () => {
         rawtx: encoded,
       });
       if (res.status === 200 && typeof res.data === 'string') {
-        setTimeout(() => {
-          updateBsvBalance(true);
-        }, 2000);
         return { txid: res.data };
       } else {
         return res.data as GorillaPoolErrorMessage;
