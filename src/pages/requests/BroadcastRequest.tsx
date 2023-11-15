@@ -75,8 +75,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
         error: message ?? 'Unknown error',
       });
 
-      setTimeout(async () => {
-        await updateBsvBalance(true).catch(() => {});
+      setTimeout(() => {
         onBroadcast();
         if (popupId) chrome.windows.remove(popupId);
       }, 2000);
@@ -92,7 +91,8 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     addSnackbar('Successfully broadcasted the tx!', 'success');
 
     storage.remove('broadcastRequest');
-    setTimeout(() => {
+    setTimeout(async () => {
+      await updateBsvBalance(true).catch(() => {});
       onBroadcast();
       if (popupId) chrome.windows.remove(popupId);
     }, 2000);
