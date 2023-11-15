@@ -75,15 +75,13 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
         error: message ?? 'Unknown error',
       });
 
-      setTimeout(() => {
+      setTimeout(async () => {
+        await updateBsvBalance(true).catch(() => {});
         onBroadcast();
         if (popupId) chrome.windows.remove(popupId);
       }, 2000);
       return;
     }
-    setTimeout(() => {
-      updateBsvBalance(true);
-    }, 2000);
     setTxid(txid);
     chrome.runtime.sendMessage({
       action: 'broadcastResponse',
