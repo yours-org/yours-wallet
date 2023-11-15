@@ -15,12 +15,12 @@ export const useBottomMenu = () => {
     return context.selected === 'bsv'
       ? navigate('/bsv-wallet')
       : context.selected === 'ords'
-        ? navigate('/ord-wallet')
-        : context.selected === 'settings'
-          ? navigate('/settings')
-          : context.selected === 'apps'
-            ? navigate('/apps')
-            : undefined;
+      ? navigate('/ord-wallet')
+      : context.selected === 'settings'
+      ? navigate('/settings')
+      : context.selected === 'apps'
+      ? navigate('/apps')
+      : undefined;
   }, [context, context.selected, navigate]);
 
   return context;

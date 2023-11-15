@@ -260,8 +260,8 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
         getSigsRes.error.message === 'invalid-password'
           ? 'Invalid Password!'
           : getSigsRes.error.message === 'unknown-address'
-            ? 'Unknown Address: ' + (getSigsRes.error.cause ?? '')
-            : 'An unknown error has occurred! Try again.';
+          ? 'Unknown Address: ' + (getSigsRes.error.cause ?? '')
+          : 'An unknown error has occurred! Try again.';
 
       chrome.runtime.sendMessage({
         action: 'getSignaturesResponse',

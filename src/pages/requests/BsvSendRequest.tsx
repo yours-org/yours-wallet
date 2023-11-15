@@ -156,10 +156,10 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           sendRes.error === 'invalid-password'
             ? 'Invalid Password!'
             : sendRes.error === 'insufficient-funds'
-              ? 'Insufficient Funds!'
-              : sendRes.error === 'fee-to-high'
-                ? 'Miner fee to high!'
-                : 'An unknown error has occurred! Try again.' + sendRes.error;
+            ? 'Insufficient Funds!'
+            : sendRes.error === 'fee-to-high'
+            ? 'Miner fee to high!'
+            : 'An unknown error has occurred! Try again.' + sendRes.error;
 
         addSnackbar(message, 'error');
         return;
