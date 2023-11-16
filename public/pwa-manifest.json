@@ -1,0 +1,31 @@
+{
+  "short_name": "Panda Wallet",
+  "name": "Panda Wallet",
+  "description": "A non-custodial and open-source wallet for BSV and 1Sat Ordinals",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1B6B93",
+  "icons": [
+    {
+      "src": "icons/icon16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon48.png",
+      "sizes": "48x48",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

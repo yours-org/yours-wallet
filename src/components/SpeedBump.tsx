@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { styled } from 'styled-components';
 import { useKeys } from '../hooks/useKeys';
 import { useSnackbar } from '../hooks/useSnackbar';
+import { useViewport } from '../hooks/useViewport';
 import { ColorThemeProps, Theme } from '../theme';
 import { sleep } from '../utils/sleep';
 import { Button } from './Button';
@@ -10,14 +11,14 @@ import { PageLoader } from './PageLoader';
 import { ButtonContainer, HeaderText, Text } from './Reusable';
 import { Show } from './Show';
 
-const Container = styled.div<ColorThemeProps>`
+const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  width: 22.5rem;
-  height: 33.75rem;
+  width: ${(props) => (props.$isMobile ? '100vw' : '22.5rem')};
+  height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
   margin: 0;
   background-color: ${({ theme }) => theme.darkAccent};
   color: ${({ theme }) => theme.white};
@@ -35,6 +36,7 @@ export type SpeedBumpProps = {
 
 export const SpeedBump = (props: SpeedBumpProps) => {
   const { message, onCancel, onConfirm, showSpeedBump, theme, withPassword = false } = props;
+  const { isMobile } = useViewport();
 
   const [password, setPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -92,7 +94,7 @@ export const SpeedBump = (props: SpeedBumpProps) => {
 
   return (
     <Show when={showSpeedBump}>
-      <Container theme={theme}>
+      <Container $isMobile={isMobile} theme={theme}>
         <Show when={isProcessing} whenFalseContent={mainContent}>
           <PageLoader theme={theme} message="Exporting Keys..." />
         </Show>

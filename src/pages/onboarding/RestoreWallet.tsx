@@ -45,6 +45,7 @@ const SeedInput = styled.textarea<ColorThemeProps & { $isExpert: boolean }>`
   border: 1px solid ${({ theme }) => theme.white + '50'};
   width: 80%;
   height: ${(props) => (props.$isExpert ? '4rem' : '6rem')};
+  font-size: 1rem;
   padding: 1rem;
   margin: 0.5rem;
   outline: none;
@@ -149,12 +150,12 @@ export const RestoreWallet = () => {
     return importWallet === 'panda'
       ? 'Restore Panda Wallet'
       : importWallet === 'relayx'
-      ? 'Restore Relay Wallet'
-      : importWallet === 'twetch'
-      ? 'Restore Twetch Wallet'
-      : importWallet === 'aym'
-      ? 'Restore Aym Wallet'
-      : 'Restore a Wallet';
+        ? 'Restore Relay Wallet'
+        : importWallet === 'twetch'
+          ? 'Restore Twetch Wallet'
+          : importWallet === 'aym'
+            ? 'Restore Aym Wallet'
+            : 'Restore a Wallet';
   };
 
   const getRestoreDescription = () => {

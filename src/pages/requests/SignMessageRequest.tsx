@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { styled } from 'styled-components';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -12,9 +11,9 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
 import { ColorThemeProps } from '../../theme';
+import { DerivationTags } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
-import { DerivationTags } from '../../utils/keys';
 
 const RequestDetailsContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -50,7 +49,6 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [signature, setSignature] = useState<string | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
-  const navigate = useNavigate();
   const { isPasswordRequired } = useWeb3Context();
 
   const { isProcessing, setIsProcessing, signMessage } = useBsv();
@@ -101,8 +99,8 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
         signRes?.error === 'invalid-password'
           ? 'Invalid Password!'
           : signRes?.error === 'key-type'
-          ? 'Key type does not exist!'
-          : 'An unknown error has occurred! Try again.';
+            ? 'Key type does not exist!'
+            : 'An unknown error has occurred! Try again.';
 
       addSnackbar(message, 'error');
       setIsProcessing(false);

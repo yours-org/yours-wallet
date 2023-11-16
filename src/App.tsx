@@ -3,13 +3,14 @@ import { Route, MemoryRouter as Router, Routes } from 'react-router-dom';
 import styled from 'styled-components';
 import { Show } from './components/Show';
 import { UnlockWallet } from './components/UnlockWallet';
-import { BottomMenuContext } from './contexts/BottomMenuContext';
+import { BottomMenuContext, BottomMenuProvider } from './contexts/BottomMenuContext';
 import { SnackbarProvider } from './contexts/SnackbarContext';
 import { useActivityDetector } from './hooks/useActivityDetector';
 import { Web3BroadcastRequest, Web3SendBsvRequest, Web3SignMessageRequest } from './hooks/useBsv';
 import { Web3GetSignaturesRequest } from './hooks/useContracts';
 import { Web3TransferOrdinalRequest } from './hooks/useOrds';
 import { useTheme } from './hooks/useTheme';
+import { useViewport } from './hooks/useViewport';
 import { useWalletLockState } from './hooks/useWalletLockState';
 import { AppsAndTools } from './pages/AppsAndTools';
 import { BsvWallet } from './pages/BsvWallet';
@@ -41,6 +42,17 @@ export type WhitelistedApp = {
   icon: string;
 };
 
+const MainContainer = styled.div<{ $isMobile?: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: ${(props) => (props.$isMobile ? '100vw' : '22.5rem')};
+  height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
+  position: relative;
+  padding: 0;
+  margin: auto;
+`;
+
 const Container = styled.div<ColorThemeProps>`
   display: flex;
   align-items: center;
@@ -52,6 +64,7 @@ const Container = styled.div<ColorThemeProps>`
 `;
 export const App = () => {
   const { isLocked } = useWalletLockState();
+  const { isMobile } = useViewport();
   const { theme } = useTheme();
   const menuContext = useContext(BottomMenuContext);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
@@ -150,103 +163,107 @@ export const App = () => {
   }, [isLocked, menuContext]);
 
   return (
-    <Container theme={theme}>
-      <SnackbarProvider>
-        <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
-          <Router>
-            <Routes>
-              <Route path="/" element={<Start />} />
-              <Route path="/create-wallet" element={<CreateWallet />} />
-              <Route path="/restore-wallet" element={<RestoreWallet />} />
-              <Route path="/import-wallet" element={<ImportWallet />} />
-              <Route
-                path="/connect"
-                element={
-                  <ConnectRequest
-                    thirdPartyAppRequestData={thirdPartyAppRequestData}
-                    popupId={popupId}
-                    whiteListedApps={whitelistedApps}
-                    onDecision={() => setThirdPartyAppRequestData(undefined)}
+    <MainContainer $isMobile={isMobile}>
+      <BottomMenuProvider>
+        <Container theme={theme}>
+          <SnackbarProvider>
+            <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
+              <Router>
+                <Routes>
+                  <Route path="/" element={<Start />} />
+                  <Route path="/create-wallet" element={<CreateWallet />} />
+                  <Route path="/restore-wallet" element={<RestoreWallet />} />
+                  <Route path="/import-wallet" element={<ImportWallet />} />
+                  <Route
+                    path="/connect"
+                    element={
+                      <ConnectRequest
+                        thirdPartyAppRequestData={thirdPartyAppRequestData}
+                        popupId={popupId}
+                        whiteListedApps={whitelistedApps}
+                        onDecision={() => setThirdPartyAppRequestData(undefined)}
+                      />
+                    }
                   />
-                }
-              />
-              <Route
-                path="/bsv-wallet"
-                element={
-                  <Show
-                    when={!bsvSendRequest && !messageToSign && !broadcastRequest && !getSignaturesRequest}
-                    whenFalseContent={
-                      <>
-                        <Show when={!!bsvSendRequest}>
-                          <BsvSendRequest
-                            popupId={popupId}
-                            web3Request={bsvSendRequest as Web3SendBsvRequest}
-                            onResponse={() => setBsvSendRequest(undefined)}
-                          />
-                        </Show>
-                        <Show when={!!messageToSign}>
-                          <SignMessageRequest
-                            messageToSign={messageToSign as Web3SignMessageRequest}
-                            popupId={popupId}
-                            onSignature={() => setMessageToSign(undefined)}
-                          />
-                        </Show>
-                        <Show when={!!broadcastRequest}>
-                          <BroadcastRequest
-                            request={broadcastRequest as Web3BroadcastRequest}
-                            popupId={popupId}
-                            onBroadcast={() => setBroadcastRequest(undefined)}
-                          />
-                        </Show>
-                        <Show when={!!getSignaturesRequest}>
-                          <GetSignaturesRequest
-                            getSigsRequest={getSignaturesRequest as Web3GetSignaturesRequest}
-                            popupId={popupId}
-                            onSignature={() => setGetSignaturesRequest(undefined)}
-                          />
-                        </Show>
-                      </>
+                  <Route
+                    path="/bsv-wallet"
+                    element={
+                      <Show
+                        when={!bsvSendRequest && !messageToSign && !broadcastRequest && !getSignaturesRequest}
+                        whenFalseContent={
+                          <>
+                            <Show when={!!bsvSendRequest}>
+                              <BsvSendRequest
+                                popupId={popupId}
+                                web3Request={bsvSendRequest as Web3SendBsvRequest}
+                                onResponse={() => setBsvSendRequest(undefined)}
+                              />
+                            </Show>
+                            <Show when={!!messageToSign}>
+                              <SignMessageRequest
+                                messageToSign={messageToSign as Web3SignMessageRequest}
+                                popupId={popupId}
+                                onSignature={() => setMessageToSign(undefined)}
+                              />
+                            </Show>
+                            <Show when={!!broadcastRequest}>
+                              <BroadcastRequest
+                                request={broadcastRequest as Web3BroadcastRequest}
+                                popupId={popupId}
+                                onBroadcast={() => setBroadcastRequest(undefined)}
+                              />
+                            </Show>
+                            <Show when={!!getSignaturesRequest}>
+                              <GetSignaturesRequest
+                                getSigsRequest={getSignaturesRequest as Web3GetSignaturesRequest}
+                                popupId={popupId}
+                                onSignature={() => setGetSignaturesRequest(undefined)}
+                              />
+                            </Show>
+                          </>
+                        }
+                      >
+                        <BsvWallet />
+                      </Show>
                     }
-                  >
-                    <BsvWallet />
-                  </Show>
-                }
-              />
-              <Route
-                path="/ord-wallet"
-                element={
-                  <Show
-                    when={!ordinalTransferRequest && !ordinalPurchaseRequest}
-                    whenFalseContent={
-                      <>
-                        <Show when={!!ordinalPurchaseRequest}>
-                          <OrdPurchaseRequest
-                            popupId={popupId}
-                            web3Request={ordinalPurchaseRequest as Web3PurchaseOrdinalRequest}
-                            onResponse={() => setOrdinalPurchaseRequest(undefined)}
-                          />
-                        </Show>
-                        <Show when={!!ordinalTransferRequest}>
-                          <OrdTransferRequest
-                            popupId={popupId}
-                            web3Request={ordinalTransferRequest as Web3TransferOrdinalRequest}
-                            onResponse={() => setOrdinalTransferRequest(undefined)}
-                          />
-                        </Show>
-                      </>
+                  />
+                  <Route
+                    path="/ord-wallet"
+                    element={
+                      <Show
+                        when={!ordinalTransferRequest && !ordinalPurchaseRequest}
+                        whenFalseContent={
+                          <>
+                            <Show when={!!ordinalPurchaseRequest}>
+                              <OrdPurchaseRequest
+                                popupId={popupId}
+                                web3Request={ordinalPurchaseRequest as Web3PurchaseOrdinalRequest}
+                                onResponse={() => setOrdinalPurchaseRequest(undefined)}
+                              />
+                            </Show>
+                            <Show when={!!ordinalTransferRequest}>
+                              <OrdTransferRequest
+                                popupId={popupId}
+                                web3Request={ordinalTransferRequest as Web3TransferOrdinalRequest}
+                                onResponse={() => setOrdinalTransferRequest(undefined)}
+                              />
+                            </Show>
+                          </>
+                        }
+                      >
+                        <OrdWallet />
+                      </Show>
                     }
-                  >
-                    <OrdWallet />
-                  </Show>
-                }
-              />
-              <Route path="/ord-wallet" element={<OrdWallet />} />
-              <Route path="/apps" element={<AppsAndTools />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
-          </Router>
-        </Show>
-      </SnackbarProvider>
-    </Container>
+                  />
+                  <Route path="/ord-wallet" element={<OrdWallet />} />
+                  <Route path="/apps" element={<AppsAndTools />} />
+                  <Route path="/settings" element={<Settings />} />
+                </Routes>
+              </Router>
+            </Show>
+          </SnackbarProvider>
+        </Container>
+      </BottomMenuProvider>
+    </MainContainer>
   );
 };
