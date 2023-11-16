@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { styled } from 'styled-components';
 import { useKeys } from '../hooks/useKeys';
 import { useTheme } from '../hooks/useTheme';
+import { useViewport } from '../hooks/useViewport';
 import { ColorThemeProps } from '../theme';
 import { sleep } from '../utils/sleep';
 import { storage } from '../utils/storage';
@@ -10,14 +11,14 @@ import { Input } from './Input';
 import { PandaHead } from './PandaHead';
 import { FormContainer, HeaderText } from './Reusable';
 
-const Container = styled.div<ColorThemeProps>`
+const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  width: 22.5rem;
-  height: 33.75rem;
+  width: ${(props) => (props.$isMobile ? '100vw' : '22.5rem')};
+  height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
   margin: 0;
   background-color: ${({ theme }) => theme.darkAccent};
   color: ${({ theme }) => theme.white};
@@ -34,6 +35,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const [password, setPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
+  const { isMobile } = useViewport();
 
   const { verifyPassword } = useKeys();
 
@@ -58,7 +60,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   };
 
   return (
-    <Container theme={theme}>
+    <Container $isMobile={isMobile} theme={theme}>
       <PandaHead animated width="4rem" />
       <HeaderText theme={theme}>Unlock Wallet</HeaderText>
       <FormContainer onSubmit={handleUnlock}>
