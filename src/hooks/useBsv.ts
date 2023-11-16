@@ -146,7 +146,7 @@ export const useBsv = () => {
         } else {
           throw Error('Invalid request');
         }
-        tx.add_output(new TxOut(BigInt(satsOut), outScript));
+        tx.add_output(new TxOut(BigInt(req.satoshis), outScript));
       });
 
       if (!sendAll) {
