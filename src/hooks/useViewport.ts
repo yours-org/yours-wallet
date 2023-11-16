@@ -19,7 +19,5 @@ export const useViewport = () => {
   const isTablet = windowSize > 780 && windowSize <= 1024;
   const isDesktop = windowSize > 1024;
 
-  console.log(isMobile);
-
   return { isMobile, isTablet, isDesktop };
 };
