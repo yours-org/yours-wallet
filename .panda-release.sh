@@ -21,5 +21,8 @@ git tag "$VERSION"
 # Step 4: Push changes and tags to remote
 git push origin main --tags
 
-# Step 5: Create a GitHub release draft without release notes
+# Step 5: Deploy PWA to vercel
+vercel --prod
+
+# Step 6: Create a GitHub release draft without release notes
 gh release create "$VERSION" "$ZIP_FILE" --draft --title "Release $VERSION"
