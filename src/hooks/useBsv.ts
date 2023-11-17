@@ -14,12 +14,14 @@ import init, {
 import { useEffect, useState } from 'react';
 import { SignMessageResponse } from '../pages/requests/SignMessageRequest';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
-import { DerivationTags, Keys } from '../utils/keys';
+import { decrypt } from '../utils/crypto';
+import { DerivationTags, Keys, TaggedDerivationData, getTaggedDerivationPubKey } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
 import { useGorillaPool } from './useGorillaPool';
-import { useKeys } from './useKeys';
+import { KeyStorage, useKeys } from './useKeys';
 import { useNetwork } from './useNetwork';
+import { usePasswordSetting } from './usePasswordSetting';
 import { useWhatsOnChain } from './useWhatsOnChain';
 
 export type UTXO = {
@@ -51,11 +53,17 @@ export type Web3SignMessageRequest = {
   encoding?: 'utf8' | 'hex' | 'base64';
 };
 
+type TaggedDerivationResponse = {
+  address?: string;
+  pubKey?: string;
+  error?: string;
+};
+
 export const useBsv = () => {
   const [bsvBalance, setBsvBalance] = useState(0);
   const [exchangeRate, setExchangeRate] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-
+  const { isPasswordRequired } = usePasswordSetting();
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, identityAddress, identityPubKey } = useKeys();
   const { network } = useNetwork();
   const { broadcastWithGorillaPool } = useGorillaPool();
@@ -280,6 +288,48 @@ export const useBsv = () => {
     setExchangeRate(r ?? 0);
   };
 
+  const retrieveTaggedDerivationPubKey = (
+    password: string,
+    tagData: TaggedDerivationData,
+  ): Promise<TaggedDerivationResponse> => {
+    setIsProcessing(true);
+    return new Promise((resolve, reject) => {
+      storage.get(['encryptedKeys', 'passKey', 'salt'], async (result: KeyStorage) => {
+        try {
+          await init();
+
+          const isVerified = !isPasswordRequired || (await verifyPassword(password ?? ''));
+          if (!isVerified) {
+            resolve({ error: 'invalid-password' });
+          }
+
+          if (!result.encryptedKeys || !result.passKey) return;
+          const d = decrypt(result.encryptedKeys, result.passKey);
+          const keys: Keys = JSON.parse(d);
+
+          if (!keys?.mnemonic) {
+            resolve({ error: 'no-keys' });
+          }
+
+          let publicKeys = getTaggedDerivationPubKey(tagData, keys.mnemonic);
+
+          const taggedAddress = P2PKHAddress.from_string(publicKeys.address)
+            .set_chain_params(getChainParams(network))
+            .to_string();
+
+          resolve({
+            address: taggedAddress,
+            pubKey: publicKeys.pubKey.to_hex(),
+          });
+        } catch (error) {
+          resolve({ error: `error: ${JSON.stringify(error)}` });
+        } finally {
+          setIsProcessing(false);
+        }
+      });
+    });
+  };
+
   useEffect(() => {
     if (!bsvAddress) return;
     updateBsvBalance();
@@ -300,5 +350,7 @@ export const useBsv = () => {
     exchangeRate,
     signMessage,
     verifyMessage,
+    retrieveKeys,
+    retrieveTaggedDerivationPubKey,
   };
 };

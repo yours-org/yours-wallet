@@ -1,8 +1,8 @@
+import { Bn, Point } from '@ts-bitcoin/core';
 import * as bip39 from 'bip39';
 import { ExtendedPrivateKey, Hash, PrivateKey } from 'bsv-wasm-web';
 import { WifKeys } from '../hooks/useKeys';
 import { DEFAULT_IDENTITY_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';
-import { Bn, Point } from '@ts-bitcoin/core';
 
 export type Keys = {
   mnemonic: string;
@@ -18,6 +18,11 @@ export type Keys = {
   identityAddress: string;
   identityPubKey: string;
   identityDerivationPath: string;
+};
+
+export type TaggedDerivationData = {
+  label: string;
+  id: string;
 };
 
 export type DerivationTags = 'wallet' | 'ord' | 'identity';
@@ -114,4 +119,18 @@ export const getKeysFromWifs = (wifs: WifKeys) => {
   };
 
   return keys;
+};
+
+const getTaggedDerivation = (tagData: TaggedDerivationData): string => {
+  const labelHex = Hash.sha_256(Buffer.from(tagData.label, 'utf-8')).to_hex();
+  const idHex = Hash.sha_256(Buffer.from(tagData.id, 'utf-8')).to_hex();
+  const labelNumber = parseInt(labelHex.slice(-8), 16) % 2 ** 31;
+  const idNumber = parseInt(idHex.slice(-8), 16) % 2 ** 31;
+  return `m/44'/236'/218'/${labelNumber}/${idNumber}`;
+};
+
+export const getTaggedDerivationPubKey = (tagData: TaggedDerivationData, mnemonic: string) => {
+  const taggedDerivation = getTaggedDerivation(tagData);
+  const keys = generateKeysFromTag(mnemonic, taggedDerivation);
+  return { address: keys.address, pubKey: keys.pubKey };
 };

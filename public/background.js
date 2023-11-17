@@ -10,6 +10,7 @@ let responseCallbackForPurchaseOrdinalRequest;
 let responseCallbackForSignMessageRequest;
 let responseCallbackForBroadcastRequest;
 let responseCallbackForGetSignaturesRequest;
+let responseCallbackForGetPubKeyFromTagRequest;
 let popupWindowId = null;
 
 const launchPopUp = () => {
@@ -65,6 +66,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     'signTransactionResponse',
     'broadcastResponse',
     'getSignaturesResponse',
+    'getPubKeyFromTagResponse',
   ];
 
   if (noAuthRequired.includes(message.action)) {
@@ -85,6 +87,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processBroadcastResponse(message);
       case 'getSignaturesResponse':
         return processGetSignaturesResponse(message);
+      case 'getPubKeyFromTagResponse':
+        return processGetPubKeyFromTagResponse(message);
       default:
         break;
     }
@@ -136,6 +140,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processGetPaymentUtxos(sendResponse);
       case 'getExchangeRate':
         return processGetExchangeRate(sendResponse);
+      case 'getPubKeyFromTag':
+        return processGetPubKeyFromTagRequest(message, sendResponse);
       default:
         break;
     }
@@ -389,6 +395,32 @@ const processTransferOrdinalRequest = (message, sendResponse) => {
   }
 };
 
+const processGetPubKeyFromTagRequest = (message, sendResponse) => {
+  if (!message.params) {
+    sendResponse({
+      type: 'getPubKeyFromTag',
+      success: false,
+      error: 'Must provide valid params!',
+    });
+  }
+  try {
+    responseCallbackForGetPubKeyFromTagRequest = sendResponse;
+    chrome.storage.local
+      .set({
+        getPubKeyFromTagRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+  } catch (error) {
+    sendResponse({
+      type: 'getPubKeyFromTag',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+};
+
 const processPurchaseOrdinalRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
@@ -592,6 +624,29 @@ const processTransferOrdinalResponse = (message) => {
   return true;
 };
 
+const processGetPubKeyFromTagResponse = (message) => {
+  if (!responseCallbackForGetPubKeyFromTagRequest) throw Error('Missing callback!');
+  try {
+    responseCallbackForGetPubKeyFromTagRequest({
+      type: 'getPubKeyFromTag',
+      success: true,
+      data: { address: message?.address, pubKey: message?.pubKey },
+    });
+  } catch (error) {
+    responseCallbackForGetPubKeyFromTagRequest({
+      type: 'getPubKeyFromTag',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  } finally {
+    responseCallbackForGetPubKeyFromTagRequest = null;
+    popupWindowId = null;
+    chrome.storage.local.remove(['getPubKeyFromTagRequest', 'popupWindowId']);
+  }
+
+  return true;
+};
+
 const processPurchaseOrdinalResponse = (message) => {
   if (!responseCallbackForPurchaseOrdinalRequest) throw Error('Missing callback!');
   try {
@@ -771,6 +826,16 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       });
       responseCallbackForGetSignaturesRequest = null;
       chrome.storage.local.remove('getSignaturesRequest');
+    }
+
+    if (responseCallbackForGetPubKeyFromTagRequest) {
+      responseCallbackForGetPubKeyFromTagRequest({
+        type: 'getPubKeyFromTag',
+        success: false,
+        error: 'User dismissed the request!',
+      });
+      responseCallbackForGetPubKeyFromTagRequest = null;
+      chrome.storage.local.remove('getPubKeyFromTagRequest');
     }
 
     popupWindowId = null;
