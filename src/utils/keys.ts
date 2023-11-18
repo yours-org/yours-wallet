@@ -21,9 +21,9 @@ export type Keys = {
 };
 
 export type InternalPandaTags =
-  | { label: 'panda'; id: 'bsv'; domain: '' }
-  | { label: 'panda'; id: 'ord'; domain: '' }
-  | { label: 'panda'; id: 'identity'; domain: '' };
+  | { label: 'panda'; id: 'bsv'; domain: ''; meta: {} }
+  | { label: 'panda'; id: 'ord'; domain: ''; meta: {} }
+  | { label: 'panda'; id: 'identity'; domain: ''; meta: {} };
 
 export type DerivationTag =
   | InternalPandaTags

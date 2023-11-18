@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { ChainParams, P2PKHAddress, PrivateKey } from 'bsv-wasm-web';
+import { TaggedDerivationResponse } from '../pages/requests/GenerateTaggedKeysRequest';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL } from '../utils/constants';
 import { decryptUsingPrivKey } from '../utils/crypto';
 import { chunkedStringArray } from '../utils/format';
@@ -212,7 +213,7 @@ export const useGorillaPool = () => {
 
   const setDerivationTags = async (identityAddress: string, keys: Keys) => {
     const taggedOrds = await getOrdUtxos(identityAddress);
-    let tags: (DerivationTag & { address: string; pubKey: string })[] = [];
+    let tags: TaggedDerivationResponse[] = [];
     for (const ord of taggedOrds) {
       try {
         if (!ord.origin?.outpoint || ord.origin.data?.insc?.file.type !== 'panda/tag') continue;
@@ -231,7 +232,7 @@ export const useGorillaPool = () => {
           .set_chain_params(getChainParams(network))
           .to_string();
 
-        tags.push({ ...parsedTag, address: taggedAddress, pubKey: taggedKeys.pubKey.to_hex() });
+        tags.push({ tag: parsedTag, address: taggedAddress, pubKey: taggedKeys.pubKey.to_hex() });
       } catch (error) {
         console.log(error);
       }

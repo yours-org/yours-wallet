@@ -578,7 +578,9 @@ const processGetTaggedKeys = async (message, sendResponse) => {
 
         let returnData =
           derivationTags.length > 0
-            ? derivationTags.filter((tag) => tag.label === message.params.label && tag.domain === message.params.domain)
+            ? derivationTags.filter(
+                (res) => res.tag.label === message.params.label && res.tag.domain === message.params.domain,
+              )
             : [];
 
         if (returnData.length > 0 && message.params.ids?.length > 0) {
@@ -681,9 +683,7 @@ const processGenerateTaggedKeysResponse = (message) => {
       data: {
         address: message?.address,
         pubKey: message?.pubKey,
-        label: message?.label,
-        id: message?.id,
-        domain: message?.domain,
+        tag: message?.tag,
       },
     });
   } catch (error) {

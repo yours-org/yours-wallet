@@ -27,6 +27,10 @@ const RequestDetailsContainer = styled.div<ColorThemeProps>`
   margin: 0.5rem;
 `;
 
+const TagText = styled(Text)`
+  margin: 0.25rem;
+`;
+
 export type SignMessageResponse = {
   address?: string;
   pubKey?: string;
@@ -131,11 +135,23 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
         <ConfirmContent>
           <HeaderText theme={theme}>Sign Message</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
-            The app is requesting a signature.
+            {'The app is requesting a signature using derivation tag:'}
           </Text>
+          <Show
+            when={!!messageToSign.tag?.label}
+            whenFalseContent={
+              <>
+                <TagText theme={theme}>{`Label: panda`}</TagText>
+                <TagText theme={theme}>{`Id: identity`}</TagText>
+              </>
+            }
+          >
+            <TagText theme={theme}>{`Label: ${messageToSign.tag?.label}`}</TagText>
+            <TagText theme={theme}>{`Id: ${messageToSign.tag?.id}`}</TagText>
+          </Show>
           <FormContainer noValidate onSubmit={(e) => handleSigning(e)}>
             <RequestDetailsContainer>
-              {<Text style={{ color: theme.white }}>{messageToSign.message}</Text>}
+              {<Text style={{ color: theme.white }}>{`Message: ${messageToSign.message}`}</Text>}
             </RequestDetailsContainer>
             <Show when={isPasswordRequired}>
               <Input

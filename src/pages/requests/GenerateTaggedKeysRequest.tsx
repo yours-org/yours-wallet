@@ -27,9 +27,7 @@ export type GenerateTaggedKeysRequestProps = {
 export type TaggedDerivationResponse = {
   address?: string;
   pubKey?: string;
-  label?: string;
-  id?: string;
-  domain?: string;
+  tag?: DerivationTag;
   error?: string;
 };
 
@@ -84,8 +82,10 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
         storage.get(['derivationTags'], ({ derivationTags }) => {
           resolve(
             derivationTags.find(
-              (d: DerivationTag) =>
-                d.domain === derivationTag.domain && d.label === derivationTag.label && d.id === derivationTag.id,
+              (res: TaggedDerivationResponse) =>
+                res.tag?.domain === derivationTag.domain &&
+                res.tag.label === derivationTag.label &&
+                res.tag.id === derivationTag.id,
             ),
           );
         });
@@ -119,9 +119,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       return {
         address: taggedAddress,
         pubKey: taggedKeys.pubKey.to_hex(),
-        label: derivationTag.label,
-        id: derivationTag.id,
-        domain: derivationTag.domain,
+        tag: derivationTag,
       };
     } catch (error: any) {
       console.log(error);
@@ -165,7 +163,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       return;
     }
 
-    await sleep(2000); // give enough time for indexer to index newly created tag
+    await sleep(3000); // give enough time for indexer to index newly created tag
     await setDerivationTags(keys.identityAddress, keys);
 
     setSuccessTxId(res.pubKey);
@@ -176,6 +174,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       action: 'generateTaggedKeysResponse',
       address: res.address,
       pubKey: res.pubKey,
+      tag: res.tag,
     });
 
     setTimeout(async () => {

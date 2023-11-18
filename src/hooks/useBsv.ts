@@ -211,7 +211,7 @@ export const useBsv = () => {
     }
     try {
       const keys = (await retrieveKeys(password)) as Keys;
-      const derivationTag = messageToSign.tag ?? { label: 'panda', id: 'identity', domain: '' };
+      const derivationTag = messageToSign.tag ?? { label: 'panda', id: 'identity', domain: '', meta: {} };
       const taggedKeys = getTaggedDerivationKeys(derivationTag, keys.mnemonic);
 
       if (!taggedKeys.wif) {
