@@ -8,6 +8,7 @@ import { BSV20Data, OrdinalData, useOrds } from '../hooks/useOrds';
 import { usePasswordSetting } from '../hooks/usePasswordSetting';
 import { useWalletLockState } from '../hooks/useWalletLockState';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
+import { Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
 
@@ -62,9 +63,9 @@ export const Web3Provider = (props: Web3ProviderProps) => {
     }
 
     (async () => {
-      const keys = await retrieveKeys(undefined, true);
+      const keys = (await retrieveKeys(undefined, true)) as Keys;
       if (keys.identityAddress && keys.identityWif) {
-        await setDerivationTags(keys.identityAddress, keys.identityWif);
+        await setDerivationTags(keys.identityAddress, keys);
       }
     })();
 

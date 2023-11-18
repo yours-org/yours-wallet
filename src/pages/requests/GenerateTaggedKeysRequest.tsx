@@ -27,6 +27,9 @@ export type GenerateTaggedKeysRequestProps = {
 export type TaggedDerivationResponse = {
   address?: string;
   pubKey?: string;
+  label?: string;
+  id?: string;
+  domain?: string;
   error?: string;
 };
 
@@ -77,10 +80,22 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       if (!keys?.mnemonic || !keys.identityPubKey || !keys.identityAddress) {
         return { error: 'no-keys' };
       }
+      const existingTag: TaggedDerivationResponse = await new Promise((resolve, reject) => {
+        storage.get(['derivationTags'], ({ derivationTags }) => {
+          resolve(
+            derivationTags.find(
+              (d: DerivationTag) =>
+                d.domain === derivationTag.domain && d.label === derivationTag.label && d.id === derivationTag.id,
+            ),
+          );
+        });
+      });
+
+      if (existingTag) return existingTag;
 
       const taggedKeys = getTaggedDerivationKeys(derivationTag, keys.mnemonic);
       const message = JSON.stringify(derivationTag);
-      const encryptPrivKey = getPrivateKeyFromTag({ label: 'panda', id: 'identity' }, keys);
+      const encryptPrivKey = getPrivateKeyFromTag({ label: 'panda', id: 'identity', domain: '' }, keys);
 
       const encryptedMessages = encryptUsingPrivKey(
         message,
@@ -104,6 +119,9 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       return {
         address: taggedAddress,
         pubKey: taggedKeys.pubKey.to_hex(),
+        label: derivationTag.label,
+        id: derivationTag.id,
+        domain: derivationTag.domain,
       };
     } catch (error: any) {
       console.log(error);
@@ -148,7 +166,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     }
 
     await sleep(2000); // give enough time for indexer to index newly created tag
-    await setDerivationTags(keys.identityAddress, keys.identityWif);
+    await setDerivationTags(keys.identityAddress, keys);
 
     setSuccessTxId(res.pubKey);
     setIsProcessing(false);

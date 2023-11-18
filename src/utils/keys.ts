@@ -21,15 +21,16 @@ export type Keys = {
 };
 
 export type InternalPandaTags =
-  | { label: 'panda'; id: 'bsv' }
-  | { label: 'panda'; id: 'ord' }
-  | { label: 'panda'; id: 'identity' };
+  | { label: 'panda'; id: 'bsv'; domain: '' }
+  | { label: 'panda'; id: 'ord'; domain: '' }
+  | { label: 'panda'; id: 'identity'; domain: '' };
 
 export type DerivationTag =
   | InternalPandaTags
   | {
       label: string;
       id: string;
+      domain: string;
       meta?: Record<string, any>;
     };
 

@@ -14,7 +14,7 @@ import init, {
 import { useEffect, useState } from 'react';
 import { SignMessageResponse } from '../pages/requests/SignMessageRequest';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
-import { DerivationTag, Keys } from '../utils/keys';
+import { DerivationTag, Keys, getTaggedDerivationKeys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
 import { useGorillaPool } from './useGorillaPool';
@@ -200,23 +200,6 @@ export const useBsv = () => {
     }
   };
 
-  const getRequestedWif = (keys: Keys, tag: DerivationTag) => {
-    let wif = keys.walletWif;
-    if (tag) {
-      if (
-        (tag.id !== 'identity' && tag.id !== 'ord' && tag.id !== 'wallet') ||
-        (tag.id === 'identity' && !keys.identityWif) ||
-        (tag.id === 'ord' && !keys.ordWif) ||
-        (tag.id === 'wallet' && !keys.walletWif)
-      ) {
-        return { error: 'key-type' };
-      }
-
-      wif = (tag.id === 'ord' ? keys.ordWif : tag.id === 'identity' ? keys.identityWif : keys.walletWif) as string; // safely cast here with above if checks
-    }
-    return { wif };
-  };
-
   const signMessage = async (
     messageToSign: Web3SignMessageRequest,
     password: string,
@@ -228,23 +211,25 @@ export const useBsv = () => {
     }
     try {
       const keys = (await retrieveKeys(password)) as Keys;
-      const res = getRequestedWif(keys, { label: 'panda', id: 'identity' });
-      if (res.error || !res.wif) {
-        return res;
+      const derivationTag = messageToSign.tag ?? { label: 'panda', id: 'identity', domain: '' };
+      const taggedKeys = getTaggedDerivationKeys(derivationTag, keys.mnemonic);
+
+      if (!taggedKeys.wif) {
+        return { error: 'key-type' };
       }
-      const privateKey = PrivateKey.from_wif(res.wif);
+
+      const privateKey = PrivateKey.from_wif(taggedKeys.wif);
       const publicKey = privateKey.to_public_key();
       const address = publicKey.to_address().set_chain_params(getChainParams(network)).to_string();
 
       const msgBuf = Buffer.from(message, encoding);
       const signature = BSM.sign_message(privateKey, msgBuf);
-      // const signature = privateKey.sign_message(msgBuf);
       return {
         address,
         pubKey: publicKey.to_hex(),
         message: message,
         sig: signature.to_compact_hex(),
-        derivationTag: { label: 'panda', id: 'identity' },
+        derivationTag,
       };
     } catch (error) {
       console.log(error);
@@ -279,28 +264,6 @@ export const useBsv = () => {
     const r = await getExchangeRate();
     setExchangeRate(r ?? 0);
   };
-
-  // const getTaggedKeys = async ()=> {
-  //     const blah = await axios.get(
-  //       'https://v3.ordinals.gorillapool.io/api/txos/address/1BFnHUTHm9FQU8svTe2ibqX79iiPZZzi7U/unspent?limit=100&offset=0&bsv20=false',
-  //     );
-
-  //     for (const b of blah.data) {
-  //       try {
-  //         const res = await axios.get(`https://v3.ordinals.gorillapool.io/content/${b.origin.outpoint}?fuzzy=false`, {
-  //           responseType: 'arraybuffer',
-  //         });
-  //         const data = res.data as Buffer;
-  //         console.log(typeof data);
-  //         console.log(data);
-
-  //         const d = await decryptUsingPrivKey(Buffer.from(data).toString('hex'), encryptPrivKey);
-  //         console.log(d);
-  //       } catch (error) {
-  //         console.log(error);
-  //       }
-  //     }
-  // }
 
   useEffect(() => {
     if (!bsvAddress) return;

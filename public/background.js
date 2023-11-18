@@ -575,8 +575,11 @@ const processGetTaggedKeys = async (message, sendResponse) => {
             error: 'Unauthorized! Panda is locked.',
           });
         }
+
         let returnData =
-          derivationTags.length > 0 ? derivationTags.filter((tag) => tag.label === message.params.label) : [];
+          derivationTags.length > 0
+            ? derivationTags.filter((tag) => tag.label === message.params.label && tag.domain === message.params.domain)
+            : [];
 
         if (returnData.length > 0 && message.params.ids?.length > 0) {
           returnData = returnData.filter((d) => message.params.ids.includes(d.id));
@@ -675,7 +678,13 @@ const processGenerateTaggedKeysResponse = (message) => {
     responseCallbackForGenerateTaggedKeysRequest({
       type: 'generateTaggedKeys',
       success: true,
-      data: { address: message?.address, pubKey: message?.pubKey },
+      data: {
+        address: message?.address,
+        pubKey: message?.pubKey,
+        label: message?.label,
+        id: message?.id,
+        domain: message?.domain,
+      },
     });
   } catch (error) {
     responseCallbackForGenerateTaggedKeysRequest({
@@ -726,7 +735,7 @@ const processSignMessageResponse = (message) => {
         pubKey: message?.pubKey,
         message: message?.message,
         sig: message?.sig,
-        keyType: message?.keyType,
+        derivationTag: message?.derivationTag,
       },
     });
   } catch (error) {

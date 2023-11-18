@@ -1,9 +1,9 @@
 import axios from 'axios';
-import { PrivateKey } from 'bsv-wasm-web';
+import { ChainParams, P2PKHAddress, PrivateKey } from 'bsv-wasm-web';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL } from '../utils/constants';
 import { decryptUsingPrivKey } from '../utils/crypto';
 import { chunkedStringArray } from '../utils/format';
-import { DerivationTag } from '../utils/keys';
+import { DerivationTag, Keys, getTaggedDerivationKeys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { isBSV20v2 } from '../utils/ordi';
 import { storage } from '../utils/storage';
@@ -27,6 +27,10 @@ export const useGorillaPool = () => {
 
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
+  };
+
+  const getChainParams = (network: NetWork): ChainParams => {
+    return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
   };
 
   const getOrdUtxos = async (ordAddress: string): Promise<OrdinalResponse> => {
@@ -206,9 +210,9 @@ export const useGorillaPool = () => {
     }
   };
 
-  const setDerivationTags = async (identityAddress: string, identityWif: string) => {
+  const setDerivationTags = async (identityAddress: string, keys: Keys) => {
     const taggedOrds = await getOrdUtxos(identityAddress);
-    let tags: DerivationTag[] = [];
+    let tags: (DerivationTag & { address: string; pubKey: string })[] = [];
     for (const ord of taggedOrds) {
       try {
         if (!ord.origin?.outpoint || ord.origin.data?.insc?.file.type !== 'panda/tag') continue;
@@ -217,10 +221,17 @@ export const useGorillaPool = () => {
 
         const derivationTag = decryptUsingPrivKey(
           Buffer.from(contentBuffer).toString('hex'),
-          PrivateKey.from_wif(identityWif),
+          PrivateKey.from_wif(keys.identityWif),
         );
 
-        tags.push(JSON.parse(derivationTag));
+        const parsedTag: DerivationTag = JSON.parse(derivationTag);
+        const taggedKeys = getTaggedDerivationKeys(parsedTag, keys.mnemonic);
+
+        const taggedAddress = P2PKHAddress.from_string(taggedKeys.address)
+          .set_chain_params(getChainParams(network))
+          .to_string();
+
+        tags.push({ ...parsedTag, address: taggedAddress, pubKey: taggedKeys.pubKey.to_hex() });
       } catch (error) {
         console.log(error);
       }
