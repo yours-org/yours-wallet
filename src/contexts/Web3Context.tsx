@@ -1,6 +1,8 @@
 import React, { createContext, useEffect } from 'react';
 import { useNoApprovalLimitSetting } from '../hooks/useApprovalLimitSetting';
 import { useBsv } from '../hooks/useBsv';
+import { useGorillaPool } from '../hooks/useGorillaPool';
+import { useKeys } from '../hooks/useKeys';
 import { useNetwork } from '../hooks/useNetwork';
 import { BSV20Data, OrdinalData, useOrds } from '../hooks/useOrds';
 import { usePasswordSetting } from '../hooks/usePasswordSetting';
@@ -31,6 +33,8 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance, identityAddress, identityPubKey } =
     useBsv();
   const { ordAddress, ordPubKey, getOrdinals, ordinals, bsv20s } = useOrds();
+  const { retrieveKeys } = useKeys();
+  const { setDerivationTags } = useGorillaPool();
   const { network, setNetwork } = useNetwork();
   const { isPasswordRequired, setIsPasswordRequired } = usePasswordSetting();
   const { noApprovalLimit, setNoAprrovalLimit } = useNoApprovalLimitSetting();
@@ -56,6 +60,13 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       storage.remove('appState');
       return;
     }
+
+    (async () => {
+      const keys = await retrieveKeys(undefined, true);
+      if (keys.identityAddress && keys.identityWif) {
+        await setDerivationTags(keys.identityAddress, keys.identityWif);
+      }
+    })();
 
     storage.get(['appState'], (result) => {
       const { appState } = result;
@@ -93,6 +104,8 @@ export const Web3Provider = (props: Web3ProviderProps) => {
     isPasswordRequired,
     identityAddress,
     identityPubKey,
+    retrieveKeys,
+    setDerivationTags,
   ]);
 
   const updateNetwork = (n: NetWork): void => {

@@ -42,5 +42,6 @@ window.panda = {
   getPaymentUtxos: createPandaMethod('getPaymentUtxos'),
   getExchangeRate: createPandaMethod('getExchangeRate'),
   purchaseOrdinal: createPandaMethod('purchaseOrdinal'),
-  getPubKeyFromTag: createPandaMethod('getPubKeyFromTag'),
+  generateTaggedKeys: createPandaMethod('generateTaggedKeys'),
+  getTaggedKeys: createPandaMethod('getTaggedKeys'),
 };

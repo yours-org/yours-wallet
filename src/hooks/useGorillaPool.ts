@@ -1,8 +1,12 @@
 import axios from 'axios';
+import { PrivateKey } from 'bsv-wasm-web';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL } from '../utils/constants';
+import { decryptUsingPrivKey } from '../utils/crypto';
 import { chunkedStringArray } from '../utils/format';
+import { DerivationTag } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { isBSV20v2 } from '../utils/ordi';
+import { storage } from '../utils/storage';
 import { OrdinalResponse, OrdinalTxo } from './ordTypes';
 import { useNetwork } from './useNetwork';
 import { BSV20 } from './useOrds';
@@ -191,6 +195,40 @@ export const useGorillaPool = () => {
     }
   };
 
+  const getOrdContentByOriginOutpoint = async (originOutpoint: string) => {
+    try {
+      const res = await axios.get(`https://v3.ordinals.gorillapool.io/content/${originOutpoint}?fuzzy=false`, {
+        responseType: 'arraybuffer',
+      });
+      return res.data as Buffer;
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const setDerivationTags = async (identityAddress: string, identityWif: string) => {
+    const taggedOrds = await getOrdUtxos(identityAddress);
+    let tags: DerivationTag[] = [];
+    for (const ord of taggedOrds) {
+      try {
+        if (!ord.origin?.outpoint || ord.origin.data?.insc?.file.type !== 'panda/tag') continue;
+        const contentBuffer = await getOrdContentByOriginOutpoint(ord.origin.outpoint.toString());
+        if (!contentBuffer) continue;
+
+        const derivationTag = decryptUsingPrivKey(
+          Buffer.from(contentBuffer).toString('hex'),
+          PrivateKey.from_wif(identityWif),
+        );
+
+        tags.push(JSON.parse(derivationTag));
+      } catch (error) {
+        console.log(error);
+      }
+    }
+
+    storage.set({ derivationTags: tags });
+  };
+
   return {
     getOrdUtxos,
     broadcastWithGorillaPool,
@@ -201,5 +239,7 @@ export const useGorillaPool = () => {
     getLockedUtxos,
     getSpentTxids,
     submitTx,
+    getOrdContentByOriginOutpoint,
+    setDerivationTags,
   };
 };

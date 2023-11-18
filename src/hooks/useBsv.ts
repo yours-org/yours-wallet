@@ -14,14 +14,12 @@ import init, {
 import { useEffect, useState } from 'react';
 import { SignMessageResponse } from '../pages/requests/SignMessageRequest';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
-import { decrypt } from '../utils/crypto';
-import { DerivationTags, Keys, TaggedDerivationData, getTaggedDerivationPubKey } from '../utils/keys';
+import { DerivationTag, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
 import { useGorillaPool } from './useGorillaPool';
-import { KeyStorage, useKeys } from './useKeys';
+import { useKeys } from './useKeys';
 import { useNetwork } from './useNetwork';
-import { usePasswordSetting } from './usePasswordSetting';
 import { useWhatsOnChain } from './useWhatsOnChain';
 
 export type UTXO = {
@@ -51,19 +49,13 @@ export type Web3BroadcastRequest = {
 export type Web3SignMessageRequest = {
   message: string;
   encoding?: 'utf8' | 'hex' | 'base64';
-};
-
-type TaggedDerivationResponse = {
-  address?: string;
-  pubKey?: string;
-  error?: string;
+  tag?: DerivationTag;
 };
 
 export const useBsv = () => {
   const [bsvBalance, setBsvBalance] = useState(0);
   const [exchangeRate, setExchangeRate] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { isPasswordRequired } = usePasswordSetting();
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, identityAddress, identityPubKey } = useKeys();
   const { network } = useNetwork();
   const { broadcastWithGorillaPool } = useGorillaPool();
@@ -208,19 +200,19 @@ export const useBsv = () => {
     }
   };
 
-  const getRequestedWif = (keys: Keys, keyType: DerivationTags) => {
+  const getRequestedWif = (keys: Keys, tag: DerivationTag) => {
     let wif = keys.walletWif;
-    if (keyType) {
+    if (tag) {
       if (
-        (keyType !== 'identity' && keyType !== 'ord' && keyType !== 'wallet') ||
-        (keyType === 'identity' && !keys.identityWif) ||
-        (keyType === 'ord' && !keys.ordWif) ||
-        (keyType === 'wallet' && !keys.walletWif)
+        (tag.id !== 'identity' && tag.id !== 'ord' && tag.id !== 'wallet') ||
+        (tag.id === 'identity' && !keys.identityWif) ||
+        (tag.id === 'ord' && !keys.ordWif) ||
+        (tag.id === 'wallet' && !keys.walletWif)
       ) {
         return { error: 'key-type' };
       }
 
-      wif = (keyType === 'ord' ? keys.ordWif : keyType === 'identity' ? keys.identityWif : keys.walletWif) as string; // safely cast here with above if checks
+      wif = (tag.id === 'ord' ? keys.ordWif : tag.id === 'identity' ? keys.identityWif : keys.walletWif) as string; // safely cast here with above if checks
     }
     return { wif };
   };
@@ -236,7 +228,7 @@ export const useBsv = () => {
     }
     try {
       const keys = (await retrieveKeys(password)) as Keys;
-      const res = getRequestedWif(keys, 'identity');
+      const res = getRequestedWif(keys, { label: 'panda', id: 'identity' });
       if (res.error || !res.wif) {
         return res;
       }
@@ -252,7 +244,7 @@ export const useBsv = () => {
         pubKey: publicKey.to_hex(),
         message: message,
         sig: signature.to_compact_hex(),
-        keyType: 'identity',
+        derivationTag: { label: 'panda', id: 'identity' },
       };
     } catch (error) {
       console.log(error);
@@ -288,47 +280,27 @@ export const useBsv = () => {
     setExchangeRate(r ?? 0);
   };
 
-  const retrieveTaggedDerivationPubKey = (
-    password: string,
-    tagData: TaggedDerivationData,
-  ): Promise<TaggedDerivationResponse> => {
-    setIsProcessing(true);
-    return new Promise((resolve, reject) => {
-      storage.get(['encryptedKeys', 'passKey', 'salt'], async (result: KeyStorage) => {
-        try {
-          await init();
+  // const getTaggedKeys = async ()=> {
+  //     const blah = await axios.get(
+  //       'https://v3.ordinals.gorillapool.io/api/txos/address/1BFnHUTHm9FQU8svTe2ibqX79iiPZZzi7U/unspent?limit=100&offset=0&bsv20=false',
+  //     );
 
-          const isVerified = !isPasswordRequired || (await verifyPassword(password ?? ''));
-          if (!isVerified) {
-            resolve({ error: 'invalid-password' });
-          }
+  //     for (const b of blah.data) {
+  //       try {
+  //         const res = await axios.get(`https://v3.ordinals.gorillapool.io/content/${b.origin.outpoint}?fuzzy=false`, {
+  //           responseType: 'arraybuffer',
+  //         });
+  //         const data = res.data as Buffer;
+  //         console.log(typeof data);
+  //         console.log(data);
 
-          if (!result.encryptedKeys || !result.passKey) return;
-          const d = decrypt(result.encryptedKeys, result.passKey);
-          const keys: Keys = JSON.parse(d);
-
-          if (!keys?.mnemonic) {
-            resolve({ error: 'no-keys' });
-          }
-
-          let publicKeys = getTaggedDerivationPubKey(tagData, keys.mnemonic);
-
-          const taggedAddress = P2PKHAddress.from_string(publicKeys.address)
-            .set_chain_params(getChainParams(network))
-            .to_string();
-
-          resolve({
-            address: taggedAddress,
-            pubKey: publicKeys.pubKey.to_hex(),
-          });
-        } catch (error) {
-          resolve({ error: `error: ${JSON.stringify(error)}` });
-        } finally {
-          setIsProcessing(false);
-        }
-      });
-    });
-  };
+  //         const d = await decryptUsingPrivKey(Buffer.from(data).toString('hex'), encryptPrivKey);
+  //         console.log(d);
+  //       } catch (error) {
+  //         console.log(error);
+  //       }
+  //     }
+  // }
 
   useEffect(() => {
     if (!bsvAddress) return;
@@ -351,6 +323,6 @@ export const useBsv = () => {
     signMessage,
     verifyMessage,
     retrieveKeys,
-    retrieveTaggedDerivationPubKey,
+    getChainParams,
   };
 };

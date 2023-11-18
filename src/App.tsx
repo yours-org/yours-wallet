@@ -23,13 +23,13 @@ import { Start } from './pages/onboarding/Start';
 import { BroadcastRequest } from './pages/requests/BroadcastRequest';
 import { BsvSendRequest } from './pages/requests/BsvSendRequest';
 import { ConnectRequest } from './pages/requests/ConnectRequest';
+import { GenerateTaggedKeysRequest } from './pages/requests/GenerateTaggedKeysRequest';
 import { GetSignaturesRequest } from './pages/requests/GetSignaturesRequest';
 import { OrdPurchaseRequest, Web3PurchaseOrdinalRequest } from './pages/requests/OrdPurchaseRequest';
 import { OrdTransferRequest } from './pages/requests/OrdTransferRequest';
-import { PubKeyFromTagRequest } from './pages/requests/PubKeyFromTagRequest';
 import { SignMessageRequest } from './pages/requests/SignMessageRequest';
 import { ColorThemeProps } from './theme';
-import { TaggedDerivationData } from './utils/keys';
+import { DerivationTag } from './utils/keys';
 import { storage } from './utils/storage';
 
 export type ThirdPartyAppRequestData = {
@@ -79,7 +79,7 @@ export const App = () => {
   const [ordinalTransferRequest, setOrdinalTransferRequest] = useState<Web3TransferOrdinalRequest | undefined>();
   const [ordinalPurchaseRequest, setOrdinalPurchaseRequest] = useState<Web3PurchaseOrdinalRequest | undefined>();
   const [getSignaturesRequest, setGetSignaturesRequest] = useState<Web3GetSignaturesRequest | undefined>();
-  const [pubKeyFromTagRequest, setPubKeyFromTagRequest] = useState<TaggedDerivationData | undefined>();
+  const [pubKeyFromTagRequest, setPubKeyFromTagRequest] = useState<DerivationTag | undefined>();
 
   useActivityDetector(isLocked);
 
@@ -100,7 +100,7 @@ export const App = () => {
         'signTransactionRequest',
         'broadcastRequest',
         'getSignaturesRequest',
-        'getPubKeyFromTagRequest',
+        'generateTaggedKeysRequest',
       ],
       (result) => {
         const {
@@ -113,7 +113,7 @@ export const App = () => {
           signMessageRequest,
           broadcastRequest,
           getSignaturesRequest,
-          getPubKeyFromTagRequest,
+          generateTaggedKeysRequest,
         } = result;
 
         if (popupWindowId) setPopupId(popupWindowId);
@@ -153,8 +153,8 @@ export const App = () => {
           setGetSignaturesRequest(getSignaturesRequest);
         }
 
-        if (getPubKeyFromTagRequest) {
-          setPubKeyFromTagRequest(getPubKeyFromTagRequest);
+        if (generateTaggedKeysRequest) {
+          setPubKeyFromTagRequest(generateTaggedKeysRequest);
         }
       },
     );
@@ -225,8 +225,8 @@ export const App = () => {
                               />
                             </Show>
                             <Show when={!!pubKeyFromTagRequest}>
-                              <PubKeyFromTagRequest
-                                web3Request={pubKeyFromTagRequest as TaggedDerivationData}
+                              <GenerateTaggedKeysRequest
+                                web3Request={pubKeyFromTagRequest as DerivationTag}
                                 popupId={popupId}
                                 onResponse={() => setPubKeyFromTagRequest(undefined)}
                               />

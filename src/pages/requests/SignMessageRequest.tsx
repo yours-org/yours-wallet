@@ -11,7 +11,7 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
 import { ColorThemeProps } from '../../theme';
-import { DerivationTags } from '../../utils/keys';
+import { DerivationTag } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
 
@@ -32,7 +32,7 @@ export type SignMessageResponse = {
   pubKey?: string;
   message?: string;
   sig?: string;
-  keyType?: DerivationTags;
+  derivationTag?: DerivationTag;
   error?: string;
 };
 

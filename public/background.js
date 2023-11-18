@@ -10,8 +10,10 @@ let responseCallbackForPurchaseOrdinalRequest;
 let responseCallbackForSignMessageRequest;
 let responseCallbackForBroadcastRequest;
 let responseCallbackForGetSignaturesRequest;
-let responseCallbackForGetPubKeyFromTagRequest;
+let responseCallbackForGenerateTaggedKeysRequest;
 let popupWindowId = null;
+
+const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 const launchPopUp = () => {
   chrome.windows.create(
@@ -66,7 +68,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     'signTransactionResponse',
     'broadcastResponse',
     'getSignaturesResponse',
-    'getPubKeyFromTagResponse',
+    'generateTaggedKeysResponse',
   ];
 
   if (noAuthRequired.includes(message.action)) {
@@ -87,8 +89,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processBroadcastResponse(message);
       case 'getSignaturesResponse':
         return processGetSignaturesResponse(message);
-      case 'getPubKeyFromTagResponse':
-        return processGetPubKeyFromTagResponse(message);
+      case 'generateTaggedKeysResponse':
+        return processGenerateTaggedKeysResponse(message);
       default:
         break;
     }
@@ -140,8 +142,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processGetPaymentUtxos(sendResponse);
       case 'getExchangeRate':
         return processGetExchangeRate(sendResponse);
-      case 'getPubKeyFromTag':
-        return processGetPubKeyFromTagRequest(message, sendResponse);
+      case 'generateTaggedKeys':
+        return processGenerateTaggedKeysRequest(message, sendResponse);
+      case 'getTaggedKeys':
+        return processGetTaggedKeys(message, sendResponse);
       default:
         break;
     }
@@ -193,7 +197,6 @@ const processDisconnectRequest = (message, sendResponse) => {
 const processIsConnectedRequest = (message, sendResponse) => {
   try {
     chrome.storage.local.get(['appState', 'lastActiveTime', 'whitelist'], (result) => {
-      const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
       const currentTime = Date.now();
       const lastActiveTime = result.lastActiveTime;
 
@@ -395,32 +398,6 @@ const processTransferOrdinalRequest = (message, sendResponse) => {
   }
 };
 
-const processGetPubKeyFromTagRequest = (message, sendResponse) => {
-  if (!message.params) {
-    sendResponse({
-      type: 'getPubKeyFromTag',
-      success: false,
-      error: 'Must provide valid params!',
-    });
-  }
-  try {
-    responseCallbackForGetPubKeyFromTagRequest = sendResponse;
-    chrome.storage.local
-      .set({
-        getPubKeyFromTagRequest: message.params,
-      })
-      .then(() => {
-        launchPopUp();
-      });
-  } catch (error) {
-    sendResponse({
-      type: 'getPubKeyFromTag',
-      success: false,
-      error: JSON.stringify(error),
-    });
-  }
-};
-
 const processPurchaseOrdinalRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
@@ -552,6 +529,74 @@ const processGetSocialProfileRequest = (sendResponse) => {
   }
 };
 
+const processGenerateTaggedKeysRequest = (message, sendResponse) => {
+  if (!message.params) {
+    sendResponse({
+      type: 'generateTaggedKeys',
+      success: false,
+      error: 'Must provide valid params!',
+    });
+  }
+  try {
+    responseCallbackForGenerateTaggedKeysRequest = sendResponse;
+    chrome.storage.local
+      .set({
+        generateTaggedKeysRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+  } catch (error) {
+    sendResponse({
+      type: 'generateTaggedKeys',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+};
+
+const processGetTaggedKeys = async (message, sendResponse) => {
+  if (!message.params.label) {
+    sendResponse({
+      type: 'getTaggedKeys',
+      success: false,
+      error: 'Must provide valid params!',
+    });
+  }
+  try {
+    chrome.storage.local.get(
+      ['derivationTags', 'appState', 'lastActiveTime'],
+      ({ derivationTags, appState, lastActiveTime }) => {
+        const currentTime = Date.now();
+        if (appState?.isLocked || currentTime - lastActiveTime > INACTIVITY_LIMIT) {
+          sendResponse({
+            type: 'getTaggedKeys',
+            success: false,
+            error: 'Unauthorized! Panda is locked.',
+          });
+        }
+        let returnData =
+          derivationTags.length > 0 ? derivationTags.filter((tag) => tag.label === message.params.label) : [];
+
+        if (returnData.length > 0 && message.params.ids?.length > 0) {
+          returnData = returnData.filter((d) => message.params.ids.includes(d.id));
+        }
+        sendResponse({
+          type: 'getTaggedKeys',
+          success: true,
+          data: returnData,
+        });
+      },
+    );
+  } catch (error) {
+    sendResponse({
+      type: 'getTaggedKeys',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+};
+
 // RESPONSES ********************************
 
 const processConnectResponse = (message) => {
@@ -624,24 +669,24 @@ const processTransferOrdinalResponse = (message) => {
   return true;
 };
 
-const processGetPubKeyFromTagResponse = (message) => {
-  if (!responseCallbackForGetPubKeyFromTagRequest) throw Error('Missing callback!');
+const processGenerateTaggedKeysResponse = (message) => {
+  if (!responseCallbackForGenerateTaggedKeysRequest) throw Error('Missing callback!');
   try {
-    responseCallbackForGetPubKeyFromTagRequest({
-      type: 'getPubKeyFromTag',
+    responseCallbackForGenerateTaggedKeysRequest({
+      type: 'generateTaggedKeys',
       success: true,
       data: { address: message?.address, pubKey: message?.pubKey },
     });
   } catch (error) {
-    responseCallbackForGetPubKeyFromTagRequest({
-      type: 'getPubKeyFromTag',
+    responseCallbackForGenerateTaggedKeysRequest({
+      type: 'generateTaggedKeys',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
-    responseCallbackForGetPubKeyFromTagRequest = null;
+    responseCallbackForGenerateTaggedKeysRequest = null;
     popupWindowId = null;
-    chrome.storage.local.remove(['getPubKeyFromTagRequest', 'popupWindowId']);
+    chrome.storage.local.remove(['generateTaggedKeysRequest', 'popupWindowId']);
   }
 
   return true;
@@ -828,14 +873,14 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       chrome.storage.local.remove('getSignaturesRequest');
     }
 
-    if (responseCallbackForGetPubKeyFromTagRequest) {
-      responseCallbackForGetPubKeyFromTagRequest({
-        type: 'getPubKeyFromTag',
+    if (responseCallbackForGenerateTaggedKeysRequest) {
+      responseCallbackForGenerateTaggedKeysRequest({
+        type: 'generateTaggedKeys',
         success: false,
         error: 'User dismissed the request!',
       });
-      responseCallbackForGetPubKeyFromTagRequest = null;
-      chrome.storage.local.remove('getPubKeyFromTagRequest');
+      responseCallbackForGenerateTaggedKeysRequest = null;
+      chrome.storage.local.remove('generateTaggedKeysRequest');
     }
 
     popupWindowId = null;
