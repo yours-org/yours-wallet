@@ -46,6 +46,11 @@ export const featuredApps = [
     link: 'https://www.takeitnft.com/marketplace/global',
   },
   {
+    icon: 'https://taleofshua.com/assets/shua_swd_512.png',
+    name: 'Tale of Shua',
+    link: 'https://taleofshua.com/profile/',
+  },
+  {
     icon: 'https://pbs.twimg.com/profile_images/1222666970203471873/zn3OPLG0_400x400.jpg',
     name: 'sCrypt',
     link: 'https://docs.scrypt.io/tokens/tutorials/ordinal-lock/#use-panda-wallet',
