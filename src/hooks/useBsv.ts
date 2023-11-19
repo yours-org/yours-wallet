@@ -146,7 +146,9 @@ export const useBsv = () => {
         } else {
           throw Error('Invalid request');
         }
-        tx.add_output(new TxOut(BigInt(req.satoshis), outScript));
+        // TODO: In event where provider method calls this and happens to have multiple outputs that equal all sats available in users wallet, this tx will likely fail due to no fee to miner. Considering an edge case for now.
+        const outSats = sendAll && request.length === 1 ? satsOut : req.satoshis;
+        tx.add_output(new TxOut(BigInt(outSats), outScript));
       });
 
       if (!sendAll) {
