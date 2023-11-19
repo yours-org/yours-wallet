@@ -506,7 +506,7 @@ const processGetSocialProfileRequest = (sendResponse) => {
         type: 'getSocialProfile',
         success: true,
         data: result?.socialProfile ?? {
-          displayName: 'Panda Wallet',
+          displayName: 'Anon Panda',
           avatar: HOSTED_PANDA_IMAGE,
         },
       });
