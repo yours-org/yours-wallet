@@ -565,6 +565,7 @@ export const OrdWallet = () => {
         onClick={() => {
           setTokenSendAmount(null);
           setPageState('main');
+          resetSendState();
         }}
       />
       {token ? (
