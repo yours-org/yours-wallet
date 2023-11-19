@@ -145,6 +145,7 @@ export const OrdWallet = () => {
     setBsvListAmount(undefined);
     setIsProcessing(false);
     setSelectedOrdinal(undefined);
+    setTokenSendAmount(null);
     setTimeout(() => {
       getOrdinals();
     }, 500);
@@ -157,11 +158,15 @@ export const OrdWallet = () => {
         ? 'No keys were found!'
         : response.error === 'insufficient-funds'
           ? 'Insufficient Funds!'
-          : response.error === 'no-ord-utxo'
-            ? 'Could not locate the ordinal!'
-            : response.error === 'broadcast-error'
-              ? 'There was an error broadcasting the tx!'
-              : 'An unknown error has occurred! Try again.';
+          : response.error === 'fee-too-high'
+            ? 'Miner fee too high!'
+            : response.error === 'no-bsv20-utxo'
+              ? 'No bsv20 token found!'
+              : response.error === 'no-ord-utxo'
+                ? 'Could not locate the ordinal!'
+                : response.error === 'broadcast-error'
+                  ? 'There was an error broadcasting the tx!'
+                  : 'An unknown error has occurred! Try again.';
   };
 
   const handleTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -276,14 +281,7 @@ export const OrdWallet = () => {
     const sendBSV20Res = await sendBSV20(token.tick, receiveAddress, BigInt(tokenSendAmount), passwordConfirm);
 
     if (!sendBSV20Res.txid || sendBSV20Res.error) {
-      const message =
-        sendBSV20Res.error === 'invalid-password'
-          ? 'Invalid Password!'
-          : sendBSV20Res.error === 'insufficient-funds'
-            ? 'Insufficient Funds!'
-            : sendBSV20Res.error === 'no-bsv20-utxo'
-              ? 'No bsv20 token found!'
-              : 'An unknown error has occurred! Try again.';
+      const message = getErrorMessage(sendBSV20Res);
 
       addSnackbar(message, 'error');
       return;

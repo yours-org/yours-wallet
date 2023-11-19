@@ -301,7 +301,7 @@ export const useOrds = () => {
       const paymentPk = PrivateKey.from_wif(payWifPk);
       const ordPk = PrivateKey.from_wif(ordWifPk);
 
-      const fundingUtxos = await getUtxos(fundingAndChangeAddress);
+      const fundingUtxos = await getUtxos(fundingAndChangeAddress, true);
 
       if (!fundingUtxos || fundingUtxos.length === 0) {
         return { error: 'insufficient-funds' };
@@ -377,13 +377,6 @@ export const useOrds = () => {
 
       inTx.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
       tx.set_input(idx, inTx);
-
-      // Fee checker
-      const finalSatsIn = tx.satoshis_in() ?? 0n;
-      const finalSatsOut = tx.satoshis_out() ?? 0n;
-      if (finalSatsIn - finalSatsOut > 500) {
-        return { error: 'fee-to-high' };
-      }
 
       const txhex = tx.to_hex();
       const { txid } = await broadcastWithGorillaPool(txhex);

@@ -515,7 +515,7 @@ const processGetSocialProfileRequest = (sendResponse) => {
         type: 'getSocialProfile',
         success: true,
         data: result?.socialProfile ?? {
-          displayName: 'Panda Wallet',
+          displayName: 'Anon Panda',
           avatar: HOSTED_PANDA_IMAGE,
         },
       });
@@ -610,7 +610,7 @@ const processConnectResponse = (message) => {
       responseCallbackForConnectRequest({
         type: 'connect',
         success: true,
-        data: message.decision === 'approved' ? message.pubKeys.identityPubKey : 'User canceled connection',
+        data: message.decision === 'approved' ? message.pubKeys.identityPubKey : undefined,
       });
     }
   } catch (error) {

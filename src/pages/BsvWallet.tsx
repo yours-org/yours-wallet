@@ -186,8 +186,8 @@ export const BsvWallet = () => {
           ? 'Invalid Password!'
           : sendRes.error === 'insufficient-funds'
             ? 'Insufficient Funds!'
-            : sendRes.error === 'fee-to-high'
-              ? 'Miner fee to high!'
+            : sendRes.error === 'fee-too-high'
+              ? 'Miner fee too high!'
               : 'An unknown error has occurred! Try again.';
 
       addSnackbar(message, 'error');
