@@ -382,7 +382,7 @@ export const useOrds = () => {
       const finalSatsIn = tx.satoshis_in() ?? 0n;
       const finalSatsOut = tx.satoshis_out() ?? 0n;
       if (finalSatsIn - finalSatsOut > 500) {
-        return { error: 'fee-to-high' };
+        return { error: 'fee-too-high' };
       }
 
       const txhex = tx.to_hex();
