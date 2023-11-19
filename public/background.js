@@ -528,7 +528,7 @@ const processConnectResponse = (message) => {
       responseCallbackForConnectRequest({
         type: 'connect',
         success: true,
-        data: message.decision === 'approved' ? message.pubKeys.identityPubKey : 'User canceled connection',
+        data: message.decision === 'approved' ? message.pubKeys.identityPubKey : undefined,
       });
     }
   } catch (error) {
