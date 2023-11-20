@@ -3,6 +3,7 @@ import { styled } from 'styled-components';
 import { ThirdPartyAppRequestData, WhitelistedApp } from '../../App';
 import { Button } from '../../components/Button';
 import { ButtonContainer, Divider, HeaderText, Text } from '../../components/Reusable';
+import { Show } from '../../components/Show';
 import { BottomMenuContext } from '../../contexts/BottomMenuContext';
 import { useBsv } from '../../hooks/useBsv';
 import { useOrds } from '../../hooks/useOrds';
@@ -113,42 +114,44 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   };
 
   return (
-    <Container>
-      <Icon size="5rem" src={thirdPartyAppRequestData?.appIcon} />
-      <HeaderText theme={theme} style={{ width: '90%' }}>
-        {thirdPartyAppRequestData?.appName}
-      </HeaderText>
-      <Text theme={theme} style={{ marginBottom: '1rem' }}>
-        {thirdPartyAppRequestData?.domain}
-      </Text>
-      <Divider />
-      <Text style={{ color: theme.white, margin: 0 }}>
-        The app is requesting to view your wallet balance and request approval for transactions.
-      </Text>
+    <Show when={!thirdPartyAppRequestData?.isAuthorized}>
+      <Container>
+        <Icon size="5rem" src={thirdPartyAppRequestData?.appIcon} />
+        <HeaderText theme={theme} style={{ width: '90%' }}>
+          {thirdPartyAppRequestData?.appName}
+        </HeaderText>
+        <Text theme={theme} style={{ marginBottom: '1rem' }}>
+          {thirdPartyAppRequestData?.domain}
+        </Text>
+        <Divider />
+        <Text style={{ color: theme.white, margin: 0 }}>
+          The app is requesting to view your wallet balance and request approval for transactions.
+        </Text>
 
-      <Divider />
-      <ButtonContainer style={{ position: 'absolute', bottom: 0 }}>
-        <Button
-          theme={theme}
-          type="warn"
-          label="Cancel"
-          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.stopPropagation();
-            handleConnectDecision(false);
-            onDecision();
-          }}
-        />
-        <Button
-          theme={theme}
-          type="primary"
-          label="Connect"
-          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-            e.stopPropagation();
-            handleConnectDecision(true);
-            onDecision();
-          }}
-        />
-      </ButtonContainer>
-    </Container>
+        <Divider />
+        <ButtonContainer style={{ position: 'absolute', bottom: 0 }}>
+          <Button
+            theme={theme}
+            type="warn"
+            label="Cancel"
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+              e.stopPropagation();
+              handleConnectDecision(false);
+              onDecision();
+            }}
+          />
+          <Button
+            theme={theme}
+            type="primary"
+            label="Connect"
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+              e.stopPropagation();
+              handleConnectDecision(true);
+              onDecision();
+            }}
+          />
+        </ButtonContainer>
+      </Container>
+    </Show>
   );
 };
