@@ -238,7 +238,7 @@ export function createTransfer(tick: string, amt: bigint): Script {
 
 export function createTransferP2PKH(address: string, tick: string, amt: bigint): Script {
   return Script.from_hex(
-    createTransfer(tick, amt).to_hex() + P2PKHAddress.from_string(address).get_locking_script().to_hex(),
+    P2PKHAddress.from_string(address).get_locking_script().to_hex() + createTransfer(tick, amt).to_hex(),
   );
 }
 
@@ -256,7 +256,7 @@ export function createTransferV2(id: string, amt: bigint): Script {
 
 export function createTransferV2P2PKH(address: string, id: string, amt: bigint): Script {
   return Script.from_hex(
-    createTransferV2(id, amt).to_hex() + P2PKHAddress.from_string(address).get_locking_script().to_hex(),
+    P2PKHAddress.from_string(address).get_locking_script().to_hex() + createTransferV2(id, amt).to_hex(),
   );
 }
 
