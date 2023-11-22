@@ -283,7 +283,11 @@ export const useBsv = () => {
     setExchangeRate(r ?? 0);
   };
 
-  const fundRawTx = async (rawtx: string): Promise<string> => {
+  const fundRawTx = async (rawtx: string, password: string): Promise<string> => {
+    const keys = await retrieveKeys(password);
+    if (!keys.walletWif) throw new Error('Missing keys');
+    const paymentPk = PrivateKey.from_wif(keys.walletWif);
+
     let satsIn = 0;
     let satsOut = 0;
     const tx = Transaction.from_hex(rawtx);
@@ -309,10 +313,11 @@ export const useBsv = () => {
       satsIn += Number(utxo.satoshis);
       size += P2PKH_INPUT_SIZE;
       fee = Math.ceil(size * FEE_PER_BYTE);
-      const sig = tx.sign(paymentPk, SigHash.Input, inputCount, Script.from_hex(utxo.script), BigInt(u.satoshis));
+      const sig = tx.sign(paymentPk, SigHash.Input, inputCount, Script.from_hex(utxo.script), BigInt(utxo.satoshis));
       txIn.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
       tx.set_input(inputCount++, txIn);
     }
+    tx.add_output(new TxOut(BigInt(satsIn - satsOut - fee), P2PKHAddress.from_string(bsvAddress).get_locking_script()));
     return tx.to_hex();
   };
 
