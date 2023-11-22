@@ -5,6 +5,7 @@ import {
   FEE_PER_BYTE,
   GP_BASE_URL,
   GP_TESTNET_BASE_URL,
+  MAX_FEE_PER_TX,
   O_LOCK_SUFFIX,
   P2PKH_INPUT_SIZE,
   P2PKH_OUTPUT_SIZE,
@@ -377,6 +378,11 @@ export const useOrds = () => {
 
       inTx.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
       tx.set_input(idx, inTx);
+
+      // Fee checker
+      const finalSatsIn = tx.satoshis_in() ?? 0n;
+      const finalSatsOut = tx.satoshis_out() ?? 0n;
+      if (finalSatsIn - finalSatsOut > MAX_FEE_PER_TX) return { error: 'fee-too-high' };
 
       const txhex = tx.to_hex();
       const { txid } = await broadcastWithGorillaPool(txhex);

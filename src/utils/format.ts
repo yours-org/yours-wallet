@@ -50,3 +50,13 @@ export const chunkedStringArray = (array: string[], chunkSize: number) => {
   }
   return result;
 };
+
+export const removeBase64Prefix = (base64Data: string): string => {
+  const commaIndex = base64Data.indexOf(',');
+
+  if (commaIndex !== -1) {
+    return base64Data.slice(commaIndex + 1);
+  }
+
+  return base64Data;
+};
