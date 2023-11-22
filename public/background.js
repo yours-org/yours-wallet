@@ -10,7 +10,10 @@ let responseCallbackForPurchaseOrdinalRequest;
 let responseCallbackForSignMessageRequest;
 let responseCallbackForBroadcastRequest;
 let responseCallbackForGetSignaturesRequest;
+let responseCallbackForGenerateTaggedKeysRequest;
 let popupWindowId = null;
+
+const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 const launchPopUp = () => {
   chrome.windows.create(
@@ -65,6 +68,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     'signTransactionResponse',
     'broadcastResponse',
     'getSignaturesResponse',
+    'generateTaggedKeysResponse',
   ];
 
   if (noAuthRequired.includes(message.action)) {
@@ -85,6 +89,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processBroadcastResponse(message);
       case 'getSignaturesResponse':
         return processGetSignaturesResponse(message);
+      case 'generateTaggedKeysResponse':
+        return processGenerateTaggedKeysResponse(message);
       default:
         break;
     }
@@ -136,6 +142,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processGetPaymentUtxos(sendResponse);
       case 'getExchangeRate':
         return processGetExchangeRate(sendResponse);
+      case 'generateTaggedKeys':
+        return processGenerateTaggedKeysRequest(message, sendResponse);
+      case 'getTaggedKeys':
+        return processGetTaggedKeys(message, sendResponse);
+      case 'inscribe':
+        return processSendBsvRequest(message, sendResponse);
       default:
         break;
     }
@@ -187,7 +199,6 @@ const processDisconnectRequest = (message, sendResponse) => {
 const processIsConnectedRequest = (message, sendResponse) => {
   try {
     chrome.storage.local.get(['appState', 'lastActiveTime', 'whitelist'], (result) => {
-      const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
       const currentTime = Date.now();
       const lastActiveTime = result.lastActiveTime;
 
@@ -347,13 +358,26 @@ const processSendBsvRequest = (message, sendResponse) => {
   }
   try {
     responseCallbackForSendBsvRequest = sendResponse;
-    chrome.storage.local
-      .set({
-        sendBsvRequest: message.params.data,
-      })
-      .then(() => {
-        launchPopUp();
+    let sendBsvRequest = message.params.data;
+
+    // If in this if block, it's an inscribe() request.
+    if (message.params.data[0].base64Data) {
+      sendBsvRequest = message.params.data.map((d) => {
+        return {
+          address: d.address,
+          inscription: {
+            base64Data: d.base64Data,
+            mimeType: d.mimeType,
+            map: d.map,
+          },
+          satoshis: d.satoshis ?? 1,
+        };
       });
+    }
+
+    chrome.storage.local.set({ sendBsvRequest }).then(() => {
+      launchPopUp();
+    });
   } catch (error) {
     sendResponse({
       type: 'sendBsv',
@@ -520,6 +544,79 @@ const processGetSocialProfileRequest = (sendResponse) => {
   }
 };
 
+const processGenerateTaggedKeysRequest = (message, sendResponse) => {
+  if (!message.params) {
+    sendResponse({
+      type: 'generateTaggedKeys',
+      success: false,
+      error: 'Must provide valid params!',
+    });
+  }
+  try {
+    responseCallbackForGenerateTaggedKeysRequest = sendResponse;
+    chrome.storage.local
+      .set({
+        generateTaggedKeysRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+  } catch (error) {
+    sendResponse({
+      type: 'generateTaggedKeys',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+};
+
+const processGetTaggedKeys = async (message, sendResponse) => {
+  if (!message.params.label) {
+    sendResponse({
+      type: 'getTaggedKeys',
+      success: false,
+      error: 'Must provide valid params!',
+    });
+  }
+  try {
+    chrome.storage.local.get(
+      ['derivationTags', 'appState', 'lastActiveTime'],
+      ({ derivationTags, appState, lastActiveTime }) => {
+        const currentTime = Date.now();
+        if (appState?.isLocked || currentTime - lastActiveTime > INACTIVITY_LIMIT) {
+          sendResponse({
+            type: 'getTaggedKeys',
+            success: false,
+            error: 'Unauthorized! Panda is locked.',
+          });
+        }
+
+        let returnData =
+          derivationTags.length > 0
+            ? derivationTags.filter(
+                (res) => res.tag.label === message.params.label && res.tag.domain === message.params.domain,
+              )
+            : [];
+
+        if (returnData.length > 0 && message.params.ids?.length > 0) {
+          returnData = returnData.filter((d) => message.params.ids.includes(d.id));
+        }
+        sendResponse({
+          type: 'getTaggedKeys',
+          success: true,
+          data: returnData,
+        });
+      },
+    );
+  } catch (error) {
+    sendResponse({
+      type: 'getTaggedKeys',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+};
+
 // RESPONSES ********************************
 
 const processConnectResponse = (message) => {
@@ -592,6 +689,33 @@ const processTransferOrdinalResponse = (message) => {
   return true;
 };
 
+const processGenerateTaggedKeysResponse = (message) => {
+  if (!responseCallbackForGenerateTaggedKeysRequest) throw Error('Missing callback!');
+  try {
+    responseCallbackForGenerateTaggedKeysRequest({
+      type: 'generateTaggedKeys',
+      success: true,
+      data: {
+        address: message?.address,
+        pubKey: message?.pubKey,
+        tag: message?.tag,
+      },
+    });
+  } catch (error) {
+    responseCallbackForGenerateTaggedKeysRequest({
+      type: 'generateTaggedKeys',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  } finally {
+    responseCallbackForGenerateTaggedKeysRequest = null;
+    popupWindowId = null;
+    chrome.storage.local.remove(['generateTaggedKeysRequest', 'popupWindowId']);
+  }
+
+  return true;
+};
+
 const processPurchaseOrdinalResponse = (message) => {
   if (!responseCallbackForPurchaseOrdinalRequest) throw Error('Missing callback!');
   try {
@@ -626,7 +750,7 @@ const processSignMessageResponse = (message) => {
         pubKey: message?.pubKey,
         message: message?.message,
         sig: message?.sig,
-        keyType: message?.keyType,
+        derivationTag: message?.derivationTag,
       },
     });
   } catch (error) {
@@ -771,6 +895,16 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       });
       responseCallbackForGetSignaturesRequest = null;
       chrome.storage.local.remove('getSignaturesRequest');
+    }
+
+    if (responseCallbackForGenerateTaggedKeysRequest) {
+      responseCallbackForGenerateTaggedKeysRequest({
+        type: 'generateTaggedKeys',
+        success: false,
+        error: 'User dismissed the request!',
+      });
+      responseCallbackForGenerateTaggedKeysRequest = null;
+      chrome.storage.local.remove('generateTaggedKeysRequest');
     }
 
     popupWindowId = null;

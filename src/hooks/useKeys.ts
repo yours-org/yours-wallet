@@ -13,11 +13,11 @@ import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto
 import { Keys, generateKeysFromTag, getKeys, getKeysFromWifs } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
+import { UTXO } from './useBsv';
 import { useGorillaPool } from './useGorillaPool';
 import { useNetwork } from './useNetwork';
 import { usePasswordSetting } from './usePasswordSetting';
 import { useWhatsOnChain } from './useWhatsOnChain';
-import { UTXO } from './useBsv';
 
 export type KeyStorage = {
   encryptedKeys: string;

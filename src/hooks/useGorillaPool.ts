@@ -1,8 +1,13 @@
 import axios from 'axios';
+import { ChainParams, P2PKHAddress, PrivateKey } from 'bsv-wasm-web';
+import { TaggedDerivationResponse } from '../pages/requests/GenerateTaggedKeysRequest';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL } from '../utils/constants';
+import { decryptUsingPrivKey } from '../utils/crypto';
 import { chunkedStringArray } from '../utils/format';
+import { DerivationTag, Keys, getTaggedDerivationKeys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { isBSV20v2 } from '../utils/ordi';
+import { storage } from '../utils/storage';
 import { OrdinalResponse, OrdinalTxo } from './ordTypes';
 import { useNetwork } from './useNetwork';
 import { BSV20 } from './useOrds';
@@ -23,6 +28,10 @@ export const useGorillaPool = () => {
 
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
+  };
+
+  const getChainParams = (network: NetWork): ChainParams => {
+    return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
   };
 
   const getOrdUtxos = async (ordAddress: string): Promise<OrdinalResponse> => {
@@ -191,6 +200,47 @@ export const useGorillaPool = () => {
     }
   };
 
+  const getOrdContentByOriginOutpoint = async (originOutpoint: string) => {
+    try {
+      const res = await axios.get(`https://v3.ordinals.gorillapool.io/content/${originOutpoint}?fuzzy=false`, {
+        responseType: 'arraybuffer',
+      });
+      return res.data as Buffer;
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const setDerivationTags = async (identityAddress: string, keys: Keys) => {
+    const taggedOrds = await getOrdUtxos(identityAddress);
+    let tags: TaggedDerivationResponse[] = [];
+    for (const ord of taggedOrds) {
+      try {
+        if (!ord.origin?.outpoint || ord.origin.data?.insc?.file.type !== 'panda/tag') continue;
+        const contentBuffer = await getOrdContentByOriginOutpoint(ord.origin.outpoint.toString());
+        if (!contentBuffer) continue;
+
+        const derivationTag = decryptUsingPrivKey(
+          Buffer.from(contentBuffer).toString('hex'),
+          PrivateKey.from_wif(keys.identityWif),
+        );
+
+        const parsedTag: DerivationTag = JSON.parse(derivationTag);
+        const taggedKeys = getTaggedDerivationKeys(parsedTag, keys.mnemonic);
+
+        const taggedAddress = P2PKHAddress.from_string(taggedKeys.address)
+          .set_chain_params(getChainParams(network))
+          .to_string();
+
+        tags.push({ tag: parsedTag, address: taggedAddress, pubKey: taggedKeys.pubKey.to_hex() });
+      } catch (error) {
+        console.log(error);
+      }
+    }
+
+    storage.set({ derivationTags: tags });
+  };
+
   return {
     getOrdUtxos,
     broadcastWithGorillaPool,
@@ -201,5 +251,7 @@ export const useGorillaPool = () => {
     getLockedUtxos,
     getSpentTxids,
     submitTx,
+    getOrdContentByOriginOutpoint,
+    setDerivationTags,
   };
 };

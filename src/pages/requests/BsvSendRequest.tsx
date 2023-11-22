@@ -159,7 +159,9 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
               ? 'Insufficient Funds!'
               : sendRes.error === 'fee-too-high'
                 ? 'Miner fee too high!'
-                : 'An unknown error has occurred! Try again.' + sendRes.error;
+                : sendRes.error === 'tx-size-too-large'
+                  ? 'Tx too big. 50MB max'
+                  : 'An unknown error has occurred! Try again.' + sendRes.error;
 
         addSnackbar(message, 'error');
         return;
