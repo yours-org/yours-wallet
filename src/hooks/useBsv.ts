@@ -21,7 +21,7 @@ import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
 import { useNetwork } from './useNetwork';
 import { useWhatsOnChain } from './useWhatsOnChain';
-
+import { FEE_PER_BYTE, P2PKH_INPUT_SIZE, P2PKH_OUTPUT_SIZE } from '../utils/constants';
 export type UTXO = {
   satoshis: number;
   vout: number;
@@ -44,6 +44,7 @@ export type Web3SendBsvRequest = {
 
 export type Web3BroadcastRequest = {
   rawtx: string;
+  fund?: boolean;
 };
 
 export type Web3SignMessageRequest = {
@@ -59,7 +60,7 @@ export const useBsv = () => {
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, identityAddress, identityPubKey } = useKeys();
   const { network } = useNetwork();
   const { broadcastWithGorillaPool } = useGorillaPool();
-  const { getUtxos, getBsvBalance, getExchangeRate, getInputs } = useWhatsOnChain();
+  const { getUtxos, getBsvBalance, getExchangeRate, getInputs, getRawTxById } = useWhatsOnChain();
 
   const getChainParams = (network: NetWork): ChainParams => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
@@ -282,6 +283,39 @@ export const useBsv = () => {
     setExchangeRate(r ?? 0);
   };
 
+  const fundRawTx = async (rawtx: string): Promise<string> => {
+    let satsIn = 0;
+    let satsOut = 0;
+    const tx = Transaction.from_hex(rawtx);
+    let inputCount = tx.get_ninputs();
+    for (let i = 0; i < inputCount; i++) {
+      const txIn = tx.get_input(i);
+      const inRawtx = await getRawTxById(txIn!.get_prev_tx_id_hex());
+      if (!inRawtx) throw Error('Could not get raw tx');
+      const inTx = Transaction.from_hex(inRawtx);
+      satsIn += Number(inTx.get_output(txIn!.get_vout()!)!.get_satoshis()!);
+    }
+    for (let i = 0; i < tx.get_noutputs(); i++) {
+      satsOut += Number(tx.get_output(i)!.get_satoshis()!);
+    }
+    let size = rawtx.length / 2 + P2PKH_OUTPUT_SIZE;
+    let fee = Math.ceil(size * FEE_PER_BYTE);
+    const fundingUtxos = await getUtxos(bsvAddress);
+    while (satsIn < satsOut + fee) {
+      const utxo = fundingUtxos.pop();
+      if (!utxo) throw Error('Insufficient funds');
+      const txIn = new TxIn(Buffer.from(utxo.txid, 'hex'), utxo.vout, Script.from_hex(''));
+      tx.add_input(txIn);
+      satsIn += Number(utxo.satoshis);
+      size += P2PKH_INPUT_SIZE;
+      fee = Math.ceil(size * FEE_PER_BYTE);
+      const sig = tx.sign(paymentPk, SigHash.Input, inputCount, Script.from_hex(utxo.script), BigInt(u.satoshis));
+      txIn.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
+      tx.set_input(inputCount++, txIn);
+    }
+    return tx.to_hex();
+  };
+
   useEffect(() => {
     if (!bsvAddress) return;
     updateBsvBalance();
@@ -302,5 +336,6 @@ export const useBsv = () => {
     exchangeRate,
     signMessage,
     verifyMessage,
+    fundRawTx,
   };
 };

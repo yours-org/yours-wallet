@@ -29,7 +29,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const { addSnackbar, message } = useSnackbar();
 
   const { broadcastWithGorillaPool } = useGorillaPool();
-  const { isProcessing, setIsProcessing, updateBsvBalance } = useBsv();
+  const { isProcessing, setIsProcessing, updateBsvBalance, fundRawTx } = useBsv();
 
   useEffect(() => {
     setSelected('bsv');
@@ -65,7 +65,11 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    const { txid, message } = await broadcastWithGorillaPool(request.rawtx);
+    let rawtx = request.rawtx;
+    if (request.fund) {
+      rawtx = await fundRawTx(rawtx);
+    }
+    const { txid, message } = await broadcastWithGorillaPool(rawtx);
     if (!txid) {
       addSnackbar('Error broadcasting the raw tx!', 'error');
       setIsProcessing(false);
