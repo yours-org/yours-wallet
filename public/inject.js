@@ -44,4 +44,5 @@ window.panda = {
   purchaseOrdinal: createPandaMethod('purchaseOrdinal'),
   generateTaggedKeys: createPandaMethod('generateTaggedKeys'),
   getTaggedKeys: createPandaMethod('getTaggedKeys'),
+  inscribe: createPandaMethod('sendBsv'),
 };

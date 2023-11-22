@@ -11,9 +11,11 @@ import init, {
   TxIn,
   TxOut,
 } from 'bsv-wasm-web';
+import { buildInscription } from 'js-1sat-ord-web';
 import { useEffect, useState } from 'react';
 import { SignMessageResponse } from '../pages/requests/SignMessageRequest';
-import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, FEE_PER_BYTE, MAX_BYTES_PER_TX, MAX_FEE_PER_TX } from '../utils/constants';
+import { removeBase64Prefix } from '../utils/format';
 import { DerivationTag, Keys, getTaggedDerivationKeys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
@@ -35,11 +37,45 @@ type SendBsvResponse = {
   error?: string;
 };
 
+export type MimeTypes =
+  | 'text/plain'
+  | 'text/html'
+  | 'text/css'
+  | 'application/javascript'
+  | 'application/json'
+  | 'application/xml'
+  | 'image/jpeg'
+  | 'image/png'
+  | 'image/gif'
+  | 'image/svg+xml'
+  | 'audio/mpeg'
+  | 'audio/wav'
+  | 'audio/wave'
+  | 'video/mp4'
+  | 'application/pdf'
+  | 'application/msword'
+  | 'application/vnd.ms-excel'
+  | 'application/vnd.ms-powerpoint'
+  | 'application/zip'
+  | 'application/x-7z-compressed'
+  | 'application/x-gzip'
+  | 'application/x-tar'
+  | 'application/x-bzip2';
+
+export type MAP = { app: string; type: string; [prop: string]: string };
+
+export type RawInscription = {
+  base64Data: string;
+  mimeType: MimeTypes;
+  map?: MAP;
+};
+
 export type Web3SendBsvRequest = {
   satoshis: number;
   address?: string;
   data?: string[]; // hex string array
   script?: string; // hex string
+  inscription?: RawInscription;
 }[];
 
 export type Web3BroadcastRequest = {
@@ -89,7 +125,7 @@ export const useBsv = () => {
         }
       }
 
-      const feeSats = 20;
+      let feeSats = 20;
       const isBelowNoApprovalLimit = Number(bsvSendAmount) <= Number(noApprovalLimit);
       const keys = await retrieveKeys(password, isBelowNoApprovalLimit);
       if (!keys?.walletWif || !keys.walletPubKey) throw Error('Undefined key');
@@ -133,7 +169,14 @@ export const useBsv = () => {
       request.forEach((req) => {
         let outScript: Script;
         if (req.address) {
-          outScript = P2PKHAddress.from_string(req.address).get_locking_script();
+          if (req.inscription) {
+            const { base64Data, mimeType, map } = req.inscription;
+            const formattedBase64 = removeBase64Prefix(base64Data);
+            outScript = buildInscription(P2PKHAddress.from_string(req.address), formattedBase64, mimeType, map);
+            feeSats = Math.ceil(outScript.to_bytes().byteLength * FEE_PER_BYTE);
+          } else {
+            outScript = P2PKHAddress.from_string(req.address).get_locking_script();
+          }
         } else if (req.script) {
           outScript = Script.from_hex(req.script);
         } else if ((req.data || []).length > 0) {
@@ -174,9 +217,11 @@ export const useBsv = () => {
       // Fee checker
       const finalSatsIn = tx.satoshis_in() ?? 0n;
       const finalSatsOut = tx.satoshis_out() ?? 0n;
-      if (finalSatsIn - finalSatsOut > 500) {
-        return { error: 'fee-too-high' };
-      }
+      if (finalSatsIn - finalSatsOut > MAX_FEE_PER_TX) return { error: 'fee-too-high' };
+
+      // Size checker
+      const bytes = tx.to_bytes().byteLength;
+      if (bytes > MAX_BYTES_PER_TX) return { error: 'tx-size-too-large' };
 
       const rawtx = tx.to_hex();
       let { txid } = await broadcastWithGorillaPool(rawtx);

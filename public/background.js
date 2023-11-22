@@ -146,6 +146,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processGenerateTaggedKeysRequest(message, sendResponse);
       case 'getTaggedKeys':
         return processGetTaggedKeys(message, sendResponse);
+      case 'inscribe':
+        return processSendBsvRequest(message, sendResponse);
       default:
         break;
     }
@@ -356,13 +358,26 @@ const processSendBsvRequest = (message, sendResponse) => {
   }
   try {
     responseCallbackForSendBsvRequest = sendResponse;
-    chrome.storage.local
-      .set({
-        sendBsvRequest: message.params.data,
-      })
-      .then(() => {
-        launchPopUp();
+    let sendBsvRequest = message.params.data;
+
+    // If in this if block, it's an inscribe() request.
+    if (message.params.data[0].base64Data) {
+      sendBsvRequest = message.params.data.map((d) => {
+        return {
+          address: d.address,
+          inscription: {
+            base64Data: d.base64Data,
+            mimeType: d.mimeType,
+            map: d.map,
+          },
+          satoshis: d.satoshis ?? 1,
+        };
       });
+    }
+
+    chrome.storage.local.set({ sendBsvRequest }).then(() => {
+      launchPopUp();
+    });
   } catch (error) {
     sendResponse({
       type: 'sendBsv',

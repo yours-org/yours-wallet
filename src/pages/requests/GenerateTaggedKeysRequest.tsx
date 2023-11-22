@@ -14,6 +14,7 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
 import { encryptUsingPrivKey } from '../../utils/crypto';
+import { truncate } from '../../utils/format';
 import { DerivationTag, Keys, getPrivateKeyFromTag, getTaggedDerivationKeys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
@@ -195,7 +196,9 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <FormContainer noValidate onSubmit={(e) => handleGetTaggedKeys(e)}>
             <Text theme={theme} style={{ margin: '1rem 0' }}>
-              {`The app is requesting to generate a new set of tagged keys with label ${web3Request.label} and id ${web3Request.id}`}
+              {`The app is requesting to generate a new set of tagged keys with label ${web3Request.label} and id ${
+                web3Request.id.length > 20 ? truncate(web3Request.id, 5, 5) : web3Request.id
+              }`}
             </Text>
             <Show when={isPasswordRequired}>
               <Input
