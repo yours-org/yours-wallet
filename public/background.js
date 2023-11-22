@@ -617,41 +617,6 @@ const processGetTaggedKeys = async (message, sendResponse) => {
   }
 };
 
-// Inscribe Request is really just an abstraction for SendBsv which is why it's using sendBsv for everything.
-// const processInscribeRequest = (message, sendResponse) => {
-//   if (!message.params.data) {
-//     sendResponse({
-//       type: 'inscribe',
-//       success: false,
-//       error: 'Must provide valid params!',
-//     });
-//   }
-//   try {
-//     responseCallbackForSendBsvRequest = sendResponse;
-//     const sendBsvRequest = message.params.data.map((d) => {
-//       return {
-//         address: d.address,
-//         inscription: {
-//           base64Data: d.base64Data,
-//           mimeType: d.mimeType,
-//           map: d.map,
-//         },
-//         satoshis: d.satoshis ?? 1,
-//       };
-//     });
-
-//     chrome.storage.local.set({ sendBsvRequest }).then(() => {
-//       launchPopUp();
-//     });
-//   } catch (error) {
-//     sendResponse({
-//       type: 'inscribe',
-//       success: false,
-//       error: JSON.stringify(error),
-//     });
-//   }
-// };
-
 // RESPONSES ********************************
 
 const processConnectResponse = (message) => {
