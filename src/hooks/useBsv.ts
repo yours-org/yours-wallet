@@ -43,6 +43,8 @@ type SendBsvResponse = {
   error?: string;
 };
 
+type FundRawTxResponse = { rawtx?: string; error?: string };
+
 export type MimeTypes =
   | 'text/plain'
   | 'text/html'
@@ -319,7 +321,12 @@ export const useBsv = () => {
     setExchangeRate(r ?? 0);
   };
 
-  const fundRawTx = async (rawtx: string, password: string): Promise<string> => {
+  const fundRawTx = async (rawtx: string, password: string): Promise<FundRawTxResponse> => {
+    const isAuthenticated = await verifyPassword(password);
+    if (!isAuthenticated) {
+      return { error: 'invalid-password' };
+    }
+
     const keys = await retrieveKeys(password);
     if (!keys.walletWif) throw new Error('Missing keys');
     const paymentPk = PrivateKey.from_wif(keys.walletWif);
@@ -354,7 +361,7 @@ export const useBsv = () => {
       tx.set_input(inputCount++, txIn);
     }
     tx.add_output(new TxOut(BigInt(satsIn - satsOut - fee), P2PKHAddress.from_string(bsvAddress).get_locking_script()));
-    return tx.to_hex();
+    return { rawtx: tx.to_hex() };
   };
 
   useEffect(() => {
