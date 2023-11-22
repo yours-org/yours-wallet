@@ -173,7 +173,7 @@ export const useBsv = () => {
             const { base64Data, mimeType, map } = req.inscription;
             const formattedBase64 = removeBase64Prefix(base64Data);
             outScript = buildInscription(P2PKHAddress.from_string(req.address), formattedBase64, mimeType, map);
-            feeSats = Math.ceil(outScript.to_bytes().byteLength * FEE_PER_BYTE);
+            feeSats += Math.ceil(outScript.to_bytes().byteLength * FEE_PER_BYTE);
           } else {
             outScript = P2PKHAddress.from_string(req.address).get_locking_script();
           }
