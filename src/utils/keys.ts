@@ -1,8 +1,8 @@
+import { Bn, Point } from '@ts-bitcoin/core';
 import * as bip39 from 'bip39';
 import { ExtendedPrivateKey, Hash, PrivateKey } from 'bsv-wasm-web';
 import { WifKeys } from '../hooks/useKeys';
 import { DEFAULT_IDENTITY_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';
-import { Bn, Point } from '@ts-bitcoin/core';
 
 export type Keys = {
   mnemonic: string;
@@ -20,7 +20,19 @@ export type Keys = {
   identityDerivationPath: string;
 };
 
-export type DerivationTags = 'wallet' | 'ord' | 'identity';
+export type InternalPandaTags =
+  | { label: 'panda'; id: 'bsv'; domain: ''; meta: {} }
+  | { label: 'panda'; id: 'ord'; domain: ''; meta: {} }
+  | { label: 'panda'; id: 'identity'; domain: ''; meta: {} };
+
+export type DerivationTag =
+  | InternalPandaTags
+  | {
+      label: string;
+      id: string;
+      domain: string;
+      meta?: Record<string, any>;
+    };
 
 const getWifAndDerivation = (seedPhrase: string, derivationPath: string) => {
   const seed = bip39.mnemonicToSeedSync(seedPhrase);
@@ -114,4 +126,35 @@ export const getKeysFromWifs = (wifs: WifKeys) => {
   };
 
   return keys;
+};
+
+const getTaggedDerivation = (tag: DerivationTag): string => {
+  const labelHex = Hash.sha_256(Buffer.from(tag.label, 'utf-8')).to_hex();
+  const idHex = Hash.sha_256(Buffer.from(tag.id, 'utf-8')).to_hex();
+  const labelNumber = parseInt(labelHex.slice(-8), 16) % 2 ** 31;
+  const idNumber = parseInt(idHex.slice(-8), 16) % 2 ** 31;
+  return `m/44'/236'/218'/${labelNumber}/${idNumber}`;
+};
+
+export const getTaggedDerivationKeys = (tag: DerivationTag, mnemonic: string) => {
+  const taggedDerivation = getTaggedDerivation(tag);
+  return generateKeysFromTag(mnemonic, taggedDerivation);
+};
+
+export const getPrivateKeyFromTag = (tag: DerivationTag, keys: Keys) => {
+  if (tag.label === 'panda') {
+    switch (tag.id) {
+      case 'bsv':
+        return PrivateKey.from_wif(keys.walletWif);
+      case 'ord':
+        return PrivateKey.from_wif(keys.ordWif);
+      case 'identity':
+        return PrivateKey.from_wif(keys.identityWif);
+      default:
+        return PrivateKey.from_wif(keys.identityWif);
+    }
+  } else {
+    const taggedKeys = getTaggedDerivationKeys(tag, keys.mnemonic);
+    return taggedKeys.privKey;
+  }
 };

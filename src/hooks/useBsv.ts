@@ -11,10 +11,12 @@ import init, {
   TxIn,
   TxOut,
 } from 'bsv-wasm-web';
+import { buildInscription } from 'js-1sat-ord-web';
 import { useEffect, useState } from 'react';
 import { SignMessageResponse } from '../pages/requests/SignMessageRequest';
-import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
-import { DerivationTags, Keys } from '../utils/keys';
+import { BSV_DECIMAL_CONVERSION, FEE_PER_BYTE, MAX_BYTES_PER_TX, MAX_FEE_PER_TX } from '../utils/constants';
+import { removeBase64Prefix } from '../utils/format';
+import { DerivationTag, Keys, getTaggedDerivationKeys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
 import { useGorillaPool } from './useGorillaPool';
@@ -35,11 +37,45 @@ type SendBsvResponse = {
   error?: string;
 };
 
+export type MimeTypes =
+  | 'text/plain'
+  | 'text/html'
+  | 'text/css'
+  | 'application/javascript'
+  | 'application/json'
+  | 'application/xml'
+  | 'image/jpeg'
+  | 'image/png'
+  | 'image/gif'
+  | 'image/svg+xml'
+  | 'audio/mpeg'
+  | 'audio/wav'
+  | 'audio/wave'
+  | 'video/mp4'
+  | 'application/pdf'
+  | 'application/msword'
+  | 'application/vnd.ms-excel'
+  | 'application/vnd.ms-powerpoint'
+  | 'application/zip'
+  | 'application/x-7z-compressed'
+  | 'application/x-gzip'
+  | 'application/x-tar'
+  | 'application/x-bzip2';
+
+export type MAP = { app: string; type: string; [prop: string]: string };
+
+export type RawInscription = {
+  base64Data: string;
+  mimeType: MimeTypes;
+  map?: MAP;
+};
+
 export type Web3SendBsvRequest = {
   satoshis: number;
   address?: string;
   data?: string[]; // hex string array
   script?: string; // hex string
+  inscription?: RawInscription;
 }[];
 
 export type Web3BroadcastRequest = {
@@ -49,13 +85,13 @@ export type Web3BroadcastRequest = {
 export type Web3SignMessageRequest = {
   message: string;
   encoding?: 'utf8' | 'hex' | 'base64';
+  tag?: DerivationTag;
 };
 
 export const useBsv = () => {
   const [bsvBalance, setBsvBalance] = useState(0);
   const [exchangeRate, setExchangeRate] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, identityAddress, identityPubKey } = useKeys();
   const { network } = useNetwork();
   const { broadcastWithGorillaPool } = useGorillaPool();
@@ -89,7 +125,7 @@ export const useBsv = () => {
         }
       }
 
-      const feeSats = 20;
+      let feeSats = 20;
       const isBelowNoApprovalLimit = Number(bsvSendAmount) <= Number(noApprovalLimit);
       const keys = await retrieveKeys(password, isBelowNoApprovalLimit);
       if (!keys?.walletWif || !keys.walletPubKey) throw Error('Undefined key');
@@ -133,7 +169,14 @@ export const useBsv = () => {
       request.forEach((req) => {
         let outScript: Script;
         if (req.address) {
-          outScript = P2PKHAddress.from_string(req.address).get_locking_script();
+          if (req.inscription) {
+            const { base64Data, mimeType, map } = req.inscription;
+            const formattedBase64 = removeBase64Prefix(base64Data);
+            outScript = buildInscription(P2PKHAddress.from_string(req.address), formattedBase64, mimeType, map);
+            feeSats = Math.ceil(outScript.to_bytes().byteLength * FEE_PER_BYTE);
+          } else {
+            outScript = P2PKHAddress.from_string(req.address).get_locking_script();
+          }
         } else if (req.script) {
           outScript = Script.from_hex(req.script);
         } else if ((req.data || []).length > 0) {
@@ -174,9 +217,11 @@ export const useBsv = () => {
       // Fee checker
       const finalSatsIn = tx.satoshis_in() ?? 0n;
       const finalSatsOut = tx.satoshis_out() ?? 0n;
-      if (finalSatsIn - finalSatsOut > 500) {
-        return { error: 'fee-too-high' };
-      }
+      if (finalSatsIn - finalSatsOut > MAX_FEE_PER_TX) return { error: 'fee-too-high' };
+
+      // Size checker
+      const bytes = tx.to_bytes().byteLength;
+      if (bytes > MAX_BYTES_PER_TX) return { error: 'tx-size-too-large' };
 
       const rawtx = tx.to_hex();
       let { txid } = await broadcastWithGorillaPool(rawtx);
@@ -202,23 +247,6 @@ export const useBsv = () => {
     }
   };
 
-  const getRequestedWif = (keys: Keys, keyType: DerivationTags) => {
-    let wif = keys.walletWif;
-    if (keyType) {
-      if (
-        (keyType !== 'identity' && keyType !== 'ord' && keyType !== 'wallet') ||
-        (keyType === 'identity' && !keys.identityWif) ||
-        (keyType === 'ord' && !keys.ordWif) ||
-        (keyType === 'wallet' && !keys.walletWif)
-      ) {
-        return { error: 'key-type' };
-      }
-
-      wif = (keyType === 'ord' ? keys.ordWif : keyType === 'identity' ? keys.identityWif : keys.walletWif) as string; // safely cast here with above if checks
-    }
-    return { wif };
-  };
-
   const signMessage = async (
     messageToSign: Web3SignMessageRequest,
     password: string,
@@ -230,23 +258,25 @@ export const useBsv = () => {
     }
     try {
       const keys = (await retrieveKeys(password)) as Keys;
-      const res = getRequestedWif(keys, 'identity');
-      if (res.error || !res.wif) {
-        return res;
+      const derivationTag = messageToSign.tag ?? { label: 'panda', id: 'identity', domain: '', meta: {} };
+      const taggedKeys = getTaggedDerivationKeys(derivationTag, keys.mnemonic);
+
+      if (!taggedKeys.wif) {
+        return { error: 'key-type' };
       }
-      const privateKey = PrivateKey.from_wif(res.wif);
+
+      const privateKey = PrivateKey.from_wif(taggedKeys.wif);
       const publicKey = privateKey.to_public_key();
       const address = publicKey.to_address().set_chain_params(getChainParams(network)).to_string();
 
       const msgBuf = Buffer.from(message, encoding);
       const signature = BSM.sign_message(privateKey, msgBuf);
-      // const signature = privateKey.sign_message(msgBuf);
       return {
         address,
         pubKey: publicKey.to_hex(),
         message: message,
         sig: signature.to_compact_hex(),
-        keyType: 'identity',
+        derivationTag,
       };
     } catch (error) {
       console.log(error);
@@ -302,5 +332,7 @@ export const useBsv = () => {
     exchangeRate,
     signMessage,
     verifyMessage,
+    retrieveKeys,
+    getChainParams,
   };
 };
