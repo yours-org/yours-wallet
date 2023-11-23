@@ -284,7 +284,7 @@ export const useBsv = () => {
         address,
         pubKey: publicKey.to_hex(),
         message: message,
-        sig: signature.to_compact_hex(),
+        sig: Buffer.from(signature.to_compact_hex(), 'hex').toString('base64'),
         derivationTag,
       };
     } catch (error) {
