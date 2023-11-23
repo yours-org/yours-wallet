@@ -93,7 +93,12 @@ const InputAmountWrapper = styled.div`
 type PageState = 'main' | 'receive' | 'send';
 type AmountType = 'bsv' | 'usd';
 
-export const BsvWallet = () => {
+export type BsvWalletProps = {
+  isOrdRequest: boolean;
+};
+
+export const BsvWallet = (props: BsvWalletProps) => {
+  const { isOrdRequest } = props;
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>('main');
@@ -110,8 +115,12 @@ export const BsvWallet = () => {
   const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, updateBsvBalance, exchangeRate } = useBsv();
 
   useEffect(() => {
-    setSelected('bsv');
-  }, [setSelected]);
+    if (isOrdRequest) {
+      setSelected('ords');
+    } else {
+      setSelected('bsv');
+    }
+  }, [isOrdRequest, setSelected]);
 
   useEffect(() => {
     if (!successTxId) return;

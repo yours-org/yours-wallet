@@ -234,7 +234,7 @@ export const App = () => {
                           </>
                         }
                       >
-                        <BsvWallet />
+                        <BsvWallet isOrdRequest={!!ordinalTransferRequest || !!ordinalPurchaseRequest} />
                       </Show>
                     }
                   />
@@ -266,7 +266,6 @@ export const App = () => {
                       </Show>
                     }
                   />
-                  <Route path="/ord-wallet" element={<OrdWallet />} />
                   <Route path="/apps" element={<AppsAndTools />} />
                   <Route path="/settings" element={<Settings />} />
                 </Routes>

@@ -1,19 +1,19 @@
+import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
 import { Button } from '../../components/Button';
-import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
-import { PurchaseOrdinal, useOrds } from '../../hooks/useOrds';
-import { Show } from '../../components/Show';
-import { useSnackbar } from '../../hooks/useSnackbar';
-import { PageLoader } from '../../components/PageLoader';
-import validate from 'bitcoin-address-validation';
-import { sleep } from '../../utils/sleep';
-import { useTheme } from '../../hooks/useTheme';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
+import { PageLoader } from '../../components/PageLoader';
+import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
+import { Show } from '../../components/Show';
+import { OrdinalTxo } from '../../hooks/ordTypes';
+import { useGorillaPool } from '../../hooks/useGorillaPool';
+import { PurchaseOrdinal, useOrds } from '../../hooks/useOrds';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
 import { BSV_DECIMAL_CONVERSION, GLOBAL_ORDERBOOK_MARKET_RATE, PANDA_DEV_WALLET } from '../../utils/constants';
-import { useGorillaPool } from '../../hooks/useGorillaPool';
-import { OrdinalTxo } from '../../hooks/ordTypes';
+import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
 
 export type Web3PurchaseOrdinalRequest = {
