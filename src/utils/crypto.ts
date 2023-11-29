@@ -56,7 +56,6 @@ export const encryptUsingPrivKey = (
   pubKeys: PublicKey[],
   privateKey: PrivateKey,
 ) => {
-  console.log(message, encoding, pubKeys, privateKey);
   const msgBuf = Buffer.from(message, encoding);
   const encryptedMessages = pubKeys.map((keys) => keys.encrypt_message(msgBuf, privateKey));
   return encryptedMessages.map((m) => Buffer.from(m.to_bytes()).toString('hex'));
