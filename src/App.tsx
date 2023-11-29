@@ -1,12 +1,18 @@
 import { useContext, useEffect, useState } from 'react';
-import { Route, MemoryRouter as Router, Routes } from 'react-router-dom';
+import { MemoryRouter as Router, Route, Routes } from 'react-router-dom';
 import styled from 'styled-components';
 import { Show } from './components/Show';
 import { UnlockWallet } from './components/UnlockWallet';
 import { BottomMenuContext, BottomMenuProvider } from './contexts/BottomMenuContext';
 import { SnackbarProvider } from './contexts/SnackbarContext';
 import { useActivityDetector } from './hooks/useActivityDetector';
-import { Web3BroadcastRequest, Web3SendBsvRequest, Web3SignMessageRequest } from './hooks/useBsv';
+import {
+  Web3BroadcastRequest,
+  Web3DecryptRequest,
+  Web3EncryptRequest,
+  Web3SendBsvRequest,
+  Web3SignMessageRequest,
+} from './hooks/useBsv';
 import { Web3GetSignaturesRequest } from './hooks/useContracts';
 import { Web3TransferOrdinalRequest } from './hooks/useOrds';
 import { useTheme } from './hooks/useTheme';
@@ -14,20 +20,22 @@ import { useViewport } from './hooks/useViewport';
 import { useWalletLockState } from './hooks/useWalletLockState';
 import { AppsAndTools } from './pages/AppsAndTools';
 import { BsvWallet } from './pages/BsvWallet';
-import { OrdWallet } from './pages/OrdWallet';
-import { Settings } from './pages/Settings';
 import { CreateWallet } from './pages/onboarding/CreateWallet';
 import { ImportWallet } from './pages/onboarding/ImportWallet';
 import { RestoreWallet } from './pages/onboarding/RestoreWallet';
 import { Start } from './pages/onboarding/Start';
+import { OrdWallet } from './pages/OrdWallet';
 import { BroadcastRequest } from './pages/requests/BroadcastRequest';
 import { BsvSendRequest } from './pages/requests/BsvSendRequest';
 import { ConnectRequest } from './pages/requests/ConnectRequest';
+import { DecryptRequest } from './pages/requests/DecryptRequest';
+import { EncryptRequest } from './pages/requests/EncryptRequest';
 import { GenerateTaggedKeysRequest } from './pages/requests/GenerateTaggedKeysRequest';
 import { GetSignaturesRequest } from './pages/requests/GetSignaturesRequest';
 import { OrdPurchaseRequest, Web3PurchaseOrdinalRequest } from './pages/requests/OrdPurchaseRequest';
 import { OrdTransferRequest } from './pages/requests/OrdTransferRequest';
 import { SignMessageRequest } from './pages/requests/SignMessageRequest';
+import { Settings } from './pages/Settings';
 import { ColorThemeProps } from './theme';
 import { DerivationTag } from './utils/keys';
 import { storage } from './utils/storage';
@@ -80,6 +88,8 @@ export const App = () => {
   const [ordinalPurchaseRequest, setOrdinalPurchaseRequest] = useState<Web3PurchaseOrdinalRequest | undefined>();
   const [getSignaturesRequest, setGetSignaturesRequest] = useState<Web3GetSignaturesRequest | undefined>();
   const [pubKeyFromTagRequest, setPubKeyFromTagRequest] = useState<DerivationTag | undefined>();
+  const [messageToEncrypt, setMessageToEncrypt] = useState<Web3EncryptRequest | undefined>();
+  const [messagesToDecrypt, setMessagesToDecrypt] = useState<Web3DecryptRequest | undefined>();
 
   useActivityDetector(isLocked);
 
@@ -101,6 +111,8 @@ export const App = () => {
         'broadcastRequest',
         'getSignaturesRequest',
         'generateTaggedKeysRequest',
+        'encryptRequest',
+        'decryptRequest',
       ],
       (result) => {
         const {
@@ -114,6 +126,8 @@ export const App = () => {
           broadcastRequest,
           getSignaturesRequest,
           generateTaggedKeysRequest,
+          encryptRequest,
+          decryptRequest,
         } = result;
 
         if (popupWindowId) setPopupId(popupWindowId);
@@ -156,6 +170,14 @@ export const App = () => {
         if (generateTaggedKeysRequest) {
           setPubKeyFromTagRequest(generateTaggedKeysRequest);
         }
+
+        if (encryptRequest) {
+          setMessageToEncrypt(encryptRequest);
+        }
+
+        if (decryptRequest) {
+          setMessagesToDecrypt(decryptRequest);
+        }
       },
     );
   }, [isLocked, menuContext]);
@@ -192,7 +214,9 @@ export const App = () => {
                           !messageToSign &&
                           !broadcastRequest &&
                           !getSignaturesRequest &&
-                          !pubKeyFromTagRequest
+                          !pubKeyFromTagRequest &&
+                          !messageToEncrypt &&
+                          !messagesToDecrypt
                         }
                         whenFalseContent={
                           <>
@@ -229,6 +253,20 @@ export const App = () => {
                                 web3Request={pubKeyFromTagRequest as DerivationTag}
                                 popupId={popupId}
                                 onResponse={() => setPubKeyFromTagRequest(undefined)}
+                              />
+                            </Show>
+                            <Show when={!!messageToEncrypt}>
+                              <EncryptRequest
+                                messageToEncrypt={messageToEncrypt as Web3EncryptRequest}
+                                popupId={popupId}
+                                onEncrypt={() => setMessageToEncrypt(undefined)}
+                              />
+                            </Show>
+                            <Show when={!!messagesToDecrypt}>
+                              <DecryptRequest
+                                encryptedMessages={messagesToDecrypt as Web3DecryptRequest}
+                                popupId={popupId}
+                                onDecrypt={() => setMessagesToDecrypt(undefined)}
                               />
                             </Show>
                           </>

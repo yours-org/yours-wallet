@@ -23,7 +23,7 @@ import {
   P2PKH_OUTPUT_SIZE,
 } from '../utils/constants';
 import { removeBase64Prefix } from '../utils/format';
-import { DerivationTag, Keys, getTaggedDerivationKeys } from '../utils/keys';
+import { DerivationTag, getTaggedDerivationKeys, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
 import { useGorillaPool } from './useGorillaPool';
@@ -94,6 +94,18 @@ export type Web3BroadcastRequest = {
 export type Web3SignMessageRequest = {
   message: string;
   encoding?: 'utf8' | 'hex' | 'base64';
+  tag?: DerivationTag;
+};
+
+export type Web3EncryptRequest = {
+  message: string;
+  encoding: 'utf8' | 'hex' | 'base64';
+  hexPubKeys: string[];
+  tag?: DerivationTag;
+};
+
+export type Web3DecryptRequest = {
+  hexMessages: string[];
   tag?: DerivationTag;
 };
 

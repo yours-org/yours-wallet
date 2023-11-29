@@ -4,7 +4,7 @@ import { TaggedDerivationResponse } from '../pages/requests/GenerateTaggedKeysRe
 import { GP_BASE_URL, GP_TESTNET_BASE_URL } from '../utils/constants';
 import { decryptUsingPrivKey } from '../utils/crypto';
 import { chunkedStringArray } from '../utils/format';
-import { DerivationTag, Keys, getTaggedDerivationKeys } from '../utils/keys';
+import { DerivationTag, getTaggedDerivationKeys, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { isBSV20v2 } from '../utils/ordi';
 import { storage } from '../utils/storage';
@@ -221,11 +221,11 @@ export const useGorillaPool = () => {
         if (!contentBuffer) continue;
 
         const derivationTag = decryptUsingPrivKey(
-          Buffer.from(contentBuffer).toString('hex'),
+          [Buffer.from(contentBuffer).toString('hex')],
           PrivateKey.from_wif(keys.identityWif),
         );
 
-        const parsedTag: DerivationTag = JSON.parse(derivationTag);
+        const parsedTag: DerivationTag = JSON.parse(derivationTag[0]);
         const taggedKeys = getTaggedDerivationKeys(parsedTag, keys.mnemonic);
 
         const taggedAddress = P2PKHAddress.from_string(taggedKeys.address)

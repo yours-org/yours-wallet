@@ -45,4 +45,6 @@ window.panda = {
   generateTaggedKeys: createPandaMethod('generateTaggedKeys'),
   getTaggedKeys: createPandaMethod('getTaggedKeys'),
   inscribe: createPandaMethod('sendBsv'),
+  encrypt: createPandaMethod('encrypt'),
+  decrypt: createPandaMethod('decrypt'),
 };
