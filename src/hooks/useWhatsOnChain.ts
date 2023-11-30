@@ -3,8 +3,8 @@ import { P2PKHAddress } from 'bsv-wasm-web';
 import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from '../utils/constants';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
-import { useNetwork } from './useNetwork';
 import { UTXO } from './useBsv';
+import { useNetwork } from './useNetwork';
 
 export type WocUtxo = {
   height: number;
@@ -57,6 +57,7 @@ export const useWhatsOnChain = () => {
         try {
           if (!pullFresh && paymentUtxos?.length > 0) {
             resolve(paymentUtxos);
+            storage.set({ paymentUtxos });
             return;
           }
 

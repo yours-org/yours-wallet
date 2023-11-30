@@ -6,7 +6,7 @@ import { Ordinal } from '../../components/Ordinal';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
-import { Web3TransferOrdinalRequest, useOrds } from '../../hooks/useOrds';
+import { useOrds, Web3TransferOrdinalRequest } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
@@ -41,14 +41,14 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
-      storage.remove('transferOrdinalRequest');
+      if (popupId) chrome.windows.remove(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
     };
-  }, []);
+  }, [popupId]);
 
   const resetSendState = () => {
     setPasswordConfirm('');

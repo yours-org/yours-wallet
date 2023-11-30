@@ -1,6 +1,5 @@
 import { PublicKey } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
-import { styled } from 'styled-components';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -12,23 +11,10 @@ import { useKeys } from '../../hooks/useKeys';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
-import { ColorThemeProps } from '../../theme';
 import { encryptUsingPrivKey } from '../../utils/crypto';
 import { getPrivateKeyFromTag, Keys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
-
-const RequestDetailsContainer = styled.div<ColorThemeProps>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  max-height: 10rem;
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: ${({ theme }) => theme.darkAccent + '80'};
-  margin: 0.5rem;
-`;
 
 export type EncryptResponse = {
   encryptedMessages: string[];
@@ -137,9 +123,6 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
             {'The app is requesting to encrypt a message using your private key:'}
           </Text>
           <FormContainer noValidate onSubmit={(e) => handleEncryption(e)}>
-            <RequestDetailsContainer>
-              {<Text style={{ color: theme.white }}>{`Message: ${messageToEncrypt.message}`}</Text>}
-            </RequestDetailsContainer>
             <Show when={isPasswordRequired}>
               <Input
                 theme={theme}

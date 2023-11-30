@@ -1031,7 +1031,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       chrome.storage.local.remove('encryptRequest');
     }
 
-    if (responseCallbackForEncryptRequest) {
+    if (responseCallbackForDecryptRequest) {
       responseCallbackForDecryptRequest({
         type: 'decrypt',
         success: false,

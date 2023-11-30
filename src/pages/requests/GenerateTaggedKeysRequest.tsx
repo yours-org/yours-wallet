@@ -15,7 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
 import { encryptUsingPrivKey } from '../../utils/crypto';
 import { truncate } from '../../utils/format';
-import { DerivationTag, Keys, getPrivateKeyFromTag, getTaggedDerivationKeys } from '../../utils/keys';
+import { DerivationTag, getPrivateKeyFromTag, getTaggedDerivationKeys, Keys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
 
@@ -54,14 +54,14 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
-      storage.remove('transferOrdinalRequest');
+      if (popupId) chrome.windows.remove(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
     };
-  }, []);
+  }, [popupId]);
 
   const resetSendState = () => {
     setPasswordConfirm('');
