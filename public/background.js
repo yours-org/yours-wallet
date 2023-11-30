@@ -526,13 +526,12 @@ const processGetSocialProfileRequest = (sendResponse) => {
   const HOSTED_PANDA_IMAGE = 'https://i.ibb.co/3fLL5X2/Panda-Wallet-Logo.png';
   try {
     chrome.storage.local.get(['socialProfile'], (result) => {
+      const displayName = result?.socialProfile?.displayName ? result.socialProfile.displayName : 'Anon Panda';
+      const avatar = result?.socialProfile?.avatar ? result.socialProfile.avatar : HOSTED_PANDA_IMAGE;
       sendResponse({
         type: 'getSocialProfile',
         success: true,
-        data: result?.socialProfile ?? {
-          displayName: 'Anon Panda',
-          avatar: HOSTED_PANDA_IMAGE,
-        },
+        data: { displayName, avatar },
       });
     });
   } catch (error) {
