@@ -86,7 +86,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
     const encrypted = encryptUsingPrivKey(
       messageToEncrypt.message,
       messageToEncrypt.encoding,
-      messageToEncrypt.hexPubKeys.map((key) => PublicKey.from_hex(key)),
+      messageToEncrypt.pubKeys.map((key) => PublicKey.from_hex(key)),
       PrivKey,
     );
 

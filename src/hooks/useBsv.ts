@@ -106,12 +106,12 @@ export type Web3SignMessageRequest = {
 export type Web3EncryptRequest = {
   message: string;
   encoding: 'utf8' | 'hex' | 'base64';
-  hexPubKeys: string[];
+  pubKeys: string[];
   tag?: DerivationTag;
 };
 
 export type Web3DecryptRequest = {
-  hexMessages: string[];
+  messages: string[];
   tag?: DerivationTag;
 };
 

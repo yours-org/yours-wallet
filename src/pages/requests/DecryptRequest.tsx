@@ -81,7 +81,7 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
     const keys = (await retrieveKeys(passwordConfirm)) as Keys;
     const PrivKey = getPrivateKeyFromTag(encryptedMessages.tag ?? { label: 'panda', id: 'identity', domain: '' }, keys);
 
-    const decrypted = decryptUsingPrivKey(encryptedMessages.hexMessages, PrivKey);
+    const decrypted = decryptUsingPrivKey(encryptedMessages.messages, PrivKey);
 
     if (!decrypted) {
       addSnackbar('Could not decrypt!', 'error');
