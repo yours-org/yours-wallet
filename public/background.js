@@ -336,7 +336,19 @@ const processGetPaymentUtxos = async (sendResponse) => {
       sendResponse({
         type: 'getPaymentUtxos',
         success: true,
-        data: paymentUtxos.length > 0 ? paymentUtxos : [],
+        data:
+          paymentUtxos.length > 0
+            ? paymentUtxos
+                .filter((u) => !u.spent)
+                .map((utxo) => {
+                  return {
+                    satoshis: utxo.satoshis,
+                    script: utxo.script,
+                    txid: utxo.txid,
+                    vout: utxo.vout,
+                  };
+                })
+            : [],
       });
     });
   } catch (error) {

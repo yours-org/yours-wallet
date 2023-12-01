@@ -18,7 +18,7 @@ import { useNetwork } from './useNetwork';
 import { useWhatsOnChain } from './useWhatsOnChain';
 
 import { createTransferP2PKH, createTransferV2P2PKH, isBSV20v2 } from '../utils/ordi';
-import { storage } from '../utils/storage';
+import { updateStoredPaymentUtxos } from '../utils/tools';
 import { OrdinalTxo } from './ordTypes';
 import { UTXO } from './useBsv';
 import { useTokens } from './useTokens';
@@ -33,9 +33,12 @@ export type OrdOperationResponse = {
   error?: string;
 };
 
+export type ChangeInfo = { change: number; changeVout: number };
+
 export type BuildAndBroadcastResponse = {
   txid: string;
   rawTx: string;
+  changeInfo: ChangeInfo;
 };
 
 export type GPArcResponse = {
@@ -226,7 +229,15 @@ export const useOrds = () => {
       );
 
       if (broadcastResponse?.txid) {
-        storage.set({ paymentUtxos: fundingUtxos.filter((u) => u.txid !== fundingUtxo.txid) }); // remove the spent utxo and update local storage
+        const script = P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex();
+        await updateStoredPaymentUtxos(
+          [fundingUtxo],
+          fundingUtxos,
+          broadcastResponse.changeInfo.change,
+          broadcastResponse.changeInfo.changeVout,
+          script,
+          broadcastResponse.txid,
+        );
         return { txid: broadcastResponse.txid };
       }
 
@@ -260,10 +271,14 @@ export const useOrds = () => {
     );
 
     const rawTx = sendRes.to_hex();
+    const tx = Transaction.from_hex(rawTx);
+
+    const changeVout = tx.get_noutputs() ? tx.get_noutputs() - 1 : 1; // The change should be at vout position 1 if the other requests fail
+    const change = Number(tx.get_output(changeVout)?.get_satoshis()) ?? 0;
     const { txid } = await broadcastWithGorillaPool(rawTx);
 
     if (txid) {
-      return { txid, rawTx };
+      return { txid, rawTx, changeInfo: { change, changeVout } };
     }
   };
 
@@ -302,7 +317,7 @@ export const useOrds = () => {
       const paymentPk = PrivateKey.from_wif(payWifPk);
       const ordPk = PrivateKey.from_wif(ordWifPk);
 
-      const fundingUtxos = await getUtxos(fundingAndChangeAddress, true);
+      const fundingUtxos = await getUtxos(fundingAndChangeAddress);
 
       if (!fundingUtxos || fundingUtxos.length === 0) {
         return { error: 'insufficient-funds' };
@@ -387,7 +402,9 @@ export const useOrds = () => {
       const txhex = tx.to_hex();
       const { txid } = await broadcastWithGorillaPool(txhex);
       if (!txid) return { error: 'broadcast-transaction-failed' };
-      storage.set({ paymentUtxos: fundingUtxos.filter((u) => u.txid !== fundingUtxo.txid) }); // remove the spent utxo and update local storage
+      const changeVout = tx.get_noutputs() - 1;
+      const script = P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex();
+      await updateStoredPaymentUtxos([fundingUtxo], fundingUtxos, change, changeVout, script, txid);
       return { txid };
     } catch (error: any) {
       console.error('sendBSV20 failed:', error);
@@ -445,9 +462,14 @@ export const useOrds = () => {
         Number(price),
       );
 
+      const dummyTx = Transaction.from_hex(rawTx);
+      const changeVout = dummyTx.get_noutputs() - 1;
+      const change = Number(dummyTx.get_output(changeVout)?.get_satoshis()) ?? 0;
+
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
-      storage.set({ paymentUtxos: paymentUtxos.filter((u) => u.txid !== paymentUtxo.txid) }); // remove the spent utxo and update local storage
+      const script = P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex();
+      await updateStoredPaymentUtxos([paymentUtxo], paymentUtxos, change, changeVout, script, txid);
       return { txid };
     } catch (error) {
       console.log(error);
@@ -619,7 +641,10 @@ export const useOrds = () => {
 
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
-      storage.set({ paymentUtxos: paymentUtxos.filter((item) => item.txid !== paymentUtxo.txid) }); // remove the spent utxo and update local storage
+      const fundingScript = P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex();
+      const change = Number(changeOut.get_satoshis());
+      const changeVout = cancelTx.get_noutputs() - 1;
+      await updateStoredPaymentUtxos([paymentUtxo], paymentUtxos, change, changeVout, fundingScript, txid);
       return { txid };
     } catch (error) {
       console.log(error);
@@ -764,19 +789,12 @@ export const useOrds = () => {
       });
 
       const rawTx = purchaseTx.to_hex();
-      const txid = purchaseTx.get_id_hex();
-      if (changeAmt > 0) {
-        fundingUtxos.push({
-          txid,
-          vout: 2,
-          satoshis: changeAmt,
-          script: P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex(),
-        });
-      }
+
       const broadcastRes = await broadcastWithGorillaPool(rawTx);
       if (!broadcastRes.txid) return { error: 'broadcast-error' };
-      storage.set({ paymentUtxos: fundingUtxos });
-      return { txid };
+      const fundingScript = P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex();
+      await updateStoredPaymentUtxos(inputs, fundingUtxos, changeAmt, 2, fundingScript, broadcastRes.txid);
+      return { txid: broadcastRes.txid };
     } catch (error) {
       console.log(error);
       return { error: JSON.stringify(error) };
