@@ -256,15 +256,16 @@ export const useGorillaPool = () => {
 
   const updateStoredPaymentUtxos = async (rawtx: string) => {
     await init();
-    const localStorage = await new Promise<{ paymentUtxos: StoredUtxo[]; appState: { addresses: Partial<Keys> } }>(
-      (resolve) => {
-        storage.get(['paymentUtxos', 'appState'], (result) => resolve(result));
-      },
-    );
+    const localStorage = await new Promise<{
+      paymentUtxos: StoredUtxo[];
+      appState: { addresses: { bsvAddress: string } };
+    }>((resolve) => {
+      storage.get(['paymentUtxos', 'appState'], (result) => resolve(result));
+    });
 
     const { paymentUtxos, appState } = localStorage;
     const { addresses } = appState;
-    const { walletAddress } = addresses;
+    const { bsvAddress } = addresses;
 
     const tx = Transaction.from_hex(rawtx);
     let inputCount = tx.get_ninputs();
@@ -282,7 +283,7 @@ export const useGorillaPool = () => {
       }
     });
 
-    const fundingScript = P2PKHAddress.from_string(walletAddress!).get_locking_script().to_hex();
+    const fundingScript = P2PKHAddress.from_string(bsvAddress!).get_locking_script().to_hex();
     const txid = tx.get_id_hex();
 
     for (let i = 0; i < outputCount; i++) {
