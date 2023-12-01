@@ -121,8 +121,8 @@ export const useBsv = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, identityAddress, identityPubKey } = useKeys();
   const { network } = useNetwork();
-  const { broadcastWithGorillaPool } = useGorillaPool();
-  const { getUtxos, getBsvBalance, getExchangeRate, getInputs, getRawTxById } = useWhatsOnChain();
+  const { broadcastWithGorillaPool, getTxOut } = useGorillaPool();
+  const { getUtxos, getBsvBalance, getExchangeRate, getInputs } = useWhatsOnChain();
 
   const getChainParams = (network: NetWork): ChainParams => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
@@ -163,8 +163,6 @@ export const useBsv = () => {
 
       // Format in and outs
       const fundingUtxos = await getUtxos(fromAddress);
-
-      const script = P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex();
 
       if (!fundingUtxos) throw Error('No Utxos!');
       const totalSats = fundingUtxos.reduce((a: number, item: UTXO) => a + item.satoshis, 0);
@@ -243,8 +241,7 @@ export const useBsv = () => {
       const rawtx = tx.to_hex();
       let { txid } = await broadcastWithGorillaPool(rawtx);
       if (txid) {
-        const changeVout = tx.get_noutputs() - 1;
-        await updateStoredPaymentUtxos(inputs, fundingUtxos, change, changeVout, script, txid);
+        await updateStoredPaymentUtxos(rawtx, fromAddress);
 
         if (isBelowNoApprovalLimit) {
           storage.get(['noApprovalLimit'], ({ noApprovalLimit }) => {
@@ -346,10 +343,8 @@ export const useBsv = () => {
     let inputCount = tx.get_ninputs();
     for (let i = 0; i < inputCount; i++) {
       const txIn = tx.get_input(i);
-      const inRawtx = await getRawTxById(txIn!.get_prev_tx_id_hex());
-      if (!inRawtx) throw Error('Could not get raw tx');
-      const inTx = Transaction.from_hex(inRawtx);
-      satsIn += Number(inTx.get_output(txIn!.get_vout()!)!.get_satoshis()!);
+      const txOut = await getTxOut(txIn!.get_prev_tx_id_hex(), txIn!.get_vout());
+      satsIn += Number(txOut!.get_satoshis());
     }
     for (let i = 0; i < tx.get_noutputs(); i++) {
       satsOut += Number(tx.get_output(i)!.get_satoshis()!);

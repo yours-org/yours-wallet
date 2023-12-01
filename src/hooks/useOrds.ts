@@ -229,15 +229,7 @@ export const useOrds = () => {
       );
 
       if (broadcastResponse?.txid) {
-        const script = P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex();
-        await updateStoredPaymentUtxos(
-          [fundingUtxo],
-          fundingUtxos,
-          broadcastResponse.changeInfo.change,
-          broadcastResponse.changeInfo.changeVout,
-          script,
-          broadcastResponse.txid,
-        );
+        await updateStoredPaymentUtxos(broadcastResponse.rawTx, fundingAndChangeAddress);
         return { txid: broadcastResponse.txid };
       }
 
@@ -402,9 +394,7 @@ export const useOrds = () => {
       const txhex = tx.to_hex();
       const { txid } = await broadcastWithGorillaPool(txhex);
       if (!txid) return { error: 'broadcast-transaction-failed' };
-      const changeVout = tx.get_noutputs() - 1;
-      const script = P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex();
-      await updateStoredPaymentUtxos([fundingUtxo], fundingUtxos, change, changeVout, script, txid);
+      await updateStoredPaymentUtxos(txhex, fundingAndChangeAddress);
       return { txid };
     } catch (error: any) {
       console.error('sendBSV20 failed:', error);
@@ -462,14 +452,9 @@ export const useOrds = () => {
         Number(price),
       );
 
-      const dummyTx = Transaction.from_hex(rawTx);
-      const changeVout = dummyTx.get_noutputs() - 1;
-      const change = Number(dummyTx.get_output(changeVout)?.get_satoshis()) ?? 0;
-
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
-      const script = P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex();
-      await updateStoredPaymentUtxos([paymentUtxo], paymentUtxos, change, changeVout, script, txid);
+      await updateStoredPaymentUtxos(rawTx, fundingAndChangeAddress);
       return { txid };
     } catch (error) {
       console.log(error);
@@ -641,10 +626,7 @@ export const useOrds = () => {
 
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
-      const fundingScript = P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex();
-      const change = Number(changeOut.get_satoshis());
-      const changeVout = cancelTx.get_noutputs() - 1;
-      await updateStoredPaymentUtxos([paymentUtxo], paymentUtxos, change, changeVout, fundingScript, txid);
+      await updateStoredPaymentUtxos(rawTx, fundingAndChangeAddress);
       return { txid };
     } catch (error) {
       console.log(error);
@@ -792,8 +774,7 @@ export const useOrds = () => {
 
       const broadcastRes = await broadcastWithGorillaPool(rawTx);
       if (!broadcastRes.txid) return { error: 'broadcast-error' };
-      const fundingScript = P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script().to_hex();
-      await updateStoredPaymentUtxos(inputs, fundingUtxos, changeAmt, 2, fundingScript, broadcastRes.txid);
+      await updateStoredPaymentUtxos(rawTx, fundingAndChangeAddress);
       return { txid: broadcastRes.txid };
     } catch (error) {
       console.log(error);
