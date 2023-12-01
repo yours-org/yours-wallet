@@ -8,7 +8,7 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { Web3SendBsvRequest, useBsv } from '../../hooks/useBsv';
+import { useBsv, Web3SendBsvRequest } from '../../hooks/useBsv';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
@@ -98,14 +98,14 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     if (requestWithinApp) return;
 
     const onbeforeunloadFn = () => {
-      storage.remove('sendBsvRequest');
+      if (popupId) chrome.windows.remove(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
     };
-  }, [requestWithinApp]);
+  }, [requestWithinApp, popupId]);
 
   const processBsvSend = async () => {
     try {

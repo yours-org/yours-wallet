@@ -68,14 +68,14 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
-      storage.remove('connectRequest');
+      if (popupId) chrome.windows.remove(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
     };
-  }, []);
+  }, [popupId]);
 
   const handleConnectDecision = async (approved: boolean) => {
     if (chrome.runtime) {

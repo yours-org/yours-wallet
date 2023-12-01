@@ -7,7 +7,7 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { SignatureResponse, Web3GetSignaturesRequest, useContracts } from '../../hooks/useContracts';
+import { SignatureResponse, useContracts, Web3GetSignaturesRequest } from '../../hooks/useContracts';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
@@ -227,14 +227,14 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
-      storage.remove('getSignaturesRequest');
+      if (popupId) chrome.windows.remove(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
     };
-  }, []);
+  }, [popupId]);
 
   const resetSendState = () => {
     setPasswordConfirm('');

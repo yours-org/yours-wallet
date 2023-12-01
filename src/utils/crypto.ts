@@ -58,12 +58,16 @@ export const encryptUsingPrivKey = (
 ) => {
   const msgBuf = Buffer.from(message, encoding);
   const encryptedMessages = pubKeys.map((keys) => keys.encrypt_message(msgBuf, privateKey));
-  return encryptedMessages.map((m) => Buffer.from(m.to_bytes()).toString('hex'));
+  return encryptedMessages.map((m) => Buffer.from(m.to_bytes()).toString('base64'));
 };
 
-export const decryptUsingPrivKey = (message: string, privateKey: PrivateKey) => {
-  const ciphertext = ECIESCiphertext.from_bytes(Buffer.from(message, 'hex'), true);
-  const pubKey = ciphertext.extract_public_key();
-  const decrypted = privateKey.decrypt_message(ciphertext, pubKey);
-  return Buffer.from(decrypted).toString('utf-8');
+export const decryptUsingPrivKey = (messages: string[], privateKey: PrivateKey) => {
+  let decryptedMessages: string[] = [];
+  for (const message of messages) {
+    const ciphertext = ECIESCiphertext.from_bytes(Buffer.from(message, 'base64'), true);
+    const pubKey = ciphertext.extract_public_key();
+    const decrypted = privateKey.decrypt_message(ciphertext, pubKey);
+    decryptedMessages.push(Buffer.from(decrypted).toString('base64'));
+  }
+  return decryptedMessages;
 };

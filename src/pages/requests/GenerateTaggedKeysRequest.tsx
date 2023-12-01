@@ -15,7 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
 import { encryptUsingPrivKey } from '../../utils/crypto';
 import { truncate } from '../../utils/format';
-import { DerivationTag, Keys, getPrivateKeyFromTag, getTaggedDerivationKeys } from '../../utils/keys';
+import { DerivationTag, getPrivateKeyFromTag, getTaggedDerivationKeys, Keys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
 
@@ -54,14 +54,14 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
-      storage.remove('transferOrdinalRequest');
+      if (popupId) chrome.windows.remove(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
     };
-  }, []);
+  }, [popupId]);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -105,8 +105,11 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
         encryptPrivKey,
       );
 
-      const base64Message = Buffer.from(encryptedMessages[0], 'hex').toString('base64');
-      const insScript = buildInscription(P2PKHAddress.from_string(keys.identityAddress), base64Message, 'panda/tag');
+      const insScript = buildInscription(
+        P2PKHAddress.from_string(keys.identityAddress),
+        encryptedMessages[0],
+        'panda/tag',
+      );
       const txid = await sendBsv([{ satoshis: 1, script: insScript.to_hex() }], password);
 
       if (!txid) {

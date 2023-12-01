@@ -64,14 +64,14 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
-      storage.remove('purchaseOrdinalRequest');
+      if (popupId) chrome.windows.remove(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
     };
-  }, []);
+  }, [popupId]);
 
   const resetSendState = () => {
     setPasswordConfirm('');

@@ -6,7 +6,7 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { Web3BroadcastRequest, useBsv } from '../../hooks/useBsv';
+import { useBsv, Web3BroadcastRequest } from '../../hooks/useBsv';
 import { useGorillaPool } from '../../hooks/useGorillaPool';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
@@ -50,20 +50,19 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
-      storage.remove('broadcastRequest');
+      if (popupId) chrome.windows.remove(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
     return () => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
     };
-  }, []);
+  }, [popupId]);
 
   useEffect(() => {
     (async () => {
       await init();
       const tx = Transaction.from_hex(request.rawtx);
-      console.log(tx.get_noutputs());
       let satsOut = 0;
       for (let index = 0; index < tx.get_noutputs(); index++) {
         satsOut += Number(tx.get_output(index)!.get_satoshis());

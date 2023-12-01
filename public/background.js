@@ -11,6 +11,8 @@ let responseCallbackForSignMessageRequest;
 let responseCallbackForBroadcastRequest;
 let responseCallbackForGetSignaturesRequest;
 let responseCallbackForGenerateTaggedKeysRequest;
+let responseCallbackForEncryptRequest;
+let responseCallbackForDecryptRequest;
 let popupWindowId = null;
 
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
@@ -69,6 +71,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     'broadcastResponse',
     'getSignaturesResponse',
     'generateTaggedKeysResponse',
+    'encryptResponse',
+    'decryptResponse',
   ];
 
   if (noAuthRequired.includes(message.action)) {
@@ -91,6 +95,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processGetSignaturesResponse(message);
       case 'generateTaggedKeysResponse':
         return processGenerateTaggedKeysResponse(message);
+      case 'encryptResponse':
+        return processEncryptResponse(message);
+      case 'decryptResponse':
+        return processDecryptResponse(message);
       default:
         break;
     }
@@ -148,6 +156,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processGetTaggedKeys(message, sendResponse);
       case 'inscribe':
         return processSendBsvRequest(message, sendResponse);
+      case 'encrypt':
+        return processEncryptRequest(message, sendResponse);
+      case 'decrypt':
+        return processDecryptRequest(message, sendResponse);
       default:
         break;
     }
@@ -628,15 +640,71 @@ const processGetTaggedKeys = async (message, sendResponse) => {
   }
 };
 
+const processEncryptRequest = (message, sendResponse) => {
+  if (!message.params) {
+    sendResponse({
+      type: 'encrypt',
+      success: false,
+      error: 'Must provide valid params!',
+    });
+  }
+  try {
+    responseCallbackForEncryptRequest = sendResponse;
+    chrome.storage.local
+      .set({
+        encryptRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+  } catch (error) {
+    sendResponse({
+      type: 'encrypt',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+
+  return true;
+};
+
+const processDecryptRequest = (message, sendResponse) => {
+  if (!message.params) {
+    sendResponse({
+      type: 'decrypt',
+      success: false,
+      error: 'Must provide valid params!',
+    });
+  }
+  try {
+    responseCallbackForDecryptRequest = sendResponse;
+    chrome.storage.local
+      .set({
+        decryptRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+  } catch (error) {
+    sendResponse({
+      type: 'decrypt',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+
+  return true;
+};
+
 // RESPONSES ********************************
 
-const processConnectResponse = (message) => {
+const processConnectResponse = (response) => {
   try {
     if (responseCallbackForConnectRequest) {
       responseCallbackForConnectRequest({
         type: 'connect',
         success: true,
-        data: message.decision === 'approved' ? message.pubKeys.identityPubKey : undefined,
+        data: response.decision === 'approved' ? response.pubKeys.identityPubKey : undefined,
       });
     }
   } catch (error) {
@@ -654,13 +722,13 @@ const processConnectResponse = (message) => {
   return true;
 };
 
-const processSendBsvResponse = (message) => {
+const processSendBsvResponse = (response) => {
   if (!responseCallbackForSendBsvRequest) throw Error('Missing callback!');
   try {
     responseCallbackForSendBsvRequest({
       type: 'sendBsv',
       success: true,
-      data: { txid: message.txid, rawtx: message.rawtx },
+      data: { txid: response.txid, rawtx: response.rawtx },
     });
   } catch (error) {
     responseCallbackForSendBsvRequest({
@@ -677,13 +745,13 @@ const processSendBsvResponse = (message) => {
   return true;
 };
 
-const processTransferOrdinalResponse = (message) => {
+const processTransferOrdinalResponse = (response) => {
   if (!responseCallbackForTransferOrdinalRequest) throw Error('Missing callback!');
   try {
     responseCallbackForTransferOrdinalRequest({
       type: 'transferOrdinal',
       success: true,
-      data: message?.txid,
+      data: response?.txid,
     });
   } catch (error) {
     responseCallbackForTransferOrdinalRequest({
@@ -700,16 +768,16 @@ const processTransferOrdinalResponse = (message) => {
   return true;
 };
 
-const processGenerateTaggedKeysResponse = (message) => {
+const processGenerateTaggedKeysResponse = (response) => {
   if (!responseCallbackForGenerateTaggedKeysRequest) throw Error('Missing callback!');
   try {
     responseCallbackForGenerateTaggedKeysRequest({
       type: 'generateTaggedKeys',
       success: true,
       data: {
-        address: message?.address,
-        pubKey: message?.pubKey,
-        tag: message?.tag,
+        address: response?.address,
+        pubKey: response?.pubKey,
+        tag: response?.tag,
       },
     });
   } catch (error) {
@@ -727,13 +795,13 @@ const processGenerateTaggedKeysResponse = (message) => {
   return true;
 };
 
-const processPurchaseOrdinalResponse = (message) => {
+const processPurchaseOrdinalResponse = (response) => {
   if (!responseCallbackForPurchaseOrdinalRequest) throw Error('Missing callback!');
   try {
     responseCallbackForPurchaseOrdinalRequest({
       type: 'purchaseOrdinal',
       success: true,
-      data: message?.txid,
+      data: response?.txid,
     });
   } catch (error) {
     responseCallbackForPurchaseOrdinalRequest({
@@ -750,18 +818,18 @@ const processPurchaseOrdinalResponse = (message) => {
   return true;
 };
 
-const processSignMessageResponse = (message) => {
+const processSignMessageResponse = (response) => {
   if (!responseCallbackForSignMessageRequest) throw Error('Missing callback!');
   try {
     responseCallbackForSignMessageRequest({
       type: 'signMessage',
       success: true,
       data: {
-        address: message?.address,
-        pubKey: message?.pubKey,
-        message: message?.message,
-        sig: message?.sig,
-        derivationTag: message?.derivationTag,
+        address: response?.address,
+        pubKey: response?.pubKey,
+        message: response?.message,
+        sig: response?.sig,
+        derivationTag: response?.derivationTag,
       },
     });
   } catch (error) {
@@ -779,21 +847,21 @@ const processSignMessageResponse = (message) => {
   return true;
 };
 
-const processBroadcastResponse = (message) => {
+const processBroadcastResponse = (response) => {
   if (!responseCallbackForBroadcastRequest) throw Error('Missing callback!');
   try {
-    if (message?.error) {
+    if (response?.error) {
       responseCallbackForBroadcastRequest({
         type: 'broadcast',
         success: false,
-        error: message?.error,
+        error: response?.error,
       });
       return;
     }
     responseCallbackForBroadcastRequest({
       type: 'broadcast',
       success: true,
-      data: message?.txid,
+      data: response?.txid,
     });
   } catch (error) {
     responseCallbackForBroadcastRequest({
@@ -810,14 +878,14 @@ const processBroadcastResponse = (message) => {
   return true;
 };
 
-const processGetSignaturesResponse = (message) => {
+const processGetSignaturesResponse = (response) => {
   if (!responseCallbackForGetSignaturesRequest) throw Error('Missing callback!');
   try {
     responseCallbackForGetSignaturesRequest({
       type: 'getSignatures',
-      success: !message?.error,
-      data: message?.sigResponses ?? [],
-      error: message?.error,
+      success: !response?.error,
+      data: response?.sigResponses ?? [],
+      error: response?.error,
     });
   } catch (error) {
     responseCallbackForGetSignaturesRequest({
@@ -829,6 +897,52 @@ const processGetSignaturesResponse = (message) => {
     responseCallbackForGetSignaturesRequest = null;
     popupWindowId = null;
     chrome.storage.local.remove(['getSignaturesRequest', 'popupWindowId']);
+  }
+
+  return true;
+};
+
+const processEncryptResponse = (response) => {
+  if (!responseCallbackForEncryptRequest) throw Error('Missing callback!');
+  try {
+    responseCallbackForEncryptRequest({
+      type: 'encrypt',
+      success: true,
+      data: response.encryptedMessages,
+    });
+  } catch (error) {
+    responseCallbackForEncryptRequest({
+      type: 'encrypt',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  } finally {
+    responseCallbackForEncryptRequest = null;
+    popupWindowId = null;
+    chrome.storage.local.remove(['encryptRequest', 'popupWindowId']);
+  }
+
+  return true;
+};
+
+const processDecryptResponse = (response) => {
+  if (!responseCallbackForDecryptRequest) throw Error('Missing callback!');
+  try {
+    responseCallbackForDecryptRequest({
+      type: 'decrypt',
+      success: true,
+      data: response.decryptedMessages,
+    });
+  } catch (error) {
+    responseCallbackForDecryptRequest({
+      type: 'decrypt',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  } finally {
+    responseCallbackForDecryptRequest = null;
+    popupWindowId = null;
+    chrome.storage.local.remove(['decryptRequest', 'popupWindowId']);
   }
 
   return true;
@@ -916,6 +1030,26 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       });
       responseCallbackForGenerateTaggedKeysRequest = null;
       chrome.storage.local.remove('generateTaggedKeysRequest');
+    }
+
+    if (responseCallbackForEncryptRequest) {
+      responseCallbackForEncryptRequest({
+        type: 'encrypt',
+        success: false,
+        error: 'User dismissed the request!',
+      });
+      responseCallbackForEncryptRequest = null;
+      chrome.storage.local.remove('encryptRequest');
+    }
+
+    if (responseCallbackForDecryptRequest) {
+      responseCallbackForDecryptRequest({
+        type: 'decrypt',
+        success: false,
+        error: 'User dismissed the request!',
+      });
+      responseCallbackForDecryptRequest = null;
+      chrome.storage.local.remove('decryptRequest');
     }
 
     popupWindowId = null;

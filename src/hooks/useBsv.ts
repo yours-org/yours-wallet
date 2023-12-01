@@ -102,6 +102,18 @@ export type Web3SignMessageRequest = {
   tag?: DerivationTag;
 };
 
+export type Web3EncryptRequest = {
+  message: string;
+  pubKeys: string[];
+  encoding?: 'utf8' | 'hex' | 'base64';
+  tag?: DerivationTag;
+};
+
+export type Web3DecryptRequest = {
+  messages: string[];
+  tag?: DerivationTag;
+};
+
 export const useBsv = () => {
   const [bsvBalance, setBsvBalance] = useState(0);
   const [exchangeRate, setExchangeRate] = useState(0);
