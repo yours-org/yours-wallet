@@ -14,7 +14,6 @@ import { StoredUtxo } from './useBsv';
 import { useNetwork } from './useNetwork';
 import { BSV20 } from './useOrds';
 import { useTokens } from './useTokens';
-import { useWeb3Context } from './useWeb3Context';
 
 type GorillaPoolErrorMessage = {
   message: string;
@@ -26,7 +25,6 @@ export type GorillaPoolBroadcastResponse = {
 };
 
 export const useGorillaPool = () => {
-  const { bsvAddress } = useWeb3Context();
   const { network, isAddressOnRightNetwork } = useNetwork();
   const { getTokenDecimals, getTokenSym } = useTokens();
 
@@ -258,10 +256,15 @@ export const useGorillaPool = () => {
 
   const updateStoredPaymentUtxos = async (rawtx: string) => {
     await init();
-    if (!bsvAddress) throw Error('No bsvAddress!');
-    const paymentUtxos = await new Promise<StoredUtxo[]>((resolve) => {
-      storage.get(['paymentUtxos'], (result) => resolve(result.paymentUtxos));
-    });
+    const localStorage = await new Promise<{ paymentUtxos: StoredUtxo[]; appState: { addresses: Partial<Keys> } }>(
+      (resolve) => {
+        storage.get(['paymentUtxos', 'appState'], (result) => resolve(result));
+      },
+    );
+
+    const { paymentUtxos, appState } = localStorage;
+    const { addresses } = appState;
+    const { walletAddress } = addresses;
 
     const tx = Transaction.from_hex(rawtx);
     let inputCount = tx.get_ninputs();
@@ -279,7 +282,7 @@ export const useGorillaPool = () => {
       }
     });
 
-    const fundingScript = P2PKHAddress.from_string(bsvAddress).get_locking_script().to_hex();
+    const fundingScript = P2PKHAddress.from_string(walletAddress!).get_locking_script().to_hex();
     const txid = tx.get_id_hex();
 
     for (let i = 0; i < outputCount; i++) {
