@@ -205,7 +205,7 @@ export const useGorillaPool = () => {
       const res = await axios.get(`https://v3.ordinals.gorillapool.io/content/${originOutpoint}?fuzzy=false`, {
         responseType: 'arraybuffer',
       });
-      return res.data as Buffer;
+      return Buffer.from(res.data);
     } catch (error) {
       console.log(error);
     }
@@ -218,7 +218,7 @@ export const useGorillaPool = () => {
       try {
         if (!ord.origin?.outpoint || ord.origin.data?.insc?.file.type !== 'panda/tag') continue;
         const contentBuffer = await getOrdContentByOriginOutpoint(ord.origin.outpoint.toString());
-        if (!contentBuffer) continue;
+        if (!contentBuffer || contentBuffer.length === 0) continue;
 
         const derivationTag = decryptUsingPrivKey(
           [Buffer.from(contentBuffer).toString('base64')],
