@@ -1,5 +1,5 @@
 import { PublicKey } from 'bsv-wasm-web';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -36,8 +36,15 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
   const { addSnackbar, message } = useSnackbar();
   const { isPasswordRequired } = useWeb3Context();
   const { retrieveKeys } = useKeys();
+  const [hasEncrypted, setHasEncrypted] = useState(false);
 
   const { isProcessing, setIsProcessing } = useBsv();
+
+  useEffect(() => {
+    if (hasEncrypted || isPasswordRequired || !messageToEncrypt || !retrieveKeys) return;
+    handleEncryption();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasEncrypted, isPasswordRequired, messageToEncrypt, retrieveKeys]);
 
   useEffect(() => {
     setSelected('bsv');
@@ -68,8 +75,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
     setIsProcessing(false);
   };
 
-  const handleEncryption = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleEncryption = async () => {
     setIsProcessing(true);
     await sleep(25);
 
@@ -103,6 +109,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
 
     addSnackbar('Successfully Encrypted!', 'success');
     setEncryptedMessages(encrypted);
+    setHasEncrypted(true);
     setIsProcessing(false);
     setTimeout(() => {
       onEncrypt();
@@ -116,13 +123,19 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
       <Show when={isProcessing}>
         <PageLoader theme={theme} message="Encrypting Message..." />
       </Show>
-      <Show when={!isProcessing && !!messageToEncrypt}>
+      <Show when={!isProcessing && !!messageToEncrypt && !hasEncrypted}>
         <ConfirmContent>
           <HeaderText theme={theme}>Encrypt Message</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             {'The app is requesting to encrypt a message using your private key:'}
           </Text>
-          <FormContainer noValidate onSubmit={(e) => handleEncryption(e)}>
+          <FormContainer
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleEncryption();
+            }}
+          >
             <Show when={isPasswordRequired}>
               <Input
                 theme={theme}
