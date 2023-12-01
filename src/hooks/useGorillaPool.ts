@@ -221,11 +221,11 @@ export const useGorillaPool = () => {
         if (!contentBuffer) continue;
 
         const derivationTag = decryptUsingPrivKey(
-          [Buffer.from(contentBuffer).toString('hex')],
+          [Buffer.from(contentBuffer).toString('base64')],
           PrivateKey.from_wif(keys.identityWif),
         );
 
-        const parsedTag: DerivationTag = JSON.parse(derivationTag[0]);
+        const parsedTag: DerivationTag = JSON.parse(Buffer.from(derivationTag[0], 'base64').toString('utf8'));
         const taggedKeys = getTaggedDerivationKeys(parsedTag, keys.mnemonic);
 
         const taggedAddress = P2PKHAddress.from_string(taggedKeys.address)

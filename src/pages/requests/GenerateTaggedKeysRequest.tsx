@@ -105,8 +105,11 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
         encryptPrivKey,
       );
 
-      const base64Message = Buffer.from(encryptedMessages[0], 'hex').toString('base64');
-      const insScript = buildInscription(P2PKHAddress.from_string(keys.identityAddress), base64Message, 'panda/tag');
+      const insScript = buildInscription(
+        P2PKHAddress.from_string(keys.identityAddress),
+        encryptedMessages[0],
+        'panda/tag',
+      );
       const txid = await sendBsv([{ satoshis: 1, script: insScript.to_hex() }], password);
 
       if (!txid) {
