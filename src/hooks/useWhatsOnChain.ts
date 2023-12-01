@@ -3,7 +3,7 @@ import { P2PKHAddress } from 'bsv-wasm-web';
 import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from '../utils/constants';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
-import { UTXO } from './useBsv';
+import { StoredUtxo, UTXO } from './useBsv';
 import { useNetwork } from './useNetwork';
 
 export type WocUtxo = {
@@ -50,30 +50,51 @@ export const useWhatsOnChain = () => {
     return bsvTotal;
   };
 
-  const getUtxos = async (fromAddress: string, pullFresh?: boolean): Promise<UTXO[]> => {
+  const getUtxos = async (fromAddress: string, pullFresh?: boolean): Promise<StoredUtxo[]> => {
     if (!isAddressOnRightNetwork(fromAddress)) return [];
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       storage.get(['paymentUtxos'], async ({ paymentUtxos }) => {
         try {
-          if (!pullFresh && paymentUtxos?.length > 0) {
-            resolve(paymentUtxos);
-            storage.set({ paymentUtxos });
+          let localUtxos: StoredUtxo[] = paymentUtxos || [];
+
+          if (!pullFresh && localUtxos.length > 0) {
+            resolve(
+              localUtxos.filter((utxo) => !utxo.spent).sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1)),
+            );
             return;
           }
 
           const { data } = await axios.get(`${getBaseUrl()}/address/${fromAddress}/unspent`, config);
-          const utxos: UTXO[] = data
-            .map((utxo: WocUtxo) => {
-              return {
-                satoshis: utxo.value,
-                vout: utxo.tx_pos,
-                txid: utxo.tx_hash,
-                script: P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex(),
-              } as UTXO;
-            })
+          const explorerUtxos: UTXO[] = data.map((utxo: WocUtxo) => {
+            return {
+              satoshis: utxo.value,
+              vout: utxo.tx_pos,
+              txid: utxo.tx_hash,
+              script: P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex(),
+            } as UTXO;
+          });
+
+          // Add new UTXOs from explorer that are not in the local storage
+          const newUtxos = explorerUtxos.filter(
+            (explorerUtxo) => !localUtxos.some((storedUtxo) => storedUtxo.txid === explorerUtxo.txid),
+          );
+          localUtxos.push(...newUtxos.map((newUtxo) => ({ ...newUtxo, spent: false, spentUnixTime: 0 })));
+
+          // Remove spent UTXOs older than 3 days
+          const currentDate = new Date();
+          const thresholdUnixTime = currentDate.getTime() - 3 * 24 * 60 * 60; // 3 days in seconds
+          const recentUtxos = localUtxos.filter(
+            (utxo) => !utxo.spent || (utxo.spentUnixTime >= thresholdUnixTime && utxo.spent),
+          );
+
+          // Update local storage to include both unspent and recently spent transactions
+          storage.set({ paymentUtxos: recentUtxos });
+
+          const unspent = recentUtxos
+            .filter((utxo) => !utxo.spent)
             .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
-          storage.set({ paymentUtxos: utxos });
-          resolve(utxos);
+
+          resolve(unspent);
         } catch (error) {
           console.log(error);
           resolve([]);

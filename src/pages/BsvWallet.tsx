@@ -28,6 +28,7 @@ import { ColorThemeProps } from '../theme';
 import { BSV_DECIMAL_CONVERSION, HOSTED_PANDA_IMAGE } from '../utils/constants';
 import { formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
+import { storage } from '../utils/storage';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -52,6 +53,11 @@ const ProfileImage = styled.img`
   height: 1.75rem;
   border-radius: 100%;
   cursor: pointer;
+  transition: transform 0.3s ease;
+
+  &:hover {
+    transform: scale(1.2);
+  }
 `;
 
 const BalanceContainer = styled.div`
@@ -236,6 +242,14 @@ export const BsvWallet = (props: BsvWalletProps) => {
         : 'Enter Send Details';
   };
 
+  const nukeUtxos = () => {
+    storage.remove('paymentUtxos');
+    // Give enough time for storage to remove
+    setTimeout(() => {
+      updateBsvBalance(true);
+    }, 50);
+  };
+
   const formatBalance = (number: number) => {
     // Convert the number to string with fixed 8 decimal places
     const numStr = number.toFixed(8);
@@ -284,7 +298,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         <ProfileImage
           title="Refresh balance"
           src={socialProfile?.avatar ? socialProfile.avatar : HOSTED_PANDA_IMAGE}
-          onClick={() => updateBsvBalance(true)}
+          onClick={nukeUtxos}
         />
       </ProfileImageContainer>
       <MiddleContainer theme={theme}>

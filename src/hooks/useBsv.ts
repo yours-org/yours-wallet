@@ -26,16 +26,22 @@ import { removeBase64Prefix } from '../utils/format';
 import { DerivationTag, getTaggedDerivationKeys, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
+import { updateStoredPaymentUtxos } from '../utils/tools';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
 import { useNetwork } from './useNetwork';
 import { useWhatsOnChain } from './useWhatsOnChain';
-export type UTXO = {
+export interface UTXO {
   satoshis: number;
   vout: number;
   txid: string;
   script: string;
-};
+}
+
+export interface StoredUtxo extends UTXO {
+  spent: boolean;
+  spentUnixTime: number;
+}
 
 type SendBsvResponse = {
   txid?: string;
@@ -156,20 +162,9 @@ export const useBsv = () => {
       const amount = request.reduce((a, r) => a + r.satoshis, 0);
 
       // Format in and outs
-      const utxos = await getUtxos(fromAddress, true);
+      const fundingUtxos = await getUtxos(fromAddress);
 
       const script = P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex();
-
-      const fundingUtxos = utxos
-        .map((utxo: UTXO) => {
-          return {
-            satoshis: utxo.satoshis,
-            vout: utxo.vout,
-            txid: utxo.txid,
-            script,
-          };
-        })
-        .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
 
       if (!fundingUtxos) throw Error('No Utxos!');
       const totalSats = fundingUtxos.reduce((a: number, item: UTXO) => a + item.satoshis, 0);
@@ -215,8 +210,9 @@ export const useBsv = () => {
         tx.add_output(new TxOut(BigInt(outSats), outScript));
       });
 
+      let change = 0;
       if (!sendAll) {
-        const change = totalInputSats - satsOut - feeSats;
+        change = totalInputSats - satsOut - feeSats;
         tx.add_output(new TxOut(BigInt(change), P2PKHAddress.from_string(fromAddress).get_locking_script()));
       }
 
@@ -247,7 +243,8 @@ export const useBsv = () => {
       const rawtx = tx.to_hex();
       let { txid } = await broadcastWithGorillaPool(rawtx);
       if (txid) {
-        storage.set({ paymentUtxos: utxos.filter((item) => !inputs.includes(item)) }); // remove the spent utxos and update local storage
+        const changeVout = tx.get_noutputs() - 1;
+        await updateStoredPaymentUtxos(inputs, fundingUtxos, change, changeVout, script, txid);
 
         if (isBelowNoApprovalLimit) {
           storage.get(['noApprovalLimit'], ({ noApprovalLimit }) => {
