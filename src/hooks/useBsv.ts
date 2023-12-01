@@ -23,19 +23,24 @@ import {
   P2PKH_OUTPUT_SIZE,
 } from '../utils/constants';
 import { removeBase64Prefix } from '../utils/format';
-import { DerivationTag, Keys, getTaggedDerivationKeys } from '../utils/keys';
+import { DerivationTag, getTaggedDerivationKeys, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
 import { useNetwork } from './useNetwork';
 import { useWhatsOnChain } from './useWhatsOnChain';
-export type UTXO = {
+export interface UTXO {
   satoshis: number;
   vout: number;
   txid: string;
   script: string;
-};
+}
+
+export interface StoredUtxo extends UTXO {
+  spent: boolean;
+  spentUnixTime: number;
+}
 
 type SendBsvResponse = {
   txid?: string;
@@ -103,8 +108,8 @@ export const useBsv = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, identityAddress, identityPubKey } = useKeys();
   const { network } = useNetwork();
-  const { broadcastWithGorillaPool } = useGorillaPool();
-  const { getUtxos, getBsvBalance, getExchangeRate, getInputs, getRawTxById } = useWhatsOnChain();
+  const { broadcastWithGorillaPool, getTxOut } = useGorillaPool();
+  const { getUtxos, getBsvBalance, getExchangeRate, getInputs } = useWhatsOnChain();
 
   const getChainParams = (network: NetWork): ChainParams => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
@@ -144,20 +149,7 @@ export const useBsv = () => {
       const amount = request.reduce((a, r) => a + r.satoshis, 0);
 
       // Format in and outs
-      const utxos = await getUtxos(fromAddress, true);
-
-      const script = P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex();
-
-      const fundingUtxos = utxos
-        .map((utxo: UTXO) => {
-          return {
-            satoshis: utxo.satoshis,
-            vout: utxo.vout,
-            txid: utxo.txid,
-            script,
-          };
-        })
-        .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
+      const fundingUtxos = await getUtxos(fromAddress);
 
       if (!fundingUtxos) throw Error('No Utxos!');
       const totalSats = fundingUtxos.reduce((a: number, item: UTXO) => a + item.satoshis, 0);
@@ -203,8 +195,9 @@ export const useBsv = () => {
         tx.add_output(new TxOut(BigInt(outSats), outScript));
       });
 
+      let change = 0;
       if (!sendAll) {
-        const change = totalInputSats - satsOut - feeSats;
+        change = totalInputSats - satsOut - feeSats;
         tx.add_output(new TxOut(BigInt(change), P2PKHAddress.from_string(fromAddress).get_locking_script()));
       }
 
@@ -235,8 +228,6 @@ export const useBsv = () => {
       const rawtx = tx.to_hex();
       let { txid } = await broadcastWithGorillaPool(rawtx);
       if (txid) {
-        storage.set({ paymentUtxos: utxos.filter((item) => !inputs.includes(item)) }); // remove the spent utxos and update local storage
-
         if (isBelowNoApprovalLimit) {
           storage.get(['noApprovalLimit'], ({ noApprovalLimit }) => {
             storage.set({
@@ -337,10 +328,8 @@ export const useBsv = () => {
     let inputCount = tx.get_ninputs();
     for (let i = 0; i < inputCount; i++) {
       const txIn = tx.get_input(i);
-      const inRawtx = await getRawTxById(txIn!.get_prev_tx_id_hex());
-      if (!inRawtx) throw Error('Could not get raw tx');
-      const inTx = Transaction.from_hex(inRawtx);
-      satsIn += Number(inTx.get_output(txIn!.get_vout()!)!.get_satoshis()!);
+      const txOut = await getTxOut(txIn!.get_prev_tx_id_hex(), txIn!.get_vout());
+      satsIn += Number(txOut!.get_satoshis());
     }
     for (let i = 0; i < tx.get_noutputs(); i++) {
       satsOut += Number(tx.get_output(i)!.get_satoshis()!);

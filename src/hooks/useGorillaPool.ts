@@ -1,14 +1,16 @@
 import axios from 'axios';
-import { ChainParams, P2PKHAddress, PrivateKey } from 'bsv-wasm-web';
+import init, { ChainParams, P2PKHAddress, PrivateKey, Transaction, TxOut } from 'bsv-wasm-web';
 import { TaggedDerivationResponse } from '../pages/requests/GenerateTaggedKeysRequest';
-import { GP_BASE_URL, GP_TESTNET_BASE_URL } from '../utils/constants';
+import { GP_BASE_URL, GP_TESTNET_BASE_URL, JUNGLE_BUS_URL } from '../utils/constants';
 import { decryptUsingPrivKey } from '../utils/crypto';
 import { chunkedStringArray } from '../utils/format';
-import { DerivationTag, Keys, getTaggedDerivationKeys } from '../utils/keys';
+import { DerivationTag, getTaggedDerivationKeys, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { isBSV20v2 } from '../utils/ordi';
 import { storage } from '../utils/storage';
+import { getCurrentUtcTimestamp } from '../utils/tools';
 import { OrdinalResponse, OrdinalTxo } from './ordTypes';
+import { StoredUtxo } from './useBsv';
 import { useNetwork } from './useNetwork';
 import { BSV20 } from './useOrds';
 import { useTokens } from './useTokens';
@@ -54,6 +56,7 @@ export const useGorillaPool = () => {
         rawtx: encoded,
       });
       if (res.status === 200 && typeof res.data === 'string') {
+        await updateStoredPaymentUtxos(txhex);
         return { txid: res.data };
       } else {
         return res.data as GorillaPoolErrorMessage;
@@ -241,6 +244,66 @@ export const useGorillaPool = () => {
     storage.set({ derivationTags: tags });
   };
 
+  const getTxOut = async (txid: string, vout: number) => {
+    try {
+      await init();
+      const { data } = await axios.get(`${JUNGLE_BUS_URL}/v1/txo/get/${txid}_${vout}`, { responseType: 'arraybuffer' });
+      return TxOut.from_hex(Buffer.from(data).toString('hex'));
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const updateStoredPaymentUtxos = async (rawtx: string) => {
+    await init();
+    const localStorage = await new Promise<{
+      paymentUtxos: StoredUtxo[];
+      appState: { addresses: { bsvAddress: string } };
+    }>((resolve) => {
+      storage.get(['paymentUtxos', 'appState'], (result) => resolve(result));
+    });
+
+    const { paymentUtxos, appState } = localStorage;
+    const { addresses } = appState;
+    const { bsvAddress } = addresses;
+
+    const tx = Transaction.from_hex(rawtx);
+    let inputCount = tx.get_ninputs();
+    let outputCount = tx.get_noutputs();
+    const spends: string[] = [];
+
+    for (let i = 0; i < inputCount; i++) {
+      const txIn = tx.get_input(i);
+      spends.push(`${txIn!.get_prev_tx_id_hex()}_${txIn!.get_vout()}`);
+    }
+    paymentUtxos.forEach((utxo) => {
+      if (spends.includes(`${utxo.txid}_${utxo.vout}`)) {
+        utxo.spent = true;
+        utxo.spentUnixTime = getCurrentUtcTimestamp();
+      }
+    });
+
+    const fundingScript = P2PKHAddress.from_string(bsvAddress!).get_locking_script().to_hex();
+    const txid = tx.get_id_hex();
+
+    for (let i = 0; i < outputCount; i++) {
+      const txOut = tx.get_output(i);
+      const outScript = txOut?.get_script_pub_key_hex();
+      if (outScript === fundingScript) {
+        paymentUtxos.push({
+          satoshis: Number(txOut!.get_satoshis()),
+          script: fundingScript,
+          txid,
+          vout: i,
+          spent: false,
+          spentUnixTime: 0,
+        });
+      }
+    }
+    storage.set({ paymentUtxos });
+    return paymentUtxos;
+  };
+
   return {
     getOrdUtxos,
     broadcastWithGorillaPool,
@@ -253,5 +316,6 @@ export const useGorillaPool = () => {
     submitTx,
     getOrdContentByOriginOutpoint,
     setDerivationTags,
+    getTxOut,
   };
 };

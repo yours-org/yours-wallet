@@ -1,11 +1,9 @@
 import init, { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
 import { DUST, FEE_PER_BYTE, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
-import { storage } from '../utils/storage';
 import { OrdinalTxo } from './ordTypes';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
-import { useWhatsOnChain } from './useWhatsOnChain';
 
 /**
  * `SignatureRequest` contains required informations for a signer to sign a certain input of a transaction.
@@ -62,7 +60,6 @@ export const useContracts = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { retrieveKeys, bsvAddress, ordAddress, verifyPassword } = useKeys();
   const { broadcastWithGorillaPool } = useGorillaPool();
-  const { getUtxos } = useWhatsOnChain();
 
   /**
    *
@@ -214,14 +211,6 @@ export const useContracts = () => {
 
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
-      const fundingUtxos = await getUtxos(keys.walletAddress);
-      fundingUtxos.push({
-        satoshis: change,
-        script: walletAddress.get_locking_script().to_hex(),
-        txid,
-        vout: 0,
-      });
-      storage.set({ paymentUtxos: fundingUtxos });
       return { txid };
     } catch (error: any) {
       console.log(error);
