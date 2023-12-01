@@ -26,7 +26,6 @@ import { removeBase64Prefix } from '../utils/format';
 import { DerivationTag, getTaggedDerivationKeys, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
-import { updateStoredPaymentUtxos } from '../utils/tools';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
 import { useNetwork } from './useNetwork';
@@ -229,8 +228,6 @@ export const useBsv = () => {
       const rawtx = tx.to_hex();
       let { txid } = await broadcastWithGorillaPool(rawtx);
       if (txid) {
-        await updateStoredPaymentUtxos(rawtx, fromAddress);
-
         if (isBelowNoApprovalLimit) {
           storage.get(['noApprovalLimit'], ({ noApprovalLimit }) => {
             storage.set({

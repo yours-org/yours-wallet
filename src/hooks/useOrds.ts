@@ -18,7 +18,6 @@ import { useNetwork } from './useNetwork';
 import { useWhatsOnChain } from './useWhatsOnChain';
 
 import { createTransferP2PKH, createTransferV2P2PKH, isBSV20v2 } from '../utils/ordi';
-import { updateStoredPaymentUtxos } from '../utils/tools';
 import { OrdinalTxo } from './ordTypes';
 import { UTXO } from './useBsv';
 import { useTokens } from './useTokens';
@@ -229,7 +228,6 @@ export const useOrds = () => {
       );
 
       if (broadcastResponse?.txid) {
-        await updateStoredPaymentUtxos(broadcastResponse.rawTx, fundingAndChangeAddress);
         return { txid: broadcastResponse.txid };
       }
 
@@ -394,7 +392,6 @@ export const useOrds = () => {
       const txhex = tx.to_hex();
       const { txid } = await broadcastWithGorillaPool(txhex);
       if (!txid) return { error: 'broadcast-transaction-failed' };
-      await updateStoredPaymentUtxos(txhex, fundingAndChangeAddress);
       return { txid };
     } catch (error: any) {
       console.error('sendBSV20 failed:', error);
@@ -454,7 +451,6 @@ export const useOrds = () => {
 
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
-      await updateStoredPaymentUtxos(rawTx, fundingAndChangeAddress);
       return { txid };
     } catch (error) {
       console.log(error);
@@ -626,7 +622,6 @@ export const useOrds = () => {
 
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
-      await updateStoredPaymentUtxos(rawTx, fundingAndChangeAddress);
       return { txid };
     } catch (error) {
       console.log(error);
@@ -774,7 +769,6 @@ export const useOrds = () => {
 
       const broadcastRes = await broadcastWithGorillaPool(rawTx);
       if (!broadcastRes.txid) return { error: 'broadcast-error' };
-      await updateStoredPaymentUtxos(rawTx, fundingAndChangeAddress);
       return { txid: broadcastRes.txid };
     } catch (error) {
       console.log(error);

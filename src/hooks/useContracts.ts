@@ -1,7 +1,6 @@
 import init, { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
 import { DUST, FEE_PER_BYTE, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
-import { updateStoredPaymentUtxos } from '../utils/tools';
 import { OrdinalTxo } from './ordTypes';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
@@ -212,8 +211,6 @@ export const useContracts = () => {
 
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
-
-      await updateStoredPaymentUtxos(rawTx, keys.walletAddress);
       return { txid };
     } catch (error: any) {
       console.log(error);
