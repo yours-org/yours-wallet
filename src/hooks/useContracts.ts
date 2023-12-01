@@ -5,7 +5,6 @@ import { updateStoredPaymentUtxos } from '../utils/tools';
 import { OrdinalTxo } from './ordTypes';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
-import { useWhatsOnChain } from './useWhatsOnChain';
 
 /**
  * `SignatureRequest` contains required informations for a signer to sign a certain input of a transaction.
@@ -62,7 +61,6 @@ export const useContracts = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { retrieveKeys, bsvAddress, ordAddress, verifyPassword } = useKeys();
   const { broadcastWithGorillaPool } = useGorillaPool();
-  const { getUtxos } = useWhatsOnChain();
 
   /**
    *
@@ -214,9 +212,8 @@ export const useContracts = () => {
 
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
-      const fundingUtxos = await getUtxos(keys.walletAddress);
-      const script = walletAddress.get_locking_script().to_hex();
-      await updateStoredPaymentUtxos([], fundingUtxos, change, 0, script, txid);
+
+      await updateStoredPaymentUtxos(rawTx, keys.walletAddress);
       return { txid };
     } catch (error: any) {
       console.log(error);
