@@ -1,5 +1,5 @@
 import axios from 'axios';
-import init, { ChainParams, P2PKHAddress, PrivateKey, TxOut } from 'bsv-wasm-web';
+import init, { ChainParams, P2PKHAddress, PrivateKey, Transaction, TxOut } from 'bsv-wasm-web';
 import { TaggedDerivationResponse } from '../pages/requests/GenerateTaggedKeysRequest';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL, JUNGLE_BUS_URL } from '../utils/constants';
 import { decryptUsingPrivKey } from '../utils/crypto';
@@ -8,10 +8,13 @@ import { DerivationTag, getTaggedDerivationKeys, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { isBSV20v2 } from '../utils/ordi';
 import { storage } from '../utils/storage';
+import { getCurrentUtcTimestamp } from '../utils/tools';
 import { OrdinalResponse, OrdinalTxo } from './ordTypes';
+import { StoredUtxo } from './useBsv';
 import { useNetwork } from './useNetwork';
 import { BSV20 } from './useOrds';
 import { useTokens } from './useTokens';
+import { useWeb3Context } from './useWeb3Context';
 
 type GorillaPoolErrorMessage = {
   message: string;
@@ -23,6 +26,7 @@ export type GorillaPoolBroadcastResponse = {
 };
 
 export const useGorillaPool = () => {
+  const { bsvAddress } = useWeb3Context();
   const { network, isAddressOnRightNetwork } = useNetwork();
   const { getTokenDecimals, getTokenSym } = useTokens();
 
@@ -54,6 +58,7 @@ export const useGorillaPool = () => {
         rawtx: encoded,
       });
       if (res.status === 200 && typeof res.data === 'string') {
+        await updateStoredPaymentUtxos(txhex);
         return { txid: res.data };
       } else {
         return res.data as GorillaPoolErrorMessage;
@@ -249,6 +254,50 @@ export const useGorillaPool = () => {
     } catch (error) {
       console.log(error);
     }
+  };
+
+  const updateStoredPaymentUtxos = async (rawtx: string) => {
+    await init();
+    if (!bsvAddress) throw Error('No bsvAddress!');
+    const paymentUtxos = await new Promise<StoredUtxo[]>((resolve) => {
+      storage.get(['paymentUtxos'], (result) => resolve(result.paymentUtxos));
+    });
+
+    const tx = Transaction.from_hex(rawtx);
+    let inputCount = tx.get_ninputs();
+    let outputCount = tx.get_noutputs();
+    const spends: string[] = [];
+
+    for (let i = 0; i < inputCount; i++) {
+      const txIn = tx.get_input(i);
+      spends.push(`${txIn!.get_prev_tx_id_hex()}_${txIn!.get_vout()}`);
+    }
+    paymentUtxos.forEach((utxo) => {
+      if (spends.includes(`${utxo.txid}_${utxo.vout}`)) {
+        utxo.spent = true;
+        utxo.spentUnixTime = getCurrentUtcTimestamp();
+      }
+    });
+
+    const fundingScript = P2PKHAddress.from_string(bsvAddress).get_locking_script().to_hex();
+    const txid = tx.get_id_hex();
+
+    for (let i = 0; i < outputCount; i++) {
+      const txOut = tx.get_output(i);
+      const outScript = txOut?.get_script_pub_key_hex();
+      if (outScript === fundingScript) {
+        paymentUtxos.push({
+          satoshis: Number(txOut!.get_satoshis()),
+          script: fundingScript,
+          txid,
+          vout: i,
+          spent: false,
+          spentUnixTime: 0,
+        });
+      }
+    }
+    storage.set({ paymentUtxos });
+    return paymentUtxos;
   };
 
   return {
