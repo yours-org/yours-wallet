@@ -21,7 +21,7 @@ import { Show } from '../components/Show';
 import Tabs from '../components/Tabs';
 import { OrdinalTxo } from '../hooks/ordTypes';
 import { useBottomMenu } from '../hooks/useBottomMenu';
-import { BSV20, ListOrdinal, OrdOperationResponse, useOrds } from '../hooks/useOrds';
+import { BSV20, ListOrdinal, OrdOperationResponse, getTokenName, useOrds } from '../hooks/useOrds';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useWeb3Context } from '../hooks/useWeb3Context';
@@ -155,18 +155,18 @@ export const OrdWallet = () => {
     return response.error === 'invalid-password'
       ? 'Invalid Password!'
       : response.error === 'no-keys'
-        ? 'No keys were found!'
-        : response.error === 'insufficient-funds'
-          ? 'Insufficient Funds!'
-          : response.error === 'fee-too-high'
-            ? 'Miner fee too high!'
-            : response.error === 'no-bsv20-utxo'
-              ? 'No bsv20 token found!'
-              : response.error === 'no-ord-utxo'
-                ? 'Could not locate the ordinal!'
-                : response.error === 'broadcast-error'
-                  ? 'There was an error broadcasting the tx!'
-                  : 'An unknown error has occurred! Try again.';
+      ? 'No keys were found!'
+      : response.error === 'insufficient-funds'
+      ? 'Insufficient Funds!'
+      : response.error === 'fee-too-high'
+      ? 'Miner fee too high!'
+      : response.error === 'no-bsv20-utxo'
+      ? 'No bsv20 token found!'
+      : response.error === 'no-ord-utxo'
+      ? 'Could not locate the ordinal!'
+      : response.error === 'broadcast-error'
+      ? 'There was an error broadcasting the tx!'
+      : 'An unknown error has occurred! Try again.';
   };
 
   const handleTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -278,7 +278,7 @@ export const OrdWallet = () => {
       return;
     }
 
-    const sendBSV20Res = await sendBSV20(token.tick, receiveAddress, BigInt(tokenSendAmount), passwordConfirm);
+    const sendBSV20Res = await sendBSV20(token.id, receiveAddress, BigInt(tokenSendAmount), passwordConfirm);
 
     if (!sendBSV20Res.txid || sendBSV20Res.error) {
       const message = getErrorMessage(sendBSV20Res);
@@ -363,9 +363,9 @@ export const OrdWallet = () => {
             return (
               <BSV20Item
                 theme={theme}
-                tick={b.sym || b.tick}
+                name={getTokenName(b)}
                 amount={showAmount(b.all.confirmed, b.dec)}
-                key={b.tick}
+                key={b.id}
                 selected={false}
                 onClick={async () => {
                   setToken(b);
@@ -570,7 +570,7 @@ export const OrdWallet = () => {
       />
       {token ? (
         <ConfirmContent>
-          <TransferBSV20Header theme={theme}>Send {token.sym || token.tick}</TransferBSV20Header>
+          <TransferBSV20Header theme={theme}>Send {getTokenName(token)}</TransferBSV20Header>
           <Text
             theme={theme}
             style={{ cursor: 'pointer' }}
