@@ -594,7 +594,6 @@ const processGenerateTaggedKeysRequest = (message, sendResponse) => {
 };
 
 const processGetTaggedKeys = async (message, sendResponse) => {
-  console.log(message.params);
   if (!message.params.label) {
     sendResponse({
       type: 'getTaggedKeys',
