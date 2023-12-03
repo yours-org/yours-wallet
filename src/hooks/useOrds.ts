@@ -52,7 +52,8 @@ export type GPArcResponse = {
 };
 
 export interface BSV20 {
-  tick: string;
+  id: string;
+  tick?: string;
   sym?: string;
   dec: number;
   all: Balance;
@@ -132,7 +133,7 @@ export const useOrds = () => {
 
       const bsv20List: Array<BSV20> = await getBsv20Balances(ordAddress);
 
-      await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.tick));
+      await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.id));
 
       setBSV20s({
         initialized: true,
@@ -285,7 +286,7 @@ export const useOrds = () => {
     }
   };
 
-  const sendBSV20 = async (tick: string, destinationAddress: string, amount: bigint, password: string) => {
+  const sendBSV20 = async (id: string, destinationAddress: string, amount: bigint, password: string) => {
     try {
       setIsProcessing(true);
       await init();
@@ -315,11 +316,11 @@ export const useOrds = () => {
 
       const fundingUtxo = getSuitableUtxo(fundingUtxos, 50);
 
-      const bsv20Utxos = await getBSV20Utxos(tick, ordinalAddress);
+      const bsv20Utxos = await getBSV20Utxos(id, ordinalAddress);
 
       if (!bsv20Utxos || bsv20Utxos.length === 0) throw Error('no-bsv20-utxo');
 
-      const isV2 = isBSV20v2(tick);
+      const isV2 = isBSV20v2(id);
 
       const tokenTotalAmt = bsv20Utxos.reduce((a, item) => {
         return a + BigInt(item.data!.bsv20!.amt);
@@ -332,8 +333,8 @@ export const useOrds = () => {
         new TxOut(
           1n,
           isV2
-            ? createTransferV2P2PKH(destinationAddress, tick, amount)
-            : createTransferP2PKH(destinationAddress, tick, amount),
+            ? createTransferV2P2PKH(destinationAddress, id, amount)
+            : createTransferP2PKH(destinationAddress, id, amount),
         ),
       );
 
@@ -342,8 +343,8 @@ export const useOrds = () => {
           new TxOut(
             1n,
             isV2
-              ? createTransferV2P2PKH(ordinalAddress, tick, tokenChangeAmt)
-              : createTransferP2PKH(ordinalAddress, tick, tokenChangeAmt),
+              ? createTransferV2P2PKH(ordinalAddress, id, tokenChangeAmt)
+              : createTransferP2PKH(ordinalAddress, id, tokenChangeAmt),
           ),
         );
       }
@@ -794,3 +795,10 @@ export const useOrds = () => {
     purchaseGlobalOrderbookListing,
   };
 };
+
+export function getTokenName(b: BSV20): string {
+  if (isBSV20v2(b.id)) {
+    return b.sym || b.id;
+  }
+  return b.tick || b.id;
+}

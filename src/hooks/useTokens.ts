@@ -7,7 +7,8 @@ import { storage } from '../utils/storage';
 import { isBSV20v2 } from '../utils/ordi';
 
 export type TokenStorage = {
-  tick: string;
+  id: string;
+  tick?: string;
   decimals: number;
   sym?: string;
   max: string;
@@ -52,19 +53,19 @@ export const useTokens = () => {
     });
   };
 
-  const cacheTokenInfos = async (ticks: Array<string>) => {
+  const cacheTokenInfos = async (ids: Array<string>) => {
     return new Promise(async (reslove, reject) => {
       try {
         const tokenInfos = (
           await Promise.all(
-            ticks.map(async (tick) => {
-              const token = tokens.find((t) => t !== null && t.tick === tick);
+            ids.map(async (id) => {
+              const token = tokens.find((t) => t !== null && t.id === id);
               if (token) {
                 return token;
               }
 
-              if (isBSV20v2(tick)) {
-                const r = await axios.get(`${getOrdinalsBaseUrl()}/api/inscriptions/${tick}`);
+              if (isBSV20v2(id)) {
+                const r = await axios.get(`${getOrdinalsBaseUrl()}/api/inscriptions/${id}`);
 
                 if (
                   r.status !== 200 ||
@@ -84,7 +85,7 @@ export const useTokens = () => {
                 }
 
                 return {
-                  tick,
+                  id,
                   decimals: parseInt(dec || '0'),
                   max: amt,
                   sym,
@@ -94,7 +95,7 @@ export const useTokens = () => {
                 } as TokenStorage;
               } else {
                 try {
-                  const r = await axios.get(`${getOrdinalsBaseUrl()}/api/bsv20/tick/${tick}`);
+                  const r = await axios.get(`${getOrdinalsBaseUrl()}/api/bsv20/tick/${id}`);
 
                   if (r.status !== 200 || typeof r.data !== 'object') {
                     return null;
@@ -103,7 +104,8 @@ export const useTokens = () => {
                   const { max, lim, txid, vout, dec } = r.data;
 
                   return {
-                    tick,
+                    id,
+                    tick: id,
                     decimals: dec || 0,
                     max,
                     lim,
@@ -135,15 +137,15 @@ export const useTokens = () => {
     });
   };
 
-  const getTokenInfo = (tick: string): Promise<TokenStorage | undefined> => {
+  const getTokenInfo = (id: string): Promise<TokenStorage | undefined> => {
     return new Promise(async (resolve, reject) => {
-      const tokenInfo = tokens.find((t) => t.tick === tick);
+      const tokenInfo = tokens.find((t) => t.id === id);
       if (tokenInfo) {
         resolve(tokenInfo);
       } else {
         const tokenInfos = await retrieveTokens();
 
-        const tokenInfo = tokenInfos.find((t) => t.tick === tick);
+        const tokenInfo = tokenInfos.find((t) => t.id === id);
 
         if (tokenInfo) {
           resolve(tokenInfo);
@@ -153,14 +155,14 @@ export const useTokens = () => {
     });
   };
 
-  const getTokenDecimals = (tick: string) => {
-    const tokenInfo = tokens.find((t) => t.tick === tick);
+  const getTokenDecimals = (id: string) => {
+    const tokenInfo = tokens.find((t) => t.id === id);
     return tokenInfo?.decimals || 0;
   };
 
-  const getTokenSym = (tick: string) => {
-    const tokenInfo = tokens.find((t) => t.tick === tick);
-    return tokenInfo?.sym || tick;
+  const getTokenSym = (id: string) => {
+    const tokenInfo = tokens.find((t) => t.id === id);
+    return tokenInfo?.sym || id;
   };
 
   return {

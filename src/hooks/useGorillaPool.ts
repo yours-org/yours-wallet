@@ -26,7 +26,7 @@ export type GorillaPoolBroadcastResponse = {
 
 export const useGorillaPool = () => {
   const { network, isAddressOnRightNetwork } = useNetwork();
-  const { getTokenDecimals, getTokenSym } = useTokens();
+  const { getTokenDecimals } = useTokens();
 
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
@@ -116,12 +116,16 @@ export const useGorillaPool = () => {
           confirmed: string;
           pending: string;
         };
-        tick: string;
+        tick?: string;
+        sym?: string;
+        id?: string;
       }) => {
+        const id = (b.tick || b.id) as string;
         return {
+          id: id,
           tick: b.tick,
-          sym: getTokenSym(b.tick),
-          dec: getTokenDecimals(b.tick),
+          sym: b.sym || null,
+          dec: getTokenDecimals(id),
           all: {
             confirmed: BigInt(b.all.confirmed),
             pending: BigInt(b.all.pending),

@@ -28,14 +28,14 @@ const Amount = styled(Text)`
 
 export type BSV20ItemProps = {
   theme: Theme;
-  tick: string;
+  name: string;
   amount: string;
   selected?: boolean;
   onClick?: () => void;
 };
 
 export const BSV20Item = (props: BSV20ItemProps) => {
-  const { tick, amount, theme, onClick } = props;
+  const { name, amount, theme, onClick } = props;
 
   const [containerColor, setContainerColor] = useState(theme.darkAccent);
 
@@ -47,7 +47,7 @@ export const BSV20Item = (props: BSV20ItemProps) => {
       onClick={onClick}
       $clickable={onClick ? 'true' : 'false'}
     >
-      <Tick theme={theme}>{tick.length > 6 ? truncate(tick, 3, 3) : tick}</Tick>
+      <Tick theme={theme}>{name.length > 6 ? truncate(name, 3, 3) : name}</Tick>
       <Amount theme={theme}>{amount}</Amount>
     </Container>
   );
