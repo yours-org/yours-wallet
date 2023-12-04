@@ -163,6 +163,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
               ? 'Error creating tag inscription'
               : 'An unknown error has occurred! Try again.';
 
+      setIsProcessing(false);
       addSnackbar(message, 'error');
       return;
     }
