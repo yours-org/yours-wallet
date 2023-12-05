@@ -108,6 +108,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   const clearRequest = () => {
     storage.remove('transferOrdinalRequest');
     if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
   };
 
   return (

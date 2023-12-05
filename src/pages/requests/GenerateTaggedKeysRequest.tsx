@@ -193,6 +193,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
   const clearRequest = () => {
     storage.remove('generateTaggedKeysRequest');
     if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
   };
 
   return (

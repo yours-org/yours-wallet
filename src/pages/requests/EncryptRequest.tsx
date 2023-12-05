@@ -122,6 +122,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
   const clearRequest = () => {
     storage.remove('encryptRequest');
     if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
   };
 
   return (

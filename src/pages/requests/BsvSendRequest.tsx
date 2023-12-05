@@ -233,6 +233,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const clearRequest = () => {
     storage.remove('sendBsvRequest');
     if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
   };
 
   return (

@@ -139,6 +139,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const clearRequest = () => {
     storage.remove('broadcastRequest');
     if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
   };
 
   return (

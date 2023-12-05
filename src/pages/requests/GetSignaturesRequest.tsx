@@ -302,6 +302,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const clearRequest = () => {
     storage.remove('getSignaturesRequest');
     if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
   };
 
   return (

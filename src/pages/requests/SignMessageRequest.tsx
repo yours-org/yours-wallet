@@ -130,6 +130,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
   const clearRequest = () => {
     storage.remove('signMessageRequest');
     if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
   };
 
   return (

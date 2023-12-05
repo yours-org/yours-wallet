@@ -114,6 +114,7 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
   const clearRequest = () => {
     storage.remove('decryptRequest');
     if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
   };
 
   return (

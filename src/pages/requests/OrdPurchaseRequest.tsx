@@ -138,6 +138,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   const clearRequest = () => {
     storage.remove('purchaseOrdinalRequest');
     if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
   };
 
   return (
