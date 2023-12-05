@@ -155,18 +155,18 @@ export const OrdWallet = () => {
     return response.error === 'invalid-password'
       ? 'Invalid Password!'
       : response.error === 'no-keys'
-      ? 'No keys were found!'
-      : response.error === 'insufficient-funds'
-      ? 'Insufficient Funds!'
-      : response.error === 'fee-too-high'
-      ? 'Miner fee too high!'
-      : response.error === 'no-bsv20-utxo'
-      ? 'No bsv20 token found!'
-      : response.error === 'no-ord-utxo'
-      ? 'Could not locate the ordinal!'
-      : response.error === 'broadcast-error'
-      ? 'There was an error broadcasting the tx!'
-      : 'An unknown error has occurred! Try again.';
+        ? 'No keys were found!'
+        : response.error === 'insufficient-funds'
+          ? 'Insufficient Funds!'
+          : response.error === 'fee-too-high'
+            ? 'Miner fee too high!'
+            : response.error === 'no-bsv20-utxo'
+              ? 'No bsv20 token found!'
+              : response.error === 'no-ord-utxo'
+                ? 'Could not locate the ordinal!'
+                : response.error === 'broadcast-error'
+                  ? 'There was an error broadcasting the tx!'
+                  : 'An unknown error has occurred! Try again.';
   };
 
   const handleTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {

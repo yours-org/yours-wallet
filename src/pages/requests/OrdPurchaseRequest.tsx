@@ -1,5 +1,6 @@
 import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
+import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
@@ -134,6 +135,12 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     }, 2000);
   };
 
+  const clearRequest = () => {
+    storage.remove('purchaseOrdinalRequest');
+    if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
+  };
+
   return (
     <>
       <Show when={isProcessing}>
@@ -142,6 +149,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
 
       <Show when={!isProcessing && !!web3Request && !!inscription}>
         <ConfirmContent>
+          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Purchase Request</HeaderText>
           <Ordinal
             inscription={inscription as OrdinalTxo}

@@ -1,6 +1,7 @@
 import { P2PKHAddress, PublicKey } from 'bsv-wasm-web';
 import { buildInscription } from 'js-1sat-ord-web';
 import { useEffect, useState } from 'react';
+import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -189,6 +190,12 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     }, 2000);
   };
 
+  const clearRequest = () => {
+    storage.remove('generateTaggedKeysRequest');
+    if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
+  };
+
   return (
     <>
       <Show when={isProcessing}>
@@ -197,6 +204,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
 
       <Show when={!isProcessing && !!web3Request}>
         <ConfirmContent>
+          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <FormContainer noValidate onSubmit={(e) => handleGetTaggedKeys(e)}>
             <Text theme={theme} style={{ margin: '1rem 0' }}>

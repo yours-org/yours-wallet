@@ -1,5 +1,6 @@
 import { PublicKey } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
+import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -118,6 +119,12 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
     }, 2000);
   };
 
+  const clearRequest = () => {
+    storage.remove('encryptRequest');
+    if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
+  };
+
   return (
     <>
       <Show when={isProcessing}>
@@ -125,6 +132,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!messageToEncrypt && !hasEncrypted}>
         <ConfirmContent>
+          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Encrypt Message</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             {'The app is requesting to encrypt a message using your private key:'}

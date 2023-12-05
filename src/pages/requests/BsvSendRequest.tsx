@@ -2,6 +2,7 @@ import { validate } from 'bitcoin-address-validation';
 import React, { useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import bsvCoin from '../../assets/bsv-coin.svg';
+import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -229,6 +230,12 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     });
   };
 
+  const clearRequest = () => {
+    storage.remove('sendBsvRequest');
+    if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
+  };
+
   return (
     <>
       <Show when={isProcessing}>
@@ -236,6 +243,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!web3Request && !hasSent}>
         <ConfirmContent>
+          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Text
             theme={theme}

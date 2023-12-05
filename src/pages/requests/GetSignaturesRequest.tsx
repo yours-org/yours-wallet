@@ -1,6 +1,7 @@
 import init, { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
 import { DefaultTheme, styled } from 'styled-components';
+import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -298,6 +299,12 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     storage.remove('getSignaturesRequest');
   };
 
+  const clearRequest = () => {
+    storage.remove('getSignaturesRequest');
+    if (popupId) chrome.windows.remove(popupId);
+    window.location.reload();
+  };
+
   return (
     <>
       <Show when={isProcessing}>
@@ -305,6 +312,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!getSigsRequest}>
         <ConfirmContent>
+          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Sign Transaction</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             The app is requesting signatures for a transaction.
