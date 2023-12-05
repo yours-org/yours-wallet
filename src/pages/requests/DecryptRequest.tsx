@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -110,6 +111,11 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
     }, 2000);
   };
 
+  const clearRequest = () => {
+    storage.remove('decryptRequest');
+    if (popupId) chrome.windows.remove(popupId);
+  };
+
   return (
     <>
       <Show when={isProcessing}>
@@ -117,6 +123,7 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!encryptedMessages && !hasDecrypted}>
         <ConfirmContent>
+          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Decrypt Messages</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             {'The app is requesting to decrypt messages using your private key:'}

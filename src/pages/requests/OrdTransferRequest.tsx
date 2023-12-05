@@ -1,5 +1,6 @@
 import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
+import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
@@ -104,6 +105,11 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     }, 2000);
   };
 
+  const clearRequest = () => {
+    storage.remove('transferOrdinalRequest');
+    if (popupId) chrome.windows.remove(popupId);
+  };
+
   return (
     <>
       <Show when={isProcessing}>
@@ -112,6 +118,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
 
       <Show when={!isProcessing && !!web3Request}>
         <ConfirmContent>
+          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Ordinal
             inscription={ordinals.data.filter((ord) => ord.outpoint.toString() === web3Request.outpoint)[0]}

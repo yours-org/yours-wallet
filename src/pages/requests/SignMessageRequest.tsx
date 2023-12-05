@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { styled } from 'styled-components';
+import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -126,6 +127,11 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
     }, 2000);
   };
 
+  const clearRequest = () => {
+    storage.remove('signMessageRequest');
+    if (popupId) chrome.windows.remove(popupId);
+  };
+
   return (
     <>
       <Show when={isProcessing}>
@@ -133,6 +139,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!messageToSign}>
         <ConfirmContent>
+          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Sign Message</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             {'The app is requesting a signature using derivation tag:'}

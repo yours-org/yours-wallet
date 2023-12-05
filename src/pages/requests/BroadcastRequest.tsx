@@ -1,5 +1,6 @@
 import init, { Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
+import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -135,6 +136,11 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     }, 2000);
   };
 
+  const clearRequest = () => {
+    storage.remove('broadcastRequest');
+    if (popupId) chrome.windows.remove(popupId);
+  };
+
   return (
     <>
       <Show when={isProcessing}>
@@ -142,6 +148,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!request}>
         <ConfirmContent>
+          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Broadcast Raw Tx</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             The app is requesting to broadcast a transaction.
