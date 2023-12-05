@@ -65,14 +65,16 @@ export const useWhatsOnChain = () => {
           }
 
           const { data } = await axios.get(`${getBaseUrl()}/address/${fromAddress}/unspent`, config);
-          const explorerUtxos: UTXO[] = data.map((utxo: WocUtxo) => {
-            return {
-              satoshis: utxo.value,
-              vout: utxo.tx_pos,
-              txid: utxo.tx_hash,
-              script: P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex(),
-            } as UTXO;
-          });
+          const explorerUtxos: UTXO[] = data
+            .filter((u: WocUtxo) => u.value !== 1) // Ensure we are never spending 1 sats
+            .map((utxo: WocUtxo) => {
+              return {
+                satoshis: utxo.value,
+                vout: utxo.tx_pos,
+                txid: utxo.tx_hash,
+                script: P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex(),
+              } as UTXO;
+            });
 
           // Add new UTXOs from explorer that are not in the local storage
           const newUtxos = explorerUtxos.filter(
