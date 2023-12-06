@@ -82,14 +82,14 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    if (!passwordConfirm) {
-      addSnackbar('Must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
-
     let rawtx = request.rawtx;
     if (request.fund) {
+      if (!passwordConfirm) {
+        addSnackbar('Must enter a password!', 'error');
+        setIsProcessing(false);
+        return;
+      }
+
       const res = await fundRawTx(rawtx, passwordConfirm);
       if (!res.rawtx || res.error) {
         const message =
