@@ -2,8 +2,8 @@ import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import oneSatLogo from '../assets/1sat-logo.svg';
-import { BSV20Item } from '../components/BSV20Item';
 import { BackButton } from '../components/BackButton';
+import { BSV20Item } from '../components/BSV20Item';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Ordinal } from '../components/Ordinal';
@@ -21,7 +21,7 @@ import { Show } from '../components/Show';
 import Tabs from '../components/Tabs';
 import { OrdinalTxo } from '../hooks/ordTypes';
 import { useBottomMenu } from '../hooks/useBottomMenu';
-import { BSV20, ListOrdinal, OrdOperationResponse, getTokenName, useOrds } from '../hooks/useOrds';
+import { BSV20, getTokenName, ListOrdinal, OrdOperationResponse, useOrds } from '../hooks/useOrds';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useWeb3Context } from '../hooks/useWeb3Context';
@@ -366,6 +366,7 @@ export const OrdWallet = () => {
                 name={getTokenName(b)}
                 amount={showAmount(b.all.confirmed, b.dec)}
                 key={b.id}
+                iconOrigin={b.icon || null}
                 selected={false}
                 onClick={async () => {
                   setToken(b);

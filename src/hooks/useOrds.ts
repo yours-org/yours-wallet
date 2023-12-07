@@ -58,6 +58,7 @@ export interface BSV20 {
   dec: number;
   all: Balance;
   listed: Balance;
+  icon?: string;
 }
 
 export interface Balance {
