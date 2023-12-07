@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import styled from 'styled-components';
 import { Theme } from '../theme';
+import { GP_BASE_URL } from '../utils/constants';
 import { HeaderText, Text } from './Reusable';
-import { useState } from 'react';
-import { truncate } from '../utils/format';
+import { Show } from './Show';
 
 const Container = styled.div<{ color: string; $clickable: string }>`
   display: flex;
@@ -17,7 +18,9 @@ const Container = styled.div<{ color: string; $clickable: string }>`
 `;
 
 const Tick = styled(HeaderText)`
-  font-size: 1rem;
+  font-size: 0.9rem;
+  width: 50%;
+  text-align: left;
 `;
 
 const Amount = styled(Text)`
@@ -26,16 +29,25 @@ const Amount = styled(Text)`
   text-align: right;
 `;
 
+const TokenIcon = styled.img`
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 0.5rem;
+`;
+
 export type BSV20ItemProps = {
   theme: Theme;
   name: string;
   amount: string;
+  iconOrigin?: string | null;
   selected?: boolean;
   onClick?: () => void;
 };
 
 export const BSV20Item = (props: BSV20ItemProps) => {
-  const { name, amount, theme, onClick } = props;
+  const { iconOrigin, name, amount, theme, onClick } = props;
 
   const [containerColor, setContainerColor] = useState(theme.darkAccent);
 
@@ -47,7 +59,10 @@ export const BSV20Item = (props: BSV20ItemProps) => {
       onClick={onClick}
       $clickable={onClick ? 'true' : 'false'}
     >
-      <Tick theme={theme}>{name.length > 6 ? truncate(name, 3, 3) : name}</Tick>
+      <Show when={!!iconOrigin && iconOrigin.length > 0}>
+        <TokenIcon src={`${GP_BASE_URL}/content/${iconOrigin}`} />
+      </Show>
+      <Tick theme={theme}>{name}</Tick>
       <Amount theme={theme}>{amount}</Amount>
     </Container>
   );

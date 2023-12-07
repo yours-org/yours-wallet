@@ -278,9 +278,12 @@ export function showAmount(amt: bigint, dec: number): string {
   }
   let left = amt / BigInt(Math.pow(10, dec));
   let right = amt % BigInt(Math.pow(10, dec));
+  const rightStr = right.toString().padStart(dec, '0');
+
   if (right > 0) {
-    return `${left}.${right}`;
+    return `${left}.${rightStr}`;
   }
+
   return `${left}`;
 }
 

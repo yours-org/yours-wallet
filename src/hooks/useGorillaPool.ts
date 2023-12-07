@@ -119,12 +119,14 @@ export const useGorillaPool = () => {
         tick?: string;
         sym?: string;
         id?: string;
+        icon?: string;
       }) => {
         const id = (b.tick || b.id) as string;
         return {
           id: id,
           tick: b.tick,
           sym: b.sym || null,
+          icon: b.icon || null,
           dec: getTokenDecimals(id),
           all: {
             confirmed: BigInt(b.all.confirmed),
