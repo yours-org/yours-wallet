@@ -15,6 +15,7 @@ const Container = styled.div<{ color: string; $clickable: string }>`
   border-radius: 0.5rem;
   margin: 0.25rem;
   cursor: ${(props) => (props.$clickable === 'true' ? 'pointer' : 'default')};
+  position: relative;
 `;
 
 const Tick = styled(HeaderText)`
@@ -37,8 +38,15 @@ const TokenIcon = styled.img`
   margin-right: 0.5rem;
 `;
 
+const TokenId = styled.p`
+  font-size: 0.4rem;
+  position: absolute;
+  bottom: 0.1rem;
+`;
+
 export type BSV20ItemProps = {
   theme: Theme;
+  id: string;
   name: string;
   amount: string;
   iconOrigin?: string | null;
@@ -47,7 +55,7 @@ export type BSV20ItemProps = {
 };
 
 export const BSV20Item = (props: BSV20ItemProps) => {
-  const { iconOrigin, name, amount, theme, onClick } = props;
+  const { id, iconOrigin, name, amount, theme, onClick } = props;
 
   const [containerColor, setContainerColor] = useState(theme.darkAccent);
 
@@ -64,6 +72,7 @@ export const BSV20Item = (props: BSV20ItemProps) => {
       </Show>
       <Tick theme={theme}>{name}</Tick>
       <Amount theme={theme}>{amount}</Amount>
+      <TokenId>{id}</TokenId>
     </Container>
   );
 };

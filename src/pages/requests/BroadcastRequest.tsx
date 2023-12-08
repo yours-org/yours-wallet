@@ -1,4 +1,4 @@
-import init, { Transaction } from 'bsv-wasm-web';
+import init, { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
@@ -34,7 +34,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [satsOut, setSatsOut] = useState(0);
   const { broadcastWithGorillaPool } = useGorillaPool();
-  const { isProcessing, setIsProcessing, updateBsvBalance, fundRawTx } = useBsv();
+  const { isProcessing, setIsProcessing, updateBsvBalance, fundRawTx, bsvAddress } = useBsv();
 
   useEffect(() => {
     setSelected('bsv');
@@ -61,16 +61,20 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   }, [popupId]);
 
   useEffect(() => {
+    if (!bsvAddress) return;
     (async () => {
       await init();
       const tx = Transaction.from_hex(request.rawtx);
       let satsOut = 0;
+      const changeScript = P2PKHAddress.from_string(bsvAddress).get_locking_script().to_hex();
       for (let index = 0; index < tx.get_noutputs(); index++) {
-        satsOut += Number(tx.get_output(index)!.get_satoshis());
+        if (tx.get_output(index)?.get_script_pub_key_hex() !== changeScript) {
+          satsOut += Number(tx.get_output(index)!.get_satoshis());
+        }
       }
       setSatsOut(satsOut);
     })();
-  }, [request.fund, request.rawtx]);
+  }, [bsvAddress, request.fund, request.rawtx]);
 
   const resetSendState = () => {
     setTxid('');

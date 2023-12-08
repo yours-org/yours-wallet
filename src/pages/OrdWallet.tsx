@@ -363,6 +363,7 @@ export const OrdWallet = () => {
             return (
               <BSV20Item
                 theme={theme}
+                id={b.id}
                 name={getTokenName(b)}
                 amount={showAmount(b.all.confirmed, b.dec)}
                 key={b.id}
