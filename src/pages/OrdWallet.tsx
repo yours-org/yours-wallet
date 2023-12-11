@@ -555,7 +555,7 @@ export const OrdWallet = () => {
       <Tabs.Panel theme={theme} label="NFT">
         {nft}
       </Tabs.Panel>
-      <Tabs.Panel theme={theme} label="BSV-20">
+      <Tabs.Panel theme={theme} label="Tokens">
         {ft}
       </Tabs.Panel>
     </Tabs>
