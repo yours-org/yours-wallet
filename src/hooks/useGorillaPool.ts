@@ -13,7 +13,6 @@ import { OrdinalResponse, OrdinalTxo } from './ordTypes';
 import { StoredUtxo } from './useBsv';
 import { useNetwork } from './useNetwork';
 import { BSV20 } from './useOrds';
-import { useTokens } from './useTokens';
 
 type GorillaPoolErrorMessage = {
   message: string;
@@ -26,7 +25,6 @@ export type GorillaPoolBroadcastResponse = {
 
 export const useGorillaPool = () => {
   const { network, isAddressOnRightNetwork } = useNetwork();
-  const { getTokenDecimals } = useTokens();
 
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
@@ -120,6 +118,7 @@ export const useGorillaPool = () => {
         sym?: string;
         id?: string;
         icon?: string;
+        dec: number;
       }) => {
         const id = (b.tick || b.id) as string;
         return {
@@ -127,7 +126,7 @@ export const useGorillaPool = () => {
           tick: b.tick,
           sym: b.sym || null,
           icon: b.icon || null,
-          dec: getTokenDecimals(id),
+          dec: b.dec,
           all: {
             confirmed: BigInt(b.all.confirmed),
             pending: BigInt(b.all.pending),

@@ -20,7 +20,6 @@ import { useWhatsOnChain } from './useWhatsOnChain';
 import { createTransferP2PKH, createTransferV2P2PKH, isBSV20v2 } from '../utils/ordi';
 import { OrdinalTxo } from './ordTypes';
 import { UTXO } from './useBsv';
-import { useTokens } from './useTokens';
 
 export class InscriptionData {
   type?: string = '';
@@ -108,7 +107,6 @@ export const useOrds = () => {
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const { network } = useNetwork();
-  const { cacheTokenInfos } = useTokens();
   const { getUtxos, getRawTxById, getSuitableUtxo } = useWhatsOnChain();
   const { getOrdUtxos, broadcastWithGorillaPool, getUtxoByOutpoint, getMarketData, getBsv20Balances, getBSV20Utxos } =
     useGorillaPool();
@@ -136,7 +134,9 @@ export const useOrds = () => {
 
       const bsv20List: Array<BSV20> = await getBsv20Balances(ordAddress);
 
-      await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.id));
+      // All the information currently used has been obtained from `getBsv20Balances`. 
+      // If other information is needed later, call `cacheTokenInfos` to obtain more Tokens information.
+      // await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.id));
 
       setBSV20s({
         initialized: true,
