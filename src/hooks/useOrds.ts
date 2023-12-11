@@ -798,8 +798,5 @@ export const useOrds = () => {
 };
 
 export function getTokenName(b: BSV20): string {
-  if (isBSV20v2(b.id)) {
-    return b.sym || b.id;
-  }
-  return b.tick || b.id;
+  return b.sym || b.tick || 'Null';
 }

@@ -26,7 +26,7 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useWeb3Context } from '../hooks/useWeb3Context';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
-import { normalize, showAmount } from '../utils/ordi';
+import { isBSV20v2, normalize, showAmount } from '../utils/ordi';
 import { sleep } from '../utils/sleep';
 
 const OrdinalsList = styled.div`
@@ -84,6 +84,46 @@ const TransferBSV20Header = styled(HeaderText)`
 
 export const OrdButtonContainer = styled(ButtonContainer)`
   margin: 0.5rem 0 0.5rem 0;
+`;
+
+const TokenIcon = styled.img`
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  object-fit: cover;
+`;
+
+const TokenId = styled(Text)`
+  font-size: 0.9rem;
+  margin: 0 0;
+  word-break: break-all;
+  width: fit-content;
+  max-width: 18rem;
+`;
+
+const TokenIdLabel = styled(Text)`
+  font-size: 1rem;
+  margin: 0 0;
+  width: fit-content;
+  font-weight: bold;
+`;
+
+const Balance = styled(Text)`
+  font-size: 1rem;
+  white-space: pre-wrap;
+  margin: 0 0;
+  width: fit-content;
+`;
+
+const RowContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-direction: row;
+  width: 80%;
+  margin: 0 0;
+  margin-top: 0.4rem;
+  padding: 0 0;
 `;
 
 type PageState = 'main' | 'receive' | 'transfer' | 'list' | 'cancel' | 'sendBSV20';
@@ -155,18 +195,18 @@ export const OrdWallet = () => {
     return response.error === 'invalid-password'
       ? 'Invalid Password!'
       : response.error === 'no-keys'
-        ? 'No keys were found!'
-        : response.error === 'insufficient-funds'
-          ? 'Insufficient Funds!'
-          : response.error === 'fee-too-high'
-            ? 'Miner fee too high!'
-            : response.error === 'no-bsv20-utxo'
-              ? 'No bsv20 token found!'
-              : response.error === 'no-ord-utxo'
-                ? 'Could not locate the ordinal!'
-                : response.error === 'broadcast-error'
-                  ? 'There was an error broadcasting the tx!'
-                  : 'An unknown error has occurred! Try again.';
+      ? 'No keys were found!'
+      : response.error === 'insufficient-funds'
+      ? 'Insufficient Funds!'
+      : response.error === 'fee-too-high'
+      ? 'Miner fee too high!'
+      : response.error === 'no-bsv20-utxo'
+      ? 'No bsv20 token found!'
+      : response.error === 'no-ord-utxo'
+      ? 'Could not locate the ordinal!'
+      : response.error === 'broadcast-error'
+      ? 'There was an error broadcasting the tx!'
+      : 'An unknown error has occurred! Try again.';
   };
 
   const handleTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -373,6 +413,9 @@ export const OrdWallet = () => {
                   setToken(b);
                   setPageState('sendBSV20');
                 }}
+                onCopyTokenId={() => {
+                  addSnackbar('Copied', 'info');
+                }}
               />
             );
           })}
@@ -573,11 +616,21 @@ export const OrdWallet = () => {
       {token ? (
         <ConfirmContent>
           <TransferBSV20Header theme={theme}>Send {getTokenName(token)}</TransferBSV20Header>
-          <Text
+          <Balance
             theme={theme}
             style={{ cursor: 'pointer' }}
             onClick={() => userSelectedAmount(String(Number(token.all.confirmed)), token)}
-          >{`Available Balance: ${showAmount(token.all.confirmed, token.dec)}`}</Text>
+          >{`Available Balance: ${showAmount(token.all.confirmed, token.dec)}`}</Balance>
+
+          <Show when={!!token.icon && token.icon.length > 0}>
+            <TokenIcon src={`${getOrdinalsBaseUrl()}/content/${token.icon}`} />
+          </Show>
+          <Show when={isBSV20v2(token.id)}>
+            <RowContainer>
+              <TokenIdLabel theme={theme}>Id:&nbsp;</TokenIdLabel>
+              <TokenId theme={theme}>{token.id}</TokenId>
+            </RowContainer>
+          </Show>
           <FormContainer noValidate onSubmit={(e) => handleSendBSV20(e)}>
             <Input
               theme={theme}
