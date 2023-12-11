@@ -118,13 +118,15 @@ export const useOrds = () => {
 
   useEffect(() => {
     if (!ordAddress) return;
-    getOrdinals();
+    getOrdinals(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ordAddress]);
 
-  const getOrdinals = async () => {
+  const getOrdinals = async (showProcessing?: boolean) => {
     try {
-      setIsProcessing(true); // TODO: set this to true if call is taking more than a second
+      showProcessing = typeof showProcessing === 'boolean' ? showProcessing : true;
+
+      setIsProcessing(showProcessing); // TODO: set this to true if call is taking more than a second
       //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
       const ordList = await getOrdUtxos(ordAddress);
       setOrdinals({

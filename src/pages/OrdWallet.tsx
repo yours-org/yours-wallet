@@ -187,7 +187,7 @@ export const OrdWallet = () => {
     setSelectedOrdinal(undefined);
     setTokenSendAmount(null);
     setTimeout(() => {
-      getOrdinals();
+      getOrdinals(false);
     }, 500);
   };
 
@@ -432,7 +432,9 @@ export const OrdWallet = () => {
       <BackButton
         onClick={() => {
           setPageState('main');
-          getOrdinals();
+          setTimeout(() => {
+            getOrdinals(false);
+          }, 500);
         }}
       />
       <Icon size={'2.5rem'} src={oneSatLogo} />
