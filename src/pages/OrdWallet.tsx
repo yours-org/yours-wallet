@@ -12,6 +12,7 @@ import { QrCode } from '../components/QrCode';
 import {
   ButtonContainer,
   ConfirmContent,
+  Divider,
   FormContainer,
   HeaderText,
   ReceiveContent,
@@ -28,6 +29,7 @@ import { useWeb3Context } from '../hooks/useWeb3Context';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { isBSV20v2, normalize, showAmount } from '../utils/ordi';
 import { sleep } from '../utils/sleep';
+import { BSV20Id } from '../components/BSV20Id';
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -93,20 +95,7 @@ const TokenIcon = styled.img`
   object-fit: cover;
 `;
 
-const TokenId = styled(Text)`
-  font-size: 0.9rem;
-  margin: 0 0;
-  word-break: break-all;
-  width: fit-content;
-  max-width: 18rem;
-`;
 
-const TokenIdLabel = styled(Text)`
-  font-size: 1rem;
-  margin: 0 0;
-  width: fit-content;
-  font-weight: bold;
-`;
 
 const Balance = styled(Text)`
   font-size: 1rem;
@@ -115,14 +104,14 @@ const Balance = styled(Text)`
   width: fit-content;
 `;
 
-const RowContainer = styled.div`
+const BSV20Container = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-direction: row;
   width: 80%;
   margin: 0 0;
-  margin-top: 0.4rem;
+  margin-top: 0.6rem;
   padding: 0 0;
 `;
 
@@ -414,7 +403,7 @@ export const OrdWallet = () => {
                   setPageState('sendBSV20');
                 }}
                 onCopyTokenId={() => {
-                  addSnackbar('Copied', 'info');
+                  addSnackbar('Copied', 'info', 1000);
                 }}
               />
             );
@@ -618,21 +607,28 @@ export const OrdWallet = () => {
       {token ? (
         <ConfirmContent>
           <TransferBSV20Header theme={theme}>Send {getTokenName(token)}</TransferBSV20Header>
-          <Balance
-            theme={theme}
-            style={{ cursor: 'pointer' }}
-            onClick={() => userSelectedAmount(String(Number(token.all.confirmed)), token)}
-          >{`Available Balance: ${showAmount(token.all.confirmed, token.dec)}`}</Balance>
+          <BSV20Container>
+            <Balance
+              theme={theme}
+              style={{ cursor: 'pointer' }}
+              onClick={() => userSelectedAmount(String(Number(token.all.confirmed)), token)}
+            >{`Available Balance: ${showAmount(token.all.confirmed, token.dec)}`}</Balance>
 
-          <Show when={!!token.icon && token.icon.length > 0}>
-            <TokenIcon src={`${getOrdinalsBaseUrl()}/content/${token.icon}`} />
-          </Show>
+            <Show when={!!token.icon && token.icon.length > 0}>
+              <TokenIcon src={`${getOrdinalsBaseUrl()}/content/${token.icon}`} />
+            </Show>
+          </BSV20Container>
+
+
           <Show when={isBSV20v2(token.id)}>
-            <RowContainer>
-              <TokenIdLabel theme={theme}>Id:&nbsp;</TokenIdLabel>
-              <TokenId theme={theme}>{token.id}</TokenId>
-            </RowContainer>
+            <BSV20Container>
+            <BSV20Id theme={theme} id={token.id}  onCopyTokenId={()=>{
+              addSnackbar('Copied', 'info', 1000);
+            }}></BSV20Id>
+            </BSV20Container>
           </Show>
+
+          <Divider></Divider>
           <FormContainer noValidate onSubmit={(e) => handleSendBSV20(e)}>
             <Input
               theme={theme}

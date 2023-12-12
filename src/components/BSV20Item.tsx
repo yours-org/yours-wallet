@@ -5,8 +5,7 @@ import { GP_BASE_URL } from '../utils/constants';
 import { HeaderText, Text } from './Reusable';
 import { Show } from './Show';
 import { isBSV20v2 } from '../utils/ordi';
-import { IconButton } from './IconButton';
-import copy from '../assets/copy.svg';
+import { BSV20Id } from './BSV20Id';
 
 const Container = styled.div<{ color: string; $clickable: string }>`
   display: flex;
@@ -107,22 +106,7 @@ export const BSV20Item = (props: BSV20ItemProps) => {
       </RowContainer>
 
       <Show when={isBSV20v2(id)}>
-        <RowContainer color={containerColor} $clickable="true">
-          <TokenIdLabel theme={theme}>Id:&nbsp;</TokenIdLabel>
-          <TokenId theme={theme} title={id}>
-            {id}
-          </TokenId>
-          <IconButton
-            icon={copy}
-            onClick={(e) => {
-              e.stopPropagation();
-
-              navigator.clipboard.writeText(id);
-
-              onCopyTokenId();
-            }}
-          ></IconButton>
-        </RowContainer>
+        <BSV20Id theme={theme} id={id} onCopyTokenId={onCopyTokenId}></BSV20Id>
       </Show>
     </Container>
   );
