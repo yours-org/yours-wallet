@@ -1,18 +1,18 @@
-import styled from 'styled-components';
-import { useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
-import { useSnackbar } from '../../hooks/useSnackbar';
+import { useNavigate } from 'react-router-dom';
+import styled from 'styled-components';
 import { BackButton } from '../../components/BackButton';
-import { Text, HeaderText } from '../../components/Reusable';
-import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
-import { PandaHead } from '../../components/PandaHead';
-import { WifKeys, useKeys } from '../../hooks/useKeys';
-import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
+import { PandaHead } from '../../components/PandaHead';
+import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
-import { sleep } from '../../utils/sleep';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { useKeys, WifKeys } from '../../hooks/useKeys';
+import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
+import { sleep } from '../../utils/sleep';
 
 const Content = styled.div`
   display: flex;
@@ -108,6 +108,10 @@ export const ImportWallet = () => {
           const jsonData = JSON.parse(text) as WifKeys;
           if (!jsonData.payPk || !jsonData.ordPk) {
             addSnackbar('Invalid 1Sat Ord Wallet format!', 'error');
+            return;
+          }
+          if (jsonData.mnemonic || jsonData.identityPk) {
+            addSnackbar('Invalid 1Sat Ord Wallet format. File contains identity or seed phrase!', 'error');
             return;
           }
           setPayPk(jsonData.payPk);

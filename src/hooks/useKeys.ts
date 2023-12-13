@@ -10,7 +10,7 @@ import {
   SWEEP_PATH,
 } from '../utils/constants';
 import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto';
-import { Keys, generateKeysFromTag, getKeys, getKeysFromWifs } from '../utils/keys';
+import { generateKeysFromTag, getKeys, getKeysFromWifs, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
 import { UTXO } from './useBsv';
@@ -28,6 +28,8 @@ export type KeyStorage = {
 export type WifKeys = {
   payPk: string;
   ordPk: string;
+  mnemonic?: string;
+  identityPk?: string;
 };
 
 export type SupportedWalletImports = 'relayx' | 'twetch' | 'aym' | 'panda' | 'wif';
