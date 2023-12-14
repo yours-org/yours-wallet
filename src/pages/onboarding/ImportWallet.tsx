@@ -40,6 +40,7 @@ export const ImportWallet = () => {
   const [step, setStep] = useState(1);
   const [payPk, setPayPk] = useState('');
   const [ordPk, setOrdPk] = useState('');
+  const [identityPk, setIdentityPk] = useState('');
 
   const { addSnackbar } = useSnackbar();
   const { generateKeysFromWifAndStoreEncrypted } = useKeys();
@@ -75,11 +76,23 @@ export const ImportWallet = () => {
         return;
       }
 
+      if (!identityPk) {
+        setLoading(false);
+        addSnackbar(
+          'IMPORTANT: Since you did not provide an identity key, Panda Wallet will generate one for you, MAKE SURE TO BACK UP YOUR NEW PANDA WALLET!',
+          'info',
+          7000,
+        );
+        await sleep(7000);
+        setLoading(true);
+      }
+
       // Some artificial delay for the loader
       await sleep(50);
       const keys = generateKeysFromWifAndStoreEncrypted(password, {
         payPk,
         ordPk,
+        identityPk,
       });
       if (!keys) {
         addSnackbar('An error occurred while restoring the wallet!', 'error');
@@ -110,12 +123,17 @@ export const ImportWallet = () => {
             addSnackbar('Invalid 1Sat Ord Wallet format!', 'error');
             return;
           }
-          if (jsonData.mnemonic || jsonData.identityPk) {
-            addSnackbar('Invalid 1Sat Ord Wallet format. File contains identity or seed phrase!', 'error');
+          if (jsonData.mnemonic) {
+            addSnackbar(
+              'Invalid 1Sat Ord Wallet format. File contains seed phrase. Please use a different restore method using your seed phrase!',
+              'error',
+              7000,
+            );
             return;
           }
-          setPayPk(jsonData.payPk);
-          setOrdPk(jsonData.ordPk);
+          setPayPk(jsonData.payPk ? jsonData.payPk : '');
+          setOrdPk(jsonData.ordPk ? jsonData.ordPk : '');
+          setIdentityPk(jsonData.identityPk ? jsonData.identityPk : '');
           setStep(2);
         } catch (error) {
           console.error('Error parsing JSON file', error);
@@ -173,6 +191,7 @@ export const ImportWallet = () => {
             type="text"
             value={payPk}
             onChange={(e) => setPayPk(e.target.value)}
+            style={{ margin: '0.25rem' }}
           />
           <Input
             theme={theme}
@@ -180,6 +199,15 @@ export const ImportWallet = () => {
             type="text"
             value={ordPk}
             onChange={(e) => setOrdPk(e.target.value)}
+            style={{ margin: '0.25rem' }}
+          />
+          <Input
+            theme={theme}
+            placeholder="Identity WIF private key"
+            type="text"
+            value={identityPk}
+            onChange={(e) => setIdentityPk(e.target.value)}
+            style={{ margin: '0.25rem' }}
           />
           <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
             Make sure you are in a safe place and no one is watching.
