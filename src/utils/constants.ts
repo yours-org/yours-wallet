@@ -18,7 +18,7 @@ export const DUST = 10;
 export const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 export const SNACKBAR_TIMEOUT = 2.5 * 1000; // 2.5 seconds
 export const HOSTED_PANDA_IMAGE = 'https://i.ibb.co/3fLL5X2/Panda-Wallet-Logo.png';
-export const PANDA_DEV_WALLET = '13y7VtdVEbB7rhiQcHpXxj9SqKp2iSU9Ud';
+export const PANDA_DEV_WALLET = '1MtzWXQEYGp89bQ9U2nfrnuChFv37j6pV6';
 export const PROVIDER_DOCS_URL = 'https://panda-wallet.gitbook.io/provider-api/intro/introduction';
 
 export const DEFAULT_WALLET_PATH = "m/44'/236'/0'/1/0";
