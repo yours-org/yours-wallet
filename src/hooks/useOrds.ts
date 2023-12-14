@@ -463,11 +463,10 @@ export const useOrds = () => {
   };
 
   const createChangeOutput = (tx: Transaction, changeAddress: string, paymentSatoshis: number) => {
-    const SAT_FEE_PER_BYTE = 0.065;
     const changeaddr = P2PKHAddress.from_string(changeAddress);
     const changeScript = changeaddr.get_locking_script();
     const emptyOut = new TxOut(BigInt(1), changeScript);
-    const fee = Math.ceil(SAT_FEE_PER_BYTE * (tx.get_size() + emptyOut.to_bytes().byteLength));
+    const fee = Math.ceil(FEE_PER_BYTE * (tx.get_size() + emptyOut.to_bytes().byteLength));
     const change = paymentSatoshis - fee;
     const changeOut = new TxOut(BigInt(change), changeScript);
     return changeOut;
