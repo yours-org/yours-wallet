@@ -18,7 +18,7 @@ const Container = styled.div<{ color: string; $clickable: string }>`
   cursor: ${(props) => (props.$clickable === 'true' ? 'pointer' : 'default')};
 `;
 
-const RowContainer = styled.div<{ color: string; $clickable: string }>`
+const RowContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -29,21 +29,34 @@ const RowContainer = styled.div<{ color: string; $clickable: string }>`
   padding: 0 0;
 `;
 
+const SymContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: start;
+  flex-direction: row;
+  max-width: calc(50%);
+  width: fit-content;
+  margin: 0 0;
+  padding: 0 0;
+`;
+
+
+
 const Tick = styled(HeaderText)`
   font-size: 0.9rem;
   text-align: left;
-  max-width: 10rem;
+  max-width: 5rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin: 0 0.1rem;
+  margin: 0 0;
 `;
 
 const Amount = styled(Text)`
   font-size: 1rem;
-  margin: 0 0.5rem;
+  margin: 0 0rem;
   text-align: right;
-  max-width: 8rem;
+  width: fit-content;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -54,23 +67,8 @@ const TokenIcon = styled.img`
   height: 2.5rem;
   border-radius: 50%;
   object-fit: cover;
-`;
-
-const TokenIdLabel = styled(Text)`
-  font-size: 1rem;
   margin: 0 0;
-  width: fit-content;
-  font-weight: bold;
-`;
-
-const TokenId = styled(Text)`
-  font-size: 1rem;
-  max-width: 16rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin: 0 0;
-  width: fit-content;
+  margin-right: 1rem;
 `;
 
 export type BSV20ItemProps = {
@@ -78,14 +76,14 @@ export type BSV20ItemProps = {
   id: string;
   name: string;
   amount: string;
-  iconOrigin?: string | null;
+  iconUrl: string | null;
   selected?: boolean;
   onClick?: () => void;
   onCopyTokenId: () => void;
 };
 
 export const BSV20Item = (props: BSV20ItemProps) => {
-  const { id, iconOrigin, name, amount, theme, onClick, onCopyTokenId } = props;
+  const { id, iconUrl, name, amount, theme, onClick, onCopyTokenId } = props;
 
   const [containerColor, setContainerColor] = useState(theme.darkAccent);
 
@@ -97,11 +95,14 @@ export const BSV20Item = (props: BSV20ItemProps) => {
       onClick={onClick}
       $clickable={onClick ? 'true' : 'false'}
     >
-      <RowContainer color={containerColor} $clickable={onClick ? 'true' : 'false'}>
-        <Show when={!!iconOrigin && iconOrigin.length > 0}>
-          <TokenIcon src={`${GP_BASE_URL}/content/${iconOrigin}`} />
-        </Show>
-        <Tick theme={theme}>{name}</Tick>
+      <RowContainer color={containerColor}>
+
+        <SymContainer>
+          <Show when={!!iconUrl && iconUrl.length > 0}>
+            <TokenIcon src={iconUrl as string} />
+          </Show>
+          <Tick theme={theme}>{name}</Tick>
+        </SymContainer>
         <Amount theme={theme}>{amount}</Amount>
       </RowContainer>
 

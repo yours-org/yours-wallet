@@ -396,7 +396,7 @@ export const OrdWallet = () => {
                 name={getTokenName(b)}
                 amount={showAmount(b.all.confirmed, b.dec)}
                 key={b.id}
-                iconOrigin={b.icon || null}
+                iconUrl={b.icon ? `${getOrdinalsBaseUrl()}/content/${b.icon}` : null}
                 selected={false}
                 onClick={async () => {
                   setToken(b);
