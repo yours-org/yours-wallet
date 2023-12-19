@@ -32,10 +32,6 @@ export const useGorillaPool = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
   };
 
-  // const getOrdinalsBaseUrlUpdated = () => {
-  //   return network === NetWork.Mainnet ? GP_BASE_URL_UPDATED : GP_TESTNET_BASE_URL;
-  // };
-
   const getChainParams = (network: NetWork): ChainParams => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
   };
