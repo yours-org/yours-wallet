@@ -2,7 +2,7 @@ export const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv/main';
 
 export const WOC_TESTNET_BASE_URL = 'https://api.whatsonchain.com/v1/bsv/test';
 
-export const GP_BASE_URL = 'https://v3.ordinals.gorillapool.io';
+export const GP_BASE_URL = 'https://ordinals.gorillapool.io';
 export const GP_BASE_URL_UPDATED = 'https://ordinals.gorillapool.io';
 export const JUNGLE_BUS_URL = 'https://junglebus.gorillapool.io';
 
