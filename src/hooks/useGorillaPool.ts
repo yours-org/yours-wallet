@@ -1,7 +1,7 @@
 import axios from 'axios';
 import init, { ChainParams, P2PKHAddress, PrivateKey, Transaction, TxOut } from 'bsv-wasm-web';
 import { TaggedDerivationResponse } from '../pages/requests/GenerateTaggedKeysRequest';
-import { GP_BASE_URL, GP_BASE_URL_UPDATED, GP_TESTNET_BASE_URL, JUNGLE_BUS_URL } from '../utils/constants';
+import { GP_BASE_URL, GP_TESTNET_BASE_URL, JUNGLE_BUS_URL } from '../utils/constants';
 import { decryptUsingPrivKey } from '../utils/crypto';
 import { chunkedStringArray } from '../utils/format';
 import { DerivationTag, getTaggedDerivationKeys, Keys } from '../utils/keys';
@@ -32,9 +32,9 @@ export const useGorillaPool = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
   };
 
-  const getOrdinalsBaseUrlUpdated = () => {
-    return network === NetWork.Mainnet ? GP_BASE_URL_UPDATED : GP_TESTNET_BASE_URL;
-  };
+  // const getOrdinalsBaseUrlUpdated = () => {
+  //   return network === NetWork.Mainnet ? GP_BASE_URL_UPDATED : GP_TESTNET_BASE_URL;
+  // };
 
   const getChainParams = (network: NetWork): ChainParams => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
