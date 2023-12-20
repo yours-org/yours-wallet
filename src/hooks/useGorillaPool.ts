@@ -179,7 +179,7 @@ export const useGorillaPool = () => {
       if (!isAddressOnRightNetwork(address)) return [];
       //TODO: use this instead of test endpoint - `${getOrdinalsBaseUrl()}/api/locks/address/${address}/unspent?limit=100&offset=0`
       const { data } = await axios.get(
-        `https://locks.gorillapool.io/api/locks/address/${address}/unspent?limit=100&offset=0`,
+        `${getOrdinalsBaseUrl()}/api/locks/address/${address}/unspent?limit=100&offset=0`,
       );
       const lockedUtxos: OrdinalTxo[] = data;
       return lockedUtxos;
@@ -195,7 +195,7 @@ export const useGorillaPool = () => {
       for (const chunk of chunks) {
         try {
           //TODO: updata url to be dynamic for testnet
-          const res = await axios.post(`https://locks.gorillapool.io/api/spends`, chunk);
+          const res = await axios.post(`${getOrdinalsBaseUrl()}/api/spends`, chunk);
           const txids = res.data as string[];
           txids.forEach((txid, i) => {
             spentTxids.set(chunk[i], txid);
@@ -211,7 +211,7 @@ export const useGorillaPool = () => {
 
   const getOrdContentByOriginOutpoint = async (originOutpoint: string) => {
     try {
-      const res = await axios.get(`https://v3.ordinals.gorillapool.io/content/${originOutpoint}?fuzzy=false`, {
+      const res = await axios.get(`${getOrdinalsBaseUrl()}/content/${originOutpoint}?fuzzy=false`, {
         responseType: 'arraybuffer',
       });
       return Buffer.from(res.data);

@@ -195,7 +195,7 @@ export const useOrds = () => {
         }
       }
 
-      const fundingUtxo = getSuitableUtxo(fundingUtxos, 50);
+      const fundingUtxo = getSuitableUtxo(fundingUtxos, 125);
 
       if (!fundingUtxo?.script) {
         const fundingRawTx = await getRawTxById(fundingUtxo.txid);
@@ -315,7 +315,7 @@ export const useOrds = () => {
         return { error: 'insufficient-funds' };
       }
 
-      const fundingUtxo = getSuitableUtxo(fundingUtxos, 50);
+      const fundingUtxo = getSuitableUtxo(fundingUtxos, 125);
 
       const bsv20Utxos = await getBSV20Utxos(id, ordinalAddress);
 
@@ -430,11 +430,11 @@ export const useOrds = () => {
 
       const totalSats = paymentUtxos.reduce((a: number, utxo: UTXO) => a + utxo.satoshis, 0);
 
-      if (totalSats < 50) {
+      if (totalSats < 125) {
         return { error: 'insufficient-funds' };
       }
 
-      const paymentUtxo = getSuitableUtxo(paymentUtxos, 50);
+      const paymentUtxo = getSuitableUtxo(paymentUtxos, 125);
 
       const ordUtxo = await getUtxoByOutpoint(outpoint);
 
@@ -568,7 +568,7 @@ export const useOrds = () => {
         throw new Error('Could not retrieve paymentUtxos');
       }
 
-      const paymentUtxo = getSuitableUtxo(paymentUtxos, 50);
+      const paymentUtxo = getSuitableUtxo(paymentUtxos, 125);
 
       const paymentPk = PrivateKey.from_wif(keys.walletWif);
       const ordinalPk = PrivateKey.from_wif(keys.ordWif);
