@@ -40,8 +40,6 @@ const SymContainer = styled.div`
   padding: 0 0;
 `;
 
-
-
 const Tick = styled(HeaderText)`
   font-size: 0.9rem;
   text-align: left;
@@ -96,7 +94,6 @@ export const BSV20Item = (props: BSV20ItemProps) => {
       $clickable={onClick ? 'true' : 'false'}
     >
       <RowContainer color={containerColor}>
-
         <SymContainer>
           <Show when={!!iconUrl && iconUrl.length > 0}>
             <TokenIcon src={iconUrl as string} />
