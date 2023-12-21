@@ -12,6 +12,7 @@ export const FEE_PER_BYTE = 0.1;
 export const MAX_BYTES_PER_TX = 50000000; // 50MB
 export const MAX_FEE_PER_TX = MAX_BYTES_PER_TX * FEE_PER_BYTE;
 export const GLOBAL_ORDERBOOK_MARKET_RATE = 0.05;
+export const FEE_SATS = 125;
 export const P2PKH_INPUT_SIZE = 148;
 export const P2PKH_OUTPUT_SIZE = 34;
 export const DUST = 10;

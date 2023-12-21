@@ -82,6 +82,28 @@ export class OrdinalTxo {
   data?: TxoData;
 }
 
+export class BSV20Txo {
+  txid: string = '';
+  vout: number = 0;
+  outpoint: string = '';
+  owner?: string;
+  script?: string;
+  spend?: string;
+  height: number = 0;
+  idx: number = 0;
+  op? = '';
+  tick?: string;
+  id?: string;
+  amt: string = '';
+  status: Bsv20Status = 0;
+  reason? = '';
+  listing = false;
+  price?: number;
+  pricePer?: number;
+  payout?: string;
+  pricePerUnit?: number;
+}
+
 export type OrdinalResponse = OrdinalTxo[];
 
 export type MapSubType = 'collection' | 'collectionItem';

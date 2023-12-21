@@ -3,6 +3,7 @@ import { sendOrdinal } from 'js-1sat-ord-web';
 import { useEffect, useState } from 'react';
 import {
   FEE_PER_BYTE,
+  FEE_SATS,
   GP_BASE_URL,
   GP_TESTNET_BASE_URL,
   MAX_FEE_PER_TX,
@@ -134,7 +135,7 @@ export const useOrds = () => {
 
       const bsv20List: Array<BSV20> = await getBsv20Balances(ordAddress);
 
-      // All the information currently used has been obtained from `getBsv20Balances`. 
+      // All the information currently used has been obtained from `getBsv20Balances`.
       // If other information is needed later, call `cacheTokenInfos` to obtain more Tokens information.
       // await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.id));
 
@@ -197,7 +198,7 @@ export const useOrds = () => {
         }
       }
 
-      const fundingUtxo = getSuitableUtxo(fundingUtxos, 125);
+      const fundingUtxo = getSuitableUtxo(fundingUtxos, FEE_SATS);
 
       if (!fundingUtxo?.script) {
         const fundingRawTx = await getRawTxById(fundingUtxo.txid);
@@ -317,7 +318,7 @@ export const useOrds = () => {
         return { error: 'insufficient-funds' };
       }
 
-      const fundingUtxo = getSuitableUtxo(fundingUtxos, 125);
+      const fundingUtxo = getSuitableUtxo(fundingUtxos, FEE_SATS);
 
       const bsv20Utxos = await getBSV20Utxos(id, ordinalAddress);
 
@@ -325,8 +326,9 @@ export const useOrds = () => {
 
       const isV2 = isBSV20v2(id);
 
+      //TODO: should consider updating this to only use what is required for the amount.
       const tokenTotalAmt = bsv20Utxos.reduce((a, item) => {
-        return a + BigInt(item.data!.bsv20!.amt);
+        return a + BigInt(item.amt);
       }, 0n);
 
       const tokenChangeAmt = tokenTotalAmt - amount;
@@ -353,8 +355,7 @@ export const useOrds = () => {
       }
 
       const totalInputSats = fundingUtxo.satoshis;
-      const feeSats = 30;
-      const change = totalInputSats - 1 - feeSats;
+      const change = totalInputSats - 1 - FEE_SATS;
 
       if (change > 0) {
         tx.add_output(
@@ -364,12 +365,13 @@ export const useOrds = () => {
 
       let idx = 0;
       for (let u of bsv20Utxos || []) {
+        let script = Script.from_bytes(Buffer.from(u.script!, 'base64'));
         const inTx = new TxIn(Buffer.from(u.txid, 'hex'), u.vout, Script.from_hex(''));
-        inTx.set_satoshis(BigInt(u.satoshis));
-        inTx.set_locking_script(Script.from_hex(u.script!));
+        inTx.set_satoshis(BigInt(1));
+        inTx.set_locking_script(script);
         tx.add_input(inTx);
 
-        const sig = tx.sign(ordPk, SigHash.InputOutputs, idx, Script.from_hex(u.script!), BigInt(u.satoshis));
+        const sig = tx.sign(ordPk, SigHash.InputOutputs, idx, script, BigInt(1));
 
         inTx.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${ordPk.to_public_key().to_hex()}`));
 
@@ -432,11 +434,11 @@ export const useOrds = () => {
 
       const totalSats = paymentUtxos.reduce((a: number, utxo: UTXO) => a + utxo.satoshis, 0);
 
-      if (totalSats < 125) {
+      if (totalSats < FEE_SATS) {
         return { error: 'insufficient-funds' };
       }
 
-      const paymentUtxo = getSuitableUtxo(paymentUtxos, 125);
+      const paymentUtxo = getSuitableUtxo(paymentUtxos, FEE_SATS);
 
       const ordUtxo = await getUtxoByOutpoint(outpoint);
 
@@ -570,7 +572,7 @@ export const useOrds = () => {
         throw new Error('Could not retrieve paymentUtxos');
       }
 
-      const paymentUtxo = getSuitableUtxo(paymentUtxos, 125);
+      const paymentUtxo = getSuitableUtxo(paymentUtxos, FEE_SATS);
 
       const paymentPk = PrivateKey.from_wif(keys.walletWif);
       const ordinalPk = PrivateKey.from_wif(keys.ordWif);

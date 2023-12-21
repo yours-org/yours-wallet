@@ -9,7 +9,7 @@ import { NetWork } from '../utils/network';
 import { isBSV20v2 } from '../utils/ordi';
 import { storage } from '../utils/storage';
 import { getCurrentUtcTimestamp } from '../utils/tools';
-import { OrdinalResponse, OrdinalTxo } from './ordTypes';
+import { BSV20Txo, OrdinalResponse, OrdinalTxo } from './ordTypes';
 import { StoredUtxo } from './useBsv';
 import { useNetwork } from './useNetwork';
 import { BSV20 } from './useOrds';
@@ -142,7 +142,7 @@ export const useGorillaPool = () => {
     return bsv20List;
   };
 
-  const getBSV20Utxos = async (tick: string, address: string): Promise<OrdinalTxo[] | undefined> => {
+  const getBSV20Utxos = async (tick: string, address: string): Promise<BSV20Txo[] | undefined> => {
     try {
       if (!address) {
         return [];
@@ -158,15 +158,7 @@ export const useGorillaPool = () => {
         return [];
       }
 
-      const utxos = await Promise.all(
-        r.data
-          .map((utxo: any) => {
-            return getUtxoByOutpoint(utxo.outpoint);
-          })
-          .filter((u) => u !== null),
-      );
-
-      return utxos as OrdinalTxo[];
+      return (r.data as BSV20Txo[]).filter((utxo) => utxo.status === 1 && !utxo.listing);
     } catch (error) {
       console.error('getBSV20Utxos', error);
       return [];
