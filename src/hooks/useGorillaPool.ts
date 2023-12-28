@@ -23,6 +23,32 @@ export type GorillaPoolBroadcastResponse = {
   message?: string;
 };
 
+export type Token = {
+  txid: string;
+  vout: number;
+  height: number;
+  idx: number;
+  tick: string;
+  id: string;
+  sym: string;
+  icon: string;
+  max: string;
+  lim: string;
+  dec: number;
+  amt: string;
+  supply: string;
+  status: number;
+  available: string;
+  pctMinted: number;
+  accounts: number;
+  pending: number;
+  included: boolean;
+  fundAddress: string;
+  fundTotal: number;
+  fundUsed: number;
+  fundBalance: number;
+};
+
 export const useGorillaPool = () => {
   const { network, isAddressOnRightNetwork } = useNetwork();
 
@@ -162,6 +188,20 @@ export const useGorillaPool = () => {
     } catch (error) {
       console.error('getBSV20Utxos', error);
       return [];
+    }
+  };
+
+  const getBsv20Details = async (tick: string) => {
+    try {
+      const url = isBSV20v2(tick)
+        ? `${getOrdinalsBaseUrl()}/api/bsv20/id/${tick}`
+        : `${getOrdinalsBaseUrl()}/api/bsv20/tick/${tick}`;
+
+      const r = await axios.get<Token>(url);
+
+      return r.data;
+    } catch (error) {
+      console.error('getBsv20Details', error);
     }
   };
 
@@ -314,5 +354,6 @@ export const useGorillaPool = () => {
     getOrdContentByOriginOutpoint,
     setDerivationTags,
     getTxOut,
+    getBsv20Details,
   };
 };

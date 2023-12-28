@@ -52,7 +52,8 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     };
 
     getOrigin();
-  }, [getUtxoByOutpoint, web3Request.outpoint]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [web3Request.outpoint]);
 
   useEffect(() => {
     if (!successTxId) return;

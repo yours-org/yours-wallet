@@ -2,6 +2,7 @@ import init, { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxO
 import { sendOrdinal } from 'js-1sat-ord-web';
 import { useEffect, useState } from 'react';
 import {
+  BSV20_INDEX_FEE,
   FEE_PER_BYTE,
   FEE_SATS,
   GP_BASE_URL,
@@ -109,8 +110,15 @@ export const useOrds = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { network } = useNetwork();
   const { getUtxos, getRawTxById, getSuitableUtxo } = useWhatsOnChain();
-  const { getOrdUtxos, broadcastWithGorillaPool, getUtxoByOutpoint, getMarketData, getBsv20Balances, getBSV20Utxos } =
-    useGorillaPool();
+  const {
+    getOrdUtxos,
+    broadcastWithGorillaPool,
+    getUtxoByOutpoint,
+    getMarketData,
+    getBsv20Balances,
+    getBSV20Utxos,
+    getBsv20Details,
+  } = useGorillaPool();
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
   };
@@ -291,6 +299,7 @@ export const useOrds = () => {
   };
 
   const sendBSV20 = async (id: string, destinationAddress: string, amount: bigint, password: string) => {
+    let indexFee = BSV20_INDEX_FEE;
     try {
       setIsProcessing(true);
       await init();
@@ -316,6 +325,12 @@ export const useOrds = () => {
 
       if (!fundingUtxos || fundingUtxos.length === 0) {
         return { error: 'insufficient-funds' };
+      }
+
+      const tokenDetails = await getBsv20Details(id);
+
+      if (!tokenDetails) {
+        return { error: 'token-details' };
       }
 
       const fundingUtxo = getSuitableUtxo(fundingUtxos, FEE_SATS);
@@ -344,6 +359,7 @@ export const useOrds = () => {
       );
 
       if (tokenChangeAmt > 0n) {
+        indexFee += indexFee;
         tx.add_output(
           new TxOut(
             1n,
@@ -353,6 +369,10 @@ export const useOrds = () => {
           ),
         );
       }
+
+      tx.add_output(
+        new TxOut(BigInt(indexFee), P2PKHAddress.from_string(tokenDetails.fundAddress).get_locking_script()),
+      );
 
       const totalInputSats = fundingUtxo.satoshis;
       const change = totalInputSats - 1 - FEE_SATS;
