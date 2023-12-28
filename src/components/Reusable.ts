@@ -10,6 +10,17 @@ export const HeaderText = styled.h1<ColorThemeProps>`
   text-align: center;
 `;
 
+
+export const SubHeaderText = styled.h1<ColorThemeProps>`
+  font-size: 1rem;
+  color: ${({ theme }) => theme.white};
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 400;
+  margin: 0.1rem 0;
+  text-align: center;
+`;
+
+
 export const Divider = styled.hr`
   width: 80%;
   opacity: 0.3;

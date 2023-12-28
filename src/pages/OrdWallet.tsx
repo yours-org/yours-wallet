@@ -16,6 +16,7 @@ import {
   FormContainer,
   HeaderText,
   ReceiveContent,
+  SubHeaderText,
   Text,
 } from '../components/Reusable';
 import { Show } from '../components/Show';
@@ -30,7 +31,9 @@ import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { isBSV20v2, normalize, showAmount } from '../utils/ordi';
 import { sleep } from '../utils/sleep';
 import { BSV20Id } from '../components/BSV20Id';
-
+import checkboxChecked from '../assets/checkbox-checked.png';
+import checkboxunChecked from '../assets/checkbox-unchecked.png';
+import { IconButton } from '../components/IconButton';
 const OrdinalsList = styled.div`
   display: flex;
   align-items: center;
@@ -66,6 +69,10 @@ const OneSatLogo = styled.img`
   margin: 0 0 1rem 0;
 `;
 
+export const CheckBox = styled.div`
+  margin: 0.5rem 0.5rem;
+`;
+
 const Icon = styled.img<{ size?: string }>`
   width: ${(props) => props.size ?? '1.5rem'};
   height: ${(props) => props.size ?? '1.5rem'};
@@ -86,6 +93,12 @@ const TransferBSV20Header = styled(HeaderText)`
 
 export const OrdButtonContainer = styled(ButtonContainer)`
   margin: 0.5rem 0 0.5rem 0;
+`;
+
+export const BSV20Header = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `;
 
 const TokenIcon = styled.img`
@@ -115,6 +128,12 @@ const BSV20Container = styled.div`
 
 type PageState = 'main' | 'receive' | 'transfer' | 'list' | 'cancel' | 'sendBSV20';
 
+
+interface Token  {
+  isConfirmed: boolean,
+  info: BSV20,
+}
+
 export const OrdWallet = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
@@ -142,7 +161,9 @@ export const OrdWallet = () => {
   const { addSnackbar, message } = useSnackbar();
   const { isPasswordRequired } = useWeb3Context();
 
-  const [token, setToken] = useState<BSV20 | null>(null);
+  const [token, setToken] = useState<Token | null>(null);
+  const [showConfirmed, setShowConfirmed] = useState(true);
+  const [showPending, setShowPending] = useState(true);
   const [tokenSendAmount, setTokenSendAmount] = useState<bigint | null>(null);
 
   useEffect(() => {
@@ -307,7 +328,7 @@ export const OrdWallet = () => {
       return;
     }
 
-    const sendBSV20Res = await sendBSV20(token.id, receiveAddress, BigInt(tokenSendAmount), passwordConfirm);
+    const sendBSV20Res = await sendBSV20(token.info.id, receiveAddress, BigInt(tokenSendAmount), passwordConfirm);
 
     if (!sendBSV20Res.txid || sendBSV20Res.error) {
       const message = getErrorMessage(sendBSV20Res);
@@ -326,14 +347,15 @@ export const OrdWallet = () => {
     });
   };
 
-  const userSelectedAmount = (inputValue: string, token: BSV20) => {
-    const amtStr = normalize(inputValue, token.dec);
+  const userSelectedAmount = (inputValue: string, token: Token) => {
+    const amtStr = normalize(inputValue, token.info.dec);
 
     const amt = BigInt(amtStr);
     setTokenSendAmount(amt);
-    if (amt > token.all.confirmed) {
+    const total = token.isConfirmed ? token.info.all.confirmed : token.info.all.pending;
+    if (amt > total) {
       setTimeout(() => {
-        setTokenSendAmount(token.all.confirmed);
+        setTokenSendAmount(total);
       }, 500);
     }
   };
@@ -388,26 +410,77 @@ export const OrdWallet = () => {
         }
       >
         <BSV20List>
-          {bsv20s.data.map((b) => {
-            return (
-              <BSV20Item
-                theme={theme}
-                id={b.id}
-                name={getTokenName(b)}
-                amount={showAmount(b.all.confirmed, b.dec)}
-                key={b.id}
-                iconUrl={b.icon ? `${getOrdinalsBaseUrl()}/content/${b.icon}` : null}
-                selected={false}
-                onClick={async () => {
-                  setToken(b);
-                  setPageState('sendBSV20');
-                }}
-                onCopyTokenId={() => {
-                  addSnackbar('Copied', 'info', 1000);
-                }}
-              />
-            );
-          })}
+          <BSV20Header>
+            <SubHeaderText theme={theme}>{bsv20s.data.filter(d => d.all.confirmed > 0n).length} Confirmed tokens 
+            </SubHeaderText>
+            <CheckBox>
+              <IconButton icon={showConfirmed ? checkboxChecked : checkboxunChecked} onClick={()=>{
+                  setShowConfirmed(!showConfirmed)
+                }}/>
+            </CheckBox>
+          </BSV20Header>
+          <Divider></Divider>
+
+          <Show when={showConfirmed}>
+            {bsv20s.data.filter(d => d.all.confirmed > 0n).map((b) => {
+              return (
+                <BSV20Item
+                  theme={theme}
+                  id={b.id}
+                  name={getTokenName(b)}
+                  amount={showAmount(b.all.confirmed, b.dec)}
+                  key={b.id}
+                  iconUrl={b.icon ? `${getOrdinalsBaseUrl()}/content/${b.icon}` : null}
+                  selected={false}
+                  onClick={async () => {
+                    setToken({
+                      isConfirmed: true,
+                      info: b
+                    });
+                    setPageState('sendBSV20');
+                  }}
+                  onCopyTokenId={() => {
+                    addSnackbar('Copied', 'info', 1000);
+                  }}
+                />
+              );
+            })}
+          </Show>
+
+          <Show when={bsv20s.data.filter(d => d.all.pending > 0n).length > 0}>
+            <BSV20Header>
+                <SubHeaderText theme={theme}>{bsv20s.data.filter(d => d.all.pending > 0n).length} Pending tokens 
+                </SubHeaderText>
+                <CheckBox>
+                  <IconButton icon={showPending ? checkboxChecked : checkboxunChecked} onClick={()=>{
+                      setShowPending(!showPending)
+                    }}/>
+                </CheckBox>
+            </BSV20Header>
+
+            <Divider></Divider>
+            <Show when={showPending}>
+              {bsv20s.data.filter(d => d.all.pending > 0n).map((b) => {
+                return (
+                  <BSV20Item
+                    theme={theme}
+                    id={b.id}
+                    name={getTokenName(b)}
+                    amount={showAmount(b.all.pending, b.dec)}
+                    key={b.id}
+                    iconUrl={b.icon ? `${getOrdinalsBaseUrl()}/content/${b.icon}` : null}
+                    selected={false}
+                    onClick={async () => {
+                      addSnackbar('Pending tokens cannot be sent!', 'error', 1000);
+                    }}
+                    onCopyTokenId={() => {
+                      addSnackbar('Copied', 'info', 1000);
+                    }}
+                  />
+                );
+              })}
+            </Show>
+          </Show>
         </BSV20List>
       </Show>
       <OrdButtonContainer>
@@ -606,24 +679,24 @@ export const OrdWallet = () => {
       />
       {token ? (
         <ConfirmContent>
-          <TransferBSV20Header theme={theme}>Send {getTokenName(token)}</TransferBSV20Header>
+          <TransferBSV20Header theme={theme}>Send {getTokenName(token.info)}</TransferBSV20Header>
           <BSV20Container>
             <Balance
               theme={theme}
               style={{ cursor: 'pointer' }}
-              onClick={() => userSelectedAmount(String(Number(token.all.confirmed)), token)}
-            >{`Available Balance: ${showAmount(token.all.confirmed, token.dec)}`}</Balance>
+              onClick={() => userSelectedAmount(String(Number(token.info.all.confirmed)), token)}
+            >{`Available Balance: ${showAmount(token.info.all.confirmed, token.info.dec)}`}</Balance>
 
-            <Show when={!!token.icon && token.icon.length > 0}>
-              <TokenIcon src={`${getOrdinalsBaseUrl()}/content/${token.icon}`} />
+            <Show when={!!token.info.icon && token.info.icon.length > 0}>
+              <TokenIcon src={`${getOrdinalsBaseUrl()}/content/${token.info.icon}`} />
             </Show>
           </BSV20Container>
 
-          <Show when={isBSV20v2(token.id)}>
+          <Show when={isBSV20v2(token.info.id)}>
             <BSV20Container>
               <BSV20Id
                 theme={theme}
-                id={token.id}
+                id={token.info.id}
                 onCopyTokenId={() => {
                   addSnackbar('Copied', 'info', 1000);
                 }}
@@ -647,7 +720,7 @@ export const OrdWallet = () => {
               placeholder="Enter Token Amount"
               type="number"
               step={'1'}
-              value={tokenSendAmount !== null ? showAmount(tokenSendAmount, token.dec) : ''}
+              value={tokenSendAmount !== null ? showAmount(tokenSendAmount, token.info.dec) : ''}
               onChange={(e) => {
                 const inputValue = e.target.value;
 

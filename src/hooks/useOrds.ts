@@ -138,7 +138,7 @@ export const useOrds = () => {
       const ordList = await getOrdUtxos(ordAddress);
       setOrdinals({
         initialized: true,
-        data: ordList,
+        data: ordList.filter(o => o.satoshis === 1),
       });
 
       const bsv20List: Array<BSV20> = await getBsv20Balances(ordAddress);
@@ -147,9 +147,11 @@ export const useOrds = () => {
       // If other information is needed later, call `cacheTokenInfos` to obtain more Tokens information.
       // await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.id));
 
+
+      const data = bsv20List.filter((o) => ((o.all.confirmed + o.all.pending) > 0n) && typeof o.dec === 'number')
       setBSV20s({
         initialized: true,
-        data: bsv20List.filter((o) => o.all.confirmed > 0n),
+        data: data,
       });
     } catch (error) {
       console.error('getOrdinals failed:', error);
