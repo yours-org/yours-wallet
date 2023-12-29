@@ -62,7 +62,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
       // We don't want the window to stay open after a successful connection. The 10ms timeout is used because of some weirdness with how chrome.sendMessage() works
       setTimeout(() => {
         if (popupId) chrome.windows.remove(popupId);
-      }, 10);
+      }, 1000);
     }
   }, [bsvPubKey, ordPubKey, popupId, thirdPartyAppRequestData, isDecided, identityPubKey]);
 
@@ -114,7 +114,16 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   };
 
   return (
-    <Show when={!thirdPartyAppRequestData?.isAuthorized}>
+    <Show
+      when={!thirdPartyAppRequestData?.isAuthorized}
+      whenFalseContent={
+        <Container>
+          <Text theme={theme} style={{ fontSize: '1.5rem', fontWeight: 700 }}>
+            Reconnecting to {thirdPartyAppRequestData?.appName} ...
+          </Text>
+        </Container>
+      }
+    >
       <Container>
         <Icon size="5rem" src={thirdPartyAppRequestData?.appIcon} />
         <HeaderText theme={theme} style={{ width: '90%' }}>
