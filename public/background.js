@@ -130,6 +130,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return processGetBalanceRequest(sendResponse);
       case 'getAddresses':
         return processGetAddressesRequest(sendResponse);
+      case 'getNetwork':
+        return processGetNetworkRequest(sendResponse);
       case 'getOrdinals':
         return processGetOrdinalsRequest(sendResponse);
       case 'sendBsv':
@@ -282,6 +284,24 @@ const processGetAddressesRequest = (sendResponse) => {
   } catch (error) {
     sendResponse({
       type: 'getAddresses',
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
+};
+
+const processGetNetworkRequest = (sendResponse) => {
+  try {
+    chrome.storage.local.get(['appState'], (result) => {
+      sendResponse({
+        type: 'getNetwork',
+        success: true,
+        data: result?.appState?.network ?? 'mainnet',
+      });
+    });
+  } catch (error) {
+    sendResponse({
+      type: 'getNetwork',
       success: false,
       error: JSON.stringify(error),
     });
