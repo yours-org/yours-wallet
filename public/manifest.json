@@ -3,7 +3,7 @@
   "manifest_version": 3,
   "name": "Panda Wallet",
   "description": "A non-custodial and open-source wallet for BSV and 1Sat Ordinals",
-  "permissions": ["storage"],
+  "permissions": ["storage",  "unlimitedStorage"],
   "action": {
     "default_popup": "index.html",
     "default_title": "Panda Wallet"
