@@ -31,6 +31,7 @@ window.panda = {
   isConnected: createPandaMethod('isConnected'),
   getPubKeys: createPandaMethod('getPubKeys'),
   getAddresses: createPandaMethod('getAddresses'),
+  getNetwork: createPandaMethod('getNetwork'),
   getBalance: createPandaMethod('getBalance'),
   getOrdinals: createPandaMethod('getOrdinals'),
   sendBsv: createPandaMethod('sendBsv'),
