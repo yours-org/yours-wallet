@@ -1,6 +1,6 @@
 {
   "name": "panda-wallet",
-  "version": "2.11.0",
+  "version": "2.11.1",
   "private": true,
   "dependencies": {
     "@testing-library/jest-dom": "^5.17.0",
