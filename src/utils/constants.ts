@@ -69,5 +69,5 @@ export const featuredApps = [
     icon: 'https://imgur.com/a/UGq2vqg',
     name: 'Library of Babel',
     link: 'https://babel.markets',
-  }
+  },
 ];

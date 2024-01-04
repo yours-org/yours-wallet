@@ -128,10 +128,9 @@ const BSV20Container = styled.div`
 
 type PageState = 'main' | 'receive' | 'transfer' | 'list' | 'cancel' | 'sendBSV20';
 
-
-interface Token  {
-  isConfirmed: boolean,
-  info: BSV20,
+interface Token {
+  isConfirmed: boolean;
+  info: BSV20;
 }
 
 export const OrdWallet = () => {
@@ -411,67 +410,39 @@ export const OrdWallet = () => {
       >
         <BSV20List>
           <BSV20Header>
-            <SubHeaderText theme={theme}>{bsv20s.data.filter(d => d.all.confirmed > 0n).length} Confirmed tokens 
+            <SubHeaderText theme={theme}>
+              {bsv20s.data.filter((d) => d.all.confirmed > 0n).length} Confirmed tokens
             </SubHeaderText>
             <CheckBox>
-              <IconButton icon={showConfirmed ? checkboxChecked : checkboxunChecked} onClick={()=>{
-                  setShowConfirmed(!showConfirmed)
-                }}/>
+              <IconButton
+                icon={showConfirmed ? checkboxChecked : checkboxunChecked}
+                onClick={() => {
+                  setShowConfirmed(!showConfirmed);
+                }}
+              />
             </CheckBox>
           </BSV20Header>
           <Divider></Divider>
 
           <Show when={showConfirmed}>
-            {bsv20s.data.filter(d => d.all.confirmed > 0n).map((b) => {
-              return (
-                <BSV20Item
-                  theme={theme}
-                  id={b.id}
-                  name={getTokenName(b)}
-                  amount={showAmount(b.all.confirmed, b.dec)}
-                  key={b.id}
-                  iconUrl={b.icon ? `${getOrdinalsBaseUrl()}/content/${b.icon}` : null}
-                  selected={false}
-                  onClick={async () => {
-                    setToken({
-                      isConfirmed: true,
-                      info: b
-                    });
-                    setPageState('sendBSV20');
-                  }}
-                  onCopyTokenId={() => {
-                    addSnackbar('Copied', 'info', 1000);
-                  }}
-                />
-              );
-            })}
-          </Show>
-
-          <Show when={bsv20s.data.filter(d => d.all.pending > 0n).length > 0}>
-            <BSV20Header>
-                <SubHeaderText theme={theme}>{bsv20s.data.filter(d => d.all.pending > 0n).length} Pending tokens 
-                </SubHeaderText>
-                <CheckBox>
-                  <IconButton icon={showPending ? checkboxChecked : checkboxunChecked} onClick={()=>{
-                      setShowPending(!showPending)
-                    }}/>
-                </CheckBox>
-            </BSV20Header>
-
-            <Divider></Divider>
-            <Show when={showPending}>
-              {bsv20s.data.filter(d => d.all.pending > 0n).map((b) => {
+            {bsv20s.data
+              .filter((d) => d.all.confirmed > 0n)
+              .map((b) => {
                 return (
                   <BSV20Item
                     theme={theme}
                     id={b.id}
                     name={getTokenName(b)}
-                    amount={showAmount(b.all.pending, b.dec)}
+                    amount={showAmount(b.all.confirmed, b.dec)}
                     key={b.id}
                     iconUrl={b.icon ? `${getOrdinalsBaseUrl()}/content/${b.icon}` : null}
                     selected={false}
                     onClick={async () => {
-                      addSnackbar('Pending tokens cannot be sent!', 'error', 1000);
+                      setToken({
+                        isConfirmed: true,
+                        info: b,
+                      });
+                      setPageState('sendBSV20');
                     }}
                     onCopyTokenId={() => {
                       addSnackbar('Copied', 'info', 1000);
@@ -479,6 +450,46 @@ export const OrdWallet = () => {
                   />
                 );
               })}
+          </Show>
+
+          <Show when={bsv20s.data.filter((d) => d.all.pending > 0n).length > 0}>
+            <BSV20Header>
+              <SubHeaderText theme={theme}>
+                {bsv20s.data.filter((d) => d.all.pending > 0n).length} Pending tokens
+              </SubHeaderText>
+              <CheckBox>
+                <IconButton
+                  icon={showPending ? checkboxChecked : checkboxunChecked}
+                  onClick={() => {
+                    setShowPending(!showPending);
+                  }}
+                />
+              </CheckBox>
+            </BSV20Header>
+
+            <Divider></Divider>
+            <Show when={showPending}>
+              {bsv20s.data
+                .filter((d) => d.all.pending > 0n)
+                .map((b) => {
+                  return (
+                    <BSV20Item
+                      theme={theme}
+                      id={b.id}
+                      name={getTokenName(b)}
+                      amount={showAmount(b.all.pending, b.dec)}
+                      key={b.id}
+                      iconUrl={b.icon ? `${getOrdinalsBaseUrl()}/content/${b.icon}` : null}
+                      selected={false}
+                      onClick={async () => {
+                        addSnackbar('Pending tokens cannot be sent!', 'error', 1000);
+                      }}
+                      onCopyTokenId={() => {
+                        addSnackbar('Copied', 'info', 1000);
+                      }}
+                    />
+                  );
+                })}
             </Show>
           </Show>
         </BSV20List>
