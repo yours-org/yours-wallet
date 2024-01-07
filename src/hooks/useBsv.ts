@@ -189,6 +189,7 @@ export const useBsv = () => {
             feeSats += Math.ceil(outScript.to_bytes().byteLength * FEE_PER_BYTE);
           } else {
             outScript = P2PKHAddress.from_string(req.address).get_locking_script();
+            feeSats += Math.ceil(outScript.to_bytes().byteLength * FEE_PER_BYTE);
           }
         } else if (req.script) {
           outScript = Script.from_hex(req.script);
