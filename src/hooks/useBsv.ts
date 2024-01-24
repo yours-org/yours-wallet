@@ -23,7 +23,7 @@ import {
   P2PKH_OUTPUT_SIZE,
 } from '../utils/constants';
 import { removeBase64Prefix } from '../utils/format';
-import { DerivationTag, getTaggedDerivationKeys, Keys } from '../utils/keys';
+import { DerivationTag, getPrivateKeyFromTag, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
 import { useGorillaPool } from './useGorillaPool';
@@ -272,13 +272,12 @@ export const useBsv = () => {
     try {
       const keys = (await retrieveKeys(password)) as Keys;
       const derivationTag = messageToSign.tag ?? { label: 'panda', id: 'identity', domain: '', meta: {} };
-      const taggedKeys = getTaggedDerivationKeys(derivationTag, keys.mnemonic);
+      const privateKey = getPrivateKeyFromTag(derivationTag, keys);
 
-      if (!taggedKeys.wif) {
+      if (!privateKey.to_wif()) {
         return { error: 'key-type' };
       }
 
-      const privateKey = PrivateKey.from_wif(taggedKeys.wif);
       const publicKey = privateKey.to_public_key();
       const address = publicKey.to_address().set_chain_params(getChainParams(network)).to_string();
 
