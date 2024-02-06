@@ -48,7 +48,6 @@ const verifyAccess = async (requestingDomain) => {
       } else {
         resolve(false);
       }
-      resolve(false);
     });
   });
 };
