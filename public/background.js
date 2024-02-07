@@ -9,7 +9,7 @@ let responseCallbackForTransferOrdinalRequest;
 let responseCallbackForPurchaseOrdinalRequest;
 let responseCallbackForSignMessageRequest;
 let responseCallbackForBroadcastRequest;
-let responseCallbackForGetSignaturesRequest;
+let responseCallbacksForGetSignaturesRequest = {};
 let responseCallbackForGenerateTaggedKeysRequest;
 let responseCallbackForEncryptRequest;
 let responseCallbackForDecryptRequest;
@@ -536,6 +536,23 @@ const processSignMessageRequest = (message, sendResponse) => {
   return true;
 };
 
+const addGetSignaturesResponseCallback = (index, callback) => {
+  responseCallbacksForGetSignaturesRequest[index] = callback;
+};
+
+const invokeGetSignaturesResponseCallback = (index, response) => {
+  if (responseCallbacksForGetSignaturesRequest[index]) {
+    responseCallbacksForGetSignaturesRequest[index](response);
+    // delete responseCallbacksForGetSignaturesRequest[index]; // Clear after invoking
+  } else {
+    console.error(`Missing callback for index: ${index}`);
+  }
+};
+
+const clearGetSignaturesResponseCallback = (index) => {
+  delete responseCallbacksForGetSignaturesRequest[index];
+};
+
 const processGetSignaturesRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
@@ -543,9 +560,12 @@ const processGetSignaturesRequest = (message, sendResponse) => {
       success: false,
       error: 'Must provide valid params!',
     });
+    return;
   }
   try {
-    responseCallbackForGetSignaturesRequest = sendResponse;
+    const inputIndex = message.params.sigRequests[0].inputIndex; // Assuming inputIndex is reliably here
+    addGetSignaturesResponseCallback(inputIndex, sendResponse);
+
     chrome.storage.local
       .set({
         getSignaturesRequest: {
@@ -899,22 +919,24 @@ const processBroadcastResponse = (response) => {
 };
 
 const processGetSignaturesResponse = (response) => {
-  if (!responseCallbackForGetSignaturesRequest) throw Error('Missing callback!');
+  const inputIndex = response.sigResponses[0].inputIndex;
+  if (!responseCallbacksForGetSignaturesRequest[inputIndex]) throw Error('Missing callback!');
+
   try {
-    responseCallbackForGetSignaturesRequest({
+    invokeGetSignaturesResponseCallback(inputIndex, {
       type: 'getSignatures',
       success: !response?.error,
       data: response?.sigResponses ?? [],
       error: response?.error,
     });
   } catch (error) {
-    responseCallbackForGetSignaturesRequest({
+    invokeGetSignaturesResponseCallback(inputIndex, {
       type: 'getSignatures',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
-    responseCallbackForGetSignaturesRequest = null;
+    clearGetSignaturesResponseCallback(inputIndex);
     popupWindowId = null;
     chrome.storage.local.remove(['getSignaturesRequest', 'popupWindowId']);
   }
@@ -1032,13 +1054,24 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       chrome.storage.local.remove('broadcastRequest');
     }
 
-    if (responseCallbackForGetSignaturesRequest) {
-      responseCallbackForGetSignaturesRequest({
-        type: 'getSignatures',
-        success: false,
-        error: 'User dismissed the request!',
-      });
-      responseCallbackForGetSignaturesRequest = null;
+    let localRemoveGetSignaturesRequest = false;
+    // Iterate over all indices in responseCallbacksForGetSignaturesRequest
+    Object.keys(responseCallbacksForGetSignaturesRequest).forEach((index) => {
+      // Check if there's a callback for the current index and invoke it with an error response
+      if (responseCallbacksForGetSignaturesRequest[index]) {
+        localRemoveGetSignaturesRequest = true;
+
+        responseCallbacksForGetSignaturesRequest[index]({
+          type: 'getSignatures',
+          success: false,
+          error: 'User dismissed the request!',
+        });
+        // Clear the callback after invocation
+        delete responseCallbacksForGetSignaturesRequest[index];
+      }
+    });
+
+    if (localRemoveGetSignaturesRequest) {
       chrome.storage.local.remove('getSignaturesRequest');
     }
 
