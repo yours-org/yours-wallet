@@ -553,6 +553,43 @@ const clearGetSignaturesResponseCallback = (index) => {
   delete responseCallbacksForGetSignaturesRequest[index];
 };
 
+const updateGetSignaturesRequests = (message) => {
+  // Assume each sigRequest can be uniquely identified by its inputIndex
+  const inputIndex = message.params.sigRequests[0].inputIndex;
+
+  chrome.storage.local.get('getSignaturesRequests', (result) => {
+    // Retrieve the existing object, or initialize as empty if not present
+    const existingData = result.getSignaturesRequests || {};
+
+    // Update or add the new request data under the unique inputIndex
+    existingData[inputIndex] = {
+      rawtx: message.params.rawtx,
+      sigRequests: message.params.sigRequests,
+    };
+
+    // Save the updated getSignaturesRequests object back to storage
+    chrome.storage.local.set({ getSignaturesRequests: existingData }, () => {
+      console.log(`getSignaturesRequests updated with data for inputIndex ${inputIndex}:`, existingData);
+    });
+  });
+};
+
+const removeGetSignaturesRequests = (inputIndex) => {
+  chrome.storage.local.get('getSignaturesRequests', (result) => {
+    if (result.getSignaturesRequests && result.getSignaturesRequests[inputIndex]) {
+      // Entry found, delete it from the object
+      delete result.getSignaturesRequests[inputIndex];
+
+      // Now save the updated object back to storage
+      chrome.storage.local.set({ getSignaturesRequests: result.getSignaturesRequests }, () => {
+        console.log(`Removed getSignaturesRequests for inputIndex ${inputIndex} from: `, result);
+      });
+    } else {
+      console.log(`No getSignaturesRequests found for inputIndex ${inputIndex} to remove from: `, result);
+    }
+  });
+};
+
 const processGetSignaturesRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
@@ -565,6 +602,8 @@ const processGetSignaturesRequest = (message, sendResponse) => {
   try {
     const inputIndex = message.params.sigRequests[0].inputIndex; // Assuming inputIndex is reliably here
     addGetSignaturesResponseCallback(inputIndex, sendResponse);
+
+    updateGetSignaturesRequests(message);
 
     chrome.storage.local
       .set({
@@ -938,6 +977,7 @@ const processGetSignaturesResponse = (response) => {
   } finally {
     clearGetSignaturesResponseCallback(inputIndex);
     popupWindowId = null;
+    removeGetSignaturesRequests(inputIndex);
     chrome.storage.local.remove(['getSignaturesRequest', 'popupWindowId']);
   }
 
@@ -1068,6 +1108,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         });
         // Clear the callback after invocation
         delete responseCallbacksForGetSignaturesRequest[index];
+        removeGetSignaturesRequests(index);
       }
     });
 
