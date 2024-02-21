@@ -64,7 +64,7 @@ export const useGorillaPool = () => {
     try {
       if (!isAddressOnRightNetwork(ordAddress)) return [];
       const { data } = await axios.get<OrdinalTxo[]>(
-        `${getOrdinalsBaseUrl()}/api/txos/address/${ordAddress}/unspent?limit=1000&offset=0`,
+        `${getOrdinalsBaseUrl()}/api/txos/address/${ordAddress}/unspent?limit=1500&offset=0`,
       );
       return data;
     } catch (error) {

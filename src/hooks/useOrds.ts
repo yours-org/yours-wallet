@@ -138,7 +138,7 @@ export const useOrds = () => {
       const ordList = await getOrdUtxos(ordAddress);
       setOrdinals({
         initialized: true,
-        data: ordList.filter(o => o.satoshis === 1),
+        data: ordList.filter((o) => o.satoshis === 1),
       });
 
       const bsv20List: Array<BSV20> = await getBsv20Balances(ordAddress);
@@ -147,8 +147,7 @@ export const useOrds = () => {
       // If other information is needed later, call `cacheTokenInfos` to obtain more Tokens information.
       // await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.id));
 
-
-      const data = bsv20List.filter((o) => ((o.all.confirmed + o.all.pending) > 0n) && typeof o.dec === 'number')
+      const data = bsv20List.filter((o) => o.all.confirmed + o.all.pending > 0n && typeof o.dec === 'number');
       setBSV20s({
         initialized: true,
         data: data,
@@ -335,8 +334,6 @@ export const useOrds = () => {
         return { error: 'token-details' };
       }
 
-      const fundingUtxo = getSuitableUtxo(fundingUtxos, FEE_SATS);
-
       const bsv20Utxos = await getBSV20Utxos(id, ordinalAddress);
 
       if (!bsv20Utxos || bsv20Utxos.length === 0) throw Error('no-bsv20-utxo');
@@ -361,7 +358,7 @@ export const useOrds = () => {
       );
 
       if (tokenChangeAmt > 0n) {
-        indexFee += indexFee;
+        indexFee += BSV20_INDEX_FEE;
         tx.add_output(
           new TxOut(
             1n,
@@ -376,8 +373,9 @@ export const useOrds = () => {
         new TxOut(BigInt(indexFee), P2PKHAddress.from_string(tokenDetails.fundAddress).get_locking_script()),
       );
 
+      const fundingUtxo = getSuitableUtxo(fundingUtxos, FEE_SATS + indexFee);
       const totalInputSats = fundingUtxo.satoshis;
-      const change = totalInputSats - 1 - FEE_SATS;
+      const change = totalInputSats - 1 - FEE_SATS - indexFee;
 
       if (change > 0) {
         tx.add_output(

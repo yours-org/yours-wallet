@@ -66,8 +66,8 @@ export const featuredApps = [
     link: 'https://hastearcade.com',
   },
   {
-    icon: 'https://imgur.com/a/UGq2vqg',
+    icon: 'https://pbs.twimg.com/profile_images/1671319128593031170/MZ_B266m_400x400.jpg',
     name: 'Library of Babel',
     link: 'https://babel.markets',
-  }
+  },
 ];

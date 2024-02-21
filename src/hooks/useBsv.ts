@@ -192,6 +192,7 @@ export const useBsv = () => {
           }
         } else if (req.script) {
           outScript = Script.from_hex(req.script);
+          feeSats += Math.ceil(outScript.to_bytes().byteLength * FEE_PER_BYTE);
         } else if ((req.data || []).length > 0) {
           let asm = `OP_0 OP_RETURN ${req.data?.join(' ')}`;
           try {
