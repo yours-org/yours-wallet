@@ -5,6 +5,7 @@ export interface Theme {
   primaryButton: string;
   white: string;
   black: string;
+  gray: string;
   errorRed: string;
 }
 
@@ -14,10 +15,11 @@ export type ColorThemeProps = {
 
 export const defaultTheme: Theme = {
   darkAccent: '#164B60',
-  mainBackground: '#1B6B93',
-  lightAccent: '#4FC0D0',
-  primaryButton: '#A2FF86',
+  mainBackground: '#010101',
+  lightAccent: '#A1FF8B',
+  primaryButton: '#34D399',
   white: '#FFFFFF',
   black: '#000000',
+  gray: '#98A2B3',
   errorRed: '#FF4646',
 };

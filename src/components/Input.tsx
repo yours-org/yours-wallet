@@ -21,11 +21,11 @@ const $shakeAnimation = keyframes`
 `;
 
 const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
-  background-color: ${({ theme }) => theme.darkAccent + '60'};
-  border-radius: 0.25rem;
-  border: 1px solid ${({ theme }) => theme.white + '40'};
+  background-color: ${({ theme }) => theme.gray + '20'};
+  border-radius: 1.25rem;
+  border: 1px solid ${({ theme }) => theme.gray};
   font-size: 1rem;
-  width: 80%;
+  width: 85%;
   height: 2rem;
   padding-left: 0.5rem;
   margin: 0.5rem;
@@ -49,7 +49,7 @@ const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
   }
 
   &::placeholder {
-    color: ${({ theme }) => theme.white + '80'};
+    color: ${({ theme }) => theme.gray};
   }
 `;
 

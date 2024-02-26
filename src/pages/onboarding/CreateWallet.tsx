@@ -104,11 +104,12 @@ export const CreateWallet = () => {
 
   const passwordStep = (
     <>
-      <BackButton onClick={() => navigate('/')} />
       <Content>
-        <HeaderText theme={theme}>Create a password</HeaderText>
+        <HeaderText style={{ fontSize: '1.5rem' }} theme={theme}>
+          Create password
+        </HeaderText>
         <Text style={{ marginBottom: '1rem' }} theme={theme}>
-          This is used to unlock your wallet.
+          This will be used to unlock your wallet.
         </Text>
         <FormContainer onSubmit={handleKeyGeneration}>
           <Input
@@ -120,7 +121,7 @@ export const CreateWallet = () => {
           />
           <Input
             theme={theme}
-            placeholder="Confirm Password"
+            placeholder="Confirm password"
             type="password"
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
@@ -129,6 +130,7 @@ export const CreateWallet = () => {
             Make sure you are in a safe place and no one is watching.
           </Text>
           <Button theme={theme} type="primary" label="Generate Seed" isSubmit />
+          <Button theme={theme} type="secondary" label="Go back" onClick={() => navigate('/')} />
         </FormContainer>
       </Content>
     </>

@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { Text } from './Reusable';
 import { SnackbarType } from '../contexts/SnackbarContext';
 import { ColorThemeProps, Theme } from '../theme';
@@ -8,24 +8,48 @@ import successIcon from '../assets/success.svg';
 
 type SnackBarColorTheme = ColorThemeProps & { color: string };
 
+const slideIn = keyframes`
+  from {
+    bottom: -100px;
+    opacity: 0;
+  }
+  to {
+    bottom: 0;
+    opacity: 1;
+  }
+`;
+
+// Animation for fading out
+const fadeOut = keyframes`
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+`;
+
 export const SnackBarContainer = styled.div<SnackBarColorTheme>`
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  width: 100%;
-  height: 100%;
+  width: 90%;
   position: absolute;
-  margin: 0;
+  bottom: 0;
+  margin: 1rem;
+  border-radius: 0.5rem;
   background-color: ${({ color }) => color};
   color: ${({ theme }) => theme.white};
   z-index: 200;
+  animation:
+    ${slideIn} 0.35s ease-out,
+    ${fadeOut} 0.35s ease-out 2.5s;
+  animation-fill-mode: forwards;
 `;
 
 const Image = styled.img`
-  width: 2rem;
-  height: 2rem;
+  width: 1rem;
+  height: 1rem;
   margin: 1rem;
 `;
 
@@ -47,11 +71,10 @@ export const Snackbar = (props: SnackbarProps) => {
       <Text
         theme={theme}
         style={{
-          margin: 0,
-          fontWeight: 500,
-          fontSize: '1.25rem',
+          margin: '1rem 0 1rem .25rem',
           color: type === 'error' ? theme.white : theme.darkAccent,
           wordWrap: 'break-word',
+          textAlign: 'left',
         }}
       >
         {message}

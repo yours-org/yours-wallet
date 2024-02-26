@@ -68,7 +68,7 @@ const BalanceContainer = styled.div`
 const NumberWrapper = styled.span<ColorThemeProps>`
   font-size: 2.5rem;
   color: ${({ theme }) => theme.white};
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 600;
   margin: 0.25rem 0;
   text-align: center;

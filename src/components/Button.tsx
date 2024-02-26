@@ -2,18 +2,18 @@ import styled from 'styled-components';
 import { ColorThemeProps, Theme } from '../theme';
 import { Show } from './Show';
 
-export type ButtonStyles = 'primary' | 'secondary' | 'warn';
+export type ButtonStyles = 'primary' | 'secondary' | 'secondary-outline' | 'warn';
 
 const Primary = styled.button<ColorThemeProps>`
   width: 80%;
   height: 2.5rem;
-  background-color: ${({ theme }) => theme.primaryButton};
+  background: linear-gradient(45deg, ${({ theme }) => theme.lightAccent}, ${({ theme }) => theme.primaryButton});
   color: ${({ theme }) => theme.mainBackground};
   border: none;
-  border-radius: 0.35rem;
-  font-family: Arial, Helvetica, sans-serif;
+  border-radius: 1.25rem;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-size: 1rem;
-  font-weight: 500;
+  font-weight: 600;
   margin: 0.5rem;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -30,14 +30,25 @@ const Primary = styled.button<ColorThemeProps>`
   }
 `;
 
-const Secondary = styled(Primary)`
-  width: 80%;
+const GradientBorderWrapper = styled.div<ColorThemeProps>`
+  display: flex;
+  align-items: center;
+  padding: 1px; /* This will be the border thickness */
+  background: linear-gradient(45deg, ${({ theme }) => theme.lightAccent}, ${({ theme }) => theme.primaryButton});
+  border-radius: 1.25rem; /* Adjust based on your button's border-radius */
+  width: 80%; /* Adjust to fit inside the wrapper */
+  margin: 0.5rem;
+`;
+
+const Secondary = styled(Primary)<{ $isOutline?: boolean }>`
+  width: 100%; /* Adjust to fit inside the wrapper */
   height: 2.5rem;
-  background: transparent;
-  color: ${({ theme }) => theme.white};
-  text-decoration: underline;
+  background: ${({ theme }) => theme.mainBackground};
+  border: none;
+  color: ${(props) => (props.$isOutline ? props.theme.white : props.theme.gray)};
   transition: none;
   transform: none;
+  margin: 0;
 
   &:disabled {
     background: transparent;
@@ -82,6 +93,20 @@ export const Button = (props: ButtonProps) => {
         >
           {label}
         </Primary>
+      </Show>
+      <Show when={type === 'secondary-outline'}>
+        <GradientBorderWrapper theme={theme}>
+          <Secondary
+            theme={theme}
+            disabled={disabled}
+            onClick={onClick}
+            type={isSubmit ? 'submit' : 'button'}
+            style={style}
+            $isOutline
+          >
+            {label}
+          </Secondary>
+        </GradientBorderWrapper>
       </Show>
       <Show when={type === 'secondary'}>
         <Secondary

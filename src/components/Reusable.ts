@@ -4,7 +4,7 @@ import { ColorThemeProps } from '../theme';
 export const HeaderText = styled.h1<ColorThemeProps>`
   font-size: 1.75rem;
   color: ${({ theme }) => theme.white};
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 600;
   margin: 0.25rem 0;
   text-align: center;
@@ -13,7 +13,7 @@ export const HeaderText = styled.h1<ColorThemeProps>`
 export const SubHeaderText = styled.h1<ColorThemeProps>`
   font-size: 1rem;
   color: ${({ theme }) => theme.white};
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 400;
   margin: 0.1rem 0;
   text-align: center;
@@ -26,13 +26,13 @@ export const Divider = styled.hr`
 `;
 
 export const Text = styled.p<ColorThemeProps>`
-  font-size: 0.9rem;
-  color: ${({ theme }) => theme.white + '90'};
-  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.85rem;
+  color: ${({ theme }) => theme.gray};
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 400;
-  margin: 0.5rem 0 2rem 0;
+  margin: 0.25rem 0 2rem 0;
   text-align: center;
-  width: 80%;
+  width: 90%;
 `;
 
 export const Badge = styled.button<{ $primary?: boolean }>`

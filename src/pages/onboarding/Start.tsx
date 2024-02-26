@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import gihubIcon from '../../assets/github.svg';
 import { Button } from '../../components/Button';
-import { PandaHead } from '../../components/PandaHead';
 import { Text } from '../../components/Reusable';
+import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useTheme } from '../../hooks/useTheme';
 import { ColorThemeProps } from '../../theme';
 import { storage } from '../../utils/storage';
+import yoursLogo from '../../assets/yours-logo.png';
 
 const Content = styled.div`
   display: flex;
@@ -20,8 +21,8 @@ const Content = styled.div`
 const TitleText = styled.h1<ColorThemeProps>`
   font-size: 2rem;
   color: ${({ theme }) => theme.white};
-  font-family: Arial, Helvetica, sans-serif;
-  font-weight: 600;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+  font-weight: 700;
   margin: 0.25rem 0;
   text-align: center;
 `;
@@ -29,9 +30,14 @@ const TitleText = styled.h1<ColorThemeProps>`
 const GithubIcon = styled.img`
   width: 1.5rem;
   height: 1.5rem;
-  position: absolute;
   bottom: 1.5rem;
+  margin-top: 1rem;
   cursor: pointer;
+`;
+
+const YoursLogo = styled.img`
+  width: 5rem;
+  height: 5rem;
 `;
 
 export const Start = () => {
@@ -67,24 +73,25 @@ export const Start = () => {
   }, [navigate]);
 
   return (
-    <>
-      {showStart ? (
-        <Content>
-          <PandaHead animated />
-          <TitleText theme={theme}>Panda Wallet</TitleText>
-          <Text theme={theme} style={{ marginBottom: '2rem' }}>
-            A non-custodial and open-source wallet for BSV and 1Sat Ordinals.
-          </Text>
-          <Button theme={theme} type="primary" label="Create New Wallet" onClick={() => navigate('/create-wallet')} />
-          <Button theme={theme} type="secondary" label="Restore Wallet" onClick={() => navigate('/restore-wallet')} />
-          <GithubIcon
-            src={gihubIcon}
-            onClick={() => window.open('https://github.com/Panda-Wallet/panda-wallet', '_blank')}
-          />
-        </Content>
-      ) : (
-        <></>
-      )}
-    </>
+    <Show when={showStart}>
+      <Content>
+        <YoursLogo src={yoursLogo} />
+        <TitleText theme={theme}>Yours Wallet</TitleText>
+        <Text theme={theme} style={{ margin: '0.25rem 0 1rem 0' }}>
+          An open source project.
+        </Text>
+        <Button theme={theme} type="primary" label="Create New Wallet" onClick={() => navigate('/create-wallet')} />
+        <Button
+          theme={theme}
+          type="secondary-outline"
+          label="Restore Wallet"
+          onClick={() => navigate('/restore-wallet')}
+        />
+        <GithubIcon
+          src={gihubIcon}
+          onClick={() => window.open('https://github.com/Panda-Wallet/panda-wallet', '_blank')}
+        />
+      </Content>
+    </Show>
   );
 };
