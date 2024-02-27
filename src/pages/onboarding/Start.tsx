@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import gihubIcon from '../../assets/github.svg';
 import { Button } from '../../components/Button';
-import { Text } from '../../components/Reusable';
+import { GithubIcon, Text, YoursLogo } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useTheme } from '../../hooks/useTheme';
@@ -25,19 +25,6 @@ const TitleText = styled.h1<ColorThemeProps>`
   font-weight: 700;
   margin: 0.25rem 0;
   text-align: center;
-`;
-
-const GithubIcon = styled.img`
-  width: 1.5rem;
-  height: 1.5rem;
-  bottom: 1.5rem;
-  margin-top: 1rem;
-  cursor: pointer;
-`;
-
-const YoursLogo = styled.img`
-  width: 5rem;
-  height: 5rem;
 `;
 
 export const Start = () => {
@@ -87,7 +74,11 @@ export const Start = () => {
           label="Restore Wallet"
           onClick={() => navigate('/restore-wallet')}
         />
-        <GithubIcon src={gihubIcon} onClick={() => window.open('https://github.com/yours-org', '_blank')} />
+        <GithubIcon
+          style={{ marginTop: '1rem' }}
+          src={gihubIcon}
+          onClick={() => window.open('https://github.com/yours-org', '_blank')}
+        />
       </Content>
     </Show>
   );

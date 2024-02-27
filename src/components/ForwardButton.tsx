@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import arrow from '../assets/right-arrow.svg';
+import rightChevron from '../assets/right-chevron.svg';
 
 export const Image = styled.img`
   width: 1.25rem;
@@ -15,5 +15,5 @@ export type ForwardButtonProps = {
 
 export const ForwardButton = (props: ForwardButtonProps) => {
   const { onClick } = props;
-  return <Image src={arrow} onClick={onClick} />;
+  return <Image src={rightChevron} onClick={onClick} />;
 };

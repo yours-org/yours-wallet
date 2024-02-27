@@ -1,12 +1,13 @@
 import { styled } from 'styled-components';
 import { ColorThemeProps, Theme } from '../theme';
-import coins from '../assets/coins.svg';
-import apps from '../assets/items.svg';
-import tokens from '../assets/tokens.svg';
+import home from '../assets/home.svg';
+import info from '../assets/info.svg';
+import tokens from '../assets/grid.svg';
 import settings from '../assets/settings.svg';
 import { MenuItems } from '../contexts/BottomMenuContext';
-import { Badge } from './Reusable';
+import { Badge, Text } from './Reusable';
 import { NetWork } from '../utils/network';
+import { Show } from './Show';
 
 const Container = styled.div<ColorThemeProps>`
   display: flex;
@@ -16,7 +17,7 @@ const Container = styled.div<ColorThemeProps>`
   height: 3.75rem;
   position: absolute;
   bottom: 0;
-  background: ${({ theme }) => theme.darkAccent};
+  background: ${({ theme }) => theme.mainBackground};
   color: ${({ theme }) => theme.white + '80'};
   z-index: 100;
 `;
@@ -35,9 +36,16 @@ const MenuContainer = styled.div<ColorThemeProps>`
 const Icon = styled.img<{ opacity: number }>`
   width: 1.5rem;
   height: 1.5rem;
-  margin: 1rem;
   opacity: ${(props) => props.opacity};
   cursor: pointer;
+`;
+
+const ContentWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
 `;
 
 export type BottomMenuProps = {
@@ -50,22 +58,25 @@ export type BottomMenuProps = {
 export type MenuProps = {
   badge?: string;
   src: string;
+  label: string;
   onClick: (e: React.MouseEvent<HTMLImageElement>) => void;
   opacity: number;
   theme: Theme;
 };
 
 const Menu = (props: MenuProps) => {
+  const { theme, label, onClick, opacity, src, badge } = props;
   return (
     <MenuContainer>
-      {props.badge ? (
-        <>
-          <Icon src={props.src} onClick={props.onClick} opacity={props.opacity} />
-          <Badge style={{ position: 'absolute', marginTop: '-0.5rem' }}>{props.badge}</Badge>
-        </>
-      ) : (
-        <Icon src={props.src} onClick={props.onClick} opacity={props.opacity} />
-      )}
+      <ContentWrapper>
+        <Icon src={src} onClick={onClick} opacity={opacity} />
+        <Text style={{ fontSize: '0.65rem', opacity: opacity }} theme={theme}>
+          {label}
+        </Text>
+        <Show when={!!badge}>
+          <Badge style={{ position: 'absolute', marginTop: '-0.5rem' }}>{badge}</Badge>
+        </Show>
+      </ContentWrapper>
     </MenuContainer>
   );
 };
@@ -75,10 +86,29 @@ export const BottomMenu = (props: BottomMenuProps) => {
 
   return (
     <Container theme={theme}>
-      <Menu theme={theme} src={coins} onClick={() => handleSelect('bsv')} opacity={selected === 'bsv' ? 1 : 0.4} />
-      <Menu theme={theme} src={tokens} onClick={() => handleSelect('ords')} opacity={selected === 'ords' ? 1 : 0.4} />
-      <Menu theme={theme} src={apps} onClick={() => handleSelect('apps')} opacity={selected === 'apps' ? 1 : 0.4} />
       <Menu
+        label="Home"
+        theme={theme}
+        src={home}
+        onClick={() => handleSelect('bsv')}
+        opacity={selected === 'bsv' ? 1 : 0.4}
+      />
+      <Menu
+        label="Tokens"
+        theme={theme}
+        src={tokens}
+        onClick={() => handleSelect('ords')}
+        opacity={selected === 'ords' ? 1 : 0.4}
+      />
+      <Menu
+        label="Resources"
+        theme={theme}
+        src={info}
+        onClick={() => handleSelect('apps')}
+        opacity={selected === 'apps' ? 1 : 0.4}
+      />
+      <Menu
+        label="Settings"
         theme={theme}
         src={settings}
         onClick={() => handleSelect('settings')}

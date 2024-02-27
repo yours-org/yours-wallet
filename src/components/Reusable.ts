@@ -27,7 +27,7 @@ export const Divider = styled.hr`
 
 export const Text = styled.p<ColorThemeProps>`
   font-size: 0.85rem;
-  color: ${({ theme }) => theme.gray};
+  color: ${({ theme }) => theme.gray ?? theme.white};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 400;
   margin: 0.25rem 0 1rem 0;
@@ -71,15 +71,15 @@ export const ButtonContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-around;
-  width: 100%;
-  margin: 1rem 0 2.5rem 0;
+  width: 90%;
+  margin: 1rem;
 `;
 
 export const MainContent = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   width: 100%;
   height: calc(100% - 3.75rem);
 `;
@@ -88,4 +88,19 @@ export const ReceiveContent = styled(MainContent)`
   justify-content: center;
   width: 100%;
   height: calc(100% - 3.75rem);
+`;
+
+export const YoursLogo = styled.img`
+  width: 5rem;
+  height: 5rem;
+`;
+
+export const GithubIcon = styled.img`
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+`;
+
+export const Warning = styled.span<ColorThemeProps>`
+  color: ${({ theme }) => theme.warning};
 `;

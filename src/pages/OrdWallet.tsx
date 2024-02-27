@@ -18,6 +18,7 @@ import {
   ReceiveContent,
   SubHeaderText,
   Text,
+  Warning,
 } from '../components/Reusable';
 import { Show } from '../components/Show';
 import Tabs from '../components/Tabs';
@@ -34,6 +35,8 @@ import { BSV20Id } from '../components/BSV20Id';
 import checkboxChecked from '../assets/checkbox-checked.png';
 import checkboxunChecked from '../assets/checkbox-unchecked.png';
 import { IconButton } from '../components/IconButton';
+import copyIcon from '../assets/copy.svg';
+
 const OrdinalsList = styled.div`
   display: flex;
   align-items: center;
@@ -71,12 +74,6 @@ const OneSatLogo = styled.img`
 
 export const CheckBox = styled.div`
   margin: 0.5rem 0.5rem;
-`;
-
-const Icon = styled.img<{ size?: string }>`
-  width: ${(props) => props.size ?? '1.5rem'};
-  height: ${(props) => props.size ?? '1.5rem'};
-  margin: 0 0.5rem 0 0;
 `;
 
 const ContentWrapper = styled.div`
@@ -124,6 +121,20 @@ const BSV20Container = styled.div`
   margin: 0 0;
   margin-top: 0.6rem;
   padding: 0 0;
+`;
+
+const CopyAddressWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin: 2rem 0;
+`;
+
+const StyledCopy = styled.img`
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.25rem;
 `;
 
 type PageState = 'main' | 'receive' | 'transfer' | 'list' | 'cancel' | 'sendBSV20';
@@ -502,7 +513,23 @@ export const OrdWallet = () => {
 
   const receive = (
     <ReceiveContent>
-      <BackButton
+      <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
+        Receive Ordinals
+      </HeaderText>
+      <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
+        Only send Ordinals and BSV20 to this address. <Warning theme={theme}>Do not send BSV here.</Warning>
+      </Text>
+      <QrCode address={ordAddress} onClick={handleCopyToClipboard} />
+      <CopyAddressWrapper onClick={handleCopyToClipboard}>
+        <StyledCopy src={copyIcon} />
+        <Text theme={theme} style={{ margin: '0', color: theme.white, fontSize: '0.75rem' }}>
+          {ordAddress}
+        </Text>
+      </CopyAddressWrapper>
+      <Button
+        label="Go back"
+        theme={theme}
+        type="secondary"
         onClick={() => {
           setPageState('main');
           setTimeout(() => {
@@ -510,17 +537,6 @@ export const OrdWallet = () => {
           }, 500);
         }}
       />
-      <Icon size={'2.5rem'} src={oneSatLogo} />
-      <HeaderText style={{ marginTop: '1rem', fontSize: '2rem' }} theme={theme}>
-        Ordinals & BSV20
-      </HeaderText>
-      <Text style={{ marginBottom: '1.25rem', fontSize: '1rem', fontWeight: 700, color: theme.errorRed }}>
-        Do not send BSV to this address!
-      </Text>
-      <QrCode address={ordAddress} onClick={handleCopyToClipboard} />
-      <Text theme={theme} style={{ marginTop: '1.5rem', cursor: 'pointer' }} onClick={handleCopyToClipboard}>
-        {ordAddress}
-      </Text>
     </ReceiveContent>
   );
 

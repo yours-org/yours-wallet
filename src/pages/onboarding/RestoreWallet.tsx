@@ -12,7 +12,7 @@ import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
-import { HeaderText, Text } from '../../components/Reusable';
+import { HeaderText, Text, YoursLogo } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import { WalletRow } from '../../components/WalletRow';
@@ -93,11 +93,6 @@ const WalletText = styled(Text)`
   text-align: left;
   color: ${({ theme }) => theme.white};
   font-weight: 600;
-`;
-
-const YoursLogo = styled.img`
-  width: 5rem;
-  height: 5rem;
 `;
 
 export const RestoreWallet = () => {
@@ -189,7 +184,6 @@ export const RestoreWallet = () => {
 
   const passwordStep = (
     <>
-      <BackButton onClick={() => navigate('/')} />
       <Content>
         <HeaderText theme={theme}>Create a password</HeaderText>
         <Text theme={theme}>This is used to unlock your wallet.</Text>
@@ -210,6 +204,7 @@ export const RestoreWallet = () => {
             style={{ marginBottom: '2rem' }}
           />
           <Button theme={theme} type="primary" label="Finish" isSubmit />
+          <Button theme={theme} type="secondary" label="Go back" onClick={() => setStep(2)} />
         </FormContainer>
       </Content>
     </>
@@ -217,7 +212,6 @@ export const RestoreWallet = () => {
 
   const enterSeedStep = (
     <>
-      <BackButton onClick={() => setStep(1)} />
       <Content>
         <HeaderText theme={theme}>{getRestoreTitle()}</HeaderText>
         <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
@@ -268,6 +262,7 @@ export const RestoreWallet = () => {
             Make sure you are in a safe place and no one is watching.
           </Text>
           <Button theme={theme} type="primary" label="Next" isSubmit />
+          <Button theme={theme} type="secondary" label="Go back" onClick={() => setStep(1)} />
         </FormContainer>
       </Content>
     </>

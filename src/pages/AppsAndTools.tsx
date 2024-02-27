@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import externalLink from '../assets/external-link.svg';
 import { BackButton } from '../components/BackButton';
 import { Button } from '../components/Button';
-import { ForwardButton } from '../components/ForwardButton';
+import { ForwardButton as RightChevron } from '../components/ForwardButton';
 import { Input } from '../components/Input';
 import { PageLoader } from '../components/PageLoader';
 import { PandaHead } from '../components/PandaHead';
@@ -248,26 +248,26 @@ export const AppsAndTools = () => {
   const main = (
     <>
       <AppsRow
-        name="Make a Difference 🙏"
+        name="Make a Difference"
         description="Fund Panda Wallet's open source developers"
         onClick={() => setPage('sponsor')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<RightChevron />}
       />
       <AppsRow
-        name="Unlock Coins 🔐"
-        description="Unlock the coins you've locked on Hodlocker"
+        name="Unlock Coins"
+        description="Unlock the coins you've locked"
         onClick={() => setPage('unlock')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<RightChevron />}
       />
       <AppsRow
-        name="Discover Apps 🤩"
+        name="Discover Apps"
         description="Meet the apps using Panda Wallet"
         onClick={() => setPage('discover-apps')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<RightChevron />}
       />
       <AppsRow
-        name="Integrate Panda Wallet 🛠"
-        description="The tools you need to integrate Panda Wallet"
+        name="Contribute or integrate"
+        description="All the tools you need to get involved"
         onClick={() => window.open(PROVIDER_DOCS_URL, '_blank')}
         jsxElement={<ExternalLinkIcon src={externalLink} />}
       />

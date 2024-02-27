@@ -5,7 +5,7 @@ import { Show } from './Show';
 export type ButtonStyles = 'primary' | 'secondary' | 'secondary-outline' | 'warn';
 
 const Primary = styled.button<ColorThemeProps>`
-  width: 80%;
+  width: 87%;
   height: 2.5rem;
   background: linear-gradient(45deg, ${({ theme }) => theme.lightAccent}, ${({ theme }) => theme.primaryButton});
   color: ${({ theme }) => theme.mainBackground};
@@ -33,15 +33,15 @@ const Primary = styled.button<ColorThemeProps>`
 const GradientBorderWrapper = styled.div<ColorThemeProps>`
   display: flex;
   align-items: center;
-  padding: 1px; /* This will be the border thickness */
+  padding: 1px; /* border thickness */
   background: linear-gradient(45deg, ${({ theme }) => theme.lightAccent}, ${({ theme }) => theme.primaryButton});
-  border-radius: 1.25rem; /* Adjust based on your button's border-radius */
-  width: 80%; /* Adjust to fit inside the wrapper */
+  border-radius: 1.25rem;
+  width: 87%;
   margin: 0.5rem;
 `;
 
 const Secondary = styled(Primary)<{ $isOutline?: boolean }>`
-  width: 100%; /* Adjust to fit inside the wrapper */
+  width: 100%;
   height: 2.5rem;
   background: ${({ theme }) => theme.mainBackground};
   border: none;
@@ -51,8 +51,8 @@ const Secondary = styled(Primary)<{ $isOutline?: boolean }>`
   margin: 0;
 
   &:disabled {
-    background: transparent;
-    color: ${({ theme }) => theme.white + '40'};
+    opacity: 1;
+    background-color: ${({ theme }) => theme.mainBackground};
   }
 
   &:hover {

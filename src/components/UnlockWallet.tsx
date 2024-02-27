@@ -8,8 +8,8 @@ import { sleep } from '../utils/sleep';
 import { storage } from '../utils/storage';
 import { Button } from './Button';
 import { Input } from './Input';
-import { PandaHead } from './PandaHead';
-import { FormContainer, HeaderText } from './Reusable';
+import yoursLogo from '../assets/yours-logo.png';
+import { FormContainer, HeaderText, Text, YoursLogo } from './Reusable';
 
 const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
   display: flex;
@@ -20,7 +20,7 @@ const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
   width: ${(props) => (props.$isMobile ? '100vw' : '22.5rem')};
   height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
   margin: 0;
-  background-color: ${({ theme }) => theme.darkAccent};
+  background-color: ${({ theme }) => theme.mainBackground};
   color: ${({ theme }) => theme.white};
   z-index: 100;
 `;
@@ -61,8 +61,11 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
 
   return (
     <Container $isMobile={isMobile} theme={theme}>
-      <PandaHead animated width="4rem" />
-      <HeaderText theme={theme}>Unlock Wallet</HeaderText>
+      <YoursLogo src={yoursLogo} />
+      <HeaderText style={{ fontSize: '1.75rem' }} theme={theme}>
+        Unlock Wallet
+      </HeaderText>
+      <Text theme={theme}>An open source project.</Text>
       <FormContainer onSubmit={handleUnlock}>
         <Input
           theme={theme}
@@ -70,12 +73,11 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          style={{ marginBottom: '2rem' }}
           shake={verificationFailed ? 'true' : 'false'}
         />
         <Button
           theme={theme}
-          type="primary"
+          type="secondary-outline"
           label={isProcessing ? 'Unlocking...' : 'Unlock'}
           disabled={isProcessing}
           isSubmit

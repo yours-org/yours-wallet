@@ -7,6 +7,7 @@ export interface Theme {
   black: string;
   gray: string;
   errorRed: string;
+  warning: string;
 }
 
 export type ColorThemeProps = {
@@ -22,4 +23,5 @@ export const defaultTheme: Theme = {
   black: '#000000',
   gray: '#98A2B3',
   errorRed: '#FF4646',
+  warning: '#F79009',
 };

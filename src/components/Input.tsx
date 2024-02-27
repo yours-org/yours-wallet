@@ -21,15 +21,16 @@ const $shakeAnimation = keyframes`
 `;
 
 const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
-  background-color: ${({ theme }) => theme.gray + '20'};
+  background-color: ${({ theme }) => theme.gray + '10'};
   border-radius: 1.25rem;
-  border: 1px solid ${({ theme }) => theme.gray};
+  border: 1px solid ${({ theme }) => theme.gray + '50'};
   font-size: 0.85rem;
   width: 85%;
   height: 2rem;
   padding-left: 0.5rem;
   margin: 0.5rem;
   outline: none;
+  text-indent: 0.5rem;
   color: ${({ theme }) => theme.white + '80'};
   animation: ${(props) =>
     props.$shake === 'true'

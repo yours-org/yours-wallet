@@ -3,7 +3,7 @@ import { Text } from './Reusable';
 import { SnackbarType } from '../contexts/SnackbarContext';
 import { ColorThemeProps, Theme } from '../theme';
 import errorIcon from '../assets/error.svg';
-import infoIcon from '../assets/info.svg';
+import infoIcon from '../assets/info-dark.svg';
 import successIcon from '../assets/success.svg';
 
 type SnackBarColorTheme = ColorThemeProps & { color: string };

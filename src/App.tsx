@@ -60,7 +60,6 @@ const MainContainer = styled.div<{ $isMobile?: boolean }>`
   height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
   position: relative;
   padding: 0;
-  margin: auto;
 `;
 
 const Container = styled.div<ColorThemeProps>`

@@ -9,8 +9,8 @@ const Container = styled.div<{ color: string; $clickable: string }>`
   align-items: center;
   justify-content: space-between;
   background-color: ${(props) => props.color};
-  width: 80%;
-  padding: 0.5rem;
+  width: 85%;
+  padding: 1rem;
   border-radius: 0.5rem;
   margin: 0.25rem;
   cursor: ${(props) => (props.$clickable === 'true' ? 'pointer' : 'default')};

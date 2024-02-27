@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
-import { HeaderText, Text } from '../../components/Reusable';
+import { HeaderText, Text, YoursLogo } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useKeys } from '../../hooks/useKeys';
@@ -12,7 +12,7 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { ColorThemeProps } from '../../theme';
 import { sleep } from '../../utils/sleep';
-import copyIcon from '../../assets/copy.svg';
+import copyIcon from '../../assets/copy-green.svg';
 import yoursLogo from '../../assets/yours-logo.png';
 
 const Content = styled.div`
@@ -55,11 +55,6 @@ const CopyToClipboardContainer = styled.div<ColorThemeProps>`
 const CopyIcon = styled.img`
   width: 0.85rem;
   height: 0.85rem;
-`;
-
-const YoursLogo = styled.img`
-  width: 5rem;
-  height: 5rem;
 `;
 
 export const CreateWallet = () => {

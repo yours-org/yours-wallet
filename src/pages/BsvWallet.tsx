@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import bsvCoin from '../assets/bsv-coin.svg';
 import switchAsset from '../assets/switch-asset.svg';
-import { BackButton } from '../components/BackButton';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { PageLoader } from '../components/PageLoader';
@@ -16,8 +15,10 @@ import {
   MainContent,
   ReceiveContent,
   Text,
+  Warning,
 } from '../components/Reusable';
 import { Show } from '../components/Show';
+import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useBsv } from '../hooks/useBsv';
 import { useSnackbar } from '../hooks/useSnackbar';
@@ -29,28 +30,22 @@ import { BSV_DECIMAL_CONVERSION, HOSTED_PANDA_IMAGE } from '../utils/constants';
 import { formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import { storage } from '../utils/storage';
+import copyIcon from '../assets/copy.svg';
+import { AssetRow } from '../components/AssetRow';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  width: 80%;
+  width: 100%;
   padding: 2.75rem 1rem;
-  border-radius: 1rem;
-  border: 0.25rem solid ${({ theme }) => theme.mainBackground + '70'};
-  background-color: ${({ theme }) => theme.darkAccent};
-`;
-
-const ProfileImageContainer = styled.div`
-  position: absolute;
-  top: 10rem;
-  right: 2.25rem;
 `;
 
 const ProfileImage = styled.img`
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 3rem;
+  height: 3rem;
+  margin: 1rem;
   border-radius: 100%;
   cursor: pointer;
   transition: transform 0.3s ease;
@@ -65,24 +60,6 @@ const BalanceContainer = styled.div`
   align-items: center;
 `;
 
-const NumberWrapper = styled.span<ColorThemeProps>`
-  font-size: 2.5rem;
-  color: ${({ theme }) => theme.white};
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  font-weight: 600;
-  margin: 0.25rem 0;
-  text-align: center;
-`;
-
-const Major = styled.span`
-  font-size: inherit;
-`;
-
-const Minor = styled.span<ColorThemeProps>`
-  font-size: 1rem;
-  color: ${({ theme }) => theme.white + '80'};
-`;
-
 const Icon = styled.img<{ size?: string }>`
   width: ${(props) => props.size ?? '1.5rem'};
   height: ${(props) => props.size ?? '1.5rem'};
@@ -94,6 +71,20 @@ const InputAmountWrapper = styled.div`
   align-items: center;
   justify-content: center;
   width: 100%;
+`;
+
+const CopyAddressWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin: 2rem 0;
+`;
+
+const StyledCopy = styled.img`
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.25rem;
 `;
 
 type PageState = 'main' | 'receive' | 'send';
@@ -250,88 +241,66 @@ export const BsvWallet = (props: BsvWalletProps) => {
     }, 50);
   };
 
-  const formatBalance = (number: number) => {
-    // Convert the number to string with fixed 8 decimal places
-    const numStr = number.toFixed(8);
-
-    const [whole, decimal] = numStr.split('.');
-
-    const [firstChar, secondChar, ...rest] = decimal.split('');
-
-    const firstTwoDecimal = `${firstChar}${secondChar}`;
-    const nextThreeDecimal = rest.slice(0, 3).join('');
-    const lastThreeDecimal = rest.slice(3, 6).join('');
-
-    return (
-      <NumberWrapper theme={theme}>
-        <Major theme={theme}>{`${whole}.${firstTwoDecimal}`}</Major>
-        <Minor theme={theme}>{` ${nextThreeDecimal} ${lastThreeDecimal}`}</Minor>
-      </NumberWrapper>
-    );
-  };
-
   const receive = (
     <ReceiveContent>
-      <BackButton
+      <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
+        Receive BSV
+      </HeaderText>
+      <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
+        Only send BSV to this address. <Warning theme={theme}>Do not send Ordinals or BSV20 here.</Warning>
+      </Text>
+      <QrCode address={bsvAddress} onClick={handleCopyToClipboard} />
+      <CopyAddressWrapper onClick={handleCopyToClipboard}>
+        <StyledCopy src={copyIcon} />
+        <Text theme={theme} style={{ margin: '0', color: theme.white, fontSize: '0.75rem' }}>
+          {bsvAddress}
+        </Text>
+      </CopyAddressWrapper>
+      <Button
+        label="Go back"
+        theme={theme}
+        type="secondary"
         onClick={() => {
           setPageState('main');
           updateBsvBalance(true);
         }}
       />
-      <Icon size={'2.5rem'} src={bsvCoin} />
-      <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
-        BSV Address
-      </HeaderText>
-      <Text style={{ marginBottom: '1.25rem', fontSize: '1rem', fontWeight: 700, color: theme.errorRed }}>
-        Do not send 1Sat Ordinals or BSV20 to this address!
-      </Text>
-      <QrCode address={bsvAddress} onClick={handleCopyToClipboard} />
-      <Text theme={theme} style={{ marginTop: '1.5rem', cursor: 'pointer' }} onClick={handleCopyToClipboard}>
-        {bsvAddress}
-      </Text>
     </ReceiveContent>
   );
 
   const main = (
     <MainContent>
-      <ProfileImageContainer>
-        <ProfileImage
-          title="Refresh balance"
-          src={socialProfile?.avatar ? socialProfile.avatar : HOSTED_PANDA_IMAGE}
-          onClick={nukeUtxos}
-        />
-      </ProfileImageContainer>
       <MiddleContainer theme={theme}>
-        <BalanceContainer>
-          <Icon src={bsvCoin} />
-          {formatBalance(bsvBalance)}
-        </BalanceContainer>
-        <Text theme={theme} style={{ margin: '0.5rem 0 0 0' }}>
+        <Show when={socialProfile.avatar !== HOSTED_PANDA_IMAGE}>
+          <ProfileImage title="Refresh balance" src={socialProfile.avatar} onClick={nukeUtxos} />
+        </Show>
+        <HeaderText style={{ fontSize: '2rem', cursor: 'pointer' }} theme={theme} onClick={nukeUtxos}>
           {formatUSD(bsvBalance * exchangeRate)}
-        </Text>
+        </HeaderText>
+        <BalanceContainer>
+          <Icon src={bsvCoin} size="1rem" />
+          <Text theme={theme} style={{ margin: '0' }}>
+            {bsvBalance}
+          </Text>
+        </BalanceContainer>
+        <ButtonContainer>
+          <Button theme={theme} type="primary" label="Receive" onClick={() => setPageState('receive')} />
+          <Button theme={theme} type="primary" label="Send" onClick={() => setPageState('send')} />
+        </ButtonContainer>
+        <AssetRow bsvBalance={bsvBalance} icon={bsvCoin} ticker="BSV" usdBalance={bsvBalance * exchangeRate} />
       </MiddleContainer>
-      <ButtonContainer>
-        <Button theme={theme} type="primary" label="Receive" onClick={() => setPageState('receive')} />
-        <Button theme={theme} type="primary" label="Send" onClick={() => setPageState('send')} />
-      </ButtonContainer>
     </MainContent>
   );
 
   const send = (
     <>
-      <BackButton
-        onClick={() => {
-          setPageState('main');
-          resetSendState();
-        }}
-      />
       <ConfirmContent>
         <HeaderText theme={theme}>Send BSV</HeaderText>
         <Text
           theme={theme}
           style={{ cursor: 'pointer' }}
           onClick={fillInputWithAllBsv}
-        >{`Available Balance: ${bsvBalance}`}</Text>
+        >{`Balance: ${bsvBalance}`}</Text>
         <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
           <Input
             theme={theme}
@@ -390,9 +359,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
               onChange={(e) => setPasswordConfirm(e.target.value)}
             />
           </Show>
-          <Text theme={theme} style={{ margin: '3rem 0 1rem' }}>
-            Double check details before sending.
-          </Text>
           <Button
             theme={theme}
             type="primary"
@@ -401,12 +367,23 @@ export const BsvWallet = (props: BsvWalletProps) => {
             isSubmit
           />
         </FormContainer>
+        <Button
+          style={{ marginTop: '1rem' }}
+          label="Go back"
+          theme={theme}
+          type="secondary"
+          onClick={() => {
+            setPageState('main');
+            resetSendState();
+          }}
+        />
       </ConfirmContent>
     </>
   );
 
   return (
     <>
+      <TopNav />
       <Show when={isProcessing && pageState === 'main'}>
         <PageLoader theme={theme} message="Loading wallet..." />
       </Show>
