@@ -181,9 +181,7 @@ export const ImportWallet = () => {
       <BackButton onClick={() => navigate('/')} />
       <Content>
         <HeaderText theme={theme}>Import a WIF Wallet</HeaderText>
-        <Text style={{ margin: '1rem' }} theme={theme}>
-          Input assets directly from your WIF private keys or import a 1Sat JSON Wallet.
-        </Text>
+        <Text theme={theme}>Input assets directly from your WIF private keys or import a 1Sat JSON Wallet.</Text>
         <FormContainer onSubmit={() => setStep(2)}>
           <Input
             theme={theme}

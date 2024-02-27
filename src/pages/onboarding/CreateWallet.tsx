@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
-import { PandaHead } from '../../components/PandaHead';
 import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
@@ -14,6 +12,8 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { ColorThemeProps } from '../../theme';
 import { sleep } from '../../utils/sleep';
+import copyIcon from '../../assets/copy.svg';
+import yoursLogo from '../../assets/yours-logo.png';
 
 const Content = styled.div`
   display: flex;
@@ -33,28 +33,33 @@ const FormContainer = styled.form`
   background: none;
 `;
 
-const SeedContainer = styled.div`
-  display: flex;
-  justify-content: space-between;
-  width: 75%;
-  margin: 0.5rem 0 2rem 0;
-`;
-
-const Column = styled.div`
+const SeedContainer = styled.div<ColorThemeProps>`
   display: flex;
   flex-direction: column;
+  background-color: ${({ theme }) => theme.darkAccent};
+  border-radius: 0.5rem;
+  border: 1px solid ${({ theme }) => theme.gray + '50'};
+  width: 80%;
+  padding: 1rem;
+  margin: 0.5rem 0 1rem 0;
 `;
 
-const SeedPill = styled.div<ColorThemeProps>`
+const CopyToClipboardContainer = styled.div<ColorThemeProps>`
   display: flex;
   align-items: center;
-  background-color: ${({ theme }) => theme.darkAccent};
-  padding: 0.1rem 0 0.1rem 1rem;
-  border-radius: 1rem;
-  color: ${({ theme }) => theme.white};
-  font-size: 0.85rem;
-  margin: 0.25rem;
-  width: 6rem;
+  margin-top: 1.5rem;
+  border: none;
+  background: none;
+`;
+
+const CopyIcon = styled.img`
+  width: 0.85rem;
+  height: 0.85rem;
+`;
+
+const YoursLogo = styled.img`
+  width: 5rem;
+  height: 5rem;
 `;
 
 export const CreateWallet = () => {
@@ -102,12 +107,16 @@ export const CreateWallet = () => {
     setStep(2);
   };
 
+  const handleCopyToClipboard = (seed: string) => {
+    navigator.clipboard.writeText(seed).then(() => {
+      addSnackbar('Copied!', 'success');
+    });
+  };
+
   const passwordStep = (
     <>
       <Content>
-        <HeaderText style={{ fontSize: '1.5rem' }} theme={theme}>
-          Create password
-        </HeaderText>
+        <HeaderText theme={theme}>Create password</HeaderText>
         <Text style={{ marginBottom: '1rem' }} theme={theme}>
           This will be used to unlock your wallet.
         </Text>
@@ -138,27 +147,30 @@ export const CreateWallet = () => {
 
   const copySeedStep = (
     <>
-      <BackButton onClick={() => setStep(1)} />
       <Content>
         <HeaderText theme={theme}>Your recovery phrase</HeaderText>
         <Text theme={theme} style={{ marginBottom: '1rem' }}>
           Safely write down and store your seed phrase in a safe place.
         </Text>
-        <SeedContainer>
-          <Column>
-            {seedWords.slice(0, 6).map((word, index) => (
-              <SeedPill theme={theme} key={index}>
-                {index + 1}. {word}
-              </SeedPill>
-            ))}
-          </Column>
-          <Column>
-            {seedWords.slice(6).map((word, index) => (
-              <SeedPill theme={theme} key={index + 6}>
-                {index + 7}. {word}
-              </SeedPill>
-            ))}
-          </Column>
+        <SeedContainer theme={theme}>
+          <Text style={{ textAlign: 'left', width: '100%', margin: '0', color: theme.white }} theme={theme}>
+            {seedWords.join(' ').trim()}
+          </Text>
+          <CopyToClipboardContainer onClick={() => handleCopyToClipboard(seedWords.join(' ').trim())}>
+            <CopyIcon src={copyIcon} />
+            <Text
+              style={{
+                color: theme.primaryButton,
+                textDecoration: 'underline',
+                margin: '0 0 0 0.5rem',
+                textAlign: 'left',
+                fontSize: '0.75rem',
+              }}
+              theme={theme}
+            >
+              Copy to clipboard
+            </Text>
+          </CopyToClipboardContainer>
         </SeedContainer>
         <Button
           theme={theme}
@@ -176,10 +188,10 @@ export const CreateWallet = () => {
   const successStep = (
     <>
       <Content>
-        <PandaHead />
+        <YoursLogo src={yoursLogo} />
         <HeaderText theme={theme}>Success!</HeaderText>
         <Text theme={theme} style={{ marginBottom: '1rem' }}>
-          Panda Wallet is ready to go.
+          Your wallet is ready to go.
         </Text>
         <Button
           theme={theme}

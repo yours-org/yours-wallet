@@ -42,8 +42,8 @@ export const SnackBarContainer = styled.div<SnackBarColorTheme>`
   color: ${({ theme }) => theme.white};
   z-index: 200;
   animation:
-    ${slideIn} 0.35s ease-out,
-    ${fadeOut} 0.35s ease-out 2.5s;
+    ${slideIn} 0.25s ease-out,
+    ${fadeOut} 0.25s ease-out 2.5s;
   animation-fill-mode: forwards;
 `;
 
@@ -64,9 +64,7 @@ export type SnackbarProps = {
 export const Snackbar = (props: SnackbarProps) => {
   const { message, type, theme } = props;
   return (
-    <SnackBarContainer
-      color={type === 'error' ? theme.errorRed : type === 'info' ? theme.lightAccent : theme.primaryButton}
-    >
+    <SnackBarContainer color={type === 'error' ? theme.errorRed : type === 'info' ? theme.white : theme.lightAccent}>
       <Image src={type === 'error' ? errorIcon : type === 'info' ? infoIcon : successIcon} />
       <Text
         theme={theme}

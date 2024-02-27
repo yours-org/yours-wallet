@@ -5,10 +5,10 @@ import { useTheme } from '../hooks/useTheme';
 const Container = styled.div<{ color: string }>`
   display: flex;
   align-items: center;
-  justify-content: center;
   background-color: ${(props) => props.color};
   border-radius: 0.5rem;
   padding: 0.5rem;
+  padding-left: 1rem;
   margin: 0.25rem;
   width: 80%;
   min-height: 2rem;
@@ -28,7 +28,7 @@ export const WalletRow = (props: WalletRowTypes) => {
     <Container
       key={window.crypto.randomUUID()}
       color={containerColor}
-      onMouseEnter={() => setContainerColor(theme.darkAccent + '99')}
+      onMouseEnter={() => setContainerColor(theme.white + '10')}
       onMouseLeave={() => setContainerColor(theme.darkAccent)}
       theme={theme}
       onClick={onClick}

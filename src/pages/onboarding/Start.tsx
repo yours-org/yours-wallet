@@ -87,10 +87,7 @@ export const Start = () => {
           label="Restore Wallet"
           onClick={() => navigate('/restore-wallet')}
         />
-        <GithubIcon
-          src={gihubIcon}
-          onClick={() => window.open('https://github.com/Panda-Wallet/panda-wallet', '_blank')}
-        />
+        <GithubIcon src={gihubIcon} onClick={() => window.open('https://github.com/yours-org', '_blank')} />
       </Content>
     </Show>
   );

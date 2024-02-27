@@ -12,8 +12,8 @@ const Primary = styled.button<ColorThemeProps>`
   border: none;
   border-radius: 1.25rem;
   font-family: 'Inter', Arial, Helvetica, sans-serif;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 0.85rem;
+  font-weight: 700;
   margin: 0.5rem;
   cursor: pointer;
   transition: all 0.3s ease;

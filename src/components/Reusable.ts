@@ -2,7 +2,7 @@ import styled, { css } from 'styled-components';
 import { ColorThemeProps } from '../theme';
 
 export const HeaderText = styled.h1<ColorThemeProps>`
-  font-size: 1.75rem;
+  font-size: 1.35rem;
   color: ${({ theme }) => theme.white};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 600;
@@ -30,7 +30,7 @@ export const Text = styled.p<ColorThemeProps>`
   color: ${({ theme }) => theme.gray};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 400;
-  margin: 0.25rem 0 2rem 0;
+  margin: 0.25rem 0 1rem 0;
   text-align: center;
   width: 90%;
 `;

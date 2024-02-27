@@ -24,7 +24,7 @@ const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
   background-color: ${({ theme }) => theme.gray + '20'};
   border-radius: 1.25rem;
   border: 1px solid ${({ theme }) => theme.gray};
-  font-size: 1rem;
+  font-size: 0.85rem;
   width: 85%;
   height: 2rem;
   padding-left: 0.5rem;

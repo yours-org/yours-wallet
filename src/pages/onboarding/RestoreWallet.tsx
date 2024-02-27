@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import aymLogo from '../../assets/aym-logo.png';
-import pandaLogoWide from '../../assets/panda-logo-wide.png';
-import relayXLogo from '../../assets/relayx-logo.png';
-import twetchLogo from '../../assets/twetch-logo.png';
+import relayXLogo from '../../assets/relayx.svg';
+import twetchLogo from '../../assets/twetch.svg';
+import pandaLogo from '../../assets/panda.svg';
+import yoursWhiteLogo from '../../assets/yours-white-logo.svg';
+import yoursLogo from '../../assets/yours-logo.png';
+import otherWallet from '../../assets/other-wallet.svg';
+import wifWallet from '../../assets/wif-wallet.svg';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
-import { PandaHead } from '../../components/PandaHead';
 import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
@@ -41,11 +43,12 @@ const FormContainer = styled.form`
 
 const SeedInput = styled.textarea<ColorThemeProps & { $isExpert: boolean }>`
   background-color: ${({ theme }) => theme.darkAccent};
-  border-radius: 0.25rem;
-  border: 1px solid ${({ theme }) => theme.white + '50'};
+  border-radius: 0.5rem;
+  border: 1px solid ${({ theme }) => theme.gray + '50'};
   width: 80%;
-  height: ${(props) => (props.$isExpert ? '4rem' : '6rem')};
-  font-size: 1rem;
+  height: 4rem;
+  font-size: 0.85rem;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
   padding: 1rem;
   margin: 0.5rem;
   outline: none;
@@ -64,17 +67,37 @@ const ExpertImportWrapper = styled.div`
   width: 90%;
 `;
 
-const WalletText = styled(Text)<ColorThemeProps>`
-  color: ${({ theme }) => theme.white};
-  margin: 0;
-  font-weight: 600;
-  font-size: 1rem;
-  text-align: center;
+const WalletWrapper = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const YoursWalletContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: ${({ theme }) => theme.black};
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
 `;
 
 const WalletLogo = styled.img`
   width: auto;
-  height: 1.5rem;
+  height: 2.25rem;
+`;
+
+const WalletText = styled(Text)`
+  margin: 0 0 0 1rem;
+  text-align: left;
+  color: ${({ theme }) => theme.white};
+  font-weight: 600;
+`;
+
+const YoursLogo = styled.img`
+  width: 5rem;
+  height: 5rem;
 `;
 
 export const RestoreWallet = () => {
@@ -147,15 +170,15 @@ export const RestoreWallet = () => {
   };
 
   const getRestoreTitle = () => {
-    return importWallet === 'panda'
-      ? 'Restore Panda Wallet'
-      : importWallet === 'relayx'
-        ? 'Restore Relay Wallet'
-        : importWallet === 'twetch'
-          ? 'Restore Twetch Wallet'
-          : importWallet === 'aym'
-            ? 'Restore Aym Wallet'
-            : 'Restore a Wallet';
+    return importWallet === 'yours'
+      ? 'Restore Yours wallet'
+      : importWallet === 'panda'
+        ? 'Restore Panda wallet'
+        : importWallet === 'relayx'
+          ? 'Restore Relay wallet'
+          : importWallet === 'twetch'
+            ? 'Restore Twetch wallet'
+            : 'Restore wallet';
   };
 
   const getRestoreDescription = () => {
@@ -241,7 +264,7 @@ export const RestoreWallet = () => {
               </Text>
             </ExpertImportWrapper>
           </Show>
-          <Text theme={theme} style={{ margin: '3rem 0 1rem' }}>
+          <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
             Make sure you are in a safe place and no one is watching.
           </Text>
           <Button theme={theme} type="primary" label="Next" isSubmit />
@@ -258,23 +281,45 @@ export const RestoreWallet = () => {
           onClick={() => handleWalletSelection(wallet)}
           element={
             <>
+              <Show when={wallet === 'yours'}>
+                <WalletWrapper>
+                  <YoursWalletContainer theme={theme}>
+                    <WalletLogo src={yoursWhiteLogo} style={{ width: '1.25rem' }} />
+                  </YoursWalletContainer>
+                  <WalletText theme={theme}>Yours</WalletText>
+                </WalletWrapper>
+              </Show>
               <Show when={wallet === 'panda'}>
-                <WalletLogo src={pandaLogoWide} style={{ height: '2.25rem' }} />
+                <WalletWrapper>
+                  <YoursWalletContainer theme={theme}>
+                    <WalletLogo src={pandaLogo} style={{ width: '1.25rem', margin: '0.25rem 0 0 0.1rem' }} />
+                  </YoursWalletContainer>
+                  <WalletText theme={theme}>Panda</WalletText>
+                </WalletWrapper>
               </Show>
               <Show when={wallet === 'relayx'}>
-                <WalletLogo src={relayXLogo} style={{ height: '1,75rem' }} />
+                <WalletWrapper>
+                  <WalletLogo src={relayXLogo} />
+                  <WalletText theme={theme}>RelayX</WalletText>
+                </WalletWrapper>
               </Show>
               <Show when={wallet === 'twetch'}>
-                <WalletLogo src={twetchLogo} style={{ height: '1.25rem' }} />
-              </Show>
-              <Show when={wallet === 'aym'}>
-                <WalletLogo src={aymLogo} style={{ height: '2rem' }} />
+                <WalletWrapper>
+                  <WalletLogo src={twetchLogo} />
+                  <WalletText theme={theme}>Twetch</WalletText>
+                </WalletWrapper>
               </Show>
               <Show when={!wallet}>
-                <WalletText theme={theme}>Other Wallet</WalletText>
+                <WalletWrapper>
+                  <WalletLogo src={otherWallet} />
+                  <WalletText theme={theme}>Other</WalletText>
+                </WalletWrapper>
               </Show>
               <Show when={wallet === 'wif'}>
-                <WalletText theme={theme}>WIF (1Sat, SHUA, etc)</WalletText>
+                <WalletWrapper>
+                  <WalletLogo src={wifWallet} />
+                  <WalletText theme={theme}>Restore with private key</WalletText>
+                </WalletWrapper>
               </Show>
             </>
           }
@@ -291,7 +336,7 @@ export const RestoreWallet = () => {
         <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
           Select the wallet you'd like to restore from
         </Text>
-        {availableWallets(['panda', 'relayx', 'twetch', 'aym', undefined, 'wif'])}
+        {availableWallets(['yours', 'panda', 'relayx', 'twetch', undefined, 'wif'])}
       </Content>
     </>
   );
@@ -299,10 +344,10 @@ export const RestoreWallet = () => {
   const successStep = (
     <>
       <Content>
-        <PandaHead />
+        <YoursLogo src={yoursLogo} />
         <HeaderText theme={theme}>Success!</HeaderText>
         <Text theme={theme} style={{ marginBottom: '1rem' }}>
-          Your Panda Wallet has been restored.
+          Your wallet has been restored.
         </Text>
         <Button
           theme={theme}
