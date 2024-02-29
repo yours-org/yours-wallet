@@ -2,7 +2,6 @@ import validate from 'bitcoin-address-validation';
 import { Fragment, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { BackButton } from '../components/BackButton';
-import { BSV20Item } from '../components/BSV20Item';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Ordinal } from '../components/Ordinal';
@@ -11,7 +10,6 @@ import { QrCode } from '../components/QrCode';
 import {
   ButtonContainer,
   ConfirmContent,
-  Divider,
   FormContainer,
   HeaderText,
   ReceiveContent,
