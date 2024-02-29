@@ -1,28 +1,28 @@
 import styled from 'styled-components';
-import { Theme } from '../theme';
+import { ColorThemeProps, Theme } from '../theme';
 import { Text } from './Reusable';
 import { IconButton } from './IconButton';
-import copy from '../assets/copy.svg';
+import copyIcon from '../assets/copy.svg';
 
 const Container = styled.div`
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-direction: row;
+  justify-content: center;
   width: 100%;
   margin: 0 0;
   margin-top: 0.4rem;
   padding: 0 0;
 `;
 
-const TokenId = styled(Text)`
-  font-size: 1rem;
+const TokenId = styled(Text)<ColorThemeProps>`
+  font-size: 0.85rem;
   max-width: 16rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin: 0 0;
   width: fit-content;
+  color: ${({ theme }) => theme.gray};
 `;
 
 export type BSV20IdProps = {
@@ -38,19 +38,17 @@ function showId(id: string) {
 export const BSV20Id = (props: BSV20IdProps) => {
   const { id, theme, onCopyTokenId } = props;
 
+  const copy = (e: any) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(id);
+    onCopyTokenId();
+  };
   return (
-    <Container>
+    <Container onClick={copy}>
+      <IconButton icon={copyIcon} onClick={(e) => copy(e)}></IconButton>
       <TokenId theme={theme} title={id}>
         {showId(id)}
       </TokenId>
-      <IconButton
-        icon={copy}
-        onClick={(e) => {
-          e.stopPropagation();
-          navigator.clipboard.writeText(id);
-          onCopyTokenId();
-        }}
-      ></IconButton>
     </Container>
   );
 };

@@ -7,11 +7,12 @@ import { Button } from '../components/Button';
 import { ForwardButton } from '../components/ForwardButton';
 import { Input } from '../components/Input';
 import { QrCode } from '../components/QrCode';
-import { HeaderText, Text } from '../components/Reusable';
+import { Text } from '../components/Reusable';
 import { SettingsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
 import { SpeedBump } from '../components/SpeedBump';
 import { ToggleSwitch } from '../components/ToggleSwitch';
+import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useKeys } from '../hooks/useKeys';
 import { useSnackbar } from '../hooks/useSnackbar';
@@ -32,11 +33,6 @@ const Content = styled.div`
   height: calc(75%);
   overflow-y: auto;
   overflow-x: hidden;
-`;
-
-const HeaderWrapper = styled.div`
-  position: absolute;
-  top: 1rem;
 `;
 
 const ConnectedAppRow = styled.div<ColorThemeProps>`
@@ -446,21 +442,7 @@ export const Settings = () => {
       }
     >
       <Content>
-        <HeaderWrapper>
-          <HeaderText style={{ fontSize: '1.25rem' }} theme={theme}>
-            {page === 'connected-apps'
-              ? 'Connected Apps'
-              : page === 'social-profile'
-                ? 'Social Profile'
-                : page === 'preferences'
-                  ? 'Preferences'
-                  : page === 'export-keys-options'
-                    ? 'Export Keys'
-                    : page === 'export-keys-qr'
-                      ? 'Exported QR code'
-                      : 'Settings'}
-          </HeaderText>
-        </HeaderWrapper>
+        <TopNav />
         <Show when={page === 'main'}>{main}</Show>
         <Show when={page === 'connected-apps'}>{connectedAppsPage}</Show>
         <Show when={page === 'preferences'}>{preferencesPage}</Show>

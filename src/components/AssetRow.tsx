@@ -2,7 +2,8 @@ import { styled } from 'styled-components';
 import { useTheme } from '../hooks/useTheme';
 import { ColorThemeProps } from '../theme';
 import { HeaderText, Text } from './Reusable';
-import { formatUSD } from '../utils/format';
+import { formatNumberWithCommasAndDecimals, formatUSD } from '../utils/format';
+import { Show } from './Show';
 
 const Container = styled.div<ColorThemeProps>`
   display: flex;
@@ -12,12 +13,14 @@ const Container = styled.div<ColorThemeProps>`
   padding: 1rem 0;
   width: 90%;
   border-radius: 0.5rem;
+  margin: 0.25rem;
 `;
 
 const Icon = styled.img<{ size?: string }>`
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
   margin-left: 1rem;
+  border-radius: 50%;
 `;
 
 const TickerWrapper = styled.div`
@@ -42,29 +45,31 @@ const BalanceWrapper = styled.div`
 export type AssetRowProps = {
   icon: string;
   ticker: string;
-  bsvBalance: number;
+  balance: number;
   usdBalance: number;
 };
 
 export const AssetRow = (props: AssetRowProps) => {
-  const { icon, ticker, bsvBalance, usdBalance } = props;
+  const { icon, ticker, balance, usdBalance } = props;
   const { theme } = useTheme();
   return (
     <Container theme={theme}>
       <TickerWrapper>
-        <Icon src={icon} />
+        <Show when={!!icon && icon.length > 0}>
+          <Icon src={icon} />
+        </Show>
         <TickerTextWrapper>
           <HeaderText style={{ fontSize: '1rem' }} theme={theme}>
             {ticker}
           </HeaderText>
-          <Text style={{ margin: '0' }} theme={theme}>
+          <Text style={{ margin: '0', textAlign: 'left' }} theme={theme}>
             Balance
           </Text>
         </TickerTextWrapper>
       </TickerWrapper>
       <BalanceWrapper>
         <HeaderText style={{ textAlign: 'right', fontSize: '1rem' }} theme={theme}>
-          {bsvBalance}
+          {formatNumberWithCommasAndDecimals(balance, 0)}
         </HeaderText>
         <Text style={{ textAlign: 'right', margin: '0' }} theme={theme}>
           {formatUSD(usdBalance)}

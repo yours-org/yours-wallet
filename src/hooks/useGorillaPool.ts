@@ -49,6 +49,33 @@ export type Token = {
   fundBalance: number;
 };
 
+export type MarketResponse = {
+  txid: string;
+  vout: number;
+  outpoint: string;
+  owner: string;
+  script: string;
+  spend: string;
+  spendHeight: number;
+  spendIdx: number;
+  height: number;
+  idx: number;
+  op: string;
+  tick: string;
+  id: string;
+  sym: string;
+  dec: number;
+  icon: string;
+  amt: string;
+  status: number;
+  reason: string;
+  listing: boolean;
+  price: number;
+  pricePer: number;
+  payout: string;
+  sale: boolean;
+};
+
 export const useGorillaPool = () => {
   const { network, isAddressOnRightNetwork } = useNetwork();
 
@@ -341,6 +368,21 @@ export const useGorillaPool = () => {
     return paymentUtxos;
   };
 
+  const getTokenPriceInSats = async (tokenIds: string[]) => {
+    let result: { id: string; satPrice: number }[] = [];
+    for (const tokenId of tokenIds) {
+      const { data } = await axios.get<MarketResponse[]>(
+        `${getOrdinalsBaseUrl()}/api/bsv20/market?sort=price_per_token&dir=asc&limit=1&offset=0&${
+          tokenId.length > 30 ? 'id' : 'tick'
+        }=${tokenId}`,
+      );
+      if (data.length > 0) {
+        result.push({ id: tokenId, satPrice: data[0].pricePer });
+      }
+    }
+    return result;
+  };
+
   return {
     getOrdUtxos,
     broadcastWithGorillaPool,
@@ -355,5 +397,6 @@ export const useGorillaPool = () => {
     setDerivationTags,
     getTxOut,
     getBsv20Details,
+    getTokenPriceInSats,
   };
 };

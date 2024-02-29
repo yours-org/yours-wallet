@@ -118,6 +118,7 @@ export const useOrds = () => {
     getBsv20Balances,
     getBSV20Utxos,
     getBsv20Details,
+    getTokenPriceInSats,
   } = useGorillaPool();
   const getOrdinalsBaseUrl = () => {
     return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
@@ -817,6 +818,7 @@ export const useOrds = () => {
     listOrdinalOnGlobalOrderbook,
     cancelGlobalOrderbookListing,
     purchaseGlobalOrderbookListing,
+    getTokenPriceInSats,
   };
 };
 

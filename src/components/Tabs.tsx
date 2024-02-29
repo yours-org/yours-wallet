@@ -26,48 +26,43 @@ const TabsWrapper = styled.div`
   flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
   height: 100%;
 `;
 
-const TabButton = styled.button<ColorThemeProps & { selected: boolean }>`
+const TabButton = styled.button<ColorThemeProps & { selected: boolean; leftButton: boolean }>`
   flex: 1;
-  height: 3rem;
+  padding: 0.25rem 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
-  margin: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
-  border-top-left-radius: 0.5rem;
-  border-top-right-radius: 0.5rem;
-  color: ${(props) => props.theme.white};
-  font-size: 1rem;
-  font-weight: 500;
-  background: ${(props) => (props.selected ? props.theme.darkAccent : props.theme.darkAccent + '60')};
-  outline: none;
-  transition: border-color 0.2s ease-in;
+  border-radius: ${(props) => (props.leftButton ? '1rem 0 0 1rem' : '0 1rem 1rem 0 ')};
+  color: ${(props) => (props.selected ? props.theme.mainBackground : props.theme.white)};
+  background: ${({ theme, selected }) =>
+    selected ? `linear-gradient(45deg, ${theme.lightAccent}, ${theme.primaryButton})` : theme.darkAccent};
   border: none;
-  border-bottom: 0.15rem solid
-    ${(props) => (props.selected ? props.theme.primaryButton : props.theme.primaryButton + '30')};
-  &:hover,
-  &:focus,
-  &:active {
-    border-bottom: 0.15rem solid
-      ${(props) => (props.selected ? props.theme.primaryButton : props.theme.primaryButton + '30')};
+  transition: background-color 0.2s ease-in-out;
+
+  &:hover {
+    background: ${(props) => props.theme.primaryHover}; /* Optional: Change color on hover */
   }
 `;
 
 const TabList = styled.div<ColorThemeProps>`
   display: flex;
   flex-direction: row;
-  width: 100%;
+  width: 50%;
+  margin-top: 5rem;
+  margin-bottom: 0.5rem;
 `;
 
 const Content = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
   width: 100%;
   height: calc(100% - 3.75rem - 2.75rem);
 `;
@@ -79,19 +74,19 @@ export type TabsProps = PropsWithChildren<{
 }>;
 
 const TabsComponent = (props: TabsProps) => {
-  const { children, tabIndex, selectTab } = props;
+  const { children, tabIndex, selectTab, theme } = props;
 
   return (
     <TabsWrapper>
-      <TabList theme={props.theme} role="tablist">
+      <TabList theme={theme} role="tablist">
         {React.Children.map(children, (child, index) => {
           if (!React.isValidElement(child)) return;
-
           const { label } = child.props;
           return (
             <TabButton
               theme={props.theme}
               role="tab"
+              leftButton={index === 0}
               selected={tabIndex === index}
               aria-selected={tabIndex === index ? 'true' : 'false'}
               onClick={() => selectTab(index)}

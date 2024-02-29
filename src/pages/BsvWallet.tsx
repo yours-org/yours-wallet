@@ -287,7 +287,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           <Button theme={theme} type="primary" label="Receive" onClick={() => setPageState('receive')} />
           <Button theme={theme} type="primary" label="Send" onClick={() => setPageState('send')} />
         </ButtonContainer>
-        <AssetRow bsvBalance={bsvBalance} icon={bsvCoin} ticker="BSV" usdBalance={bsvBalance * exchangeRate} />
+        <AssetRow balance={bsvBalance} icon={bsvCoin} ticker="BSV" usdBalance={bsvBalance * exchangeRate} />
       </MiddleContainer>
     </MainContent>
   );

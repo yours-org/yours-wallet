@@ -18,6 +18,7 @@ export interface Web3ContextProps {
   bsv20s: BSV20Data;
   isPasswordRequired: boolean;
   noApprovalLimit: number | undefined;
+  exchangeRate: number;
   updateNetwork: (n: NetWork) => void;
   updateNoApprovalLimit: (amt: number) => void;
   updatePasswordRequirement: (passwordSetting: boolean) => void;
@@ -138,6 +139,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
         isPasswordRequired,
         noApprovalLimit,
         updateNoApprovalLimit,
+        exchangeRate,
       }}
     >
       {children}

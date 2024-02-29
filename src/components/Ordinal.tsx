@@ -11,14 +11,13 @@ export type OrdinalDivProps = ColorThemeProps & {
 };
 
 const OrdinalWrapper = styled.div<OrdinalDivProps>`
-  height: ${(props) => props.size ?? '9rem'};
-  width: ${(props) => props.size ?? '9rem'};
+  height: ${(props) => props.size ?? '6.5rem'};
+  width: ${(props) => props.size ?? '6.5rem'};
   background-image: url(${(props) => props.url});
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  border-radius: 0.5rem;
-  margin: 0.5rem;
+  border-radius: 1.25rem;
   cursor: pointer;
   border: ${(props) => (props.selected ? `0.3rem solid ${props.theme.lightAccent}` : undefined)};
 `;
@@ -48,8 +47,8 @@ const JsonWrapper = styled.div<OrdinalDivProps>`
   display: flex;
   align-items: center;
   justify-content: center;
-  height: ${(props) => props.size ?? '9rem'};
-  width: ${(props) => props.size ?? '9rem'};
+  height: ${(props) => props.size ?? '6.5rem'};
+  width: ${(props) => props.size ?? '6.5rem'};
   border-radius: 0.5rem;
   position: relative;
   background-color: ${(props) => props.theme.darkAccent};
@@ -69,9 +68,11 @@ export const Json = styled.pre<ColorThemeProps>`
 `;
 
 export const FlexWrapper = styled.div`
+  flex: 0 1 calc(33.333% - 1rem); // Adjust the percentage and subtraction to account for margins/gaps
   display: flex;
   flex-direction: column;
   align-items: center;
+  margin: 0.5rem;
 `;
 
 export type OrdinalProps = {
@@ -128,10 +129,10 @@ export const Ordinal = (props: OrdinalProps) => {
       <Show when={!isTransfer}>
         <Text
           theme={theme}
-          style={{ margin: '0.25rem 0', cursor: 'pointer' }}
+          style={{ margin: '0.25rem 0', cursor: 'pointer', fontSize: '0.75rem' }}
           onClick={() => window.open(url, '_blank')}
         >
-          {`#${inscription?.origin?.num}`}
+          {inscription?.origin?.data?.map?.name ?? 'Unknown name'}
         </Text>
       </Show>
     </FlexWrapper>

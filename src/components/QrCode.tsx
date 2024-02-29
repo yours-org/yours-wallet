@@ -6,6 +6,7 @@ const QrImage = styled.img`
   width: 10rem;
   height: 10rem;
   cursor: pointer;
+  border-radius: 1.5rem;
 `;
 
 export type QrCodeProps = {

@@ -6,8 +6,8 @@ import { Button } from '../components/Button';
 import { ForwardButton as RightChevron } from '../components/ForwardButton';
 import { Input } from '../components/Input';
 import { PageLoader } from '../components/PageLoader';
-import { PandaHead } from '../components/PandaHead';
-import { HeaderText, Text } from '../components/Reusable';
+import yoursLogo from '../assets/yours-logo.png';
+import { HeaderText, Text, YoursLogo } from '../components/Reusable';
 import { SettingsRow as AppsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
 import { OrdinalTxo } from '../hooks/ordTypes';
@@ -24,6 +24,7 @@ import { BSV_DECIMAL_CONVERSION, PANDA_DEV_WALLET, PROVIDER_DOCS_URL, featuredAp
 import { truncate } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import { BsvSendRequest } from './requests/BsvSendRequest';
+import { TopNav } from '../components/TopNav';
 
 const Content = styled.div`
   display: flex;
@@ -33,11 +34,6 @@ const Content = styled.div`
   height: calc(75%);
   overflow-y: auto;
   overflow-x: hidden;
-`;
-
-const HeaderWrapper = styled.div`
-  position: absolute;
-  top: 1rem;
 `;
 
 const PageWrapper = styled.div<{ $marginTop: string }>`
@@ -401,11 +397,10 @@ export const AppsAndTools = () => {
 
   const sponsorPage = (
     <PageWrapper $marginTop={'0'}>
-      <BackButton onClick={() => setPage('main')} />
-      <PandaHead width="3rem" />
+      <YoursLogo src={yoursLogo} />
       <HeaderText theme={theme}>Fund Developers</HeaderText>
       <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
-        Panda Wallet is an open-source initiative and relies on tips and sponsorships to sustain its development.
+        Yours is an open-source initiative, consider supporting the devs.
       </Text>
       <Show
         when={otherIsSelected}
@@ -433,15 +428,16 @@ export const AppsAndTools = () => {
           <Button theme={theme} type="primary" label="Submit" onClick={() => handleSubmit(Number(selectedAmount))} />
         </ButtonsWrapper>
       </Show>
-      <Text theme={theme} style={{ width: '95%', margin: '2rem 0 0 0' }}>
+      <Text theme={theme} style={{ width: '95%', margin: '2rem 0 1rem 0' }}>
         Give Monthly through Panda Wallet's transparent Open Collective.
       </Text>
       <Button
         theme={theme}
-        type="secondary"
+        type="secondary-outline"
         label="View Open Collective"
         onClick={() => window.open('https://opencollective.com/panda-wallet', '_blank')}
       />
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
     </PageWrapper>
   );
 
@@ -457,15 +453,7 @@ export const AppsAndTools = () => {
 
   return (
     <Content>
-      <HeaderWrapper>
-        <HeaderText style={{ fontSize: '1.25rem' }} theme={theme}>
-          {page === 'sponsor' || page === 'sponsor-thanks' || page === 'unlock'
-            ? ''
-            : page === 'discover-apps'
-              ? 'Discover Apps'
-              : 'Apps & Tools'}
-        </HeaderText>
-      </HeaderWrapper>
+      <TopNav />
       <Show when={isProcessing && page === 'unlock'}>
         <PageLoader theme={theme} message={isUnlocking ? 'Unlocking coins...' : 'Gathering info...'} />
       </Show>

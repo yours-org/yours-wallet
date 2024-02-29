@@ -8,7 +8,6 @@ import yoursWhiteLogo from '../../assets/yours-white-logo.svg';
 import yoursLogo from '../../assets/yours-logo.png';
 import otherWallet from '../../assets/other-wallet.svg';
 import wifWallet from '../../assets/wif-wallet.svg';
-import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -325,13 +324,19 @@ export const RestoreWallet = () => {
 
   const selectImportWallet = (
     <>
-      <BackButton onClick={() => navigate('/')} />
       <Content>
         <HeaderText theme={theme}>Restore a Wallet</HeaderText>
         <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
           Select the wallet you'd like to restore from
         </Text>
         {availableWallets(['yours', 'panda', 'relayx', 'twetch', undefined, 'wif'])}
+        <Button
+          style={{ marginTop: '1rem' }}
+          theme={theme}
+          type="secondary"
+          label="Go back"
+          onClick={() => navigate('/')}
+        />
       </Content>
     </>
   );
