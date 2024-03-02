@@ -24,8 +24,47 @@ const createPandaMethod = (type) => {
   };
 };
 
+const createPandaEventEmitter = () => {
+  const eventListeners = new Map(); // Object to store event listeners
+  const whitelistedEvents = ['signedOut', 'networkChanged']; // Whitelisted event names
+
+  const on = (eventName, callback) => {
+    // Check if the provided event name is in the whitelist
+    if (whitelistedEvents.includes(eventName)) {
+      if (!eventListeners.has(eventName)) {
+        eventListeners.set(eventName, []);
+      }
+      eventListeners.get(eventName).push(callback);
+    } else {
+      console.error('Event name is not whitelisted:', eventName);
+    }
+  };
+
+  const removeListener = (eventName, callback) => {
+    const listeners = eventListeners.get(eventName);
+    if (listeners) {
+      eventListeners.set(
+        eventName,
+        listeners.filter((fn) => fn !== callback),
+      );
+    }
+  };
+
+  return Object.freeze({
+    get eventListeners() {
+      return eventListeners;
+    },
+    get whitelistedEvents() {
+      return whitelistedEvents;
+    },
+    on,
+    removeListener,
+  });
+};
+
 window.panda = {
   isReady: true,
+  ...createPandaEventEmitter(),
   connect: createPandaMethod('connect'),
   disconnect: createPandaMethod('disconnect'),
   isConnected: createPandaMethod('isConnected'),
@@ -49,3 +88,13 @@ window.panda = {
   encrypt: createPandaMethod('encrypt'),
   decrypt: createPandaMethod('decrypt'),
 };
+
+document.addEventListener('PandaEmitEvent', (event) => {
+  const { action, params } = event.detail;
+  // Check if window.panda is defined and has event listeners for the action
+  if (window.panda && window.panda.eventListeners && window.panda.eventListeners.has(action)) {
+    const listeners = window.panda.eventListeners.get(action);
+    // Trigger each listener with the provided params
+    listeners.forEach((callback) => callback(params));
+  }
+});
