@@ -34,11 +34,12 @@ const MenuContainer = styled.div<ColorThemeProps>`
   position: relative;
 `;
 
-const Icon = styled.img<{ opacity: number }>`
+const Icon = styled.img<{ $opacity: number }>`
   width: 1.5rem;
   height: 1.5rem;
-  opacity: ${(props) => props.opacity};
+  opacity: ${(props) => props.$opacity};
   cursor: pointer;
+  margin-bottom: 0.25rem;
 `;
 
 const ContentWrapper = styled.div`
@@ -47,6 +48,11 @@ const ContentWrapper = styled.div`
   align-items: center;
   justify-content: center;
   width: 100%;
+`;
+
+const StyledText = styled(Text)<{ $opacity: number }>`
+  color: ${({ theme }) => theme.white};
+  opacity: ${(props) => props.$opacity};
 `;
 
 export type BottomMenuProps = {
@@ -70,10 +76,10 @@ const Menu = (props: MenuProps) => {
   return (
     <MenuContainer>
       <ContentWrapper>
-        <Icon src={src} onClick={onClick} opacity={opacity} />
-        <Text style={{ margin: 0, fontSize: '0.65rem', opacity: opacity }} theme={theme}>
+        <Icon src={src} onClick={onClick} $opacity={opacity} />
+        <StyledText style={{ margin: 0, fontSize: '0.65rem' }} theme={theme} $opacity={opacity}>
           {label}
-        </Text>
+        </StyledText>
         <Show when={!!badge}>
           <Badge style={{ position: 'absolute', marginTop: '-0.5rem' }}>{badge}</Badge>
         </Show>

@@ -2,7 +2,7 @@ import { useContext, useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { ThirdPartyAppRequestData, WhitelistedApp } from '../../App';
 import { Button } from '../../components/Button';
-import { ButtonContainer, Divider, HeaderText, Text } from '../../components/Reusable';
+import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { BottomMenuContext } from '../../contexts/BottomMenuContext';
 import { useBsv } from '../../hooks/useBsv';

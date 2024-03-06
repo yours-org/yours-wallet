@@ -29,9 +29,6 @@ import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { isBSV20v2, normalize, showAmount } from '../utils/ordi';
 import { sleep } from '../utils/sleep';
 import { BSV20Id } from '../components/BSV20Id';
-import checkboxChecked from '../assets/checkbox-checked.png';
-import checkboxunChecked from '../assets/checkbox-unchecked.png';
-import { IconButton } from '../components/IconButton';
 import copyIcon from '../assets/copy.svg';
 import { TopNav } from '../components/TopNav';
 import { AssetRow } from '../components/AssetRow';
@@ -173,8 +170,6 @@ export const OrdWallet = () => {
   const { isPasswordRequired, exchangeRate } = useWeb3Context();
 
   const [token, setToken] = useState<Token | null>(null);
-  const [showConfirmed, setShowConfirmed] = useState(true);
-  const [showPending, setShowPending] = useState(true);
   const [tokenSendAmount, setTokenSendAmount] = useState<bigint | null>(null);
   const [priceData, setPriceData] = useState<{ id: string; satPrice: number }[]>([]);
 
@@ -432,17 +427,11 @@ export const OrdWallet = () => {
       >
         <BSV20List>
           <BSV20Header>
-            <CheckBox>
-              <IconButton
-                icon={showConfirmed ? checkboxChecked : checkboxunChecked}
-                onClick={() => {
-                  setShowConfirmed(!showConfirmed);
-                }}
-              />
-            </CheckBox>
-            <SubHeaderText theme={theme}>Confirmed</SubHeaderText>
+            <SubHeaderText style={{ marginLeft: '1rem', color: theme.gray }} theme={theme}>
+              Confirmed
+            </SubHeaderText>
           </BSV20Header>
-          <Show when={showConfirmed}>
+          <div style={{ width: '100%' }}>
             {bsv20s.data
               .filter((d) => d.all.confirmed > 0n)
               .map((b) => {
@@ -471,21 +460,15 @@ export const OrdWallet = () => {
                   </div>
                 );
               })}
-          </Show>
+          </div>
 
           <Show when={bsv20s.data.filter((d) => d.all.pending > 0n).length > 0}>
             <BSV20Header style={{ marginTop: '2rem' }}>
-              <CheckBox>
-                <IconButton
-                  icon={showPending ? checkboxChecked : checkboxunChecked}
-                  onClick={() => {
-                    setShowPending(!showPending);
-                  }}
-                />
-              </CheckBox>
-              <SubHeaderText theme={theme}>Pending</SubHeaderText>
+              <SubHeaderText style={{ marginLeft: '1rem', color: theme.gray }} theme={theme}>
+                Pending
+              </SubHeaderText>
             </BSV20Header>
-            <Show when={showPending}>
+            <div style={{ width: '100%' }}>
               {bsv20s.data
                 .filter((d) => d.all.pending > 0n)
                 .map((b) => {
@@ -509,7 +492,7 @@ export const OrdWallet = () => {
                     </div>
                   );
                 })}
-            </Show>
+            </div>
           </Show>
         </BSV20List>
       </Show>

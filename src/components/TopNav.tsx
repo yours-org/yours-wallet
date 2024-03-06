@@ -6,6 +6,7 @@ import activeCircle from '../assets/active-circle.png';
 import { useKeys } from '../hooks/useKeys';
 import { truncate } from '../utils/format';
 import gitHubIcon from '../assets/github.svg';
+import { useSnackbar } from '../hooks/useSnackbar';
 
 const Container = styled.div`
   display: flex;
@@ -35,6 +36,14 @@ const Circle = styled.img`
 export const TopNav = () => {
   const { theme } = useTheme();
   const { bsvAddress } = useKeys();
+  const { addSnackbar } = useSnackbar();
+
+  const handleCopyToClipboard = () => {
+    navigator.clipboard.writeText(bsvAddress).then(() => {
+      addSnackbar('Copied!', 'success');
+    });
+  };
+
   return (
     <Container>
       <LogoWrapper>
@@ -43,7 +52,11 @@ export const TopNav = () => {
           /
         </Text>
         <Circle src={activeCircle} />
-        <Text style={{ margin: '0 0 0 0.25rem', color: theme.white, fontSize: '0.75rem' }} theme={theme}>
+        <Text
+          style={{ margin: '0 0 0 0.25rem', color: theme.white, fontSize: '0.75rem' }}
+          theme={theme}
+          onClick={handleCopyToClipboard}
+        >
           {truncate(bsvAddress, 5, 5)}
         </Text>
       </LogoWrapper>

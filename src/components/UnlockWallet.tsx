@@ -65,7 +65,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       <HeaderText style={{ fontSize: '1.75rem' }} theme={theme}>
         Unlock Wallet
       </HeaderText>
-      <Text theme={theme}>An open source project.</Text>
+      <Text theme={theme}>Use password to unlock your wallet.</Text>
       <FormContainer onSubmit={handleUnlock}>
         <Input
           theme={theme}

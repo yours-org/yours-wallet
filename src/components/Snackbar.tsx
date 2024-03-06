@@ -10,7 +10,7 @@ type SnackBarColorTheme = ColorThemeProps & { color: string };
 
 const slideIn = keyframes`
   from {
-    bottom: -100px;
+    bottom: -15px;
     opacity: 0;
   }
   to {

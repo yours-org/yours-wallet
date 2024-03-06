@@ -22,6 +22,9 @@ export const SNACKBAR_TIMEOUT = 3 * 1000; // 2.5 seconds
 export const HOSTED_PANDA_IMAGE = 'https://i.ibb.co/3fLL5X2/Panda-Wallet-Logo.png';
 export const PANDA_DEV_WALLET = '1MtzWXQEYGp89bQ9U2nfrnuChFv37j6pV6';
 export const PROVIDER_DOCS_URL = 'https://panda-wallet.gitbook.io/provider-api/intro/introduction';
+export const PANDA_GITHUB_REPO = 'https://github.com/Panda-Wallet/panda-wallet';
+export const YOURS_GITHUB_WALLET_REPO = 'https://github.com/yours-org/yours-wallet';
+export const YOURS_GITHUB_REPOS = 'https://github.com/orgs/yours-org/repositories';
 
 export const DEFAULT_WALLET_PATH = "m/44'/236'/0'/1/0";
 export const DEFAULT_ORD_PATH = "m/44'/236'/1'/0/0";

@@ -1,13 +1,16 @@
+// IMPORTANT NOTE: Uncomment everything that is commented back out to re-enable the sponser page should it ever make sense
+
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import externalLink from '../assets/external-link.svg';
-import { BackButton } from '../components/BackButton';
 import { Button } from '../components/Button';
 import { ForwardButton as RightChevron } from '../components/ForwardButton';
 import { Input } from '../components/Input';
 import { PageLoader } from '../components/PageLoader';
-import yoursLogo from '../assets/yours-logo.png';
-import { HeaderText, Text, YoursLogo } from '../components/Reusable';
+// import yoursLogo from '../assets/yours-logo.png';
+// import { HeaderText, Text, YoursLogo } from '../components/Reusable';
+// import { HeaderText, Text } from '../components/Reusable';
+import { Text } from '../components/Reusable';
 import { SettingsRow as AppsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
 import { OrdinalTxo } from '../hooks/ordTypes';
@@ -20,10 +23,11 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useWhatsOnChain } from '../hooks/useWhatsOnChain';
 import { ColorThemeProps } from '../theme';
-import { BSV_DECIMAL_CONVERSION, PANDA_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
+// import { BSV_DECIMAL_CONVERSION, PANDA_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, featuredApps, YOURS_GITHUB_REPOS, PANDA_GITHUB_REPO } from '../utils/constants';
 import { truncate } from '../utils/format';
 import { sleep } from '../utils/sleep';
-import { BsvSendRequest } from './requests/BsvSendRequest';
+// import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { AssetRow } from '../components/AssetRow';
 import bsvCoin from '../assets/bsv-coin.svg';
@@ -46,19 +50,19 @@ const PageWrapper = styled.div<{ $marginTop: string }>`
   width: 100%;
 `;
 
-const AmountsWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-`;
+// const AmountsWrapper = styled.div`
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   flex-wrap: wrap;
+// `;
 
-const ButtonsWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 90%;
-`;
+// const ButtonsWrapper = styled.div`
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   width: 90%;
+// `;
 
 const ScrollableContainer = styled.div`
   display: flex;
@@ -132,17 +136,18 @@ type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unloc
 export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
-  const { exchangeRate, identityAddress } = useBsv();
+  // const { exchangeRate, identityAddress } = useBsv();
+  const { identityAddress } = useBsv();
   const { getLockedUtxos, getSpentTxids } = useGorillaPool();
   const { getChainInfo } = useWhatsOnChain();
   const { isPasswordRequired } = usePasswordSetting();
   const { addSnackbar } = useSnackbar();
   const { unlock, isProcessing, setIsProcessing } = useContracts();
   const [page, setPage] = useState<AppsPage>('main');
-  const [otherIsSelected, setOtherIsSelected] = useState(false);
-  const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
-  const [satAmount, setSatAmount] = useState(0);
-  const [didSubmit, setDidSubmit] = useState(false);
+  // const [otherIsSelected, setOtherIsSelected] = useState(false);
+  // const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
+  // const [satAmount, setSatAmount] = useState(0);
+  // const [didSubmit, setDidSubmit] = useState(false);
   const [lockedUtxos, setLockedUtxos] = useState<OrdinalTxo[]>([]);
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
   const [totalLocked, setTotalLocked] = useState(0);
@@ -188,17 +193,17 @@ export const AppsAndTools = () => {
     setSelected('apps');
   }, [setSelected]);
 
-  useEffect(() => {
-    if (!satAmount) return;
-    setDidSubmit(true);
-  }, [satAmount]);
+  // useEffect(() => {
+  //   if (!satAmount) return;
+  //   setDidSubmit(true);
+  // }, [satAmount]);
 
-  const handleSubmit = (amount: number) => {
-    if (!amount || !exchangeRate) return;
+  // const handleSubmit = (amount: number) => {
+  //   if (!amount || !exchangeRate) return;
 
-    const satAmount = Math.round((amount / exchangeRate) * BSV_DECIMAL_CONVERSION);
-    setSatAmount(satAmount);
-  };
+  //   const satAmount = Math.round((amount / exchangeRate) * BSV_DECIMAL_CONVERSION);
+  //   setSatAmount(satAmount);
+  // };
 
   const toggleShowingLockDetails = () => setShowingLockDetails(!showingLockDetails);
 
@@ -246,12 +251,12 @@ export const AppsAndTools = () => {
 
   const main = (
     <>
-      <AppsRow
+      {/* <AppsRow
         name="Make a Difference"
         description="Fund Panda Wallet's open source developers"
         onClick={() => setPage('sponsor')}
         jsxElement={<RightChevron />}
-      />
+      /> */}
       <AppsRow
         name="Unlock Coins"
         description="Unlock the coins you've locked"
@@ -267,7 +272,7 @@ export const AppsAndTools = () => {
       <AppsRow
         name="Contribute or integrate"
         description="All the tools you need to get involved"
-        onClick={() => window.open(PROVIDER_DOCS_URL, '_blank')}
+        onClick={() => window.open(PANDA_GITHUB_REPO, '_blank')}
         jsxElement={<ExternalLinkIcon src={externalLink} />}
       />
     </>
@@ -358,7 +363,7 @@ export const AppsAndTools = () => {
       <Show when={featuredApps.length > 0} whenFalseContent={<Text theme={theme}>No apps</Text>}>
         <Text theme={theme} style={{ marginBottom: 0 }}>
           If your app has integrated Yours Wallet but is not listed,{' '}
-          <a href="https://twitter.com/wallet_panda" rel="noreferrer" target="_blank" style={{ color: theme.white }}>
+          <a href={YOURS_GITHUB_REPOS} rel="noreferrer" target="_blank" style={{ color: theme.white }}>
             let us know!
           </a>
         </Text>
@@ -386,82 +391,82 @@ export const AppsAndTools = () => {
     </PageWrapper>
   );
 
-  const generateButtons = (amounts: string[]) => {
-    return amounts.map((amt, idx) => {
-      return (
-        <Button
-          key={`${amt}_${idx}`}
-          theme={theme}
-          style={{ maxWidth: '5rem' }}
-          type="primary"
-          label={amt === 'Other' ? amt : `$${amt}`}
-          onClick={() => {
-            if (amt === 'Other') {
-              setOtherIsSelected(true);
-            } else {
-              handleSubmit(Number(amt));
-            }
-          }}
-        />
-      );
-    });
-  };
+  // const generateButtons = (amounts: string[]) => {
+  //   return amounts.map((amt, idx) => {
+  //     return (
+  //       <Button
+  //         key={`${amt}_${idx}`}
+  //         theme={theme}
+  //         style={{ maxWidth: '5rem' }}
+  //         type="primary"
+  //         label={amt === 'Other' ? amt : `$${amt}`}
+  //         onClick={() => {
+  //           if (amt === 'Other') {
+  //             setOtherIsSelected(true);
+  //           } else {
+  //             handleSubmit(Number(amt));
+  //           }
+  //         }}
+  //       />
+  //     );
+  //   });
+  // };
 
-  const sponsorPage = (
-    <PageWrapper $marginTop={'0'}>
-      <YoursLogo src={yoursLogo} />
-      <HeaderText theme={theme}>Fund Developers</HeaderText>
-      <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
-        Yours is an open-source initiative, consider supporting the devs.
-      </Text>
-      <Show
-        when={otherIsSelected}
-        whenFalseContent={
-          <AmountsWrapper>{generateButtons(['25', '50', '100', '250', '500', 'Other'])}</AmountsWrapper>
-        }
-      >
-        <Input
-          theme={theme}
-          placeholder={'Enter USD Amount'}
-          type="number"
-          step="1"
-          value={selectedAmount !== null && selectedAmount !== undefined ? selectedAmount : ''}
-          onChange={(e) => {
-            const inputValue = e.target.value;
-            if (inputValue === '') {
-              setSelectedAmount(null);
-            } else {
-              setSelectedAmount(Number(inputValue));
-            }
-          }}
-        />
-        <ButtonsWrapper>
-          <Button theme={theme} type="warn" label="Cancel" onClick={() => setOtherIsSelected(false)} />
-          <Button theme={theme} type="primary" label="Submit" onClick={() => handleSubmit(Number(selectedAmount))} />
-        </ButtonsWrapper>
-      </Show>
-      <Text theme={theme} style={{ width: '95%', margin: '2rem 0 1rem 0' }}>
-        Give Monthly through Panda Wallet's transparent Open Collective.
-      </Text>
-      <Button
-        theme={theme}
-        type="secondary-outline"
-        label="View Open Collective"
-        onClick={() => window.open('https://opencollective.com/panda-wallet', '_blank')}
-      />
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
-    </PageWrapper>
-  );
+  // const sponsorPage = (
+  //   <PageWrapper $marginTop={'0'}>
+  //     <YoursLogo src={yoursLogo} />
+  //     <HeaderText theme={theme}>Fund Developers</HeaderText>
+  //     <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
+  //       Yours is an open-source initiative, consider supporting the devs.
+  //     </Text>
+  //     <Show
+  //       when={otherIsSelected}
+  //       whenFalseContent={
+  //         <AmountsWrapper>{generateButtons(['25', '50', '100', '250', '500', 'Other'])}</AmountsWrapper>
+  //       }
+  //     >
+  //       <Input
+  //         theme={theme}
+  //         placeholder={'Enter USD Amount'}
+  //         type="number"
+  //         step="1"
+  //         value={selectedAmount !== null && selectedAmount !== undefined ? selectedAmount : ''}
+  //         onChange={(e) => {
+  //           const inputValue = e.target.value;
+  //           if (inputValue === '') {
+  //             setSelectedAmount(null);
+  //           } else {
+  //             setSelectedAmount(Number(inputValue));
+  //           }
+  //         }}
+  //       />
+  //       <ButtonsWrapper>
+  //         <Button theme={theme} type="warn" label="Cancel" onClick={() => setOtherIsSelected(false)} />
+  //         <Button theme={theme} type="primary" label="Submit" onClick={() => handleSubmit(Number(selectedAmount))} />
+  //       </ButtonsWrapper>
+  //     </Show>
+  //     <Text theme={theme} style={{ width: '95%', margin: '2rem 0 1rem 0' }}>
+  //       Give Monthly through Panda Wallet's transparent Open Collective.
+  //     </Text>
+  //     <Button
+  //       theme={theme}
+  //       type="secondary-outline"
+  //       label="View Open Collective"
+  //       onClick={() => window.open('https://opencollective.com/panda-wallet', '_blank')}
+  //     />
+  //     <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
+  //   </PageWrapper>
+  // );
 
-  const thankYouSponsorPage = (
-    <PageWrapper $marginTop={'8rem'}>
-      <BackButton onClick={() => setPage('main')} />
-      <HeaderText theme={theme}>🙏 Thank You</HeaderText>
-      <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
-        Your contribution has been received.
-      </Text>
-    </PageWrapper>
-  );
+  // const thankYouSponsorPage = (
+  //   <PageWrapper $marginTop={'8rem'}>
+  //     <BackButton onClick={() => setPage('main')} />
+  //     <HeaderText theme={theme}>🙏 Thank You</HeaderText>
+  //     <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
+  //       Your contribution has been received.
+  //     </Text>
+  //   </PageWrapper>
+  // );
 
   return (
     <Content>
@@ -470,11 +475,11 @@ export const AppsAndTools = () => {
         <PageLoader theme={theme} message={isUnlocking ? 'Unlocking coins...' : 'Gathering info...'} />
       </Show>
       <Show when={page === 'main'}>{main}</Show>
-      <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show>
-      <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show>
+      {/* <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show> */}
+      {/* <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show> */}
       <Show when={!isProcessing && page === 'unlock'}>{unlockPage}</Show>
       <Show when={page === 'discover-apps'}>{discoverAppsPage}</Show>
-      <Show when={page === 'sponsor' && didSubmit}>
+      {/* <Show when={page === 'sponsor' && didSubmit}>
         <BsvSendRequest
           web3Request={[{ address: PANDA_DEV_WALLET, satoshis: satAmount }]}
           popupId={undefined}
@@ -484,7 +489,7 @@ export const AppsAndTools = () => {
           }}
           requestWithinApp
         />
-      </Show>
+      </Show> */}
     </Content>
   );
 };

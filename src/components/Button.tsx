@@ -6,7 +6,7 @@ export type ButtonStyles = 'primary' | 'secondary' | 'secondary-outline' | 'warn
 
 const Primary = styled.button<ColorThemeProps>`
   width: 87%;
-  height: 2.5rem;
+  height: 2.25rem;
   background: linear-gradient(45deg, ${({ theme }) => theme.lightAccent}, ${({ theme }) => theme.primaryButton});
   color: ${({ theme }) => theme.mainBackground};
   border: none;
@@ -42,7 +42,7 @@ const GradientBorderWrapper = styled.div<ColorThemeProps>`
 
 const SecondaryOutline = styled(Primary)<{ $isOutline?: boolean }>`
   width: 100%;
-  height: 2.5rem;
+  height: 2.25rem;
   background: ${({ theme }) => theme.mainBackground};
   border: none;
   color: ${(props) => (props.$isOutline ? props.theme.white : props.theme.gray)};

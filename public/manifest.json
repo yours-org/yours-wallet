@@ -1,12 +1,12 @@
 {
   "version": "2.11.4",
   "manifest_version": 3,
-  "name": "Panda Wallet",
+  "name": "Yours Wallet",
   "description": "A non-custodial and open-source wallet for BSV and 1Sat Ordinals",
   "permissions": ["storage", "unlimitedStorage"],
   "action": {
     "default_popup": "index.html",
-    "default_title": "Panda Wallet"
+    "default_title": "Yours Wallet"
   },
   "background": {
     "service_worker": "background.js",
