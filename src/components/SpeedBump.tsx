@@ -20,7 +20,7 @@ const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
   width: ${(props) => (props.$isMobile ? '100vw' : '22.5rem')};
   height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
   margin: 0;
-  background-color: ${({ theme }) => theme.darkAccent};
+  background-color: ${({ theme }) => theme.mainBackground};
   color: ${({ theme }) => theme.white};
   z-index: 100;
 `;
@@ -86,7 +86,7 @@ export const SpeedBump = (props: SpeedBumpProps) => {
         />
       </Show>
       <ButtonContainer>
-        <Button theme={theme} type="warn" label="Confirm" onClick={handleConfirm} />
+        <Button theme={theme} type="secondary-outline" label="Confirm" onClick={handleConfirm} />
         <Button theme={theme} type="primary" label="Cancel" onClick={onCancel} />
       </ButtonContainer>
     </>

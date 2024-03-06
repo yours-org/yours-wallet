@@ -1,6 +1,6 @@
 {
-  "short_name": "Panda Wallet",
-  "name": "Panda Wallet",
+  "short_name": "Yours",
+  "name": "Yours Wallet",
   "description": "A non-custodial and open-source wallet for BSV and 1Sat Ordinals",
   "start_url": "./index.html",
   "display": "standalone",

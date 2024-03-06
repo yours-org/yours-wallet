@@ -26,6 +26,7 @@ const MenuContainer = styled.div<ColorThemeProps>`
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   width: 100%;
   height: 3.75rem;
   bottom: 0;
@@ -70,7 +71,7 @@ const Menu = (props: MenuProps) => {
     <MenuContainer>
       <ContentWrapper>
         <Icon src={src} onClick={onClick} opacity={opacity} />
-        <Text style={{ fontSize: '0.65rem', opacity: opacity }} theme={theme}>
+        <Text style={{ margin: 0, fontSize: '0.65rem', opacity: opacity }} theme={theme}>
           {label}
         </Text>
         <Show when={!!badge}>

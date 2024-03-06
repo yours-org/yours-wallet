@@ -40,7 +40,7 @@ const GradientBorderWrapper = styled.div<ColorThemeProps>`
   margin: 0.5rem;
 `;
 
-const Secondary = styled(Primary)<{ $isOutline?: boolean }>`
+const SecondaryOutline = styled(Primary)<{ $isOutline?: boolean }>`
   width: 100%;
   height: 2.5rem;
   background: ${({ theme }) => theme.mainBackground};
@@ -58,6 +58,10 @@ const Secondary = styled(Primary)<{ $isOutline?: boolean }>`
   &:hover {
     transform: none;
   }
+`;
+
+const Secondary = styled(SecondaryOutline)`
+  margin: 0.5rem 0 0 0;
 `;
 
 const Warn = styled(Primary)`
@@ -96,7 +100,7 @@ export const Button = (props: ButtonProps) => {
       </Show>
       <Show when={type === 'secondary-outline'}>
         <GradientBorderWrapper theme={theme}>
-          <Secondary
+          <SecondaryOutline
             theme={theme}
             disabled={disabled}
             onClick={onClick}
@@ -105,7 +109,7 @@ export const Button = (props: ButtonProps) => {
             $isOutline
           >
             {label}
-          </Secondary>
+          </SecondaryOutline>
         </GradientBorderWrapper>
       </Show>
       <Show when={type === 'secondary'}>

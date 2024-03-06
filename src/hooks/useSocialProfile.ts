@@ -18,7 +18,7 @@ export const useSocialProfile = () => {
       return new Promise((resolve, reject) => {
         storage.get(['socialProfile'], async (result) => {
           try {
-            if (result?.socialProfile && !window.location.href.includes('localhost')) {
+            if (result?.socialProfile) {
               setSocialProfile(result.socialProfile);
             }
             resolve(result.socialProfile);

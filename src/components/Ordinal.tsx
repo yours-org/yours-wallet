@@ -19,7 +19,7 @@ const OrdinalWrapper = styled.div<OrdinalDivProps>`
   background-repeat: no-repeat;
   border-radius: 1.25rem;
   cursor: pointer;
-  border: ${(props) => (props.selected ? `0.3rem solid ${props.theme.lightAccent}` : undefined)};
+  border: ${(props) => (props.selected ? `0.1rem solid ${props.theme.lightAccent}` : undefined)};
 `;
 
 const TextWrapper = styled(OrdinalWrapper)`
@@ -54,7 +54,7 @@ const JsonWrapper = styled.div<OrdinalDivProps>`
   background-color: ${(props) => props.theme.darkAccent};
   margin: 0.5rem;
   cursor: pointer;
-  border: ${(props) => (props.selected ? `0.3rem solid ${props.theme.lightAccent}` : undefined)};
+  border: ${(props) => (props.selected ? `0.1rem solid ${props.theme.lightAccent}` : undefined)};
   overflow: auto;
 `;
 

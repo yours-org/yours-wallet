@@ -30,7 +30,7 @@ const TabsWrapper = styled.div`
   height: 100%;
 `;
 
-const TabButton = styled.button<ColorThemeProps & { selected: boolean; leftButton: boolean }>`
+const TabButton = styled.button<ColorThemeProps & { $selected: boolean; $leftButton: boolean }>`
   flex: 1;
   padding: 0.25rem 1rem;
   display: flex;
@@ -39,10 +39,10 @@ const TabButton = styled.button<ColorThemeProps & { selected: boolean; leftButto
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  border-radius: ${(props) => (props.leftButton ? '1rem 0 0 1rem' : '0 1rem 1rem 0 ')};
-  color: ${(props) => (props.selected ? props.theme.mainBackground : props.theme.white)};
-  background: ${({ theme, selected }) =>
-    selected ? `linear-gradient(45deg, ${theme.lightAccent}, ${theme.primaryButton})` : theme.darkAccent};
+  border-radius: ${(props) => (props.$leftButton ? '1rem 0 0 1rem' : '0 1rem 1rem 0 ')};
+  color: ${(props) => (props.$selected ? props.theme.mainBackground : props.theme.white)};
+  background: ${({ theme, $selected }) =>
+    $selected ? `linear-gradient(45deg, ${theme.lightAccent}, ${theme.primaryButton})` : theme.darkAccent};
   border: none;
   transition: background-color 0.2s ease-in-out;
 
@@ -86,8 +86,8 @@ const TabsComponent = (props: TabsProps) => {
             <TabButton
               theme={props.theme}
               role="tab"
-              leftButton={index === 0}
-              selected={tabIndex === index}
+              $leftButton={index === 0}
+              $selected={tabIndex === index}
               aria-selected={tabIndex === index ? 'true' : 'false'}
               onClick={() => selectTab(index)}
             >
@@ -96,7 +96,6 @@ const TabsComponent = (props: TabsProps) => {
           );
         })}
       </TabList>
-
       <Content>{React.Children.map(children, (comp, index) => (tabIndex === index ? comp : undefined))}</Content>
     </TabsWrapper>
   );

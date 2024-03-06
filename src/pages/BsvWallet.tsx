@@ -43,9 +43,9 @@ const MiddleContainer = styled.div<ColorThemeProps>`
 `;
 
 const ProfileImage = styled.img`
-  width: 3rem;
-  height: 3rem;
-  margin: 1rem;
+  width: 4rem;
+  height: 4rem;
+  margin: 0.25rem;
   border-radius: 100%;
   cursor: pointer;
   transition: transform 0.3s ease;
@@ -368,7 +368,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
           />
         </FormContainer>
         <Button
-          style={{ marginTop: '1rem' }}
           label="Go back"
           theme={theme}
           type="secondary"

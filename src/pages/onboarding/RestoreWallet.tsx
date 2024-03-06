@@ -330,13 +330,7 @@ export const RestoreWallet = () => {
           Select the wallet you'd like to restore from
         </Text>
         {availableWallets(['yours', 'panda', 'relayx', 'twetch', undefined, 'wif'])}
-        <Button
-          style={{ marginTop: '1rem' }}
-          theme={theme}
-          type="secondary"
-          label="Go back"
-          onClick={() => navigate('/')}
-        />
+        <Button theme={theme} type="secondary" label="Go back" onClick={() => navigate('/')} />
       </Content>
     </>
   );

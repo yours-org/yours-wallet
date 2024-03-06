@@ -315,7 +315,6 @@ export const Settings = () => {
 
   const connectedAppsPage = (
     <PageWrapper $marginTop={connectedApps.length === 0 ? '10rem' : '-1rem'}>
-      <BackButton onClick={() => setPage('main')} />
       <Show when={connectedApps.length > 0} whenFalseContent={<Text theme={theme}>No apps connected</Text>}>
         <ScrollableContainer>
           {connectedApps.map((app, idx) => {
@@ -331,23 +330,23 @@ export const Settings = () => {
           })}
         </ScrollableContainer>
       </Show>
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
     </PageWrapper>
   );
 
   const exportKeysAsQrCodePage = (
     <>
-      <BackButton onClick={() => setPage('main')} />
       <Show when={shouldVisibleExportedKeys} whenFalseContent={<Text theme={theme}>Timed out. Please try again</Text>}>
         <ExportKeysAsQrCodeContainer>
           <QrCode address={exportKeysQrData} />
         </ExportKeysAsQrCodeContainer>
       </Show>
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
     </>
   );
 
   const exportKeyOptionsPage = (
     <>
-      <BackButton onClick={() => setPage('main')} />
       <SettingsRow
         name="Download Keys"
         description="Download your seed, private, and public keys"
@@ -358,12 +357,12 @@ export const Settings = () => {
         description="Display private keys as QR code for mobile import"
         onClick={handleExportKeysAsQrCodeIntent}
       />
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
     </>
   );
 
   const preferencesPage = (
     <>
-      <BackButton onClick={() => setPage('main')} />
       <SettingsRow
         name="Social Profile"
         description="Set your display name and avatar"
@@ -395,6 +394,7 @@ export const Settings = () => {
           />
         }
       />
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
     </>
   );
 

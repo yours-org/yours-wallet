@@ -25,6 +25,8 @@ import { truncate } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
+import { AssetRow } from '../components/AssetRow';
+import bsvCoin from '../assets/bsv-coin.svg';
 
 const Content = styled.div`
   display: flex;
@@ -67,6 +69,7 @@ const ScrollableContainer = styled.div`
   overflow-x: hidden;
   width: 100%;
   padding: 1rem;
+  margin-top: 1rem;
 `;
 
 const DiscoverAppsRow = styled.div<ColorThemeProps>`
@@ -285,21 +288,14 @@ export const AppsAndTools = () => {
   );
 
   const unlockPage = (
-    <PageWrapper $marginTop={'1rem'}>
-      <BackButton onClick={() => setPage('main')} />
-      <HeaderText style={{ fontSize: '2.5rem' }} theme={theme}>
-        🔐
-      </HeaderText>
-      <HeaderText theme={theme}>Unlock Coins</HeaderText>
-      <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
-        Unlock coins you've previously locked up!
-      </Text>
-      <Text theme={theme} style={{ margin: '0.25rem', color: theme.white, fontSize: '1rem', fontWeight: 600 }}>
-        {`Total Locked: ${totalLocked / BSV_DECIMAL_CONVERSION} BSV`}
-      </Text>
-      <Text theme={theme} style={{ margin: '0.25rem 0 1rem', color: theme.white, fontSize: '1rem', fontWeight: 600 }}>
-        {`Unlockable: ${totalUnlockable / BSV_DECIMAL_CONVERSION} BSV`}
-      </Text>
+    <PageWrapper $marginTop={'7rem'}>
+      <AssetRow
+        ticker="Total Locked"
+        balance={totalLocked / BSV_DECIMAL_CONVERSION}
+        usdBalance={Number((totalUnlockable / BSV_DECIMAL_CONVERSION).toFixed(3))}
+        icon={bsvCoin}
+        isUnlockPage
+      />
       <Show when={isPasswordRequired}>
         <Input
           theme={theme}
@@ -320,7 +316,17 @@ export const AppsAndTools = () => {
         type="secondary"
         label={showingLockDetails ? 'Hide Pending' : 'Show Pending'}
         onClick={toggleShowingLockDetails}
+        style={{ marginBottom: showingLockDetails ? '1rem' : '0' }}
       />
+      <Show when={!showingLockDetails}>
+        <Button
+          style={{ marginTop: '0.5rem' }}
+          theme={theme}
+          type="secondary"
+          label={'Go back'}
+          onClick={() => setPage('main')}
+        />
+      </Show>
       <Show when={showingLockDetails}>
         {headerLockDetailsRow}
         {lockedUtxos
@@ -349,10 +355,9 @@ export const AppsAndTools = () => {
 
   const discoverAppsPage = (
     <PageWrapper $marginTop={featuredApps.length === 0 ? '10rem' : '0'}>
-      <BackButton onClick={() => setPage('main')} />
       <Show when={featuredApps.length > 0} whenFalseContent={<Text theme={theme}>No apps</Text>}>
         <Text theme={theme} style={{ marginBottom: 0 }}>
-          If your app has integrated Panda Wallet but is not listed,{' '}
+          If your app has integrated Yours Wallet but is not listed,{' '}
           <a href="https://twitter.com/wallet_panda" rel="noreferrer" target="_blank" style={{ color: theme.white }}>
             let us know!
           </a>
@@ -369,6 +374,13 @@ export const AppsAndTools = () => {
               </DiscoverAppsRow>
             );
           })}
+          <Button
+            style={{ marginTop: '2rem' }}
+            theme={theme}
+            type="secondary"
+            label={'Go back'}
+            onClick={() => setPage('main')}
+          />
         </ScrollableContainer>
       </Show>
     </PageWrapper>

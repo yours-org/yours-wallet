@@ -10,13 +10,14 @@ import { useOrds } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { storage } from '../../utils/storage';
+import greenCheck from '../../assets/green-check.svg';
+import { ColorThemeProps } from '../../theme';
 
 const Container = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
-  margin-bottom: 4rem;
 `;
 
 const Icon = styled.img<{ size: string }>`
@@ -24,6 +25,27 @@ const Icon = styled.img<{ size: string }>`
   height: ${(props) => props.size};
   margin: 0 0 1rem 0;
   border-radius: 0.5rem;
+`;
+
+const PermissionsContainer = styled.div<ColorThemeProps>`
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  width: 75%;
+  background-color: ${({ theme }) => theme.darkAccent};
+  border-radius: 0.75rem;
+  margin: 1rem 0 1.5rem 0;
+`;
+
+const Permission = styled.div`
+  display: flex;
+  align-items: center;
+  margin: 0.5rem;
+`;
+
+const CheckMark = styled.img`
+  width: 1rem;
+  height: 1rem;
 `;
 
 export type ConnectRequestProps = {
@@ -110,7 +132,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
     storage.remove('connectRequest');
     setTimeout(() => {
       if (popupId) chrome.windows.remove(popupId);
-    }, 2000);
+    }, 100);
   };
 
   return (
@@ -132,34 +154,36 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
         <Text theme={theme} style={{ marginBottom: '1rem' }}>
           {thirdPartyAppRequestData?.domain}
         </Text>
-        <Divider />
-        <Text style={{ color: theme.white, margin: 0 }}>
-          The app is requesting to view your wallet balance and request approval for transactions.
-        </Text>
-
-        <Divider />
-        <ButtonContainer style={{ position: 'absolute', bottom: 0 }}>
-          <Button
-            theme={theme}
-            type="warn"
-            label="Cancel"
-            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-              e.stopPropagation();
-              handleConnectDecision(false);
-              onDecision();
-            }}
-          />
-          <Button
-            theme={theme}
-            type="primary"
-            label="Connect"
-            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-              e.stopPropagation();
-              handleConnectDecision(true);
-              onDecision();
-            }}
-          />
-        </ButtonContainer>
+        <PermissionsContainer theme={theme}>
+          <Permission>
+            <CheckMark style={{ marginRight: '1rem' }} src={greenCheck} />
+            <Text style={{ color: theme.white, margin: 0, textAlign: 'left' }}>View your wallet public keys</Text>
+          </Permission>
+          <Permission>
+            <CheckMark style={{ marginRight: '1rem' }} src={greenCheck} />
+            <Text style={{ color: theme.white, margin: 0, textAlign: 'left' }}>Request approval for transactions</Text>
+          </Permission>
+        </PermissionsContainer>
+        <Button
+          theme={theme}
+          type="primary"
+          label="Connect"
+          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+            e.stopPropagation();
+            handleConnectDecision(true);
+            onDecision();
+          }}
+        />
+        <Button
+          theme={theme}
+          type="secondary-outline"
+          label="Cancel"
+          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+            e.stopPropagation();
+            handleConnectDecision(false);
+            onDecision();
+          }}
+        />
       </Container>
     </Show>
   );

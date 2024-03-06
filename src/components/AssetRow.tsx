@@ -40,6 +40,7 @@ const BalanceWrapper = styled.div`
   flex-direction: column;
   align-items: flex-end;
   margin-right: 1rem;
+  width: 40%;
 `;
 
 export type AssetRowProps = {
@@ -47,10 +48,12 @@ export type AssetRowProps = {
   ticker: string;
   balance: number;
   usdBalance: number;
+  isUnlockPage?: boolean;
 };
 
 export const AssetRow = (props: AssetRowProps) => {
-  const { icon, ticker, balance, usdBalance } = props;
+  const { icon, ticker, balance, usdBalance, isUnlockPage } = props;
+  const unlockableAmount = usdBalance;
   const { theme } = useTheme();
   return (
     <Container theme={theme}>
@@ -63,16 +66,16 @@ export const AssetRow = (props: AssetRowProps) => {
             {ticker}
           </HeaderText>
           <Text style={{ margin: '0', textAlign: 'left' }} theme={theme}>
-            Balance
+            {isUnlockPage ? 'Unlockable' : 'Balance'}
           </Text>
         </TickerTextWrapper>
       </TickerWrapper>
       <BalanceWrapper>
         <HeaderText style={{ textAlign: 'right', fontSize: '1rem' }} theme={theme}>
-          {formatNumberWithCommasAndDecimals(balance, 0)}
+          {`${formatNumberWithCommasAndDecimals(balance, 3)}${isUnlockPage ? ' BSV' : ''}`}
         </HeaderText>
         <Text style={{ textAlign: 'right', margin: '0' }} theme={theme}>
-          {formatUSD(usdBalance)}
+          {isUnlockPage ? `${unlockableAmount} BSV` : formatUSD(usdBalance)}
         </Text>
       </BalanceWrapper>
     </Container>

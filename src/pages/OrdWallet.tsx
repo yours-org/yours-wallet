@@ -39,20 +39,20 @@ import { formatNumberWithCommasAndDecimals } from '../utils/format';
 
 const OrdinalsList = styled.div`
   display: flex;
-  align-items: center;
   justify-content: center;
   flex-wrap: wrap;
   overflow-y: auto;
   width: 100%;
   margin-top: 0.5rem;
+  height: 25rem;
 `;
 
 const BSV20List = styled.div`
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
   overflow-y: auto;
+  overflow-x: hidden;
   width: 100%;
   margin-top: 0.5rem;
   height: calc(100% - 10rem);
@@ -72,7 +72,6 @@ export const CheckBox = styled.div`
 `;
 
 const ContentWrapper = styled.div`
-  margin-top: -2rem;
   width: 100%;
 `;
 
@@ -120,7 +119,7 @@ const BSV20Container = styled.div`
   justify-content: space-between;
   flex-direction: row;
   width: 80%;
-  margin: 0.25rem 0 0.75rem 0;
+  margin: 0 0 0.75rem 0;
   padding: 0 0;
 `;
 
@@ -201,10 +200,10 @@ export const OrdWallet = () => {
 
   useEffect(() => {
     if (!successTxId) return;
-    if (!message) {
-      resetSendState();
-      setPageState('main');
-    }
+    // if (!message) {
+    resetSendState();
+    setPageState('main');
+    // }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message]);
 
@@ -449,6 +448,7 @@ export const OrdWallet = () => {
               .map((b) => {
                 return (
                   <div
+                    key={b.id}
                     style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
                     onClick={async () => {
                       setToken({
@@ -584,7 +584,6 @@ export const OrdWallet = () => {
           <Button theme={theme} type="primary" label="Transfer Now" disabled={isProcessing} isSubmit />
         </FormContainer>
         <Button
-          style={{ marginTop: '1rem' }}
           theme={theme}
           type="secondary"
           label="Go back"
@@ -774,10 +773,10 @@ export const OrdWallet = () => {
             <Button theme={theme} type="primary" label="Send" disabled={isProcessing} isSubmit />
           </FormContainer>
           <Button
-            style={{ marginTop: '1rem' }}
             theme={theme}
             type="secondary"
             label="Go back"
+            style={{ marginTop: '0.5rem' }}
             disabled={isProcessing}
             onClick={() => {
               setTokenSendAmount(null);

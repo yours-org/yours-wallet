@@ -46,6 +46,11 @@ export const whiteListedColorThemeCollections = [
 // Featured 3rd party integrations
 export const featuredApps = [
   {
+    icon: 'https://avatars.githubusercontent.com/u/159480043?s=400&u=8b1a3850d6e233f4d59af3275fe9e5e3fd81dcb3&v=4',
+    name: 'Yours',
+    link: 'https://yours.org',
+  },
+  {
     icon: 'https://pbs.twimg.com/profile_images/1469020626912354306/4WA3cIs3_400x400.jpg',
     name: 'Take It NFT',
     link: 'https://www.takeitnft.com/marketplace/global',
