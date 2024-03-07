@@ -1,5 +1,5 @@
 /* global chrome */
-console.log('🐼 Panda Wallet Background Script Running!');
+console.log('Yours Wallet Background Script Running!');
 
 const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv';
 
@@ -60,6 +60,10 @@ const authorizeRequest = async (message) => {
 
 // MESSAGE LISTENER
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (['signedOut', 'networkChanged'].includes(message.action)) {
+    return emitEventToActiveTabs(message);
+  }
+
   const noAuthRequired = [
     'isConnected',
     'userConnectResponse',
@@ -169,6 +173,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   return true;
 });
+
+// EMIT EVENTS ********************************
+
+const emitEventToActiveTabs = (message) => {
+  const { action, params } = message;
+  chrome.tabs.query({ active: true }, function (tabs) {
+    tabs.forEach(function (tab) {
+      chrome.tabs.sendMessage(tab.id, { type: 'PandaEmitEvent', action, params });
+    });
+  });
+  return true;
+};
 
 // REQUESTS ***************************************
 

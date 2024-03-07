@@ -37,3 +37,11 @@ const buildResponseCallback = (messageId) => {
     document.dispatchEvent(responseEvent);
   };
 };
+
+chrome.runtime.onMessage.addListener((message) => {
+  const { type, action, params } = message;
+  if (type === 'PandaEmitEvent') {
+    const event = new CustomEvent(type, { detail: { action, params } });
+    document.dispatchEvent(event);
+  }
+});
