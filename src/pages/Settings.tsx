@@ -248,6 +248,10 @@ export const Settings = () => {
     await storage.clear();
     setDecisionType(undefined);
     window.location.reload();
+
+    chrome.runtime.sendMessage({
+      action: 'signedOut',
+    });
   };
 
   const handleCancel = () => {
@@ -267,6 +271,13 @@ export const Settings = () => {
     setTimeout(() => {
       window.location.reload();
     }, SNACKBAR_TIMEOUT - 500);
+
+    chrome.runtime.sendMessage({
+      action: 'networkChanged',
+      params: {
+        network,
+      },
+    });
   };
 
   const handleSpeedBumpConfirm = (password?: string) => {
