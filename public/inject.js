@@ -24,7 +24,7 @@ const createPandaMethod = (type) => {
   };
 };
 
-window.panda = {
+const provider = {
   isReady: true,
   connect: createPandaMethod('connect'),
   disconnect: createPandaMethod('disconnect'),
@@ -49,3 +49,6 @@ window.panda = {
   encrypt: createPandaMethod('encrypt'),
   decrypt: createPandaMethod('decrypt'),
 };
+
+window.panda = provider;
+window.yours = provider;
