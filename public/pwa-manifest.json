@@ -4,8 +4,8 @@
   "description": "A non-custodial and open-source wallet for BSV and 1Sat Ordinals",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#1B6B93",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "icons": [
     {
       "src": "icons/icon16.png",
