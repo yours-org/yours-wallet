@@ -74,6 +74,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           shake={verificationFailed ? 'true' : 'false'}
+          autoFocus
         />
         <Button
           theme={theme}
