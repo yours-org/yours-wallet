@@ -346,6 +346,10 @@ export const useOrds = () => {
         return a + BigInt(item.amt);
       }, 0n);
 
+      if (amount > tokenTotalAmt) {
+        return { error: 'insufficient-funds' };
+      }
+
       const tokenChangeAmt = tokenTotalAmt - amount;
 
       const tx = new Transaction(1, 0);
