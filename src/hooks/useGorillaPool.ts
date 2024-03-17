@@ -102,9 +102,11 @@ export const useGorillaPool = () => {
 
   const broadcastWithGorillaPool = async (txhex: string): Promise<GorillaPoolBroadcastResponse> => {
     try {
-      const encoded = Buffer.from(txhex, 'hex').toString('base64');
-      const res = await axios.post<string | GorillaPoolErrorMessage>(`${getOrdinalsBaseUrl()}/api/tx`, {
-        rawtx: encoded,
+      const decoded = Buffer.from(txhex, 'hex');
+      const res = await axios.post<string | GorillaPoolErrorMessage>(`${getOrdinalsBaseUrl()}/api/tx/bin`, decoded, {
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
       });
       if (res.status === 200 && typeof res.data === 'string') {
         await updateStoredPaymentUtxos(txhex);
