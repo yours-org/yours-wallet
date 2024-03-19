@@ -59,7 +59,7 @@ export const AssetRow = (props: AssetRowProps) => {
   const { theme } = useTheme();
   const isDisplaySat = isLock && balance < 0.0001;
   return (
-    <Container onClick={onClick} theme={theme}>
+    <Container style={{ cursor: isLock ? 'pointer' : undefined }} onClick={onClick} theme={theme}>
       <TickerWrapper>
         <Show when={!!icon && icon.length > 0}>
           <Icon src={icon} />
