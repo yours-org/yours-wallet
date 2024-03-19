@@ -81,7 +81,7 @@ const Menu = (props: MenuProps) => {
           {label}
         </StyledText>
         <Show when={!!badge}>
-          <Badge style={{ position: 'absolute', marginTop: '-0.5rem' }}>{badge}</Badge>
+          <Badge style={{ position: 'absolute', marginTop: '-4rem' }}>{badge}</Badge>
         </Show>
       </ContentWrapper>
     </MenuContainer>
