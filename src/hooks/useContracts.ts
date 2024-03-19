@@ -150,17 +150,12 @@ export const useContracts = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const unlock = async (locks: OrdinalTxo[], password: string, currentBlockHeight: number) => {
+  const unlock = async (locks: OrdinalTxo[], currentBlockHeight: number) => {
     try {
       await init();
       setIsProcessing(true);
 
-      const isAuthenticated = await verifyPassword(password);
-      if (!isAuthenticated) {
-        return { error: 'invalid-password' };
-      }
-
-      const keys = await retrieveKeys(password);
+      const keys = await retrieveKeys(undefined, true); // using below limit to bypass password
       if (!keys.identityWif || !keys.walletAddress) {
         throw Error('No keys');
       }

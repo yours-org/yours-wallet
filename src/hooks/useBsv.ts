@@ -26,6 +26,8 @@ import { removeBase64Prefix } from '../utils/format';
 import { DerivationTag, getPrivateKeyFromTag, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
+import { OrdinalTxo } from './ordTypes';
+import { useContracts } from './useContracts';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
 import { useNetwork } from './useNetwork';
@@ -114,14 +116,22 @@ export type Web3DecryptRequest = {
   tag?: DerivationTag;
 };
 
+export type LockData = {
+  totalLocked: number;
+  unlockable: number;
+  nextUnlock: number;
+};
+
 export const useBsv = () => {
   const [bsvBalance, setBsvBalance] = useState(0);
   const [exchangeRate, setExchangeRate] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [lockData, setLockData] = useState<LockData>({ totalLocked: 0, unlockable: 0, nextUnlock: 0 });
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, identityAddress, identityPubKey } = useKeys();
   const { network } = useNetwork();
-  const { broadcastWithGorillaPool, getTxOut } = useGorillaPool();
-  const { getUtxos, getBsvBalance, getExchangeRate, getInputs } = useWhatsOnChain();
+  const { broadcastWithGorillaPool, getTxOut, getLockedUtxos, getSpentTxids } = useGorillaPool();
+  const { getUtxos, getBsvBalance, getExchangeRate, getInputs, getChainInfo } = useWhatsOnChain();
+  const { unlock } = useContracts();
 
   const getChainParams = (network: NetWork): ChainParams => {
     return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
@@ -132,6 +142,38 @@ export const useBsv = () => {
     getUtxos(bsvAddress);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress]);
+
+  const unlockLockedCoins = async (balanceOnly = false) => {
+    if (!identityAddress) return;
+    const chainInfo = await getChainInfo();
+    let lockedTxos = await getLockedUtxos(identityAddress);
+    const blockHeight = Number(chainInfo?.blocks);
+    const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
+    const spentTxids = await getSpentTxids(outpoints);
+    lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
+    if (lockedTxos.length > 0) {
+      const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
+      let unlockableTotal = 0;
+      let theBlocksCoinsUnlock: number[] = [];
+      lockedTxos.forEach((txo) => {
+        const theBlockCoinsUnlock = Number(txo?.data?.lock?.until);
+        theBlocksCoinsUnlock.push(theBlockCoinsUnlock);
+        if (theBlockCoinsUnlock <= blockHeight) {
+          unlockableTotal += txo.satoshis;
+        }
+      });
+      setLockData({
+        totalLocked: lockTotal,
+        unlockable: unlockableTotal,
+        nextUnlock: theBlocksCoinsUnlock.sort((a, b) => a - b)[0],
+      });
+      if (balanceOnly) return;
+      const txos = lockedTxos.filter((i) => Number(i.data?.lock?.until) <= blockHeight);
+      if (txos.length > 0) {
+        return await unlock(txos, blockHeight);
+      }
+    }
+  };
 
   const sendBsv = async (
     request: Web3SendBsvRequest,
@@ -388,5 +430,7 @@ export const useBsv = () => {
     fundRawTx,
     retrieveKeys,
     getChainParams,
+    unlockLockedCoins,
+    lockData,
   };
 };

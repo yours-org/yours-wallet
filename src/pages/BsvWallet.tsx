@@ -32,6 +32,7 @@ import { sleep } from '../utils/sleep';
 import { storage } from '../utils/storage';
 import copyIcon from '../assets/copy.svg';
 import { AssetRow } from '../components/AssetRow';
+import lockIcon from '../assets/lock.svg';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -97,7 +98,7 @@ export type BsvWalletProps = {
 export const BsvWallet = (props: BsvWalletProps) => {
   const { isOrdRequest } = props;
   const { theme } = useTheme();
-  const { setSelected } = useBottomMenu();
+  const { setSelected, handleSelect } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>('main');
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const [usdSendAmount, setUsdSendAmount] = useState<number | null>(null);
@@ -108,8 +109,41 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { addSnackbar, message } = useSnackbar();
   const { socialProfile } = useSocialProfile();
   const { isPasswordRequired } = useWeb3Context();
+  const [unlockAttempted, setUnlockAttempted] = useState(false);
 
-  const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, updateBsvBalance, exchangeRate } = useBsv();
+  const {
+    bsvAddress,
+    bsvBalance,
+    isProcessing,
+    setIsProcessing,
+    sendBsv,
+    updateBsvBalance,
+    exchangeRate,
+    lockData,
+    unlockLockedCoins,
+    identityAddress,
+  } = useBsv();
+
+  useEffect(() => {
+    if (!identityAddress) return;
+    if (!unlockAttempted) {
+      (async () => {
+        const res = await unlockLockedCoins();
+        setUnlockAttempted(true);
+        if (res) {
+          if (res.error) addSnackbar('Error unlocking coins!', 'error');
+          if (res.txid) {
+            nukeUtxos();
+            await unlockLockedCoins(true);
+            await sleep(1000);
+            addSnackbar('Successfully unlocked coins!', 'success');
+          }
+        }
+      })();
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockData, identityAddress]);
 
   useEffect(() => {
     if (isOrdRequest) {
@@ -288,6 +322,17 @@ export const BsvWallet = (props: BsvWalletProps) => {
           <Button theme={theme} type="primary" label="Send" onClick={() => setPageState('send')} />
         </ButtonContainer>
         <AssetRow balance={bsvBalance} icon={bsvCoin} ticker="BSV" usdBalance={bsvBalance * exchangeRate} />
+        <Show when={lockData.totalLocked > 0}>
+          <AssetRow
+            ticker="Total Locked"
+            balance={lockData.totalLocked / BSV_DECIMAL_CONVERSION}
+            usdBalance={Number((lockData.unlockable / BSV_DECIMAL_CONVERSION).toFixed(3))}
+            icon={lockIcon}
+            isLock
+            nextUnlock={lockData?.nextUnlock}
+            onClick={() => handleSelect('apps', 'pending-locks')}
+          />
+        </Show>
       </MiddleContainer>
     </MainContent>
   );

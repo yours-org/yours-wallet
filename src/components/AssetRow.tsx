@@ -4,6 +4,7 @@ import { ColorThemeProps } from '../theme';
 import { HeaderText, Text } from './Reusable';
 import { formatNumberWithCommasAndDecimals, formatUSD } from '../utils/format';
 import { Show } from './Show';
+import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 
 const Container = styled.div<ColorThemeProps>`
   display: flex;
@@ -48,15 +49,17 @@ export type AssetRowProps = {
   ticker: string;
   balance: number;
   usdBalance: number;
-  isUnlockPage?: boolean;
+  isLock?: boolean;
+  nextUnlock?: number;
+  onClick?: () => void;
 };
 
 export const AssetRow = (props: AssetRowProps) => {
-  const { icon, ticker, balance, usdBalance, isUnlockPage } = props;
-  const unlockableAmount = usdBalance;
+  const { icon, ticker, balance, usdBalance, isLock, nextUnlock, onClick } = props;
   const { theme } = useTheme();
+  const isDisplaySat = isLock && balance < 0.0001;
   return (
-    <Container theme={theme}>
+    <Container onClick={onClick} theme={theme}>
       <TickerWrapper>
         <Show when={!!icon && icon.length > 0}>
           <Icon src={icon} />
@@ -66,16 +69,19 @@ export const AssetRow = (props: AssetRowProps) => {
             {ticker}
           </HeaderText>
           <Text style={{ margin: '0', textAlign: 'left' }} theme={theme}>
-            {isUnlockPage ? 'Unlockable' : 'Balance'}
+            {isLock ? 'Next unlock' : 'Balance'}
           </Text>
         </TickerTextWrapper>
       </TickerWrapper>
       <BalanceWrapper>
         <HeaderText style={{ textAlign: 'right', fontSize: '1rem' }} theme={theme}>
-          {`${formatNumberWithCommasAndDecimals(balance, 3)}${isUnlockPage ? ' BSV' : ''}`}
+          {`${formatNumberWithCommasAndDecimals(
+            isDisplaySat ? balance * BSV_DECIMAL_CONVERSION : balance,
+            isDisplaySat ? 0 : 3,
+          )}${isLock ? (isDisplaySat ? `${balance === 0.00000001 ? ' SAT' : ' SATS'}` : ' BSV') : ''}`}
         </HeaderText>
         <Text style={{ textAlign: 'right', margin: '0' }} theme={theme}>
-          {isUnlockPage ? `${unlockableAmount} BSV` : formatUSD(usdBalance)}
+          {isLock ? `Block ${nextUnlock}` : formatUSD(usdBalance)}
         </Text>
       </BalanceWrapper>
     </Container>
