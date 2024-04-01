@@ -91,6 +91,13 @@ export const Ordinal = (props: OrdinalProps) => {
 
   const renderContent = () => {
     switch (true) {
+      case contentType?.startsWith('image/svg'):
+      case contentType?.startsWith('text/html'):
+        return (
+          <OrdinalWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
+            <iframe src={url} style={{ border: '0px', height: '100%', width: '100%' }} sandbox="true" />
+          </OrdinalWrapper>
+        );
       case contentType?.startsWith('image/'):
         return (
           <OrdinalWrapper
