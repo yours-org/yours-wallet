@@ -4,13 +4,13 @@
 
 Version: v3.2.0
 
-<a href="https://chrome.google.com/webstore/detail/panda-wallet/mlbnicldlpdimbjdcncnklfempedeipj" target="_blank">🐼 Download Chrome Extension 🐼</a>
+<a href="https://chrome.google.com/webstore/detail/panda-wallet/mlbnicldlpdimbjdcncnklfempedeipj" target="_blank">🌱 Download Chrome Extension 🌱</a>
 
-# Panda Wallet | Non-Custodial Web3 Wallet For BSV
+# Yours Wallet | Non-Custodial Web3 Wallet For BSV
 
 ## IMPORTANT NOTICE: Panda is in the process of rebranding to Yours Wallet. The wallet will automatically be updated but namespace changes to the repo will take some time!
 
-Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV) and [1Sat Ordinals](https://docs.1satordinals.com/). This wallet allows users to have full control over their funds, providing security and independence in managing their assets.
+Yours Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV) and [1Sat Ordinals](https://docs.1satordinals.com/). This wallet allows users to have full control over their funds, providing security and independence in managing their assets.
 
 ## Features
 
@@ -24,17 +24,17 @@ Panda Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV
 
 #### Wallet Provider API 🚀
 
-Documentation on integrating Panda Wallet into your decentralized web3 application can be [found here](https://panda-wallet.gitbook.io/provider-api/).
+Documentation on integrating Yours Wallet into your decentralized web3 application can be [found here](https://panda-wallet.gitbook.io/provider-api/).
 
 You can also check out the live sample app: https://panda-wallet-sample-app.vercel.app/
 
 #### Contributing 🙌
 
-If you'd like to contribute to Panda Wallet's development check out [contributing](CONTRIBUTING.md).
+If you'd like to contribute to the development of Yours Wallet, check out [contributing](CONTRIBUTING.md).
 
 ## Issues, Bugs, and Feature Requests
 
-[Create an issue](https://github.com/Panda-Wallet/panda-wallet/issues) and track the [Kanban Board](https://github.com/orgs/Panda-Wallet/projects/1)
+[Create an issue](https://github.com/yours-org/yours-wallet/issues) and track the [Kanban Board](https://github.com/orgs/Panda-Wallet/projects/1)
 
 ## Support The Project
 
@@ -42,9 +42,9 @@ If you'd like to contribute to Panda Wallet's development check out [contributin
 
 ## Contact Us
 
-[X](https://twitter.com/wallet_panda) - @wallet_panda
-[Discord](https://discord.gg/qHs6hTkmsf)
+* [@yoursxbt on X](https://twitter.com/yoursxbt)
+* [Discord](https://discord.gg/qHs6hTkmsf)
 
 ## License
 
-Panda Wallet is released under the [MIT License](https://opensource.org/licenses/MIT)
+Yours Wallet is released under the [MIT License](https://opensource.org/licenses/MIT)

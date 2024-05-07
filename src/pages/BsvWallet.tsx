@@ -26,7 +26,7 @@ import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useWeb3Context } from '../hooks/useWeb3Context';
 import { ColorThemeProps } from '../theme';
-import { BSV_DECIMAL_CONVERSION, HOSTED_PANDA_IMAGE } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, HOSTED_YOURS_IMAGE } from '../utils/constants';
 import { formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import { storage } from '../utils/storage';
@@ -305,7 +305,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const main = (
     <MainContent>
       <MiddleContainer theme={theme}>
-        <Show when={socialProfile.avatar !== HOSTED_PANDA_IMAGE}>
+        <Show when={socialProfile.avatar !== HOSTED_YOURS_IMAGE}>
           <ProfileImage title="Refresh balance" src={socialProfile.avatar} onClick={nukeUtxos} />
         </Show>
         <HeaderText style={{ fontSize: '2rem', cursor: 'pointer' }} theme={theme} onClick={nukeUtxos}>

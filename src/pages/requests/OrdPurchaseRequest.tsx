@@ -13,7 +13,7 @@ import { PurchaseOrdinal, useOrds } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
-import { BSV_DECIMAL_CONVERSION, GLOBAL_ORDERBOOK_MARKET_RATE, PANDA_DEV_WALLET } from '../../utils/constants';
+import { BSV_DECIMAL_CONVERSION, GLOBAL_ORDERBOOK_MARKET_RATE, YOURS_DEV_WALLET } from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
 
@@ -40,7 +40,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   const { addSnackbar, message } = useSnackbar();
   const { isPasswordRequired } = useWeb3Context();
   const [inscription, setInscription] = useState<OrdinalTxo | undefined>();
-  const marketplaceAddress = web3Request.marketplaceAddress ?? PANDA_DEV_WALLET;
+  const marketplaceAddress = web3Request.marketplaceAddress ?? YOURS_DEV_WALLET;
   const marketplaceRate = web3Request.marketplaceRate ?? GLOBAL_ORDERBOOK_MARKET_RATE;
   const outpoint = web3Request.outpoint;
 
