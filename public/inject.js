@@ -1,9 +1,9 @@
-const createPandaMethod = (type) => {
+const createYoursMethod = (type) => {
   return async (params) => {
     return new Promise((resolve, reject) => {
       // Send request
       const messageId = `${type}-${Date.now()}-${Math.random()}`;
-      const requestEvent = new CustomEvent('PandaRequest', {
+      const requestEvent = new CustomEvent('YoursRequest', {
         detail: { messageId, type, params },
       });
       document.dispatchEvent(requestEvent);
@@ -24,7 +24,7 @@ const createPandaMethod = (type) => {
   };
 };
 
-const createPandaEventEmitter = () => {
+const createYoursEventEmitter = () => {
   const eventListeners = new Map(); // Object to store event listeners
   const whitelistedEvents = ['signedOut', 'networkChanged']; // Whitelisted event names
 
@@ -64,35 +64,35 @@ const createPandaEventEmitter = () => {
 
 const provider = {
   isReady: true,
-  ...createPandaEventEmitter(),
-  connect: createPandaMethod('connect'),
-  disconnect: createPandaMethod('disconnect'),
-  isConnected: createPandaMethod('isConnected'),
-  getPubKeys: createPandaMethod('getPubKeys'),
-  getAddresses: createPandaMethod('getAddresses'),
-  getNetwork: createPandaMethod('getNetwork'),
-  getBalance: createPandaMethod('getBalance'),
-  getOrdinals: createPandaMethod('getOrdinals'),
-  sendBsv: createPandaMethod('sendBsv'),
-  transferOrdinal: createPandaMethod('transferOrdinal'),
-  signMessage: createPandaMethod('signMessage'),
-  broadcast: createPandaMethod('broadcast'),
-  getSignatures: createPandaMethod('getSignatures'),
-  getSocialProfile: createPandaMethod('getSocialProfile'),
-  getPaymentUtxos: createPandaMethod('getPaymentUtxos'),
-  getExchangeRate: createPandaMethod('getExchangeRate'),
-  purchaseOrdinal: createPandaMethod('purchaseOrdinal'),
-  generateTaggedKeys: createPandaMethod('generateTaggedKeys'),
-  getTaggedKeys: createPandaMethod('getTaggedKeys'),
-  inscribe: createPandaMethod('sendBsv'),
-  encrypt: createPandaMethod('encrypt'),
-  decrypt: createPandaMethod('decrypt'),
+  ...createYoursEventEmitter(),
+  connect: createYoursMethod('connect'),
+  disconnect: createYoursMethod('disconnect'),
+  isConnected: createYoursMethod('isConnected'),
+  getPubKeys: createYoursMethod('getPubKeys'),
+  getAddresses: createYoursMethod('getAddresses'),
+  getNetwork: createYoursMethod('getNetwork'),
+  getBalance: createYoursMethod('getBalance'),
+  getOrdinals: createYoursMethod('getOrdinals'),
+  sendBsv: createYoursMethod('sendBsv'),
+  transferOrdinal: createYoursMethod('transferOrdinal'),
+  signMessage: createYoursMethod('signMessage'),
+  broadcast: createYoursMethod('broadcast'),
+  getSignatures: createYoursMethod('getSignatures'),
+  getSocialProfile: createYoursMethod('getSocialProfile'),
+  getPaymentUtxos: createYoursMethod('getPaymentUtxos'),
+  getExchangeRate: createYoursMethod('getExchangeRate'),
+  purchaseOrdinal: createYoursMethod('purchaseOrdinal'),
+  generateTaggedKeys: createYoursMethod('generateTaggedKeys'),
+  getTaggedKeys: createYoursMethod('getTaggedKeys'),
+  inscribe: createYoursMethod('sendBsv'),
+  encrypt: createYoursMethod('encrypt'),
+  decrypt: createYoursMethod('decrypt'),
 };
 
 window.panda = provider;
 window.yours = provider;
 
-document.addEventListener('PandaEmitEvent', (event) => {
+document.addEventListener('YoursEmitEvent', (event) => {
   const { action, params } = event.detail;
   // Check if window.panda is defined and has event listeners for the action
   if (window.panda && window.panda.eventListeners && window.panda.eventListeners.has(action)) {
@@ -102,7 +102,7 @@ document.addEventListener('PandaEmitEvent', (event) => {
   }
 });
 
-document.addEventListener('PandaEmitEvent', (event) => {
+document.addEventListener('YoursEmitEvent', (event) => {
   const { action, params } = event.detail;
   // Check if window.yours is defined and has event listeners for the action
   if (window.yours && window.yours.eventListeners && window.yours.eventListeners.has(action)) {

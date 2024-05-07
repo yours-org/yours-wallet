@@ -180,7 +180,7 @@ const emitEventToActiveTabs = (message) => {
   const { action, params } = message;
   chrome.tabs.query({ active: true }, function (tabs) {
     tabs.forEach(function (tab) {
-      chrome.tabs.sendMessage(tab.id, { type: 'PandaEmitEvent', action, params });
+      chrome.tabs.sendMessage(tab.id, { type: 'YoursEmitEvent', action, params });
     });
   });
   return true;
@@ -583,11 +583,11 @@ const processGetSignaturesRequest = (message, sendResponse) => {
 };
 
 const processGetSocialProfileRequest = (sendResponse) => {
-  const HOSTED_PANDA_IMAGE = 'https://i.ibb.co/3fLL5X2/Panda-Wallet-Logo.png';
+  const HOSTED_YOURS_IMAGE = 'https://i.ibb.co/zGcthBv/yours-org-light.png';
   try {
     chrome.storage.local.get(['socialProfile'], (result) => {
       const displayName = result?.socialProfile?.displayName ? result.socialProfile.displayName : 'Anon Panda';
-      const avatar = result?.socialProfile?.avatar ? result.socialProfile.avatar : HOSTED_PANDA_IMAGE;
+      const avatar = result?.socialProfile?.avatar ? result.socialProfile.avatar : HOSTED_YOURS_IMAGE;
       sendResponse({
         type: 'getSocialProfile',
         success: true,
@@ -646,7 +646,7 @@ const processGetTaggedKeys = async (message, sendResponse) => {
           sendResponse({
             type: 'getTaggedKeys',
             success: false,
-            error: 'Unauthorized! Panda is locked.',
+            error: 'Unauthorized! Yours Wallet is locked.',
           });
         }
 

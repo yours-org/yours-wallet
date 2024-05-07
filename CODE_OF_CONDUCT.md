@@ -1,8 +1,8 @@
-## Panda Wallet Code of Conduct
+## Yours Wallet Code of Conduct
 
 **Introduction:**
 
-The Panda Wallet community is committed to providing a safe, respectful, and inclusive environment for all contributors and users. This code of conduct outlines our expectations for behavior and sets the standard for how we interact within our community.
+The Yours Wallet community is committed to providing a safe, respectful, and inclusive environment for all contributors and users. This code of conduct outlines our expectations for behavior and sets the standard for how we interact within our community.
 
 **1. Purpose:**
 
@@ -10,7 +10,7 @@ The purpose of this code of conduct is to ensure that all individuals, regardles
 
 **2. Expected Behavior:**
 
-When interacting within the Panda Wallet community, we expect all community members, including contributors, maintainers, and users, to:
+When interacting within the Yours Wallet community, we expect all community members, including contributors, maintainers, and users, to:
 
 - Be respectful and considerate of others.
 - Use welcoming and inclusive language.
@@ -36,7 +36,7 @@ Consequences for violating this code of conduct may include warnings, temporary 
 
 **5. Enforcement Responsibilities:**
 
-The enforcement of this code of conduct is the responsibility of Panda Wallet's Maintainers and ultimately the Project Lead. They are responsible for reviewing reports, conducting investigations, and taking appropriate action to address violations. Their decisions will be guided by the principles of fairness and due process.
+The enforcement of this code of conduct is the responsibility of Yours Wallet's Maintainers and ultimately the Project Lead. They are responsible for reviewing reports, conducting investigations, and taking appropriate action to address violations. Their decisions will be guided by the principles of fairness and due process.
 
 **6. Contact Information:**
 
@@ -48,8 +48,8 @@ This code of conduct may be revised or improved over time to better serve the co
 
 **8. Acknowledgment:**
 
-By participating in the Panda Wallet community, you acknowledge your commitment to abiding by this code of conduct and helping to create a positive and inclusive environment.
+By participating in the Yours Wallet community, you acknowledge your commitment to abiding by this code of conduct and helping to create a positive and inclusive environment.
 
 **Conclusion:**
 
-The Panda Wallet community thrives on collaboration, respect, and diverse perspectives. We appreciate your cooperation in making this a welcoming place for everyone, and we look forward to working together for the betterment of our project.
+The Yours Wallet community thrives on collaboration, respect, and diverse perspectives. We appreciate your cooperation in making this a welcoming place for everyone, and we look forward to working together for the betterment of our project.

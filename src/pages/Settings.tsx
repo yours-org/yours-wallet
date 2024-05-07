@@ -212,7 +212,7 @@ export const Settings = () => {
     const url = URL.createObjectURL(blob);
     const tempLink = document.createElement('a');
     tempLink.href = url;
-    tempLink.setAttribute('download', 'panda_wallet_keys.json');
+    tempLink.setAttribute('download', 'yours_wallet_keys.json');
     document.body.appendChild(tempLink);
     tempLink.click();
     document.body.removeChild(tempLink);
@@ -320,7 +320,7 @@ export const Settings = () => {
       />
 
       <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={lockWallet} />
-      <SettingsRow name="Sign Out" description="Sign out of Panda Wallet completely" onClick={handleSignOutIntent} />
+      <SettingsRow name="Sign Out" description="Sign out of Yours Wallet completely" onClick={handleSignOutIntent} />
     </>
   );
 

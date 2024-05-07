@@ -20,8 +20,8 @@ import { useGorillaPool } from '../hooks/useGorillaPool';
 import { useTheme } from '../hooks/useTheme';
 import { useWhatsOnChain } from '../hooks/useWhatsOnChain';
 import { ColorThemeProps } from '../theme';
-// import { BSV_DECIMAL_CONVERSION, PANDA_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
-import { BSV_DECIMAL_CONVERSION, featuredApps, YOURS_GITHUB_REPOS, PANDA_GITHUB_REPO } from '../utils/constants';
+// import { BSV_DECIMAL_CONVERSION, YOURS_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, featuredApps, YOURS_GITHUB_REPOS, YOURS_GITHUB_REPO } from '../utils/constants';
 import { truncate } from '../utils/format';
 // import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
@@ -184,7 +184,7 @@ export const AppsAndTools = () => {
     <>
       {/* <AppsRow
         name="Make a Difference"
-        description="Fund Panda Wallet's open source developers"
+        description="Fund Yours Wallet's open source developers"
         onClick={() => setPage('sponsor')}
         jsxElement={<RightChevron />}
       /> */}
@@ -196,14 +196,14 @@ export const AppsAndTools = () => {
       />
       <AppsRow
         name="Discover Apps"
-        description="Meet the apps using Panda Wallet"
+        description="Meet the apps using Yours Wallet"
         onClick={() => setPage('discover-apps')}
         jsxElement={<RightChevron />}
       />
       <AppsRow
         name="Contribute or integrate"
         description="All the tools you need to get involved"
-        onClick={() => window.open(PANDA_GITHUB_REPO, '_blank')}
+        onClick={() => window.open(YOURS_GITHUB_REPO, '_blank')}
         jsxElement={<ExternalLinkIcon src={externalLink} />}
       />
     </>
@@ -347,7 +347,7 @@ export const AppsAndTools = () => {
   //       </ButtonsWrapper>
   //     </Show>
   //     <Text theme={theme} style={{ width: '95%', margin: '2rem 0 1rem 0' }}>
-  //       Give Monthly through Panda Wallet's transparent Open Collective.
+  //       Give Monthly through Yours Wallet's transparent Open Collective.
   //     </Text>
   //     <Button
   //       theme={theme}
@@ -382,7 +382,7 @@ export const AppsAndTools = () => {
       <Show when={page === 'discover-apps'}>{discoverAppsPage}</Show>
       {/* <Show when={page === 'sponsor' && didSubmit}>
         <BsvSendRequest
-          web3Request={[{ address: PANDA_DEV_WALLET, satoshis: satAmount }]}
+          web3Request={[{ address: YOURS_DEV_WALLET, satoshis: satAmount }]}
           popupId={undefined}
           onResponse={() => {
             setDidSubmit(false);

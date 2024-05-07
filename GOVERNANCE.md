@@ -24,7 +24,7 @@
 
 #### Decision-Making Process:
 
-**Issues and Features:** Contributors and the community can [Create an issue](https://github.com/Panda-Wallet/panda-wallet/issues) and track the [Kanban Board](https://github.com/orgs/Panda-Wallet/projects/1) to propose new features, discuss improvements, or report bugs. All PRs will require at least one approval from the Project Lead or a Maintainers.
+**Issues and Features:** Contributors and the community can [Create an issue](https://github.com/yours-org/yours-wallet/issues) and track the [Kanban Board](https://github.com/orgs/Panda-Wallet/projects/1) to propose new features, discuss improvements, or report bugs. All PRs will require at least one approval from the Project Lead or a Maintainers.
 
 #### Pull Requests:
 

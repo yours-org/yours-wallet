@@ -82,7 +82,7 @@ const TransferBSV20Header = styled(HeaderText)`
 
 export const OrdButtonContainer = styled(ButtonContainer)`
   margin: 0.5rem 0 0.5rem 0;
-  position: fixed;
+  position: absolute;
   bottom: 4.5rem;
 `;
 

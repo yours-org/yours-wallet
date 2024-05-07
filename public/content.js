@@ -1,12 +1,12 @@
 /* global chrome */
 
-console.log('🐼 Panda Wallet Loaded');
+console.log('🌱 Yours Wallet Loaded');
 
 const script = document.createElement('script');
 script.src = chrome.runtime.getURL('inject.js');
 (document.head || document.documentElement).appendChild(script);
 
-document.addEventListener('PandaRequest', (e) => {
+document.addEventListener('YoursRequest', (e) => {
   if (!e?.detail?.type) return;
   const { type, params: originalParams = {} } = e.detail;
 
@@ -40,7 +40,7 @@ const buildResponseCallback = (messageId) => {
 
 chrome.runtime.onMessage.addListener((message) => {
   const { type, action, params } = message;
-  if (type === 'PandaEmitEvent') {
+  if (type === 'YoursEmitEvent') {
     const event = new CustomEvent(type, { detail: { action, params } });
     document.dispatchEvent(event);
   }
