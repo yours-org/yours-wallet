@@ -5,7 +5,7 @@ import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
-import { PandaHead } from '../../components/PandaHead';
+import { YoursIcon } from '../../components/YoursIcon';
 import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
@@ -79,7 +79,7 @@ export const ImportWallet = () => {
       if (!identityPk) {
         setLoading(false);
         addSnackbar(
-          'IMPORTANT: Since you did not provide an identity key, Panda Wallet will generate one for you, MAKE SURE TO BACK UP YOUR NEW PANDA WALLET!',
+          'IMPORTANT: Since you did not provide an identity key, Yours Wallet will generate one for you, MAKE SURE TO BACK UP YOUR NEW YOURS WALLET!',
           'info',
           7000,
         );
@@ -236,7 +236,7 @@ export const ImportWallet = () => {
   const successStep = (
     <>
       <Content>
-        <PandaHead />
+        <YoursIcon />
         <HeaderText theme={theme}>Success!</HeaderText>
         <Text theme={theme} style={{ marginBottom: '1rem' }}>
           Your wallet has been imported.

@@ -20,13 +20,13 @@ export type Keys = {
   identityDerivationPath: string;
 };
 
-export type InternalPandaTags =
+export type InternalYoursTags =
   | { label: 'panda'; id: 'bsv'; domain: ''; meta: {} }
   | { label: 'panda'; id: 'ord'; domain: ''; meta: {} }
   | { label: 'panda'; id: 'identity'; domain: ''; meta: {} };
 
 export type DerivationTag =
-  | InternalPandaTags
+  | InternalYoursTags
   | {
       label: string;
       id: string;

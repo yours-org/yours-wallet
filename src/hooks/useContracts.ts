@@ -58,7 +58,7 @@ const DEFAULT_SIGHASH_TYPE = 65; // SIGHASH_ALL | SIGHASH_FORKID
 
 export const useContracts = () => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const { retrieveKeys, bsvAddress, ordAddress, verifyPassword } = useKeys();
+  const { retrieveKeys, bsvAddress, ordAddress, verifyPassword, identityAddress } = useKeys();
   const { broadcastWithGorillaPool } = useGorillaPool();
 
   /**
@@ -89,6 +89,9 @@ export const useContracts = () => {
           }
           if (addr === ordAddress) {
             return PrivateKey.from_wif(keys.ordWif!);
+          }
+          if (addr === identityAddress) {
+            return PrivateKey.from_wif(keys.identityWif!);
           }
           throw new Error('unknown-address', { cause: addr });
         });

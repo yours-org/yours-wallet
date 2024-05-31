@@ -232,7 +232,7 @@ export const useGorillaPool = () => {
     }
   };
 
-  const getLockedUtxos = async (address: string) => {
+  const getLockedBsvUtxos = async (address: string) => {
     try {
       if (!isAddressOnRightNetwork(address)) return [];
       //TODO: use this instead of test endpoint - `${getOrdinalsBaseUrl()}/api/locks/address/${address}/unspent?limit=100&offset=0`
@@ -240,7 +240,7 @@ export const useGorillaPool = () => {
         `${getOrdinalsBaseUrl()}/api/locks/address/${address}/unspent?limit=100&offset=0`,
       );
       const lockedUtxos: OrdinalTxo[] = data;
-      return lockedUtxos;
+      return lockedUtxos.filter((utxo) => !utxo.data?.bsv20);
     } catch (e) {
       throw new Error(JSON.stringify(e));
     }
@@ -390,7 +390,7 @@ export const useGorillaPool = () => {
     getMarketData,
     getBsv20Balances,
     getBSV20Utxos,
-    getLockedUtxos,
+    getLockedBsvUtxos,
     getSpentTxids,
     submitTx,
     getOrdContentByOriginOutpoint,

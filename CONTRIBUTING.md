@@ -1,6 +1,6 @@
-## Contributing to Panda Wallet
+## Contributing to Yours Wallet
 
-Thank you for your interest in contributing to Panda Wallet! Your contributions are what move the project forward. Please follow these steps to set up your development environment and ensure that your code adheres to our formatting standards.
+Thank you for your interest in contributing to Yours Wallet! Your contributions are what move the project forward. Please follow these steps to set up your development environment and ensure that your code adheres to our formatting standards.
 
 ## Getting Started
 
@@ -57,11 +57,11 @@ git commit -m "Your descriptive commit message"
 git push origin my-feature
 ```
 
-10. **Create a Pull Request:**: Navigate to your forked repository on GitHub, and you should see an option to create a pull request and merge into `Panda-Wallet:main`. Click it, fill out the pull request template, and submit your changes for review.
+10. **Create a Pull Request:**: Navigate to your forked repository on GitHub, and you should see an option to create a pull request and merge into `Yours-Wallet:main`. Click it, fill out the pull request template, and submit your changes for review.
 
 11. **Code Review:** Your changes will be reviewed, and you may be asked to make further adjustments. Once the changes are approved, they will be merged into the main project.
 
-12. **Celebrate:** 🎉 Congratulations, you've contributed to Panda Wallet!
+12. **Celebrate:** 🎉 Congratulations, you've contributed to Yours Wallet!
 
 **\*If you plan to contribute, please review the PR Guidelines**
 

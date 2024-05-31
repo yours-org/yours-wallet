@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
-import panda from '../assets/panda.svg';
+import yoursLogo from '../assets/yours-logo.png';
 
-const PandaImg = styled.img<{
+const Yoursmg = styled.img<{
   $rotation: { x: number; y: number };
 }>`
   transition: transform 0.1s;
@@ -15,14 +15,14 @@ interface Rotation {
   y: number;
 }
 
-export type PandaHeadProps = {
+export type YoursIconProps = {
   /** The size of the head */
   width?: string;
   /** Whether or not the head should follow the mouse */
   animated?: boolean;
 };
 
-export const PandaHead = (props: PandaHeadProps) => {
+export const YoursIcon = (props: YoursIconProps) => {
   const { animated, width } = props;
   const [rotation, setRotation] = useState<Rotation>({ x: 0, y: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
@@ -55,11 +55,11 @@ export const PandaHead = (props: PandaHeadProps) => {
   }, [animated]);
 
   return (
-    <PandaImg
+    <Yoursmg
       ref={imgRef}
-      src={panda}
+      src={yoursLogo}
       width={width}
-      alt="Panda Head"
+      alt="Yours Head"
       $rotation={rotation}
       style={{
         transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,

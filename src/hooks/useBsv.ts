@@ -129,7 +129,7 @@ export const useBsv = () => {
   const [lockData, setLockData] = useState<LockData>({ totalLocked: 0, unlockable: 0, nextUnlock: 0 });
   const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, identityAddress, identityPubKey } = useKeys();
   const { network } = useNetwork();
-  const { broadcastWithGorillaPool, getTxOut, getLockedUtxos, getSpentTxids } = useGorillaPool();
+  const { broadcastWithGorillaPool, getTxOut, getLockedBsvUtxos, getSpentTxids } = useGorillaPool();
   const { getUtxos, getBsvBalance, getExchangeRate, getInputs, getChainInfo } = useWhatsOnChain();
   const { unlock } = useContracts();
 
@@ -146,7 +146,7 @@ export const useBsv = () => {
   const unlockLockedCoins = async (balanceOnly = false) => {
     if (!identityAddress) return;
     const chainInfo = await getChainInfo();
-    let lockedTxos = await getLockedUtxos(identityAddress);
+    let lockedTxos = await getLockedBsvUtxos(identityAddress);
     const blockHeight = Number(chainInfo?.blocks);
     const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
     const spentTxids = await getSpentTxids(outpoints);
