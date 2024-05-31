@@ -3,6 +3,7 @@ import { OrdinalTxo } from '../hooks/ordTypes';
 import { ColorThemeProps, Theme } from '../theme';
 import { Text } from './Reusable';
 import { Show } from './Show';
+import React from 'react';
 
 export type OrdinalDivProps = ColorThemeProps & {
   url: string;
@@ -92,9 +93,35 @@ export const Ordinal = (props: OrdinalProps) => {
   const renderContent = () => {
     switch (true) {
       case contentType?.startsWith('image/svg'):
-      case contentType?.startsWith('text/html'):
         return (
           <OrdinalWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
+            <iframe src={url} style={{ border: '0px', height: '100%', width: '100%' }} sandbox="true" />
+          </OrdinalWrapper>
+        );
+      case contentType?.startsWith('text/html'):
+        if (inscription.origin?.data?.map?.previewUrl) {
+          return (
+            <OrdinalWrapper
+              size={size}
+              selected={selected}
+              url={inscription.origin?.data?.map?.previewUrl}
+              theme={theme}
+              style={{ backgroundImage: `url(${url})` }}
+              onClick={onClick}
+            />
+          );
+        }
+        return (
+          <OrdinalWrapper
+            size={size}
+            selected={selected}
+            url={url}
+            theme={theme}
+            onClick={(e: React.MouseEvent) => {
+              e.preventDefault();
+              if (onClick) onClick();
+            }}
+          >
             <iframe src={url} style={{ border: '0px', height: '100%', width: '100%' }} sandbox="true" />
           </OrdinalWrapper>
         );
