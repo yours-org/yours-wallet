@@ -23,6 +23,15 @@ const OrdinalWrapper = styled.div<OrdinalDivProps>`
   border: ${(props) => (props.selected ? `0.1rem solid ${props.theme.lightAccent}` : undefined)};
 `;
 
+const StyledIFrame = styled.iframe<{ size?: string }>`
+  height: ${(props) => props.size ?? '6.5rem'};
+  width: ${(props) => props.size ?? '6.5rem'};
+  border-radius: 1.25rem;
+  border: none;
+  cursor: pointer;
+  pointer-events: none;
+`;
+
 const TextWrapper = styled(OrdinalWrapper)`
   display: flex;
   flex-direction: column;
@@ -95,7 +104,7 @@ export const Ordinal = (props: OrdinalProps) => {
       case contentType?.startsWith('image/svg'):
         return (
           <OrdinalWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <iframe src={url} style={{ border: '0px', height: '100%', width: '100%' }} sandbox="true" />
+            <StyledIFrame src={url} sandbox="true" size={size} />
           </OrdinalWrapper>
         );
       case contentType?.startsWith('text/html'):
@@ -112,17 +121,8 @@ export const Ordinal = (props: OrdinalProps) => {
           );
         }
         return (
-          <OrdinalWrapper
-            size={size}
-            selected={selected}
-            url={url}
-            theme={theme}
-            onClick={(e: React.MouseEvent) => {
-              e.preventDefault();
-              if (onClick) onClick();
-            }}
-          >
-            <iframe src={url} style={{ border: '0px', height: '100%', width: '100%' }} sandbox="true" />
+          <OrdinalWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
+            <StyledIFrame src={url} sandbox="true" size={size} />
           </OrdinalWrapper>
         );
       case contentType?.startsWith('image/'):
