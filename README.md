@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Version: v3.2.0
+Version: v3.3.0
 
 <a href="https://chrome.google.com/webstore/detail/panda-wallet/mlbnicldlpdimbjdcncnklfempedeipj" target="_blank">🌱 Download Chrome Extension 🌱</a>
 

@@ -1,6 +1,6 @@
 {
   "name": "yours-wallet",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "private": true,
   "dependencies": {
     "@testing-library/jest-dom": "^5.17.0",
