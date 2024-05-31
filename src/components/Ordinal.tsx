@@ -3,6 +3,7 @@ import { OrdinalTxo } from '../hooks/ordTypes';
 import { ColorThemeProps, Theme } from '../theme';
 import { Text } from './Reusable';
 import { Show } from './Show';
+import React from 'react';
 
 export type OrdinalDivProps = ColorThemeProps & {
   url: string;
@@ -20,6 +21,15 @@ const OrdinalWrapper = styled.div<OrdinalDivProps>`
   border-radius: 1.25rem;
   cursor: pointer;
   border: ${(props) => (props.selected ? `0.1rem solid ${props.theme.lightAccent}` : undefined)};
+`;
+
+const StyledIFrame = styled.iframe<{ size?: string }>`
+  height: ${(props) => props.size ?? '6.5rem'};
+  width: ${(props) => props.size ?? '6.5rem'};
+  border-radius: 1.25rem;
+  border: none;
+  cursor: pointer;
+  pointer-events: none;
 `;
 
 const TextWrapper = styled(OrdinalWrapper)`
@@ -92,10 +102,27 @@ export const Ordinal = (props: OrdinalProps) => {
   const renderContent = () => {
     switch (true) {
       case contentType?.startsWith('image/svg'):
-      case contentType?.startsWith('text/html'):
         return (
           <OrdinalWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <iframe src={url} style={{ border: '0px', height: '100%', width: '100%' }} sandbox="true" />
+            <StyledIFrame src={url} sandbox="true" size={size} />
+          </OrdinalWrapper>
+        );
+      case contentType?.startsWith('text/html'):
+        if (inscription.origin?.data?.map?.previewUrl) {
+          return (
+            <OrdinalWrapper
+              size={size}
+              selected={selected}
+              url={inscription.origin?.data?.map?.previewUrl}
+              theme={theme}
+              style={{ backgroundImage: `url(${url})` }}
+              onClick={onClick}
+            />
+          );
+        }
+        return (
+          <OrdinalWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
+            <StyledIFrame src={url} sandbox="true" size={size} />
           </OrdinalWrapper>
         );
       case contentType?.startsWith('image/'):
