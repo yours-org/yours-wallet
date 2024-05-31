@@ -132,7 +132,7 @@ export const AppsAndTools = () => {
   const { setSelected, query } = useBottomMenu();
   // const { exchangeRate, identityAddress } = useBsv();
   const { identityAddress } = useBsv();
-  const { getLockedUtxos, getSpentTxids } = useGorillaPool();
+  const { getLockedBsvUtxos, getSpentTxids } = useGorillaPool();
   const { getChainInfo } = useWhatsOnChain();
   const { isProcessing, setIsProcessing } = useContracts();
   const [page, setPage] = useState<AppsPage>(query === 'pending-locks' ? 'unlock' : 'main');
@@ -147,7 +147,7 @@ export const AppsAndTools = () => {
     setIsProcessing(true);
     if (!identityAddress) throw Error('Identity address missing!');
     const chainInfo = await getChainInfo();
-    let lockedTxos = await getLockedUtxos(identityAddress);
+    let lockedTxos = await getLockedBsvUtxos(identityAddress);
     const blockHeight = Number(chainInfo?.blocks);
     if (blockHeight) setCurrentBlockHeight(blockHeight);
     const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
