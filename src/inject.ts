@@ -1,4 +1,6 @@
+//@ts-ignore
 const createYoursMethod = (type) => {
+  //@ts-ignore
   return async (params) => {
     return new Promise((resolve, reject) => {
       // Send request
@@ -9,6 +11,7 @@ const createYoursMethod = (type) => {
       document.dispatchEvent(requestEvent);
 
       // Listen for a response
+      //@ts-ignore
       function onResponse(e) {
         if (e.detail.type === type) {
           if (e.detail.success) {
@@ -28,6 +31,7 @@ const createYoursEventEmitter = () => {
   const eventListeners = new Map(); // Object to store event listeners
   const whitelistedEvents = ['signedOut', 'networkChanged']; // Whitelisted event names
 
+  //@ts-ignore
   const on = (eventName, callback) => {
     // Check if the provided event name is in the whitelist
     if (whitelistedEvents.includes(eventName)) {
@@ -40,11 +44,13 @@ const createYoursEventEmitter = () => {
     }
   };
 
+  //@ts-ignore
   const removeListener = (eventName, callback) => {
     const listeners = eventListeners.get(eventName);
     if (listeners) {
       eventListeners.set(
         eventName,
+        //@ts-ignore
         listeners.filter((fn) => fn !== callback),
       );
     }
@@ -89,25 +95,35 @@ const provider = {
   decrypt: createYoursMethod('decrypt'),
 };
 
+//@ts-ignore
 window.panda = provider;
+//@ts-ignore
 window.yours = provider;
 
 document.addEventListener('YoursEmitEvent', (event) => {
+  //@ts-ignore
   const { action, params } = event.detail;
   // Check if window.panda is defined and has event listeners for the action
+  //@ts-ignore
   if (window.panda && window.panda.eventListeners && window.panda.eventListeners.has(action)) {
+    //@ts-ignore
     const listeners = window.panda.eventListeners.get(action);
     // Trigger each listener with the provided params
+    //@ts-ignore
     listeners.forEach((callback) => callback(params));
   }
 });
 
 document.addEventListener('YoursEmitEvent', (event) => {
+  //@ts-ignore
   const { action, params } = event.detail;
   // Check if window.yours is defined and has event listeners for the action
+  //@ts-ignore
   if (window.yours && window.yours.eventListeners && window.yours.eventListeners.has(action)) {
+    //@ts-ignore
     const listeners = window.yours.eventListeners.get(action);
     // Trigger each listener with the provided params
+    //@ts-ignore
     listeners.forEach((callback) => callback(params));
   }
 });

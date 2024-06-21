@@ -3,17 +3,17 @@ console.log('Yours Wallet Background Script Running!');
 
 const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv';
 
-let responseCallbackForConnectRequest;
-let responseCallbackForSendBsvRequest;
-let responseCallbackForTransferOrdinalRequest;
-let responseCallbackForPurchaseOrdinalRequest;
-let responseCallbackForSignMessageRequest;
-let responseCallbackForBroadcastRequest;
-let responseCallbackForGetSignaturesRequest;
-let responseCallbackForGenerateTaggedKeysRequest;
-let responseCallbackForEncryptRequest;
-let responseCallbackForDecryptRequest;
-let popupWindowId = null;
+let responseCallbackForConnectRequest: any;
+let responseCallbackForSendBsvRequest: any;
+let responseCallbackForTransferOrdinalRequest: any;
+let responseCallbackForPurchaseOrdinalRequest: any;
+let responseCallbackForSignMessageRequest: any;
+let responseCallbackForBroadcastRequest: any;
+let responseCallbackForGetSignaturesRequest: any;
+let responseCallbackForGenerateTaggedKeysRequest: any;
+let responseCallbackForEncryptRequest: any;
+let responseCallbackForDecryptRequest: any;
+let popupWindowId: number | undefined;
 
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
@@ -26,7 +26,7 @@ const launchPopUp = () => {
       height: 567,
     },
     (window) => {
-      popupWindowId = window.id;
+      popupWindowId = window?.id;
       chrome.storage.local.set({
         popupWindowId,
       });
@@ -34,7 +34,7 @@ const launchPopUp = () => {
   );
 };
 
-const verifyAccess = async (requestingDomain) => {
+const verifyAccess = async (requestingDomain: any) => {
   return new Promise((resolve) => {
     chrome.storage.local.get(['whitelist'], (result) => {
       const { whitelist } = result;
@@ -43,7 +43,7 @@ const verifyAccess = async (requestingDomain) => {
         return;
       }
 
-      if (whitelist.map((i) => i.domain).includes(requestingDomain)) {
+      if (whitelist.map((i: any) => i.domain).includes(requestingDomain)) {
         resolve(true);
       } else {
         resolve(false);
@@ -53,7 +53,7 @@ const verifyAccess = async (requestingDomain) => {
   });
 };
 
-const authorizeRequest = async (message) => {
+const authorizeRequest = async (message: any) => {
   const { params } = message;
   return await verifyAccess(params.domain);
 };
@@ -176,10 +176,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // EMIT EVENTS ********************************
 
-const emitEventToActiveTabs = (message) => {
+const emitEventToActiveTabs = (message: any) => {
   const { action, params } = message;
-  chrome.tabs.query({ active: true }, function (tabs) {
-    tabs.forEach(function (tab) {
+  chrome.tabs.query({ active: true }, function (tabs: any) {
+    tabs.forEach(function (tab: any) {
       chrome.tabs.sendMessage(tab.id, { type: 'YoursEmitEvent', action, params });
     });
   });
@@ -188,7 +188,7 @@ const emitEventToActiveTabs = (message) => {
 
 // REQUESTS ***************************************
 
-const processConnectRequest = (message, sendResponse, isAuthorized) => {
+const processConnectRequest = (message: any, sendResponse: any, isAuthorized: any) => {
   responseCallbackForConnectRequest = sendResponse;
   chrome.storage.local
     .set({
@@ -201,13 +201,13 @@ const processConnectRequest = (message, sendResponse, isAuthorized) => {
   return true;
 };
 
-const processDisconnectRequest = (message, sendResponse) => {
+const processDisconnectRequest = (message: any, sendResponse: any) => {
   try {
     chrome.storage.local.get(['whitelist'], (result) => {
       if (!result.whitelist) throw Error('Already disconnected!');
       const { params } = message;
 
-      const updatedWhitelist = result.whitelist.filter((i) => i.domain !== params.domain);
+      const updatedWhitelist = result.whitelist?.filter((i: any) => i.domain !== params.domain);
 
       chrome.storage.local.set({ whitelist: updatedWhitelist }, () => {
         sendResponse({
@@ -226,7 +226,7 @@ const processDisconnectRequest = (message, sendResponse) => {
   }
 };
 
-const processIsConnectedRequest = (message, sendResponse) => {
+const processIsConnectedRequest = (message: any, sendResponse: any) => {
   try {
     chrome.storage.local.get(['appState', 'lastActiveTime', 'whitelist'], (result) => {
       const currentTime = Date.now();
@@ -238,7 +238,7 @@ const processIsConnectedRequest = (message, sendResponse) => {
         data:
           !result?.appState?.isLocked &&
           currentTime - lastActiveTime < INACTIVITY_LIMIT &&
-          result.whitelist?.map((i) => i.domain).includes(message.params.domain),
+          result.whitelist?.map((i: any) => i.domain).includes(message.params.domain),
       });
     });
   } catch (error) {
@@ -252,7 +252,7 @@ const processIsConnectedRequest = (message, sendResponse) => {
   return true;
 };
 
-const processGetBalanceRequest = (sendResponse) => {
+const processGetBalanceRequest = (sendResponse: any) => {
   try {
     chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
@@ -270,7 +270,7 @@ const processGetBalanceRequest = (sendResponse) => {
   }
 };
 
-const processGetPubKeysRequest = (sendResponse) => {
+const processGetPubKeysRequest = (sendResponse: any) => {
   try {
     chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
@@ -288,7 +288,7 @@ const processGetPubKeysRequest = (sendResponse) => {
   }
 };
 
-const processGetAddressesRequest = (sendResponse) => {
+const processGetAddressesRequest = (sendResponse: any) => {
   try {
     chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
@@ -306,7 +306,7 @@ const processGetAddressesRequest = (sendResponse) => {
   }
 };
 
-const processGetNetworkRequest = (sendResponse) => {
+const processGetNetworkRequest = (sendResponse: any) => {
   try {
     chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
@@ -324,7 +324,7 @@ const processGetNetworkRequest = (sendResponse) => {
   }
 };
 
-const processGetOrdinalsRequest = (sendResponse) => {
+const processGetOrdinalsRequest = (sendResponse: any) => {
   try {
     chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
@@ -342,7 +342,7 @@ const processGetOrdinalsRequest = (sendResponse) => {
   }
 };
 
-const processGetExchangeRate = (sendResponse) => {
+const processGetExchangeRate = (sendResponse: any) => {
   chrome.storage.local.get(['exchangeRateCache'], async (data) => {
     try {
       const { exchangeRateCache } = data;
@@ -378,7 +378,7 @@ const processGetExchangeRate = (sendResponse) => {
   });
 };
 
-const processGetPaymentUtxos = async (sendResponse) => {
+const processGetPaymentUtxos = async (sendResponse: any) => {
   try {
     chrome.storage.local.get(['paymentUtxos'], ({ paymentUtxos }) => {
       sendResponse({
@@ -387,8 +387,8 @@ const processGetPaymentUtxos = async (sendResponse) => {
         data:
           paymentUtxos.length > 0
             ? paymentUtxos
-                .filter((u) => !u.spent)
-                .map((utxo) => {
+                .filter((u: any) => !u.spent)
+                .map((utxo: any) => {
                   return {
                     satoshis: utxo.satoshis,
                     script: utxo.script,
@@ -408,7 +408,7 @@ const processGetPaymentUtxos = async (sendResponse) => {
   }
 };
 
-const processSendBsvRequest = (message, sendResponse) => {
+const processSendBsvRequest = (message: any, sendResponse: any) => {
   if (!message.params.data) {
     sendResponse({
       type: 'sendBsv',
@@ -422,7 +422,7 @@ const processSendBsvRequest = (message, sendResponse) => {
 
     // If in this if block, it's an inscribe() request.
     if (message.params.data[0].base64Data) {
-      sendBsvRequest = message.params.data.map((d) => {
+      sendBsvRequest = message.params.data.map((d: any) => {
         return {
           address: d.address,
           inscription: {
@@ -447,7 +447,7 @@ const processSendBsvRequest = (message, sendResponse) => {
   }
 };
 
-const processTransferOrdinalRequest = (message, sendResponse) => {
+const processTransferOrdinalRequest = (message: any, sendResponse: any) => {
   if (!message.params) {
     sendResponse({
       type: 'transferOrdinal',
@@ -473,7 +473,7 @@ const processTransferOrdinalRequest = (message, sendResponse) => {
   }
 };
 
-const processPurchaseOrdinalRequest = (message, sendResponse) => {
+const processPurchaseOrdinalRequest = (message: any, sendResponse: any) => {
   if (!message.params) {
     sendResponse({
       type: 'purchaseOrdinal',
@@ -499,7 +499,7 @@ const processPurchaseOrdinalRequest = (message, sendResponse) => {
   }
 };
 
-const processBroadcastRequest = (message, sendResponse) => {
+const processBroadcastRequest = (message: any, sendResponse: any) => {
   if (!message.params) {
     sendResponse({
       type: 'broadcast',
@@ -525,7 +525,7 @@ const processBroadcastRequest = (message, sendResponse) => {
   }
 };
 
-const processSignMessageRequest = (message, sendResponse) => {
+const processSignMessageRequest = (message: any, sendResponse: any) => {
   if (!message.params) {
     sendResponse({
       type: 'signMessage',
@@ -553,7 +553,7 @@ const processSignMessageRequest = (message, sendResponse) => {
   return true;
 };
 
-const processGetSignaturesRequest = (message, sendResponse) => {
+const processGetSignaturesRequest = (message: any, sendResponse: any) => {
   if (!message.params) {
     sendResponse({
       type: 'getSignatures',
@@ -582,7 +582,7 @@ const processGetSignaturesRequest = (message, sendResponse) => {
   }
 };
 
-const processGetSocialProfileRequest = (sendResponse) => {
+const processGetSocialProfileRequest = (sendResponse: any) => {
   const HOSTED_YOURS_IMAGE = 'https://i.ibb.co/zGcthBv/yours-org-light.png';
   try {
     chrome.storage.local.get(['socialProfile'], (result) => {
@@ -603,7 +603,7 @@ const processGetSocialProfileRequest = (sendResponse) => {
   }
 };
 
-const processGenerateTaggedKeysRequest = (message, sendResponse) => {
+const processGenerateTaggedKeysRequest = (message: any, sendResponse: any) => {
   if (!message.params) {
     sendResponse({
       type: 'generateTaggedKeys',
@@ -629,7 +629,7 @@ const processGenerateTaggedKeysRequest = (message, sendResponse) => {
   }
 };
 
-const processGetTaggedKeys = async (message, sendResponse) => {
+const processGetTaggedKeys = async (message: any, sendResponse: any) => {
   if (!message.params.label) {
     sendResponse({
       type: 'getTaggedKeys',
@@ -652,13 +652,13 @@ const processGetTaggedKeys = async (message, sendResponse) => {
 
         let returnData =
           derivationTags.length > 0
-            ? derivationTags.filter(
-                (res) => res.tag.label === message.params.label && res.tag.domain === message.params.domain,
+            ? derivationTags?.filter(
+                (res: any) => res.tag.label === message.params.label && res.tag.domain === message.params.domain,
               )
             : [];
 
         if (returnData.length > 0 && message.params.ids?.length > 0) {
-          returnData = returnData.filter((d) => message.params.ids.includes(d.tag.id));
+          returnData = returnData?.filter((d: any) => message.params.ids.includes(d.tag.id));
         }
 
         sendResponse({
@@ -677,7 +677,7 @@ const processGetTaggedKeys = async (message, sendResponse) => {
   }
 };
 
-const processEncryptRequest = (message, sendResponse) => {
+const processEncryptRequest = (message: any, sendResponse: any) => {
   if (!message.params) {
     sendResponse({
       type: 'encrypt',
@@ -705,7 +705,7 @@ const processEncryptRequest = (message, sendResponse) => {
   return true;
 };
 
-const processDecryptRequest = (message, sendResponse) => {
+const processDecryptRequest = (message: any, sendResponse: any) => {
   if (!message.params) {
     sendResponse({
       type: 'decrypt',
@@ -735,7 +735,7 @@ const processDecryptRequest = (message, sendResponse) => {
 
 // RESPONSES ********************************
 
-const processConnectResponse = (response) => {
+const processConnectResponse = (response: any) => {
   try {
     if (responseCallbackForConnectRequest) {
       responseCallbackForConnectRequest({
@@ -752,14 +752,14 @@ const processConnectResponse = (response) => {
     });
   } finally {
     responseCallbackForConnectRequest = null;
-    popupWindowId = null;
+    popupWindowId = undefined;
     chrome.storage.local.remove('popupWindowId');
   }
 
   return true;
 };
 
-const processSendBsvResponse = (response) => {
+const processSendBsvResponse = (response: any) => {
   if (!responseCallbackForSendBsvRequest) throw Error('Missing callback!');
   try {
     responseCallbackForSendBsvRequest({
@@ -775,14 +775,14 @@ const processSendBsvResponse = (response) => {
     });
   } finally {
     responseCallbackForSendBsvRequest = null;
-    popupWindowId = null;
+    popupWindowId = undefined;
     chrome.storage.local.remove(['sendBsvRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processTransferOrdinalResponse = (response) => {
+const processTransferOrdinalResponse = (response: any) => {
   if (!responseCallbackForTransferOrdinalRequest) throw Error('Missing callback!');
   try {
     responseCallbackForTransferOrdinalRequest({
@@ -798,14 +798,14 @@ const processTransferOrdinalResponse = (response) => {
     });
   } finally {
     responseCallbackForTransferOrdinalRequest = null;
-    popupWindowId = null;
+    popupWindowId = undefined;
     chrome.storage.local.remove(['transferOrdinalRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processGenerateTaggedKeysResponse = (response) => {
+const processGenerateTaggedKeysResponse = (response: any) => {
   if (!responseCallbackForGenerateTaggedKeysRequest) throw Error('Missing callback!');
   try {
     responseCallbackForGenerateTaggedKeysRequest({
@@ -825,14 +825,14 @@ const processGenerateTaggedKeysResponse = (response) => {
     });
   } finally {
     responseCallbackForGenerateTaggedKeysRequest = null;
-    popupWindowId = null;
+    popupWindowId = undefined;
     chrome.storage.local.remove(['generateTaggedKeysRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processPurchaseOrdinalResponse = (response) => {
+const processPurchaseOrdinalResponse = (response: any) => {
   if (!responseCallbackForPurchaseOrdinalRequest) throw Error('Missing callback!');
   try {
     responseCallbackForPurchaseOrdinalRequest({
@@ -848,14 +848,14 @@ const processPurchaseOrdinalResponse = (response) => {
     });
   } finally {
     responseCallbackForPurchaseOrdinalRequest = null;
-    popupWindowId = null;
+    popupWindowId = undefined;
     chrome.storage.local.remove(['purchaseOrdinalRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processSignMessageResponse = (response) => {
+const processSignMessageResponse = (response: any) => {
   if (!responseCallbackForSignMessageRequest) throw Error('Missing callback!');
   try {
     responseCallbackForSignMessageRequest({
@@ -877,14 +877,14 @@ const processSignMessageResponse = (response) => {
     });
   } finally {
     responseCallbackForSignMessageRequest = null;
-    popupWindowId = null;
+    popupWindowId = undefined;
     chrome.storage.local.remove(['signMessageRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processBroadcastResponse = (response) => {
+const processBroadcastResponse = (response: any) => {
   if (!responseCallbackForBroadcastRequest) throw Error('Missing callback!');
   try {
     if (response?.error) {
@@ -908,14 +908,14 @@ const processBroadcastResponse = (response) => {
     });
   } finally {
     responseCallbackForBroadcastRequest = null;
-    popupWindowId = null;
+    popupWindowId = undefined;
     chrome.storage.local.remove(['broadcastRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processGetSignaturesResponse = (response) => {
+const processGetSignaturesResponse = (response: any) => {
   if (!responseCallbackForGetSignaturesRequest) throw Error('Missing callback!');
   try {
     responseCallbackForGetSignaturesRequest({
@@ -932,14 +932,14 @@ const processGetSignaturesResponse = (response) => {
     });
   } finally {
     responseCallbackForGetSignaturesRequest = null;
-    popupWindowId = null;
+    popupWindowId = undefined;
     chrome.storage.local.remove(['getSignaturesRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processEncryptResponse = (response) => {
+const processEncryptResponse = (response: any) => {
   if (!responseCallbackForEncryptRequest) throw Error('Missing callback!');
   try {
     responseCallbackForEncryptRequest({
@@ -955,14 +955,14 @@ const processEncryptResponse = (response) => {
     });
   } finally {
     responseCallbackForEncryptRequest = null;
-    popupWindowId = null;
+    popupWindowId = undefined;
     chrome.storage.local.remove(['encryptRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processDecryptResponse = (response) => {
+const processDecryptResponse = (response: any) => {
   if (!responseCallbackForDecryptRequest) throw Error('Missing callback!');
   try {
     responseCallbackForDecryptRequest({
@@ -978,7 +978,7 @@ const processDecryptResponse = (response) => {
     });
   } finally {
     responseCallbackForDecryptRequest = null;
-    popupWindowId = null;
+    popupWindowId = undefined;
     chrome.storage.local.remove(['decryptRequest', 'popupWindowId']);
   }
 
@@ -1089,7 +1089,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       chrome.storage.local.remove('decryptRequest');
     }
 
-    popupWindowId = null;
+    popupWindowId = undefined;
     chrome.storage.local.remove('popupWindowId');
   }
 });
