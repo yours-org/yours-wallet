@@ -21,9 +21,9 @@ export type Keys = {
 };
 
 export type InternalYoursTags =
-  | { label: 'panda'; id: 'bsv'; domain: ''; meta: {} }
-  | { label: 'panda'; id: 'ord'; domain: ''; meta: {} }
-  | { label: 'panda'; id: 'identity'; domain: ''; meta: {} };
+  | { label: 'panda'; id: 'bsv'; domain: ''; meta: Record<string, never> }
+  | { label: 'panda'; id: 'ord'; domain: ''; meta: Record<string, never> }
+  | { label: 'panda'; id: 'identity'; domain: ''; meta: Record<string, never> };
 
 export type DerivationTag =
   | InternalYoursTags
@@ -31,7 +31,7 @@ export type DerivationTag =
       label: string;
       id: string;
       domain: string;
-      meta?: Record<string, any>;
+      meta?: Record<string, never>;
     };
 
 const getWifAndDerivation = (seedPhrase: string, derivationPath: string) => {

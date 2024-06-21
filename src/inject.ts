@@ -1,7 +1,40 @@
-//@ts-ignore
-const createYoursMethod = (type) => {
-  //@ts-ignore
-  return async (params) => {
+export enum YoursEventName {
+  CONNECT = 'connect',
+  DISCONNECT = 'disconnect',
+  IS_CONNECTED = 'isConnected',
+  GET_PUB_KEYS = 'getPubKeys',
+  GET_ADDRESSES = 'getAddresses',
+  GET_NETWORK = 'getNetwork',
+  GET_BALANCE = 'getBalance',
+  GET_ORDINALS = 'getOrdinals',
+  SEND_BSV = 'sendBsv',
+  TRANSFER_ORDINAL = 'transferOrdinal',
+  SIGN_MESSAGE = 'signMessage',
+  BROADCAST = 'broadcast',
+  GET_SIGNATURES = 'getSignatures',
+  GET_SOCIAL_PROFILE = 'getSocialProfile',
+  GET_PAYMENT_UTXOS = 'getPaymentUtxos',
+  GET_EXCHANGE_RATE = 'getExchangeRate',
+  PURCHASE_ORDINAL = 'purchaseOrdinal',
+  GENERATE_TAGGED_KEYS = 'generateTaggedKeys',
+  GET_TAGGED_KEYS = 'getTaggedKeys',
+  INSCRIBE = 'sendBsv',
+  ENCRYPT = 'encrypt',
+  DECRYPT = 'decrypt',
+  SIGN_OUT = 'signOut',
+  ON_NETWORK_CHANGE = 'onNetworkChange',
+}
+
+export enum CustomListenerName {
+  YOURS_EMIT_EVENT = 'YoursEmitEvent',
+  YOURS_REQUEST = 'YoursRequest',
+  YOURS_RESPONSE = 'YoursResponse',
+}
+
+export type YoursProvider = typeof provider;
+
+const createYoursMethod = (type: YoursEventName) => {
+  return async (params: any) => {
     return new Promise((resolve, reject) => {
       // Send request
       const messageId = `${type}-${Date.now()}-${Math.random()}`;
@@ -11,8 +44,8 @@ const createYoursMethod = (type) => {
       document.dispatchEvent(requestEvent);
 
       // Listen for a response
-      //@ts-ignore
-      function onResponse(e) {
+
+      function onResponse(e: any) {
         if (e.detail.type === type) {
           if (e.detail.success) {
             resolve(e.detail.data);
@@ -31,8 +64,7 @@ const createYoursEventEmitter = () => {
   const eventListeners = new Map(); // Object to store event listeners
   const whitelistedEvents = ['signedOut', 'networkChanged']; // Whitelisted event names
 
-  //@ts-ignore
-  const on = (eventName, callback) => {
+  const on = (eventName: YoursEventName, callback: any) => {
     // Check if the provided event name is in the whitelist
     if (whitelistedEvents.includes(eventName)) {
       if (!eventListeners.has(eventName)) {
@@ -44,14 +76,13 @@ const createYoursEventEmitter = () => {
     }
   };
 
-  //@ts-ignore
-  const removeListener = (eventName, callback) => {
+  const removeListener = (eventName: YoursEventName, callback: any) => {
     const listeners = eventListeners.get(eventName);
     if (listeners) {
       eventListeners.set(
         eventName,
-        //@ts-ignore
-        listeners.filter((fn) => fn !== callback),
+
+        listeners.filter((fn: any) => fn !== callback),
       );
     }
   };
@@ -71,59 +102,47 @@ const createYoursEventEmitter = () => {
 const provider = {
   isReady: true,
   ...createYoursEventEmitter(),
-  connect: createYoursMethod('connect'),
-  disconnect: createYoursMethod('disconnect'),
-  isConnected: createYoursMethod('isConnected'),
-  getPubKeys: createYoursMethod('getPubKeys'),
-  getAddresses: createYoursMethod('getAddresses'),
-  getNetwork: createYoursMethod('getNetwork'),
-  getBalance: createYoursMethod('getBalance'),
-  getOrdinals: createYoursMethod('getOrdinals'),
-  sendBsv: createYoursMethod('sendBsv'),
-  transferOrdinal: createYoursMethod('transferOrdinal'),
-  signMessage: createYoursMethod('signMessage'),
-  broadcast: createYoursMethod('broadcast'),
-  getSignatures: createYoursMethod('getSignatures'),
-  getSocialProfile: createYoursMethod('getSocialProfile'),
-  getPaymentUtxos: createYoursMethod('getPaymentUtxos'),
-  getExchangeRate: createYoursMethod('getExchangeRate'),
-  purchaseOrdinal: createYoursMethod('purchaseOrdinal'),
-  generateTaggedKeys: createYoursMethod('generateTaggedKeys'),
-  getTaggedKeys: createYoursMethod('getTaggedKeys'),
-  inscribe: createYoursMethod('sendBsv'),
-  encrypt: createYoursMethod('encrypt'),
-  decrypt: createYoursMethod('decrypt'),
+  connect: createYoursMethod(YoursEventName.CONNECT),
+  disconnect: createYoursMethod(YoursEventName.DISCONNECT),
+  isConnected: createYoursMethod(YoursEventName.IS_CONNECTED),
+  getPubKeys: createYoursMethod(YoursEventName.GET_PUB_KEYS),
+  getAddresses: createYoursMethod(YoursEventName.GET_ADDRESSES),
+  getNetwork: createYoursMethod(YoursEventName.GET_NETWORK),
+  getBalance: createYoursMethod(YoursEventName.GET_BALANCE),
+  getOrdinals: createYoursMethod(YoursEventName.GET_ORDINALS),
+  sendBsv: createYoursMethod(YoursEventName.SEND_BSV),
+  transferOrdinal: createYoursMethod(YoursEventName.TRANSFER_ORDINAL),
+  signMessage: createYoursMethod(YoursEventName.SIGN_MESSAGE),
+  broadcast: createYoursMethod(YoursEventName.BROADCAST),
+  getSignatures: createYoursMethod(YoursEventName.GET_SIGNATURES),
+  getSocialProfile: createYoursMethod(YoursEventName.GET_SOCIAL_PROFILE),
+  getPaymentUtxos: createYoursMethod(YoursEventName.GET_PAYMENT_UTXOS),
+  getExchangeRate: createYoursMethod(YoursEventName.GET_EXCHANGE_RATE),
+  purchaseOrdinal: createYoursMethod(YoursEventName.PURCHASE_ORDINAL),
+  generateTaggedKeys: createYoursMethod(YoursEventName.GENERATE_TAGGED_KEYS),
+  getTaggedKeys: createYoursMethod(YoursEventName.GET_TAGGED_KEYS),
+  inscribe: createYoursMethod(YoursEventName.INSCRIBE),
+  encrypt: createYoursMethod(YoursEventName.ENCRYPT),
+  decrypt: createYoursMethod(YoursEventName.DECRYPT),
 };
 
-//@ts-ignore
 window.panda = provider;
-//@ts-ignore
+
 window.yours = provider;
 
-document.addEventListener('YoursEmitEvent', (event) => {
-  //@ts-ignore
+document.addEventListener(CustomListenerName.YOURS_EMIT_EVENT, (event: any) => {
   const { action, params } = event.detail;
   // Check if window.panda is defined and has event listeners for the action
-  //@ts-ignore
-  if (window.panda && window.panda.eventListeners && window.panda.eventListeners.has(action)) {
-    //@ts-ignore
-    const listeners = window.panda.eventListeners.get(action);
-    // Trigger each listener with the provided params
-    //@ts-ignore
-    listeners.forEach((callback) => callback(params));
-  }
-});
 
-document.addEventListener('YoursEmitEvent', (event) => {
-  //@ts-ignore
-  const { action, params } = event.detail;
-  // Check if window.yours is defined and has event listeners for the action
-  //@ts-ignore
-  if (window.yours && window.yours.eventListeners && window.yours.eventListeners.has(action)) {
-    //@ts-ignore
-    const listeners = window.yours.eventListeners.get(action);
-    // Trigger each listener with the provided params
-    //@ts-ignore
-    listeners.forEach((callback) => callback(params));
+  let listeners;
+  if (window.panda && window.panda.eventListeners && window.panda.eventListeners.has(action)) {
+    listeners = window.panda.eventListeners.get(action);
   }
+
+  if (window.yours && window.yours.eventListeners && window.yours.eventListeners.has(action)) {
+    listeners = window.yours.eventListeners.get(action);
+  }
+
+  if (!listeners) return;
+  listeners.forEach((callback: any) => callback(params));
 });

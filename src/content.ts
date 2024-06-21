@@ -1,49 +1,45 @@
 /* global chrome */
 
+import { CustomListenerName } from './inject';
+
 console.log('🌱 Yours Wallet Loaded');
 
 const script = document.createElement('script');
 script.src = chrome.runtime.getURL('inject.js');
 (document.head || document.documentElement).appendChild(script);
 
-document.addEventListener('YoursRequest', (e) => {
-  //@ts-ignore
+document.addEventListener(CustomListenerName.YOURS_REQUEST, (e: any) => {
   if (!e?.detail?.type) return;
-  //@ts-ignore
+
   const { type, params: originalParams = {} } = e.detail;
 
-  let params = {};
+  let params: Record<string, any> = {};
 
   if (type === 'connect') {
-    //@ts-ignore
-    params.appName = document.title || document.querySelector('meta[name="application-name"]')?.content || 'Unknown';
-    //@ts-ignore
+    params.appName =
+      document.title ||
+      (document.querySelector('meta[name="application-name"]') as HTMLMetaElement)?.content ||
+      'Unknown';
+
     params.appIcon =
-      //@ts-ignore
-      document.querySelector('link[rel="apple-touch-icon"]')?.href ||
-      //@ts-ignore
-      document.querySelector('link[rel="icon"]')?.href ||
+      (document.querySelector('link[rel="apple-touch-icon"]') as HTMLLinkElement)?.href ||
+      (document.querySelector('link[rel="icon"]') as HTMLLinkElement)?.href ||
       '';
   }
 
   if (Array.isArray(originalParams)) {
-    //@ts-ignore
     params.data = originalParams;
   } else if (typeof originalParams === 'object') {
     params = { ...params, ...originalParams };
   }
 
-  //@ts-ignore
   params.domain = window.location.hostname;
 
-  //@ts-ignore
   chrome.runtime.sendMessage({ action: type, params }, buildResponseCallback(e.detail.messageId));
 });
 
-//@ts-ignore
-const buildResponseCallback = (messageId) => {
-  //@ts-ignore
-  return (response) => {
+const buildResponseCallback = (messageId: string) => {
+  return (response: any) => {
     const responseEvent = new CustomEvent(messageId, { detail: response });
     document.dispatchEvent(responseEvent);
   };

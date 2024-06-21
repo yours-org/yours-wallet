@@ -2,7 +2,7 @@ const webpack = require('webpack');
 const WebpackPluginReplaceNpm = require('replace-module-webpack-plugin');
 const path = require('path');
 
-module.exports = function override(config, env) {
+module.exports = function override(config) {
   config.resolve.extensions.push('.ts', '.tsx');
 
   config.module.rules.push({
