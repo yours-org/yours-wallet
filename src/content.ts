@@ -1,6 +1,13 @@
 /* global chrome */
 
-import { CustomListenerName } from './inject';
+import {
+  CustomListenerName,
+  EmitEventDetail,
+  RequestEventDetail,
+  RequestParams,
+  ResponseEventDetail,
+  YoursEventName,
+} from './inject';
 
 console.log('🌱 Yours Wallet Loaded');
 
@@ -8,14 +15,13 @@ const script = document.createElement('script');
 script.src = chrome.runtime.getURL('inject.js');
 (document.head || document.documentElement).appendChild(script);
 
-document.addEventListener(CustomListenerName.YOURS_REQUEST, (e: any) => {
-  if (!e?.detail?.type) return;
+self.addEventListener(CustomListenerName.YOURS_REQUEST, (e: Event) => {
+  const { type, messageId, params: originalParams = {} } = (e as CustomEvent<RequestEventDetail>).detail;
+  if (!type) return;
 
-  const { type, params: originalParams = {} } = e.detail;
+  let params: RequestParams = {};
 
-  let params: Record<string, any> = {};
-
-  if (type === 'connect') {
+  if (type === YoursEventName.CONNECT) {
     params.appName =
       document.title ||
       (document.querySelector('meta[name="application-name"]') as HTMLMetaElement)?.content ||
@@ -35,20 +41,20 @@ document.addEventListener(CustomListenerName.YOURS_REQUEST, (e: any) => {
 
   params.domain = window.location.hostname;
 
-  chrome.runtime.sendMessage({ action: type, params }, buildResponseCallback(e.detail.messageId));
+  chrome.runtime.sendMessage({ action: type, params }, buildResponseCallback(messageId));
 });
 
 const buildResponseCallback = (messageId: string) => {
-  return (response: any) => {
+  return (response: ResponseEventDetail) => {
     const responseEvent = new CustomEvent(messageId, { detail: response });
-    document.dispatchEvent(responseEvent);
+    self.dispatchEvent(responseEvent);
   };
 };
 
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message: EmitEventDetail) => {
   const { type, action, params } = message;
-  if (type === 'YoursEmitEvent') {
+  if (type === CustomListenerName.YOURS_EMIT_EVENT) {
     const event = new CustomEvent(type, { detail: { action, params } });
-    document.dispatchEvent(event);
+    self.dispatchEvent(event);
   }
 });

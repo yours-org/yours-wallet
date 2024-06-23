@@ -1,9 +1,9 @@
-import { YoursProvider } from './inject';
+import { YoursProviderType } from 'yours-wallet-provider';
 
 declare global {
   interface Window {
-    yours: YoursProvider;
-    panda: YoursProvider;
+    yours: YoursProviderType;
+    panda: YoursProviderType;
   }
 }
 
