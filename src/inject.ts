@@ -99,7 +99,6 @@ export type RequestEvent = {
 export type ResponseEventDetail = {
   type: YoursEventName;
   success: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?:
     | SendBsvResponse
     | PubKeys
