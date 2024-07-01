@@ -22,7 +22,7 @@ export const ThemeProvider = (props: ThemeProviderProps) => {
   const [theme, setTheme] = useState<Theme>(defaultTheme);
 
   useEffect(() => {
-    storage.get('colorTheme', (result) => {
+    storage.get('colorTheme').then((result) => {
       if (result.colorTheme) {
         setTheme(result.colorTheme);
       }

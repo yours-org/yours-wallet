@@ -1,6 +1,7 @@
 import { P2PKHAddress, PublicKey } from 'bsv-wasm-web';
 import { buildInscription } from 'js-1sat-ord-web';
 import { useEffect, useState } from 'react';
+import { DerivationTag, TaggedDerivationRequest } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -14,18 +15,20 @@ import { useNetwork } from '../../hooks/useNetwork';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { encryptUsingPrivKey } from '../../utils/crypto';
 import { truncate } from '../../utils/format';
-import { DerivationTag, getPrivateKeyFromTag, getTaggedDerivationKeys, Keys } from '../../utils/keys';
+import { getPrivateKeyFromTag, getTaggedDerivationKeys, Keys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
 
 export type GenerateTaggedKeysRequestProps = {
-  web3Request: DerivationTag;
+  request: TaggedDerivationRequest & { domain?: string };
   popupId: number | undefined;
   onResponse: () => void;
 };
 
+// TODO: Try to use the provider type here... need to figure out how to handle error
 export type TaggedDerivationResponse = {
   address?: string;
   pubKey?: string;
@@ -34,7 +37,7 @@ export type TaggedDerivationResponse = {
 };
 
 export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps) => {
-  const { web3Request, popupId, onResponse } = props;
+  const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
   const { network } = useNetwork();
   const { isProcessing, setIsProcessing, sendBsv, getChainParams } = useBsv();
@@ -55,7 +58,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
+      if (popupId) removeWindow(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
@@ -80,18 +83,15 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       if (!keys?.mnemonic || !keys.identityPubKey || !keys.identityAddress) {
         return { error: 'no-keys' };
       }
-      const existingTag: TaggedDerivationResponse = await new Promise((resolve, reject) => {
-        storage.get(['derivationTags'], ({ derivationTags }) => {
-          resolve(
-            derivationTags.find(
-              (res: TaggedDerivationResponse) =>
-                res.tag?.domain === derivationTag.domain &&
-                res.tag.label === derivationTag.label &&
-                res.tag.id === derivationTag.id,
-            ),
-          );
-        });
-      });
+
+      const { derivationTags } = await storage.get(['derivationTags']);
+
+      const existingTag = derivationTags.find(
+        (res: TaggedDerivationResponse) =>
+          res.tag?.domain === derivationTag.domain &&
+          res.tag.label === derivationTag.label &&
+          res.tag.id === derivationTag.id,
+      );
 
       if (existingTag) return existingTag;
 
@@ -137,8 +137,14 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     e.preventDefault();
     setIsProcessing(true);
 
+    if (!request?.domain) {
+      addSnackbar('Invalid or domain information', 'info');
+      setIsProcessing(false);
+      return;
+    }
+
     await sleep(25);
-    if (!web3Request.label || !web3Request.id) {
+    if (!request.label || !request.id) {
       addSnackbar('Invalid or missing tag data', 'info');
       setIsProcessing(false);
       return;
@@ -151,7 +157,8 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     }
 
     const keys = (await retrieveKeys(passwordConfirm)) as Keys;
-    const res = await createTaggedKeys(passwordConfirm, web3Request, keys);
+    const res = await createTaggedKeys(passwordConfirm, request as DerivationTag, keys);
+    //TODO: look into this... doesn't seem optimal
     setIsProcessing(true); // sendBsv call in createTaggedKeys sets to false but it's still processing at this point
 
     if (!res.address || !res.pubKey) {
@@ -176,7 +183,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     setIsProcessing(false);
     addSnackbar('Successfully generated key!', 'success');
 
-    chrome.runtime.sendMessage({
+    sendMessage({
       action: 'generateTaggedKeysResponse',
       address: res.address,
       pubKey: res.pubKey,
@@ -185,14 +192,14 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
 
     setTimeout(async () => {
       onResponse();
-      storage.remove('generateTaggedKeysRequest');
-      if (popupId) chrome.windows.remove(popupId);
+      await storage.remove('generateTaggedKeysRequest');
+      if (popupId) removeWindow(popupId);
     }, 2000);
   };
 
-  const clearRequest = () => {
-    storage.remove('generateTaggedKeysRequest');
-    if (popupId) chrome.windows.remove(popupId);
+  const clearRequest = async () => {
+    await storage.remove('generateTaggedKeysRequest');
+    if (popupId) removeWindow(popupId);
     window.location.reload();
   };
 
@@ -202,14 +209,14 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
         <PageLoader theme={theme} message="Processing request..." />
       </Show>
 
-      <Show when={!isProcessing && !!web3Request}>
+      <Show when={!isProcessing && !!request}>
         <ConfirmContent>
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <FormContainer noValidate onSubmit={(e) => handleGetTaggedKeys(e)}>
             <Text theme={theme} style={{ margin: '1rem 0' }}>
-              {`The app is requesting to generate a new set of tagged keys with label ${web3Request.label} and id ${
-                web3Request.id.length > 20 ? truncate(web3Request.id, 5, 5) : web3Request.id
+              {`The app is requesting to generate a new set of tagged keys with label ${request.label} and id ${
+                request.id.length > 20 ? truncate(request.id, 5, 5) : request.id
               }`}
             </Text>
             <Show when={isPasswordRequired}>

@@ -14,6 +14,7 @@ import { ColorThemeProps } from '../../theme';
 import { sleep } from '../../utils/sleep';
 import copyIcon from '../../assets/copy-green.svg';
 import yoursLogo from '../../assets/yours-logo.png';
+import { useWeb3ContextNew } from '../../hooks/useWeb3ContextNew';
 
 const Content = styled.div`
   display: flex;
@@ -69,6 +70,7 @@ export const CreateWallet = () => {
   const { generateSeedAndStoreEncrypted } = useKeys();
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
+  const { setEncryptedKeys } = useWeb3ContextNew();
 
   useEffect(() => {
     hideMenu();
@@ -97,6 +99,9 @@ export const CreateWallet = () => {
     await sleep(50);
     const mnemonic = generateSeedAndStoreEncrypted(password);
     setSeedWords(mnemonic.split(' '));
+
+    // Save the encrypted keys to context
+    setEncryptedKeys(mnemonic);
 
     setLoading(false);
     setStep(2);

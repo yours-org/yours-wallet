@@ -1,5 +1,5 @@
 import validate from 'bitcoin-address-validation';
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { BackButton } from '../components/BackButton';
 import { Button } from '../components/Button';
@@ -281,10 +281,16 @@ export const OrdWallet = () => {
       return;
     }
 
+    if (!bsvListAmount) {
+      addSnackbar('You must enter a valid BSV amount!', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
     const listing: ListOrdinal = {
       outpoint: ordinalOutpoint,
       password: passwordConfirm,
-      price: Math.ceil(bsvListAmount! * BSV_DECIMAL_CONVERSION),
+      price: Math.ceil(bsvListAmount * BSV_DECIMAL_CONVERSION),
     };
 
     const listRes = await listOrdinalOnGlobalOrderbook(listing);

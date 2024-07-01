@@ -74,6 +74,7 @@ export type RequestParams = {
   appIcon?: string;
   data?: any;
   domain?: string;
+  isAuthorized?: boolean;
 };
 
 export type RequestEventDetail = {
@@ -105,6 +106,11 @@ export type EmitEventDetail = {
 
 export type EmitEvent = {
   detail: EmitEventDetail;
+};
+
+export type WhitelistedApp = {
+  domain: string;
+  icon: string;
 };
 
 export type Decision = 'approved' | 'declined';

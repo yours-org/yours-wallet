@@ -6,7 +6,7 @@ export const useNoApprovalLimitSetting = () => {
 
   const retrieveLimit = (): Promise<boolean> => {
     return new Promise((resolve, reject) => {
-      storage.get(['noApprovalLimit'], async (res) => {
+      storage.get(['noApprovalLimit']).then((res) => {
         try {
           const limit = res.noApprovalLimit ?? 0;
           setNoApprovalLimit(limit);

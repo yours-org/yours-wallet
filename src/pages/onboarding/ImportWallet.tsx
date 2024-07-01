@@ -41,7 +41,6 @@ export const ImportWallet = () => {
   const [payPk, setPayPk] = useState('');
   const [ordPk, setOrdPk] = useState('');
   const [identityPk, setIdentityPk] = useState('');
-
   const { addSnackbar } = useSnackbar();
   const { generateKeysFromWifAndStoreEncrypted } = useKeys();
   const { hideMenu, showMenu } = useBottomMenu();

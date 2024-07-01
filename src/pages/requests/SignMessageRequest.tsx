@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { styled } from 'styled-components';
+import { SignMessage } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -7,13 +8,13 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useBsv, Web3SignMessageRequest } from '../../hooks/useBsv';
+import { useBsv } from '../../hooks/useBsv';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
 import { ColorThemeProps } from '../../theme';
-import { DerivationTag } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
+import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { storage } from '../../utils/storage';
 
 const RequestDetailsContainer = styled.div<ColorThemeProps>`
@@ -32,48 +33,42 @@ const TagText = styled(Text)`
   margin: 0.25rem;
 `;
 
-export type SignMessageResponse = {
-  address?: string;
-  pubKey?: string;
-  message?: string;
-  sig?: string;
-  derivationTag?: DerivationTag;
-  error?: string;
-};
-
 export type SignMessageRequestProps = {
-  messageToSign: Web3SignMessageRequest;
+  request: SignMessage;
   popupId: number | undefined;
   onSignature: () => void;
 };
 
 export const SignMessageRequest = (props: SignMessageRequestProps) => {
-  const { messageToSign, onSignature, popupId } = props;
+  const { request, onSignature, popupId } = props;
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [signature, setSignature] = useState<string | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
   const { isPasswordRequired } = useWeb3Context();
-
   const { isProcessing, setIsProcessing, signMessage } = useBsv();
 
   useEffect(() => {
     setSelected('bsv');
   }, [setSelected]);
 
+  const resetSendState = () => {
+    setPasswordConfirm('');
+    setIsProcessing(false);
+  };
+
   useEffect(() => {
     if (!signature) return;
     if (!message && signature) {
       resetSendState();
     }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, signature]);
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
+      if (popupId) removeWindow(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
@@ -81,11 +76,6 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
     };
   }, [popupId]);
-
-  const resetSendState = () => {
-    setPasswordConfirm('');
-    setIsProcessing(false);
-  };
 
   const handleSigning = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -98,7 +88,8 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       return;
     }
 
-    const signRes = await signMessage(messageToSign, passwordConfirm);
+    //TODO: This should not be any type. The signMessage method should be refactored to return provider type. Error handling should be done differently.
+    const signRes: any = await signMessage(request, passwordConfirm);
     if (!signRes?.sig) {
       const message =
         signRes?.error === 'invalid-password'
@@ -112,7 +103,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       return;
     }
 
-    chrome.runtime.sendMessage({
+    await sendMessage({
       action: 'signMessageResponse',
       ...signRes,
     });
@@ -120,16 +111,16 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
     addSnackbar('Successfully Signed!', 'success');
     setSignature(signRes.sig);
     setIsProcessing(false);
-    setTimeout(() => {
+    setTimeout(async () => {
       onSignature();
-      storage.remove('signMessageRequest');
-      if (popupId) chrome.windows.remove(popupId);
+      await storage.remove('signMessageRequest');
+      if (popupId) await removeWindow(popupId);
     }, 2000);
   };
 
-  const clearRequest = () => {
-    storage.remove('signMessageRequest');
-    if (popupId) chrome.windows.remove(popupId);
+  const clearRequest = async () => {
+    await storage.remove('signMessageRequest');
+    if (popupId) await removeWindow(popupId);
     window.location.reload();
   };
 
@@ -138,7 +129,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       <Show when={isProcessing}>
         <PageLoader theme={theme} message="Signing Transaction..." />
       </Show>
-      <Show when={!isProcessing && !!messageToSign}>
+      <Show when={!isProcessing && !!request}>
         <ConfirmContent>
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Sign Message</HeaderText>
@@ -146,7 +137,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
             {'The app is requesting a signature using derivation tag:'}
           </Text>
           <Show
-            when={!!messageToSign.tag?.label}
+            when={!!request.tag?.label}
             whenFalseContent={
               <>
                 <TagText theme={theme}>{`Label: panda`}</TagText>
@@ -154,12 +145,12 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
               </>
             }
           >
-            <TagText theme={theme}>{`Label: ${messageToSign.tag?.label}`}</TagText>
-            <TagText theme={theme}>{`Id: ${messageToSign.tag?.id}`}</TagText>
+            <TagText theme={theme}>{`Label: ${request.tag?.label}`}</TagText>
+            <TagText theme={theme}>{`Id: ${request.tag?.id}`}</TagText>
           </Show>
           <FormContainer noValidate onSubmit={(e) => handleSigning(e)}>
             <RequestDetailsContainer>
-              {<Text style={{ color: theme.white }}>{`Message: ${messageToSign.message}`}</Text>}
+              {<Text style={{ color: theme.white }}>{`Message: ${request.message}`}</Text>}
             </RequestDetailsContainer>
             <Show when={isPasswordRequired}>
               <Input

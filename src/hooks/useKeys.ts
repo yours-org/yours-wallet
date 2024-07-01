@@ -148,7 +148,7 @@ export const useKeys = () => {
    */
   const retrieveKeys = (password?: string, isBelowNoApprovalLimit?: boolean): Promise<Keys | Partial<Keys>> => {
     return new Promise((resolve, reject) => {
-      storage.get(['encryptedKeys', 'passKey', 'salt'], async (result: KeyStorage) => {
+      storage.get(['encryptedKeys', 'passKey', 'salt']).then(async (result: KeyStorage) => {
         try {
           await init();
           if (!result.encryptedKeys || !result.passKey) return;
@@ -206,7 +206,7 @@ export const useKeys = () => {
   const verifyPassword = (password: string): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       if (!isPasswordRequired) resolve(true);
-      storage.get(['salt', 'passKey'], (result: KeyStorage) => {
+      storage.get(['salt', 'passKey']).then((result: KeyStorage) => {
         try {
           const derivedKey = deriveKey(password, result.salt);
           resolve(derivedKey === result.passKey);

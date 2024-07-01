@@ -1,6 +1,7 @@
 import init, { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
 import { DefaultTheme, styled } from 'styled-components';
+import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -8,10 +9,11 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { SignatureResponse, useContracts, Web3GetSignaturesRequest } from '../../hooks/useContracts';
+import { useContracts } from '../../hooks/useContracts';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
 
@@ -103,7 +105,7 @@ const OutputContent = (props: {
   );
 };
 
-const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
+const TxViewer = (props: { request: GetSignatures }) => {
   const { theme } = useTheme();
   const [showDetail, setShowDetail] = useState(false);
   const { request } = props;
@@ -111,17 +113,22 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
 
   useEffect(() => {
     const setTheTx = async () => {
-      await init();
-      const tx = Transaction.from_hex(request.rawtx);
-      const numOuts = tx.get_noutputs();
-      const outputs: { asm: string; satoshis: number }[] = [];
-      for (let i = 0; i < numOuts; i++) {
-        const output = tx.get_output(i);
-        const asm = output!.get_script_pub_key().to_asm_string();
-        const satoshis = output!.get_satoshis();
-        outputs.push({ asm, satoshis: Number(satoshis) });
+      try {
+        await init();
+        const tx = Transaction.from_hex(request.rawtx);
+        const numOuts = tx.get_noutputs();
+        const outputs: { asm: string; satoshis: number }[] = [];
+        for (let i = 0; i < numOuts; i++) {
+          const output = tx.get_output(i);
+          const asm = output?.get_script_pub_key().to_asm_string();
+          const satoshis = output?.get_satoshis();
+          if (!asm) throw new Error('Could not parse output and get asm string');
+          outputs.push({ asm, satoshis: Number(satoshis) });
+        }
+        setTxOutputs(outputs);
+      } catch (error) {
+        console.error(error);
       }
-      setTxOutputs(outputs);
     };
     setTheTx();
   }, [request.rawtx]);
@@ -133,7 +140,6 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
           theme={theme}
           type="secondary"
           label="Details"
-          // disabled={isProcessing}
           onClick={() => setShowDetail(!showDetail)}
           style={{ marginTop: '0' }}
         />
@@ -144,25 +150,23 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
           <Text theme={theme} style={{ margin: '0.5rem 0' }}>
             Inputs To Sign
           </Text>
-          {request.sigRequests.map((sigReq) => {
-            return (
-              <TxInput>
-                <InputContent
-                  idx={sigReq.inputIndex}
-                  tag={sigReq.script ? 'nonStandard' : 'P2PKH'}
-                  addr={[sigReq.address].flat().join(', ')}
-                  sats={sigReq.satoshis}
-                  theme={theme}
-                />
-              </TxInput>
-            );
-          })}
+          {request.sigRequests.map((sigReq) => (
+            <TxInput key={sigReq.inputIndex}>
+              <InputContent
+                idx={sigReq.inputIndex}
+                tag={sigReq.script ? 'nonStandard' : 'P2PKH'}
+                addr={[sigReq.address].flat().join(', ')}
+                sats={sigReq.satoshis}
+                theme={theme}
+              />
+            </TxInput>
+          ))}
         </TxInputsContainer>
         <TxOutputsContainer>
           <Text theme={theme} style={{ margin: '0.5rem 0' }}>
             Outputs
           </Text>
-          {txOutputs ? (
+          {txOutputs.length > 0 ? (
             txOutputs.map(({ asm, satoshis }, idx: number) => {
               const pubkeyHash = (/^OP_DUP OP_HASH160 ([0-9a-fA-F]{40}) OP_EQUALVERIFY OP_CHECKSIG$/.exec(asm) ||
                 [])[1];
@@ -172,7 +176,7 @@ const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
                 : 'Unknown Address';
 
               return (
-                <TxOutput>
+                <TxOutput key={idx}>
                   <OutputContent
                     idx={idx}
                     tag={isP2PKH ? 'P2PKH' : 'nonStandard'}
@@ -198,7 +202,7 @@ export type GetSignaturesResponse = {
 };
 
 export type GetSignaturesRequestProps = {
-  getSigsRequest: Web3GetSignaturesRequest;
+  request: GetSignatures;
   popupId: number | undefined;
   onSignature: () => void;
 };
@@ -210,13 +214,28 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { addSnackbar, message } = useSnackbar();
   const { isPasswordRequired } = useWeb3Context();
 
-  const { getSigsRequest, onSignature, popupId } = props;
-  const [getSigsResponse, setGetSigsResponse] = useState<any>(undefined);
+  const { request, onSignature, popupId } = props;
+  //TODO: this type should just be the response from the provider. Figure out how to better handle error.
+  const [getSigsResponse, setGetSigsResponse] = useState<{
+    sigResponses?: SignatureResponse[] | undefined;
+    error?:
+      | {
+          message: string;
+          cause?: any;
+        }
+      | undefined;
+  }>();
   const { isProcessing, setIsProcessing, getSignatures } = useContracts();
 
   useEffect(() => {
     setSelected('bsv');
   }, [setSelected]);
+
+  const resetSendState = () => {
+    setPasswordConfirm('');
+    setGetSigsResponse(undefined);
+    setIsProcessing(false);
+  };
 
   useEffect(() => {
     if (!getSigsResponse) return;
@@ -228,7 +247,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
+      if (popupId) removeWindow(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
@@ -236,12 +255,6 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       window.removeEventListener('beforeunload', onbeforeunloadFn);
     };
   }, [popupId]);
-
-  const resetSendState = () => {
-    setPasswordConfirm('');
-    setGetSigsResponse(undefined);
-    setIsProcessing(false);
-  };
 
   const handleSigning = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -254,7 +267,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       return;
     }
 
-    const getSigsRes = await getSignatures(getSigsRequest, passwordConfirm);
+    const getSigsRes = await getSignatures(request, passwordConfirm);
 
     if (getSigsRes?.error) {
       const message =
@@ -264,7 +277,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
             ? 'Unknown Address: ' + (getSigsRes.error.cause ?? '')
             : 'An unknown error has occurred! Try again.';
 
-      chrome.runtime.sendMessage({
+      sendMessage({
         action: 'getSignaturesResponse',
         ...getSigsRes,
       });
@@ -276,8 +289,8 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       return;
     }
 
-    setGetSigsResponse(getSigsRes.sigResponses);
-    chrome.runtime.sendMessage({
+    setGetSigsResponse(getSigsRes);
+    sendMessage({
       action: 'getSignaturesResponse',
       ...getSigsRes,
     });
@@ -286,22 +299,22 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
 
     addSnackbar('Successfully Signed!', 'success');
 
-    setTimeout(() => {
+    setTimeout(async () => {
       onSignature();
-      storage.remove('getSignaturesRequest');
-      if (popupId) chrome.windows.remove(popupId);
+      await storage.remove('getSignaturesRequest');
+      if (popupId) removeWindow(popupId);
     }, 2000);
   };
 
   const rejectSigning = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     e.preventDefault();
-    if (popupId) chrome.windows.remove(popupId);
-    storage.remove('getSignaturesRequest');
+    if (popupId) removeWindow(popupId);
+    await storage.remove('getSignaturesRequest');
   };
 
-  const clearRequest = () => {
-    storage.remove('getSignaturesRequest');
-    if (popupId) chrome.windows.remove(popupId);
+  const clearRequest = async () => {
+    await storage.remove('getSignaturesRequest');
+    if (popupId) removeWindow(popupId);
     window.location.reload();
   };
 
@@ -310,7 +323,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       <Show when={isProcessing}>
         <PageLoader theme={theme} message="Signing Transaction..." />
       </Show>
-      <Show when={!isProcessing && !!getSigsRequest}>
+      <Show when={!isProcessing && !!request}>
         <ConfirmContent>
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Sign Transaction</HeaderText>
@@ -318,7 +331,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
             The app is requesting signatures for a transaction.
           </Text>
           <FormContainer noValidate onSubmit={(e) => handleSigning(e)}>
-            <TxViewer request={getSigsRequest} />
+            <TxViewer request={request} />
             <Show when={isPasswordRequired}>
               <Input
                 theme={theme}

@@ -17,31 +17,30 @@ export const WalletLockProvider = (props: WalletLockProviderProps) => {
   const { children } = props;
   const [isLocked, setIsLocked] = useState<boolean>(false);
 
-  const lockWallet = () => {
+  const lockWallet = async () => {
     const timestamp = Date.now();
     const twentyMinutesAgo = timestamp - 20 * 60 * 1000;
-    storage.set({ lastActiveTime: twentyMinutesAgo });
-    storage.remove('appState');
+    await storage.set({ lastActiveTime: twentyMinutesAgo });
+    await storage.remove('appState');
     setIsLocked(true);
   };
 
   useEffect(() => {
-    const checkLockState = () => {
-      storage.get(['lastActiveTime', 'encryptedKeys'], (result) => {
-        const currentTime = Date.now();
-        const lastActiveTime = result.lastActiveTime;
+    const checkLockState = async () => {
+      const result = await storage.get(['lastActiveTime', 'encryptedKeys']);
+      const currentTime = Date.now();
+      const lastActiveTime = result.lastActiveTime;
 
-        if (!result.encryptedKeys) {
-          setIsLocked(false);
-          return;
-        }
+      if (!result.encryptedKeys) {
+        setIsLocked(false);
+        return;
+      }
 
-        if (currentTime - lastActiveTime > INACTIVITY_LIMIT) {
-          lockWallet();
-        } else {
-          setIsLocked(false);
-        }
-      });
+      if (currentTime - lastActiveTime > INACTIVITY_LIMIT) {
+        lockWallet();
+      } else {
+        setIsLocked(false);
+      }
     };
 
     checkLockState();

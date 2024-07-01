@@ -19,6 +19,7 @@ import {
   SignMessage,
 } from 'yours-wallet-provider';
 import { CustomListenerName, Decision, RequestParams, ResponseEventDetail, YoursEventName } from './inject';
+import { launchPopUp } from './utils/chromeHelpers';
 
 console.log('Yours Wallet Background Script Running!');
 
@@ -40,23 +41,6 @@ let popupWindowId: number | undefined;
 
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
-const launchPopUp = () => {
-  chrome.windows.create(
-    {
-      url: chrome.runtime.getURL('index.html'),
-      type: 'popup',
-      width: 360,
-      height: 567,
-    },
-    (window) => {
-      popupWindowId = window?.id;
-      chrome.storage.local.set({
-        popupWindowId,
-      });
-    },
-  );
-};
-
 const verifyAccess = async (requestingDomain: string): Promise<boolean> => {
   return new Promise((resolve) => {
     chrome.storage.local.get(['whitelist'], (result) => {
@@ -76,6 +60,7 @@ const verifyAccess = async (requestingDomain: string): Promise<boolean> => {
 };
 
 const authorizeRequest = async (message: { params: { domain: string } }): Promise<boolean> => {
+  console.log('authorizeRequest', message);
   const { params } = message;
   return await verifyAccess(params.domain);
 };
@@ -104,6 +89,7 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
       case YoursEventName.IS_CONNECTED:
         return processIsConnectedRequest(message.params as { domain: string }, sendResponse);
       case YoursEventName.USER_CONNECT_RESPONSE:
+        console.log('USER_CONNECT_RESPONSE', message);
         return processConnectResponse(message as { decision: Decision; pubKeys: PubKeys });
       case YoursEventName.SEND_BSV_RESPONSE:
         return processSendBsvResponse(message as SendBsvResponse);
@@ -136,6 +122,7 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
     }
 
     if (!isAuthorized) {
+      console.log('im here');
       sendResponse({
         type: message.action,
         success: false,
@@ -795,7 +782,7 @@ const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys
   } finally {
     responseCallbackForConnectRequest = null;
     popupWindowId = undefined;
-    chrome.storage.local.remove('popupWindowId');
+    chrome.storage.local.remove('connectRequest');
   }
 
   return true;

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { WhitelistedApp } from '../App';
 import x from '../assets/x.svg';
 import { BackButton } from '../components/BackButton';
 import { Button } from '../components/Button';
@@ -20,7 +19,9 @@ import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useWalletLockState } from '../hooks/useWalletLockState';
 import { useWeb3Context } from '../hooks/useWeb3Context';
+import { WhitelistedApp } from '../inject';
 import { ColorThemeProps } from '../theme';
+import { sendMessage } from '../utils/chromeHelpers';
 import { SNACKBAR_TIMEOUT } from '../utils/constants';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
@@ -135,18 +136,16 @@ export const Settings = () => {
   const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(socialProfile?.avatar);
 
   useEffect(() => {
-    const getWhitelist = (): Promise<string[]> => {
-      return new Promise((resolve, reject) => {
-        storage.get(['whitelist'], async (result) => {
-          try {
-            const { whitelist } = result;
-            setConnectedApps(whitelist ?? []);
-            resolve(whitelist ?? []);
-          } catch (error) {
-            reject(error);
-          }
-        });
-      });
+    const getWhitelist = async (): Promise<string[]> => {
+      const result = await storage.get(['whitelist']);
+      try {
+        const { whitelist } = result;
+        setConnectedApps(whitelist ?? []);
+        return whitelist ?? [];
+      } catch (error) {
+        console.error(error);
+        return [];
+      }
     };
 
     getWhitelist();
@@ -245,7 +244,7 @@ export const Settings = () => {
     setDecisionType(undefined);
     window.location.reload();
 
-    chrome.runtime.sendMessage({
+    sendMessage({
       action: 'signedOut',
     });
   };
@@ -268,7 +267,7 @@ export const Settings = () => {
       window.location.reload();
     }, SNACKBAR_TIMEOUT - 500);
 
-    chrome.runtime.sendMessage({
+    sendMessage({
       action: 'networkChanged',
       params: {
         network,

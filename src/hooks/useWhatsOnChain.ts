@@ -52,82 +52,72 @@ export const useWhatsOnChain = () => {
 
   const getUtxos = async (fromAddress: string, pullFresh?: boolean): Promise<StoredUtxo[]> => {
     if (!isAddressOnRightNetwork(fromAddress)) return [];
-    return new Promise((resolve) => {
-      storage.get(['paymentUtxos'], async ({ paymentUtxos }) => {
-        try {
-          const localUtxos: StoredUtxo[] = paymentUtxos || [];
+    const { paymentUtxos } = await storage.get(['paymentUtxos']);
+    try {
+      const localUtxos: StoredUtxo[] = paymentUtxos || [];
 
-          if (!pullFresh && localUtxos.length > 0) {
-            resolve(
-              localUtxos.filter((utxo) => !utxo.spent).sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1)),
-            );
-            return;
-          }
+      if (!pullFresh && localUtxos.length > 0) {
+        return localUtxos.filter((utxo) => !utxo.spent).sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
+      }
 
-          const { data } = await axios.get(`${getBaseUrl()}/address/${fromAddress}/unspent`, config);
-          const explorerUtxos: UTXO[] = data
-            .filter((u: WocUtxo) => u.value !== 1) // Ensure we are never spending 1 sats
-            .map((utxo: WocUtxo) => {
-              return {
-                satoshis: utxo.value,
-                vout: utxo.tx_pos,
-                txid: utxo.tx_hash,
-                script: P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex(),
-              } as UTXO;
-            });
+      const { data } = await axios.get(`${getBaseUrl()}/address/${fromAddress}/unspent`, config);
+      const explorerUtxos: UTXO[] = data
+        .filter((u: WocUtxo) => u.value !== 1) // Ensure we are never spending 1 sats
+        .map((utxo: WocUtxo) => {
+          return {
+            satoshis: utxo.value,
+            vout: utxo.tx_pos,
+            txid: utxo.tx_hash,
+            script: P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex(),
+          } as UTXO;
+        });
 
-          // Add new UTXOs from explorer that are not in the local storage
-          const newUtxos = explorerUtxos.filter(
-            (explorerUtxo) => !localUtxos.some((storedUtxo) => storedUtxo.txid === explorerUtxo.txid),
-          );
-          localUtxos.push(...newUtxos.map((newUtxo) => ({ ...newUtxo, spent: false, spentUnixTime: 0 })));
+      // Add new UTXOs from explorer that are not in the local storage
+      const newUtxos = explorerUtxos.filter(
+        (explorerUtxo) => !localUtxos.some((storedUtxo) => storedUtxo.txid === explorerUtxo.txid),
+      );
+      localUtxos.push(...newUtxos.map((newUtxo) => ({ ...newUtxo, spent: false, spentUnixTime: 0 })));
 
-          // Remove spent UTXOs older than 3 days
-          const currentDate = new Date();
-          const thresholdUnixTime = currentDate.getTime() - 3 * 24 * 60 * 60; // 3 days in seconds
-          const recentUtxos = localUtxos.filter(
-            (utxo) => !utxo.spent || (utxo.spentUnixTime >= thresholdUnixTime && utxo.spent),
-          );
+      // Remove spent UTXOs older than 3 days
+      const currentDate = new Date();
+      const thresholdUnixTime = currentDate.getTime() - 3 * 24 * 60 * 60; // 3 days in seconds
+      const recentUtxos = localUtxos.filter(
+        (utxo) => !utxo.spent || (utxo.spentUnixTime >= thresholdUnixTime && utxo.spent),
+      );
 
-          // Update local storage to include both unspent and recently spent transactions
-          storage.set({ paymentUtxos: recentUtxos });
+      // Update local storage to include both unspent and recently spent transactions
+      storage.set({ paymentUtxos: recentUtxos });
 
-          const unspent = recentUtxos
-            .filter((utxo) => !utxo.spent)
-            .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
+      const unspent = recentUtxos
+        .filter((utxo) => !utxo.spent)
+        .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
 
-          resolve(unspent);
-        } catch (error) {
-          console.log(error);
-          resolve([]);
-        }
-      });
-    });
+      return unspent;
+    } catch (error) {
+      console.log(error);
+      return [];
+    }
   };
 
   const getExchangeRate = async (): Promise<number | undefined> => {
-    return new Promise((resolve, reject) => {
-      storage.get(['exchangeRateCache'], async ({ exchangeRateCache }) => {
-        try {
-          if (exchangeRateCache?.rate && Date.now() - exchangeRateCache.timestamp < 5 * 60 * 1000) {
-            resolve(Number(exchangeRateCache.rate.toFixed(2)));
-          } else {
-            const res = await axios.get(`${getBaseUrl()}/exchangerate`, config);
-            if (!res.data) {
-              throw new Error('Could not fetch exchange rate from WOC!');
-            }
-
-            const rate = Number(res.data.rate.toFixed(2));
-            const currentTime = Date.now();
-            storage.set({ exchangeRateCache: { rate, timestamp: currentTime } });
-            resolve(rate);
-          }
-        } catch (error) {
-          console.log(error);
-          reject(error);
+    const { exchangeRateCache } = await storage.get(['exchangeRateCache']);
+    try {
+      if (exchangeRateCache?.rate && Date.now() - exchangeRateCache.timestamp < 5 * 60 * 1000) {
+        return Number(exchangeRateCache.rate.toFixed(2));
+      } else {
+        const res = await axios.get(`${getBaseUrl()}/exchangerate`, config);
+        if (!res.data) {
+          throw new Error('Could not fetch exchange rate from WOC!');
         }
-      });
-    });
+
+        const rate = Number(res.data.rate.toFixed(2));
+        const currentTime = Date.now();
+        await storage.set({ exchangeRateCache: { rate, timestamp: currentTime } });
+        return rate;
+      }
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   const getRawTxById = async (txid: string): Promise<string | undefined> => {

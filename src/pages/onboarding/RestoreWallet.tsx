@@ -21,6 +21,7 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { ColorThemeProps } from '../../theme';
 import { sleep } from '../../utils/sleep';
+import { useWeb3ContextNew } from '../../hooks/useWeb3ContextNew';
 
 const Content = styled.div`
   display: flex;
@@ -110,6 +111,8 @@ export const RestoreWallet = () => {
   const [walletDerivation, setWalletDerivation] = useState<string | null>(null);
   const [ordDerivation, setOrdDerivation] = useState<string | null>(null);
   const [identityDerivation, setIdentityDerivation] = useState<string | null>(null);
+  const { setEncryptedKeys } = useWeb3ContextNew();
+
   useEffect(() => {
     hideMenu();
 
@@ -150,6 +153,7 @@ export const RestoreWallet = () => {
       return;
     }
 
+    setEncryptedKeys(mnemonic);
     setLoading(false);
     setStep(4);
   };

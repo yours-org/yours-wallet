@@ -70,9 +70,8 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       }
     })();
 
-    storage.get(['appState'], (result) => {
+    storage.get(['appState']).then(async (result) => {
       const { appState } = result;
-
       // only update appState when popupWindowId is empty;
 
       const balance = {
@@ -81,7 +80,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
         usdInCents: Math.round(bsvBalance * exchangeRate * 100),
       };
 
-      storage.set({
+      await storage.set({
         appState: {
           isLocked,
           ordinals: ordinals.initialized ? ordinals.data : appState?.ordinals || [],

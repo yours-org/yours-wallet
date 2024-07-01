@@ -7,7 +7,7 @@ export const useActivityDetector = (isWalletLocked: boolean) => {
       if (isWalletLocked) return;
 
       const timestamp = Date.now();
-      storage.set({ lastActiveTime: timestamp });
+      await storage.set({ lastActiveTime: timestamp });
     };
 
     document.addEventListener('mousemove', handleActivity);

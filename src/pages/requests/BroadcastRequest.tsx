@@ -1,5 +1,6 @@
 import init, { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
+import { Broadcast } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -7,12 +8,13 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useBsv, Web3BroadcastRequest } from '../../hooks/useBsv';
+import { useBsv } from '../../hooks/useBsv';
 import { useGorillaPool } from '../../hooks/useGorillaPool';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
+import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { storage } from '../../utils/storage';
 
 export type BroadcastResponse = {
@@ -20,7 +22,7 @@ export type BroadcastResponse = {
 };
 
 export type BroadcastRequestProps = {
-  request: Web3BroadcastRequest;
+  request: Broadcast;
   popupId: number | undefined;
   onBroadcast: () => void;
 };
@@ -40,18 +42,22 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     setSelected('bsv');
   }, [setSelected]);
 
+  const resetSendState = () => {
+    setTxid('');
+    setIsProcessing(false);
+  };
+
   useEffect(() => {
     if (!txid) return;
     if (!message && txid) {
       resetSendState();
     }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, txid]);
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
+      if (popupId) removeWindow(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
@@ -77,11 +83,6 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       setSatsOut(satsOut);
     })();
   }, [bsvAddress, request.fund, request.rawtx]);
-
-  const resetSendState = () => {
-    setTxid('');
-    setIsProcessing(false);
-  };
 
   const handleBroadcast = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -114,19 +115,19 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       addSnackbar('Error broadcasting the raw tx!', 'error');
       setIsProcessing(false);
 
-      chrome.runtime.sendMessage({
+      await sendMessage({
         action: 'broadcastResponse',
         error: message ?? 'Unknown error',
       });
 
-      setTimeout(() => {
+      setTimeout(async () => {
         onBroadcast();
-        if (popupId) chrome.windows.remove(popupId);
+        if (popupId) await removeWindow(popupId);
       }, 2000);
       return;
     }
     setTxid(txid);
-    chrome.runtime.sendMessage({
+    await sendMessage({
       action: 'broadcastResponse',
       txid,
     });
@@ -134,19 +135,19 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     setIsProcessing(false);
     addSnackbar('Successfully broadcasted the tx!', 'success');
 
-    storage.remove('broadcastRequest');
+    await storage.remove('broadcastRequest');
     setTimeout(async () => {
       await updateBsvBalance(true).catch((e: unknown) => {
         console.log(e);
       });
       onBroadcast();
-      if (popupId) chrome.windows.remove(popupId);
+      if (popupId) await removeWindow(popupId);
     }, 2000);
   };
 
-  const clearRequest = () => {
-    storage.remove('broadcastRequest');
-    if (popupId) chrome.windows.remove(popupId);
+  const clearRequest = async () => {
+    await storage.remove('broadcastRequest');
+    if (popupId) await removeWindow(popupId);
     window.location.reload();
   };
 

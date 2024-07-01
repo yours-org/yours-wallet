@@ -31,30 +31,27 @@ export const useTokens = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const retrieveTokens = (): Promise<Array<TokenStorage>> => {
-    return new Promise((resolve, _) => {
-      const key = `tokens_${network}`;
-      storage.get([key], async (result: any) => {
-        try {
-          if (!result || !result[key]) {
-            resolve([]);
-            return;
-          }
+  const retrieveTokens = async (): Promise<Array<TokenStorage>> => {
+    const key = `tokens_${network}`;
+    try {
+      const result = await storage.get([key]);
+      if (!result || !result[key]) {
+        return [];
+      }
 
-          const tokenInfos = result[key];
+      const tokenInfos = result[key];
 
-          setTokens(tokenInfos);
-          resolve(tokenInfos);
-        } catch (error) {
-          storage.remove(key);
-          resolve([]);
-        }
-      });
-    });
+      setTokens(tokenInfos);
+      return tokenInfos;
+    } catch (error) {
+      await storage.remove(key);
+      return [];
+    }
   };
 
   const cacheTokenInfos = async (ids: Array<string>) => {
-    return new Promise(async (reslove, reject) => {
+    // eslint-disable-next-line no-async-promise-executor
+    return new Promise(async (resolve, reject) => {
       try {
         const tokenInfos = (
           await Promise.all(
@@ -121,15 +118,9 @@ export const useTokens = () => {
           )
         ).filter((t) => t !== null) as Array<TokenStorage>;
 
-        storage.set(
-          {
-            [`tokens_${network}`]: tokenInfos,
-          },
-          () => {
-            setTokens(tokenInfos);
-            reslove(tokenInfos);
-          },
-        );
+        await storage.set({ [`tokens_${network}`]: tokenInfos });
+        setTokens(tokenInfos);
+        resolve(tokenInfos);
       } catch (error) {
         console.error('cacheTokens failed: ', error);
         reject(error);
@@ -137,22 +128,19 @@ export const useTokens = () => {
     });
   };
 
-  const getTokenInfo = (id: string): Promise<TokenStorage | undefined> => {
-    return new Promise(async (resolve, reject) => {
-      const tokenInfo = tokens.find((t) => t.id === id);
+  const getTokenInfo = async (id: string): Promise<TokenStorage | undefined> => {
+    const tokenInfo = tokens.find((t) => t.id === id);
+    if (tokenInfo) {
+      return tokenInfo;
+    } else {
+      const tokenInfos = await retrieveTokens();
+      const tokenInfo = tokenInfos.find((t) => t.id === id);
+
       if (tokenInfo) {
-        resolve(tokenInfo);
-      } else {
-        const tokenInfos = await retrieveTokens();
-
-        const tokenInfo = tokenInfos.find((t) => t.id === id);
-
-        if (tokenInfo) {
-          resolve(tokenInfo);
-        }
+        return tokenInfo;
       }
-      resolve(undefined);
-    });
+    }
+    return;
   };
 
   const getTokenDecimals = (id: string) => {

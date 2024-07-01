@@ -1,5 +1,6 @@
 import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
+import { TransferOrdinal } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -7,22 +8,23 @@ import { Ordinal } from '../../components/Ordinal';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
-import { useOrds, Web3TransferOrdinalRequest } from '../../hooks/useOrds';
+import { useOrds } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
 
 export type OrdTransferRequestProps = {
-  web3Request: Web3TransferOrdinalRequest;
+  request: TransferOrdinal;
   popupId: number | undefined;
   onResponse: () => void;
 };
 
 export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
-  const { web3Request, popupId, onResponse } = props;
+  const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
   const { ordAddress, getOrdinals, isProcessing, transferOrdinal, setIsProcessing, getOrdinalsBaseUrl, ordinals } =
     useOrds();
@@ -42,7 +44,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
 
   useEffect(() => {
     const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
+      if (popupId) removeWindow(popupId);
     };
 
     window.addEventListener('beforeunload', onbeforeunloadFn);
@@ -62,7 +64,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     setIsProcessing(true);
 
     await sleep(25);
-    if (!validate(web3Request.address)) {
+    if (!validate(request.address)) {
       addSnackbar('Invalid address detected!', 'info');
       setIsProcessing(false);
       return;
@@ -74,7 +76,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
       return;
     }
 
-    const transferRes = await transferOrdinal(web3Request.address, web3Request.outpoint, passwordConfirm);
+    const transferRes = await transferOrdinal(request.address, request.outpoint, passwordConfirm);
 
     if (!transferRes.txid || transferRes.error) {
       const message =
@@ -93,21 +95,21 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     setSuccessTxId(transferRes.txid);
     addSnackbar('Transfer Successful!', 'success');
 
-    chrome.runtime.sendMessage({
+    sendMessage({
       action: 'transferOrdinalResponse',
       txid: transferRes.txid,
     });
 
     setTimeout(async () => {
       onResponse();
-      storage.remove('transferOrdinalRequest');
-      if (popupId) chrome.windows.remove(popupId);
+      await storage.remove('transferOrdinalRequest');
+      if (popupId) removeWindow(popupId);
     }, 2000);
   };
 
-  const clearRequest = () => {
-    storage.remove('transferOrdinalRequest');
-    if (popupId) chrome.windows.remove(popupId);
+  const clearRequest = async () => {
+    await storage.remove('transferOrdinalRequest');
+    if (popupId) removeWindow(popupId);
     window.location.reload();
   };
 
@@ -117,19 +119,19 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
         <PageLoader theme={theme} message="Processing request..." />
       </Show>
 
-      <Show when={!isProcessing && !!web3Request}>
+      <Show when={!isProcessing && !!request}>
         <ConfirmContent>
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Ordinal
-            inscription={ordinals.data.filter((ord) => ord.outpoint.toString() === web3Request.outpoint)[0]}
+            inscription={ordinals.data.filter((ord) => ord.outpoint.toString() === request.outpoint)[0]}
             theme={theme}
-            url={`${getOrdinalsBaseUrl()}/content/${web3Request.origin}`}
+            url={`${getOrdinalsBaseUrl()}/content/${request.origin}`}
             selected={true}
           />
           <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>
             <Text theme={theme} style={{ margin: '1rem 0' }}>
-              {`Transfer to: ${truncate(web3Request.address, 5, 5)}`}
+              {`Transfer to: ${truncate(request.address, 5, 5)}`}
             </Text>
             <Show when={isPasswordRequired}>
               <Input

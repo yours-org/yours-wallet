@@ -24,7 +24,6 @@ import { useBsv } from '../hooks/useBsv';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
-import { useWeb3Context } from '../hooks/useWeb3Context';
 import { ColorThemeProps } from '../theme';
 import { BSV_DECIMAL_CONVERSION, HOSTED_YOURS_IMAGE } from '../utils/constants';
 import { formatUSD } from '../utils/format';
@@ -33,6 +32,7 @@ import { storage } from '../utils/storage';
 import copyIcon from '../assets/copy.svg';
 import { AssetRow } from '../components/AssetRow';
 import lockIcon from '../assets/lock.svg';
+import { usePasswordSetting } from '../hooks/usePasswordSetting';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -108,7 +108,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const { socialProfile } = useSocialProfile();
-  const { isPasswordRequired } = useWeb3Context();
+  const { isPasswordRequired } = usePasswordSetting();
   const [unlockAttempted, setUnlockAttempted] = useState(false);
 
   const {
