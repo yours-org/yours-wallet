@@ -26,8 +26,11 @@ import {
   WhitelistedApp,
   YoursEventName,
 } from './inject';
+import { EncryptResponse } from './pages/requests/EncryptRequest';
+import { DecryptResponse } from './pages/requests/DecryptRequest';
 import { launchPopUp } from './utils/chromeHelpers';
 import { storage } from './utils/storage';
+import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 
 console.log('Yours Wallet Background Script Running!');
 
@@ -98,13 +101,13 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
       case YoursEventName.BROADCAST_RESPONSE:
         return processBroadcastResponse(message as { txid: string });
       case YoursEventName.GET_SIGNATURES_RESPONSE:
-        return processGetSignaturesResponse(message as { error?: string; sigResponses?: SignatureResponse[] });
+        return processGetSignaturesResponse(message as GetSignaturesResponse);
       case YoursEventName.GENERATE_TAGGED_KEYS_RESPONSE:
         return processGenerateTaggedKeysResponse(message as TaggedDerivationResponse);
       case YoursEventName.ENCRYPT_RESPONSE:
-        return processEncryptResponse(message as { encryptedMessages: string[] });
+        return processEncryptResponse(message as EncryptResponse);
       case YoursEventName.DECRYPT_RESPONSE:
-        return processDecryptResponse(message as { decryptedMessages: string[] });
+        return processDecryptResponse(message as DecryptResponse);
       default:
         break;
     }

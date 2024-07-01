@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ChromeStorageObject } from '../contexts/types/global.types';
 
 interface Storage {
