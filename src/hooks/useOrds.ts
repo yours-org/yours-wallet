@@ -389,9 +389,8 @@ export const useOrds = () => {
       }
 
       let idx = 0;
-      for (const u of bsv20Utxos || []) {
-        if (!u?.script) throw Error('No script');
-        const script = Script.from_bytes(Buffer.from(u.script, 'base64'));
+      for (let u of bsv20Utxos || []) {
+        let script = Script.from_bytes(Buffer.from(u.script!, 'base64'));
         const inTx = new TxIn(Buffer.from(u.txid, 'hex'), u.vout, Script.from_hex(''));
         inTx.set_satoshis(BigInt(1));
         inTx.set_locking_script(script);
@@ -425,7 +424,6 @@ export const useOrds = () => {
       const { txid } = await broadcastWithGorillaPool(txhex);
       if (!txid) return { error: 'broadcast-transaction-failed' };
       return { txid };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error('sendBSV20 failed:', error);
       return { error: error.message ?? 'unknown' };
@@ -519,7 +517,7 @@ export const useOrds = () => {
     const ordIn = new TxIn(txBuf, ordinal.vout, Script.from_hex(''));
     tx.add_input(ordIn);
 
-    const utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_hex(''));
+    let utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_hex(''));
 
     tx.add_input(utxoIn);
 
@@ -616,7 +614,7 @@ export const useOrds = () => {
       const ordIn = new TxIn(Buffer.from(listingTxid, 'hex'), 0, Script.from_hex(''));
       cancelTx.add_input(ordIn);
 
-      const utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_hex(''));
+      let utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_hex(''));
       cancelTx.add_input(utxoIn);
 
       const destinationAddress = P2PKHAddress.from_string(ordAddress);
@@ -717,7 +715,7 @@ export const useOrds = () => {
       purchaseTx.add_output(dummyChangeOutput);
 
       // output 3 - marketFee
-      const marketFee = Math.ceil(price * marketplaceRate);
+      let marketFee = Math.ceil(price * marketplaceRate);
       const dummyMarketFeeOutput = new TxOut(
         BigInt(marketFee),
         P2PKHAddress.from_string(marketplaceAddress).get_locking_script(),
@@ -725,8 +723,7 @@ export const useOrds = () => {
       purchaseTx.add_output(dummyMarketFeeOutput);
       satsOut += marketFee;
 
-      const listingScript = listing.script;
-      if (!listingScript) throw Error('No listing script');
+      let listingScript = listing.script!;
       let preimage = purchaseTx.sighash_preimage(
         SigHash.InputOutput,
         0,
@@ -736,16 +733,16 @@ export const useOrds = () => {
 
       listingInput.set_unlocking_script(
         Script.from_asm_string(
-          `${purchaseTx.get_output(0)?.to_hex()} ${purchaseTx.get_output(2)?.to_hex()}${purchaseTx
-            .get_output(3)
-            ?.to_hex()} ${Buffer.from(preimage).toString('hex')} OP_0`,
+          `${purchaseTx.get_output(0)!.to_hex()} ${purchaseTx.get_output(2)!.to_hex()}${purchaseTx
+            .get_output(3)!
+            .to_hex()} ${Buffer.from(preimage).toString('hex')} OP_0`,
         ),
       );
       purchaseTx.set_input(0, listingInput);
 
       let size = purchaseTx.to_bytes().length + P2PKH_INPUT_SIZE + P2PKH_OUTPUT_SIZE;
       let fee = Math.ceil(size * FEE_PER_BYTE);
-      const inputs: UTXO[] = [];
+      let inputs: UTXO[] = [];
       while (satsIn < satsOut + fee) {
         const utxo = fundingUtxos.pop();
         if (!utxo) {
@@ -759,7 +756,7 @@ export const useOrds = () => {
         fee = Math.ceil(size * FEE_PER_BYTE);
       }
 
-      const changeAmt = satsIn - (satsOut + fee);
+      let changeAmt = satsIn - (satsOut + fee);
       const changeOutput = new TxOut(
         BigInt(changeAmt),
         P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script(),
@@ -776,15 +773,15 @@ export const useOrds = () => {
 
       listingInput.set_unlocking_script(
         Script.from_asm_string(
-          `${purchaseTx.get_output(0)?.to_hex()} ${purchaseTx.get_output(2)?.to_hex()}${purchaseTx
-            .get_output(3)
-            ?.to_hex()} ${Buffer.from(preimage).toString('hex')} OP_0`,
+          `${purchaseTx.get_output(0)!.to_hex()} ${purchaseTx.get_output(2)!.to_hex()}${purchaseTx
+            .get_output(3)!
+            .to_hex()} ${Buffer.from(preimage).toString('hex')} OP_0`,
         ),
       );
       purchaseTx.set_input(0, listingInput);
 
       inputs.forEach((utxo, idx) => {
-        const fundingInput = purchaseTx.get_input(idx + 1);
+        const fundingInput = purchaseTx.get_input(idx + 1)!;
         const sig = purchaseTx.sign(
           payPk,
           SigHash.InputOutputs,
@@ -792,8 +789,6 @@ export const useOrds = () => {
           Script.from_hex(utxo.script),
           BigInt(utxo.satoshis),
         );
-
-        if (!fundingInput) throw Error('No funding input');
 
         fundingInput.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${payPk.to_public_key().to_hex()}`));
 

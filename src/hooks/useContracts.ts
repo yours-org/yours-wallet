@@ -70,7 +70,6 @@ export const useContracts = () => {
   const getSignatures = async (
     request: Web3GetSignaturesRequest,
     password: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ sigResponses?: SignatureResponse[]; error?: { message: string; cause?: any } }> => {
     try {
       await init();
@@ -86,13 +85,13 @@ export const useContracts = () => {
         const addresses = address instanceof Array ? address : [address];
         return addresses.map((addr) => {
           if (addr === bsvAddress) {
-            return keys?.walletWif && PrivateKey.from_wif(keys.walletWif);
+            return PrivateKey.from_wif(keys.walletWif!);
           }
           if (addr === ordAddress) {
-            return keys?.ordWif && PrivateKey.from_wif(keys.ordWif);
+            return PrivateKey.from_wif(keys.ordWif!);
           }
           if (addr === identityAddress) {
-            return keys?.identityWif && PrivateKey.from_wif(keys.identityWif);
+            return PrivateKey.from_wif(keys.identityWif!);
           }
           throw new Error('unknown-address', { cause: addr });
         });
@@ -100,8 +99,8 @@ export const useContracts = () => {
 
       const tx = Transaction.from_hex(request.rawtx);
       const sigResponses: SignatureResponse[] = request.sigRequests.flatMap((sigReq) => {
-        const privkeys = getPrivKeys(sigReq.address) as PrivateKey[];
-        if (!privkeys.length) throw new Error('no-private-key', { cause: sigReq.address });
+        const privkeys = getPrivKeys(sigReq.address);
+
         return privkeys.map((privKey: PrivateKey) => {
           const addr = privKey.to_public_key().to_address();
           const script = sigReq.script ? Script.from_hex(sigReq.script) : addr.get_locking_script();
@@ -137,8 +136,6 @@ export const useContracts = () => {
         });
       });
       return Promise.resolve({ sigResponses });
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error('getSignatures error', err);
       return {
@@ -191,23 +188,21 @@ export const useContracts = () => {
       }
 
       for (const [vin, lock] of locks.entries()) {
-        if (!lock?.data?.lock?.until) continue;
         const fragment = Script.from_asm_string(
           Buffer.from(lockPkh).toString('hex') +
             ' ' +
-            Buffer.from(lock.data.lock.until.toString(16).padStart(6, '0'), 'hex').reverse().toString('hex'),
+            Buffer.from(lock.data!.lock!.until.toString(16).padStart(6, '0'), 'hex').reverse().toString('hex'),
         );
 
         const script = Script.from_hex(SCRYPT_PREFIX + fragment.to_hex() + LOCK_SUFFIX);
-        const preimage = tx.sighash_preimage(SigHash.InputsOutputs, vin, script, BigInt(lock.satoshis));
+        let preimage = tx.sighash_preimage(SigHash.InputsOutputs, vin, script!, BigInt(lock.satoshis));
 
-        const sig = tx.sign(lockPk, SigHash.InputsOutputs, vin, script, BigInt(lock.satoshis));
+        const sig = tx.sign(lockPk, SigHash.InputsOutputs, vin, script!, BigInt(lock.satoshis));
 
-        const asm = `${sig.to_hex()} ${lockPk.to_public_key().to_hex()} ${Buffer.from(preimage).toString('hex')}`;
+        let asm = `${sig.to_hex()} ${lockPk.to_public_key().to_hex()} ${Buffer.from(preimage).toString('hex')}`;
         const txin = tx.get_input(vin);
-        if (!txin) throw Error('no-txin');
         txin?.set_unlocking_script(Script.from_asm_string(asm));
-        tx.set_input(vin, txin);
+        tx.set_input(vin, txin!);
       }
 
       const rawTx = tx.to_hex();
@@ -215,8 +210,6 @@ export const useContracts = () => {
       const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
       return { txid };
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.log(error);
       return { error: error.message ?? 'unknown' };
