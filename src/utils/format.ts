@@ -26,7 +26,7 @@ export const truncate = (str: string, startLength: number, endLength: number) =>
   return `${startStr}...${endStr}`;
 };
 
-export const formatNumberWithCommasAndDecimals = (number: number, decimalPlaces = 2): string => {
+export const formatNumberWithCommasAndDecimals = (number: number, decimalPlaces: number = 2): string => {
   if (isNaN(number)) {
     return 'Invalid Number';
   }

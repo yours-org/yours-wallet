@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { storage } from '../utils/storage';
 
 export const useNoApprovalLimitSetting = () => {
-  const [noApprovalLimit, setNoApprovalLimit] = useState<number | undefined>();
+  const [noApprovalLimit, setNoAprrovalLimit] = useState<number | undefined>();
 
   const retrieveLimit = (): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       storage.get(['noApprovalLimit'], async (res) => {
         try {
           const limit = res.noApprovalLimit ?? 0;
-          setNoApprovalLimit(limit);
+          setNoAprrovalLimit(limit);
           resolve(res.noApprovalLimit);
         } catch (error) {
           reject(error);
@@ -25,6 +25,6 @@ export const useNoApprovalLimitSetting = () => {
 
   return {
     noApprovalLimit,
-    setNoApprovalLimit,
+    setNoAprrovalLimit,
   };
 };

@@ -39,7 +39,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   const { setDerivationTags } = useGorillaPool();
   const { network, setNetwork } = useNetwork();
   const { isPasswordRequired, setIsPasswordRequired } = usePasswordSetting();
-  const { noApprovalLimit, setNoApprovalLimit } = useNoApprovalLimitSetting();
+  const { noApprovalLimit, setNoAprrovalLimit } = useNoApprovalLimitSetting();
 
   useEffect(() => {
     // Here we are pulling in any new Utxos unaccounted for.
@@ -125,7 +125,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
 
   const updateNoApprovalLimit = (amt: number) => {
     storage.set({ noApprovalLimit: amt });
-    setNoApprovalLimit(amt);
+    setNoAprrovalLimit(amt);
   };
 
   return (

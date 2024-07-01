@@ -1,16 +1,8 @@
 const webpack = require('webpack');
 const WebpackPluginReplaceNpm = require('replace-module-webpack-plugin');
-const path = require('path');
 
-module.exports = function override(config) {
-  config.resolve.extensions.push('.ts', '.tsx');
-
-  config.module.rules.push({
-    test: /\.tsx?$/,
-    use: 'ts-loader',
-    exclude: /node_modules/,
-  });
-
+module.exports = function override(config, env) {
+  // Ensure crypto-browserify is used as a fallback for the crypto module
   config.resolve.fallback = {
     ...config.resolve.fallback,
     crypto: require.resolve('crypto-browserify'),
@@ -24,6 +16,7 @@ module.exports = function override(config) {
     os: false,
   };
 
+  // Define plugins
   config.plugins = [
     ...config.plugins,
     new WebpackPluginReplaceNpm({
@@ -43,21 +36,6 @@ module.exports = function override(config) {
       Buffer: ['buffer', 'Buffer'],
     }),
   ];
-
-  // Ensure the default entry point is included
-  config.entry = {
-    main: path.resolve(__dirname, 'src/index.tsx'),
-    background: path.resolve(__dirname, 'src/background.ts'),
-    content: path.resolve(__dirname, 'src/content.ts'),
-    inject: path.resolve(__dirname, 'src/inject.ts'),
-  };
-
-  // Ensure output configuration includes the background script
-  config.output = {
-    ...config.output,
-    filename: '[name].js',
-    path: path.resolve(__dirname, 'build'),
-  };
 
   return config;
 };

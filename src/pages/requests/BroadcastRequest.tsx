@@ -69,9 +69,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       const changeScript = P2PKHAddress.from_string(bsvAddress).get_locking_script().to_hex();
       for (let index = 0; index < tx.get_noutputs(); index++) {
         if (tx.get_output(index)?.get_script_pub_key_hex() !== changeScript) {
-          const output = tx.get_output(index);
-          if (!output) continue;
-          satsOut += Number(output.get_satoshis());
+          satsOut += Number(tx.get_output(index)!.get_satoshis());
         }
       }
       setSatsOut(satsOut);
@@ -136,9 +134,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
 
     storage.remove('broadcastRequest');
     setTimeout(async () => {
-      await updateBsvBalance(true).catch((e: unknown) => {
-        console.log(e);
-      });
+      await updateBsvBalance(true).catch(() => {});
       onBroadcast();
       if (popupId) chrome.windows.remove(popupId);
     }, 2000);

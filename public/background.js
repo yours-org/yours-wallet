@@ -1,42 +1,19 @@
 /* global chrome */
-import {
-  EncryptRequest,
-  GetSignatures,
-  PubKeys,
-  SendBsv,
-  SendBsvResponse,
-  SignedMessage,
-  TransferOrdinal,
-  DecryptRequest,
-  PurchaseOrdinal,
-  SignatureResponse,
-  TaggedDerivationRequest,
-  TaggedDerivationResponse,
-  GetTaggedKeysRequest,
-  Utxos,
-  Broadcast,
-  InscribeRequest,
-  SignMessage,
-} from 'yours-wallet-provider';
-import { CustomListenerName, Decision, RequestParams, ResponseEventDetail, YoursEventName } from './inject';
-
 console.log('Yours Wallet Background Script Running!');
 
 const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv';
 
-type CallbackResponse = (response: ResponseEventDetail) => void;
-
-let responseCallbackForConnectRequest: CallbackResponse | null = null;
-let responseCallbackForSendBsvRequest: CallbackResponse | null = null;
-let responseCallbackForTransferOrdinalRequest: CallbackResponse | null = null;
-let responseCallbackForPurchaseOrdinalRequest: CallbackResponse | null = null;
-let responseCallbackForSignMessageRequest: CallbackResponse | null = null;
-let responseCallbackForBroadcastRequest: CallbackResponse | null = null;
-let responseCallbackForGetSignaturesRequest: CallbackResponse | null = null;
-let responseCallbackForGenerateTaggedKeysRequest: CallbackResponse | null = null;
-let responseCallbackForEncryptRequest: CallbackResponse | null = null;
-let responseCallbackForDecryptRequest: CallbackResponse | null = null;
-let popupWindowId: number | undefined;
+let responseCallbackForConnectRequest;
+let responseCallbackForSendBsvRequest;
+let responseCallbackForTransferOrdinalRequest;
+let responseCallbackForPurchaseOrdinalRequest;
+let responseCallbackForSignMessageRequest;
+let responseCallbackForBroadcastRequest;
+let responseCallbackForGetSignaturesRequest;
+let responseCallbackForGenerateTaggedKeysRequest;
+let responseCallbackForEncryptRequest;
+let responseCallbackForDecryptRequest;
+let popupWindowId = null;
 
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
@@ -49,7 +26,7 @@ const launchPopUp = () => {
       height: 567,
     },
     (window) => {
-      popupWindowId = window?.id;
+      popupWindowId = window.id;
       chrome.storage.local.set({
         popupWindowId,
       });
@@ -57,72 +34,75 @@ const launchPopUp = () => {
   );
 };
 
-const verifyAccess = async (requestingDomain: string): Promise<boolean> => {
+const verifyAccess = async (requestingDomain) => {
   return new Promise((resolve) => {
     chrome.storage.local.get(['whitelist'], (result) => {
-      const { whitelist } = result as { whitelist: { domain: string }[] };
+      const { whitelist } = result;
       if (!whitelist) {
         resolve(false);
         return;
       }
 
-      if (whitelist.map((i: { domain: string }) => i.domain).includes(requestingDomain)) {
+      if (whitelist.map((i) => i.domain).includes(requestingDomain)) {
         resolve(true);
       } else {
         resolve(false);
       }
+      resolve(false);
     });
   });
 };
 
-const authorizeRequest = async (message: { params: { domain: string } }): Promise<boolean> => {
+const authorizeRequest = async (message) => {
   const { params } = message;
   return await verifyAccess(params.domain);
 };
 
-chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
-  if ([YoursEventName.SIGNED_OUT, YoursEventName.NETWORK_CHANGED].includes(message.action)) {
+// MESSAGE LISTENER
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (['signedOut', 'networkChanged'].includes(message.action)) {
     return emitEventToActiveTabs(message);
   }
 
   const noAuthRequired = [
-    YoursEventName.IS_CONNECTED,
-    YoursEventName.USER_CONNECT_RESPONSE,
-    YoursEventName.SEND_BSV_RESPONSE,
-    YoursEventName.TRANSFER_ORDINAL_RESPONSE,
-    YoursEventName.PURCHASE_ORDINAL_RESPONSE,
-    YoursEventName.SIGN_MESSAGE_RESPONSE,
-    YoursEventName.BROADCAST_RESPONSE,
-    YoursEventName.GET_SIGNATURES_RESPONSE,
-    YoursEventName.GENERATE_TAGGED_KEYS_RESPONSE,
-    YoursEventName.ENCRYPT_RESPONSE,
-    YoursEventName.DECRYPT_RESPONSE,
+    'isConnected',
+    'userConnectResponse',
+    'sendBsvResponse',
+    'transferOrdinalResponse',
+    'purchaseOrdinalResponse',
+    'signMessageResponse',
+    'signTransactionResponse',
+    'broadcastResponse',
+    'getSignaturesResponse',
+    'generateTaggedKeysResponse',
+    'encryptResponse',
+    'decryptResponse',
   ];
 
   if (noAuthRequired.includes(message.action)) {
     switch (message.action) {
-      case YoursEventName.IS_CONNECTED:
-        return processIsConnectedRequest(message.params as { domain: string }, sendResponse);
-      case YoursEventName.USER_CONNECT_RESPONSE:
-        return processConnectResponse(message as { decision: Decision; pubKeys: PubKeys });
-      case YoursEventName.SEND_BSV_RESPONSE:
-        return processSendBsvResponse(message as SendBsvResponse);
-      case YoursEventName.TRANSFER_ORDINAL_RESPONSE:
-        return processTransferOrdinalResponse(message as { txid: string });
-      case YoursEventName.PURCHASE_ORDINAL_RESPONSE:
-        return processPurchaseOrdinalResponse(message as { txid: string });
-      case YoursEventName.SIGN_MESSAGE_RESPONSE:
-        return processSignMessageResponse(message as SignedMessage);
-      case YoursEventName.BROADCAST_RESPONSE:
-        return processBroadcastResponse(message as { txid: string });
-      case YoursEventName.GET_SIGNATURES_RESPONSE:
-        return processGetSignaturesResponse(message as { error?: string; sigResponses?: SignatureResponse[] });
-      case YoursEventName.GENERATE_TAGGED_KEYS_RESPONSE:
-        return processGenerateTaggedKeysResponse(message as TaggedDerivationResponse);
-      case YoursEventName.ENCRYPT_RESPONSE:
-        return processEncryptResponse(message as { encryptedMessages: string[] });
-      case YoursEventName.DECRYPT_RESPONSE:
-        return processDecryptResponse(message as { decryptedMessages: string[] });
+      case 'isConnected':
+        return processIsConnectedRequest(message, sendResponse);
+      case 'userConnectResponse':
+        return processConnectResponse(message);
+      case 'sendBsvResponse':
+        return processSendBsvResponse(message);
+      case 'transferOrdinalResponse':
+        return processTransferOrdinalResponse(message);
+      case 'purchaseOrdinalResponse':
+        return processPurchaseOrdinalResponse(message);
+      case 'signMessageResponse':
+        return processSignMessageResponse(message);
+      case 'broadcastResponse':
+        return processBroadcastResponse(message);
+      case 'getSignaturesResponse':
+        return processGetSignaturesResponse(message);
+      case 'generateTaggedKeysResponse':
+        return processGenerateTaggedKeysResponse(message);
+      case 'encryptResponse':
+        return processEncryptResponse(message);
+      case 'decryptResponse':
+        return processDecryptResponse(message);
       default:
         break;
     }
@@ -130,8 +110,9 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
     return;
   }
 
+  // We need to authorize access for these endpoints
   authorizeRequest(message).then((isAuthorized) => {
-    if (message.action === YoursEventName.CONNECT) {
+    if (message.action === 'connect') {
       return processConnectRequest(message, sendResponse, isAuthorized);
     }
 
@@ -145,45 +126,45 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
     }
 
     switch (message.action) {
-      case YoursEventName.DISCONNECT:
+      case 'disconnect':
         return processDisconnectRequest(message, sendResponse);
-      case YoursEventName.GET_PUB_KEYS:
+      case 'getPubKeys':
         return processGetPubKeysRequest(sendResponse);
-      case YoursEventName.GET_BALANCE:
+      case 'getBalance':
         return processGetBalanceRequest(sendResponse);
-      case YoursEventName.GET_ADDRESSES:
+      case 'getAddresses':
         return processGetAddressesRequest(sendResponse);
-      case YoursEventName.GET_NETWORK:
+      case 'getNetwork':
         return processGetNetworkRequest(sendResponse);
-      case YoursEventName.GET_ORDINALS:
+      case 'getOrdinals':
         return processGetOrdinalsRequest(sendResponse);
-      case YoursEventName.SEND_BSV:
+      case 'sendBsv':
         return processSendBsvRequest(message, sendResponse);
-      case YoursEventName.TRANSFER_ORDINAL:
+      case 'transferOrdinal':
         return processTransferOrdinalRequest(message, sendResponse);
-      case YoursEventName.PURCHASE_ORDINAL:
+      case 'purchaseOrdinal':
         return processPurchaseOrdinalRequest(message, sendResponse);
-      case YoursEventName.SIGN_MESSAGE:
+      case 'signMessage':
         return processSignMessageRequest(message, sendResponse);
-      case YoursEventName.BROADCAST:
+      case 'broadcast':
         return processBroadcastRequest(message, sendResponse);
-      case YoursEventName.GET_SIGNATURES:
+      case 'getSignatures':
         return processGetSignaturesRequest(message, sendResponse);
-      case YoursEventName.GET_SOCIAL_PROFILE:
+      case 'getSocialProfile':
         return processGetSocialProfileRequest(sendResponse);
-      case YoursEventName.GET_PAYMENT_UTXOS:
+      case 'getPaymentUtxos':
         return processGetPaymentUtxos(sendResponse);
-      case YoursEventName.GET_EXCHANGE_RATE:
+      case 'getExchangeRate':
         return processGetExchangeRate(sendResponse);
-      case YoursEventName.GENERATE_TAGGED_KEYS:
+      case 'generateTaggedKeys':
         return processGenerateTaggedKeysRequest(message, sendResponse);
-      case YoursEventName.GET_TAGGED_KEYS:
+      case 'getTaggedKeys':
         return processGetTaggedKeys(message, sendResponse);
-      case YoursEventName.INSCRIBE:
+      case 'inscribe':
         return processSendBsvRequest(message, sendResponse);
-      case YoursEventName.ENCRYPT:
+      case 'encrypt':
         return processEncryptRequest(message, sendResponse);
-      case YoursEventName.DECRYPT:
+      case 'decrypt':
         return processDecryptRequest(message, sendResponse);
       default:
         break;
@@ -195,11 +176,11 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
 
 // EMIT EVENTS ********************************
 
-const emitEventToActiveTabs = (message: { action: YoursEventName; params: any }) => {
+const emitEventToActiveTabs = (message) => {
   const { action, params } = message;
   chrome.tabs.query({ active: true }, function (tabs) {
-    tabs.forEach(function (tab: any) {
-      chrome.tabs.sendMessage(tab.id, { type: CustomListenerName.YOURS_EMIT_EVENT, action, params });
+    tabs.forEach(function (tab) {
+      chrome.tabs.sendMessage(tab.id, { type: 'YoursEmitEvent', action, params });
     });
   });
   return true;
@@ -207,11 +188,7 @@ const emitEventToActiveTabs = (message: { action: YoursEventName; params: any })
 
 // REQUESTS ***************************************
 
-const processConnectRequest = (
-  message: { params: RequestParams },
-  sendResponse: CallbackResponse,
-  isAuthorized: boolean,
-) => {
+const processConnectRequest = (message, sendResponse, isAuthorized) => {
   responseCallbackForConnectRequest = sendResponse;
   chrome.storage.local
     .set({
@@ -224,17 +201,17 @@ const processConnectRequest = (
   return true;
 };
 
-const processDisconnectRequest = (message: { params: { domain: string } }, sendResponse: CallbackResponse) => {
+const processDisconnectRequest = (message, sendResponse) => {
   try {
     chrome.storage.local.get(['whitelist'], (result) => {
       if (!result.whitelist) throw Error('Already disconnected!');
       const { params } = message;
 
-      const updatedWhitelist = result.whitelist?.filter((i: { domain: string }) => i.domain !== params.domain);
+      const updatedWhitelist = result.whitelist.filter((i) => i.domain !== params.domain);
 
       chrome.storage.local.set({ whitelist: updatedWhitelist }, () => {
         sendResponse({
-          type: YoursEventName.DISCONNECT,
+          type: 'disconnect',
           success: true,
           data: true,
         });
@@ -242,31 +219,31 @@ const processDisconnectRequest = (message: { params: { domain: string } }, sendR
     });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.DISCONNECT,
+      type: 'disconnect',
       success: true, // This is true in the catch because we want to return a boolean
       data: false,
     });
   }
 };
 
-const processIsConnectedRequest = (params: { domain: string }, sendResponse: CallbackResponse) => {
+const processIsConnectedRequest = (message, sendResponse) => {
   try {
     chrome.storage.local.get(['appState', 'lastActiveTime', 'whitelist'], (result) => {
       const currentTime = Date.now();
       const lastActiveTime = result.lastActiveTime;
 
       sendResponse({
-        type: YoursEventName.IS_CONNECTED,
+        type: 'isConnected',
         success: true,
         data:
           !result?.appState?.isLocked &&
           currentTime - lastActiveTime < INACTIVITY_LIMIT &&
-          result.whitelist?.map((i: { domain: string }) => i.domain).includes(params.domain),
+          result.whitelist?.map((i) => i.domain).includes(message.params.domain),
       });
     });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.IS_CONNECTED,
+      type: 'isConnected',
       success: true, // This is true in the catch because we want to return a boolean
       error: false,
     });
@@ -275,106 +252,107 @@ const processIsConnectedRequest = (params: { domain: string }, sendResponse: Cal
   return true;
 };
 
-const processGetBalanceRequest = (sendResponse: CallbackResponse) => {
+const processGetBalanceRequest = (sendResponse) => {
   try {
     chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
-        type: YoursEventName.GET_BALANCE,
+        type: 'getBalance',
         success: true,
         data: result?.appState?.balance,
       });
     });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.GET_BALANCE,
+      type: 'getBalance',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processGetPubKeysRequest = (sendResponse: CallbackResponse) => {
+const processGetPubKeysRequest = (sendResponse) => {
   try {
     chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
-        type: YoursEventName.GET_PUB_KEYS,
+        type: 'getPubKeys',
         success: true,
         data: result?.appState?.pubKeys,
       });
     });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.GET_PUB_KEYS,
+      type: 'getPubKeys',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processGetAddressesRequest = (sendResponse: CallbackResponse) => {
+const processGetAddressesRequest = (sendResponse) => {
   try {
     chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
-        type: YoursEventName.GET_ADDRESSES,
+        type: 'getAddresses',
         success: true,
         data: result?.appState?.addresses,
       });
     });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.GET_ADDRESSES,
+      type: 'getAddresses',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processGetNetworkRequest = (sendResponse: CallbackResponse) => {
+const processGetNetworkRequest = (sendResponse) => {
   try {
     chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
-        type: YoursEventName.GET_NETWORK,
+        type: 'getNetwork',
         success: true,
         data: result?.appState?.network ?? 'mainnet',
       });
     });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.GET_NETWORK,
+      type: 'getNetwork',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processGetOrdinalsRequest = (sendResponse: CallbackResponse) => {
+const processGetOrdinalsRequest = (sendResponse) => {
   try {
     chrome.storage.local.get(['appState'], (result) => {
       sendResponse({
-        type: YoursEventName.GET_ORDINALS,
+        type: 'getOrdinals',
         success: true,
         data: result?.appState?.ordinals ?? [],
       });
     });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.GET_ORDINALS,
+      type: 'getOrdinals',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processGetExchangeRate = (sendResponse: CallbackResponse) => {
+const processGetExchangeRate = (sendResponse) => {
   chrome.storage.local.get(['exchangeRateCache'], async (data) => {
     try {
       const { exchangeRateCache } = data;
       if (exchangeRateCache?.rate && Date.now() - exchangeRateCache.timestamp < 5 * 60 * 1000) {
         sendResponse({
-          type: YoursEventName.GET_EXCHANGE_RATE,
+          type: 'getExchangeRate',
           success: true,
           data: Number(exchangeRateCache.rate.toFixed(2)),
         });
+        sendResponse();
       } else {
         const res = await fetch(`${WOC_BASE_URL}/main/exchangerate`);
         if (!res.ok) {
@@ -383,18 +361,16 @@ const processGetExchangeRate = (sendResponse: CallbackResponse) => {
         const data = await res.json();
         const rate = data.rate;
         const currentTime = Date.now();
-        chrome.storage.local.set({
-          exchangeRateCache: { rate, timestamp: currentTime },
-        });
+        chrome.storage.local.set({ exchangeRateCache: { rate, timestamp: currentTime } });
         sendResponse({
-          type: YoursEventName.GET_EXCHANGE_RATE,
+          type: 'getExchangeRate',
           success: true,
           data: Number(rate.toFixed(2)),
         });
       }
     } catch (error) {
       sendResponse({
-        type: YoursEventName.GET_EXCHANGE_RATE,
+        type: 'getExchangeRate',
         success: false,
         error: JSON.stringify(error),
       });
@@ -402,17 +378,17 @@ const processGetExchangeRate = (sendResponse: CallbackResponse) => {
   });
 };
 
-const processGetPaymentUtxos = async (sendResponse: CallbackResponse) => {
+const processGetPaymentUtxos = async (sendResponse) => {
   try {
     chrome.storage.local.get(['paymentUtxos'], ({ paymentUtxos }) => {
       sendResponse({
-        type: YoursEventName.GET_PAYMENT_UTXOS,
+        type: 'getPaymentUtxos',
         success: true,
         data:
           paymentUtxos.length > 0
             ? paymentUtxos
-                .filter((u: Utxos & { spent: boolean }) => !u.spent)
-                .map((utxo: Utxos) => {
+                .filter((u) => !u.spent)
+                .map((utxo) => {
                   return {
                     satoshis: utxo.satoshis,
                     script: utxo.script,
@@ -425,30 +401,28 @@ const processGetPaymentUtxos = async (sendResponse: CallbackResponse) => {
     });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.GET_PAYMENT_UTXOS,
+      type: 'getPaymentUtxos',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processSendBsvRequest = (message: { params: { data: SendBsv[] } }, sendResponse: CallbackResponse) => {
+const processSendBsvRequest = (message, sendResponse) => {
   if (!message.params.data) {
     sendResponse({
-      type: YoursEventName.SEND_BSV,
+      type: 'sendBsv',
       success: false,
       error: 'Must provide valid params!',
     });
-    return;
   }
   try {
     responseCallbackForSendBsvRequest = sendResponse;
     let sendBsvRequest = message.params.data;
 
     // If in this if block, it's an inscribe() request.
-    const inscribeRequest = message.params.data as InscribeRequest[];
-    if (inscribeRequest[0].base64Data) {
-      sendBsvRequest = inscribeRequest.map((d: InscribeRequest) => {
+    if (message.params.data[0].base64Data) {
+      sendBsvRequest = message.params.data.map((d) => {
         return {
           address: d.address,
           inscription: {
@@ -466,21 +440,20 @@ const processSendBsvRequest = (message: { params: { data: SendBsv[] } }, sendRes
     });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.SEND_BSV,
+      type: 'sendBsv',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processTransferOrdinalRequest = (message: { params: TransferOrdinal }, sendResponse: CallbackResponse) => {
+const processTransferOrdinalRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
-      type: YoursEventName.TRANSFER_ORDINAL,
+      type: 'transferOrdinal',
       success: false,
       error: 'Must provide valid params!',
     });
-    return;
   }
   try {
     responseCallbackForTransferOrdinalRequest = sendResponse;
@@ -493,21 +466,20 @@ const processTransferOrdinalRequest = (message: { params: TransferOrdinal }, sen
       });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.TRANSFER_ORDINAL,
+      type: 'transferOrdinal',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processPurchaseOrdinalRequest = (message: { params: PurchaseOrdinal }, sendResponse: CallbackResponse) => {
+const processPurchaseOrdinalRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
-      type: YoursEventName.PURCHASE_ORDINAL,
+      type: 'purchaseOrdinal',
       success: false,
       error: 'Must provide valid params!',
     });
-    return;
   }
   try {
     responseCallbackForPurchaseOrdinalRequest = sendResponse;
@@ -520,21 +492,20 @@ const processPurchaseOrdinalRequest = (message: { params: PurchaseOrdinal }, sen
       });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.PURCHASE_ORDINAL,
+      type: 'purchaseOrdinal',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processBroadcastRequest = (message: { params: Broadcast }, sendResponse: CallbackResponse) => {
+const processBroadcastRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
-      type: YoursEventName.BROADCAST,
+      type: 'broadcast',
       success: false,
       error: 'Must provide valid params!',
     });
-    return;
   }
   try {
     responseCallbackForBroadcastRequest = sendResponse;
@@ -547,21 +518,20 @@ const processBroadcastRequest = (message: { params: Broadcast }, sendResponse: C
       });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.BROADCAST,
+      type: 'broadcast',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processSignMessageRequest = (message: { params: SignMessage }, sendResponse: CallbackResponse) => {
+const processSignMessageRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
-      type: YoursEventName.SIGN_MESSAGE,
+      type: 'signMessage',
       success: false,
       error: 'Must provide valid params!',
     });
-    return;
   }
   try {
     responseCallbackForSignMessageRequest = sendResponse;
@@ -574,7 +544,7 @@ const processSignMessageRequest = (message: { params: SignMessage }, sendRespons
       });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.SIGN_MESSAGE,
+      type: 'signMessage',
       success: false,
       error: JSON.stringify(error),
     });
@@ -583,14 +553,13 @@ const processSignMessageRequest = (message: { params: SignMessage }, sendRespons
   return true;
 };
 
-const processGetSignaturesRequest = (message: { params: GetSignatures }, sendResponse: CallbackResponse) => {
+const processGetSignaturesRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
-      type: YoursEventName.GET_SIGNATURES,
+      type: 'getSignatures',
       success: false,
       error: 'Must provide valid params!',
     });
-    return;
   }
   try {
     responseCallbackForGetSignaturesRequest = sendResponse;
@@ -606,45 +575,41 @@ const processGetSignaturesRequest = (message: { params: GetSignatures }, sendRes
       });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.GET_SIGNATURES,
+      type: 'getSignatures',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processGetSocialProfileRequest = (sendResponse: CallbackResponse) => {
+const processGetSocialProfileRequest = (sendResponse) => {
   const HOSTED_YOURS_IMAGE = 'https://i.ibb.co/zGcthBv/yours-org-light.png';
   try {
     chrome.storage.local.get(['socialProfile'], (result) => {
       const displayName = result?.socialProfile?.displayName ? result.socialProfile.displayName : 'Anon Panda';
       const avatar = result?.socialProfile?.avatar ? result.socialProfile.avatar : HOSTED_YOURS_IMAGE;
       sendResponse({
-        type: YoursEventName.GET_SOCIAL_PROFILE,
+        type: 'getSocialProfile',
         success: true,
         data: { displayName, avatar },
       });
     });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.GET_SOCIAL_PROFILE,
+      type: 'getSocialProfile',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processGenerateTaggedKeysRequest = (
-  message: { params: TaggedDerivationRequest },
-  sendResponse: CallbackResponse,
-) => {
+const processGenerateTaggedKeysRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
-      type: YoursEventName.GENERATE_TAGGED_KEYS,
+      type: 'generateTaggedKeys',
       success: false,
       error: 'Must provide valid params!',
     });
-    return;
   }
   try {
     responseCallbackForGenerateTaggedKeysRequest = sendResponse;
@@ -657,24 +622,20 @@ const processGenerateTaggedKeysRequest = (
       });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.GENERATE_TAGGED_KEYS,
+      type: 'generateTaggedKeys',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processGetTaggedKeys = async (
-  message: { params: GetTaggedKeysRequest & { domain: string } },
-  sendResponse: CallbackResponse,
-) => {
+const processGetTaggedKeys = async (message, sendResponse) => {
   if (!message.params.label) {
     sendResponse({
-      type: YoursEventName.GET_TAGGED_KEYS,
+      type: 'getTaggedKeys',
       success: false,
       error: 'Must provide valid params!',
     });
-    return;
   }
   try {
     chrome.storage.local.get(
@@ -683,7 +644,7 @@ const processGetTaggedKeys = async (
         const currentTime = Date.now();
         if (appState?.isLocked || currentTime - lastActiveTime > INACTIVITY_LIMIT) {
           sendResponse({
-            type: YoursEventName.GET_TAGGED_KEYS,
+            type: 'getTaggedKeys',
             success: false,
             error: 'Unauthorized! Yours Wallet is locked.',
           });
@@ -691,18 +652,17 @@ const processGetTaggedKeys = async (
 
         let returnData =
           derivationTags.length > 0
-            ? derivationTags?.filter(
-                (res: TaggedDerivationResponse) =>
-                  res.tag.label === message.params.label && res.tag.domain === message.params.domain,
+            ? derivationTags.filter(
+                (res) => res.tag.label === message.params.label && res.tag.domain === message.params.domain,
               )
             : [];
 
-        if (returnData.length > 0 && (message?.params?.ids?.length ?? 0 > 0)) {
-          returnData = returnData?.filter((d: TaggedDerivationResponse) => message?.params?.ids?.includes(d.tag.id));
+        if (returnData.length > 0 && message.params.ids?.length > 0) {
+          returnData = returnData.filter((d) => message.params.ids.includes(d.tag.id));
         }
 
         sendResponse({
-          type: YoursEventName.GET_TAGGED_KEYS,
+          type: 'getTaggedKeys',
           success: true,
           data: returnData,
         });
@@ -710,21 +670,20 @@ const processGetTaggedKeys = async (
     );
   } catch (error) {
     sendResponse({
-      type: YoursEventName.GET_TAGGED_KEYS,
+      type: 'getTaggedKeys',
       success: false,
       error: JSON.stringify(error),
     });
   }
 };
 
-const processEncryptRequest = (message: { params: EncryptRequest }, sendResponse: CallbackResponse) => {
+const processEncryptRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
-      type: YoursEventName.ENCRYPT,
+      type: 'encrypt',
       success: false,
       error: 'Must provide valid params!',
     });
-    return;
   }
   try {
     responseCallbackForEncryptRequest = sendResponse;
@@ -737,7 +696,7 @@ const processEncryptRequest = (message: { params: EncryptRequest }, sendResponse
       });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.ENCRYPT,
+      type: 'encrypt',
       success: false,
       error: JSON.stringify(error),
     });
@@ -746,14 +705,13 @@ const processEncryptRequest = (message: { params: EncryptRequest }, sendResponse
   return true;
 };
 
-const processDecryptRequest = (message: { params: DecryptRequest }, sendResponse: CallbackResponse) => {
+const processDecryptRequest = (message, sendResponse) => {
   if (!message.params) {
     sendResponse({
-      type: YoursEventName.DECRYPT,
+      type: 'decrypt',
       success: false,
       error: 'Must provide valid params!',
     });
-    return;
   }
   try {
     responseCallbackForDecryptRequest = sendResponse;
@@ -766,7 +724,7 @@ const processDecryptRequest = (message: { params: DecryptRequest }, sendResponse
       });
   } catch (error) {
     sendResponse({
-      type: YoursEventName.DECRYPT,
+      type: 'decrypt',
       success: false,
       error: JSON.stringify(error),
     });
@@ -777,81 +735,81 @@ const processDecryptRequest = (message: { params: DecryptRequest }, sendResponse
 
 // RESPONSES ********************************
 
-const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys }) => {
+const processConnectResponse = (response) => {
   try {
     if (responseCallbackForConnectRequest) {
       responseCallbackForConnectRequest({
-        type: YoursEventName.CONNECT,
+        type: 'connect',
         success: true,
         data: response.decision === 'approved' ? response.pubKeys.identityPubKey : undefined,
       });
     }
   } catch (error) {
-    responseCallbackForConnectRequest?.({
-      type: YoursEventName.CONNECT,
+    responseCallbackForConnectRequest({
+      type: 'connect',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForConnectRequest = null;
-    popupWindowId = undefined;
+    popupWindowId = null;
     chrome.storage.local.remove('popupWindowId');
   }
 
   return true;
 };
 
-const processSendBsvResponse = (response: SendBsvResponse) => {
+const processSendBsvResponse = (response) => {
   if (!responseCallbackForSendBsvRequest) throw Error('Missing callback!');
   try {
     responseCallbackForSendBsvRequest({
-      type: YoursEventName.SEND_BSV,
+      type: 'sendBsv',
       success: true,
       data: { txid: response.txid, rawtx: response.rawtx },
     });
   } catch (error) {
-    responseCallbackForSendBsvRequest?.({
-      type: YoursEventName.SEND_BSV,
+    responseCallbackForSendBsvRequest({
+      type: 'sendBsv',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForSendBsvRequest = null;
-    popupWindowId = undefined;
+    popupWindowId = null;
     chrome.storage.local.remove(['sendBsvRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processTransferOrdinalResponse = (response: { txid: string }) => {
+const processTransferOrdinalResponse = (response) => {
   if (!responseCallbackForTransferOrdinalRequest) throw Error('Missing callback!');
   try {
     responseCallbackForTransferOrdinalRequest({
-      type: YoursEventName.TRANSFER_ORDINAL,
+      type: 'transferOrdinal',
       success: true,
       data: response?.txid,
     });
   } catch (error) {
-    responseCallbackForTransferOrdinalRequest?.({
-      type: YoursEventName.TRANSFER_ORDINAL,
+    responseCallbackForTransferOrdinalRequest({
+      type: 'transferOrdinal',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForTransferOrdinalRequest = null;
-    popupWindowId = undefined;
+    popupWindowId = null;
     chrome.storage.local.remove(['transferOrdinalRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processGenerateTaggedKeysResponse = (response: TaggedDerivationResponse) => {
+const processGenerateTaggedKeysResponse = (response) => {
   if (!responseCallbackForGenerateTaggedKeysRequest) throw Error('Missing callback!');
   try {
     responseCallbackForGenerateTaggedKeysRequest({
-      type: YoursEventName.GENERATE_TAGGED_KEYS,
+      type: 'generateTaggedKeys',
       success: true,
       data: {
         address: response?.address,
@@ -860,48 +818,48 @@ const processGenerateTaggedKeysResponse = (response: TaggedDerivationResponse) =
       },
     });
   } catch (error) {
-    responseCallbackForGenerateTaggedKeysRequest?.({
-      type: YoursEventName.GENERATE_TAGGED_KEYS,
+    responseCallbackForGenerateTaggedKeysRequest({
+      type: 'generateTaggedKeys',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForGenerateTaggedKeysRequest = null;
-    popupWindowId = undefined;
+    popupWindowId = null;
     chrome.storage.local.remove(['generateTaggedKeysRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processPurchaseOrdinalResponse = (response: { txid: string }) => {
+const processPurchaseOrdinalResponse = (response) => {
   if (!responseCallbackForPurchaseOrdinalRequest) throw Error('Missing callback!');
   try {
     responseCallbackForPurchaseOrdinalRequest({
-      type: YoursEventName.PURCHASE_ORDINAL,
+      type: 'purchaseOrdinal',
       success: true,
       data: response?.txid,
     });
   } catch (error) {
-    responseCallbackForPurchaseOrdinalRequest?.({
-      type: YoursEventName.PURCHASE_ORDINAL,
+    responseCallbackForPurchaseOrdinalRequest({
+      type: 'purchaseOrdinal',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForPurchaseOrdinalRequest = null;
-    popupWindowId = undefined;
+    popupWindowId = null;
     chrome.storage.local.remove(['purchaseOrdinalRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processSignMessageResponse = (response: SignedMessage) => {
+const processSignMessageResponse = (response) => {
   if (!responseCallbackForSignMessageRequest) throw Error('Missing callback!');
   try {
     responseCallbackForSignMessageRequest({
-      type: YoursEventName.SIGN_MESSAGE,
+      type: 'signMessage',
       success: true,
       data: {
         address: response?.address,
@@ -912,115 +870,115 @@ const processSignMessageResponse = (response: SignedMessage) => {
       },
     });
   } catch (error) {
-    responseCallbackForSignMessageRequest?.({
-      type: YoursEventName.SIGN_MESSAGE,
+    responseCallbackForSignMessageRequest({
+      type: 'signMessage',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForSignMessageRequest = null;
-    popupWindowId = undefined;
+    popupWindowId = null;
     chrome.storage.local.remove(['signMessageRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processBroadcastResponse = (response: { error?: string; txid?: string }) => {
+const processBroadcastResponse = (response) => {
   if (!responseCallbackForBroadcastRequest) throw Error('Missing callback!');
   try {
     if (response?.error) {
       responseCallbackForBroadcastRequest({
-        type: YoursEventName.BROADCAST,
+        type: 'broadcast',
         success: false,
         error: response?.error,
       });
       return;
     }
     responseCallbackForBroadcastRequest({
-      type: YoursEventName.BROADCAST,
+      type: 'broadcast',
       success: true,
       data: response?.txid,
     });
   } catch (error) {
-    responseCallbackForBroadcastRequest?.({
-      type: YoursEventName.BROADCAST,
+    responseCallbackForBroadcastRequest({
+      type: 'broadcast',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForBroadcastRequest = null;
-    popupWindowId = undefined;
+    popupWindowId = null;
     chrome.storage.local.remove(['broadcastRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processGetSignaturesResponse = (response: { error?: string; sigResponses?: SignatureResponse[] }) => {
+const processGetSignaturesResponse = (response) => {
   if (!responseCallbackForGetSignaturesRequest) throw Error('Missing callback!');
   try {
     responseCallbackForGetSignaturesRequest({
-      type: YoursEventName.GET_SIGNATURES,
+      type: 'getSignatures',
       success: !response?.error,
       data: response?.sigResponses ?? [],
       error: response?.error,
     });
   } catch (error) {
-    responseCallbackForGetSignaturesRequest?.({
-      type: YoursEventName.GET_SIGNATURES,
+    responseCallbackForGetSignaturesRequest({
+      type: 'getSignatures',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForGetSignaturesRequest = null;
-    popupWindowId = undefined;
+    popupWindowId = null;
     chrome.storage.local.remove(['getSignaturesRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processEncryptResponse = (response: { encryptedMessages: string[] }) => {
+const processEncryptResponse = (response) => {
   if (!responseCallbackForEncryptRequest) throw Error('Missing callback!');
   try {
     responseCallbackForEncryptRequest({
-      type: YoursEventName.ENCRYPT,
+      type: 'encrypt',
       success: true,
       data: response.encryptedMessages,
     });
   } catch (error) {
-    responseCallbackForEncryptRequest?.({
-      type: YoursEventName.ENCRYPT,
+    responseCallbackForEncryptRequest({
+      type: 'encrypt',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForEncryptRequest = null;
-    popupWindowId = undefined;
+    popupWindowId = null;
     chrome.storage.local.remove(['encryptRequest', 'popupWindowId']);
   }
 
   return true;
 };
 
-const processDecryptResponse = (response: { decryptedMessages: string[] }) => {
+const processDecryptResponse = (response) => {
   if (!responseCallbackForDecryptRequest) throw Error('Missing callback!');
   try {
     responseCallbackForDecryptRequest({
-      type: YoursEventName.DECRYPT,
+      type: 'decrypt',
       success: true,
       data: response.decryptedMessages,
     });
   } catch (error) {
-    responseCallbackForDecryptRequest?.({
-      type: YoursEventName.DECRYPT,
+    responseCallbackForDecryptRequest({
+      type: 'decrypt',
       success: false,
       error: JSON.stringify(error),
     });
   } finally {
     responseCallbackForDecryptRequest = null;
-    popupWindowId = undefined;
+    popupWindowId = null;
     chrome.storage.local.remove(['decryptRequest', 'popupWindowId']);
   }
 
@@ -1033,7 +991,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
   if (closedWindowId === popupWindowId) {
     if (responseCallbackForConnectRequest) {
       responseCallbackForConnectRequest({
-        type: YoursEventName.CONNECT,
+        type: 'connect',
         success: false,
         error: 'User dismissed the request!',
       });
@@ -1043,7 +1001,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
 
     if (responseCallbackForSendBsvRequest) {
       responseCallbackForSendBsvRequest({
-        type: YoursEventName.SEND_BSV,
+        type: 'sendBsv',
         success: false,
         error: 'User dismissed the request!',
       });
@@ -1053,7 +1011,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
 
     if (responseCallbackForSignMessageRequest) {
       responseCallbackForSignMessageRequest({
-        type: YoursEventName.SIGN_MESSAGE,
+        type: 'signMessage',
         success: false,
         error: 'User dismissed the request!',
       });
@@ -1063,7 +1021,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
 
     if (responseCallbackForTransferOrdinalRequest) {
       responseCallbackForTransferOrdinalRequest({
-        type: YoursEventName.TRANSFER_ORDINAL,
+        type: 'transferOrdinal',
         success: false,
         error: 'User dismissed the request!',
       });
@@ -1073,7 +1031,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
 
     if (responseCallbackForPurchaseOrdinalRequest) {
       responseCallbackForPurchaseOrdinalRequest({
-        type: YoursEventName.PURCHASE_ORDINAL,
+        type: 'purchaseOrdinal',
         success: false,
         error: 'User dismissed the request!',
       });
@@ -1083,7 +1041,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
 
     if (responseCallbackForBroadcastRequest) {
       responseCallbackForBroadcastRequest({
-        type: YoursEventName.BROADCAST,
+        type: 'broadcast',
         success: false,
         error: 'User dismissed the request!',
       });
@@ -1093,7 +1051,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
 
     if (responseCallbackForGetSignaturesRequest) {
       responseCallbackForGetSignaturesRequest({
-        type: YoursEventName.GET_SIGNATURES,
+        type: 'getSignatures',
         success: false,
         error: 'User dismissed the request!',
       });
@@ -1103,7 +1061,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
 
     if (responseCallbackForGenerateTaggedKeysRequest) {
       responseCallbackForGenerateTaggedKeysRequest({
-        type: YoursEventName.GENERATE_TAGGED_KEYS,
+        type: 'generateTaggedKeys',
         success: false,
         error: 'User dismissed the request!',
       });
@@ -1113,7 +1071,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
 
     if (responseCallbackForEncryptRequest) {
       responseCallbackForEncryptRequest({
-        type: YoursEventName.ENCRYPT,
+        type: 'encrypt',
         success: false,
         error: 'User dismissed the request!',
       });
@@ -1123,7 +1081,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
 
     if (responseCallbackForDecryptRequest) {
       responseCallbackForDecryptRequest({
-        type: YoursEventName.DECRYPT,
+        type: 'decrypt',
         success: false,
         error: 'User dismissed the request!',
       });
@@ -1131,7 +1089,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
       chrome.storage.local.remove('decryptRequest');
     }
 
-    popupWindowId = undefined;
+    popupWindowId = null;
     chrome.storage.local.remove('popupWindowId');
   }
 });
