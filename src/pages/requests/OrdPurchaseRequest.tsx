@@ -20,7 +20,7 @@ import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
 
 export type OrdPurchaseRequestProps = {
-  request: PurchaseOrdinal & { password: string };
+  request: PurchaseOrdinal & { password?: string };
   popupId: number | undefined;
   onResponse: () => void;
 };

@@ -13,7 +13,7 @@ import { usePasswordSetting } from './usePasswordSetting';
 import { useWhatsOnChain } from './useWhatsOnChain';
 
 export type KeyStorage = {
-  encryptedKeys: string;
+  encryptedKeys: string; // stringified Keys object (hint: search for "Keys" type)
   passKey: string;
   salt: string;
 };

@@ -20,7 +20,7 @@ import {
   TaggedDerivationRequest,
   TaggedDerivationResponse,
   TransferOrdinal,
-  Utxos,
+  Utxo,
   YoursEventListeners,
   YoursEvents,
   YoursProviderType,
@@ -201,7 +201,7 @@ const provider: YoursProviderType = {
   broadcast: createYoursMethod<string | undefined, Broadcast>(YoursEventName.BROADCAST),
   getSignatures: createYoursMethod<SignatureResponse[] | undefined, GetSignatures>(YoursEventName.GET_SIGNATURES),
   getSocialProfile: createYoursMethod<SocialProfile | undefined, void>(YoursEventName.GET_SOCIAL_PROFILE),
-  getPaymentUtxos: createYoursMethod<Utxos[] | undefined, void>(YoursEventName.GET_PAYMENT_UTXOS),
+  getPaymentUtxos: createYoursMethod<Utxo[] | undefined, void>(YoursEventName.GET_PAYMENT_UTXOS),
   getExchangeRate: createYoursMethod<number | undefined, void>(YoursEventName.GET_EXCHANGE_RATE),
   purchaseOrdinal: createYoursMethod<string | undefined, PurchaseOrdinal>(YoursEventName.PURCHASE_ORDINAL),
   generateTaggedKeys: createYoursMethod<TaggedDerivationResponse, TaggedDerivationRequest>(

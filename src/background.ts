@@ -13,13 +13,21 @@ import {
   TaggedDerivationRequest,
   TaggedDerivationResponse,
   GetTaggedKeysRequest,
-  Utxos,
+  Utxo,
   Broadcast,
   InscribeRequest,
   SignMessage,
 } from 'yours-wallet-provider';
-import { CustomListenerName, Decision, RequestParams, ResponseEventDetail, YoursEventName } from './inject';
+import {
+  CustomListenerName,
+  Decision,
+  RequestParams,
+  ResponseEventDetail,
+  WhitelistedApp,
+  YoursEventName,
+} from './inject';
 import { launchPopUp } from './utils/chromeHelpers';
+import { storage } from './utils/storage';
 
 console.log('Yours Wallet Background Script Running!');
 
@@ -42,21 +50,9 @@ let popupWindowId: number | undefined;
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 const verifyAccess = async (requestingDomain: string): Promise<boolean> => {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(['whitelist'], (result) => {
-      const { whitelist } = result as { whitelist: { domain: string }[] };
-      if (!whitelist) {
-        resolve(false);
-        return;
-      }
-
-      if (whitelist.map((i: { domain: string }) => i.domain).includes(requestingDomain)) {
-        resolve(true);
-      } else {
-        resolve(false);
-      }
-    });
-  });
+  const { whitelist } = (await storage.get('whitelist')) as { whitelist: WhitelistedApp[] };
+  if (!whitelist) return false;
+  return whitelist.map((i: WhitelistedApp) => i.domain).includes(requestingDomain);
 };
 
 const authorizeRequest = async (message: { params: { domain: string } }): Promise<boolean> => {
@@ -398,8 +394,8 @@ const processGetPaymentUtxos = async (sendResponse: CallbackResponse) => {
         data:
           paymentUtxos.length > 0
             ? paymentUtxos
-                .filter((u: Utxos & { spent: boolean }) => !u.spent)
-                .map((utxo: Utxos) => {
+                .filter((u: Utxo & { spent: boolean }) => !u.spent)
+                .map((utxo: Utxo) => {
                   return {
                     satoshis: utxo.satoshis,
                     script: utxo.script,

@@ -11,31 +11,36 @@ import {
   TransferOrdinal,
 } from 'yours-wallet-provider';
 import { RequestParams, WhitelistedApp } from '../inject';
+import { storage } from '../utils/storage';
+import { ChromeStorageObject } from './types/global.types';
 
 type Dispatch<T> = (value: T) => void;
 type SetStateAction<T> = T | ((prevState: T) => T);
 
 export type Web3ContextTypeNew = {
+  //Web3 Requests
   connectRequest: RequestParams | undefined;
   setConnectRequest: Dispatch<SetStateAction<RequestParams | undefined>>;
   sendBsvRequest: SendBsv[] | undefined;
   setSendBsvRequest: Dispatch<SetStateAction<SendBsv[] | undefined>>;
   transferOrdinalRequest: TransferOrdinal | undefined;
   setTransferOrdinalRequest: Dispatch<SetStateAction<TransferOrdinal | undefined>>;
-  purchaseOrdinalRequest: (PurchaseOrdinal & { password: string }) | undefined;
-  setPurchaseOrdinalRequest: Dispatch<SetStateAction<(PurchaseOrdinal & { password: string }) | undefined>>;
+  purchaseOrdinalRequest: PurchaseOrdinal | undefined;
+  setPurchaseOrdinalRequest: Dispatch<SetStateAction<PurchaseOrdinal | undefined>>;
   signMessageRequest: SignMessage | undefined;
   setSignMessageRequest: Dispatch<SetStateAction<SignMessage | undefined>>;
   broadcastRequest: Broadcast | undefined;
   setBroadcastRequest: Dispatch<SetStateAction<Broadcast | undefined>>;
   getSignaturesRequest: GetSignatures | undefined;
   setGetSignaturesRequest: Dispatch<SetStateAction<GetSignatures | undefined>>;
-  generateTaggedKeysRequest: (TaggedDerivationRequest & { domain?: string }) | undefined;
-  setGenerateTaggedKeysRequest: Dispatch<SetStateAction<(TaggedDerivationRequest & { domain?: string }) | undefined>>;
+  generateTaggedKeysRequest: TaggedDerivationRequest | undefined;
+  setGenerateTaggedKeysRequest: Dispatch<SetStateAction<TaggedDerivationRequest | undefined>>;
   encryptRequest: EncryptRequest | undefined;
   setEncryptRequest: Dispatch<SetStateAction<EncryptRequest | undefined>>;
   decryptRequest: DecryptRequest | undefined;
   setDecryptRequest: Dispatch<SetStateAction<DecryptRequest | undefined>>;
+
+  // Everything else
   popupId: number | undefined;
   setPopupId: Dispatch<SetStateAction<number | undefined>>;
   whitelist: WhitelistedApp[];
@@ -51,9 +56,7 @@ export const Web3ProviderNew: React.FC<{ children: ReactNode }> = ({ children })
   const [connectRequest, setConnectRequest] = useState<RequestParams | undefined>(undefined);
   const [sendBsvRequest, setSendBsvRequest] = useState<SendBsv[] | undefined>(undefined);
   const [transferOrdinalRequest, setTransferOrdinalRequest] = useState<TransferOrdinal | undefined>(undefined);
-  const [purchaseOrdinalRequest, setPurchaseOrdinalRequest] = useState<
-    (PurchaseOrdinal & { password: string }) | undefined
-  >(undefined);
+  const [purchaseOrdinalRequest, setPurchaseOrdinalRequest] = useState<PurchaseOrdinal | undefined>(undefined);
   const [signMessageRequest, setSignMessageRequest] = useState<SignMessage | undefined>(undefined);
   const [broadcastRequest, setBroadcastRequest] = useState<Broadcast | undefined>(undefined);
   const [getSignaturesRequest, setGetSignaturesRequest] = useState<GetSignatures | undefined>(undefined);
@@ -113,7 +116,7 @@ export const Web3ProviderNew: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   useEffect(() => {
-    const handleStorageChange = (result: any) => {
+    const handleStorageChange = async (result: Partial<ChromeStorageObject>) => {
       const {
         connectRequest,
         sendBsvRequest,
@@ -145,34 +148,23 @@ export const Web3ProviderNew: React.FC<{ children: ReactNode }> = ({ children })
       if (encryptedKeys) setEncryptedKeys(encryptedKeys);
     };
 
-    chrome.storage.local.get(
-      [
-        'connectRequest',
-        'sendBsvRequest',
-        'transferOrdinalRequest',
-        'purchaseOrdinalRequest',
-        'signMessageRequest',
-        'broadcastRequest',
-        'getSignaturesRequest',
-        'generateTaggedKeysRequest',
-        'encryptRequest',
-        'decryptRequest',
-        'popupWindowId',
-        'whitelist',
-        'encryptedKeys',
-      ],
-      handleStorageChange,
-    );
+    const setStorageStateAndAddListener = async () => {
+      const res: ChromeStorageObject = await storage.get(null); // passing null returns everything in storage
+      handleStorageChange(res);
 
-    chrome.storage.onChanged.addListener((changes, namespace) => {
-      if (namespace === 'local') {
-        const result: any = {};
-        Object.keys(changes).forEach((key) => {
-          result[key] = changes[key].newValue;
-        });
-        handleStorageChange(result);
-      }
-    });
+      // Ensures that any storage changes update the our react app state
+      storage.onChanged.addListener((changes, namespace) => {
+        if (namespace === 'local') {
+          const result: Partial<ChromeStorageObject> = {};
+          Object.keys(changes).forEach((key) => {
+            result[key] = changes[key].newValue;
+          });
+          handleStorageChange(result);
+        }
+      });
+    };
+
+    setStorageStateAndAddListener();
   }, []);
 
   return (

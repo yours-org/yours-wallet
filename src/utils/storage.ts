@@ -1,6 +1,8 @@
+import { ChromeStorageObject } from '../contexts/types/global.types';
+
 interface Storage {
   set: (obj: any) => Promise<void>;
-  get: (key: string | string[]) => Promise<any>;
+  get: (key: string | string[] | null) => Promise<any>;
   remove: (key: string | string[]) => Promise<void>;
   clear: () => Promise<void>;
   onChanged: {
@@ -22,29 +24,34 @@ const mockStorage: Storage = {
     return new Promise((resolve) => {
       const result: { [key: string]: string | null } = {};
 
-      if (typeof keyOrKeys === 'string') {
-        const value = localStorage.getItem(keyOrKeys);
-        if (typeof value === 'string') {
-          if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith('{') && value.endsWith('}'))) {
-            result[keyOrKeys] = JSON.parse(value);
-          } else {
-            result[keyOrKeys] = value;
+      if (keyOrKeys === null) {
+        // Retrieve all items from localStorage
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key) {
+            const value = localStorage.getItem(key);
+            try {
+              result[key] = value ? JSON.parse(value) : value;
+            } catch {
+              result[key] = value;
+            }
           }
-        } else {
+        }
+        resolve(result);
+      } else if (typeof keyOrKeys === 'string') {
+        const value = localStorage.getItem(keyOrKeys);
+        try {
+          result[keyOrKeys] = value ? JSON.parse(value) : value;
+        } catch {
           result[keyOrKeys] = value;
         }
-
         resolve(result);
       } else if (Array.isArray(keyOrKeys)) {
         keyOrKeys.forEach((key) => {
           const value = localStorage.getItem(key);
-          if (typeof value === 'string') {
-            if ((value.startsWith('[') && value.endsWith(']')) || (value.startsWith('{') && value.endsWith('}'))) {
-              result[key] = JSON.parse(value);
-            } else {
-              result[key] = value;
-            }
-          } else {
+          try {
+            result[key] = value ? JSON.parse(value) : value;
+          } catch {
             result[key] = value;
           }
         });
@@ -90,7 +97,7 @@ const chromeStorage: Storage = {
       });
     }),
   get: (keyOrKeys) =>
-    new Promise<any>((resolve, reject) => {
+    new Promise<Partial<ChromeStorageObject>>((resolve, reject) => {
       chrome.storage.local.get(keyOrKeys, (result) => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
