@@ -130,7 +130,7 @@ export function getInscription(script: Script): Inscription | undefined {
 }
 
 export function getBsv20v1(script: Script): BSV20V1_JSON {
-  let i = getInscription(script);
+  const i = getInscription(script);
 
   if (!i) {
     throw new Error(`doesn't contains any inscription!`);
@@ -169,7 +169,7 @@ export function getBsv20v1(script: Script): BSV20V1_JSON {
 }
 
 export function getBsv20v2(script: Script): BSV20V2_JSON {
-  let i = getInscription(script);
+  const i = getInscription(script);
 
   if (!i) {
     throw new Error(`doesn't contains any inscription!`);
@@ -276,8 +276,8 @@ export function showAmount(amt: bigint, dec: number): string {
   if (dec === 0) {
     return amtStr;
   }
-  let left = amt / BigInt(Math.pow(10, dec));
-  let right = amt % BigInt(Math.pow(10, dec));
+  const left = amt / BigInt(Math.pow(10, dec));
+  const right = amt % BigInt(Math.pow(10, dec));
   const rightStr = right.toString().padStart(dec, '0');
 
   if (right > 0) {

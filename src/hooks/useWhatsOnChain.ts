@@ -52,10 +52,10 @@ export const useWhatsOnChain = () => {
 
   const getUtxos = async (fromAddress: string, pullFresh?: boolean): Promise<StoredUtxo[]> => {
     if (!isAddressOnRightNetwork(fromAddress)) return [];
-    return new Promise(async (resolve) => {
+    return new Promise((resolve) => {
       storage.get(['paymentUtxos'], async ({ paymentUtxos }) => {
         try {
-          let localUtxos: StoredUtxo[] = paymentUtxos || [];
+          const localUtxos: StoredUtxo[] = paymentUtxos || [];
 
           if (!pullFresh && localUtxos.length > 0) {
             resolve(
@@ -168,7 +168,7 @@ export const useWhatsOnChain = () => {
     if (isSendAll) return utxos;
     let sum = 0;
     let index = 0;
-    let inputs: UTXO[] = [];
+    const inputs: UTXO[] = [];
 
     while (sum <= satsOut) {
       const utxo = utxos[index];

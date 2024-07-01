@@ -1,11 +1,7 @@
 import { useEffect, useState } from 'react';
+import { SocialProfile } from 'yours-wallet-provider';
 import { HOSTED_YOURS_IMAGE } from '../utils/constants';
 import { storage } from '../utils/storage';
-
-export type SocialProfile = {
-  displayName: string;
-  avatar: string;
-};
 
 export const useSocialProfile = () => {
   const [socialProfile, setSocialProfile] = useState<SocialProfile>({

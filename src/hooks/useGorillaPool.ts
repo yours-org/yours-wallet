@@ -112,6 +112,8 @@ export const useGorillaPool = () => {
       } else {
         return res.data as GorillaPoolErrorMessage;
       }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.log(error);
       return { message: JSON.stringify(error.response.data ?? 'Unknown error while broadcasting tx') };
@@ -120,7 +122,7 @@ export const useGorillaPool = () => {
 
   const submitTx = async (txid: string) => {
     try {
-      let res = await axios.post(`${getOrdinalsBaseUrl()}/api/tx/${txid}/submit`);
+      const res = await axios.post(`${getOrdinalsBaseUrl()}/api/tx/${txid}/submit`);
 
       if (res.status !== 0) {
         console.error('submitTx failed: ', txid);
@@ -249,7 +251,7 @@ export const useGorillaPool = () => {
   const getSpentTxids = async (outpoints: string[]): Promise<Map<string, string>> => {
     try {
       const chunks = chunkedStringArray(outpoints, 50);
-      let spentTxids = new Map<string, string>();
+      const spentTxids = new Map<string, string>();
       for (const chunk of chunks) {
         try {
           //TODO: updata url to be dynamic for testnet
@@ -258,7 +260,9 @@ export const useGorillaPool = () => {
           txids.forEach((txid, i) => {
             spentTxids.set(chunk[i], txid);
           });
-        } catch (error) {}
+        } catch (error) {
+          console.log(error);
+        }
       }
       return spentTxids;
     } catch (error) {
@@ -280,7 +284,7 @@ export const useGorillaPool = () => {
 
   const setDerivationTags = async (identityAddress: string, keys: Keys) => {
     const taggedOrds = await getOrdUtxos(identityAddress);
-    let tags: TaggedDerivationResponse[] = [];
+    const tags: TaggedDerivationResponse[] = [];
     for (const ord of taggedOrds) {
       try {
         if (!ord.origin?.outpoint || ord.origin.data?.insc?.file.type !== 'panda/tag') continue;
@@ -332,13 +336,14 @@ export const useGorillaPool = () => {
     const { bsvAddress } = addresses;
 
     const tx = Transaction.from_hex(rawtx);
-    let inputCount = tx.get_ninputs();
-    let outputCount = tx.get_noutputs();
+    const inputCount = tx.get_ninputs();
+    const outputCount = tx.get_noutputs();
     const spends: string[] = [];
 
     for (let i = 0; i < inputCount; i++) {
       const txIn = tx.get_input(i);
-      spends.push(`${txIn!.get_prev_tx_id_hex()}_${txIn!.get_vout()}`);
+      if (!txIn) continue;
+      spends.push(`${txIn.get_prev_tx_id_hex()}_${txIn.get_vout()}`);
     }
     paymentUtxos.forEach((utxo) => {
       if (spends.includes(`${utxo.txid}_${utxo.vout}`)) {
@@ -347,15 +352,16 @@ export const useGorillaPool = () => {
       }
     });
 
-    const fundingScript = P2PKHAddress.from_string(bsvAddress!).get_locking_script().to_hex();
+    const fundingScript = P2PKHAddress.from_string(bsvAddress).get_locking_script().to_hex();
     const txid = tx.get_id_hex();
 
     for (let i = 0; i < outputCount; i++) {
       const txOut = tx.get_output(i);
+      if (!txOut) continue;
       const outScript = txOut?.get_script_pub_key_hex();
       if (outScript === fundingScript) {
         paymentUtxos.push({
-          satoshis: Number(txOut!.get_satoshis()),
+          satoshis: Number(txOut.get_satoshis()),
           script: fundingScript,
           txid,
           vout: i,
@@ -369,7 +375,7 @@ export const useGorillaPool = () => {
   };
 
   const getTokenPriceInSats = async (tokenIds: string[]) => {
-    let result: { id: string; satPrice: number }[] = [];
+    const result: { id: string; satPrice: number }[] = [];
     for (const tokenId of tokenIds) {
       const { data } = await axios.get<MarketResponse[]>(
         `${getOrdinalsBaseUrl()}/api/bsv20/market?sort=price_per_token&dir=asc&limit=1&offset=0&${
