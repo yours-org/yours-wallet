@@ -110,7 +110,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
 
   const processBsvSend = async () => {
     try {
-      let validationFail = new Map<string, boolean>();
+      const validationFail = new Map<string, boolean>();
       validationFail.set('address', false);
       validationFail.set('script', false);
       validationFail.set('data', false);

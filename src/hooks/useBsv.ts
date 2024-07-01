@@ -154,7 +154,7 @@ export const useBsv = () => {
     if (lockedTxos.length > 0) {
       const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
       let unlockableTotal = 0;
-      let theBlocksCoinsUnlock: number[] = [];
+      const theBlocksCoinsUnlock: number[] = [];
       lockedTxos.forEach((txo) => {
         const theBlockCoinsUnlock = Number(txo?.data?.lock?.until);
         theBlocksCoinsUnlock.push(theBlockCoinsUnlock);
@@ -236,7 +236,7 @@ export const useBsv = () => {
           outScript = Script.from_hex(req.script);
           feeSats += Math.ceil(outScript.to_bytes().byteLength * FEE_PER_BYTE);
         } else if ((req.data || []).length > 0) {
-          let asm = `OP_0 OP_RETURN ${req.data?.join(' ')}`;
+          const asm = `OP_0 OP_RETURN ${req.data?.join(' ')}`;
           try {
             outScript = Script.from_asm_string(asm);
           } catch (e) {
@@ -258,7 +258,7 @@ export const useBsv = () => {
 
       // build txins from our inputs
       let idx = 0;
-      for (let u of inputs || []) {
+      for (const u of inputs || []) {
         const inTx = new TxIn(Buffer.from(u.txid, 'hex'), u.vout, Script.from_hex(''));
 
         inTx.set_satoshis(BigInt(u.satoshis));
@@ -281,7 +281,7 @@ export const useBsv = () => {
       if (bytes > MAX_BYTES_PER_TX) return { error: 'tx-size-too-large' };
 
       const rawtx = tx.to_hex();
-      let { txid } = await broadcastWithGorillaPool(rawtx);
+      const { txid } = await broadcastWithGorillaPool(rawtx);
       if (txid) {
         if (isBelowNoApprovalLimit) {
           storage.get(['noApprovalLimit'], ({ noApprovalLimit }) => {
@@ -294,6 +294,7 @@ export const useBsv = () => {
         }
       }
       return { txid, rawtx };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.log(error);
       return { error: error.message ?? 'unknown' };
@@ -382,11 +383,15 @@ export const useBsv = () => {
     let inputCount = tx.get_ninputs();
     for (let i = 0; i < inputCount; i++) {
       const txIn = tx.get_input(i);
-      const txOut = await getTxOut(txIn!.get_prev_tx_id_hex(), txIn!.get_vout());
-      satsIn += Number(txOut!.get_satoshis());
+      if (!txIn) throw Error('Invalid input');
+      const txOut = await getTxOut(txIn.get_prev_tx_id_hex(), txIn.get_vout());
+      if (!txOut) throw Error('Invalid output');
+      satsIn += Number(txOut.get_satoshis());
     }
     for (let i = 0; i < tx.get_noutputs(); i++) {
-      satsOut += Number(tx.get_output(i)!.get_satoshis()!);
+      const output = tx.get_output(i);
+      if (!output) throw Error('Invalid output');
+      satsOut += Number(output.get_satoshis());
     }
     let size = rawtx.length / 2 + P2PKH_OUTPUT_SIZE;
     let fee = Math.ceil(size * FEE_PER_BYTE);

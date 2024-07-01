@@ -62,7 +62,7 @@ export const encryptUsingPrivKey = (
 };
 
 export const decryptUsingPrivKey = (messages: string[], privateKey: PrivateKey) => {
-  let decryptedMessages: string[] = [];
+  const decryptedMessages: string[] = [];
   for (const message of messages) {
     const ciphertext = ECIESCiphertext.from_bytes(Buffer.from(message, 'base64'), true);
     const pubKey = ciphertext.extract_public_key();
