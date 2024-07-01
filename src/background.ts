@@ -64,6 +64,7 @@ const authorizeRequest = async (message: { params: { domain: string } }): Promis
   return await verifyAccess(params.domain);
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
   if ([YoursEventName.SIGNED_OUT, YoursEventName.NETWORK_CHANGED].includes(message.action)) {
     return emitEventToActiveTabs(message);
@@ -181,11 +182,13 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
 
 // EMIT EVENTS ********************************
 
-const emitEventToActiveTabs = (message: { action: YoursEventName; params: any }) => {
+const emitEventToActiveTabs = (message: { action: YoursEventName; params: RequestParams }) => {
   const { action, params } = message;
   chrome.tabs.query({ active: true }, function (tabs) {
-    tabs.forEach(function (tab: any) {
-      chrome.tabs.sendMessage(tab.id, { type: CustomListenerName.YOURS_EMIT_EVENT, action, params });
+    tabs.forEach(function (tab: chrome.tabs.Tab) {
+      if (tab.id) {
+        chrome.tabs.sendMessage(tab.id, { type: CustomListenerName.YOURS_EMIT_EVENT, action, params });
+      }
     });
   });
   return true;

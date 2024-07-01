@@ -72,7 +72,16 @@ export enum CustomListenerName {
 export type RequestParams = {
   appName?: string;
   appIcon?: string;
-  data?: any;
+  data?:
+    | SendBsv[]
+    | TransferOrdinal
+    | PurchaseOrdinal
+    | SignMessage
+    | Broadcast
+    | GetSignatures
+    | TaggedDerivationRequest
+    | EncryptRequest
+    | DecryptRequest;
   domain?: string;
   isAuthorized?: boolean;
 };
@@ -90,7 +99,23 @@ export type RequestEvent = {
 export type ResponseEventDetail = {
   type: YoursEventName;
   success: boolean;
-  data?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data?:
+    | SendBsvResponse
+    | PubKeys
+    | Addresses
+    | NetWork
+    | Balance
+    | Ordinal[]
+    | SignatureResponse[]
+    | SocialProfile
+    | TaggedDerivationResponse
+    | SignedMessage
+    | boolean
+    | string
+    | number
+    | string[]
+    | undefined;
   error?: string | undefined | boolean;
 };
 
