@@ -65,7 +65,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   const [isDecided, setIsDecided] = useState(false);
   const { bsvPubKey, identityPubKey } = useBsv();
   const { ordPubKey } = useOrds();
-  const { setWhitelist, clearRequest } = useWeb3ContextNew();
+  const { clearRequest } = useWeb3ContextNew();
 
   useEffect(() => {
     if (!context) return;
