@@ -27,7 +27,7 @@ import {
 } from 'yours-wallet-provider';
 
 export enum YoursEventName {
-  CONNECT = 'connect',
+  CONNECT = 'connectRequest',
   DISCONNECT = 'disconnect',
   IS_CONNECTED = 'isConnected',
   GET_PUB_KEYS = 'getPubKeys',
@@ -35,20 +35,20 @@ export enum YoursEventName {
   GET_NETWORK = 'getNetwork',
   GET_BALANCE = 'getBalance',
   GET_ORDINALS = 'getOrdinals',
-  SEND_BSV = 'sendBsv',
-  TRANSFER_ORDINAL = 'transferOrdinal',
-  SIGN_MESSAGE = 'signMessage',
-  BROADCAST = 'broadcast',
-  GET_SIGNATURES = 'getSignatures',
+  SEND_BSV = 'sendBsvRequest',
+  TRANSFER_ORDINAL = 'transferOrdinalRequest',
+  SIGN_MESSAGE = 'signMessageRequest',
+  BROADCAST = 'broadcastRequest',
+  GET_SIGNATURES = 'getSignaturesRequest',
   GET_SOCIAL_PROFILE = 'getSocialProfile',
   GET_PAYMENT_UTXOS = 'getPaymentUtxos',
   GET_EXCHANGE_RATE = 'getExchangeRate',
-  PURCHASE_ORDINAL = 'purchaseOrdinal',
-  GENERATE_TAGGED_KEYS = 'generateTaggedKeys',
+  PURCHASE_ORDINAL = 'purchaseOrdinalRequest',
+  GENERATE_TAGGED_KEYS = 'generateTaggedKeysRequest',
   GET_TAGGED_KEYS = 'getTaggedKeys',
   INSCRIBE = 'sendBsv',
-  ENCRYPT = 'encrypt',
-  DECRYPT = 'decrypt',
+  ENCRYPT = 'encryptRequest',
+  DECRYPT = 'decryptRequest',
   SIGNED_OUT = 'signedOut',
   NETWORK_CHANGED = 'networkChanged',
   USER_CONNECT_RESPONSE = 'userConnectResponse',
@@ -99,7 +99,8 @@ export type RequestEvent = {
 export type ResponseEventDetail = {
   type: YoursEventName;
   success: boolean;
-  data?:
+  data?: (
+    | ConnectResponse
     | SendBsvResponse
     | PubKeys
     | Addresses
@@ -109,12 +110,15 @@ export type ResponseEventDetail = {
     | SignatureResponse[]
     | SocialProfile
     | TaggedDerivationResponse
+    | TaggedDerivationResponse[]
     | SignedMessage
+    | Utxo[]
     | boolean
     | string
     | number
     | string[]
-    | undefined;
+    | undefined
+  ) & { popupId?: number };
   error?: string | undefined | boolean;
 };
 
@@ -138,6 +142,7 @@ export type WhitelistedApp = {
 };
 
 export type Decision = 'approved' | 'declined';
+export type ConnectResponse = { decision: Decision; pubKeys: PubKeys };
 
 const createYoursMethod = <T, P = RequestParams>(type: YoursEventName) => {
   return async (params?: P) => {
@@ -147,20 +152,20 @@ const createYoursMethod = <T, P = RequestParams>(type: YoursEventName) => {
         detail: { messageId, type, params },
       });
 
-      self.dispatchEvent(requestEvent);
-
       function onResponse(e: Event) {
         const responseEvent = e as CustomEvent<ResponseEventDetail>;
-        if (responseEvent.detail.type === type) {
-          if (responseEvent.detail.success) {
-            resolve(responseEvent.detail.data as T);
+        const { detail } = responseEvent;
+        if (detail.type === type) {
+          if (detail.success) {
+            resolve(detail.data as T);
           } else {
-            reject(responseEvent.detail.error);
+            reject(detail.error);
           }
         }
       }
 
       self.addEventListener(messageId, onResponse, { once: true });
+      self.dispatchEvent(requestEvent);
     });
   };
 };

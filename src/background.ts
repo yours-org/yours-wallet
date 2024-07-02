@@ -28,7 +28,7 @@ import {
 } from './inject';
 import { EncryptResponse } from './pages/requests/EncryptRequest';
 import { DecryptResponse } from './pages/requests/DecryptRequest';
-import { launchPopUp } from './utils/chromeHelpers';
+import { launchPopUp, removeWindow } from './utils/chromeHelpers';
 import { storage } from './utils/storage';
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 
@@ -122,7 +122,6 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
     }
 
     if (!isAuthorized) {
-      console.log('im here');
       sendResponse({
         type: message.action,
         success: false,
@@ -766,6 +765,24 @@ const processDecryptRequest = (message: { params: DecryptRequest }, sendResponse
 
 // RESPONSES ********************************
 
+const cleanup = (types: YoursEventName[]) => {
+  responseCallbackForConnectRequest = null;
+  responseCallbackForSendBsvRequest = null;
+  responseCallbackForTransferOrdinalRequest = null;
+  responseCallbackForPurchaseOrdinalRequest = null;
+  responseCallbackForSignMessageRequest = null;
+  responseCallbackForBroadcastRequest = null;
+  responseCallbackForGetSignaturesRequest = null;
+  responseCallbackForGenerateTaggedKeysRequest = null;
+  responseCallbackForEncryptRequest = null;
+  responseCallbackForDecryptRequest = null;
+  chrome.storage.local.get('popupWindowId').then((res) => {
+    if (res.popupWindowId) removeWindow(res.popupWindowId);
+  });
+  popupWindowId = undefined;
+  chrome.storage.local.remove([...types, 'popupWindowId']);
+};
+
 const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys }) => {
   try {
     if (responseCallbackForConnectRequest) {
@@ -782,9 +799,7 @@ const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys
       error: JSON.stringify(error),
     });
   } finally {
-    responseCallbackForConnectRequest = null;
-    popupWindowId = undefined;
-    chrome.storage.local.remove('connectRequest');
+    cleanup([YoursEventName.CONNECT]);
   }
 
   return true;
@@ -805,9 +820,7 @@ const processSendBsvResponse = (response: SendBsvResponse) => {
       error: JSON.stringify(error),
     });
   } finally {
-    responseCallbackForSendBsvRequest = null;
-    popupWindowId = undefined;
-    chrome.storage.local.remove(['sendBsvRequest', 'popupWindowId']);
+    cleanup([YoursEventName.SEND_BSV]);
   }
 
   return true;
@@ -828,9 +841,7 @@ const processTransferOrdinalResponse = (response: { txid: string }) => {
       error: JSON.stringify(error),
     });
   } finally {
-    responseCallbackForTransferOrdinalRequest = null;
-    popupWindowId = undefined;
-    chrome.storage.local.remove(['transferOrdinalRequest', 'popupWindowId']);
+    cleanup([YoursEventName.TRANSFER_ORDINAL]);
   }
 
   return true;
@@ -855,9 +866,7 @@ const processGenerateTaggedKeysResponse = (response: TaggedDerivationResponse) =
       error: JSON.stringify(error),
     });
   } finally {
-    responseCallbackForGenerateTaggedKeysRequest = null;
-    popupWindowId = undefined;
-    chrome.storage.local.remove(['generateTaggedKeysRequest', 'popupWindowId']);
+    cleanup([YoursEventName.GENERATE_TAGGED_KEYS]);
   }
 
   return true;
@@ -878,9 +887,7 @@ const processPurchaseOrdinalResponse = (response: { txid: string }) => {
       error: JSON.stringify(error),
     });
   } finally {
-    responseCallbackForPurchaseOrdinalRequest = null;
-    popupWindowId = undefined;
-    chrome.storage.local.remove(['purchaseOrdinalRequest', 'popupWindowId']);
+    cleanup([YoursEventName.PURCHASE_ORDINAL]);
   }
 
   return true;
@@ -907,9 +914,7 @@ const processSignMessageResponse = (response: SignedMessage) => {
       error: JSON.stringify(error),
     });
   } finally {
-    responseCallbackForSignMessageRequest = null;
-    popupWindowId = undefined;
-    chrome.storage.local.remove(['signMessageRequest', 'popupWindowId']);
+    cleanup([YoursEventName.SIGN_MESSAGE]);
   }
 
   return true;
@@ -938,9 +943,7 @@ const processBroadcastResponse = (response: { error?: string; txid?: string }) =
       error: JSON.stringify(error),
     });
   } finally {
-    responseCallbackForBroadcastRequest = null;
-    popupWindowId = undefined;
-    chrome.storage.local.remove(['broadcastRequest', 'popupWindowId']);
+    cleanup([YoursEventName.BROADCAST]);
   }
 
   return true;
@@ -962,9 +965,7 @@ const processGetSignaturesResponse = (response: { error?: string; sigResponses?:
       error: JSON.stringify(error),
     });
   } finally {
-    responseCallbackForGetSignaturesRequest = null;
-    popupWindowId = undefined;
-    chrome.storage.local.remove(['getSignaturesRequest', 'popupWindowId']);
+    cleanup([YoursEventName.GET_SIGNATURES]);
   }
 
   return true;
@@ -985,9 +986,7 @@ const processEncryptResponse = (response: { encryptedMessages: string[] }) => {
       error: JSON.stringify(error),
     });
   } finally {
-    responseCallbackForEncryptRequest = null;
-    popupWindowId = undefined;
-    chrome.storage.local.remove(['encryptRequest', 'popupWindowId']);
+    cleanup([YoursEventName.ENCRYPT]);
   }
 
   return true;
@@ -1008,16 +1007,14 @@ const processDecryptResponse = (response: { decryptedMessages: string[] }) => {
       error: JSON.stringify(error),
     });
   } finally {
-    responseCallbackForDecryptRequest = null;
-    popupWindowId = undefined;
-    chrome.storage.local.remove(['decryptRequest', 'popupWindowId']);
+    cleanup([YoursEventName.DECRYPT]);
   }
 
   return true;
 };
 
 // HANDLE WINDOW CLOSE *****************************************
-
+// This handle the case where the user doesn't explicity dismiss the request but closes the window
 chrome.windows.onRemoved.addListener((closedWindowId) => {
   if (closedWindowId === popupWindowId) {
     if (responseCallbackForConnectRequest) {

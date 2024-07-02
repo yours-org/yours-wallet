@@ -28,7 +28,7 @@ import { OrdTransferRequest } from './pages/requests/OrdTransferRequest';
 import { SignMessageRequest } from './pages/requests/SignMessageRequest';
 import { Settings } from './pages/Settings';
 import { ColorThemeProps } from './theme';
-import { useWeb3ContextNew } from './hooks/useWeb3ContextNew';
+import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
 
 const MainContainer = styled.div<{ $isMobile?: boolean }>`
   display: flex;
@@ -66,10 +66,10 @@ export const App = () => {
     generateTaggedKeysRequest,
     encryptRequest,
     decryptRequest,
+    clearRequest,
     popupId,
     whitelist,
-    clearRequest,
-  } = useWeb3ContextNew();
+  } = useWeb3RequestContext();
 
   useActivityDetector(isLocked);
 

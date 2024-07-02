@@ -11,7 +11,7 @@ import { Show } from '../../components/Show';
 import { useOrds } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
@@ -31,7 +31,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useWeb3Context();
+  const { isPasswordRequired } = useAppStateContext();
 
   useEffect(() => {
     if (!successTxId) return;

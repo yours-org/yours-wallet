@@ -21,7 +21,7 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { ColorThemeProps } from '../../theme';
 import { sleep } from '../../utils/sleep';
-import { useWeb3ContextNew } from '../../hooks/useWeb3ContextNew';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 
 const Content = styled.div`
   display: flex;
@@ -111,7 +111,7 @@ export const RestoreWallet = () => {
   const [walletDerivation, setWalletDerivation] = useState<string | null>(null);
   const [ordDerivation, setOrdDerivation] = useState<string | null>(null);
   const [identityDerivation, setIdentityDerivation] = useState<string | null>(null);
-  const { setEncryptedKeys } = useWeb3ContextNew();
+  const { setEncryptedKeys } = useAppStateContext();
 
   useEffect(() => {
     hideMenu();

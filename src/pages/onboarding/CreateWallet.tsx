@@ -14,7 +14,7 @@ import { ColorThemeProps } from '../../theme';
 import { sleep } from '../../utils/sleep';
 import copyIcon from '../../assets/copy-green.svg';
 import yoursLogo from '../../assets/yours-logo.png';
-import { useWeb3ContextNew } from '../../hooks/useWeb3ContextNew';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 
 const Content = styled.div`
   display: flex;
@@ -70,7 +70,7 @@ export const CreateWallet = () => {
   const { generateSeedAndStoreEncrypted } = useKeys();
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
-  const { setEncryptedKeys } = useWeb3ContextNew();
+  const { setEncryptedKeys } = useAppStateContext();
 
   useEffect(() => {
     hideMenu();

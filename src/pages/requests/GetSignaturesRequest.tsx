@@ -12,7 +12,7 @@ import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useContracts } from '../../hooks/useContracts';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
@@ -212,7 +212,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { setSelected } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useWeb3Context();
+  const { isPasswordRequired } = useAppStateContext();
 
   const { request, onSignature, popupId } = props;
   //TODO: this type should just be the response from the provider. Figure out how to better handle error.

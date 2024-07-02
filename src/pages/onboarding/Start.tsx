@@ -9,7 +9,7 @@ import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useTheme } from '../../hooks/useTheme';
 import { ColorThemeProps } from '../../theme';
 import yoursLogo from '../../assets/yours-logo.png';
-import { useWeb3ContextNew } from '../../hooks/useWeb3ContextNew';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 
 const Content = styled.div`
   display: flex;
@@ -32,7 +32,7 @@ export const Start = () => {
   const navigate = useNavigate();
   const [showStart, setShowStart] = useState(false);
   const { hideMenu, showMenu } = useBottomMenu();
-  const { connectRequest, encryptedKeys } = useWeb3ContextNew();
+  const { encryptedKeys } = useAppStateContext();
 
   useEffect(() => {
     hideMenu();
@@ -43,12 +43,6 @@ export const Start = () => {
   }, [hideMenu, showMenu]);
 
   useEffect(() => {
-    if (connectRequest) {
-      setShowStart(false);
-      navigate('/connect');
-      return;
-    }
-
     if (encryptedKeys) {
       setShowStart(false);
       navigate('/bsv-wallet');
@@ -56,7 +50,7 @@ export const Start = () => {
     }
 
     setShowStart(true);
-  }, [connectRequest, encryptedKeys, navigate]);
+  }, [encryptedKeys, navigate]);
 
   return (
     <Show when={showStart}>

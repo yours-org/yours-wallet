@@ -12,7 +12,7 @@ import { useBsv } from '../../hooks/useBsv';
 import { useKeys } from '../../hooks/useKeys';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { encryptUsingPrivKey } from '../../utils/crypto';
 import { getPrivateKeyFromTag, Keys } from '../../utils/keys';
@@ -37,7 +37,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [encryptedMessages, setEncryptedMessages] = useState<string[] | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useWeb3Context();
+  const { isPasswordRequired } = useAppStateContext();
   const { retrieveKeys } = useKeys();
   const [hasEncrypted, setHasEncrypted] = useState(false);
 

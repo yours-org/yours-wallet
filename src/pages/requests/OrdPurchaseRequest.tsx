@@ -13,7 +13,7 @@ import { useGorillaPool } from '../../hooks/useGorillaPool';
 import { useOrds } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { BSV_DECIMAL_CONVERSION, GLOBAL_ORDERBOOK_MARKET_RATE, YOURS_DEV_WALLET } from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
@@ -34,7 +34,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useWeb3Context();
+  const { isPasswordRequired } = useAppStateContext();
   const [inscription, setInscription] = useState<OrdinalTxo | undefined>();
   const marketplaceAddress = request.marketplaceAddress ?? YOURS_DEV_WALLET;
   const marketplaceRate = request.marketplaceRate ?? GLOBAL_ORDERBOOK_MARKET_RATE;

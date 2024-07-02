@@ -11,7 +11,7 @@ import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useBsv } from '../../hooks/useBsv';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 import { ColorThemeProps } from '../../theme';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
@@ -46,7 +46,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [signature, setSignature] = useState<string | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useWeb3Context();
+  const { isPasswordRequired } = useAppStateContext();
   const { isProcessing, setIsProcessing, signMessage } = useBsv();
 
   useEffect(() => {

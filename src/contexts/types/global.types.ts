@@ -18,24 +18,27 @@ import {
 } from 'yours-wallet-provider';
 import { WhitelistedApp } from '../../inject';
 
-// TODO: multi account
-// interface Account {
-//     identityPubKey: string;
-//     name: string;
-//     icon: string;
-// }
+export type Dispatch<T> = (value: T) => void;
 
-interface AppState {
+interface Account {
+  name: string;
+  icon: string;
+  encryptedKeys: string; // See Keys type
+  derivationTags: TaggedDerivationResponse[];
+  whitelist: WhitelistedApp[];
+}
+
+export interface AppState {
   addresses: Addresses;
   balance: Balance;
   isLocked: boolean;
   isPasswordRequired: boolean;
   network: NetWork;
-  ordinals: Ordinal[];
+  ordinals: Ordinal[]; // TODO: remove
   pubKeys: PubKeys;
 }
 
-type ExchangeRateCache = {
+export type ExchangeRateCache = {
   rate: number;
   timestamp: number;
 };
@@ -49,15 +52,14 @@ type ConnectRequest = {
 
 export interface ChromeStorageObject {
   appState: AppState;
-  derivationTags: TaggedDerivationResponse[];
-  encryptedKeys: string; // stringified Keys object (hint: search for "Keys" type)
+  accounts: { [identityAddress: string]: Account };
+  selectedAccount: string;
   exchangeRateCache: ExchangeRateCache;
   lastActiveTime: number;
   passKey: string;
-  paymentUtxos: Utxo[];
+  paymentUtxos: Utxo[]; // TODO: remove
   popupWindowId: number;
   salt: string;
-  whitelist: WhitelistedApp[];
   connectRequest?: ConnectRequest;
   sendBsvRequest?: SendBsv[];
   transferOrdinalRequest?: TransferOrdinal;

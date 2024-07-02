@@ -18,7 +18,7 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useWalletLockState } from '../hooks/useWalletLockState';
-import { useWeb3Context } from '../hooks/useWeb3Context';
+import { useAppStateContext } from '../hooks/useAppStateContext';
 import { WhitelistedApp } from '../inject';
 import { ColorThemeProps } from '../theme';
 import { sendMessage } from '../utils/chromeHelpers';
@@ -122,7 +122,7 @@ export const Settings = () => {
     updatePasswordRequirement,
     updateNoApprovalLimit,
     noApprovalLimit,
-  } = useWeb3Context();
+  } = useAppStateContext();
   const [page, setPage] = useState<SettingsPage>('main');
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');

@@ -1,19 +1,17 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect } from 'react';
 import { styled } from 'styled-components';
 import { Button } from '../../components/Button';
 import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { BottomMenuContext } from '../../contexts/BottomMenuContext';
-import { useBsv } from '../../hooks/useBsv';
-import { useOrds } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import greenCheck from '../../assets/green-check.svg';
 import { ColorThemeProps } from '../../theme';
-import { useWeb3ContextNew } from '../../hooks/useWeb3ContextNew';
 import { RequestParams, WhitelistedApp } from '../../inject';
-import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
+import { sendMessage } from '../../utils/chromeHelpers';
 import { storage } from '../../utils/storage';
+import { useKeys } from '../../hooks/useKeys';
 
 const Container = styled.div`
   display: flex;
@@ -58,14 +56,11 @@ export type ConnectRequestProps = {
 };
 
 export const ConnectRequest = (props: ConnectRequestProps) => {
-  const { request, whiteListedApps, popupId, onDecision } = props;
+  const { request, whiteListedApps, onDecision } = props;
   const { theme } = useTheme();
   const context = useContext(BottomMenuContext);
   const { addSnackbar } = useSnackbar();
-  const [isDecided, setIsDecided] = useState(false);
-  const { bsvPubKey, identityPubKey } = useBsv();
-  const { ordPubKey } = useOrds();
-  const { clearRequest } = useWeb3ContextNew();
+  const { identityPubKey, bsvPubKey, ordPubKey } = useKeys();
 
   useEffect(() => {
     if (!context) return;
@@ -75,61 +70,44 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   }, [context]);
 
   useEffect(() => {
-    if (isDecided) return;
-    if (request && !request.isAuthorized) return;
-    if (!bsvPubKey || !ordPubKey) return;
+    if (!request?.isAuthorized) return;
+    if (!identityPubKey || !bsvPubKey || !ordPubKey) return;
     if (!window.location.href.includes('localhost')) {
       sendMessage({
         action: 'userConnectResponse',
         decision: 'approved',
-        pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
+        pubKeys: { identityPubKey, bsvPubKey, ordPubKey },
       });
-      clearRequest('connectRequest');
-      if (popupId) removeWindow(popupId);
+      onDecision();
     }
-  }, [bsvPubKey, ordPubKey, popupId, request, isDecided, identityPubKey, clearRequest]);
+  }, [request, identityPubKey, bsvPubKey, ordPubKey, onDecision]);
 
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) removeWindow(popupId);
-    };
+  const handleAccept = async () => {
+    await storage.set({
+      whitelist: [
+        ...whiteListedApps,
+        {
+          domain: request?.domain ?? '',
+          icon: request?.appIcon ?? '',
+        },
+      ],
+    });
+    sendMessage({
+      action: 'userConnectResponse',
+      decision: 'approved',
+      pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
+    });
+    addSnackbar(`Approved`, 'success');
+    onDecision();
+  };
 
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
-  const handleConnectDecision = async (approved: boolean) => {
-    if (chrome.runtime) {
-      if (approved) {
-        await storage.set({
-          whitelist: [
-            ...whiteListedApps,
-            {
-              domain: request?.domain ?? '',
-              icon: request?.appIcon ?? '',
-            },
-          ],
-        });
-        await sendMessage({
-          action: 'userConnectResponse',
-          decision: 'approved',
-          pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
-        });
-        addSnackbar(`Approved`, 'success');
-      } else {
-        await sendMessage({
-          action: 'userConnectResponse',
-          decision: 'declined',
-        });
-        addSnackbar(`Declined`, 'error');
-      }
-    }
-
-    setIsDecided(true);
-    clearRequest('connectRequest');
-    if (popupId) removeWindow(popupId);
+  const handleDecline = async () => {
+    sendMessage({
+      action: 'userConnectResponse',
+      decision: 'declined',
+    });
+    addSnackbar(`Declined`, 'error');
+    onDecision();
   };
 
   return (
@@ -167,8 +145,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
           label="Connect"
           onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
-            handleConnectDecision(true);
-            onDecision();
+            handleAccept();
           }}
         />
         <Button
@@ -177,8 +154,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
           label="Cancel"
           onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
-            handleConnectDecision(false);
-            onDecision();
+            handleDecline();
           }}
         />
       </Container>
