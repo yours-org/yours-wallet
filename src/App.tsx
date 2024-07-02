@@ -29,6 +29,7 @@ import { SignMessageRequest } from './pages/requests/SignMessageRequest';
 import { Settings } from './pages/Settings';
 import { ColorThemeProps } from './theme';
 import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
+import { useAppStateContext } from './hooks/useAppStateContext';
 
 const MainContainer = styled.div<{ $isMobile?: boolean }>`
   display: flex;
@@ -68,8 +69,9 @@ export const App = () => {
     decryptRequest,
     clearRequest,
     popupId,
-    whitelist,
   } = useWeb3RequestContext();
+
+  const { whitelistedApps } = useAppStateContext();
 
   useActivityDetector(isLocked);
 
@@ -105,7 +107,7 @@ export const App = () => {
                       <ConnectRequest
                         request={connectRequest}
                         onDecision={() => clearRequest('connectRequest')}
-                        whiteListedApps={whitelist}
+                        whiteListedApps={whitelistedApps}
                         popupId={popupId}
                       />
                     }

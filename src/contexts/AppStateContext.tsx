@@ -7,6 +7,7 @@ import { useNetwork } from '../hooks/useNetwork';
 import { BSV20Data, OrdinalData, useOrds } from '../hooks/useOrds';
 import { usePasswordSetting } from '../hooks/usePasswordSetting';
 import { useWalletLockState } from '../hooks/useWalletLockState';
+import { WhitelistedApp } from '../inject';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
@@ -22,6 +23,7 @@ export interface AppStateContextProps {
   exchangeRate: number;
   encryptedKeys: string | undefined;
   setEncryptedKeys: Dispatch<SetStateAction<string | undefined>>;
+  whitelistedApps: WhitelistedApp[];
   updateNetwork: (n: NetWork) => void;
   updateNoApprovalLimit: (amt: number) => void;
   updatePasswordRequirement: (passwordSetting: boolean) => void;
@@ -40,12 +42,14 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
   const { isPasswordRequired, setIsPasswordRequired } = usePasswordSetting();
   const { noApprovalLimit, setNoApprovalLimit } = useNoApprovalLimitSetting();
   const [encryptedKeys, setEncryptedKeys] = useState<string | undefined>(undefined);
+  const [whitelistedApps, setWhitelistedApps] = useState<WhitelistedApp[]>([]);
 
   useEffect(() => {
     const handleStateChanges = async (result: Partial<ChromeStorageObject>) => {
-      const { encryptedKeys } = result;
+      const { encryptedKeys, whitelist } = result;
 
       if (encryptedKeys) setEncryptedKeys(encryptedKeys);
+      if (whitelist) setWhitelistedApps(whitelist);
     };
 
     const getStorageAndSetRequestState = async () => {
@@ -96,15 +100,15 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     })();
 
-    storage.get(['appState']).then(async (result) => {
-      const { appState } = result;
-      // only update appState when popupWindowId is empty;
+    storage.get(null).then(async (result: ChromeStorageObject) => {
+      const { appState, popupWindowId } = result;
 
       const balance = {
         bsv: bsvBalance,
         satoshis: Math.round(bsvBalance * BSV_DECIMAL_CONVERSION),
         usdInCents: Math.round(bsvBalance * exchangeRate * 100),
       };
+      if (popupWindowId) return; // Don't change app state if the popup window is open
 
       await storage.set({
         appState: {
@@ -166,6 +170,7 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
         updateNoApprovalLimit,
         exchangeRate,
         encryptedKeys,
+        whitelistedApps,
         setEncryptedKeys,
       }}
     >

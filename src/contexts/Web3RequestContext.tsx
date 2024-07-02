@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, ReactNode, SetStateAction } from 'react';
+import { createContext, useState, useEffect, ReactNode } from 'react';
 import {
   Broadcast,
   DecryptRequest,
@@ -10,35 +10,22 @@ import {
   TaggedDerivationRequest,
   TransferOrdinal,
 } from 'yours-wallet-provider';
-import { RequestParams, WhitelistedApp } from '../inject';
+import { RequestParams } from '../inject';
 import { storage } from '../utils/storage';
-import { ChromeStorageObject, Dispatch } from './types/global.types';
+import { ChromeStorageObject } from './types/global.types';
 
 export type Web3RequestContextProps = {
   connectRequest: RequestParams | undefined;
-  setConnectRequest: Dispatch<SetStateAction<RequestParams | undefined>>;
   sendBsvRequest: SendBsv[] | undefined;
-  setSendBsvRequest: Dispatch<SetStateAction<SendBsv[] | undefined>>;
   transferOrdinalRequest: TransferOrdinal | undefined;
-  setTransferOrdinalRequest: Dispatch<SetStateAction<TransferOrdinal | undefined>>;
   purchaseOrdinalRequest: PurchaseOrdinal | undefined;
-  setPurchaseOrdinalRequest: Dispatch<SetStateAction<PurchaseOrdinal | undefined>>;
   signMessageRequest: SignMessage | undefined;
-  setSignMessageRequest: Dispatch<SetStateAction<SignMessage | undefined>>;
   broadcastRequest: Broadcast | undefined;
-  setBroadcastRequest: Dispatch<SetStateAction<Broadcast | undefined>>;
   getSignaturesRequest: GetSignatures | undefined;
-  setGetSignaturesRequest: Dispatch<SetStateAction<GetSignatures | undefined>>;
   generateTaggedKeysRequest: TaggedDerivationRequest | undefined;
-  setGenerateTaggedKeysRequest: Dispatch<SetStateAction<TaggedDerivationRequest | undefined>>;
   encryptRequest: EncryptRequest | undefined;
-  setEncryptRequest: Dispatch<SetStateAction<EncryptRequest | undefined>>;
   decryptRequest: DecryptRequest | undefined;
-  setDecryptRequest: Dispatch<SetStateAction<DecryptRequest | undefined>>;
   popupId: number | undefined;
-  setPopupId: Dispatch<SetStateAction<number | undefined>>;
-  whitelist: WhitelistedApp[];
-  setWhitelist: Dispatch<SetStateAction<WhitelistedApp[]>>;
   clearRequest: (type: keyof Omit<Web3RequestContextProps, 'clearRequest'>) => void;
 };
 
@@ -58,7 +45,6 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [encryptRequest, setEncryptRequest] = useState<EncryptRequest | undefined>(undefined);
   const [decryptRequest, setDecryptRequest] = useState<DecryptRequest | undefined>(undefined);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
-  const [whitelist, setWhitelist] = useState<WhitelistedApp[]>([]);
 
   const clearRequest = () => {
     setConnectRequest(undefined);
@@ -114,30 +100,17 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     <Web3RequestContext.Provider
       value={{
         connectRequest,
-        setConnectRequest,
         sendBsvRequest,
-        setSendBsvRequest,
         transferOrdinalRequest,
-        setTransferOrdinalRequest,
         purchaseOrdinalRequest,
-        setPurchaseOrdinalRequest,
         signMessageRequest,
-        setSignMessageRequest,
         broadcastRequest,
-        setBroadcastRequest,
         getSignaturesRequest,
-        setGetSignaturesRequest,
         generateTaggedKeysRequest,
-        setGenerateTaggedKeysRequest,
         encryptRequest,
-        setEncryptRequest,
         decryptRequest,
-        setDecryptRequest,
         clearRequest,
         popupId,
-        setPopupId,
-        whitelist,
-        setWhitelist,
       }}
     >
       {children}

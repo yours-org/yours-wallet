@@ -20,13 +20,13 @@ import { WhitelistedApp } from '../../inject';
 
 export type Dispatch<T> = (value: T) => void;
 
-interface Account {
-  name: string;
-  icon: string;
-  encryptedKeys: string; // See Keys type
-  derivationTags: TaggedDerivationResponse[];
-  whitelist: WhitelistedApp[];
-}
+// interface Account {
+//   name: string;
+//   icon: string;
+//   encryptedKeys: string; // See Keys type
+//   derivationTags: TaggedDerivationResponse[];
+//   whitelist: WhitelistedApp[];
+// }
 
 export interface AppState {
   addresses: Addresses;
@@ -52,11 +52,14 @@ type ConnectRequest = {
 
 export interface ChromeStorageObject {
   appState: AppState;
-  accounts: { [identityAddress: string]: Account };
-  selectedAccount: string;
+  // accounts: { [identityAddress: string]: Account };
+  // selectedAccount: string;
   exchangeRateCache: ExchangeRateCache;
   lastActiveTime: number;
   passKey: string;
+  encryptedKeys: string; // TODO: move to account
+  derivationTags: TaggedDerivationResponse[]; // TODO: move to account
+  whitelist: WhitelistedApp[]; // TODO: move to account
   paymentUtxos: Utxo[]; // TODO: remove
   popupWindowId: number;
   salt: string;
