@@ -42,7 +42,7 @@ export const Badge = styled.button<{ $primary?: boolean }>`
   color: ${({ theme }) => theme.white + '90'};
   margin: 0.5em 1em;
   padding: 0.25em 1em;
-  ${(props) => css`
+  ${() => css`
     background: #bf4f74;
     color: white;
   `}

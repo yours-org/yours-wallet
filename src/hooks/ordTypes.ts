@@ -68,34 +68,34 @@ export interface Inscription {
   file: File;
 }
 export class OrdinalTxo {
-  txid: string = '';
-  vout: number = 0;
-  outpoint: Outpoint = new Outpoint();
-  satoshis: number = 0;
-  accSats: number = 0;
+  txid = '';
+  vout = 0;
+  outpoint = new Outpoint();
+  satoshis = 0;
+  accSats = 0;
   owner?: string;
   script?: string;
   spend?: string;
   origin?: Origin;
-  height: number = 0;
-  idx: number = 0;
+  height = 0;
+  idx = 0;
   data?: TxoData;
 }
 
 export class BSV20Txo {
-  txid: string = '';
-  vout: number = 0;
-  outpoint: string = '';
+  txid = '';
+  vout = 0;
+  outpoint = '';
   owner?: string;
   script?: string;
   spend?: string;
-  height: number = 0;
-  idx: number = 0;
+  height = 0;
+  idx = 0;
   op? = '';
   tick?: string;
   id?: string;
-  amt: string = '';
-  status: Bsv20Status = 0;
+  amt = '';
+  status = 0;
   reason? = '';
   listing = false;
   price?: number;

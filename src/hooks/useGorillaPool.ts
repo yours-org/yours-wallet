@@ -1,10 +1,11 @@
 import axios from 'axios';
 import init, { ChainParams, P2PKHAddress, PrivateKey, Transaction, TxOut } from 'bsv-wasm-web';
+import { DerivationTag } from 'yours-wallet-provider';
 import { TaggedDerivationResponse } from '../pages/requests/GenerateTaggedKeysRequest';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL, JUNGLE_BUS_URL } from '../utils/constants';
 import { decryptUsingPrivKey } from '../utils/crypto';
 import { chunkedStringArray } from '../utils/format';
-import { DerivationTag, getTaggedDerivationKeys, Keys } from '../utils/keys';
+import { getTaggedDerivationKeys, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { isBSV20v2 } from '../utils/ordi';
 import { storage } from '../utils/storage';
@@ -309,7 +310,7 @@ export const useGorillaPool = () => {
       }
     }
 
-    storage.set({ derivationTags: tags });
+    await storage.set({ derivationTags: tags });
   };
 
   const getTxOut = async (txid: string, vout: number) => {
@@ -328,7 +329,7 @@ export const useGorillaPool = () => {
       paymentUtxos: StoredUtxo[];
       appState: { addresses: { bsvAddress: string } };
     }>((resolve) => {
-      storage.get(['paymentUtxos', 'appState'], (result) => resolve(result));
+      storage.get(['paymentUtxos', 'appState']).then((result) => resolve(result));
     });
 
     const { paymentUtxos, appState } = localStorage;
@@ -370,7 +371,7 @@ export const useGorillaPool = () => {
         });
       }
     }
-    storage.set({ paymentUtxos });
+    await storage.set({ paymentUtxos });
     return paymentUtxos;
   };
 

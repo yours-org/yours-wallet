@@ -1,4 +1,4 @@
-import React, { createContext, useEffect } from 'react';
+import React, { createContext, ReactNode, SetStateAction, useEffect, useState } from 'react';
 import { useNoApprovalLimitSetting } from '../hooks/useApprovalLimitSetting';
 import { useBsv } from '../hooks/useBsv';
 import { useGorillaPool } from '../hooks/useGorillaPool';
@@ -7,30 +7,31 @@ import { useNetwork } from '../hooks/useNetwork';
 import { BSV20Data, OrdinalData, useOrds } from '../hooks/useOrds';
 import { usePasswordSetting } from '../hooks/usePasswordSetting';
 import { useWalletLockState } from '../hooks/useWalletLockState';
+import { WhitelistedApp } from '../inject';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
+import { ChromeStorageObject, Dispatch } from './types/global.types';
 
-export interface Web3ContextProps {
+export interface AppStateContextProps {
   network: NetWork;
   ordinals: OrdinalData;
   bsv20s: BSV20Data;
   isPasswordRequired: boolean;
   noApprovalLimit: number | undefined;
   exchangeRate: number;
+  encryptedKeys: string | undefined;
+  setEncryptedKeys: Dispatch<SetStateAction<string | undefined>>;
+  whitelistedApps: WhitelistedApp[];
   updateNetwork: (n: NetWork) => void;
   updateNoApprovalLimit: (amt: number) => void;
   updatePasswordRequirement: (passwordSetting: boolean) => void;
 }
 
-export const Web3Context = createContext<Web3ContextProps | undefined>(undefined);
+export const AppStateContext = createContext<AppStateContextProps | undefined>(undefined);
 
-interface Web3ProviderProps {
-  children: React.ReactNode;
-}
-export const Web3Provider = (props: Web3ProviderProps) => {
-  const { children } = props;
+export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { isLocked } = useWalletLockState();
   const { bsvAddress, bsvPubKey, bsvBalance, exchangeRate, updateBsvBalance, identityAddress, identityPubKey } =
     useBsv();
@@ -40,6 +41,35 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   const { network, setNetwork } = useNetwork();
   const { isPasswordRequired, setIsPasswordRequired } = usePasswordSetting();
   const { noApprovalLimit, setNoApprovalLimit } = useNoApprovalLimitSetting();
+  const [encryptedKeys, setEncryptedKeys] = useState<string | undefined>(undefined);
+  const [whitelistedApps, setWhitelistedApps] = useState<WhitelistedApp[]>([]);
+
+  useEffect(() => {
+    const handleStateChanges = async (result: Partial<ChromeStorageObject>) => {
+      const { encryptedKeys, whitelist } = result;
+
+      if (encryptedKeys) setEncryptedKeys(encryptedKeys);
+      if (whitelist) setWhitelistedApps(whitelist);
+    };
+
+    const getStorageAndSetRequestState = async () => {
+      const res: ChromeStorageObject = await storage.get(null); // passing null returns everything in storage
+      handleStateChanges(res);
+
+      // Ensures that any storage changes (other than requests) update the react app state
+      storage.onChanged.addListener((changes, namespace) => {
+        if (namespace === 'local') {
+          const result: Partial<ChromeStorageObject> = {};
+          Object.keys(changes).forEach((key) => {
+            result[key] = changes[key].newValue;
+          });
+          handleStateChanges(result);
+        }
+      });
+    };
+
+    getStorageAndSetRequestState();
+  }, []);
 
   useEffect(() => {
     // Here we are pulling in any new Utxos unaccounted for.
@@ -70,18 +100,17 @@ export const Web3Provider = (props: Web3ProviderProps) => {
       }
     })();
 
-    storage.get(['appState'], (result) => {
-      const { appState } = result;
-
-      // only update appState when popupWindowId is empty;
+    storage.get(null).then(async (result: ChromeStorageObject) => {
+      const { appState, popupWindowId } = result;
 
       const balance = {
         bsv: bsvBalance,
         satoshis: Math.round(bsvBalance * BSV_DECIMAL_CONVERSION),
         usdInCents: Math.round(bsvBalance * exchangeRate * 100),
       };
+      if (popupWindowId) return; // Don't change app state if the popup window is open
 
-      storage.set({
+      await storage.set({
         appState: {
           isLocked,
           ordinals: ordinals.initialized ? ordinals.data : appState?.ordinals || [],
@@ -129,7 +158,7 @@ export const Web3Provider = (props: Web3ProviderProps) => {
   };
 
   return (
-    <Web3Context.Provider
+    <AppStateContext.Provider
       value={{
         network,
         updateNetwork,
@@ -140,9 +169,12 @@ export const Web3Provider = (props: Web3ProviderProps) => {
         noApprovalLimit,
         updateNoApprovalLimit,
         exchangeRate,
+        encryptedKeys,
+        whitelistedApps,
+        setEncryptedKeys,
       }}
     >
       {children}
-    </Web3Context.Provider>
+    </AppStateContext.Provider>
   );
 };

@@ -13,7 +13,7 @@ import init, {
 } from 'bsv-wasm-web';
 import { buildInscription } from 'js-1sat-ord-web';
 import { useEffect, useState } from 'react';
-import { SignMessageResponse } from '../pages/requests/SignMessageRequest';
+import { SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
 import {
   BSV_DECIMAL_CONVERSION,
   FEE_PER_BYTE,
@@ -23,7 +23,7 @@ import {
   P2PKH_OUTPUT_SIZE,
 } from '../utils/constants';
 import { removeBase64Prefix } from '../utils/format';
-import { DerivationTag, getPrivateKeyFromTag, Keys } from '../utils/keys';
+import { getPrivateKeyFromTag, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
 import { OrdinalTxo } from './ordTypes';
@@ -85,37 +85,6 @@ export type RawInscription = {
   map?: MAP;
 };
 
-export type Web3SendBsvRequest = {
-  satoshis: number;
-  address?: string;
-  data?: string[]; // hex string array
-  script?: string; // hex string
-  inscription?: RawInscription;
-}[];
-
-export type Web3BroadcastRequest = {
-  rawtx: string;
-  fund?: boolean;
-};
-
-export type Web3SignMessageRequest = {
-  message: string;
-  encoding?: 'utf8' | 'hex' | 'base64';
-  tag?: DerivationTag;
-};
-
-export type Web3EncryptRequest = {
-  message: string;
-  pubKeys: string[];
-  encoding?: 'utf8' | 'hex' | 'base64';
-  tag?: DerivationTag;
-};
-
-export type Web3DecryptRequest = {
-  messages: string[];
-  tag?: DerivationTag;
-};
-
 export type LockData = {
   totalLocked: number;
   unlockable: number;
@@ -175,11 +144,7 @@ export const useBsv = () => {
     }
   };
 
-  const sendBsv = async (
-    request: Web3SendBsvRequest,
-    password: string,
-    noApprovalLimit?: number,
-  ): Promise<SendBsvResponse> => {
+  const sendBsv = async (request: SendBsv[], password: string, noApprovalLimit?: number): Promise<SendBsvResponse> => {
     try {
       setIsProcessing(true);
       await init();
@@ -284,12 +249,11 @@ export const useBsv = () => {
       const { txid } = await broadcastWithGorillaPool(rawtx);
       if (txid) {
         if (isBelowNoApprovalLimit) {
-          storage.get(['noApprovalLimit'], ({ noApprovalLimit }) => {
-            storage.set({
-              noApprovalLimit: noApprovalLimit
-                ? Number((noApprovalLimit - amount / BSV_DECIMAL_CONVERSION).toFixed(8))
-                : 0,
-            });
+          const { noApprovalLimit } = await storage.get(['noApprovalLimit']);
+          await storage.set({
+            noApprovalLimit: noApprovalLimit
+              ? Number((noApprovalLimit - amount / BSV_DECIMAL_CONVERSION).toFixed(8))
+              : 0,
           });
         }
       }
@@ -304,9 +268,9 @@ export const useBsv = () => {
   };
 
   const signMessage = async (
-    messageToSign: Web3SignMessageRequest,
+    messageToSign: SignMessage,
     password: string,
-  ): Promise<SignMessageResponse | undefined> => {
+  ): Promise<SignedMessage | { error: string } | undefined> => {
     const { message, encoding } = messageToSign;
     const isAuthenticated = await verifyPassword(password);
     if (!isAuthenticated) {

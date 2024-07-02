@@ -1,5 +1,6 @@
 import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
+import { PurchaseOrdinal } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -9,28 +10,23 @@ import { ConfirmContent, FormContainer, HeaderText, Text } from '../../component
 import { Show } from '../../components/Show';
 import { OrdinalTxo } from '../../hooks/ordTypes';
 import { useGorillaPool } from '../../hooks/useGorillaPool';
-import { PurchaseOrdinal, useOrds } from '../../hooks/useOrds';
+import { useOrds } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
+import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { BSV_DECIMAL_CONVERSION, GLOBAL_ORDERBOOK_MARKET_RATE, YOURS_DEV_WALLET } from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
 import { storage } from '../../utils/storage';
 
-export type Web3PurchaseOrdinalRequest = {
-  outpoint: string;
-  marketplaceRate?: number;
-  marketplaceAddress?: string;
-};
-
 export type OrdPurchaseRequestProps = {
-  web3Request: Web3PurchaseOrdinalRequest;
+  request: PurchaseOrdinal & { password?: string };
   popupId: number | undefined;
   onResponse: () => void;
 };
 
 export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
-  const { web3Request, popupId, onResponse } = props;
+  const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
   const { ordAddress, getOrdinals, isProcessing, purchaseGlobalOrderbookListing, setIsProcessing, getOrdinalsBaseUrl } =
     useOrds();
@@ -38,22 +34,22 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useWeb3Context();
+  const { isPasswordRequired } = useAppStateContext();
   const [inscription, setInscription] = useState<OrdinalTxo | undefined>();
-  const marketplaceAddress = web3Request.marketplaceAddress ?? YOURS_DEV_WALLET;
-  const marketplaceRate = web3Request.marketplaceRate ?? GLOBAL_ORDERBOOK_MARKET_RATE;
-  const outpoint = web3Request.outpoint;
+  const marketplaceAddress = request.marketplaceAddress ?? YOURS_DEV_WALLET;
+  const marketplaceRate = request.marketplaceRate ?? GLOBAL_ORDERBOOK_MARKET_RATE;
+  const outpoint = request.outpoint;
 
   useEffect(() => {
-    if (!web3Request.outpoint) return;
+    if (!request.outpoint) return;
     const getOrigin = async () => {
-      const res = await getUtxoByOutpoint(web3Request.outpoint);
+      const res = await getUtxoByOutpoint(request.outpoint);
       setInscription(res);
     };
 
     getOrigin();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [web3Request.outpoint]);
+  }, [request.outpoint]);
 
   useEffect(() => {
     if (!successTxId) return;
@@ -63,17 +59,6 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, getOrdinals, ordAddress]);
-
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -99,7 +84,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
       return;
     }
 
-    const purchaseListing: PurchaseOrdinal = {
+    const purchaseListing: PurchaseOrdinal & { password: string } = {
       marketplaceAddress,
       marketplaceRate,
       outpoint,
@@ -122,23 +107,19 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
       return;
     }
 
-    chrome.runtime.sendMessage({
+    sendMessage({
       action: 'purchaseOrdinalResponse',
       txid: purchaseRes.txid,
     });
 
     setSuccessTxId(purchaseRes.txid);
     addSnackbar('Purchase Successful!', 'success');
-    setTimeout(async () => {
-      onResponse();
-      storage.remove('purchaseOrdinalRequest');
-      if (popupId) chrome.windows.remove(popupId);
-    }, 2000);
+    onResponse();
   };
 
-  const clearRequest = () => {
-    storage.remove('purchaseOrdinalRequest');
-    if (popupId) chrome.windows.remove(popupId);
+  const clearRequest = async () => {
+    await storage.remove('purchaseOrdinalRequest');
+    if (popupId) removeWindow(popupId);
     window.location.reload();
   };
 
@@ -148,7 +129,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
         <PageLoader theme={theme} message="Purchasing Ordinal..." />
       </Show>
 
-      <Show when={!isProcessing && !!web3Request && !!inscription}>
+      <Show when={!isProcessing && !!request && !!inscription}>
         <ConfirmContent>
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Purchase Request</HeaderText>

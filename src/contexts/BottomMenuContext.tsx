@@ -1,7 +1,7 @@
 import { ReactNode, createContext, useState } from 'react';
 import { BottomMenu } from '../components/BottomMenu';
+import { useNetwork } from '../hooks/useNetwork';
 import { useTheme } from '../hooks/useTheme';
-import { useWeb3Context } from '../hooks/useWeb3Context';
 
 export type MenuItems = 'bsv' | 'ords' | 'apps' | 'settings';
 
@@ -27,7 +27,7 @@ export const BottomMenuProvider = (props: BottomMenuProviderProps) => {
   const [selected, setSelected] = useState<MenuItems | null>(null);
   const [query, setQuery] = useState('');
   const [isVisible, setIsVisible] = useState(false);
-  const { network } = useWeb3Context();
+  const { network } = useNetwork();
 
   const handleSelect = (item: MenuItems, pageQuery?: string) => {
     setSelected(item);

@@ -1,5 +1,5 @@
 import validate from 'bitcoin-address-validation';
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { BackButton } from '../components/BackButton';
 import { Button } from '../components/Button';
@@ -24,7 +24,7 @@ import { useBottomMenu } from '../hooks/useBottomMenu';
 import { BSV20, getTokenName, ListOrdinal, OrdOperationResponse, useOrds } from '../hooks/useOrds';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
-import { useWeb3Context } from '../hooks/useWeb3Context';
+import { useAppStateContext } from '../hooks/useAppStateContext';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { isBSV20v2, normalize, showAmount } from '../utils/ordi';
 import { sleep } from '../utils/sleep';
@@ -167,7 +167,7 @@ export const OrdWallet = () => {
   const [bsvListAmount, setBsvListAmount] = useState<number | null>();
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired, exchangeRate } = useWeb3Context();
+  const { isPasswordRequired, exchangeRate } = useAppStateContext();
 
   const [token, setToken] = useState<Token | null>(null);
   const [tokenSendAmount, setTokenSendAmount] = useState<bigint | null>(null);
@@ -281,10 +281,16 @@ export const OrdWallet = () => {
       return;
     }
 
+    if (!bsvListAmount) {
+      addSnackbar('You must enter a valid BSV amount!', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
     const listing: ListOrdinal = {
       outpoint: ordinalOutpoint,
       password: passwordConfirm,
-      price: Math.ceil(bsvListAmount! * BSV_DECIMAL_CONVERSION),
+      price: Math.ceil(bsvListAmount * BSV_DECIMAL_CONVERSION),
     };
 
     const listRes = await listOrdinalOnGlobalOrderbook(listing);

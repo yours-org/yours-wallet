@@ -1,6 +1,7 @@
 import { Bn, Point } from '@ts-bitcoin/core';
 import * as bip39 from 'bip39';
 import { ExtendedPrivateKey, Hash, PrivateKey } from 'bsv-wasm-web';
+import { DerivationTag } from 'yours-wallet-provider';
 import { WifKeys } from '../hooks/useKeys';
 import { DEFAULT_IDENTITY_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';
 
@@ -19,20 +20,6 @@ export type Keys = {
   identityPubKey: string;
   identityDerivationPath: string;
 };
-
-export type InternalYoursTags =
-  | { label: 'panda'; id: 'bsv'; domain: ''; meta: Record<string, never> }
-  | { label: 'panda'; id: 'ord'; domain: ''; meta: Record<string, never> }
-  | { label: 'panda'; id: 'identity'; domain: ''; meta: Record<string, never> };
-
-export type DerivationTag =
-  | InternalYoursTags
-  | {
-      label: string;
-      id: string;
-      domain: string;
-      meta?: Record<string, never>;
-    };
 
 const getWifAndDerivation = (seedPhrase: string, derivationPath: string) => {
   const seed = bip39.mnemonicToSeedSync(seedPhrase);

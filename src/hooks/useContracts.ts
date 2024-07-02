@@ -1,58 +1,10 @@
 import init, { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
+import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
 import { DUST, FEE_PER_BYTE, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
 import { OrdinalTxo } from './ordTypes';
 import { useGorillaPool } from './useGorillaPool';
 import { useKeys } from './useKeys';
-
-/**
- * `SignatureRequest` contains required informations for a signer to sign a certain input of a transaction.
- */
-export interface SignatureRequest {
-  prevTxid: string;
-  outputIndex: number;
-  /** The index of input to sign. */
-  inputIndex: number;
-  /** The previous output satoshis value of the input to spend. */
-  satoshis: number;
-  /** The address(es) of corresponding private key(s) required to sign the input. */
-  address: string | string[];
-  /** The previous output script of input, default value is a P2PKH locking script for the `address` if omitted. */
-  script?: string;
-  /** The sighash type, default value is `SIGHASH_ALL | SIGHASH_FORKID` if omitted. */
-  sigHashType?: number;
-  /**
-   * Index of the OP_CODESEPARATOR to split the previous output script at during verification.
-   * If undefined, the whole script is used.
-   * */
-  csIdx?: number;
-  /** The extra information for signing. */
-  data?: unknown;
-}
-
-export type Web3GetSignaturesRequest = {
-  /** The raw transaction hex to get signatures from. */
-  rawtx: string;
-
-  /** The signature requst informations, see details in `SignatureRequest`. */
-  sigRequests: SignatureRequest[];
-};
-
-/**
- * `SignatureResponse` contains the signing result corresponding to a `SignatureRequest`.
- */
-export interface SignatureResponse {
-  /** The index of input. */
-  inputIndex: number;
-  /** The signature.*/
-  sig: string;
-  /** The public key bound with the `sig`. */
-  pubKey: string;
-  /** The sighash type, default value is `SIGHASH_ALL | SIGHASH_FORKID` if omitted. */
-  sigHashType: number;
-  /** The index of the OP_CODESEPARATOR to split the previous output script at.*/
-  csIdx?: number;
-}
 
 const DEFAULT_SIGHASH_TYPE = 65; // SIGHASH_ALL | SIGHASH_FORKID
 
@@ -68,7 +20,7 @@ export const useContracts = () => {
    * @returns A promise which resolves to a list of `SignatureReponse` corresponding to the `request` or an error object if any.
    */
   const getSignatures = async (
-    request: Web3GetSignaturesRequest,
+    request: GetSignatures,
     password: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ sigResponses?: SignatureResponse[]; error?: { message: string; cause?: any } }> => {

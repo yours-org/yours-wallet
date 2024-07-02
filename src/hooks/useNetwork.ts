@@ -5,23 +5,15 @@ import { storage } from '../utils/storage';
 export const useNetwork = () => {
   const [network, setNetwork] = useState(NetWork.Mainnet);
 
-  const retrieveNetwork = (): Promise<NetWork> => {
-    return new Promise((resolve, reject) => {
-      storage.get(['network'], async (result: NetWorkStorage) => {
-        try {
-          if (!result.network) {
-            setNetwork(NetWork.Mainnet);
-            resolve(NetWork.Mainnet);
-            return;
-          }
+  const retrieveNetwork = async (): Promise<NetWork> => {
+    const result: NetWorkStorage = await storage.get(['network']);
+    if (!result.network) {
+      setNetwork(NetWork.Mainnet);
+      return NetWork.Mainnet;
+    }
 
-          setNetwork(result.network);
-          resolve(result.network);
-        } catch (error) {
-          reject(error);
-        }
-      });
-    });
+    setNetwork(result.network);
+    return result.network;
   };
 
   useEffect(() => {

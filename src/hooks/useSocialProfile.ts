@@ -10,19 +10,12 @@ export const useSocialProfile = () => {
   });
 
   useEffect(() => {
-    const getSocialProfile = (): Promise<string[]> => {
-      return new Promise((resolve, reject) => {
-        storage.get(['socialProfile'], async (result) => {
-          try {
-            if (result?.socialProfile) {
-              setSocialProfile(result.socialProfile);
-            }
-            resolve(result.socialProfile);
-          } catch (error) {
-            reject(error);
-          }
-        });
-      });
+    const getSocialProfile = async (): Promise<SocialProfile> => {
+      const res = await storage.get(['socialProfile']);
+      if (res?.socialProfile) {
+        setSocialProfile(res.socialProfile);
+      }
+      return res.socialProfile;
     };
 
     getSocialProfile();

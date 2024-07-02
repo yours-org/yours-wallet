@@ -1,17 +1,17 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect } from 'react';
 import { styled } from 'styled-components';
-import { ThirdPartyAppRequestData, WhitelistedApp } from '../../App';
 import { Button } from '../../components/Button';
 import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { BottomMenuContext } from '../../contexts/BottomMenuContext';
-import { useBsv } from '../../hooks/useBsv';
-import { useOrds } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { storage } from '../../utils/storage';
 import greenCheck from '../../assets/green-check.svg';
 import { ColorThemeProps } from '../../theme';
+import { RequestParams, WhitelistedApp } from '../../inject';
+import { sendMessage } from '../../utils/chromeHelpers';
+import { storage } from '../../utils/storage';
+import { useKeys } from '../../hooks/useKeys';
 
 const Container = styled.div`
   display: flex;
@@ -49,19 +49,18 @@ const CheckMark = styled.img`
 `;
 
 export type ConnectRequestProps = {
-  thirdPartyAppRequestData: ThirdPartyAppRequestData | undefined;
+  request: RequestParams | undefined;
   whiteListedApps: WhitelistedApp[];
   popupId: number | undefined;
   onDecision: () => void;
 };
+
 export const ConnectRequest = (props: ConnectRequestProps) => {
-  const { thirdPartyAppRequestData, whiteListedApps, popupId, onDecision } = props;
+  const { request, whiteListedApps, onDecision } = props;
   const { theme } = useTheme();
   const context = useContext(BottomMenuContext);
   const { addSnackbar } = useSnackbar();
-  const [isDecided, setIsDecided] = useState(false);
-  const { bsvPubKey, identityPubKey } = useBsv();
-  const { ordPubKey } = useOrds();
+  const { identityPubKey, bsvPubKey, ordPubKey } = useKeys();
 
   useEffect(() => {
     if (!context) return;
@@ -71,88 +70,64 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   }, [context]);
 
   useEffect(() => {
-    if (isDecided) return;
-    if (thirdPartyAppRequestData && !thirdPartyAppRequestData.isAuthorized) return;
-    if (!bsvPubKey || !ordPubKey) return;
+    if (!request?.isAuthorized) return;
+    if (!identityPubKey || !bsvPubKey || !ordPubKey) return;
     if (!window.location.href.includes('localhost')) {
-      chrome.runtime.sendMessage({
+      sendMessage({
         action: 'userConnectResponse',
         decision: 'approved',
-        pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
+        pubKeys: { identityPubKey, bsvPubKey, ordPubKey },
       });
-      storage.remove('connectRequest');
-      // We don't want the window to stay open after a successful connection. The 10ms timeout is used because of some weirdness with how chrome.sendMessage() works
-      setTimeout(() => {
-        if (popupId) chrome.windows.remove(popupId);
-      }, 1000);
+      onDecision();
     }
-  }, [bsvPubKey, ordPubKey, popupId, thirdPartyAppRequestData, isDecided, identityPubKey]);
+  }, [request, identityPubKey, bsvPubKey, ordPubKey, onDecision]);
 
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
-    };
+  const handleAccept = async () => {
+    await storage.set({
+      whitelist: [
+        ...whiteListedApps,
+        {
+          domain: request?.domain ?? '',
+          icon: request?.appIcon ?? '',
+        },
+      ],
+    });
+    sendMessage({
+      action: 'userConnectResponse',
+      decision: 'approved',
+      pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
+    });
+    addSnackbar(`Approved`, 'success');
+    onDecision();
+  };
 
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
-  const handleConnectDecision = async (approved: boolean) => {
-    if (chrome.runtime) {
-      if (approved) {
-        storage.set({
-          whitelist: [
-            ...whiteListedApps,
-            {
-              domain: thirdPartyAppRequestData?.domain,
-              icon: thirdPartyAppRequestData?.appIcon,
-            },
-          ],
-        });
-        chrome.runtime.sendMessage({
-          action: 'userConnectResponse',
-          decision: 'approved',
-          pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
-        });
-        addSnackbar(`Approved`, 'success');
-      } else {
-        chrome.runtime.sendMessage({
-          action: 'userConnectResponse',
-          decision: 'declined',
-        });
-
-        addSnackbar(`Declined`, 'error');
-      }
-    }
-
-    setIsDecided(true);
-
-    storage.remove('connectRequest');
-    setTimeout(() => {
-      if (popupId) chrome.windows.remove(popupId);
-    }, 100);
+  const handleDecline = async () => {
+    sendMessage({
+      action: 'userConnectResponse',
+      decision: 'declined',
+    });
+    addSnackbar(`Declined`, 'error');
+    onDecision();
   };
 
   return (
     <Show
-      when={!thirdPartyAppRequestData?.isAuthorized}
+      when={!request?.isAuthorized}
       whenFalseContent={
         <Container>
           <Text theme={theme} style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-            Reconnecting to {thirdPartyAppRequestData?.appName} ...
+            Reconnecting to {request?.appName} ...
           </Text>
         </Container>
       }
     >
       <Container>
-        <Icon size="5rem" src={thirdPartyAppRequestData?.appIcon} />
+        <Icon size="5rem" src={request?.appIcon} />
         <HeaderText theme={theme} style={{ width: '90%' }}>
-          {thirdPartyAppRequestData?.appName}
+          {request?.appName}
         </HeaderText>
         <Text theme={theme} style={{ marginBottom: '1rem' }}>
-          {thirdPartyAppRequestData?.domain}
+          {request?.domain}
         </Text>
         <PermissionsContainer theme={theme}>
           <Permission>
@@ -170,8 +145,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
           label="Connect"
           onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
-            handleConnectDecision(true);
-            onDecision();
+            handleAccept();
           }}
         />
         <Button
@@ -180,8 +154,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
           label="Cancel"
           onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
-            handleConnectDecision(false);
-            onDecision();
+            handleDecline();
           }}
         />
       </Container>

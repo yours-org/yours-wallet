@@ -1,12 +1,18 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { ChromeStorageObject } from '../contexts/types/global.types';
+
 interface Storage {
-  set: (obj: any, callback?: () => void) => void;
-  get: (key: string | string[], callback: (result: any) => void) => void;
-  remove: (key: string | string[], callback?: () => void) => void;
+  set: (obj: any) => Promise<void>;
+  get: (key: string | string[] | null) => Promise<any>;
+  remove: (key: string | string[]) => Promise<void>;
   clear: () => Promise<void>;
+  onChanged: {
+    addListener: (callback: (changes: any, namespace: string) => void) => void;
+  };
 }
 
 const mockStorage: Storage = {
-  set: (obj, callback) => {
+  set: async (obj) => {
     Object.keys(obj).forEach((key) => {
       if (typeof obj[key] === 'object') {
         localStorage.setItem(key, JSON.stringify(obj[key]));
@@ -14,42 +20,47 @@ const mockStorage: Storage = {
         localStorage.setItem(key, obj[key]);
       }
     });
-    if (callback) callback();
   },
-  get: (keyOrKeys, callback) => {
-    // Define an indexable type for the result object
-    const result: { [key: string]: string | null } = {};
+  get: async (keyOrKeys) => {
+    return new Promise((resolve) => {
+      const result: { [key: string]: string | null } = {};
 
-    if (typeof keyOrKeys === 'string') {
-      const value = localStorage.getItem(keyOrKeys);
-      if (typeof value === 'string') {
-        if ((value.startsWith('"') && value.startsWith('"')) || (value.startsWith('{') && value.startsWith('}'))) {
-          result[keyOrKeys] = JSON.parse(value);
-        } else {
+      if (keyOrKeys === null) {
+        // Retrieve all items from localStorage
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key) {
+            const value = localStorage.getItem(key);
+            try {
+              result[key] = value ? JSON.parse(value) : value;
+            } catch {
+              result[key] = value;
+            }
+          }
+        }
+        resolve(result);
+      } else if (typeof keyOrKeys === 'string') {
+        const value = localStorage.getItem(keyOrKeys);
+        try {
+          result[keyOrKeys] = value ? JSON.parse(value) : value;
+        } catch {
           result[keyOrKeys] = value;
         }
-      } else {
-        result[keyOrKeys] = value;
-      }
-
-      callback(result);
-    } else if (Array.isArray(keyOrKeys)) {
-      keyOrKeys.forEach((key) => {
-        const value = localStorage.getItem(key);
-        if (typeof value === 'string') {
-          if ((value.startsWith('[') && value.endsWith(']')) || (value.startsWith('{') && value.endsWith('}'))) {
-            result[key] = JSON.parse(value);
-          } else {
+        resolve(result);
+      } else if (Array.isArray(keyOrKeys)) {
+        keyOrKeys.forEach((key) => {
+          const value = localStorage.getItem(key);
+          try {
+            result[key] = value ? JSON.parse(value) : value;
+          } catch {
             result[key] = value;
           }
-        } else {
-          result[key] = value;
-        }
-      });
-      callback(result);
-    }
+        });
+        resolve(result);
+      }
+    });
   },
-  remove: (keyOrKeys, callback) => {
+  remove: async (keyOrKeys) => {
     if (typeof keyOrKeys === 'string') {
       localStorage.removeItem(keyOrKeys);
     } else if (Array.isArray(keyOrKeys)) {
@@ -57,19 +68,82 @@ const mockStorage: Storage = {
         localStorage.removeItem(key);
       });
     }
-    if (callback) callback();
   },
   clear: async () => {
-    // Made the clear method asynchronous
     await new Promise<void>((resolve) => {
       localStorage.clear();
       resolve();
     });
   },
+  onChanged: {
+    addListener: (callback) => {
+      window.addEventListener('storage', (event) => {
+        const changes = { [event.key as string]: { newValue: event.newValue, oldValue: event.oldValue } };
+        callback(changes, 'local');
+      });
+    },
+  },
 };
 
-// Checking if we're in a Chrome environment
+// Wrapper to adapt chrome.storage.onChanged to match our custom Storage interface
+const chromeStorage: Storage = {
+  set: (obj) =>
+    new Promise<void>((resolve, reject) => {
+      chrome.storage.local.set(obj, () => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else {
+          resolve();
+        }
+      });
+    }),
+  get: (keyOrKeys) =>
+    new Promise<Partial<ChromeStorageObject>>((resolve, reject) => {
+      chrome.storage.local.get(keyOrKeys, (result) => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else {
+          resolve(result);
+        }
+      });
+    }),
+  remove: (keyOrKeys) =>
+    new Promise<void>((resolve, reject) => {
+      chrome.storage.local.remove(keyOrKeys, () => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else {
+          resolve();
+        }
+      });
+    }),
+  clear: () =>
+    new Promise<void>((resolve, reject) => {
+      chrome.storage.local.clear(() => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else {
+          resolve();
+        }
+      });
+    }),
+  onChanged: {
+    addListener: (callback) => {
+      chrome.storage.onChanged.addListener((changes, namespace) => {
+        const adaptedChanges = Object.keys(changes).reduce(
+          (acc, key) => {
+            acc[key] = { newValue: changes[key].newValue, oldValue: changes[key].oldValue };
+            return acc;
+          },
+          {} as Record<string, { newValue: any; oldValue: any }>,
+        );
+        callback(adaptedChanges, namespace);
+      });
+    },
+  },
+};
+
 const isChromeEnv = typeof chrome !== 'undefined' && typeof chrome.storage !== 'undefined';
 
-// Use chrome.storage.local if in Chrome environment, otherwise use mockStorage
-export const storage: Storage = isChromeEnv ? chrome.storage.local : mockStorage;
+// Use chromeStorage if in Chrome environment, otherwise use mockStorage
+export const storage: Storage = isChromeEnv ? chromeStorage : mockStorage;

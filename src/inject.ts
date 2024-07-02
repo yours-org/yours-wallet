@@ -20,14 +20,14 @@ import {
   TaggedDerivationRequest,
   TaggedDerivationResponse,
   TransferOrdinal,
-  Utxos,
+  Utxo,
   YoursEventListeners,
   YoursEvents,
   YoursProviderType,
 } from 'yours-wallet-provider';
 
 export enum YoursEventName {
-  CONNECT = 'connect',
+  CONNECT = 'connectRequest',
   DISCONNECT = 'disconnect',
   IS_CONNECTED = 'isConnected',
   GET_PUB_KEYS = 'getPubKeys',
@@ -35,20 +35,20 @@ export enum YoursEventName {
   GET_NETWORK = 'getNetwork',
   GET_BALANCE = 'getBalance',
   GET_ORDINALS = 'getOrdinals',
-  SEND_BSV = 'sendBsv',
-  TRANSFER_ORDINAL = 'transferOrdinal',
-  SIGN_MESSAGE = 'signMessage',
-  BROADCAST = 'broadcast',
-  GET_SIGNATURES = 'getSignatures',
+  SEND_BSV = 'sendBsvRequest',
+  TRANSFER_ORDINAL = 'transferOrdinalRequest',
+  SIGN_MESSAGE = 'signMessageRequest',
+  BROADCAST = 'broadcastRequest',
+  GET_SIGNATURES = 'getSignaturesRequest',
   GET_SOCIAL_PROFILE = 'getSocialProfile',
   GET_PAYMENT_UTXOS = 'getPaymentUtxos',
   GET_EXCHANGE_RATE = 'getExchangeRate',
-  PURCHASE_ORDINAL = 'purchaseOrdinal',
-  GENERATE_TAGGED_KEYS = 'generateTaggedKeys',
+  PURCHASE_ORDINAL = 'purchaseOrdinalRequest',
+  GENERATE_TAGGED_KEYS = 'generateTaggedKeysRequest',
   GET_TAGGED_KEYS = 'getTaggedKeys',
   INSCRIBE = 'sendBsv',
-  ENCRYPT = 'encrypt',
-  DECRYPT = 'decrypt',
+  ENCRYPT = 'encryptRequest',
+  DECRYPT = 'decryptRequest',
   SIGNED_OUT = 'signedOut',
   NETWORK_CHANGED = 'networkChanged',
   USER_CONNECT_RESPONSE = 'userConnectResponse',
@@ -72,8 +72,18 @@ export enum CustomListenerName {
 export type RequestParams = {
   appName?: string;
   appIcon?: string;
-  data?: any;
+  data?:
+    | SendBsv[]
+    | TransferOrdinal
+    | PurchaseOrdinal
+    | SignMessage
+    | Broadcast
+    | GetSignatures
+    | TaggedDerivationRequest
+    | EncryptRequest
+    | DecryptRequest;
   domain?: string;
+  isAuthorized?: boolean;
 };
 
 export type RequestEventDetail = {
@@ -89,7 +99,26 @@ export type RequestEvent = {
 export type ResponseEventDetail = {
   type: YoursEventName;
   success: boolean;
-  data?: any;
+  data?: (
+    | ConnectResponse
+    | SendBsvResponse
+    | PubKeys
+    | Addresses
+    | NetWork
+    | Balance
+    | Ordinal[]
+    | SignatureResponse[]
+    | SocialProfile
+    | TaggedDerivationResponse
+    | TaggedDerivationResponse[]
+    | SignedMessage
+    | Utxo[]
+    | boolean
+    | string
+    | number
+    | string[]
+    | undefined
+  ) & { popupId?: number };
   error?: string | undefined | boolean;
 };
 
@@ -107,7 +136,13 @@ export type EmitEvent = {
   detail: EmitEventDetail;
 };
 
+export type WhitelistedApp = {
+  domain: string;
+  icon: string;
+};
+
 export type Decision = 'approved' | 'declined';
+export type ConnectResponse = { decision: Decision; pubKeys: PubKeys };
 
 const createYoursMethod = <T, P = RequestParams>(type: YoursEventName) => {
   return async (params?: P) => {
@@ -117,20 +152,20 @@ const createYoursMethod = <T, P = RequestParams>(type: YoursEventName) => {
         detail: { messageId, type, params },
       });
 
-      self.dispatchEvent(requestEvent);
-
       function onResponse(e: Event) {
         const responseEvent = e as CustomEvent<ResponseEventDetail>;
-        if (responseEvent.detail.type === type) {
-          if (responseEvent.detail.success) {
-            resolve(responseEvent.detail.data as T);
+        const { detail } = responseEvent;
+        if (detail.type === type) {
+          if (detail.success) {
+            resolve(detail.data as T);
           } else {
-            reject(responseEvent.detail.error);
+            reject(detail.error);
           }
         }
       }
 
       self.addEventListener(messageId, onResponse, { once: true });
+      self.dispatchEvent(requestEvent);
     });
   };
 };
@@ -195,7 +230,7 @@ const provider: YoursProviderType = {
   broadcast: createYoursMethod<string | undefined, Broadcast>(YoursEventName.BROADCAST),
   getSignatures: createYoursMethod<SignatureResponse[] | undefined, GetSignatures>(YoursEventName.GET_SIGNATURES),
   getSocialProfile: createYoursMethod<SocialProfile | undefined, void>(YoursEventName.GET_SOCIAL_PROFILE),
-  getPaymentUtxos: createYoursMethod<Utxos[] | undefined, void>(YoursEventName.GET_PAYMENT_UTXOS),
+  getPaymentUtxos: createYoursMethod<Utxo[] | undefined, void>(YoursEventName.GET_PAYMENT_UTXOS),
   getExchangeRate: createYoursMethod<number | undefined, void>(YoursEventName.GET_EXCHANGE_RATE),
   purchaseOrdinal: createYoursMethod<string | undefined, PurchaseOrdinal>(YoursEventName.PURCHASE_ORDINAL),
   generateTaggedKeys: createYoursMethod<TaggedDerivationResponse, TaggedDerivationRequest>(

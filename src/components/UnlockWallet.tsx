@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { styled } from 'styled-components';
+import styled from 'styled-components';
 import { useKeys } from '../hooks/useKeys';
 import { useTheme } from '../hooks/useTheme';
 import { useViewport } from '../hooks/useViewport';
@@ -47,7 +47,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
     if (isVerified) {
       setVerificationFailed(false);
       const timestamp = Date.now();
-      storage.set({ lastActiveTime: timestamp });
+      await storage.set({ lastActiveTime: timestamp });
       onUnlock();
     } else {
       setVerificationFailed(true);

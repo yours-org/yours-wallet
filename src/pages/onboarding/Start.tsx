@@ -8,8 +8,8 @@ import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useTheme } from '../../hooks/useTheme';
 import { ColorThemeProps } from '../../theme';
-import { storage } from '../../utils/storage';
 import yoursLogo from '../../assets/yours-logo.png';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 
 const Content = styled.div`
   display: flex;
@@ -32,6 +32,7 @@ export const Start = () => {
   const navigate = useNavigate();
   const [showStart, setShowStart] = useState(false);
   const { hideMenu, showMenu } = useBottomMenu();
+  const { encryptedKeys } = useAppStateContext();
 
   useEffect(() => {
     hideMenu();
@@ -41,23 +42,15 @@ export const Start = () => {
     };
   }, [hideMenu, showMenu]);
 
-  // If the encrypted keys are present, take the user to the wallet page.
   useEffect(() => {
-    storage.get(['encryptedKeys', 'connectRequest'], (result) => {
-      if (result?.connectRequest) {
-        setShowStart(false);
-        navigate('/connect');
-        return;
-      }
+    if (encryptedKeys) {
+      setShowStart(false);
+      navigate('/bsv-wallet');
+      return;
+    }
 
-      if (result?.encryptedKeys) {
-        setShowStart(false);
-        navigate('/bsv-wallet');
-        return;
-      }
-      setShowStart(true);
-    });
-  }, [navigate]);
+    setShowStart(true);
+  }, [encryptedKeys, navigate]);
 
   return (
     <Show when={showStart}>

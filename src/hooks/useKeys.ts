@@ -6,14 +6,13 @@ import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto
 import { generateKeysFromTag, getKeys, getKeysFromWifs, Keys } from '../utils/keys';
 import { NetWork } from '../utils/network';
 import { storage } from '../utils/storage';
-import { UTXO } from './useBsv';
 import { useGorillaPool } from './useGorillaPool';
 import { useNetwork } from './useNetwork';
 import { usePasswordSetting } from './usePasswordSetting';
-import { useWhatsOnChain } from './useWhatsOnChain';
+import { useWhatsOnChain, WocUtxo } from './useWhatsOnChain';
 
 export type KeyStorage = {
-  encryptedKeys: string;
+  encryptedKeys: string; // stringified Keys object (hint: search for "Keys" type)
   passKey: string;
   salt: string;
 };
@@ -99,14 +98,14 @@ export const useKeys = () => {
     await init();
     const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
     if (!isAddressOnRightNetwork(sweepWallet.address)) return;
-    const { data } = await axios.get<UTXO[]>(`${getBaseUrl()}/address/${sweepWallet.address}/unspent`);
+    const { data } = await axios.get<WocUtxo[]>(`${getBaseUrl()}/address/${sweepWallet.address}/unspent`);
     const utxos = data;
     if (utxos.length === 0) return;
     const tx = new Transaction(1, 0);
     const changeAddress = P2PKHAddress.from_string(sweepWallet.address);
 
     let satsIn = 0;
-    utxos.forEach((utxo: any, vin: number) => {
+    utxos.forEach((utxo: WocUtxo, vin: number) => {
       const txin = new TxIn(Buffer.from(utxo.tx_hash, 'hex'), utxo.tx_pos, Script.from_hex(''));
       tx.add_input(txin);
       satsIn += utxo.value;
@@ -148,7 +147,7 @@ export const useKeys = () => {
    */
   const retrieveKeys = (password?: string, isBelowNoApprovalLimit?: boolean): Promise<Keys | Partial<Keys>> => {
     return new Promise((resolve, reject) => {
-      storage.get(['encryptedKeys', 'passKey', 'salt'], async (result: KeyStorage) => {
+      storage.get(['encryptedKeys', 'passKey', 'salt']).then(async (result: KeyStorage) => {
         try {
           await init();
           if (!result.encryptedKeys || !result.passKey) return;
@@ -206,7 +205,7 @@ export const useKeys = () => {
   const verifyPassword = (password: string): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       if (!isPasswordRequired) resolve(true);
-      storage.get(['salt', 'passKey'], (result: KeyStorage) => {
+      storage.get(['salt', 'passKey']).then((result: KeyStorage) => {
         try {
           const derivedKey = deriveKey(password, result.salt);
           resolve(derivedKey === result.passKey);

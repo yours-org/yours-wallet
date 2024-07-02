@@ -22,6 +22,7 @@ import { useWhatsOnChain } from './useWhatsOnChain';
 import { createTransferP2PKH, createTransferV2P2PKH, isBSV20v2 } from '../utils/ordi';
 import { OrdinalTxo } from './ordTypes';
 import { UTXO } from './useBsv';
+import { PurchaseOrdinal } from 'yours-wallet-provider';
 
 export class InscriptionData {
   type?: string = '';
@@ -67,23 +68,10 @@ export interface Balance {
   pending: bigint;
 }
 
-export type Web3TransferOrdinalRequest = {
-  address: string;
-  origin: string;
-  outpoint: string;
-};
-
 export type ListOrdinal = {
   outpoint: string;
   price: number;
   password: string;
-};
-
-export type PurchaseOrdinal = {
-  outpoint: string;
-  password: string;
-  marketplaceRate: number;
-  marketplaceAddress: string;
 };
 
 export interface BSV20Data {
@@ -663,7 +651,7 @@ export const useOrds = () => {
     }
   };
 
-  const purchaseGlobalOrderbookListing = async (purchaseOrdinal: PurchaseOrdinal) => {
+  const purchaseGlobalOrderbookListing = async (purchaseOrdinal: PurchaseOrdinal & { password: string }) => {
     try {
       const { marketplaceAddress, marketplaceRate, outpoint, password } = purchaseOrdinal;
       setIsProcessing(true);
@@ -717,10 +705,10 @@ export const useOrds = () => {
       purchaseTx.add_output(dummyChangeOutput);
 
       // output 3 - marketFee
-      const marketFee = Math.ceil(price * marketplaceRate);
+      const marketFee = Math.ceil(price * (marketplaceRate ?? 0));
       const dummyMarketFeeOutput = new TxOut(
         BigInt(marketFee),
-        P2PKHAddress.from_string(marketplaceAddress).get_locking_script(),
+        P2PKHAddress.from_string(marketplaceAddress ?? '').get_locking_script(),
       );
       purchaseTx.add_output(dummyMarketFeeOutput);
       satsOut += marketFee;
