@@ -60,17 +60,6 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, getOrdinals, ordAddress]);
 
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) removeWindow(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
   const resetSendState = () => {
     setPasswordConfirm('');
     setSuccessTxId('');
@@ -125,11 +114,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
 
     setSuccessTxId(purchaseRes.txid);
     addSnackbar('Purchase Successful!', 'success');
-    setTimeout(async () => {
-      onResponse();
-      await storage.remove('purchaseOrdinalRequest');
-      if (popupId) removeWindow(popupId);
-    }, 2000);
+    onResponse();
   };
 
   const clearRequest = async () => {

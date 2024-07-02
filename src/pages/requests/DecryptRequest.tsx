@@ -60,17 +60,6 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, decryptedMessages]);
 
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) removeWindow(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
   const resetSendState = () => {
     setPasswordConfirm('');
     setIsProcessing(false);
@@ -106,11 +95,7 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
     setDecryptedMessages(decrypted);
     setHasDecrypted(true);
     setIsProcessing(false);
-    setTimeout(async () => {
-      onDecrypt();
-      await storage.remove('decryptRequest');
-      if (popupId) removeWindow(popupId);
-    }, 2000);
+    onDecrypt();
   };
 
   const clearRequest = async () => {

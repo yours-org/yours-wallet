@@ -56,17 +56,6 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   }, [message, txid]);
 
   useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) removeWindow(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
-  useEffect(() => {
     if (!bsvAddress) return;
     (async () => {
       await init();
@@ -114,40 +103,32 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     if (!txid) {
       addSnackbar('Error broadcasting the raw tx!', 'error');
       setIsProcessing(false);
-
-      await sendMessage({
+      sendMessage({
         action: 'broadcastResponse',
         error: message ?? 'Unknown error',
       });
-
-      setTimeout(async () => {
-        onBroadcast();
-        if (popupId) await removeWindow(popupId);
-      }, 2000);
+      onBroadcast();
       return;
     }
     setTxid(txid);
-    await sendMessage({
+    sendMessage({
       action: 'broadcastResponse',
       txid,
     });
 
     setIsProcessing(false);
     addSnackbar('Successfully broadcasted the tx!', 'success');
-
-    await storage.remove('broadcastRequest');
+    onBroadcast();
     setTimeout(async () => {
       await updateBsvBalance(true).catch((e: unknown) => {
         console.log(e);
       });
-      onBroadcast();
-      if (popupId) await removeWindow(popupId);
-    }, 2000);
+    }, 3000);
   };
 
   const clearRequest = async () => {
     await storage.remove('broadcastRequest');
-    if (popupId) await removeWindow(popupId);
+    if (popupId) removeWindow(popupId);
     window.location.reload();
   };
 

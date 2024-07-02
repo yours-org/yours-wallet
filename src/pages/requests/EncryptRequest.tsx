@@ -62,17 +62,6 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, encryptedMessages]);
 
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      storage.remove('encryptRequest');
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, []);
-
   const resetSendState = () => {
     setPasswordConfirm('');
     setIsProcessing(false);
@@ -114,11 +103,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
     setEncryptedMessages(encrypted);
     setHasEncrypted(true);
     setIsProcessing(false);
-    setTimeout(async () => {
-      onEncrypt();
-      await storage.remove('encryptRequest');
-      if (popupId) removeWindow(popupId);
-    }, 2000);
+    onEncrypt();
   };
 
   const clearRequest = async () => {

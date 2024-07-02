@@ -66,17 +66,6 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, signature]);
 
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) removeWindow(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
   const handleSigning = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -89,6 +78,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
     }
 
     //TODO: This should not be any type. The signMessage method should be refactored to return provider type. Error handling should be done differently.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const signRes: any = await signMessage(request, passwordConfirm);
     if (!signRes?.sig) {
       const message =
@@ -103,7 +93,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       return;
     }
 
-    await sendMessage({
+    sendMessage({
       action: 'signMessageResponse',
       ...signRes,
     });
@@ -111,16 +101,12 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
     addSnackbar('Successfully Signed!', 'success');
     setSignature(signRes.sig);
     setIsProcessing(false);
-    setTimeout(async () => {
-      onSignature();
-      await storage.remove('signMessageRequest');
-      if (popupId) await removeWindow(popupId);
-    }, 2000);
+    onSignature();
   };
 
   const clearRequest = async () => {
     await storage.remove('signMessageRequest');
-    if (popupId) await removeWindow(popupId);
+    if (popupId) removeWindow(popupId);
     window.location.reload();
   };
 

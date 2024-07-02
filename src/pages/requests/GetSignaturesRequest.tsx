@@ -221,6 +221,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     error?:
       | {
           message: string;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           cause?: any;
         }
       | undefined;
@@ -244,17 +245,6 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, getSigsResponse]);
-
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) removeWindow(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
 
   const handleSigning = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -298,12 +288,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     setIsProcessing(false);
 
     addSnackbar('Successfully Signed!', 'success');
-
-    setTimeout(async () => {
-      onSignature();
-      await storage.remove('getSignaturesRequest');
-      if (popupId) removeWindow(popupId);
-    }, 2000);
+    onSignature();
   };
 
   const rejectSigning = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {

@@ -132,21 +132,13 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       addSnackbar('Transaction Successful!', 'success');
 
       if (!requestWithinApp) {
-        await sendMessage({
+        sendMessage({
           action: 'sendBsvResponse',
           txid: sendRes.txid,
           rawtx: sendRes.rawtx,
         });
       }
-
-      setTimeout(async () => {
-        onResponse();
-        if (!requestWithinApp) {
-          await storage.remove('sendBsvRequest');
-        }
-
-        if (popupId) await removeWindow(popupId);
-      }, 2000);
+      onResponse();
     } catch (error) {
       console.log(error);
     } finally {
@@ -185,19 +177,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress, message, successTxId]);
-
-  useEffect(() => {
-    if (requestWithinApp) return;
-
-    const onbeforeunloadFn = () => {
-      if (popupId) removeWindow(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [requestWithinApp, popupId]);
 
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

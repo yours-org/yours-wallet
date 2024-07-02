@@ -42,17 +42,6 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, getOrdinals, ordAddress]);
 
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) removeWindow(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
   const resetSendState = () => {
     setPasswordConfirm('');
     setSuccessTxId('');
@@ -99,12 +88,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
       action: 'transferOrdinalResponse',
       txid: transferRes.txid,
     });
-
-    setTimeout(async () => {
-      onResponse();
-      await storage.remove('transferOrdinalRequest');
-      if (popupId) removeWindow(popupId);
-    }, 2000);
+    onResponse();
   };
 
   const clearRequest = async () => {

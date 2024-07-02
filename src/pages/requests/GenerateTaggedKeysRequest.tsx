@@ -56,17 +56,6 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message]);
 
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) removeWindow(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
   const resetSendState = () => {
     setPasswordConfirm('');
     setSuccessTxId('');
@@ -126,6 +115,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
         pubKey: taggedKeys.pubKey.to_hex(),
         tag: derivationTag,
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.log(error);
       setIsProcessing(false);
@@ -189,12 +179,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       pubKey: res.pubKey,
       tag: res.tag,
     });
-
-    setTimeout(async () => {
-      onResponse();
-      await storage.remove('generateTaggedKeysRequest');
-      if (popupId) removeWindow(popupId);
-    }, 2000);
+    onResponse();
   };
 
   const clearRequest = async () => {
