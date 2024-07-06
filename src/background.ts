@@ -33,6 +33,7 @@ import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 const chromeStorageService = new ChromeStorageService();
+chromeStorageService.getStorage();
 
 console.log('Yours Wallet Background Script Running!');
 

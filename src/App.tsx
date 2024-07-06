@@ -68,12 +68,17 @@ export const App = () => {
     decryptRequest,
     clearRequest,
     popupId,
+    getStorageAndSetRequestState,
   } = useWeb3RequestContext();
 
   const { account } = chromeStorageService.getCurrentAccountObject();
   const whitelistedApps = account?.settings?.whitelist ?? [];
 
   useActivityDetector(isLocked, chromeStorageService);
+
+  useEffect(() => {
+    getStorageAndSetRequestState(chromeStorageService);
+  }, [chromeStorageService, getStorageAndSetRequestState]);
 
   const handleUnlock = async () => {
     //TODO: prob a better way to do this
