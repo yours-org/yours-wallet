@@ -1,15 +1,14 @@
 import { useState } from 'react';
 import styled from 'styled-components';
-import { useKeys } from '../hooks/useKeys';
 import { useTheme } from '../hooks/useTheme';
 import { useViewport } from '../hooks/useViewport';
 import { ColorThemeProps } from '../theme';
 import { sleep } from '../utils/sleep';
-import { storage } from '../utils/storage';
 import { Button } from './Button';
 import { Input } from './Input';
 import yoursLogo from '../assets/yours-logo.png';
 import { FormContainer, HeaderText, Text, YoursLogo } from './Reusable';
+import { useServiceContext } from '../hooks/useServiceContext';
 
 const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
   display: flex;
@@ -37,17 +36,17 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const [verificationFailed, setVerificationFailed] = useState(false);
   const { isMobile } = useViewport();
 
-  const { verifyPassword } = useKeys();
+  const { keysService, chromeStorageService } = useServiceContext();
 
   const handleUnlock = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
     await sleep(25);
-    const isVerified = await verifyPassword(password);
+    const isVerified = await keysService.verifyPassword(password);
     if (isVerified) {
       setVerificationFailed(false);
       const timestamp = Date.now();
-      await storage.set({ lastActiveTime: timestamp });
+      await chromeStorageService.update({ lastActiveTime: timestamp });
       onUnlock();
     } else {
       setVerificationFailed(true);

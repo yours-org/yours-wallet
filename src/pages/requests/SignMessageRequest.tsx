@@ -8,14 +8,12 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useBsv } from '../../hooks/useBsv';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useAppStateContext } from '../../hooks/useAppStateContext';
+import { useServiceContext } from '../../hooks/useServiceContext';
 import { ColorThemeProps } from '../../theme';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
-import { storage } from '../../utils/storage';
 
 const RequestDetailsContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -46,8 +44,9 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [signature, setSignature] = useState<string | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useAppStateContext();
-  const { isProcessing, setIsProcessing, signMessage } = useBsv();
+  const { chromeStorageService, bsvService } = useServiceContext();
+  const isPasswordRequired = chromeStorageService.isPasswordRequired();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     setSelected('bsv');
@@ -79,7 +78,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
 
     //TODO: This should not be any type. The signMessage method should be refactored to return provider type. Error handling should be done differently.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const signRes: any = await signMessage(request, passwordConfirm);
+    const signRes: any = await bsvService.signMessage(request, passwordConfirm);
     if (!signRes?.sig) {
       const message =
         signRes?.error === 'invalid-password'
@@ -105,7 +104,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
   };
 
   const clearRequest = async () => {
-    await storage.remove('signMessageRequest');
+    await chromeStorageService.remove('signMessageRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();
   };

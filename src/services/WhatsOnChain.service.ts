@@ -1,48 +1,31 @@
 import axios from 'axios';
 import { P2PKHAddress } from 'bsv-wasm-web';
+import { NetWork } from 'yours-wallet-provider';
 import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from '../utils/constants';
-import { NetWork } from '../utils/network';
-import { storage } from '../utils/storage';
-import { StoredUtxo, UTXO } from './useBsv';
-import { useNetwork } from './useNetwork';
+import { isAddressOnRightNetwork } from '../utils/tools';
+import { ChromeStorageService } from './ChromeStorage.service';
+import { StoredUtxo, UTXO } from './types/bsv.types';
+import { ChromeStorageObject } from './types/chromeStorage.types';
+import { ChainInfo, WocUtxo } from './types/whatsOnChain.types';
 
-export type WocUtxo = {
-  height: number;
-  tx_pos: number;
-  tx_hash: string;
-  value: number;
-};
+export class WhatsOnChainService {
+  apiKey: string;
+  config: { headers: { 'woc-api-key': string } };
+  constructor(private readonly chromeStorageService: ChromeStorageService) {
+    this.apiKey = process.env.REACT_APP_WOC_API_KEY as string;
+    this.config = {
+      headers: {
+        'woc-api-key': this.apiKey,
+      },
+    };
+  }
 
-export type ChainInfo = {
-  chain: string;
-  blocks: number;
-  headers: number;
-  bestblockhash: string;
-  difficulty: number;
-  mediantime: number;
-  verificationprogress: number;
-  pruned: boolean;
-  chainwork: string;
-};
-
-export const useWhatsOnChain = () => {
-  const { network, isAddressOnRightNetwork } = useNetwork();
-  const apiKey = process.env.REACT_APP_WOC_API_KEY;
-  const config =
-    network === NetWork.Mainnet
-      ? {
-          headers: {
-            'woc-api-key': apiKey,
-          },
-        }
-      : undefined;
-
-  const getBaseUrl = () => {
-    return network === NetWork.Mainnet ? WOC_BASE_URL : WOC_TESTNET_BASE_URL;
+  getBaseUrl = (network: NetWork) => {
+    return network === ('mainnet' as NetWork) ? WOC_BASE_URL : WOC_TESTNET_BASE_URL;
   };
 
-  const getBsvBalance = async (address: string, pullFresh?: boolean): Promise<number | undefined> => {
-    const utxos = await getUtxos(address, pullFresh);
+  getBsvBalance = async (address: string, pullFresh?: boolean): Promise<number | undefined> => {
+    const utxos = await this.getUtxos(address, pullFresh);
     if (!utxos) return 0;
 
     const sats = utxos.reduce((a, item) => a + item.satoshis, 0);
@@ -50,17 +33,22 @@ export const useWhatsOnChain = () => {
     return bsvTotal;
   };
 
-  const getUtxos = async (fromAddress: string, pullFresh?: boolean): Promise<StoredUtxo[]> => {
-    if (!isAddressOnRightNetwork(fromAddress)) return [];
-    const { paymentUtxos } = await storage.get(['paymentUtxos']);
+  getUtxos = async (fromAddress: string, pullFresh?: boolean): Promise<StoredUtxo[]> => {
+    const network = this.chromeStorageService.getNetwork();
+    if (!isAddressOnRightNetwork(network, fromAddress)) return [];
+    const { account } = this.chromeStorageService.getCurrentAccountObject();
+    if (!account) return [];
+    const { paymentUtxos } = account;
     try {
       const localUtxos: StoredUtxo[] = paymentUtxos || [];
 
       if (!pullFresh && localUtxos.length > 0) {
-        return localUtxos.filter((utxo) => !utxo.spent).sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
+        return localUtxos
+          .filter((utxo) => !utxo.spent)
+          .sort((a: StoredUtxo, b: StoredUtxo) => (a.satoshis > b.satoshis ? -1 : 1));
       }
 
-      const { data } = await axios.get(`${getBaseUrl()}/address/${fromAddress}/unspent`, config);
+      const { data } = await axios.get(`${this.getBaseUrl(network)}/address/${fromAddress}/unspent`, this.config);
       const explorerUtxos: UTXO[] = data
         .filter((u: WocUtxo) => u.value !== 1) // Ensure we are never spending 1 sats
         .map((utxo: WocUtxo) => {
@@ -85,8 +73,14 @@ export const useWhatsOnChain = () => {
         (utxo) => !utxo.spent || (utxo.spentUnixTime >= thresholdUnixTime && utxo.spent),
       );
 
-      // Update local storage to include both unspent and recently spent transactions
-      storage.set({ paymentUtxos: recentUtxos });
+      const key: keyof ChromeStorageObject = 'accounts';
+      const update: Partial<ChromeStorageObject['accounts']> = {
+        [account.addresses.identityAddress]: {
+          ...account,
+          paymentUtxos: recentUtxos,
+        },
+      };
+      await this.chromeStorageService.updateNested(key, update);
 
       const unspent = recentUtxos
         .filter((utxo) => !utxo.spent)
@@ -99,20 +93,21 @@ export const useWhatsOnChain = () => {
     }
   };
 
-  const getExchangeRate = async (): Promise<number | undefined> => {
-    const { exchangeRateCache } = await storage.get(['exchangeRateCache']);
+  getExchangeRate = async (): Promise<number | undefined> => {
+    const network = this.chromeStorageService.getNetwork();
+    const { exchangeRateCache } = this.chromeStorageService.getCurrentAccountObject();
     try {
       if (exchangeRateCache?.rate && Date.now() - exchangeRateCache.timestamp < 5 * 60 * 1000) {
         return Number(exchangeRateCache.rate.toFixed(2));
       } else {
-        const res = await axios.get(`${getBaseUrl()}/exchangerate`, config);
+        const res = await axios.get(`${this.getBaseUrl(network)}/exchangerate`, this.config);
         if (!res.data) {
           throw new Error('Could not fetch exchange rate from WOC!');
         }
 
         const rate = Number(res.data.rate.toFixed(2));
         const currentTime = Date.now();
-        await storage.set({ exchangeRateCache: { rate, timestamp: currentTime } });
+        await this.chromeStorageService.update({ exchangeRateCache: { rate, timestamp: currentTime } });
         return rate;
       }
     } catch (error) {
@@ -120,18 +115,20 @@ export const useWhatsOnChain = () => {
     }
   };
 
-  const getRawTxById = async (txid: string): Promise<string | undefined> => {
+  getRawTxById = async (txid: string): Promise<string | undefined> => {
     try {
-      const { data } = await axios.get(`${getBaseUrl()}/tx/${txid}/hex`, config);
+      const network = this.chromeStorageService.getNetwork();
+      const { data } = await axios.get(`${this.getBaseUrl(network)}/tx/${txid}/hex`, this.config);
       return data;
     } catch (error) {
       console.log(error);
     }
   };
 
-  const broadcastRawTx = async (txhex: string): Promise<string | undefined> => {
+  broadcastRawTx = async (txhex: string): Promise<string | undefined> => {
     try {
-      const { data: txid } = await axios.post(`${getBaseUrl()}/tx/raw`, { txhex }, config);
+      const network = this.chromeStorageService.getNetwork();
+      const { data: txid } = await axios.post(`${this.getBaseUrl(network)}/tx/raw`, { txhex }, this.config);
       return txid;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
@@ -143,7 +140,7 @@ export const useWhatsOnChain = () => {
     }
   };
 
-  const getSuitableUtxo = (utxos: UTXO[], minimum: number) => {
+  getSuitableUtxo = (utxos: UTXO[], minimum: number) => {
     const suitableUtxos = utxos.filter((utxo) => utxo.satoshis > minimum);
 
     if (suitableUtxos.length === 0) {
@@ -154,7 +151,7 @@ export const useWhatsOnChain = () => {
     return suitableUtxos[randomIndex];
   };
 
-  const getInputs = (utxos: UTXO[], satsOut: number, isSendAll: boolean) => {
+  getInputs = (utxos: UTXO[], satsOut: number, isSendAll: boolean) => {
     if (isSendAll) return utxos;
     let sum = 0;
     let index = 0;
@@ -169,24 +166,13 @@ export const useWhatsOnChain = () => {
     return inputs;
   };
 
-  const getChainInfo = async (): Promise<ChainInfo | undefined> => {
+  getChainInfo = async (): Promise<ChainInfo | undefined> => {
     try {
-      const { data } = await axios.get(`${getBaseUrl()}/chain/info`, config);
+      const network = this.chromeStorageService.getNetwork();
+      const { data } = await axios.get(`${this.getBaseUrl(network)}/chain/info`, this.config);
       return data as ChainInfo;
     } catch (error) {
       console.log(error);
     }
   };
-
-  return {
-    getUtxos,
-    getBsvBalance,
-    getExchangeRate,
-    getRawTxById,
-    getBaseUrl,
-    broadcastRawTx,
-    getSuitableUtxo,
-    getInputs,
-    getChainInfo,
-  };
-};
+}

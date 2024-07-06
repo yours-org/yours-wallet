@@ -9,10 +9,11 @@ import { YoursIcon } from '../../components/YoursIcon';
 import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useKeys, WifKeys } from '../../hooks/useKeys';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { sleep } from '../../utils/sleep';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { WifKeys } from '../../services/types/keys.types';
 
 const Content = styled.div`
   display: flex;
@@ -42,7 +43,7 @@ export const ImportWallet = () => {
   const [ordPk, setOrdPk] = useState('');
   const [identityPk, setIdentityPk] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { generateKeysFromWifAndStoreEncrypted } = useKeys();
+  const { keysService } = useServiceContext();
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
   const hiddenFileInput = useRef<HTMLInputElement>(null);
@@ -88,7 +89,7 @@ export const ImportWallet = () => {
 
       // Some artificial delay for the loader
       await sleep(50);
-      const keys = generateKeysFromWifAndStoreEncrypted(password, {
+      const keys = await keysService.generateKeysFromWifAndStoreEncrypted(password, {
         payPk,
         ordPk,
         identityPk,
