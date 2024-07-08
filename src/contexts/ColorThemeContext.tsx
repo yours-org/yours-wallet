@@ -1,4 +1,3 @@
-// ThemeContext.tsx
 import React, { ReactNode, createContext, useEffect, useState } from 'react';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { Theme, defaultTheme } from '../theme';
@@ -15,14 +14,16 @@ interface ThemeProviderProps {
   children: ReactNode;
 }
 
-export const ThemeProvider = (props: ThemeProviderProps) => {
-  const { children } = props;
+export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(defaultTheme);
-  const { chromeStorageService, ordinalService } = useServiceContext();
-  const ordinals = ordinalService.getOrdinals();
+  const { chromeStorageService, ordinalService, isReady } = useServiceContext();
 
   useEffect(() => {
+    if (!isReady) return;
+
+    const ordinals = ordinalService.getOrdinals();
     const { colorTheme } = chromeStorageService.getCurrentAccountObject();
+
     if (colorTheme) {
       setTheme(colorTheme);
     }
@@ -43,7 +44,7 @@ export const ThemeProvider = (props: ThemeProviderProps) => {
       chromeStorageService.remove('colorTheme');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isReady, chromeStorageService, ordinalService]);
 
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 };

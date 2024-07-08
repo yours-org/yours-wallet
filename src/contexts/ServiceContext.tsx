@@ -8,16 +8,30 @@ import { ContractService } from '../services/Contract.service';
 import { BsvService } from '../services/Bsv.service';
 import { OrdinalService } from '../services/Ordinal.service';
 import { INACTIVITY_LIMIT } from '../utils/constants';
+
 init();
 
-const chromeStorageService = new ChromeStorageService();
-chromeStorageService.getAndSetStorage(); // This initializes the storage object
-const wocService = new WhatsOnChainService(chromeStorageService);
-const gorillaPoolService = new GorillaPoolService(chromeStorageService);
-const keysService = new KeysService(gorillaPoolService, wocService, chromeStorageService);
-const contractService = new ContractService(keysService, gorillaPoolService);
-const bsvService = new BsvService(keysService, gorillaPoolService, wocService, contractService, chromeStorageService);
-const ordinalService = new OrdinalService(keysService, wocService, gorillaPoolService);
+const initializeServices = async () => {
+  const chromeStorageService = new ChromeStorageService();
+  await chromeStorageService.getAndSetStorage(); // Ensure the storage is initialized
+
+  const wocService = new WhatsOnChainService(chromeStorageService);
+  const gorillaPoolService = new GorillaPoolService(chromeStorageService);
+  const keysService = new KeysService(gorillaPoolService, wocService, chromeStorageService);
+  const contractService = new ContractService(keysService, gorillaPoolService);
+  const bsvService = new BsvService(keysService, gorillaPoolService, wocService, contractService, chromeStorageService);
+  const ordinalService = new OrdinalService(keysService, wocService, gorillaPoolService);
+
+  return {
+    chromeStorageService,
+    keysService,
+    bsvService,
+    ordinalService,
+    wocService,
+    gorillaPoolService,
+    contractService,
+  };
+};
 
 export interface ServiceContextProps {
   chromeStorageService: ChromeStorageService;
@@ -35,40 +49,47 @@ export interface ServiceContextProps {
 export const ServiceContext = createContext<ServiceContextProps | undefined>(undefined);
 
 export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [isLocked, setIsLocked] = useState<boolean>(true);
+  const [services, setServices] = useState<Partial<ServiceContextProps>>({});
+  const [isLocked, setIsLocked] = useState<boolean>(false);
   const [isReady, setIsReady] = useState<boolean>(false);
 
   useEffect(() => {
-    chromeStorageService.getAndSetStorage().then(async () => {
+    const initServices = async () => {
+      const initializedServices = await initializeServices();
+      const { chromeStorageService, keysService, bsvService } = initializedServices;
+
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (account?.addresses?.bsvAddress) {
         await keysService.retrieveKeys();
         await bsvService.rate();
         await bsvService.updateBsvBalance(true);
-        setIsReady(true);
       }
-    });
+      setServices({ ...initializedServices, isLocked, isReady, lockWallet });
+      setIsReady(true);
+    };
+    initServices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const lockWallet = useCallback(async () => {
     if (!isReady) return;
+    setIsLocked(true);
     const timestamp = Date.now();
     const twentyMinutesAgo = timestamp - 20 * 60 * 1000;
-    await chromeStorageService.update({ lastActiveTime: twentyMinutesAgo });
-    setIsLocked(true);
-  }, [isReady]);
+    services?.chromeStorageService?.update({ lastActiveTime: twentyMinutesAgo });
+  }, [isReady, services]);
 
   useEffect(() => {
     const checkLockState = async () => {
-      if (!isReady) return;
+      if (!isReady || !services) return;
       try {
-        const result = chromeStorageService.getCurrentAccountObject();
+        const result = services.chromeStorageService?.getCurrentAccountObject();
         const currentTime = Date.now();
-        const lastActiveTime = result.lastActiveTime;
+        const lastActiveTime = result?.lastActiveTime;
 
         if (!lastActiveTime) return;
 
-        if (!result.account?.encryptedKeys) {
+        if (!result?.account?.encryptedKeys) {
           setIsLocked(false);
           return;
         }
@@ -90,21 +111,18 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return () => {
       clearInterval(interval);
     };
-  }, [lockWallet, isReady]);
+  }, [lockWallet, isReady, services]);
+
   return (
     <ServiceContext.Provider
-      value={{
-        chromeStorageService,
-        keysService,
-        bsvService,
-        ordinalService,
-        wocService,
-        gorillaPoolService,
-        contractService,
-        isLocked,
-        isReady,
-        lockWallet,
-      }}
+      value={
+        {
+          ...services,
+          isLocked,
+          isReady,
+          lockWallet,
+        } as ServiceContextProps
+      }
     >
       {children}
     </ServiceContext.Provider>
