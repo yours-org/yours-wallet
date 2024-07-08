@@ -9,9 +9,8 @@ import { BsvService } from '../services/Bsv.service';
 import { OrdinalService } from '../services/Ordinal.service';
 import { INACTIVITY_LIMIT } from '../utils/constants';
 
-init();
-
 const initializeServices = async () => {
+  await init();
   const chromeStorageService = new ChromeStorageService();
   await chromeStorageService.getAndSetStorage(); // Ensure the storage is initialized
 
@@ -55,17 +54,22 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   useEffect(() => {
     const initServices = async () => {
-      const initializedServices = await initializeServices();
-      const { chromeStorageService, keysService, bsvService } = initializedServices;
+      try {
+        const initializedServices = await initializeServices();
+        const { chromeStorageService, keysService, bsvService } = initializedServices;
 
-      const { account } = chromeStorageService.getCurrentAccountObject();
-      if (account?.addresses?.bsvAddress) {
-        await keysService.retrieveKeys();
-        await bsvService.rate();
-        await bsvService.updateBsvBalance(true);
+        const { account } = chromeStorageService.getCurrentAccountObject();
+        if (account?.addresses?.bsvAddress) {
+          await keysService.retrieveKeys();
+          await bsvService.rate();
+          await bsvService.updateBsvBalance(true);
+        }
+        setServices({ ...initializedServices, isLocked, isReady, lockWallet });
+        setIsReady(true);
+      } catch (error) {
+        console.error('Error initializing services:', error);
+        //TODO: show error to user?
       }
-      setServices({ ...initializedServices, isLocked, isReady, lockWallet });
-      setIsReady(true);
     };
     initServices();
     // eslint-disable-next-line react-hooks/exhaustive-deps

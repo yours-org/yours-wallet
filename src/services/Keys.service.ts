@@ -210,7 +210,8 @@ export class KeysService {
         };
       }
     } catch (error) {
-      throw new Error(JSON.stringify(error));
+      console.error('Error in retrieveKeys:', error);
+      throw new Error('Failed to retrieve keys');
     }
   };
 
