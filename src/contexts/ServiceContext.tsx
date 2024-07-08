@@ -11,6 +11,7 @@ import { INACTIVITY_LIMIT } from '../utils/constants';
 init();
 
 const chromeStorageService = new ChromeStorageService();
+chromeStorageService.getAndSetStorage(); // This initializes the storage object
 const wocService = new WhatsOnChainService(chromeStorageService);
 const gorillaPoolService = new GorillaPoolService(chromeStorageService);
 const keysService = new KeysService(gorillaPoolService, wocService, chromeStorageService);
@@ -34,33 +35,32 @@ export interface ServiceContextProps {
 export const ServiceContext = createContext<ServiceContextProps | undefined>(undefined);
 
 export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [isLocked, setIsLocked] = useState<boolean>(false);
+  const [isLocked, setIsLocked] = useState<boolean>(true);
   const [isReady, setIsReady] = useState<boolean>(false);
 
+  useEffect(() => {
+    chromeStorageService.getAndSetStorage().then(async () => {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (account?.addresses?.bsvAddress) {
+        await keysService.retrieveKeys();
+        await bsvService.rate();
+        await bsvService.updateBsvBalance(true);
+        setIsReady(true);
+      }
+    });
+  }, []);
+
   const lockWallet = useCallback(async () => {
+    if (!isReady) return;
     const timestamp = Date.now();
     const twentyMinutesAgo = timestamp - 20 * 60 * 1000;
     await chromeStorageService.update({ lastActiveTime: twentyMinutesAgo });
     setIsLocked(true);
-  }, []);
-
-  useEffect(() => {
-    (async () => {
-      await chromeStorageService.getStorage();
-      if (chromeStorageService.storage) {
-        const { account } = chromeStorageService.getCurrentAccountObject();
-        if (account?.addresses?.bsvAddress) {
-          await keysService.retrieveKeys();
-          await bsvService.updateBsvBalance(true);
-        }
-        await bsvService.rate();
-        setIsReady(true);
-      }
-    })();
-  }, []);
+  }, [isReady]);
 
   useEffect(() => {
     const checkLockState = async () => {
+      if (!isReady) return;
       try {
         const result = chromeStorageService.getCurrentAccountObject();
         const currentTime = Date.now();
@@ -90,8 +90,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return () => {
       clearInterval(interval);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [lockWallet, isReady]);
   return (
     <ServiceContext.Provider
       value={{

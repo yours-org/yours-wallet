@@ -74,12 +74,12 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
     if (!request?.isAuthorized) return;
     if (!identityPubKey || !bsvPubKey || !ordPubKey) return;
     if (!window.location.href.includes('localhost')) {
+      onDecision();
       sendMessage({
         action: 'userConnectResponse',
         decision: 'approved',
         pubKeys: { identityPubKey, bsvPubKey, ordPubKey },
       });
-      onDecision();
     }
   }, [request, identityPubKey, bsvPubKey, ordPubKey, onDecision]);
 
@@ -104,22 +104,22 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
       },
     };
     await chromeStorageService.updateNested(key, update);
+    onDecision();
     sendMessage({
       action: 'userConnectResponse',
       decision: 'approved',
       pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
     });
     addSnackbar(`Approved`, 'success');
-    onDecision();
   };
 
   const handleDecline = async () => {
+    onDecision();
     sendMessage({
       action: 'userConnectResponse',
       decision: 'declined',
     });
     addSnackbar(`Declined`, 'error');
-    onDecision();
   };
 
   return (

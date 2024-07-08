@@ -27,8 +27,8 @@ import { PurchaseOrdinal } from 'yours-wallet-provider';
 import { UTXO } from './types/bsv.types';
 
 export class OrdinalService {
-  ordinals: OrdinalData;
-  bsv20s: BSV20Data;
+  private ordinals: OrdinalData;
+  private bsv20s: BSV20Data;
   constructor(
     private readonly keysService: KeysService,
     private readonly wocService: WhatsOnChainService,
@@ -38,7 +38,10 @@ export class OrdinalService {
     this.bsv20s = { initialized: false, data: [] };
   }
 
-  getOrdinals = async (ordAddress: string) => {
+  getOrdinals = (): OrdinalData => this.ordinals;
+  getBsv20s = (): BSV20Data => this.bsv20s;
+
+  fetchOrdinals = async (ordAddress: string) => {
     try {
       //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
       const ordList = await this.gorillaPoolService.getOrdUtxos(ordAddress);
@@ -77,7 +80,7 @@ export class OrdinalService {
       const fundingAndChangeAddress = keys.walletAddress;
       const payWifPk = keys.walletWif;
 
-      const fundingUtxos = await this.wocService.getUtxos(fundingAndChangeAddress);
+      const fundingUtxos = await this.wocService.getAndUpdateUtxoStorage(fundingAndChangeAddress);
 
       if (!fundingUtxos || fundingUtxos.length === 0) {
         return { error: 'insufficient-funds' };
@@ -212,7 +215,7 @@ export class OrdinalService {
       const paymentPk = PrivateKey.from_wif(payWifPk);
       const ordPk = PrivateKey.from_wif(ordWifPk);
 
-      const fundingUtxos = await this.wocService.getUtxos(fundingAndChangeAddress);
+      const fundingUtxos = await this.wocService.getAndUpdateUtxoStorage(fundingAndChangeAddress);
 
       if (!fundingUtxos || fundingUtxos.length === 0) {
         return { error: 'insufficient-funds' };
@@ -336,7 +339,7 @@ export class OrdinalService {
       const paymentPk = PrivateKey.from_wif(keys.walletWif);
       const ordPk = PrivateKey.from_wif(keys.ordWif);
 
-      const paymentUtxos = await this.wocService.getUtxos(fundingAndChangeAddress);
+      const paymentUtxos = await this.wocService.getAndUpdateUtxoStorage(fundingAndChangeAddress);
 
       if (!paymentUtxos.length) {
         throw new Error('Could not retrieve paymentUtxos');
@@ -471,7 +474,7 @@ export class OrdinalService {
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
       const fundingAndChangeAddress = this.keysService.bsvAddress;
 
-      const paymentUtxos = await this.wocService.getUtxos(fundingAndChangeAddress);
+      const paymentUtxos = await this.wocService.getAndUpdateUtxoStorage(fundingAndChangeAddress);
 
       if (!paymentUtxos.length) {
         throw new Error('Could not retrieve paymentUtxos');
@@ -551,7 +554,7 @@ export class OrdinalService {
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
       const fundingAndChangeAddress = this.keysService.bsvAddress;
 
-      const fundingUtxos = await this.wocService.getUtxos(fundingAndChangeAddress);
+      const fundingUtxos = await this.wocService.getAndUpdateUtxoStorage(fundingAndChangeAddress);
 
       if (!fundingUtxos.length) {
         throw new Error('Could not retrieve funding UTXOs');

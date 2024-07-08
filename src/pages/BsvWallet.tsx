@@ -107,7 +107,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [amountType, setAmountType] = useState<AmountType>('bsv');
   const [successTxId, setSuccessTxId] = useState('');
-  const { addSnackbar, message } = useSnackbar();
+  const { addSnackbar } = useSnackbar();
   const { chromeStorageService, keysService, bsvService } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
@@ -115,7 +115,19 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const [isProcessing, setIsProcessing] = useState(false);
   const { bsvAddress, identityAddress } = keysService;
-  const { bsvBalance, exchangeRate, lockData, unlockLockedCoins, updateBsvBalance, sendBsv } = bsvService;
+  const { getBsvBalance, getExchangeRate, getLockData, unlockLockedCoins, updateBsvBalance, sendBsv } = bsvService;
+  const [bsvBalance, setBsvBalance] = useState<number>(getBsvBalance());
+  const [exchangeRate, setExchangeRate] = useState<number>(getExchangeRate());
+  const [lockData, setLockData] = useState(getLockData());
+
+  const refreshUtxos = async (showLoad = false) => {
+    showLoad && setIsProcessing(true);
+    await updateBsvBalance(true);
+    setBsvBalance(getBsvBalance());
+    setExchangeRate(getExchangeRate());
+    setLockData(getLockData());
+    showLoad && setIsProcessing(false);
+  };
 
   useEffect(() => {
     if (connectRequest) {
@@ -133,7 +145,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         if (res) {
           if (res.error) addSnackbar('Error unlocking coins!', 'error');
           if (res.txid) {
-            nukeUtxos();
+            await refreshUtxos();
             await unlockLockedCoins(true);
             await sleep(1000);
             addSnackbar('Successfully unlocked coins!', 'success');
@@ -143,7 +155,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lockData, identityAddress]);
+  }, [identityAddress]);
 
   useEffect(() => {
     if (isOrdRequest) {
@@ -155,12 +167,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   useEffect(() => {
     if (!successTxId) return;
-    if (!message && bsvAddress) {
-      resetSendState();
-      setPageState('main');
-    }
+    resetSendState();
+    setPageState('main');
+    setTimeout(() => refreshUtxos(), 1000); // slight delay to allow for transaction to be processed
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successTxId, message, bsvAddress]);
+  }, [successTxId]);
 
   const resetSendState = () => {
     setSatSendAmount(null);
@@ -170,10 +181,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
     setPasswordConfirm('');
     setSuccessTxId('');
     setIsProcessing(false);
-
-    setTimeout(() => {
-      updateBsvBalance(true);
-    }, 500);
   };
 
   const handleCopyToClipboard = () => {
@@ -267,14 +274,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
         : 'Enter Send Details';
   };
 
-  const nukeUtxos = () => {
-    chromeStorageService.remove('paymentUtxos');
-    // Give enough time for storage to remove
-    setTimeout(() => {
-      updateBsvBalance(true);
-    }, 50);
-  };
-
   const receive = (
     <ReceiveContent>
       <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
@@ -306,9 +305,14 @@ export const BsvWallet = (props: BsvWalletProps) => {
     <MainContent>
       <MiddleContainer theme={theme}>
         <Show when={socialProfile.avatar !== HOSTED_YOURS_IMAGE}>
-          <ProfileImage title="Refresh balance" src={socialProfile.avatar} onClick={nukeUtxos} />
+          <ProfileImage title="Refresh Wallet Balance" src={socialProfile.avatar} onClick={() => refreshUtxos(true)} />
         </Show>
-        <HeaderText style={{ fontSize: '2rem', cursor: 'pointer' }} theme={theme} onClick={nukeUtxos}>
+        <HeaderText
+          title="Refresh Wallet Balance"
+          style={{ fontSize: '2rem', cursor: 'pointer' }}
+          theme={theme}
+          onClick={() => refreshUtxos(true)}
+        >
           {formatUSD(bsvBalance * exchangeRate)}
         </HeaderText>
         <BalanceContainer>

@@ -6,17 +6,18 @@ export class ChromeStorageService {
   storage: Partial<ChromeStorageObject> | undefined;
 
   constructor() {
-    this.getStorage().then((storage) => {
+    this.getAndSetStorage().then((storage) => {
       this.storage = storage;
     });
   }
 
   private set = async (obj: Partial<ChromeStorageObject>): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
-      chrome.storage.local.set(obj, () => {
+      chrome.storage.local.set(obj, async () => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
         } else {
+          await this.getAndSetStorage();
           resolve();
         }
       });
@@ -59,7 +60,7 @@ export class ChromeStorageService {
     });
   };
 
-  getStorage = async (): Promise<Partial<ChromeStorageObject> | undefined> => {
+  getAndSetStorage = async (): Promise<Partial<ChromeStorageObject> | undefined> => {
     this.storage = await this.get(null); // fetches all chrome storage by passing null
     return this.storage;
   };

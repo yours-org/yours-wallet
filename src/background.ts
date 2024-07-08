@@ -33,7 +33,7 @@ import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 const chromeStorageService = new ChromeStorageService();
-chromeStorageService.getStorage();
+chromeStorageService.getAndSetStorage();
 
 console.log('Yours Wallet Background Script Running!');
 
@@ -56,7 +56,7 @@ let popupWindowId: number | undefined;
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 const verifyAccess = async (requestingDomain: string): Promise<boolean> => {
-  const { accounts, selectedAccount } = (await chromeStorageService.getStorage()) as ChromeStorageObject;
+  const { accounts, selectedAccount } = (await chromeStorageService.getAndSetStorage()) as ChromeStorageObject;
   if (!accounts || !selectedAccount) return false;
   const whitelist = accounts[selectedAccount].settings.whitelist;
   if (!whitelist) return false;
@@ -219,7 +219,7 @@ const processConnectRequest = (
 
 const processDisconnectRequest = (message: { params: { domain: string } }, sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       const { whitelist } = account.settings;
@@ -255,7 +255,7 @@ const processDisconnectRequest = (message: { params: { domain: string } }, sendR
 
 const processIsConnectedRequest = (params: { domain: string }, sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const result = chromeStorageService.getCurrentAccountObject();
       if (!result?.account) throw Error('No account found!');
       const currentTime = Date.now();
@@ -283,7 +283,7 @@ const processIsConnectedRequest = (params: { domain: string }, sendResponse: Cal
 
 const processGetBalanceRequest = (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       sendResponse({
@@ -303,7 +303,7 @@ const processGetBalanceRequest = (sendResponse: CallbackResponse) => {
 
 const processGetPubKeysRequest = (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       sendResponse({
@@ -323,7 +323,7 @@ const processGetPubKeysRequest = (sendResponse: CallbackResponse) => {
 
 const processGetAddressesRequest = (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       sendResponse({
@@ -343,7 +343,7 @@ const processGetAddressesRequest = (sendResponse: CallbackResponse) => {
 
 const processGetNetworkRequest = (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       sendResponse({
@@ -363,7 +363,7 @@ const processGetNetworkRequest = (sendResponse: CallbackResponse) => {
 
 const processGetOrdinalsRequest = (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       sendResponse({
@@ -383,7 +383,7 @@ const processGetOrdinalsRequest = (sendResponse: CallbackResponse) => {
 
 const processGetExchangeRate = (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(async (res) => {
+    chromeStorageService.getAndSetStorage().then(async (res) => {
       if (!res) throw Error('Could not get storage!');
       const { exchangeRateCache } = res;
       if (exchangeRateCache?.rate && Date.now() - exchangeRateCache.timestamp < 5 * 60 * 1000) {
@@ -421,7 +421,7 @@ const processGetExchangeRate = (sendResponse: CallbackResponse) => {
 
 const processGetPaymentUtxos = async (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       const paymentUtxos = account.paymentUtxos;
@@ -636,7 +636,7 @@ const processGetSignaturesRequest = (message: { params: GetSignatures }, sendRes
 const processGetSocialProfileRequest = (sendResponse: CallbackResponse) => {
   const HOSTED_YOURS_IMAGE = 'https://i.ibb.co/zGcthBv/yours-org-light.png';
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       const displayName = account.socialProfile?.displayName ? account.socialProfile.displayName : 'Anon Panda';
@@ -699,7 +699,7 @@ const processGetTaggedKeys = async (
     return;
   }
   try {
-    chromeStorageService.getStorage().then((res) => {
+    chromeStorageService.getAndSetStorage().then((res) => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!res || !account) throw Error('No account found!');
       const { lastActiveTime, isLocked } = res;
@@ -811,7 +811,7 @@ const cleanup = (types: YoursEventName[]) => {
   responseCallbackForGenerateTaggedKeysRequest = null;
   responseCallbackForEncryptRequest = null;
   responseCallbackForDecryptRequest = null;
-  chromeStorageService.getStorage().then((res) => {
+  chromeStorageService.getAndSetStorage().then((res) => {
     if (res?.popupWindowId) removeWindow(res.popupWindowId);
   });
   popupWindowId = undefined;

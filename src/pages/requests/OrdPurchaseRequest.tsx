@@ -56,7 +56,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     if (!successTxId) return;
     if (!message && ordAddress) {
       resetSendState();
-      ordinalService.getOrdinals(ordAddress);
+      ordinalService.fetchOrdinals(ordAddress);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, ordAddress]);

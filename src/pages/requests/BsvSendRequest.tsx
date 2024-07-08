@@ -60,7 +60,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const { bsvService, chromeStorageService, keysService } = useServiceContext();
-  const { sendBsv, updateBsvBalance, bsvBalance } = bsvService;
+  const { sendBsv, updateBsvBalance, getBsvBalance } = bsvService;
   const { bsvAddress } = keysService;
   const [hasSent, setHasSent] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -229,7 +229,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           <Text
             theme={theme}
             style={{ cursor: 'pointer', margin: '0.75rem 0' }}
-          >{`Available Balance: ${bsvBalance}`}</Text>
+          >{`Available Balance: ${getBsvBalance()}`}</Text>
           <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
             <RequestDetailsContainer>{web3Details()}</RequestDetailsContainer>
             <Show when={isPasswordRequired}>

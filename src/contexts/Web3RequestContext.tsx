@@ -89,7 +89,7 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   };
 
   const getStorageAndSetRequestState = async (chromeStorageService: ChromeStorageService) => {
-    const res = await chromeStorageService.getStorage();
+    const res = await chromeStorageService.getAndSetStorage();
     if (res) handleRequestStates(res);
   };
 

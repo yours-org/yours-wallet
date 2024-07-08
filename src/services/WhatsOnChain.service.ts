@@ -25,7 +25,7 @@ export class WhatsOnChainService {
   };
 
   getBsvBalance = async (address: string, pullFresh?: boolean): Promise<number | undefined> => {
-    const utxos = await this.getUtxos(address, pullFresh);
+    const utxos = await this.getAndUpdateUtxoStorage(address, pullFresh);
     if (!utxos) return 0;
 
     const sats = utxos.reduce((a, item) => a + item.satoshis, 0);
@@ -33,13 +33,26 @@ export class WhatsOnChainService {
     return bsvTotal;
   };
 
-  getUtxos = async (fromAddress: string, pullFresh?: boolean): Promise<StoredUtxo[]> => {
-    const network = this.chromeStorageService.getNetwork();
-    if (!isAddressOnRightNetwork(network, fromAddress)) return [];
-    const { account } = this.chromeStorageService.getCurrentAccountObject();
-    if (!account) return [];
-    const { paymentUtxos } = account;
+  private filterAndRemoveDuplicateTxidsFromUtxos = (recentUtxos: StoredUtxo[]): StoredUtxo[] => {
+    const utxoMap = new Map<string, (typeof recentUtxos)[0]>();
+
+    recentUtxos.forEach((utxo) => {
+      const existingUtxo = utxoMap.get(utxo.txid);
+      if (!existingUtxo || utxo.spent) {
+        utxoMap.set(utxo.txid, utxo);
+      }
+    });
+
+    return Array.from(utxoMap.values());
+  };
+
+  getAndUpdateUtxoStorage = async (fromAddress: string, pullFresh?: boolean): Promise<StoredUtxo[]> => {
     try {
+      const network = this.chromeStorageService.getNetwork();
+      if (!isAddressOnRightNetwork(network, fromAddress)) return [];
+      const { account } = this.chromeStorageService.getCurrentAccountObject();
+      if (!account) return [];
+      const { paymentUtxos } = account;
       const localUtxos: StoredUtxo[] = paymentUtxos || [];
 
       if (!pullFresh && localUtxos.length > 0) {
@@ -73,18 +86,20 @@ export class WhatsOnChainService {
         (utxo) => !utxo.spent || (utxo.spentUnixTime >= thresholdUnixTime && utxo.spent),
       );
 
+      const filteredUtxos = this.filterAndRemoveDuplicateTxidsFromUtxos(recentUtxos);
+
+      const unspent = filteredUtxos
+        .filter((utxo) => !utxo.spent)
+        .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
+
       const key: keyof ChromeStorageObject = 'accounts';
       const update: Partial<ChromeStorageObject['accounts']> = {
         [account.addresses.identityAddress]: {
           ...account,
-          paymentUtxos: recentUtxos,
+          paymentUtxos: unspent,
         },
       };
       await this.chromeStorageService.updateNested(key, update);
-
-      const unspent = recentUtxos
-        .filter((utxo) => !utxo.spent)
-        .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
 
       return unspent;
     } catch (error) {

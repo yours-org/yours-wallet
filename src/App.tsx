@@ -1,4 +1,5 @@
-import { useEffect, useContext } from 'react';
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+import { useEffect, useContext, useState } from 'react';
 import { MemoryRouter as Router, Route, Routes } from 'react-router-dom';
 import styled from 'styled-components';
 import { Show } from './components/Show';
@@ -29,6 +30,8 @@ import { Settings } from './pages/Settings';
 import { ColorThemeProps } from './theme';
 import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
 import { useServiceContext } from './hooks/useServiceContext';
+import { WhitelistedApp } from './inject';
+import { PageLoader } from './components/PageLoader';
 
 const MainContainer = styled.div<{ $isMobile?: boolean }>`
   display: flex;
@@ -38,6 +41,7 @@ const MainContainer = styled.div<{ $isMobile?: boolean }>`
   height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
   position: relative;
   padding: 0;
+  background-color: ${({ theme }) => theme.mainBackground};
 `;
 
 const Container = styled.div<ColorThemeProps>`
@@ -70,15 +74,20 @@ export const App = () => {
     popupId,
     getStorageAndSetRequestState,
   } = useWeb3RequestContext();
+  const [whitelistedApps, setWhitelistedApps] = useState<WhitelistedApp[]>([]);
 
-  const { account } = chromeStorageService.getCurrentAccountObject();
-  const whitelistedApps = account?.settings?.whitelist ?? [];
+  useEffect(() => {
+    if (isReady) {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      setWhitelistedApps(account?.settings?.whitelist ?? []);
+    }
+  }, [chromeStorageService, isReady]);
 
   useActivityDetector(isLocked, chromeStorageService);
 
   useEffect(() => {
-    getStorageAndSetRequestState(chromeStorageService);
-  }, [chromeStorageService, getStorageAndSetRequestState]);
+    isReady && getStorageAndSetRequestState(chromeStorageService);
+  }, [chromeStorageService, getStorageAndSetRequestState, isReady]);
 
   const handleUnlock = async () => {
     //TODO: prob a better way to do this
@@ -96,144 +105,137 @@ export const App = () => {
   }, [transferOrdinalRequest, purchaseOrdinalRequest, menuContext]);
 
   return (
-    <MainContainer $isMobile={isMobile}>
-      <BottomMenuProvider network={chromeStorageService.getNetwork()}>
-        <Container theme={theme}>
-          <SnackbarProvider>
-            <Show when={!isLocked && isReady} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
-              <Router>
-                <Routes>
-                  <Route path="/" element={<Start />} />
-                  <Route path="/create-wallet" element={<CreateWallet />} />
-                  <Route path="/restore-wallet" element={<RestoreWallet />} />
-                  <Route path="/import-wallet" element={<ImportWallet />} />
-                  <Route
-                    path="/connect"
-                    element={
-                      <ConnectRequest
-                        request={connectRequest}
-                        onDecision={() => clearRequest('connectRequest')}
-                        whiteListedApps={whitelistedApps}
-                        popupId={popupId}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/bsv-wallet"
-                    element={
-                      <Show
-                        when={
-                          !sendBsvRequest &&
-                          !signMessageRequest &&
-                          !broadcastRequest &&
-                          !getSignaturesRequest &&
-                          !generateTaggedKeysRequest &&
-                          !encryptRequest &&
-                          !decryptRequest
-                        }
-                        whenFalseContent={
-                          <>
-                            <Show when={!!sendBsvRequest}>
-                              <BsvSendRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                                request={sendBsvRequest!}
-                                onResponse={() => clearRequest('sendBsvRequest')}
-                                popupId={popupId}
-                              />
-                            </Show>
-                            <Show when={!!signMessageRequest}>
-                              <SignMessageRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                                request={signMessageRequest!}
-                                onSignature={() => clearRequest('signMessageRequest')}
-                                popupId={popupId}
-                              />
-                            </Show>
-                            <Show when={!!broadcastRequest}>
-                              <BroadcastRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                                request={broadcastRequest!}
-                                onBroadcast={() => clearRequest('broadcastRequest')}
-                                popupId={popupId}
-                              />
-                            </Show>
-                            <Show when={!!getSignaturesRequest}>
-                              <GetSignaturesRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                                request={getSignaturesRequest!}
-                                onSignature={() => clearRequest('getSignaturesRequest')}
-                                popupId={popupId}
-                              />
-                            </Show>
-                            <Show when={!!generateTaggedKeysRequest}>
-                              <GenerateTaggedKeysRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                                request={generateTaggedKeysRequest!}
-                                onResponse={() => clearRequest('generateTaggedKeysRequest')}
-                                popupId={popupId}
-                              />
-                            </Show>
-                            <Show when={!!encryptRequest}>
-                              <EncryptRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                                request={encryptRequest!}
-                                onEncrypt={() => clearRequest('encryptRequest')}
-                                popupId={popupId}
-                              />
-                            </Show>
-                            <Show when={!!decryptRequest}>
-                              <DecryptRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                                request={decryptRequest!}
-                                onDecrypt={() => clearRequest('decryptRequest')}
-                                popupId={popupId}
-                              />
-                            </Show>
-                          </>
-                        }
-                      >
-                        <BsvWallet isOrdRequest={!!transferOrdinalRequest || !!purchaseOrdinalRequest} />
-                      </Show>
-                    }
-                  />
-                  <Route
-                    path="/ord-wallet"
-                    element={
-                      <Show
-                        when={!transferOrdinalRequest && !purchaseOrdinalRequest}
-                        whenFalseContent={
-                          <>
-                            <Show when={!!purchaseOrdinalRequest}>
-                              <OrdPurchaseRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                                request={purchaseOrdinalRequest!}
-                                onResponse={() => clearRequest('purchaseOrdinalRequest')}
-                                popupId={popupId}
-                              />
-                            </Show>
-                            <Show when={!!transferOrdinalRequest}>
-                              <OrdTransferRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                                request={transferOrdinalRequest!}
-                                onResponse={() => clearRequest('transferOrdinalRequest')}
-                                popupId={popupId}
-                              />
-                            </Show>
-                          </>
-                        }
-                      >
-                        <OrdWallet />
-                      </Show>
-                    }
-                  />
-                  <Route path="/apps" element={<AppsAndTools />} />
-                  <Route path="/settings" element={<Settings />} />
-                </Routes>
-              </Router>
-            </Show>
-          </SnackbarProvider>
-        </Container>
-      </BottomMenuProvider>
+    <MainContainer $isMobile={isMobile} theme={theme}>
+      <Show when={isReady} whenFalseContent={<PageLoader message="Loading..." theme={theme} />}>
+        <BottomMenuProvider network={chromeStorageService.getNetwork()}>
+          <Container theme={theme}>
+            <SnackbarProvider>
+              <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
+                <Router>
+                  <Routes>
+                    <Route path="/" element={<Start />} />
+                    <Route path="/create-wallet" element={<CreateWallet />} />
+                    <Route path="/restore-wallet" element={<RestoreWallet />} />
+                    <Route path="/import-wallet" element={<ImportWallet />} />
+                    <Route
+                      path="/connect"
+                      element={
+                        <ConnectRequest
+                          request={connectRequest}
+                          onDecision={() => clearRequest('connectRequest')}
+                          whiteListedApps={whitelistedApps}
+                          popupId={popupId}
+                        />
+                      }
+                    />
+                    <Route
+                      path="/bsv-wallet"
+                      element={
+                        <Show
+                          when={
+                            !sendBsvRequest &&
+                            !signMessageRequest &&
+                            !broadcastRequest &&
+                            !getSignaturesRequest &&
+                            !generateTaggedKeysRequest &&
+                            !encryptRequest &&
+                            !decryptRequest
+                          }
+                          whenFalseContent={
+                            <>
+                              <Show when={!!sendBsvRequest}>
+                                <BsvSendRequest
+                                  request={sendBsvRequest!}
+                                  onResponse={() => clearRequest('sendBsvRequest')}
+                                  popupId={popupId}
+                                />
+                              </Show>
+                              <Show when={!!signMessageRequest}>
+                                <SignMessageRequest
+                                  request={signMessageRequest!}
+                                  onSignature={() => clearRequest('signMessageRequest')}
+                                  popupId={popupId}
+                                />
+                              </Show>
+                              <Show when={!!broadcastRequest}>
+                                <BroadcastRequest
+                                  request={broadcastRequest!}
+                                  onBroadcast={() => clearRequest('broadcastRequest')}
+                                  popupId={popupId}
+                                />
+                              </Show>
+                              <Show when={!!getSignaturesRequest}>
+                                <GetSignaturesRequest
+                                  request={getSignaturesRequest!}
+                                  onSignature={() => clearRequest('getSignaturesRequest')}
+                                  popupId={popupId}
+                                />
+                              </Show>
+                              <Show when={!!generateTaggedKeysRequest}>
+                                <GenerateTaggedKeysRequest
+                                  request={generateTaggedKeysRequest!}
+                                  onResponse={() => clearRequest('generateTaggedKeysRequest')}
+                                  popupId={popupId}
+                                />
+                              </Show>
+                              <Show when={!!encryptRequest}>
+                                <EncryptRequest
+                                  request={encryptRequest!}
+                                  onEncrypt={() => clearRequest('encryptRequest')}
+                                  popupId={popupId}
+                                />
+                              </Show>
+                              <Show when={!!decryptRequest}>
+                                <DecryptRequest
+                                  request={decryptRequest!}
+                                  onDecrypt={() => clearRequest('decryptRequest')}
+                                  popupId={popupId}
+                                />
+                              </Show>
+                            </>
+                          }
+                        >
+                          <BsvWallet isOrdRequest={!!transferOrdinalRequest || !!purchaseOrdinalRequest} />
+                        </Show>
+                      }
+                    />
+                    <Route
+                      path="/ord-wallet"
+                      element={
+                        <Show
+                          when={!transferOrdinalRequest && !purchaseOrdinalRequest}
+                          whenFalseContent={
+                            <>
+                              <Show when={!!purchaseOrdinalRequest}>
+                                <OrdPurchaseRequest
+                                  request={purchaseOrdinalRequest!}
+                                  onResponse={() => clearRequest('purchaseOrdinalRequest')}
+                                  popupId={popupId}
+                                />
+                              </Show>
+                              <Show when={!!transferOrdinalRequest}>
+                                <OrdTransferRequest
+                                  request={transferOrdinalRequest!}
+                                  onResponse={() => clearRequest('transferOrdinalRequest')}
+                                  popupId={popupId}
+                                />
+                              </Show>
+                            </>
+                          }
+                        >
+                          <OrdWallet />
+                        </Show>
+                      }
+                    />
+                    <Route path="/apps" element={<AppsAndTools />} />
+                    <Route path="/settings" element={<Settings />} />
+                  </Routes>
+                </Router>
+              </Show>
+            </SnackbarProvider>
+          </Container>
+        </BottomMenuProvider>
+      </Show>
     </MainContainer>
   );
 };

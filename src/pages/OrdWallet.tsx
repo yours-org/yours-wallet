@@ -148,10 +148,10 @@ export const OrdWallet = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { ordAddress } = keysService;
   const {
-    getOrdinals,
+    fetchOrdinals: getOrdinals,
     transferOrdinal,
     sendBSV20,
-    bsv20s,
+    getBsv20s,
     listOrdinalOnGlobalOrderbook,
     cancelGlobalOrderbookListing,
     getTokenName,
@@ -169,7 +169,8 @@ export const OrdWallet = () => {
   const [token, setToken] = useState<Token | null>(null);
   const [tokenSendAmount, setTokenSendAmount] = useState<bigint | null>(null);
   const [priceData, setPriceData] = useState<{ id: string; satPrice: number }[]>([]);
-  const ordinals = ordinalService.ordinals;
+  const ordinals = ordinalService.getOrdinals();
+  const bsv20s = getBsv20s();
 
   useEffect(() => {
     if (!bsv20s.data.length) return;
@@ -457,7 +458,7 @@ export const OrdWallet = () => {
                       ticker={getTokenName(b)}
                       usdBalance={
                         (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
-                        (bsvService.exchangeRate / BSV_DECIMAL_CONVERSION) *
+                        (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
                         Number(showAmount(b.all.confirmed, b.dec))
                       }
                     />
@@ -489,7 +490,7 @@ export const OrdWallet = () => {
                         ticker={getTokenName(b)}
                         usdBalance={
                           (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
-                          (bsvService.exchangeRate / BSV_DECIMAL_CONVERSION) *
+                          (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
                           Number(showAmount(b.all.confirmed, b.dec))
                         }
                       />

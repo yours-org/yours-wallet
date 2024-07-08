@@ -19,7 +19,7 @@ export const ThemeProvider = (props: ThemeProviderProps) => {
   const { children } = props;
   const [theme, setTheme] = useState<Theme>(defaultTheme);
   const { chromeStorageService, ordinalService } = useServiceContext();
-  const ordinals = ordinalService.ordinals;
+  const ordinals = ordinalService.getOrdinals();
 
   useEffect(() => {
     const { colorTheme } = chromeStorageService.getCurrentAccountObject();
