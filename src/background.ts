@@ -32,8 +32,12 @@ import { launchPopUp, removeWindow } from './utils/chromeHelpers';
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
+import { BlockHeaderService } from './services/block-headers';
 const chromeStorageService = new ChromeStorageService();
 chromeStorageService.getStorage();
+
+const blockHeaderService = new BlockHeaderService();
+blockHeaderService.syncBlocks();
 
 console.log('Yours Wallet Background Script Running!');
 
