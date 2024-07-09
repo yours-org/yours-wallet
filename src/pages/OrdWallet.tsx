@@ -31,7 +31,8 @@ import copyIcon from '../assets/copy.svg';
 import { TopNav } from '../components/TopNav';
 import { AssetRow } from '../components/AssetRow';
 import { formatNumberWithCommasAndDecimals } from '../utils/format';
-import { BSV20, ListOrdinal, OrdinalTxo, OrdOperationResponse } from '../services/types/ordinal.types';
+import { ListOrdinal, OrdOperationResponse } from '../services/types/ordinal.types';
+import { Bsv20, Ordinal as OrdinalType } from 'yours-wallet-provider';
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -137,7 +138,7 @@ type PageState = 'main' | 'receive' | 'transfer' | 'list' | 'cancel' | 'sendBSV2
 
 interface Token {
   isConfirmed: boolean;
-  info: BSV20;
+  info: Bsv20;
 }
 
 export const OrdWallet = () => {
@@ -148,7 +149,7 @@ export const OrdWallet = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { ordAddress } = keysService;
   const {
-    fetchOrdinals: getOrdinals,
+    getAndSetOrdinals,
     transferOrdinal,
     sendBSV20,
     getBsv20s,
@@ -158,7 +159,7 @@ export const OrdWallet = () => {
   } = ordinalService;
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const network = chromeStorageService.getNetwork();
-  const [selectedOrdinal, setSelectedOrdinal] = useState<OrdinalTxo | undefined>();
+  const [selectedOrdinal, setSelectedOrdinal] = useState<OrdinalType | undefined>();
   const [tabIndex, selectTab] = useState(0);
   const [ordinalOutpoint, setOrdinalOutpoint] = useState('');
   const [receiveAddress, setReceiveAddress] = useState('');
@@ -175,7 +176,7 @@ export const OrdWallet = () => {
   useEffect(() => {
     if (!bsv20s.data.length) return;
     (async () => {
-      const data = await gorillaPoolService.getTokenPriceInSats(bsv20s.data.map((d) => d.id));
+      const data = await gorillaPoolService.getTokenPriceInSats(bsv20s.data.map((d) => d?.id || ''));
       setPriceData(data);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,7 +188,7 @@ export const OrdWallet = () => {
 
   useEffect(() => {
     if (ordAddress) {
-      getOrdinals(ordAddress);
+      getAndSetOrdinals(ordAddress);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ordAddress]);
@@ -210,7 +211,7 @@ export const OrdWallet = () => {
     setSelectedOrdinal(undefined);
     setTokenSendAmount(null);
     setTimeout(() => {
-      getOrdinals(ordAddress);
+      getAndSetOrdinals(ordAddress);
     }, 500);
   };
 
@@ -345,6 +346,12 @@ export const OrdWallet = () => {
     }
 
     if (token === null || tokenSendAmount === null) {
+      setIsProcessing(false);
+      return;
+    }
+
+    if (!token.info.id) {
+      addSnackbar('Missing token ID!', 'error');
       setIsProcessing(false);
       return;
     }
@@ -530,7 +537,7 @@ export const OrdWallet = () => {
           setPageState('main');
           setTimeout(() => {
             setIsProcessing(false);
-            getOrdinals(ordAddress);
+            getAndSetOrdinals(ordAddress);
           }, 500);
         }}
       />
@@ -547,7 +554,7 @@ export const OrdWallet = () => {
         }`}</HeaderText>
         <Ordinal
           theme={theme}
-          inscription={selectedOrdinal as OrdinalTxo}
+          inscription={selectedOrdinal as OrdinalType}
           url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinal?.origin?.outpoint.toString()}`}
           isTransfer
         />
@@ -600,7 +607,7 @@ export const OrdWallet = () => {
         <Text style={{ margin: 0 }} theme={theme}>{`#${selectedOrdinal?.origin?.num}`}</Text>
         <Ordinal
           theme={theme}
-          inscription={selectedOrdinal as OrdinalTxo}
+          inscription={selectedOrdinal as OrdinalType}
           url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinal?.origin?.outpoint.toString()}`}
           selected
           isTransfer
@@ -715,11 +722,11 @@ export const OrdWallet = () => {
               )}`}
             </Balance>
           </BSV20Container>
-          <Show when={isBSV20v2(token.info.id)}>
+          <Show when={isBSV20v2(token.info.id ?? '')}>
             <BSV20Container>
               <BSV20Id
                 theme={theme}
-                id={token.info.id}
+                id={token.info.id ?? ''}
                 onCopyTokenId={() => {
                   addSnackbar('Copied', 'success');
                 }}
@@ -800,7 +807,7 @@ export const OrdWallet = () => {
         <Text style={{ margin: 0 }} theme={theme}>{`#${selectedOrdinal?.origin?.num}`}</Text>
         <Ordinal
           theme={theme}
-          inscription={selectedOrdinal as OrdinalTxo}
+          inscription={selectedOrdinal as OrdinalType}
           url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinal?.origin?.outpoint.toString()}`}
           selected
           isTransfer

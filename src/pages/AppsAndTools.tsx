@@ -21,7 +21,7 @@ import { truncate } from '../utils/format';
 // import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { OrdinalTxo } from '../services/types/ordinal.types';
+import { Ordinal } from 'yours-wallet-provider';
 
 const Content = styled.div`
   display: flex;
@@ -138,7 +138,7 @@ export const AppsAndTools = () => {
   // const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   // const [satAmount, setSatAmount] = useState(0);
   // const [didSubmit, setDidSubmit] = useState(false);
-  const [lockedUtxos, setLockedUtxos] = useState<OrdinalTxo[]>([]);
+  const [lockedUtxos, setLockedUtxos] = useState<Ordinal[]>([]);
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
 
   const getLockData = async () => {

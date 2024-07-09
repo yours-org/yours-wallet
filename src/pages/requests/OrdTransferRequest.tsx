@@ -38,7 +38,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     if (!successTxId) return;
     if (!message && ordAddress) {
       resetSendState();
-      ordinalService.fetchOrdinals(ordAddress);
+      ordinalService.getAndSetOrdinals(ordAddress);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, ordAddress]);

@@ -19,7 +19,7 @@ const initializeServices = async () => {
   const keysService = new KeysService(gorillaPoolService, wocService, chromeStorageService);
   const contractService = new ContractService(keysService, gorillaPoolService);
   const bsvService = new BsvService(keysService, gorillaPoolService, wocService, contractService, chromeStorageService);
-  const ordinalService = new OrdinalService(keysService, wocService, gorillaPoolService);
+  const ordinalService = new OrdinalService(keysService, wocService, gorillaPoolService, chromeStorageService);
 
   return {
     chromeStorageService,
@@ -56,15 +56,19 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const initServices = async () => {
       try {
         const initializedServices = await initializeServices();
-        const { chromeStorageService, keysService, bsvService } = initializedServices;
+        const { chromeStorageService, keysService, bsvService, ordinalService } = initializedServices;
 
         const { account } = chromeStorageService.getCurrentAccountObject();
-        if (account?.addresses?.bsvAddress) {
+        if (!account) throw new Error('No account found in storage');
+        const { bsvAddress, ordAddress } = account.addresses;
+        if (bsvAddress && ordAddress) {
           await keysService.retrieveKeys();
           await bsvService.rate();
           await bsvService.updateBsvBalance(true);
+          await ordinalService.getAndSetOrdinals(ordAddress);
         }
         setServices({ ...initializedServices, isLocked, isReady, lockWallet });
+
         setIsReady(true);
       } catch (error) {
         console.error('Error initializing services:', error);

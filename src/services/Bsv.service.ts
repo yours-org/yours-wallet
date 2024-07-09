@@ -11,7 +11,7 @@ import {
   TxOut,
 } from 'bsv-wasm-web';
 import { buildInscription } from 'js-1sat-ord-web';
-import { SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
+import { Ordinal, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
 import {
   BSV_DECIMAL_CONVERSION,
   FEE_PER_BYTE,
@@ -29,7 +29,6 @@ import { KeysService } from './Keys.service';
 import { getChainParams } from './serviceHelpers';
 import { FundRawTxResponse, LockData, SendBsvResponse, UTXO } from './types/bsv.types';
 import { ChromeStorageObject } from './types/chromeStorage.types';
-import { OrdinalTxo } from './types/ordinal.types';
 import { WhatsOnChainService } from './WhatsOnChain.service';
 
 export class BsvService {
@@ -66,7 +65,7 @@ export class BsvService {
     const spentTxids = await this.gorillaPoolService.getSpentTxids(outpoints);
     lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
     if (lockedTxos.length > 0) {
-      const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
+      const lockTotal = lockedTxos.reduce((a: number, utxo: Ordinal) => a + utxo.satoshis, 0);
       let unlockableTotal = 0;
       const theBlocksCoinsUnlock: number[] = [];
       lockedTxos.forEach((txo) => {

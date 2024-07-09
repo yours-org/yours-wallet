@@ -2,12 +2,10 @@ import { GorillaPoolService } from './GorillaPool.service';
 import { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { KeysService } from './Keys.service';
 import {
-  BSV20,
   BSV20Data,
   BuildAndBroadcastResponse,
   ListOrdinal,
   OrdinalData,
-  OrdinalTxo,
   OrdOperationResponse,
 } from './types/ordinal.types';
 import { WhatsOnChainService } from './WhatsOnChain.service';
@@ -23,8 +21,10 @@ import {
 } from '../utils/constants';
 import { sendOrdinal } from 'js-1sat-ord-web';
 import { createTransferP2PKH, createTransferV2P2PKH, isBSV20v2 } from '../utils/ordi';
-import { PurchaseOrdinal } from 'yours-wallet-provider';
+import { Bsv20, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
 import { UTXO } from './types/bsv.types';
+import { ChromeStorageObject } from './types/chromeStorage.types';
+import { ChromeStorageService } from './ChromeStorage.service';
 
 export class OrdinalService {
   private ordinals: OrdinalData;
@@ -33,6 +33,7 @@ export class OrdinalService {
     private readonly keysService: KeysService,
     private readonly wocService: WhatsOnChainService,
     private readonly gorillaPoolService: GorillaPoolService,
+    private readonly chromeStorageService: ChromeStorageService,
   ) {
     this.ordinals = { initialized: false, data: [] };
     this.bsv20s = { initialized: false, data: [] };
@@ -41,13 +42,13 @@ export class OrdinalService {
   getOrdinals = (): OrdinalData => this.ordinals;
   getBsv20s = (): BSV20Data => this.bsv20s;
 
-  fetchOrdinals = async (ordAddress: string) => {
+  getAndSetOrdinals = async (ordAddress: string) => {
     try {
       //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
       const ordList = await this.gorillaPoolService.getOrdUtxos(ordAddress);
       this.ordinals = { initialized: true, data: ordList.filter((o) => o.satoshis === 1) };
 
-      const bsv20List: Array<BSV20> = await this.gorillaPoolService.getBsv20Balances(ordAddress);
+      const bsv20List: Array<Bsv20> = await this.gorillaPoolService.getBsv20Balances(ordAddress);
 
       // All the information currently used has been obtained from `getBsv20Balances`.
       // If other information is needed later, call `cacheTokenInfos` to obtain more Tokens information.
@@ -55,6 +56,17 @@ export class OrdinalService {
 
       const data = bsv20List.filter((o) => o.all.confirmed + o.all.pending > 0n && typeof o.dec === 'number');
       this.bsv20s = { initialized: true, data };
+      const { account } = this.chromeStorageService.getCurrentAccountObject();
+      if (!account) throw Error('No account found!');
+      const key: keyof ChromeStorageObject = 'accounts';
+      const update: Partial<ChromeStorageObject['accounts']> = {
+        [this.keysService.identityAddress]: {
+          ...account,
+          ordinals: this.ordinals.initialized ? this.ordinals.data : account.ordinals || [],
+        },
+      };
+      await this.chromeStorageService.updateNested(key, update);
+      return this.ordinals;
     } catch (error) {
       console.error('getOrdinals failed:', error);
     }
@@ -182,7 +194,7 @@ export class OrdinalService {
     }
   };
 
-  getOrdinalUtxos = async (ordAddress: string): Promise<OrdinalTxo[] | undefined> => {
+  getOrdinalUtxos = async (ordAddress: string): Promise<Ordinal[] | undefined> => {
     try {
       if (!ordAddress) {
         return [];
@@ -389,7 +401,7 @@ export class OrdinalService {
 
   async listOrdinal(
     paymentUtxo: UTXO,
-    ordinal: OrdinalTxo,
+    ordinal: Ordinal,
     paymentPk: PrivateKey,
     changeAddress: string,
     ordPk: PrivateKey,
@@ -690,7 +702,7 @@ export class OrdinalService {
     }
   };
 
-  getTokenName(b: BSV20): string {
+  getTokenName(b: Bsv20): string {
     return b.sym || b.tick || 'Null';
   }
 }
