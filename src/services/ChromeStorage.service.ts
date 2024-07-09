@@ -92,7 +92,7 @@ export class ChromeStorageService {
   };
 
   getCurrentAccountObject = (): Partial<CurrentAccountObject> => {
-    if (!this.storage) {
+    if (this.storage === null || this.storage === undefined) {
       throw new Error('Storage is not initialized.');
     }
     const { accounts, selectedAccount } = this.storage as ChromeStorageObject;
@@ -110,7 +110,7 @@ export class ChromeStorageService {
   };
 
   getNetwork = (): NetWork => {
-    if (!this.storage) {
+    if (this.storage === null || this.storage === undefined) {
       throw new Error('Storage is not initialized.');
     }
     const { accounts, selectedAccount } = this.storage as ChromeStorageObject;
@@ -126,7 +126,7 @@ export class ChromeStorageService {
   };
 
   isPasswordRequired = (): boolean => {
-    if (!this.storage) {
+    if (this.storage === null || this.storage === undefined) {
       throw new Error('Storage is not initialized.');
     }
     const { accounts, selectedAccount } = this.storage as ChromeStorageObject;

@@ -59,13 +59,14 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
         const { chromeStorageService, keysService, bsvService, ordinalService } = initializedServices;
 
         const { account } = chromeStorageService.getCurrentAccountObject();
-        if (!account) throw new Error('No account found in storage');
-        const { bsvAddress, ordAddress } = account.addresses;
-        if (bsvAddress && ordAddress) {
-          await keysService.retrieveKeys();
-          await bsvService.rate();
-          await bsvService.updateBsvBalance(true);
-          await ordinalService.getAndSetOrdinals(ordAddress);
+        if (account) {
+          const { bsvAddress, ordAddress } = account.addresses;
+          if (bsvAddress && ordAddress) {
+            await keysService.retrieveKeys();
+            await bsvService.rate();
+            await bsvService.updateBsvBalance(true);
+            await ordinalService.getAndSetOrdinals(ordAddress);
+          }
         }
         setServices({ ...initializedServices, isLocked, isReady, lockWallet });
 
