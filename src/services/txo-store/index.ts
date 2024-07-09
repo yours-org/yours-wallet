@@ -9,6 +9,7 @@ import { Block } from './models/block';
 import { Spend } from './models/spend';
 import { Buffer } from 'buffer';
 import { parseAddress } from './models/address';
+import { NetWork } from 'yours-wallet-provider';
 
 const VERSION = 1;
 
@@ -35,6 +36,7 @@ export class TxoStore {
     public addresses = new Set<string>(),
     public broadcaster?: Broadcaster,
     public blocksService?: BlockHeaderService,
+    public network: NetWork = NetWork.Mainnet,
   ) {
     this.indexers.forEach((i) => (i.addresses = this.addresses));
     this.db = openDB<TxoSchema>(`txostore-${accountId}`, VERSION, {

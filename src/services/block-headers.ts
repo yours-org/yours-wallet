@@ -1,5 +1,6 @@
 import type { ChainTracker } from '@bsv/sdk';
 import { openDB, type DBSchema, type IDBPDatabase } from '@tempfix/idb';
+import { NetWork } from 'yours-wallet-provider';
 
 const VERSION = 1;
 const PAGE_SIZE = 10000;
@@ -28,7 +29,7 @@ export interface BlockSchema extends DBSchema {
 export class BlockHeaderService implements ChainTracker {
   db: Promise<IDBPDatabase<BlockSchema>>;
   syncInProgress = false;
-  constructor() {
+  constructor(public network: NetWork = NetWork.Mainnet) {
     this.db = openDB<BlockSchema>(`blocks`, VERSION, {
       upgrade(db) {
         const headers = db.createObjectStore('headers', { keyPath: 'height' });
