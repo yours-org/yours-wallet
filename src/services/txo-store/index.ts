@@ -39,7 +39,7 @@ export class TxoStore {
     public network: NetWork = NetWork.Mainnet,
   ) {
     this.indexers.forEach((i) => (i.addresses = this.addresses));
-    this.db = openDB<TxoSchema>(`txostore-${accountId}`, VERSION, {
+    this.db = openDB<TxoSchema>(`txostore-${accountId}-${network}`, VERSION, {
       upgrade(db) {
         const txos = db.createObjectStore('txos', { keyPath: ['txid', 'vout'] });
         txos.createIndex('events', 'events', { multiEntry: true });

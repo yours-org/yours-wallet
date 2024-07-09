@@ -30,7 +30,7 @@ export class BlockHeaderService implements ChainTracker {
   db: Promise<IDBPDatabase<BlockSchema>>;
   syncInProgress = false;
   constructor(public network: NetWork = NetWork.Mainnet) {
-    this.db = openDB<BlockSchema>(`blocks`, VERSION, {
+    this.db = openDB<BlockSchema>(`blocks-${network}`, VERSION, {
       upgrade(db) {
         const headers = db.createObjectStore('headers', { keyPath: 'height' });
         headers.createIndex('byHash', 'hash');
