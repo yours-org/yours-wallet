@@ -112,7 +112,6 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
       case YoursEventName.IS_CONNECTED:
         return processIsConnectedRequest(message.params as { domain: string }, sendResponse);
       case YoursEventName.USER_CONNECT_RESPONSE:
-        console.log('USER_CONNECT_RESPONSE', message);
         return processConnectResponse(message as { decision: Decision; pubKeys: PubKeys });
       case YoursEventName.SEND_BSV_RESPONSE:
         return processSendBsvResponse(message as SendBsvResponse);
@@ -167,6 +166,7 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
       case YoursEventName.GET_ORDINALS:
         return processGetOrdinalsRequest(sendResponse);
       case YoursEventName.SEND_BSV:
+      case YoursEventName.INSCRIBE: // We use the sendBsv functionality here
         return processSendBsvRequest(message, sendResponse);
       case YoursEventName.TRANSFER_ORDINAL:
         return processTransferOrdinalRequest(message, sendResponse);
@@ -188,8 +188,6 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
         return processGenerateTaggedKeysRequest(message, sendResponse);
       case YoursEventName.GET_TAGGED_KEYS:
         return processGetTaggedKeys(message, sendResponse);
-      case YoursEventName.INSCRIBE:
-        return processSendBsvRequest(message, sendResponse);
       case YoursEventName.ENCRYPT:
         return processEncryptRequest(message, sendResponse);
       case YoursEventName.DECRYPT:
@@ -470,7 +468,11 @@ const processGetPaymentUtxos = async (sendResponse: CallbackResponse) => {
   }
 };
 
-const processSendBsvRequest = (message: { params: { data: SendBsv[] } }, sendResponse: CallbackResponse) => {
+// Important note: We process the InscribeRequest as a SendBsv request.
+const processSendBsvRequest = (
+  message: { params: { data: SendBsv[] | InscribeRequest[] } },
+  sendResponse: CallbackResponse,
+) => {
   if (!message.params.data) {
     sendResponse({
       type: YoursEventName.SEND_BSV,
@@ -481,7 +483,7 @@ const processSendBsvRequest = (message: { params: { data: SendBsv[] } }, sendRes
   }
   try {
     responseCallbackForSendBsvRequest = sendResponse;
-    let sendBsvRequest = message.params.data;
+    let sendBsvRequest = message.params.data as SendBsv[];
 
     // If in this if block, it's an inscribe() request.
     const inscribeRequest = message.params.data as InscribeRequest[];
@@ -495,7 +497,7 @@ const processSendBsvRequest = (message: { params: { data: SendBsv[] } }, sendRes
             map: d.map,
           },
           satoshis: d.satoshis ?? 1,
-        };
+        } as SendBsv;
       });
     }
 
@@ -820,21 +822,24 @@ const processDecryptRequest = (message: { params: DecryptRequest }, sendResponse
 
 const cleanup = (types: YoursEventName[]) => {
   chromeStorageService.getAndSetStorage().then((res) => {
-    if (res?.popupWindowId) removeWindow(res.popupWindowId);
+    // Here we allow 1 second for yours wallet ui to display success message before killing the window
+    setTimeout(() => {
+      if (res?.popupWindowId) {
+        removeWindow(res.popupWindowId);
+        chromeStorageService.remove([...types, 'popupWindowId']);
+      }
+    }, 1000);
   });
-
-  chromeStorageService.remove([...types, 'popupWindowId']);
 };
 
 const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys }) => {
+  if (!responseCallbackForConnectRequest) throw Error('Missing callback!');
   try {
-    if (responseCallbackForConnectRequest) {
-      responseCallbackForConnectRequest({
-        type: YoursEventName.CONNECT,
-        success: true,
-        data: response.decision === 'approved' ? response.pubKeys.identityPubKey : undefined,
-      });
-    }
+    responseCallbackForConnectRequest({
+      type: YoursEventName.CONNECT,
+      success: true,
+      data: response.decision === 'approved' ? response.pubKeys.identityPubKey : undefined,
+    });
   } catch (error) {
     responseCallbackForConnectRequest?.({
       type: YoursEventName.CONNECT,
