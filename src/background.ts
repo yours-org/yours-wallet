@@ -28,7 +28,7 @@ import {
 } from './inject';
 import { EncryptResponse } from './pages/requests/EncryptRequest';
 import { DecryptResponse } from './pages/requests/DecryptRequest';
-import { launchPopUp, removeWindow } from './utils/chromeHelpers';
+import { removeWindow } from './utils/chromeHelpers';
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
@@ -55,6 +55,25 @@ let popupWindowId: number | undefined;
 
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
+const launchPopUp = () => {
+  chrome.windows.create(
+    {
+      url: chrome.runtime.getURL('index.html'),
+      type: 'popup',
+      width: 360,
+      height: 567,
+    },
+    (window) => {
+      popupWindowId = window?.id;
+      if (popupWindowId) {
+        chrome.storage.local.set({
+          popupWindowId,
+        });
+      }
+    },
+  );
+};
+
 const verifyAccess = async (requestingDomain: string): Promise<boolean> => {
   const { accounts, selectedAccount } = (await chromeStorageService.getAndSetStorage()) as ChromeStorageObject;
   if (!accounts || !selectedAccount) return false;
@@ -64,7 +83,6 @@ const verifyAccess = async (requestingDomain: string): Promise<boolean> => {
 };
 
 const authorizeRequest = async (message: { params: { domain: string } }): Promise<boolean> => {
-  console.log('authorizeRequest', message);
   const { params } = message;
   return await verifyAccess(params.domain);
 };
@@ -801,20 +819,10 @@ const processDecryptRequest = (message: { params: DecryptRequest }, sendResponse
 // RESPONSES ********************************
 
 const cleanup = (types: YoursEventName[]) => {
-  responseCallbackForConnectRequest = null;
-  responseCallbackForSendBsvRequest = null;
-  responseCallbackForTransferOrdinalRequest = null;
-  responseCallbackForPurchaseOrdinalRequest = null;
-  responseCallbackForSignMessageRequest = null;
-  responseCallbackForBroadcastRequest = null;
-  responseCallbackForGetSignaturesRequest = null;
-  responseCallbackForGenerateTaggedKeysRequest = null;
-  responseCallbackForEncryptRequest = null;
-  responseCallbackForDecryptRequest = null;
   chromeStorageService.getAndSetStorage().then((res) => {
     if (res?.popupWindowId) removeWindow(res.popupWindowId);
   });
-  popupWindowId = undefined;
+
   chromeStorageService.remove([...types, 'popupWindowId']);
 };
 
@@ -1049,7 +1057,6 @@ const processDecryptResponse = (response: { decryptedMessages: string[] }) => {
 };
 
 // HANDLE WINDOW CLOSE *****************************************
-// This handle the case where the user doesn't explicity dismiss the request but closes the window
 chrome.windows.onRemoved.addListener((closedWindowId) => {
   if (closedWindowId === popupWindowId) {
     if (responseCallbackForConnectRequest) {

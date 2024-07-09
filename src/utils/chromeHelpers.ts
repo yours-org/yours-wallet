@@ -15,22 +15,3 @@ export const removeWindow = (windowId: number) => {
     }
   });
 };
-
-export const launchPopUp = () => {
-  chrome.windows.create(
-    {
-      url: chrome.runtime.getURL('index.html'),
-      type: 'popup',
-      width: 360,
-      height: 567,
-    },
-    (window) => {
-      const popupWindowId = window?.id;
-      if (popupWindowId) {
-        chrome.storage.local.set({
-          popupWindowId,
-        });
-      }
-    },
-  );
-};
