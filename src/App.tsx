@@ -117,7 +117,7 @@ export const App = () => {
       <BottomMenuProvider network={chromeStorageService.getNetwork()}>
         <Container theme={theme}>
           <SnackbarProvider>
-            <Show when={!isLocked && isReady} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
+            <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
               <Router>
                 <Routes>
                   <Route path="/" element={<Start />} />
