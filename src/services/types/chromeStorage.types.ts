@@ -76,9 +76,6 @@ export interface ChromeStorageObject {
   generateTaggedKeysRequest?: TaggedDerivationRequest;
   encryptRequest?: EncryptRequest;
   decryptRequest?: DecryptRequest;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  // [key: string]: any; // This is used to account for any additional items chrome.storage.local may return when strongly typing the chrome.storage.onChange method
 }
 
 export type CurrentAccountObject = Omit<
