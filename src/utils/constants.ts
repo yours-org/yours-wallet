@@ -1,5 +1,3 @@
-import { NetWork } from 'yours-wallet-provider';
-
 export const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv/main';
 
 export const WOC_TESTNET_BASE_URL = 'https://api.whatsonchain.com/v1/bsv/test';
@@ -81,18 +79,3 @@ export const featuredApps = [
     link: 'https://babel.markets',
   },
 ];
-
-export const DEFAULT_ACCOUNT = {
-  addresses: { bsvAddress: '', ordAddress: '', identityAddress: '' },
-  pubKeys: { bsvPubKey: '', ordPubKey: '', identityPubKey: '' },
-  settings: { network: 'mainnet' as NetWork, noApprovalLimit: 0, whitelist: [] },
-  balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
-  encryptedKeys: '',
-  isPasswordRequired: true,
-  derivationTags: [],
-  icon: HOSTED_YOURS_IMAGE,
-  name: 'Account 1',
-  ordinals: [],
-  paymentUtxos: [],
-  socialProfile: { avatar: HOSTED_YOURS_IMAGE, displayName: 'Anon Panda' },
-};

@@ -6,8 +6,8 @@ import tokens from '../assets/grid.svg';
 import settings from '../assets/settings.svg';
 import { MenuItems } from '../contexts/BottomMenuContext';
 import { Badge, Text } from './Reusable';
+import { NetWork } from '../utils/network';
 import { Show } from './Show';
-import { NetWork } from 'yours-wallet-provider';
 
 const Container = styled.div<ColorThemeProps>`
   display: flex;
@@ -120,7 +120,7 @@ export const BottomMenu = (props: BottomMenuProps) => {
         src={settings}
         onClick={() => handleSelect('settings')}
         opacity={selected === 'settings' ? 1 : 0.4}
-        badge={props.network === 'testnet' ? 'testnet' : undefined}
+        badge={props.network === NetWork.Testnet ? 'testnet' : undefined}
       />
     </Container>
   );

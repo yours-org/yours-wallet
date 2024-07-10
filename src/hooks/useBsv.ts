@@ -1,5 +1,6 @@
-import {
+import init, {
   BSM,
+  ChainParams,
   P2PKHAddress,
   PrivateKey,
   PublicKey,
@@ -11,6 +12,7 @@ import {
   TxOut,
 } from 'bsv-wasm-web';
 import { buildInscription } from 'js-1sat-ord-web';
+import { useEffect, useState } from 'react';
 import { SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
 import {
   BSV_DECIMAL_CONVERSION,
@@ -22,39 +24,101 @@ import {
 } from '../utils/constants';
 import { removeBase64Prefix } from '../utils/format';
 import { getPrivateKeyFromTag, Keys } from '../utils/keys';
-import { ChromeStorageService } from './ChromeStorage.service';
-import { ContractService } from './Contract.service';
-import { GorillaPoolService } from './GorillaPool.service';
-import { KeysService } from './Keys.service';
-import { getChainParams } from './serviceHelpers';
-import { FundRawTxResponse, LockData, SendBsvResponse, UTXO } from './types/bsv.types';
-import { ChromeStorageObject } from './types/chromeStorage.types';
-import { OrdinalTxo } from './types/ordinal.types';
-import { WhatsOnChainService } from './WhatsOnChain.service';
+import { NetWork } from '../utils/network';
+import { storage } from '../utils/storage';
+import { OrdinalTxo } from './ordTypes';
+import { useContracts } from './useContracts';
+import { useGorillaPool } from './useGorillaPool';
+import { useKeys } from './useKeys';
+import { useNetwork } from './useNetwork';
+import { useWhatsOnChain } from './useWhatsOnChain';
+export interface UTXO {
+  satoshis: number;
+  vout: number;
+  txid: string;
+  script: string;
+}
 
-export class BsvService {
-  bsvBalance: number;
-  exchangeRate: number;
-  lockData: LockData;
-  constructor(
-    private readonly keysService: KeysService,
-    private readonly gorillaPoolService: GorillaPoolService,
-    private readonly wocService: WhatsOnChainService,
-    private readonly contractService: ContractService,
-    private readonly chromeStorageService: ChromeStorageService,
-  ) {
-    this.bsvBalance = 0;
-    this.exchangeRate = 0;
-    this.lockData = { totalLocked: 0, unlockable: 0, nextUnlock: 0 };
-  }
+export interface StoredUtxo extends UTXO {
+  spent: boolean;
+  spentUnixTime: number;
+}
 
-  unlockLockedCoins = async (balanceOnly = false) => {
-    if (!this.keysService.identityAddress) return;
-    const chainInfo = await this.wocService.getChainInfo();
-    let lockedTxos = await this.gorillaPoolService.getLockedBsvUtxos(this.keysService.identityAddress);
+type SendBsvResponse = {
+  txid?: string;
+  rawtx?: string;
+  error?: string;
+};
+
+type FundRawTxResponse = { rawtx?: string; error?: string };
+
+export type MimeTypes =
+  | 'text/plain'
+  | 'text/html'
+  | 'text/css'
+  | 'application/javascript'
+  | 'application/json'
+  | 'application/xml'
+  | 'image/jpeg'
+  | 'image/png'
+  | 'image/gif'
+  | 'image/svg+xml'
+  | 'audio/mpeg'
+  | 'audio/wav'
+  | 'audio/wave'
+  | 'video/mp4'
+  | 'application/pdf'
+  | 'application/msword'
+  | 'application/vnd.ms-excel'
+  | 'application/vnd.ms-powerpoint'
+  | 'application/zip'
+  | 'application/x-7z-compressed'
+  | 'application/x-gzip'
+  | 'application/x-tar'
+  | 'application/x-bzip2';
+
+export type MAP = { app: string; type: string; [prop: string]: string };
+
+export type RawInscription = {
+  base64Data: string;
+  mimeType: MimeTypes;
+  map?: MAP;
+};
+
+export type LockData = {
+  totalLocked: number;
+  unlockable: number;
+  nextUnlock: number;
+};
+
+export const useBsv = () => {
+  const [bsvBalance, setBsvBalance] = useState(0);
+  const [exchangeRate, setExchangeRate] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [lockData, setLockData] = useState<LockData>({ totalLocked: 0, unlockable: 0, nextUnlock: 0 });
+  const { retrieveKeys, bsvAddress, verifyPassword, bsvPubKey, identityAddress, identityPubKey } = useKeys();
+  const { network } = useNetwork();
+  const { broadcastWithGorillaPool, getTxOut, getLockedBsvUtxos, getSpentTxids } = useGorillaPool();
+  const { getUtxos, getBsvBalance, getExchangeRate, getInputs, getChainInfo } = useWhatsOnChain();
+  const { unlock } = useContracts();
+
+  const getChainParams = (network: NetWork): ChainParams => {
+    return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
+  };
+
+  useEffect(() => {
+    if (!bsvAddress) return;
+    getUtxos(bsvAddress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bsvAddress]);
+
+  const unlockLockedCoins = async (balanceOnly = false) => {
+    if (!identityAddress) return;
+    const chainInfo = await getChainInfo();
+    let lockedTxos = await getLockedBsvUtxos(identityAddress);
     const blockHeight = Number(chainInfo?.blocks);
     const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
-    const spentTxids = await this.gorillaPoolService.getSpentTxids(outpoints);
+    const spentTxids = await getSpentTxids(outpoints);
     lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
     if (lockedTxos.length > 0) {
       const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
@@ -67,26 +131,28 @@ export class BsvService {
           unlockableTotal += txo.satoshis;
         }
       });
-      this.lockData = {
+      setLockData({
         totalLocked: lockTotal,
         unlockable: unlockableTotal,
         nextUnlock: theBlocksCoinsUnlock.sort((a, b) => a - b)[0],
-      };
+      });
       if (balanceOnly) return;
       const txos = lockedTxos.filter((i) => Number(i.data?.lock?.until) <= blockHeight);
       if (txos.length > 0) {
-        return await this.contractService.unlock(txos, blockHeight);
+        return await unlock(txos, blockHeight);
       }
     }
   };
 
-  sendBsv = async (request: SendBsv[], password: string, noApprovalLimit?: number): Promise<SendBsvResponse> => {
+  const sendBsv = async (request: SendBsv[], password: string, noApprovalLimit?: number): Promise<SendBsvResponse> => {
     try {
+      setIsProcessing(true);
+      await init();
       const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
       const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
 
       if (bsvSendAmount > Number(noApprovalLimit)) {
-        const isAuthenticated = await this.keysService.verifyPassword(password);
+        const isAuthenticated = await verifyPassword(password);
         if (!isAuthenticated) {
           return { error: 'invalid-password' };
         }
@@ -94,16 +160,15 @@ export class BsvService {
 
       let feeSats = 20;
       const isBelowNoApprovalLimit = Number(bsvSendAmount) <= Number(noApprovalLimit);
-      const keys = await this.keysService.retrieveKeys(password, isBelowNoApprovalLimit);
+      const keys = await retrieveKeys(password, isBelowNoApprovalLimit);
       if (!keys?.walletWif || !keys.walletPubKey) throw Error('Undefined key');
       const paymentPk = PrivateKey.from_wif(keys.walletWif);
       const pubKey = paymentPk.to_public_key();
-      const network = this.chromeStorageService.getNetwork();
       const fromAddress = pubKey.to_address().set_chain_params(getChainParams(network)).to_string();
       const amount = request.reduce((a, r) => a + r.satoshis, 0);
 
       // Format in and outs
-      const fundingUtxos = await this.wocService.getUtxos(fromAddress);
+      const fundingUtxos = await getUtxos(fromAddress);
 
       if (!fundingUtxos) throw Error('No Utxos!');
       const totalSats = fundingUtxos.reduce((a: number, item: UTXO) => a + item.satoshis, 0);
@@ -114,7 +179,7 @@ export class BsvService {
 
       const sendAll = totalSats === amount;
       const satsOut = sendAll ? totalSats - feeSats : amount;
-      const inputs = this.wocService.getInputs(fundingUtxos, satsOut, sendAll);
+      const inputs = getInputs(fundingUtxos, satsOut, sendAll);
 
       const totalInputSats = inputs.reduce((a, item) => a + item.satoshis, 0);
 
@@ -181,25 +246,15 @@ export class BsvService {
       if (bytes > MAX_BYTES_PER_TX) return { error: 'tx-size-too-large' };
 
       const rawtx = tx.to_hex();
-      const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawtx);
+      const { txid } = await broadcastWithGorillaPool(rawtx);
       if (txid) {
         if (isBelowNoApprovalLimit) {
-          const { account } = this.chromeStorageService.getCurrentAccountObject();
-          if (!account) throw Error('No account found!');
-          const { noApprovalLimit } = account.settings;
-          const key: keyof ChromeStorageObject = 'accounts';
-          const update: Partial<ChromeStorageObject['accounts']> = {
-            [this.keysService.identityAddress]: {
-              ...account,
-              settings: {
-                ...account.settings,
-                noApprovalLimit: noApprovalLimit
-                  ? Number((noApprovalLimit - amount / BSV_DECIMAL_CONVERSION).toFixed(8))
-                  : 0,
-              },
-            },
-          };
-          await this.chromeStorageService.updateNested(key, update);
+          const { noApprovalLimit } = await storage.get(['noApprovalLimit']);
+          await storage.set({
+            noApprovalLimit: noApprovalLimit
+              ? Number((noApprovalLimit - amount / BSV_DECIMAL_CONVERSION).toFixed(8))
+              : 0,
+          });
         }
       }
       return { txid, rawtx };
@@ -207,20 +262,22 @@ export class BsvService {
     } catch (error: any) {
       console.log(error);
       return { error: error.message ?? 'unknown' };
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  signMessage = async (
+  const signMessage = async (
     messageToSign: SignMessage,
     password: string,
   ): Promise<SignedMessage | { error: string } | undefined> => {
     const { message, encoding } = messageToSign;
-    const isAuthenticated = await this.keysService.verifyPassword(password);
+    const isAuthenticated = await verifyPassword(password);
     if (!isAuthenticated) {
       return { error: 'invalid-password' };
     }
     try {
-      const keys = (await this.keysService.retrieveKeys(password)) as Keys;
+      const keys = (await retrieveKeys(password)) as Keys;
       const derivationTag = messageToSign.tag ?? { label: 'panda', id: 'identity', domain: '', meta: {} };
       const privateKey = getPrivateKeyFromTag(derivationTag, keys);
 
@@ -228,7 +285,6 @@ export class BsvService {
         return { error: 'key-type' };
       }
 
-      const network = this.chromeStorageService.getNetwork();
       const publicKey = privateKey.to_public_key();
       const address = publicKey.to_address().set_chain_params(getChainParams(network)).to_string();
 
@@ -246,14 +302,13 @@ export class BsvService {
     }
   };
 
-  verifyMessage = async (
+  const verifyMessage = (
     message: string,
     signatureHex: string,
     publicKeyHex: string,
     encoding: 'utf8' | 'hex' | 'base64' = 'utf8',
   ) => {
     try {
-      const network = this.chromeStorageService.getNetwork();
       const msgBuf = Buffer.from(message, encoding);
       const publicKey = PublicKey.from_hex(publicKeyHex);
       const signature = Signature.from_compact_bytes(Buffer.from(signatureHex, 'hex'));
@@ -266,23 +321,23 @@ export class BsvService {
     }
   };
 
-  updateBsvBalance = async (pullFresh?: boolean) => {
-    const total = await this.wocService.getBsvBalance(this.keysService.bsvAddress, pullFresh);
-    this.bsvBalance = total ?? 0;
+  const updateBsvBalance = async (pullFresh?: boolean) => {
+    const total = await getBsvBalance(bsvAddress, pullFresh);
+    setBsvBalance(total ?? 0);
   };
 
-  rate = async () => {
-    const r = await this.wocService.getExchangeRate();
-    this.exchangeRate = r ?? 0;
+  const rate = async () => {
+    const r = await getExchangeRate();
+    setExchangeRate(r ?? 0);
   };
 
-  fundRawTx = async (rawtx: string, password: string): Promise<FundRawTxResponse> => {
-    const isAuthenticated = await this.keysService.verifyPassword(password);
+  const fundRawTx = async (rawtx: string, password: string): Promise<FundRawTxResponse> => {
+    const isAuthenticated = await verifyPassword(password);
     if (!isAuthenticated) {
       return { error: 'invalid-password' };
     }
 
-    const keys = await this.keysService.retrieveKeys(password);
+    const keys = await retrieveKeys(password);
     if (!keys.walletWif) throw new Error('Missing keys');
     const paymentPk = PrivateKey.from_wif(keys.walletWif);
 
@@ -293,7 +348,7 @@ export class BsvService {
     for (let i = 0; i < inputCount; i++) {
       const txIn = tx.get_input(i);
       if (!txIn) throw Error('Invalid input');
-      const txOut = await this.gorillaPoolService.getTxOut(txIn.get_prev_tx_id_hex(), txIn.get_vout());
+      const txOut = await getTxOut(txIn.get_prev_tx_id_hex(), txIn.get_vout());
       if (!txOut) throw Error('Invalid output');
       satsIn += Number(txOut.get_satoshis());
     }
@@ -304,7 +359,7 @@ export class BsvService {
     }
     let size = rawtx.length / 2 + P2PKH_OUTPUT_SIZE;
     let fee = Math.ceil(size * FEE_PER_BYTE);
-    const fundingUtxos = await this.wocService.getUtxos(this.keysService.bsvAddress);
+    const fundingUtxos = await getUtxos(bsvAddress);
     while (satsIn < satsOut + fee) {
       const utxo = fundingUtxos.pop();
       if (!utxo) throw Error('Insufficient funds');
@@ -317,12 +372,34 @@ export class BsvService {
       txIn.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
       tx.set_input(inputCount++, txIn);
     }
-    tx.add_output(
-      new TxOut(
-        BigInt(satsIn - satsOut - fee),
-        P2PKHAddress.from_string(this.keysService.bsvAddress).get_locking_script(),
-      ),
-    );
+    tx.add_output(new TxOut(BigInt(satsIn - satsOut - fee), P2PKHAddress.from_string(bsvAddress).get_locking_script()));
     return { rawtx: tx.to_hex() };
   };
-}
+
+  useEffect(() => {
+    if (!bsvAddress) return;
+    updateBsvBalance();
+    rate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bsvAddress]);
+
+  return {
+    bsvBalance,
+    bsvAddress,
+    bsvPubKey,
+    identityAddress,
+    identityPubKey,
+    isProcessing,
+    sendBsv,
+    setIsProcessing,
+    updateBsvBalance,
+    exchangeRate,
+    signMessage,
+    verifyMessage,
+    fundRawTx,
+    retrieveKeys,
+    getChainParams,
+    unlockLockedCoins,
+    lockData,
+  };
+};

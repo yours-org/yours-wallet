@@ -16,12 +16,12 @@ import { Show } from '../../components/Show';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import { WalletRow } from '../../components/WalletRow';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { SupportedWalletImports, useKeys } from '../../hooks/useKeys';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { ColorThemeProps } from '../../theme';
 import { sleep } from '../../utils/sleep';
-import { useServiceContext } from '../../hooks/useServiceContext';
-import { SupportedWalletImports } from '../../services/types/keys.types';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 
 const Content = styled.div`
   display: flex;
@@ -103,6 +103,7 @@ export const RestoreWallet = () => {
   const [step, setStep] = useState(1);
   const [seedWords, setSeedWords] = useState<string>('');
   const { addSnackbar } = useSnackbar();
+  const { generateSeedAndStoreEncrypted } = useKeys();
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
   const [isExpertImport, setIsExpertImport] = useState(false);
@@ -110,7 +111,7 @@ export const RestoreWallet = () => {
   const [walletDerivation, setWalletDerivation] = useState<string | null>(null);
   const [ordDerivation, setOrdDerivation] = useState<string | null>(null);
   const [identityDerivation, setIdentityDerivation] = useState<string | null>(null);
-  const { keysService } = useServiceContext();
+  const { setEncryptedKeys } = useAppStateContext();
 
   useEffect(() => {
     hideMenu();
@@ -139,7 +140,7 @@ export const RestoreWallet = () => {
 
     // Some artificial delay for the loader
     await sleep(50);
-    const mnemonic = await keysService.generateSeedAndStoreEncrypted(
+    const mnemonic = generateSeedAndStoreEncrypted(
       password,
       seedWords,
       walletDerivation,
@@ -152,7 +153,7 @@ export const RestoreWallet = () => {
       return;
     }
 
-    // setEncryptedKeys(mnemonic);
+    setEncryptedKeys(mnemonic);
     setLoading(false);
     setStep(4);
   };

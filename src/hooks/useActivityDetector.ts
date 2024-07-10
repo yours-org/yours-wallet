@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
-import { ChromeStorageService } from '../services/ChromeStorage.service';
+import { storage } from '../utils/storage';
 
-export const useActivityDetector = (isWalletLocked: boolean, chromeStorageService: ChromeStorageService) => {
+export const useActivityDetector = (isWalletLocked: boolean) => {
   useEffect(() => {
     const handleActivity = async () => {
       if (isWalletLocked) return;
 
       const timestamp = Date.now();
-      await chromeStorageService.update({ lastActiveTime: timestamp });
+      await storage.set({ lastActiveTime: timestamp });
     };
 
     document.addEventListener('mousemove', handleActivity);
@@ -15,6 +15,5 @@ export const useActivityDetector = (isWalletLocked: boolean, chromeStorageServic
     return () => {
       document.removeEventListener('mousemove', handleActivity);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isWalletLocked]);
 };
