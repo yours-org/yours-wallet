@@ -33,19 +33,6 @@ export class WhatsOnChainService {
     return bsvTotal;
   };
 
-  private filterAndRemoveDuplicateTxidsFromUtxos = (recentUtxos: StoredUtxo[]): StoredUtxo[] => {
-    const utxoMap = new Map<string, (typeof recentUtxos)[0]>();
-
-    recentUtxos.forEach((utxo) => {
-      const existingUtxo = utxoMap.get(utxo.txid);
-      if (!existingUtxo || utxo.spent) {
-        utxoMap.set(utxo.txid, utxo);
-      }
-    });
-
-    return Array.from(utxoMap.values());
-  };
-
   getAndUpdateUtxoStorage = async (fromAddress: string, pullFresh?: boolean): Promise<StoredUtxo[]> => {
     try {
       const network = this.chromeStorageService.getNetwork();
@@ -53,16 +40,15 @@ export class WhatsOnChainService {
       const { account } = this.chromeStorageService.getCurrentAccountObject();
       if (!account) return [];
       const { paymentUtxos } = account;
-      const localUtxos: StoredUtxo[] = paymentUtxos || [];
 
-      if (!pullFresh && localUtxos.length > 0) {
-        return localUtxos
+      if (!pullFresh && paymentUtxos.length > 0) {
+        return paymentUtxos
           .filter((utxo) => !utxo.spent)
           .sort((a: StoredUtxo, b: StoredUtxo) => (a.satoshis > b.satoshis ? -1 : 1));
       }
 
       const { data } = await axios.get(`${this.getBaseUrl(network)}/address/${fromAddress}/unspent`, this.config);
-      const explorerUtxos: UTXO[] = data
+      const explorerUtxos: StoredUtxo[] = data
         .filter((u: WocUtxo) => u.value !== 1) // Ensure we are never spending 1 sats
         .map((utxo: WocUtxo) => {
           return {
@@ -70,38 +56,21 @@ export class WhatsOnChainService {
             vout: utxo.tx_pos,
             txid: utxo.tx_hash,
             script: P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex(),
-          } as UTXO;
+            spent: false,
+            spentUnixTime: 0,
+          } as StoredUtxo;
         });
-
-      // Add new UTXOs from explorer that are not in the local storage
-      const newUtxos = explorerUtxos.filter(
-        (explorerUtxo) => !localUtxos.some((storedUtxo) => storedUtxo.txid === explorerUtxo.txid),
-      );
-      localUtxos.push(...newUtxos.map((newUtxo) => ({ ...newUtxo, spent: false, spentUnixTime: 0 })));
-
-      // Remove spent UTXOs older than 3 days
-      const currentDate = new Date();
-      const thresholdUnixTime = currentDate.getTime() - 3 * 24 * 60 * 60; // 3 days in seconds
-      const recentUtxos = localUtxos.filter(
-        (utxo) => !utxo.spent || (utxo.spentUnixTime >= thresholdUnixTime && utxo.spent),
-      );
-
-      const filteredUtxos = this.filterAndRemoveDuplicateTxidsFromUtxos(recentUtxos);
-
-      const unspent = filteredUtxos
-        .filter((utxo) => !utxo.spent)
-        .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
 
       const key: keyof ChromeStorageObject = 'accounts';
       const update: Partial<ChromeStorageObject['accounts']> = {
         [account.addresses.identityAddress]: {
           ...account,
-          paymentUtxos: unspent,
+          paymentUtxos: explorerUtxos,
         },
       };
       await this.chromeStorageService.updateNested(key, update);
 
-      return unspent;
+      return explorerUtxos;
     } catch (error) {
       console.log(error);
       return [];

@@ -173,6 +173,8 @@ const createYoursMethod = <T, P = RequestParams>(type: YoursEventName) => {
 
 const createYoursEventEmitter = () => {
   const eventListeners = new Map<string, YoursEventListeners[]>(); // Object to store event listeners
+  //TODO: networkChanged event will no longer be used and should be replaced with accountChanged
+  // TODO: ensure these on events are still firing when they should
   const whitelistedEvents: YoursEvents[] = ['signedOut', 'networkChanged']; // Whitelisted event names
 
   const on = (eventName: YoursEvents, callback: YoursEventListeners) => {

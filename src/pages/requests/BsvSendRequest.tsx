@@ -155,8 +155,11 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     if (request.length > 0 && bsvSendAmount <= noApprovalLimit) {
       setHasSent(true);
 
-      setTimeout(() => {
-        processBsvSend();
+      setTimeout(async () => {
+        setIsProcessing(true);
+        await processBsvSend();
+        setIsProcessing(false);
+        await updateBsvBalance(true);
       }, 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

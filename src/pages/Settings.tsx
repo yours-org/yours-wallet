@@ -13,16 +13,13 @@ import { SpeedBump } from '../components/SpeedBump';
 import { ToggleSwitch } from '../components/ToggleSwitch';
 import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
-import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { WhitelistedApp } from '../inject';
 import { ColorThemeProps } from '../theme';
 import { sendMessage } from '../utils/chromeHelpers';
-import { SNACKBAR_TIMEOUT } from '../utils/constants';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
-import { NetWork } from 'yours-wallet-provider';
 
 const Content = styled.div`
   display: flex;
@@ -111,7 +108,6 @@ export const Settings = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
-  const { addSnackbar } = useSnackbar();
   const { chromeStorageService, keysService, lockWallet } = useServiceContext();
   const [page, setPage] = useState<SettingsPage>('main');
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
@@ -122,9 +118,10 @@ export const Settings = () => {
   const [shouldVisibleExportedKeys, setShouldVisibleExportedKeys] = useState(false);
   const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState(socialProfile.displayName);
   const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(socialProfile?.avatar);
-  const network = chromeStorageService.getNetwork();
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const noApprovalLimit = chromeStorageService.getCurrentAccountObject().account?.settings.noApprovalLimit ?? 0;
+  const [isPasswordRequired, setIsPasswordRequired] = useState(chromeStorageService.isPasswordRequired());
+  const [noApprovalLimit, setNoApprovalLimit] = useState(
+    chromeStorageService.getCurrentAccountObject().account?.settings.noApprovalLimit ?? 0,
+  );
 
   useEffect(() => {
     const getWhitelist = async (): Promise<WhitelistedApp[]> => {
@@ -262,36 +259,6 @@ export const Settings = () => {
     setSelected('settings');
   }, [setSelected]);
 
-  const handleNetworkChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newNetwork = e.target.checked ? ('testnet' as NetWork) : ('mainnet' as NetWork);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found');
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
-        ...account,
-        settings: {
-          ...account.settings,
-          network: newNetwork,
-        },
-      },
-    };
-    await chromeStorageService.updateNested(key, update);
-
-    // The provider relies on appState in local storage to accurately return addresses. This is an easy way to handle making sure the state is always up to date.
-    addSnackbar(`Switching to ${newNetwork}`, 'info');
-    setTimeout(() => {
-      window.location.reload();
-    }, SNACKBAR_TIMEOUT - 500);
-
-    sendMessage({
-      action: 'networkChanged',
-      params: {
-        network: newNetwork,
-      },
-    });
-  };
-
   const handleSpeedBumpConfirm = (password?: string) => {
     if (decisionType === 'sign-out') {
       signOut();
@@ -310,6 +277,7 @@ export const Settings = () => {
   };
 
   const handleUpdatePasswordRequirement = async (isRequired: boolean) => {
+    setIsPasswordRequired(isRequired);
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (!account) throw new Error('No account found');
     const key: keyof ChromeStorageObject = 'accounts';
@@ -323,6 +291,7 @@ export const Settings = () => {
   };
 
   const handleUpdateApprovalLimit = async (amount: number) => {
+    setNoApprovalLimit(amount);
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (!account) throw new Error('No account found');
     const key: keyof ChromeStorageObject = 'accounts';
@@ -351,13 +320,6 @@ export const Settings = () => {
         description="Manage your wallet preferences"
         onClick={() => setPage('preferences')}
         jsxElement={<ForwardButton />}
-      />
-      <SettingsRow
-        name="Testnet Mode"
-        description="Applies to balances and app connections"
-        jsxElement={
-          <ToggleSwitch theme={theme} on={network === ('testnet' as NetWork)} onChange={handleNetworkChange} />
-        }
       />
       <SettingsRow
         name="Export Keys"

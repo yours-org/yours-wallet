@@ -175,24 +175,6 @@ export class KeysService {
         this.identityPubKey = keys.identityPubKey;
       }
 
-      const key: keyof ChromeStorageObject = 'accounts';
-      const update: Partial<ChromeStorageObject['accounts']> = {
-        [this.identityAddress]: {
-          ...account,
-          addresses: {
-            bsvAddress: this.bsvAddress,
-            ordAddress: this.ordAddress,
-            identityAddress: this.identityAddress,
-          },
-          pubKeys: {
-            bsvPubKey: this.bsvPubKey,
-            ordPubKey: this.ordPubKey,
-            identityPubKey: this.identityPubKey,
-          },
-        },
-      };
-      await this.chromeStorageService.updateNested(key, update);
-
       if (!isPasswordRequired || isBelowNoApprovalLimit || password) {
         const isVerified = isBelowNoApprovalLimit || !isPasswordRequired || (await this.verifyPassword(password ?? ''));
         if (isVerified) {
