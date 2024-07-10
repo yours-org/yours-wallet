@@ -1,4 +1,5 @@
-import { Outpoint } from '../utils/outpoint';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { Outpoint } from '../../utils/outpoint';
 
 export interface Claim {
   sub: string;
@@ -123,4 +124,64 @@ export interface Inscription {
   text?: string;
   words?: string[];
   file: File;
+}
+
+export class InscriptionData {
+  type?: string = '';
+  data?: Buffer = Buffer.alloc(0);
+}
+
+export type OrdOperationResponse = {
+  txid?: string;
+  error?: string;
+};
+
+export type ChangeInfo = { change: number; changeVout: number };
+
+export type BuildAndBroadcastResponse = {
+  txid: string;
+  rawTx: string;
+  changeInfo: ChangeInfo;
+};
+
+export type GPArcResponse = {
+  blockHash: string;
+  blockHeight: number;
+  extraInfo: string;
+  status: number;
+  timestamp: string;
+  title: string;
+  txStatus: string;
+  txid: string;
+};
+
+export interface BSV20 {
+  id: string;
+  tick?: string;
+  sym?: string;
+  dec: number;
+  all: Balance;
+  listed: Balance;
+  icon?: string;
+}
+
+export interface Balance {
+  confirmed: bigint;
+  pending: bigint;
+}
+
+export type ListOrdinal = {
+  outpoint: string;
+  price: number;
+  password: string;
+};
+
+export interface BSV20Data {
+  initialized: boolean;
+  data: BSV20[];
+}
+
+export interface OrdinalData {
+  initialized: boolean;
+  data: OrdinalTxo[];
 }

@@ -1,9 +1,8 @@
 // ThemeContext.tsx
 import React, { ReactNode, createContext, useEffect, useState } from 'react';
-import { useOrds } from '../hooks/useOrds';
+import { useServiceContext } from '../hooks/useServiceContext';
 import { Theme, defaultTheme } from '../theme';
 import { whiteListedColorThemeCollections } from '../utils/constants';
-import { storage } from '../utils/storage';
 
 export interface ThemeContextProps {
   theme: Theme;
@@ -18,32 +17,33 @@ interface ThemeProviderProps {
 
 export const ThemeProvider = (props: ThemeProviderProps) => {
   const { children } = props;
-  const { ordinals } = useOrds();
   const [theme, setTheme] = useState<Theme>(defaultTheme);
+  const { chromeStorageService, ordinalService } = useServiceContext();
+  const ordinals = ordinalService.ordinals;
 
   useEffect(() => {
-    storage.get('colorTheme').then((result) => {
-      if (result.colorTheme) {
-        setTheme(result.colorTheme);
-      }
+    const { colorTheme } = chromeStorageService.getCurrentAccountObject();
+    if (colorTheme) {
+      setTheme(colorTheme);
+    }
 
-      if (!ordinals.initialized) return;
+    if (!ordinals.initialized) return;
 
-      const themeOrds = ordinals.data.filter((ord) =>
-        whiteListedColorThemeCollections.includes(ord.origin?.data?.map?.subTypeData?.collectionId),
-      );
+    const themeOrds = ordinals.data.filter((ord) =>
+      whiteListedColorThemeCollections.includes(ord.origin?.data?.map?.subTypeData?.collectionId),
+    );
 
-      if (themeOrds.length > 0) {
-        const themeOrd = themeOrds[0]; // User that holds multiple themes in wallet is not yet supported so will always use index 0
-        const colorTheme = JSON.parse(themeOrd.origin?.data?.map?.colorTheme) as Theme;
+    if (themeOrds.length > 0) {
+      const themeOrd = themeOrds[0]; // User that holds multiple themes in wallet is not yet supported so will always use index 0
+      const colorTheme = JSON.parse(themeOrd.origin?.data?.map?.colorTheme) as Theme;
 
-        setTheme(colorTheme);
-        storage.set({ colorTheme });
-      } else {
-        storage.remove('colorTheme');
-      }
-    });
-  }, [ordinals]);
+      setTheme(colorTheme);
+      chromeStorageService.update({ colorTheme });
+    } else {
+      chromeStorageService.remove('colorTheme');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 };

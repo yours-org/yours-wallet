@@ -8,16 +8,13 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useBsv } from '../../hooks/useBsv';
-import { useKeys } from '../../hooks/useKeys';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useAppStateContext } from '../../hooks/useAppStateContext';
+import { useServiceContext } from '../../hooks/useServiceContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { encryptUsingPrivKey } from '../../utils/crypto';
 import { getPrivateKeyFromTag, Keys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
-import { storage } from '../../utils/storage';
 
 export type EncryptResponse = {
   encryptedMessages: string[];
@@ -37,17 +34,16 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [encryptedMessages, setEncryptedMessages] = useState<string[] | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useAppStateContext();
-  const { retrieveKeys } = useKeys();
+  const { chromeStorageService, keysService } = useServiceContext();
   const [hasEncrypted, setHasEncrypted] = useState(false);
-
-  const { isProcessing, setIsProcessing } = useBsv();
+  const isPasswordRequired = chromeStorageService.isPasswordRequired();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    if (hasEncrypted || isPasswordRequired || !request || !retrieveKeys) return;
+    if (hasEncrypted || isPasswordRequired || !request) return;
     handleEncryption();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasEncrypted, isPasswordRequired, request, retrieveKeys]);
+  }, [hasEncrypted, isPasswordRequired, request]);
 
   useEffect(() => {
     setSelected('bsv');
@@ -77,7 +73,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
       return;
     }
 
-    const keys = (await retrieveKeys(passwordConfirm)) as Keys;
+    const keys = (await keysService.retrieveKeys(passwordConfirm)) as Keys;
 
     const PrivKey = getPrivateKeyFromTag(request.tag ?? { label: 'panda', id: 'identity', domain: '' }, keys);
 
@@ -107,7 +103,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
   };
 
   const clearRequest = async () => {
-    await storage.remove('encryptRequest');
+    await chromeStorageService.remove('encryptRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();
   };

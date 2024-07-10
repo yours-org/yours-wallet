@@ -10,8 +10,8 @@ import greenCheck from '../../assets/green-check.svg';
 import { ColorThemeProps } from '../../theme';
 import { RequestParams, WhitelistedApp } from '../../inject';
 import { sendMessage } from '../../utils/chromeHelpers';
-import { storage } from '../../utils/storage';
-import { useKeys } from '../../hooks/useKeys';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 
 const Container = styled.div`
   display: flex;
@@ -60,7 +60,8 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   const { theme } = useTheme();
   const context = useContext(BottomMenuContext);
   const { addSnackbar } = useSnackbar();
-  const { identityPubKey, bsvPubKey, ordPubKey } = useKeys();
+  const { keysService, chromeStorageService } = useServiceContext();
+  const { identityPubKey, bsvPubKey, ordPubKey, identityAddress } = keysService;
 
   useEffect(() => {
     if (!context) return;
@@ -83,15 +84,26 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   }, [request, identityPubKey, bsvPubKey, ordPubKey, onDecision]);
 
   const handleAccept = async () => {
-    await storage.set({
-      whitelist: [
-        ...whiteListedApps,
-        {
-          domain: request?.domain ?? '',
-          icon: request?.appIcon ?? '',
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) throw Error('No account found');
+    const { settings } = account;
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [identityAddress]: {
+        ...account,
+        settings: {
+          ...settings,
+          whitelist: [
+            ...whiteListedApps,
+            {
+              domain: request?.domain ?? '',
+              icon: request?.appIcon ?? '',
+            },
+          ],
         },
-      ],
-    });
+      },
+    };
+    await chromeStorageService.updateNested(key, update);
     sendMessage({
       action: 'userConnectResponse',
       decision: 'approved',

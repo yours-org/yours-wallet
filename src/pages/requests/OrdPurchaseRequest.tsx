@@ -8,16 +8,13 @@ import { Ordinal } from '../../components/Ordinal';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
-import { OrdinalTxo } from '../../hooks/ordTypes';
-import { useGorillaPool } from '../../hooks/useGorillaPool';
-import { useOrds } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useAppStateContext } from '../../hooks/useAppStateContext';
+import { useServiceContext } from '../../hooks/useServiceContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { BSV_DECIMAL_CONVERSION, GLOBAL_ORDERBOOK_MARKET_RATE, YOURS_DEV_WALLET } from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
-import { storage } from '../../utils/storage';
+import { OrdinalTxo } from '../../services/types/ordinal.types';
 
 export type OrdPurchaseRequestProps = {
   request: PurchaseOrdinal & { password?: string };
@@ -28,22 +25,26 @@ export type OrdPurchaseRequestProps = {
 export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
-  const { ordAddress, getOrdinals, isProcessing, purchaseGlobalOrderbookListing, setIsProcessing, getOrdinalsBaseUrl } =
-    useOrds();
-  const { getUtxoByOutpoint } = useGorillaPool();
+  // const { ordAddress, getOrdinals, isProcessing, purchaseGlobalOrderbookListing, setIsProcessing, getOrdinalsBaseUrl } =
+  //   useOrds();
+  // const { getUtxoByOutpoint } = useGorillaPool();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useAppStateContext();
+  const { gorillaPoolService, ordinalService, chromeStorageService, keysService } = useServiceContext();
+  const { ordAddress } = keysService;
   const [inscription, setInscription] = useState<OrdinalTxo | undefined>();
+  const [isProcessing, setIsProcessing] = useState(false);
   const marketplaceAddress = request.marketplaceAddress ?? YOURS_DEV_WALLET;
   const marketplaceRate = request.marketplaceRate ?? GLOBAL_ORDERBOOK_MARKET_RATE;
   const outpoint = request.outpoint;
+  const isPasswordRequired = chromeStorageService.isPasswordRequired();
+  const network = chromeStorageService.getNetwork();
 
   useEffect(() => {
     if (!request.outpoint) return;
     const getOrigin = async () => {
-      const res = await getUtxoByOutpoint(request.outpoint);
+      const res = await gorillaPoolService.getUtxoByOutpoint(request.outpoint);
       setInscription(res);
     };
 
@@ -55,10 +56,10 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     if (!successTxId) return;
     if (!message && ordAddress) {
       resetSendState();
-      getOrdinals();
+      ordinalService.getOrdinals(ordAddress);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successTxId, message, getOrdinals, ordAddress]);
+  }, [successTxId, message, ordAddress]);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -90,7 +91,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
       outpoint,
       password: passwordConfirm,
     };
-    const purchaseRes = await purchaseGlobalOrderbookListing(purchaseListing);
+    const purchaseRes = await ordinalService.purchaseGlobalOrderbookListing(purchaseListing);
 
     if (!purchaseRes.txid || purchaseRes.error) {
       const message =
@@ -118,7 +119,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   };
 
   const clearRequest = async () => {
-    await storage.remove('purchaseOrdinalRequest');
+    await chromeStorageService.remove('purchaseOrdinalRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();
   };
@@ -136,7 +137,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
           <Ordinal
             inscription={inscription as OrdinalTxo}
             theme={theme}
-            url={`${getOrdinalsBaseUrl()}/content/${inscription?.origin?.outpoint.toString()}`}
+            url={`${gorillaPoolService.getBaseUrl(network)}/content/${inscription?.origin?.outpoint.toString()}`}
             selected={true}
           />
           <FormContainer noValidate onSubmit={(e) => handlePurchaseOrdinal(e)}>

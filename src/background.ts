@@ -29,8 +29,15 @@ import {
 import { EncryptResponse } from './pages/requests/EncryptRequest';
 import { DecryptResponse } from './pages/requests/DecryptRequest';
 import { launchPopUp, removeWindow } from './utils/chromeHelpers';
-import { storage } from './utils/storage';
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
+import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
+import { ChromeStorageService } from './services/ChromeStorage.service';
+import { BlockHeaderService } from './services/block-headers';
+const chromeStorageService = new ChromeStorageService();
+chromeStorageService.getStorage();
+
+const blockHeaderService = new BlockHeaderService();
+blockHeaderService.syncBlocks();
 
 console.log('Yours Wallet Background Script Running!');
 
@@ -53,7 +60,9 @@ let popupWindowId: number | undefined;
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 const verifyAccess = async (requestingDomain: string): Promise<boolean> => {
-  const { whitelist } = (await storage.get('whitelist')) as { whitelist: WhitelistedApp[] };
+  const { accounts, selectedAccount } = (await chromeStorageService.getStorage()) as ChromeStorageObject;
+  if (!accounts || !selectedAccount) return false;
+  const whitelist = accounts[selectedAccount].settings.whitelist;
   if (!whitelist) return false;
   return whitelist.map((i: WhitelistedApp) => i.domain).includes(requestingDomain);
 };
@@ -201,9 +210,9 @@ const processConnectRequest = (
   isAuthorized: boolean,
 ) => {
   responseCallbackForConnectRequest = sendResponse;
-  chrome.storage.local
-    .set({
-      connectRequest: { ...message.params, isAuthorized },
+  chromeStorageService
+    .update({
+      connectRequest: { ...message.params, isAuthorized } as ConnectRequest,
     })
     .then(() => {
       launchPopUp();
@@ -214,13 +223,24 @@ const processConnectRequest = (
 
 const processDisconnectRequest = (message: { params: { domain: string } }, sendResponse: CallbackResponse) => {
   try {
-    chrome.storage.local.get(['whitelist'], (result) => {
-      if (!result.whitelist) throw Error('Already disconnected!');
+    chromeStorageService.getStorage().then(() => {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) throw Error('No account found!');
+      const { whitelist } = account.settings;
+      if (!whitelist) throw Error('Already disconnected!');
       const { params } = message;
-
-      const updatedWhitelist = result.whitelist?.filter((i: { domain: string }) => i.domain !== params.domain);
-
-      chrome.storage.local.set({ whitelist: updatedWhitelist }, () => {
+      const updatedWhitelist = whitelist.filter((i: { domain: string }) => i.domain !== params.domain);
+      const key: keyof ChromeStorageObject = 'accounts';
+      const update: Partial<ChromeStorageObject['accounts']> = {
+        [account.addresses.identityAddress]: {
+          ...account,
+          settings: {
+            ...account.settings,
+            whitelist: updatedWhitelist,
+          },
+        },
+      };
+      chromeStorageService.updateNested(key, update).then(() => {
         sendResponse({
           type: YoursEventName.DISCONNECT,
           success: true,
@@ -239,7 +259,9 @@ const processDisconnectRequest = (message: { params: { domain: string } }, sendR
 
 const processIsConnectedRequest = (params: { domain: string }, sendResponse: CallbackResponse) => {
   try {
-    chrome.storage.local.get(['appState', 'lastActiveTime', 'whitelist'], (result) => {
+    chromeStorageService.getStorage().then(() => {
+      const result = chromeStorageService.getCurrentAccountObject();
+      if (!result?.account) throw Error('No account found!');
       const currentTime = Date.now();
       const lastActiveTime = result.lastActiveTime;
 
@@ -247,9 +269,9 @@ const processIsConnectedRequest = (params: { domain: string }, sendResponse: Cal
         type: YoursEventName.IS_CONNECTED,
         success: true,
         data:
-          !result?.appState?.isLocked &&
-          currentTime - lastActiveTime < INACTIVITY_LIMIT &&
-          result.whitelist?.map((i: { domain: string }) => i.domain).includes(params.domain),
+          !result.isLocked &&
+          currentTime - Number(lastActiveTime) < INACTIVITY_LIMIT &&
+          result.account.settings.whitelist?.map((i: { domain: string }) => i.domain).includes(params.domain),
       });
     });
   } catch (error) {
@@ -265,11 +287,13 @@ const processIsConnectedRequest = (params: { domain: string }, sendResponse: Cal
 
 const processGetBalanceRequest = (sendResponse: CallbackResponse) => {
   try {
-    chrome.storage.local.get(['appState'], (result) => {
+    chromeStorageService.getStorage().then(() => {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) throw Error('No account found!');
       sendResponse({
         type: YoursEventName.GET_BALANCE,
         success: true,
-        data: result?.appState?.balance,
+        data: account.balance,
       });
     });
   } catch (error) {
@@ -283,11 +307,13 @@ const processGetBalanceRequest = (sendResponse: CallbackResponse) => {
 
 const processGetPubKeysRequest = (sendResponse: CallbackResponse) => {
   try {
-    chrome.storage.local.get(['appState'], (result) => {
+    chromeStorageService.getStorage().then(() => {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) throw Error('No account found!');
       sendResponse({
         type: YoursEventName.GET_PUB_KEYS,
         success: true,
-        data: result?.appState?.pubKeys,
+        data: account.pubKeys,
       });
     });
   } catch (error) {
@@ -301,11 +327,13 @@ const processGetPubKeysRequest = (sendResponse: CallbackResponse) => {
 
 const processGetAddressesRequest = (sendResponse: CallbackResponse) => {
   try {
-    chrome.storage.local.get(['appState'], (result) => {
+    chromeStorageService.getStorage().then(() => {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) throw Error('No account found!');
       sendResponse({
         type: YoursEventName.GET_ADDRESSES,
         success: true,
-        data: result?.appState?.addresses,
+        data: account.addresses,
       });
     });
   } catch (error) {
@@ -319,11 +347,13 @@ const processGetAddressesRequest = (sendResponse: CallbackResponse) => {
 
 const processGetNetworkRequest = (sendResponse: CallbackResponse) => {
   try {
-    chrome.storage.local.get(['appState'], (result) => {
+    chromeStorageService.getStorage().then(() => {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) throw Error('No account found!');
       sendResponse({
         type: YoursEventName.GET_NETWORK,
         success: true,
-        data: result?.appState?.network ?? 'mainnet',
+        data: account.settings?.network ?? 'mainnet',
       });
     });
   } catch (error) {
@@ -337,11 +367,13 @@ const processGetNetworkRequest = (sendResponse: CallbackResponse) => {
 
 const processGetOrdinalsRequest = (sendResponse: CallbackResponse) => {
   try {
-    chrome.storage.local.get(['appState'], (result) => {
+    chromeStorageService.getStorage().then(() => {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) throw Error('No account found!');
       sendResponse({
         type: YoursEventName.GET_ORDINALS,
         success: true,
-        data: result?.appState?.ordinals ?? [],
+        data: account.ordinals ?? [],
       });
     });
   } catch (error) {
@@ -354,9 +386,10 @@ const processGetOrdinalsRequest = (sendResponse: CallbackResponse) => {
 };
 
 const processGetExchangeRate = (sendResponse: CallbackResponse) => {
-  chrome.storage.local.get(['exchangeRateCache'], async (data) => {
-    try {
-      const { exchangeRateCache } = data;
+  try {
+    chromeStorageService.getStorage().then(async (res) => {
+      if (!res) throw Error('Could not get storage!');
+      const { exchangeRateCache } = res;
       if (exchangeRateCache?.rate && Date.now() - exchangeRateCache.timestamp < 5 * 60 * 1000) {
         sendResponse({
           type: YoursEventName.GET_EXCHANGE_RATE,
@@ -371,7 +404,7 @@ const processGetExchangeRate = (sendResponse: CallbackResponse) => {
         const data = await res.json();
         const rate = data.rate;
         const currentTime = Date.now();
-        chrome.storage.local.set({
+        chromeStorageService.update({
           exchangeRateCache: { rate, timestamp: currentTime },
         });
         sendResponse({
@@ -380,19 +413,22 @@ const processGetExchangeRate = (sendResponse: CallbackResponse) => {
           data: Number(rate.toFixed(2)),
         });
       }
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GET_EXCHANGE_RATE,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  });
+    });
+  } catch (error) {
+    sendResponse({
+      type: YoursEventName.GET_EXCHANGE_RATE,
+      success: false,
+      error: JSON.stringify(error),
+    });
+  }
 };
 
 const processGetPaymentUtxos = async (sendResponse: CallbackResponse) => {
   try {
-    chrome.storage.local.get(['paymentUtxos'], ({ paymentUtxos }) => {
+    chromeStorageService.getStorage().then(() => {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) throw Error('No account found!');
+      const paymentUtxos = account.paymentUtxos;
       sendResponse({
         type: YoursEventName.GET_PAYMENT_UTXOS,
         success: true,
@@ -449,7 +485,7 @@ const processSendBsvRequest = (message: { params: { data: SendBsv[] } }, sendRes
       });
     }
 
-    chrome.storage.local.set({ sendBsvRequest }).then(() => {
+    chromeStorageService.update({ sendBsvRequest }).then(() => {
       launchPopUp();
     });
   } catch (error) {
@@ -472,8 +508,8 @@ const processTransferOrdinalRequest = (message: { params: TransferOrdinal }, sen
   }
   try {
     responseCallbackForTransferOrdinalRequest = sendResponse;
-    chrome.storage.local
-      .set({
+    chromeStorageService
+      .update({
         transferOrdinalRequest: message.params,
       })
       .then(() => {
@@ -499,8 +535,8 @@ const processPurchaseOrdinalRequest = (message: { params: PurchaseOrdinal }, sen
   }
   try {
     responseCallbackForPurchaseOrdinalRequest = sendResponse;
-    chrome.storage.local
-      .set({
+    chromeStorageService
+      .update({
         purchaseOrdinalRequest: message.params,
       })
       .then(() => {
@@ -526,8 +562,8 @@ const processBroadcastRequest = (message: { params: Broadcast }, sendResponse: C
   }
   try {
     responseCallbackForBroadcastRequest = sendResponse;
-    chrome.storage.local
-      .set({
+    chromeStorageService
+      .update({
         broadcastRequest: message.params,
       })
       .then(() => {
@@ -553,8 +589,8 @@ const processSignMessageRequest = (message: { params: SignMessage }, sendRespons
   }
   try {
     responseCallbackForSignMessageRequest = sendResponse;
-    chrome.storage.local
-      .set({
+    chromeStorageService
+      .update({
         signMessageRequest: message.params,
       })
       .then(() => {
@@ -582,8 +618,8 @@ const processGetSignaturesRequest = (message: { params: GetSignatures }, sendRes
   }
   try {
     responseCallbackForGetSignaturesRequest = sendResponse;
-    chrome.storage.local
-      .set({
+    chromeStorageService
+      .update({
         getSignaturesRequest: {
           rawtx: message.params.rawtx,
           sigRequests: message.params.sigRequests,
@@ -604,9 +640,11 @@ const processGetSignaturesRequest = (message: { params: GetSignatures }, sendRes
 const processGetSocialProfileRequest = (sendResponse: CallbackResponse) => {
   const HOSTED_YOURS_IMAGE = 'https://i.ibb.co/zGcthBv/yours-org-light.png';
   try {
-    chrome.storage.local.get(['socialProfile'], (result) => {
-      const displayName = result?.socialProfile?.displayName ? result.socialProfile.displayName : 'Anon Panda';
-      const avatar = result?.socialProfile?.avatar ? result.socialProfile.avatar : HOSTED_YOURS_IMAGE;
+    chromeStorageService.getStorage().then(() => {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) throw Error('No account found!');
+      const displayName = account.socialProfile?.displayName ? account.socialProfile.displayName : 'Anon Panda';
+      const avatar = account.socialProfile?.avatar ? account.socialProfile.avatar : HOSTED_YOURS_IMAGE;
       sendResponse({
         type: YoursEventName.GET_SOCIAL_PROFILE,
         success: true,
@@ -636,8 +674,8 @@ const processGenerateTaggedKeysRequest = (
   }
   try {
     responseCallbackForGenerateTaggedKeysRequest = sendResponse;
-    chrome.storage.local
-      .set({
+    chromeStorageService
+      .update({
         generateTaggedKeysRequest: message.params,
       })
       .then(() => {
@@ -665,37 +703,38 @@ const processGetTaggedKeys = async (
     return;
   }
   try {
-    chrome.storage.local.get(
-      ['derivationTags', 'appState', 'lastActiveTime'],
-      ({ derivationTags, appState, lastActiveTime }) => {
-        const currentTime = Date.now();
-        if (appState?.isLocked || currentTime - lastActiveTime > INACTIVITY_LIMIT) {
-          sendResponse({
-            type: YoursEventName.GET_TAGGED_KEYS,
-            success: false,
-            error: 'Unauthorized! Yours Wallet is locked.',
-          });
-        }
-
-        let returnData =
-          derivationTags.length > 0
-            ? derivationTags?.filter(
-                (res: TaggedDerivationResponse) =>
-                  res.tag.label === message.params.label && res.tag.domain === message.params.domain,
-              )
-            : [];
-
-        if (returnData.length > 0 && (message?.params?.ids?.length ?? 0 > 0)) {
-          returnData = returnData?.filter((d: TaggedDerivationResponse) => message?.params?.ids?.includes(d.tag.id));
-        }
-
+    chromeStorageService.getStorage().then((res) => {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!res || !account) throw Error('No account found!');
+      const { lastActiveTime, isLocked } = res;
+      const { derivationTags } = account;
+      const currentTime = Date.now();
+      if (isLocked || currentTime - Number(lastActiveTime) > INACTIVITY_LIMIT) {
         sendResponse({
           type: YoursEventName.GET_TAGGED_KEYS,
-          success: true,
-          data: returnData,
+          success: false,
+          error: 'Unauthorized! Yours Wallet is locked.',
         });
-      },
-    );
+      }
+
+      let returnData =
+        derivationTags.length > 0
+          ? derivationTags?.filter(
+              (res: TaggedDerivationResponse) =>
+                res.tag.label === message.params.label && res.tag.domain === message.params.domain,
+            )
+          : [];
+
+      if (returnData.length > 0 && (message?.params?.ids?.length ?? 0 > 0)) {
+        returnData = returnData?.filter((d: TaggedDerivationResponse) => message?.params?.ids?.includes(d.tag.id));
+      }
+
+      sendResponse({
+        type: YoursEventName.GET_TAGGED_KEYS,
+        success: true,
+        data: returnData,
+      });
+    });
   } catch (error) {
     sendResponse({
       type: YoursEventName.GET_TAGGED_KEYS,
@@ -716,8 +755,8 @@ const processEncryptRequest = (message: { params: EncryptRequest }, sendResponse
   }
   try {
     responseCallbackForEncryptRequest = sendResponse;
-    chrome.storage.local
-      .set({
+    chromeStorageService
+      .update({
         encryptRequest: message.params,
       })
       .then(() => {
@@ -745,8 +784,8 @@ const processDecryptRequest = (message: { params: DecryptRequest }, sendResponse
   }
   try {
     responseCallbackForDecryptRequest = sendResponse;
-    chrome.storage.local
-      .set({
+    chromeStorageService
+      .update({
         decryptRequest: message.params,
       })
       .then(() => {
@@ -776,11 +815,11 @@ const cleanup = (types: YoursEventName[]) => {
   responseCallbackForGenerateTaggedKeysRequest = null;
   responseCallbackForEncryptRequest = null;
   responseCallbackForDecryptRequest = null;
-  chrome.storage.local.get('popupWindowId').then((res) => {
-    if (res.popupWindowId) removeWindow(res.popupWindowId);
+  chromeStorageService.getStorage().then((res) => {
+    if (res?.popupWindowId) removeWindow(res.popupWindowId);
   });
   popupWindowId = undefined;
-  chrome.storage.local.remove([...types, 'popupWindowId']);
+  chromeStorageService.remove([...types, 'popupWindowId']);
 };
 
 const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys }) => {
@@ -1024,7 +1063,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         error: 'User dismissed the request!',
       });
       responseCallbackForConnectRequest = null;
-      chrome.storage.local.remove('connectRequest');
+      chromeStorageService.remove('connectRequest');
     }
 
     if (responseCallbackForSendBsvRequest) {
@@ -1034,7 +1073,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         error: 'User dismissed the request!',
       });
       responseCallbackForSendBsvRequest = null;
-      chrome.storage.local.remove('sendBsvRequest');
+      chromeStorageService.remove('sendBsvRequest');
     }
 
     if (responseCallbackForSignMessageRequest) {
@@ -1044,7 +1083,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         error: 'User dismissed the request!',
       });
       responseCallbackForSignMessageRequest = null;
-      chrome.storage.local.remove('signMessageRequest');
+      chromeStorageService.remove('signMessageRequest');
     }
 
     if (responseCallbackForTransferOrdinalRequest) {
@@ -1054,7 +1093,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         error: 'User dismissed the request!',
       });
       responseCallbackForTransferOrdinalRequest = null;
-      chrome.storage.local.remove('transferOrdinalRequest');
+      chromeStorageService.remove('transferOrdinalRequest');
     }
 
     if (responseCallbackForPurchaseOrdinalRequest) {
@@ -1064,7 +1103,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         error: 'User dismissed the request!',
       });
       responseCallbackForPurchaseOrdinalRequest = null;
-      chrome.storage.local.remove('purchaseOrdinalRequest');
+      chromeStorageService.remove('purchaseOrdinalRequest');
     }
 
     if (responseCallbackForBroadcastRequest) {
@@ -1074,7 +1113,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         error: 'User dismissed the request!',
       });
       responseCallbackForBroadcastRequest = null;
-      chrome.storage.local.remove('broadcastRequest');
+      chromeStorageService.remove('broadcastRequest');
     }
 
     if (responseCallbackForGetSignaturesRequest) {
@@ -1084,7 +1123,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         error: 'User dismissed the request!',
       });
       responseCallbackForGetSignaturesRequest = null;
-      chrome.storage.local.remove('getSignaturesRequest');
+      chromeStorageService.remove('getSignaturesRequest');
     }
 
     if (responseCallbackForGenerateTaggedKeysRequest) {
@@ -1094,7 +1133,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         error: 'User dismissed the request!',
       });
       responseCallbackForGenerateTaggedKeysRequest = null;
-      chrome.storage.local.remove('generateTaggedKeysRequest');
+      chromeStorageService.remove('generateTaggedKeysRequest');
     }
 
     if (responseCallbackForEncryptRequest) {
@@ -1104,7 +1143,7 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         error: 'User dismissed the request!',
       });
       responseCallbackForEncryptRequest = null;
-      chrome.storage.local.remove('encryptRequest');
+      chromeStorageService.remove('encryptRequest');
     }
 
     if (responseCallbackForDecryptRequest) {
@@ -1114,10 +1153,10 @@ chrome.windows.onRemoved.addListener((closedWindowId) => {
         error: 'User dismissed the request!',
       });
       responseCallbackForDecryptRequest = null;
-      chrome.storage.local.remove('decryptRequest');
+      chromeStorageService.remove('decryptRequest');
     }
 
     popupWindowId = undefined;
-    chrome.storage.local.remove('popupWindowId');
+    chromeStorageService.remove('popupWindowId');
   }
 });

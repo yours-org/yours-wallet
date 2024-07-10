@@ -7,16 +7,13 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useBsv } from '../../hooks/useBsv';
-import { useKeys } from '../../hooks/useKeys';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useAppStateContext } from '../../hooks/useAppStateContext';
+import { useServiceContext } from '../../hooks/useServiceContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { decryptUsingPrivKey } from '../../utils/crypto';
 import { getPrivateKeyFromTag, Keys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
-import { storage } from '../../utils/storage';
 
 export type DecryptResponse = {
   decryptedMessages: string[];
@@ -36,16 +33,16 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [decryptedMessages, setDecryptedMessages] = useState<string[] | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useAppStateContext();
-  const { retrieveKeys } = useKeys();
+  const { chromeStorageService, keysService } = useServiceContext();
   const [hasDecrypted, setHasDecrypted] = useState(false);
-  const { isProcessing, setIsProcessing } = useBsv();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const isPasswordRequired = chromeStorageService.isPasswordRequired();
 
   useEffect(() => {
-    if (hasDecrypted || isPasswordRequired || !request || !retrieveKeys) return;
+    if (hasDecrypted || isPasswordRequired || !request) return;
     handleDecryption();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasDecrypted, isPasswordRequired, request, retrieveKeys]);
+  }, [hasDecrypted, isPasswordRequired, request]);
 
   useEffect(() => {
     setSelected('bsv');
@@ -75,7 +72,7 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
       return;
     }
 
-    const keys = (await retrieveKeys(passwordConfirm)) as Keys;
+    const keys = (await keysService.retrieveKeys(passwordConfirm)) as Keys;
     const PrivKey = getPrivateKeyFromTag(request.tag ?? { label: 'panda', id: 'identity', domain: '' }, keys);
 
     const decrypted = decryptUsingPrivKey(request.messages, PrivKey);
@@ -99,7 +96,7 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
   };
 
   const clearRequest = async () => {
-    await storage.remove('decryptRequest');
+    await chromeStorageService.remove('decryptRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();
   };
