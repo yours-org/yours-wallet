@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { P2PKHAddress, PrivateKey, Transaction, TxOut } from 'bsv-wasm-web';
-import { DerivationTag, NetWork, TaggedDerivationResponse } from 'yours-wallet-provider';
+import { Bsv20, BSV20Txo, DerivationTag, NetWork, Ordinal, TaggedDerivationResponse } from 'yours-wallet-provider';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL, JUNGLE_BUS_URL } from '../utils/constants';
 import { decryptUsingPrivKey } from '../utils/crypto';
@@ -15,7 +15,7 @@ import {
   MarketResponse,
   Token,
 } from './types/gorillaPool.types';
-import { BSV20, BSV20Txo, OrdinalResponse, OrdinalTxo } from './types/ordinal.types';
+import { OrdinalResponse } from './types/ordinal.types';
 import { ChromeStorageService } from './ChromeStorage.service';
 
 export class GorillaPoolService {
@@ -28,7 +28,7 @@ export class GorillaPoolService {
     try {
       const network = this.chromeStorageService.getNetwork();
       if (!isAddressOnRightNetwork(network, ordAddress)) return [];
-      const { data } = await axios.get<OrdinalTxo[]>(
+      const { data } = await axios.get<Ordinal[]>(
         `${this.getBaseUrl(network)}/api/txos/address/${ordAddress}/unspent?limit=1500&offset=0`,
       );
       return data;
@@ -71,11 +71,11 @@ export class GorillaPoolService {
     }
   };
 
-  getUtxoByOutpoint = async (outpoint: string): Promise<OrdinalTxo> => {
+  getUtxoByOutpoint = async (outpoint: string): Promise<Ordinal> => {
     try {
       const network = this.chromeStorageService.getNetwork();
       const { data } = await axios.get(`${this.getBaseUrl(network)}/api/txos/${outpoint}?script=true`);
-      const ordUtxo: OrdinalTxo = data;
+      const ordUtxo: Ordinal = data;
       if (!ordUtxo.script) throw Error('No script when fetching by outpoint');
       ordUtxo.script = Buffer.from(ordUtxo.script, 'base64').toString('hex');
       return ordUtxo;
@@ -88,7 +88,7 @@ export class GorillaPoolService {
     try {
       const network = this.chromeStorageService.getNetwork();
       const res = await axios.get(`${this.getBaseUrl(network)}/api/inscriptions/${outpoint}?script=true`);
-      const data = res.data as OrdinalTxo;
+      const data = res.data as Ordinal;
       if (!data?.script || !data.origin?.outpoint.toString()) throw new Error('Could not get listing script');
       return { script: data.script, origin: data.origin.outpoint.toString() };
     } catch (error) {
@@ -101,7 +101,7 @@ export class GorillaPoolService {
     if (!isAddressOnRightNetwork(network, ordAddress)) return [];
     const res = await axios.get(`${this.getBaseUrl(network)}/api/bsv20/${ordAddress}/balance`);
 
-    const bsv20List: Array<BSV20> = res.data.map(
+    const bsv20List: Array<Bsv20> = res.data.map(
       (b: {
         all: {
           confirmed: string;
@@ -186,7 +186,7 @@ export class GorillaPoolService {
       const { data } = await axios.get(
         `${this.getBaseUrl(network)}/api/locks/address/${address}/unspent?limit=100&offset=0`,
       );
-      const lockedUtxos: OrdinalTxo[] = data;
+      const lockedUtxos: Ordinal[] = data;
       return lockedUtxos.filter((utxo) => !utxo.data?.bsv20);
     } catch (e) {
       throw new Error(JSON.stringify(e));

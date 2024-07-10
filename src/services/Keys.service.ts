@@ -175,24 +175,6 @@ export class KeysService {
         this.identityPubKey = keys.identityPubKey;
       }
 
-      const key: keyof ChromeStorageObject = 'accounts';
-      const update: Partial<ChromeStorageObject['accounts']> = {
-        [this.identityAddress]: {
-          ...account,
-          addresses: {
-            bsvAddress: this.bsvAddress,
-            ordAddress: this.ordAddress,
-            identityAddress: this.identityAddress,
-          },
-          pubKeys: {
-            bsvPubKey: this.bsvPubKey,
-            ordPubKey: this.ordPubKey,
-            identityPubKey: this.identityPubKey,
-          },
-        },
-      };
-      await this.chromeStorageService.updateNested(key, update);
-
       if (!isPasswordRequired || isBelowNoApprovalLimit || password) {
         const isVerified = isBelowNoApprovalLimit || !isPasswordRequired || (await this.verifyPassword(password ?? ''));
         if (isVerified) {
@@ -210,20 +192,19 @@ export class KeysService {
         };
       }
     } catch (error) {
-      throw new Error(JSON.stringify(error));
+      console.error('Error in retrieveKeys:', error);
+      throw new Error('Failed to retrieve keys');
     }
   };
 
   verifyPassword = async (password: string): Promise<boolean> => {
     const isRequired = this.chromeStorageService.isPasswordRequired();
     if (!isRequired) return true;
-    const result = await this.chromeStorageService.getStorage();
-    if (!result) return false;
-    const { salt, passKey } = result;
+    const { salt, passKey } = this.chromeStorageService.getCurrentAccountObject();
     if (!salt || !passKey) return false;
     try {
       const derivedKey = deriveKey(password, salt);
-      return derivedKey === result.passKey;
+      return derivedKey === passKey;
     } catch (error) {
       return false;
     }

@@ -38,7 +38,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     if (!successTxId) return;
     if (!message && ordAddress) {
       resetSendState();
-      ordinalService.getOrdinals(ordAddress);
+      ordinalService.getAndSetOrdinals(ordAddress);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, ordAddress]);
@@ -109,7 +109,9 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Ordinal
-            inscription={ordinalService.ordinals.data.filter((ord) => ord.outpoint.toString() === request.outpoint)[0]}
+            inscription={
+              ordinalService.getOrdinals().data.filter((ord) => ord.outpoint.toString() === request.outpoint)[0]
+            }
             theme={theme}
             url={`${gorillaPoolService.getBaseUrl(network)}/content/${request.origin}`}
             selected={true}

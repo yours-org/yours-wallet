@@ -28,16 +28,12 @@ import {
 } from './inject';
 import { EncryptResponse } from './pages/requests/EncryptRequest';
 import { DecryptResponse } from './pages/requests/DecryptRequest';
-import { launchPopUp, removeWindow } from './utils/chromeHelpers';
+import { removeWindow } from './utils/chromeHelpers';
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { BlockHeaderService } from './services/block-headers';
 const chromeStorageService = new ChromeStorageService();
-chromeStorageService.getStorage();
-
-const blockHeaderService = new BlockHeaderService();
-blockHeaderService.syncBlocks();
+chromeStorageService.getAndSetStorage();
 
 console.log('Yours Wallet Background Script Running!');
 
@@ -59,8 +55,27 @@ let popupWindowId: number | undefined;
 
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
+const launchPopUp = () => {
+  chrome.windows.create(
+    {
+      url: chrome.runtime.getURL('index.html'),
+      type: 'popup',
+      width: 360,
+      height: 567,
+    },
+    (window) => {
+      popupWindowId = window?.id;
+      if (popupWindowId) {
+        chrome.storage.local.set({
+          popupWindowId,
+        });
+      }
+    },
+  );
+};
+
 const verifyAccess = async (requestingDomain: string): Promise<boolean> => {
-  const { accounts, selectedAccount } = (await chromeStorageService.getStorage()) as ChromeStorageObject;
+  const { accounts, selectedAccount } = (await chromeStorageService.getAndSetStorage()) as ChromeStorageObject;
   if (!accounts || !selectedAccount) return false;
   const whitelist = accounts[selectedAccount].settings.whitelist;
   if (!whitelist) return false;
@@ -68,7 +83,6 @@ const verifyAccess = async (requestingDomain: string): Promise<boolean> => {
 };
 
 const authorizeRequest = async (message: { params: { domain: string } }): Promise<boolean> => {
-  console.log('authorizeRequest', message);
   const { params } = message;
   return await verifyAccess(params.domain);
 };
@@ -98,7 +112,6 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
       case YoursEventName.IS_CONNECTED:
         return processIsConnectedRequest(message.params as { domain: string }, sendResponse);
       case YoursEventName.USER_CONNECT_RESPONSE:
-        console.log('USER_CONNECT_RESPONSE', message);
         return processConnectResponse(message as { decision: Decision; pubKeys: PubKeys });
       case YoursEventName.SEND_BSV_RESPONSE:
         return processSendBsvResponse(message as SendBsvResponse);
@@ -153,6 +166,7 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
       case YoursEventName.GET_ORDINALS:
         return processGetOrdinalsRequest(sendResponse);
       case YoursEventName.SEND_BSV:
+      case YoursEventName.INSCRIBE: // We use the sendBsv functionality here
         return processSendBsvRequest(message, sendResponse);
       case YoursEventName.TRANSFER_ORDINAL:
         return processTransferOrdinalRequest(message, sendResponse);
@@ -174,8 +188,6 @@ chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: Callba
         return processGenerateTaggedKeysRequest(message, sendResponse);
       case YoursEventName.GET_TAGGED_KEYS:
         return processGetTaggedKeys(message, sendResponse);
-      case YoursEventName.INSCRIBE:
-        return processSendBsvRequest(message, sendResponse);
       case YoursEventName.ENCRYPT:
         return processEncryptRequest(message, sendResponse);
       case YoursEventName.DECRYPT:
@@ -223,7 +235,7 @@ const processConnectRequest = (
 
 const processDisconnectRequest = (message: { params: { domain: string } }, sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       const { whitelist } = account.settings;
@@ -259,7 +271,7 @@ const processDisconnectRequest = (message: { params: { domain: string } }, sendR
 
 const processIsConnectedRequest = (params: { domain: string }, sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const result = chromeStorageService.getCurrentAccountObject();
       if (!result?.account) throw Error('No account found!');
       const currentTime = Date.now();
@@ -287,7 +299,7 @@ const processIsConnectedRequest = (params: { domain: string }, sendResponse: Cal
 
 const processGetBalanceRequest = (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       sendResponse({
@@ -307,7 +319,7 @@ const processGetBalanceRequest = (sendResponse: CallbackResponse) => {
 
 const processGetPubKeysRequest = (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       sendResponse({
@@ -327,7 +339,7 @@ const processGetPubKeysRequest = (sendResponse: CallbackResponse) => {
 
 const processGetAddressesRequest = (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       sendResponse({
@@ -347,7 +359,7 @@ const processGetAddressesRequest = (sendResponse: CallbackResponse) => {
 
 const processGetNetworkRequest = (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       sendResponse({
@@ -367,7 +379,7 @@ const processGetNetworkRequest = (sendResponse: CallbackResponse) => {
 
 const processGetOrdinalsRequest = (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       sendResponse({
@@ -387,7 +399,7 @@ const processGetOrdinalsRequest = (sendResponse: CallbackResponse) => {
 
 const processGetExchangeRate = (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(async (res) => {
+    chromeStorageService.getAndSetStorage().then(async (res) => {
       if (!res) throw Error('Could not get storage!');
       const { exchangeRateCache } = res;
       if (exchangeRateCache?.rate && Date.now() - exchangeRateCache.timestamp < 5 * 60 * 1000) {
@@ -425,7 +437,7 @@ const processGetExchangeRate = (sendResponse: CallbackResponse) => {
 
 const processGetPaymentUtxos = async (sendResponse: CallbackResponse) => {
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       const paymentUtxos = account.paymentUtxos;
@@ -456,7 +468,11 @@ const processGetPaymentUtxos = async (sendResponse: CallbackResponse) => {
   }
 };
 
-const processSendBsvRequest = (message: { params: { data: SendBsv[] } }, sendResponse: CallbackResponse) => {
+// Important note: We process the InscribeRequest as a SendBsv request.
+const processSendBsvRequest = (
+  message: { params: { data: SendBsv[] | InscribeRequest[] } },
+  sendResponse: CallbackResponse,
+) => {
   if (!message.params.data) {
     sendResponse({
       type: YoursEventName.SEND_BSV,
@@ -467,7 +483,7 @@ const processSendBsvRequest = (message: { params: { data: SendBsv[] } }, sendRes
   }
   try {
     responseCallbackForSendBsvRequest = sendResponse;
-    let sendBsvRequest = message.params.data;
+    let sendBsvRequest = message.params.data as SendBsv[];
 
     // If in this if block, it's an inscribe() request.
     const inscribeRequest = message.params.data as InscribeRequest[];
@@ -481,7 +497,7 @@ const processSendBsvRequest = (message: { params: { data: SendBsv[] } }, sendRes
             map: d.map,
           },
           satoshis: d.satoshis ?? 1,
-        };
+        } as SendBsv;
       });
     }
 
@@ -640,7 +656,7 @@ const processGetSignaturesRequest = (message: { params: GetSignatures }, sendRes
 const processGetSocialProfileRequest = (sendResponse: CallbackResponse) => {
   const HOSTED_YOURS_IMAGE = 'https://i.ibb.co/zGcthBv/yours-org-light.png';
   try {
-    chromeStorageService.getStorage().then(() => {
+    chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
       const displayName = account.socialProfile?.displayName ? account.socialProfile.displayName : 'Anon Panda';
@@ -703,7 +719,7 @@ const processGetTaggedKeys = async (
     return;
   }
   try {
-    chromeStorageService.getStorage().then((res) => {
+    chromeStorageService.getAndSetStorage().then((res) => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!res || !account) throw Error('No account found!');
       const { lastActiveTime, isLocked } = res;
@@ -805,32 +821,25 @@ const processDecryptRequest = (message: { params: DecryptRequest }, sendResponse
 // RESPONSES ********************************
 
 const cleanup = (types: YoursEventName[]) => {
-  responseCallbackForConnectRequest = null;
-  responseCallbackForSendBsvRequest = null;
-  responseCallbackForTransferOrdinalRequest = null;
-  responseCallbackForPurchaseOrdinalRequest = null;
-  responseCallbackForSignMessageRequest = null;
-  responseCallbackForBroadcastRequest = null;
-  responseCallbackForGetSignaturesRequest = null;
-  responseCallbackForGenerateTaggedKeysRequest = null;
-  responseCallbackForEncryptRequest = null;
-  responseCallbackForDecryptRequest = null;
-  chromeStorageService.getStorage().then((res) => {
-    if (res?.popupWindowId) removeWindow(res.popupWindowId);
+  chromeStorageService.getAndSetStorage().then((res) => {
+    // Here we allow 1 second for yours wallet ui to display success message before killing the window
+    setTimeout(() => {
+      if (res?.popupWindowId) {
+        removeWindow(res.popupWindowId);
+        chromeStorageService.remove([...types, 'popupWindowId']);
+      }
+    }, 1000);
   });
-  popupWindowId = undefined;
-  chromeStorageService.remove([...types, 'popupWindowId']);
 };
 
 const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys }) => {
+  if (!responseCallbackForConnectRequest) throw Error('Missing callback!');
   try {
-    if (responseCallbackForConnectRequest) {
-      responseCallbackForConnectRequest({
-        type: YoursEventName.CONNECT,
-        success: true,
-        data: response.decision === 'approved' ? response.pubKeys.identityPubKey : undefined,
-      });
-    }
+    responseCallbackForConnectRequest({
+      type: YoursEventName.CONNECT,
+      success: true,
+      data: response.decision === 'approved' ? response.pubKeys.identityPubKey : undefined,
+    });
   } catch (error) {
     responseCallbackForConnectRequest?.({
       type: YoursEventName.CONNECT,
@@ -1053,7 +1062,6 @@ const processDecryptResponse = (response: { decryptedMessages: string[] }) => {
 };
 
 // HANDLE WINDOW CLOSE *****************************************
-// This handle the case where the user doesn't explicity dismiss the request but closes the window
 chrome.windows.onRemoved.addListener((closedWindowId) => {
   if (closedWindowId === popupWindowId) {
     if (responseCallbackForConnectRequest) {

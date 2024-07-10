@@ -1,9 +1,8 @@
 import { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
-import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
+import { GetSignatures, Ordinal, SignatureResponse } from 'yours-wallet-provider';
 import { DUST, FEE_PER_BYTE, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
 import { GorillaPoolService } from './GorillaPool.service';
 import { KeysService } from './Keys.service';
-import { OrdinalTxo } from './types/ordinal.types';
 
 const DEFAULT_SIGHASH_TYPE = 65; // SIGHASH_ALL | SIGHASH_FORKID
 
@@ -93,7 +92,7 @@ export class ContractService {
     }
   };
 
-  unlock = async (locks: OrdinalTxo[], currentBlockHeight: number) => {
+  unlock = async (locks: Ordinal[], currentBlockHeight: number) => {
     try {
       const keys = await this.keysService.retrieveKeys(undefined, true); // using below limit to bypass password
       if (!keys.identityWif || !keys.walletAddress) {

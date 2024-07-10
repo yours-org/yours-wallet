@@ -25,7 +25,7 @@ export class WhatsOnChainService {
   };
 
   getBsvBalance = async (address: string, pullFresh?: boolean): Promise<number | undefined> => {
-    const utxos = await this.getUtxos(address, pullFresh);
+    const utxos = await this.getAndUpdateUtxoStorage(address, pullFresh);
     if (!utxos) return 0;
 
     const sats = utxos.reduce((a, item) => a + item.satoshis, 0);
@@ -33,23 +33,22 @@ export class WhatsOnChainService {
     return bsvTotal;
   };
 
-  getUtxos = async (fromAddress: string, pullFresh?: boolean): Promise<StoredUtxo[]> => {
-    const network = this.chromeStorageService.getNetwork();
-    if (!isAddressOnRightNetwork(network, fromAddress)) return [];
-    const { account } = this.chromeStorageService.getCurrentAccountObject();
-    if (!account) return [];
-    const { paymentUtxos } = account;
+  getAndUpdateUtxoStorage = async (fromAddress: string, pullFresh?: boolean): Promise<StoredUtxo[]> => {
     try {
-      const localUtxos: StoredUtxo[] = paymentUtxos || [];
+      const network = this.chromeStorageService.getNetwork();
+      if (!isAddressOnRightNetwork(network, fromAddress)) return [];
+      const { account } = this.chromeStorageService.getCurrentAccountObject();
+      if (!account) return [];
+      const { paymentUtxos } = account;
 
-      if (!pullFresh && localUtxos.length > 0) {
-        return localUtxos
+      if (!pullFresh && paymentUtxos.length > 0) {
+        return paymentUtxos
           .filter((utxo) => !utxo.spent)
           .sort((a: StoredUtxo, b: StoredUtxo) => (a.satoshis > b.satoshis ? -1 : 1));
       }
 
       const { data } = await axios.get(`${this.getBaseUrl(network)}/address/${fromAddress}/unspent`, this.config);
-      const explorerUtxos: UTXO[] = data
+      const explorerUtxos: StoredUtxo[] = data
         .filter((u: WocUtxo) => u.value !== 1) // Ensure we are never spending 1 sats
         .map((utxo: WocUtxo) => {
           return {
@@ -57,36 +56,21 @@ export class WhatsOnChainService {
             vout: utxo.tx_pos,
             txid: utxo.tx_hash,
             script: P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex(),
-          } as UTXO;
+            spent: false,
+            spentUnixTime: 0,
+          } as StoredUtxo;
         });
-
-      // Add new UTXOs from explorer that are not in the local storage
-      const newUtxos = explorerUtxos.filter(
-        (explorerUtxo) => !localUtxos.some((storedUtxo) => storedUtxo.txid === explorerUtxo.txid),
-      );
-      localUtxos.push(...newUtxos.map((newUtxo) => ({ ...newUtxo, spent: false, spentUnixTime: 0 })));
-
-      // Remove spent UTXOs older than 3 days
-      const currentDate = new Date();
-      const thresholdUnixTime = currentDate.getTime() - 3 * 24 * 60 * 60; // 3 days in seconds
-      const recentUtxos = localUtxos.filter(
-        (utxo) => !utxo.spent || (utxo.spentUnixTime >= thresholdUnixTime && utxo.spent),
-      );
 
       const key: keyof ChromeStorageObject = 'accounts';
       const update: Partial<ChromeStorageObject['accounts']> = {
         [account.addresses.identityAddress]: {
           ...account,
-          paymentUtxos: recentUtxos,
+          paymentUtxos: explorerUtxos,
         },
       };
       await this.chromeStorageService.updateNested(key, update);
 
-      const unspent = recentUtxos
-        .filter((utxo) => !utxo.spent)
-        .sort((a: UTXO, b: UTXO) => (a.satoshis > b.satoshis ? -1 : 1));
-
-      return unspent;
+      return explorerUtxos;
     } catch (error) {
       console.log(error);
       return [];

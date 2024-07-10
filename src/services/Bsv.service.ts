@@ -11,7 +11,7 @@ import {
   TxOut,
 } from 'bsv-wasm-web';
 import { buildInscription } from 'js-1sat-ord-web';
-import { SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
+import { Ordinal, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
 import {
   BSV_DECIMAL_CONVERSION,
   FEE_PER_BYTE,
@@ -29,13 +29,12 @@ import { KeysService } from './Keys.service';
 import { getChainParams } from './serviceHelpers';
 import { FundRawTxResponse, LockData, SendBsvResponse, UTXO } from './types/bsv.types';
 import { ChromeStorageObject } from './types/chromeStorage.types';
-import { OrdinalTxo } from './types/ordinal.types';
 import { WhatsOnChainService } from './WhatsOnChain.service';
 
 export class BsvService {
-  bsvBalance: number;
-  exchangeRate: number;
-  lockData: LockData;
+  private bsvBalance: number;
+  private exchangeRate: number;
+  private lockData: LockData;
   constructor(
     private readonly keysService: KeysService,
     private readonly gorillaPoolService: GorillaPoolService,
@@ -48,6 +47,15 @@ export class BsvService {
     this.lockData = { totalLocked: 0, unlockable: 0, nextUnlock: 0 };
   }
 
+  getBsvBalance = () => this.bsvBalance;
+  getExchangeRate = () => this.exchangeRate;
+  getLockData = () => this.lockData;
+
+  rate = async () => {
+    const r = await this.wocService.getExchangeRate();
+    this.exchangeRate = r ?? 0;
+  };
+
   unlockLockedCoins = async (balanceOnly = false) => {
     if (!this.keysService.identityAddress) return;
     const chainInfo = await this.wocService.getChainInfo();
@@ -57,7 +65,7 @@ export class BsvService {
     const spentTxids = await this.gorillaPoolService.getSpentTxids(outpoints);
     lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
     if (lockedTxos.length > 0) {
-      const lockTotal = lockedTxos.reduce((a: number, utxo: OrdinalTxo) => a + utxo.satoshis, 0);
+      const lockTotal = lockedTxos.reduce((a: number, utxo: Ordinal) => a + utxo.satoshis, 0);
       let unlockableTotal = 0;
       const theBlocksCoinsUnlock: number[] = [];
       lockedTxos.forEach((txo) => {
@@ -103,7 +111,7 @@ export class BsvService {
       const amount = request.reduce((a, r) => a + r.satoshis, 0);
 
       // Format in and outs
-      const fundingUtxos = await this.wocService.getUtxos(fromAddress);
+      const fundingUtxos = await this.wocService.getAndUpdateUtxoStorage(fromAddress);
 
       if (!fundingUtxos) throw Error('No Utxos!');
       const totalSats = fundingUtxos.reduce((a: number, item: UTXO) => a + item.satoshis, 0);
@@ -269,11 +277,21 @@ export class BsvService {
   updateBsvBalance = async (pullFresh?: boolean) => {
     const total = await this.wocService.getBsvBalance(this.keysService.bsvAddress, pullFresh);
     this.bsvBalance = total ?? 0;
-  };
-
-  rate = async () => {
-    const r = await this.wocService.getExchangeRate();
-    this.exchangeRate = r ?? 0;
+    const balance = {
+      bsv: this.bsvBalance,
+      satoshis: Math.round(this.bsvBalance * BSV_DECIMAL_CONVERSION),
+      usdInCents: Math.round(this.bsvBalance * this.exchangeRate * 100),
+    };
+    const { account } = this.chromeStorageService.getCurrentAccountObject();
+    if (!account) throw Error('No account found!');
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [this.keysService.identityAddress]: {
+        ...account,
+        balance,
+      },
+    };
+    await this.chromeStorageService.updateNested(key, update);
   };
 
   fundRawTx = async (rawtx: string, password: string): Promise<FundRawTxResponse> => {
@@ -304,7 +322,7 @@ export class BsvService {
     }
     let size = rawtx.length / 2 + P2PKH_OUTPUT_SIZE;
     let fee = Math.ceil(size * FEE_PER_BYTE);
-    const fundingUtxos = await this.wocService.getUtxos(this.keysService.bsvAddress);
+    const fundingUtxos = await this.wocService.getAndUpdateUtxoStorage(this.keysService.bsvAddress);
     while (satsIn < satsOut + fee) {
       const utxo = fundingUtxos.pop();
       if (!utxo) throw Error('Insufficient funds');

@@ -65,6 +65,7 @@ export interface ChromeStorageObject {
   salt: string;
   isLocked: boolean;
   colorTheme: Theme;
+  version?: number;
   connectRequest?: ConnectRequest;
   sendBsvRequest?: SendBsv[];
   transferOrdinalRequest?: TransferOrdinal;
@@ -75,9 +76,6 @@ export interface ChromeStorageObject {
   generateTaggedKeysRequest?: TaggedDerivationRequest;
   encryptRequest?: EncryptRequest;
   decryptRequest?: DecryptRequest;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  // [key: string]: any; // This is used to account for any additional items chrome.storage.local may return when strongly typing the chrome.storage.onChange method
 }
 
 export type CurrentAccountObject = Omit<
@@ -96,3 +94,30 @@ export type CurrentAccountObject = Omit<
   | 'encryptRequest'
   | 'decryptRequest'
 > & { account: Account };
+
+type AppState = {
+  addresses: Addresses;
+  balance: Balance;
+  isLocked: boolean;
+  isPasswordRequired: boolean;
+  network: NetWork;
+  ordinals: Ordinal[];
+  pubKeys: PubKeys;
+};
+
+export type DeprecatedStorage = {
+  appState: AppState;
+  derivationTags: TaggedDerivationResponse[];
+  encryptedKeys: string;
+  exchangeRateCache: ExchangeRateCache;
+  socialProfile: SocialProfile;
+  noApprovalLimit: number;
+  lastActiveTime: number;
+  passKey: string;
+  network: NetWork;
+  paymentUtxos: StoredUtxo[];
+  salt: string;
+  whitelist: WhitelistedApp[];
+  colorTheme: Theme;
+  popupWindowId: number;
+};

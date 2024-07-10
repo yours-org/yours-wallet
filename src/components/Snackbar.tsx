@@ -29,7 +29,7 @@ const fadeOut = keyframes`
   }
 `;
 
-export const SnackBarContainer = styled.div<SnackBarColorTheme>`
+export const SnackBarContainer = styled.div<SnackBarColorTheme & { duration: number }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -43,7 +43,7 @@ export const SnackBarContainer = styled.div<SnackBarColorTheme>`
   z-index: 200;
   animation:
     ${slideIn} 0.25s ease-out,
-    ${fadeOut} 0.25s ease-out 2.5s;
+    ${fadeOut} 0.25s ease-out ${({ duration }) => `${duration}s`};
   animation-fill-mode: forwards;
 `;
 
@@ -59,12 +59,16 @@ export type SnackbarProps = {
   /** The type of snackbar. success | error | info */
   type: SnackbarType | null;
   theme: Theme;
+  duration?: number;
 };
 
 export const Snackbar = (props: SnackbarProps) => {
-  const { message, type, theme } = props;
+  const { message, type, theme, duration = 2.5 } = props;
   return (
-    <SnackBarContainer color={type === 'error' ? theme.errorRed : type === 'info' ? theme.white : theme.lightAccent}>
+    <SnackBarContainer
+      duration={duration}
+      color={type === 'error' ? theme.errorRed : type === 'info' ? theme.white : theme.lightAccent}
+    >
       <Image src={type === 'error' ? errorIcon : type === 'info' ? infoIcon : successIcon} />
       <Text
         theme={theme}

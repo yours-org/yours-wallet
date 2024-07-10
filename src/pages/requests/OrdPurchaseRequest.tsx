@@ -1,6 +1,6 @@
 import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
-import { PurchaseOrdinal } from 'yours-wallet-provider';
+import { Ordinal as OrdinalType, PurchaseOrdinal } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -14,7 +14,6 @@ import { useServiceContext } from '../../hooks/useServiceContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { BSV_DECIMAL_CONVERSION, GLOBAL_ORDERBOOK_MARKET_RATE, YOURS_DEV_WALLET } from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
-import { OrdinalTxo } from '../../services/types/ordinal.types';
 
 export type OrdPurchaseRequestProps = {
   request: PurchaseOrdinal & { password?: string };
@@ -33,7 +32,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   const { addSnackbar, message } = useSnackbar();
   const { gorillaPoolService, ordinalService, chromeStorageService, keysService } = useServiceContext();
   const { ordAddress } = keysService;
-  const [inscription, setInscription] = useState<OrdinalTxo | undefined>();
+  const [inscription, setInscription] = useState<OrdinalType | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
   const marketplaceAddress = request.marketplaceAddress ?? YOURS_DEV_WALLET;
   const marketplaceRate = request.marketplaceRate ?? GLOBAL_ORDERBOOK_MARKET_RATE;
@@ -56,7 +55,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     if (!successTxId) return;
     if (!message && ordAddress) {
       resetSendState();
-      ordinalService.getOrdinals(ordAddress);
+      ordinalService.getAndSetOrdinals(ordAddress);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message, ordAddress]);
@@ -135,7 +134,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Purchase Request</HeaderText>
           <Ordinal
-            inscription={inscription as OrdinalTxo}
+            inscription={inscription as OrdinalType}
             theme={theme}
             url={`${gorillaPoolService.getBaseUrl(network)}/content/${inscription?.origin?.outpoint.toString()}`}
             selected={true}
