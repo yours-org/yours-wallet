@@ -21,21 +21,24 @@ export const SnackbarProvider = (props: SnackbarProviderProps) => {
   const { children } = props;
   const { theme } = useTheme();
   const [message, setMessage] = useState<string | null>(null);
+  const [duration, setDuration] = useState<number>(SNACKBAR_TIMEOUT);
   const [snackBarType, setSnackBarType] = useState<SnackbarType | null>(null);
 
-  const addSnackbar = (msg: string, type: SnackbarType, duration?: number) => {
+  const addSnackbar = (msg: string, type: SnackbarType, dur?: number) => {
     setMessage(msg);
     setSnackBarType(type);
+    setDuration(dur || SNACKBAR_TIMEOUT);
 
     setTimeout(() => {
       setMessage(null);
       setSnackBarType(null);
-    }, duration || SNACKBAR_TIMEOUT);
+      setDuration(SNACKBAR_TIMEOUT);
+    }, dur || SNACKBAR_TIMEOUT);
   };
 
   return (
     <SnackbarContext.Provider value={{ message, snackBarType, addSnackbar }}>
-      {message && <Snackbar theme={theme} message={message} type={snackBarType} />}
+      {message && <Snackbar theme={theme} message={message} type={snackBarType} duration={duration} />}
       {children}
     </SnackbarContext.Provider>
   );
