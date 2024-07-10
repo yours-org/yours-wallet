@@ -20,6 +20,7 @@ import {
 import { Show } from '../components/Show';
 import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
+import { useBsv } from '../hooks/useBsv';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
@@ -27,12 +28,13 @@ import { ColorThemeProps } from '../theme';
 import { BSV_DECIMAL_CONVERSION, HOSTED_YOURS_IMAGE } from '../utils/constants';
 import { formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
+import { storage } from '../utils/storage';
 import copyIcon from '../assets/copy.svg';
 import { AssetRow } from '../components/AssetRow';
 import lockIcon from '../assets/lock.svg';
+import { usePasswordSetting } from '../hooks/usePasswordSetting';
 import { useNavigate } from 'react-router-dom';
 import { useWeb3RequestContext } from '../hooks/useWeb3RequestContext';
-import { useServiceContext } from '../hooks/useServiceContext';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -108,14 +110,23 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [amountType, setAmountType] = useState<AmountType>('bsv');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService } = useServiceContext();
-  const { socialProfile } = useSocialProfile(chromeStorageService);
+  const { socialProfile } = useSocialProfile();
+  const { isPasswordRequired } = usePasswordSetting();
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const { bsvAddress, identityAddress } = keysService;
-  const { bsvBalance, exchangeRate, lockData, unlockLockedCoins, updateBsvBalance, sendBsv } = bsvService;
+
+  const {
+    bsvAddress,
+    bsvBalance,
+    isProcessing,
+    setIsProcessing,
+    sendBsv,
+    updateBsvBalance,
+    exchangeRate,
+    lockData,
+    unlockLockedCoins,
+    identityAddress,
+  } = useBsv();
 
   useEffect(() => {
     if (connectRequest) {
@@ -268,7 +279,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   };
 
   const nukeUtxos = () => {
-    chromeStorageService.remove('paymentUtxos');
+    storage.remove('paymentUtxos');
     // Give enough time for storage to remove
     setTimeout(() => {
       updateBsvBalance(true);

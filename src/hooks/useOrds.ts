@@ -1,74 +1,168 @@
-import { GorillaPoolService } from './GorillaPool.service';
-import { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
-import { KeysService } from './Keys.service';
-import {
-  BSV20,
-  BSV20Data,
-  BuildAndBroadcastResponse,
-  ListOrdinal,
-  OrdinalData,
-  OrdinalTxo,
-  OrdOperationResponse,
-} from './types/ordinal.types';
-import { WhatsOnChainService } from './WhatsOnChain.service';
+import init, { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
+import { sendOrdinal } from 'js-1sat-ord-web';
+import { useEffect, useState } from 'react';
 import {
   BSV20_INDEX_FEE,
   FEE_PER_BYTE,
   FEE_SATS,
+  GP_BASE_URL,
+  GP_TESTNET_BASE_URL,
   MAX_FEE_PER_TX,
   O_LOCK_SUFFIX,
   P2PKH_INPUT_SIZE,
   P2PKH_OUTPUT_SIZE,
   SCRYPT_PREFIX,
 } from '../utils/constants';
-import { sendOrdinal } from 'js-1sat-ord-web';
+import { NetWork } from '../utils/network';
+import { useGorillaPool } from './useGorillaPool';
+import { useKeys } from './useKeys';
+import { useNetwork } from './useNetwork';
+import { useWhatsOnChain } from './useWhatsOnChain';
+
 import { createTransferP2PKH, createTransferV2P2PKH, isBSV20v2 } from '../utils/ordi';
+import { OrdinalTxo } from './ordTypes';
+import { UTXO } from './useBsv';
 import { PurchaseOrdinal } from 'yours-wallet-provider';
-import { UTXO } from './types/bsv.types';
 
-export class OrdinalService {
-  ordinals: OrdinalData;
-  bsv20s: BSV20Data;
-  constructor(
-    private readonly keysService: KeysService,
-    private readonly wocService: WhatsOnChainService,
-    private readonly gorillaPoolService: GorillaPoolService,
-  ) {
-    this.ordinals = { initialized: false, data: [] };
-    this.bsv20s = { initialized: false, data: [] };
-  }
+export class InscriptionData {
+  type?: string = '';
+  data?: Buffer = Buffer.alloc(0);
+}
 
-  getOrdinals = async (ordAddress: string) => {
+export type OrdOperationResponse = {
+  txid?: string;
+  error?: string;
+};
+
+export type ChangeInfo = { change: number; changeVout: number };
+
+export type BuildAndBroadcastResponse = {
+  txid: string;
+  rawTx: string;
+  changeInfo: ChangeInfo;
+};
+
+export type GPArcResponse = {
+  blockHash: string;
+  blockHeight: number;
+  extraInfo: string;
+  status: number;
+  timestamp: string;
+  title: string;
+  txStatus: string;
+  txid: string;
+};
+
+export interface BSV20 {
+  id: string;
+  tick?: string;
+  sym?: string;
+  dec: number;
+  all: Balance;
+  listed: Balance;
+  icon?: string;
+}
+
+export interface Balance {
+  confirmed: bigint;
+  pending: bigint;
+}
+
+export type ListOrdinal = {
+  outpoint: string;
+  price: number;
+  password: string;
+};
+
+export interface BSV20Data {
+  initialized: boolean;
+  data: BSV20[];
+}
+
+export interface OrdinalData {
+  initialized: boolean;
+  data: OrdinalTxo[];
+}
+
+export const useOrds = () => {
+  const { ordAddress, retrieveKeys, verifyPassword, ordPubKey, bsvAddress } = useKeys();
+
+  const [ordinals, setOrdinals] = useState<OrdinalData>({
+    initialized: false,
+    data: [],
+  });
+  const [bsv20s, setBSV20s] = useState<BSV20Data>({
+    initialized: false,
+    data: [],
+  });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { network } = useNetwork();
+  const { getUtxos, getRawTxById, getSuitableUtxo } = useWhatsOnChain();
+  const {
+    getOrdUtxos,
+    broadcastWithGorillaPool,
+    getUtxoByOutpoint,
+    getMarketData,
+    getBsv20Balances,
+    getBSV20Utxos,
+    getBsv20Details,
+    getTokenPriceInSats,
+  } = useGorillaPool();
+  const getOrdinalsBaseUrl = () => {
+    return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
+  };
+
+  useEffect(() => {
+    if (!ordAddress) return;
+    getOrdinals(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordAddress]);
+
+  const getOrdinals = async (showProcessing?: boolean) => {
     try {
-      //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
-      const ordList = await this.gorillaPoolService.getOrdUtxos(ordAddress);
-      this.ordinals = { initialized: true, data: ordList.filter((o) => o.satoshis === 1) };
+      showProcessing = typeof showProcessing === 'boolean' ? showProcessing : true;
 
-      const bsv20List: Array<BSV20> = await this.gorillaPoolService.getBsv20Balances(ordAddress);
+      setIsProcessing(showProcessing); // TODO: set this to true if call is taking more than a second
+      //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
+      const ordList = await getOrdUtxos(ordAddress);
+      setOrdinals({
+        initialized: true,
+        data: ordList.filter((o) => o.satoshis === 1),
+      });
+
+      const bsv20List: Array<BSV20> = await getBsv20Balances(ordAddress);
 
       // All the information currently used has been obtained from `getBsv20Balances`.
       // If other information is needed later, call `cacheTokenInfos` to obtain more Tokens information.
       // await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.id));
 
       const data = bsv20List.filter((o) => o.all.confirmed + o.all.pending > 0n && typeof o.dec === 'number');
-      this.bsv20s = { initialized: true, data };
+      setBSV20s({
+        initialized: true,
+        data: data,
+      });
     } catch (error) {
       console.error('getOrdinals failed:', error);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  transferOrdinal = async (
+  const transferOrdinal = async (
     destinationAddress: string,
     outpoint: string,
     password: string,
   ): Promise<OrdOperationResponse> => {
     try {
-      const isAuthenticated = await this.keysService.verifyPassword(password);
+      await init();
+      setIsProcessing(true);
+
+      const isAuthenticated = await verifyPassword(password);
       if (!isAuthenticated) {
         return { error: 'invalid-password' };
       }
 
-      const keys = await this.keysService.retrieveKeys(password);
+      const keys = await retrieveKeys(password);
       if (!keys?.ordAddress || !keys.ordWif || !keys.walletAddress || !keys.walletWif) {
         throw Error('No keys');
       }
@@ -77,13 +171,13 @@ export class OrdinalService {
       const fundingAndChangeAddress = keys.walletAddress;
       const payWifPk = keys.walletWif;
 
-      const fundingUtxos = await this.wocService.getUtxos(fundingAndChangeAddress);
+      const fundingUtxos = await getUtxos(fundingAndChangeAddress);
 
       if (!fundingUtxos || fundingUtxos.length === 0) {
         return { error: 'insufficient-funds' };
       }
 
-      const ordUtxos = await this.getOrdinalUtxos(ordinalAddress);
+      const ordUtxos = await getOrdinalUtxos(ordinalAddress);
       if (!ordUtxos) throw Error('No ord utxos!');
       const ordUtxo = ordUtxos.find((o) => o.outpoint.toString() === outpoint);
 
@@ -92,7 +186,7 @@ export class OrdinalService {
       }
 
       if (!ordUtxo.script) {
-        const ordRawTx = await this.wocService.getRawTxById(ordUtxo.txid);
+        const ordRawTx = await getRawTxById(ordUtxo.txid);
         if (!ordRawTx) throw Error('Could not get raw tx');
         const tx = Transaction.from_hex(ordRawTx);
         const out = tx.get_output(ordUtxo.vout);
@@ -102,10 +196,10 @@ export class OrdinalService {
         }
       }
 
-      const fundingUtxo = this.wocService.getSuitableUtxo(fundingUtxos, FEE_SATS);
+      const fundingUtxo = getSuitableUtxo(fundingUtxos, FEE_SATS);
 
       if (!fundingUtxo?.script) {
-        const fundingRawTx = await this.wocService.getRawTxById(fundingUtxo.txid);
+        const fundingRawTx = await getRawTxById(fundingUtxo.txid);
         if (!fundingRawTx) throw Error('Could not get raw tx');
         const tx = Transaction.from_hex(fundingRawTx);
         const out = tx.get_output(ordUtxo.vout);
@@ -127,7 +221,7 @@ export class OrdinalService {
         vout: ordUtxo.vout,
       };
 
-      const broadcastResponse = await this.buildAndBroadcastOrdinalTx(
+      const broadcastResponse = await buildAndBroadcastOrdinalTx(
         fundingUtxo,
         formattedOrdUtxo,
         payPrivateKey,
@@ -144,10 +238,12 @@ export class OrdinalService {
     } catch (error) {
       console.error('transferOrdinal failed:', error);
       return { error: JSON.stringify(error) };
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  buildAndBroadcastOrdinalTx = async (
+  const buildAndBroadcastOrdinalTx = async (
     fundingUtxo: UTXO,
     ordUtxo: UTXO,
     payPrivateKey: PrivateKey,
@@ -172,19 +268,19 @@ export class OrdinalService {
 
     const changeVout = tx.get_noutputs() ? tx.get_noutputs() - 1 : 1; // The change should be at vout position 1 if the other requests fail
     const change = Number(tx.get_output(changeVout)?.get_satoshis()) ?? 0;
-    const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
+    const { txid } = await broadcastWithGorillaPool(rawTx);
 
     if (txid) {
       return { txid, rawTx, changeInfo: { change, changeVout } };
     }
   };
 
-  getOrdinalUtxos = async (ordAddress: string): Promise<OrdinalTxo[] | undefined> => {
+  const getOrdinalUtxos = async (address: string): Promise<OrdinalTxo[] | undefined> => {
     try {
-      if (!ordAddress) {
+      if (!address) {
         return [];
       }
-      const utxos = await this.gorillaPoolService.getOrdUtxos(ordAddress);
+      const utxos = await getOrdUtxos(ordAddress);
 
       return utxos;
     } catch (error) {
@@ -192,15 +288,18 @@ export class OrdinalService {
     }
   };
 
-  sendBSV20 = async (id: string, destinationAddress: string, amount: bigint, password: string) => {
+  const sendBSV20 = async (id: string, destinationAddress: string, amount: bigint, password: string) => {
     let indexFee = BSV20_INDEX_FEE;
     try {
-      const isAuthenticated = await this.keysService.verifyPassword(password);
+      setIsProcessing(true);
+      await init();
+
+      const isAuthenticated = await verifyPassword(password);
       if (!isAuthenticated) {
         return { error: 'invalid-password' };
       }
 
-      const keys = await this.keysService.retrieveKeys(password);
+      const keys = await retrieveKeys(password);
       if (!keys?.ordAddress || !keys.ordWif || !keys.walletAddress || !keys.walletWif) {
         throw Error('No keys');
       }
@@ -212,19 +311,19 @@ export class OrdinalService {
       const paymentPk = PrivateKey.from_wif(payWifPk);
       const ordPk = PrivateKey.from_wif(ordWifPk);
 
-      const fundingUtxos = await this.wocService.getUtxos(fundingAndChangeAddress);
+      const fundingUtxos = await getUtxos(fundingAndChangeAddress);
 
       if (!fundingUtxos || fundingUtxos.length === 0) {
         return { error: 'insufficient-funds' };
       }
 
-      const tokenDetails = await this.gorillaPoolService.getBsv20Details(id);
+      const tokenDetails = await getBsv20Details(id);
 
       if (!tokenDetails) {
         return { error: 'token-details' };
       }
 
-      const bsv20Utxos = await this.gorillaPoolService.getBSV20Utxos(id, ordinalAddress);
+      const bsv20Utxos = await getBSV20Utxos(id, ordinalAddress);
 
       if (!bsv20Utxos || bsv20Utxos.length === 0) throw Error('no-bsv20-utxo');
 
@@ -267,7 +366,7 @@ export class OrdinalService {
         new TxOut(BigInt(indexFee), P2PKHAddress.from_string(tokenDetails.fundAddress).get_locking_script()),
       );
 
-      const fundingUtxo = this.wocService.getSuitableUtxo(fundingUtxos, FEE_SATS + indexFee);
+      const fundingUtxo = getSuitableUtxo(fundingUtxos, FEE_SATS + indexFee);
       const totalInputSats = fundingUtxo.satoshis;
       const change = totalInputSats - 1 - FEE_SATS - indexFee;
 
@@ -311,32 +410,38 @@ export class OrdinalService {
       if (finalSatsIn - finalSatsOut > MAX_FEE_PER_TX) return { error: 'fee-too-high' };
 
       const txhex = tx.to_hex();
-      const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(txhex);
+      const { txid } = await broadcastWithGorillaPool(txhex);
       if (!txid) return { error: 'broadcast-transaction-failed' };
       return { txid };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error('sendBSV20 failed:', error);
       return { error: error.message ?? 'unknown' };
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  listOrdinalOnGlobalOrderbook = async (listing: ListOrdinal): Promise<OrdOperationResponse> => {
+  const listOrdinalOnGlobalOrderbook = async (listing: ListOrdinal): Promise<OrdOperationResponse> => {
     try {
       const { outpoint, price, password } = listing;
-      const isAuthenticated = await this.keysService.verifyPassword(password);
+
+      setIsProcessing(true);
+      await init();
+
+      const isAuthenticated = await verifyPassword(password);
       if (!isAuthenticated) {
         return { error: 'invalid-password' };
       }
-      const keys = await this.keysService.retrieveKeys(password);
+      const keys = await retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
 
-      const fundingAndChangeAddress = this.keysService.bsvAddress;
+      const fundingAndChangeAddress = bsvAddress;
       const paymentPk = PrivateKey.from_wif(keys.walletWif);
       const ordPk = PrivateKey.from_wif(keys.ordWif);
 
-      const paymentUtxos = await this.wocService.getUtxos(fundingAndChangeAddress);
+      const paymentUtxos = await getUtxos(fundingAndChangeAddress);
 
       if (!paymentUtxos.length) {
         throw new Error('Could not retrieve paymentUtxos');
@@ -348,33 +453,35 @@ export class OrdinalService {
         return { error: 'insufficient-funds' };
       }
 
-      const paymentUtxo = this.wocService.getSuitableUtxo(paymentUtxos, FEE_SATS);
+      const paymentUtxo = getSuitableUtxo(paymentUtxos, FEE_SATS);
 
-      const ordUtxo = await this.gorillaPoolService.getUtxoByOutpoint(outpoint);
+      const ordUtxo = await getUtxoByOutpoint(outpoint);
 
       if (!ordUtxo) return { error: 'no-ord-utxo' };
 
-      const rawTx = await this.listOrdinal(
+      const rawTx = await listOrdinal(
         paymentUtxo,
         ordUtxo,
         paymentPk,
         fundingAndChangeAddress,
         ordPk,
-        this.keysService.ordAddress,
+        ordAddress,
         fundingAndChangeAddress,
         Number(price),
       );
 
-      const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
+      const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
       return { txid };
     } catch (error) {
       console.log(error);
       return { error: JSON.stringify(error) };
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  createChangeOutput(tx: Transaction, changeAddress: string, paymentSatoshis: number) {
+  const createChangeOutput = (tx: Transaction, changeAddress: string, paymentSatoshis: number) => {
     const changeaddr = P2PKHAddress.from_string(changeAddress);
     const changeScript = changeaddr.get_locking_script();
     const emptyOut = new TxOut(BigInt(1), changeScript);
@@ -382,9 +489,9 @@ export class OrdinalService {
     const change = paymentSatoshis - fee;
     const changeOut = new TxOut(BigInt(change), changeScript);
     return changeOut;
-  }
+  };
 
-  async listOrdinal(
+  const listOrdinal = async (
     paymentUtxo: UTXO,
     ordinal: OrdinalTxo,
     paymentPk: PrivateKey,
@@ -393,7 +500,7 @@ export class OrdinalService {
     ordAddress: string,
     payoutAddress: string,
     satoshisPayout: number,
-  ) {
+  ) => {
     const tx = new Transaction(1, 0);
     const t = ordinal.txid;
     const txBuf = Buffer.from(t, 'hex');
@@ -417,11 +524,11 @@ export class OrdinalService {
     const satOut = new TxOut(BigInt(1), Script.from_asm_string(ordLockScript));
     tx.add_output(satOut);
 
-    const changeOut = this.createChangeOutput(tx, changeAddress, paymentUtxo.satoshis);
+    const changeOut = createChangeOutput(tx, changeAddress, paymentUtxo.satoshis);
     tx.add_output(changeOut);
 
     if (!ordinal.script) {
-      const ordRawTxHex = await this.wocService.getRawTxById(ordinal.txid);
+      const ordRawTxHex = await getRawTxById(ordinal.txid);
       if (!ordRawTxHex) throw new Error('Could not get raw hex');
       const tx = Transaction.from_hex(ordRawTxHex);
       const out = tx.get_output(ordinal.vout);
@@ -458,26 +565,29 @@ export class OrdinalService {
     utxoIn.set_unlocking_script(Script.from_asm_string(`${sig2.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
     tx.set_input(1, utxoIn);
     return tx.to_hex();
-  }
+  };
 
-  async cancelGlobalOrderbookListing(outpoint: string, password: string): Promise<OrdOperationResponse> {
+  const cancelGlobalOrderbookListing = async (outpoint: string, password: string): Promise<OrdOperationResponse> => {
     try {
-      const isAuthenticated = await this.keysService.verifyPassword(password);
+      setIsProcessing(true);
+      await init();
+
+      const isAuthenticated = await verifyPassword(password);
       if (!isAuthenticated) {
         return { error: 'invalid-password' };
       }
-      const keys = await this.keysService.retrieveKeys(password);
+      const keys = await retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
-      const fundingAndChangeAddress = this.keysService.bsvAddress;
+      const fundingAndChangeAddress = bsvAddress;
 
-      const paymentUtxos = await this.wocService.getUtxos(fundingAndChangeAddress);
+      const paymentUtxos = await getUtxos(fundingAndChangeAddress);
 
       if (!paymentUtxos.length) {
         throw new Error('Could not retrieve paymentUtxos');
       }
 
-      const paymentUtxo = this.wocService.getSuitableUtxo(paymentUtxos, FEE_SATS);
+      const paymentUtxo = getSuitableUtxo(paymentUtxos, FEE_SATS);
 
       const paymentPk = PrivateKey.from_wif(keys.walletWif);
       const ordinalPk = PrivateKey.from_wif(keys.ordWif);
@@ -489,7 +599,7 @@ export class OrdinalService {
 
       const cancelTx = new Transaction(1, 0);
 
-      const { script } = await this.gorillaPoolService.getMarketData(outpoint);
+      const { script } = await getMarketData(outpoint);
 
       const ordIn = new TxIn(Buffer.from(listingTxid, 'hex'), 0, Script.from_hex(''));
       cancelTx.add_input(ordIn);
@@ -497,11 +607,11 @@ export class OrdinalService {
       const utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_hex(''));
       cancelTx.add_input(utxoIn);
 
-      const destinationAddress = P2PKHAddress.from_string(this.keysService.ordAddress);
+      const destinationAddress = P2PKHAddress.from_string(ordAddress);
       const satOut = new TxOut(BigInt(1), destinationAddress.get_locking_script());
       cancelTx.add_output(satOut);
 
-      const changeOut = this.createChangeOutput(cancelTx, fundingAndChangeAddress, paymentUtxo.satoshis);
+      const changeOut = createChangeOutput(cancelTx, fundingAndChangeAddress, paymentUtxo.satoshis);
       cancelTx.add_output(changeOut);
 
       // sign listing to cancel
@@ -530,35 +640,40 @@ export class OrdinalService {
       cancelTx.set_input(1, utxoIn);
       const rawTx = cancelTx.to_hex();
 
-      const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
+      const { txid } = await broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
       return { txid };
     } catch (error) {
       console.log(error);
       return { error: JSON.stringify(error) };
+    } finally {
+      setIsProcessing(false);
     }
-  }
+  };
 
-  purchaseGlobalOrderbookListing = async (purchaseOrdinal: PurchaseOrdinal & { password: string }) => {
+  const purchaseGlobalOrderbookListing = async (purchaseOrdinal: PurchaseOrdinal & { password: string }) => {
     try {
       const { marketplaceAddress, marketplaceRate, outpoint, password } = purchaseOrdinal;
-      const isAuthenticated = await this.keysService.verifyPassword(password);
+      setIsProcessing(true);
+      await init();
+
+      const isAuthenticated = await verifyPassword(password);
       if (!isAuthenticated) {
         return { error: 'invalid-password' };
       }
-      const keys = await this.keysService.retrieveKeys(password);
+      const keys = await retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
-      const fundingAndChangeAddress = this.keysService.bsvAddress;
+      const fundingAndChangeAddress = bsvAddress;
 
-      const fundingUtxos = await this.wocService.getUtxos(fundingAndChangeAddress);
+      const fundingUtxos = await getUtxos(fundingAndChangeAddress);
 
       if (!fundingUtxos.length) {
         throw new Error('Could not retrieve funding UTXOs');
       }
 
       const payPk = PrivateKey.from_wif(keys.walletWif);
-      const listing = await this.gorillaPoolService.getUtxoByOutpoint(outpoint);
+      const listing = await getUtxoByOutpoint(outpoint);
       const price = Number(listing.data?.list?.price);
       const payout = listing.data?.list?.payout;
 
@@ -573,10 +688,7 @@ export class OrdinalService {
       satsIn += listing.satoshis;
 
       // output 0
-      const buyerOutput = new TxOut(
-        BigInt(1),
-        P2PKHAddress.from_string(this.keysService.ordAddress).get_locking_script(),
-      );
+      const buyerOutput = new TxOut(BigInt(1), P2PKHAddress.from_string(ordAddress).get_locking_script());
       purchaseTx.add_output(buyerOutput);
       satsOut += 1;
 
@@ -678,16 +790,35 @@ export class OrdinalService {
 
       const rawTx = purchaseTx.to_hex();
 
-      const broadcastRes = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
+      const broadcastRes = await broadcastWithGorillaPool(rawTx);
       if (!broadcastRes.txid) return { error: 'broadcast-error' };
       return { txid: broadcastRes.txid };
     } catch (error) {
       console.log(error);
       return { error: JSON.stringify(error) };
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  getTokenName(b: BSV20): string {
-    return b.sym || b.tick || 'Null';
-  }
+  return {
+    bsv20s,
+    ordinals,
+    ordAddress,
+    ordPubKey,
+    getOrdinals,
+    isProcessing,
+    transferOrdinal,
+    setIsProcessing,
+    getOrdinalsBaseUrl,
+    sendBSV20,
+    listOrdinalOnGlobalOrderbook,
+    cancelGlobalOrderbookListing,
+    purchaseGlobalOrderbookListing,
+    getTokenPriceInSats,
+  };
+};
+
+export function getTokenName(b: BSV20): string {
+  return b.sym || b.tick || 'Null';
 }

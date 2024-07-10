@@ -1,35 +1,98 @@
 import axios from 'axios';
-import { P2PKHAddress, PrivateKey, Transaction, TxOut } from 'bsv-wasm-web';
-import { DerivationTag, NetWork, TaggedDerivationResponse } from 'yours-wallet-provider';
-import { ChromeStorageObject } from './types/chromeStorage.types';
+import init, { ChainParams, P2PKHAddress, PrivateKey, Transaction, TxOut } from 'bsv-wasm-web';
+import { DerivationTag } from 'yours-wallet-provider';
+import { TaggedDerivationResponse } from '../pages/requests/GenerateTaggedKeysRequest';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL, JUNGLE_BUS_URL } from '../utils/constants';
 import { decryptUsingPrivKey } from '../utils/crypto';
 import { chunkedStringArray } from '../utils/format';
 import { getTaggedDerivationKeys, Keys } from '../utils/keys';
+import { NetWork } from '../utils/network';
 import { isBSV20v2 } from '../utils/ordi';
-import { getCurrentUtcTimestamp, isAddressOnRightNetwork } from '../utils/tools';
-import { getChainParams } from './serviceHelpers';
-import {
-  GorillaPoolBroadcastResponse,
-  GorillaPoolErrorMessage,
-  MarketResponse,
-  Token,
-} from './types/gorillaPool.types';
-import { BSV20, BSV20Txo, OrdinalResponse, OrdinalTxo } from './types/ordinal.types';
-import { ChromeStorageService } from './ChromeStorage.service';
+import { storage } from '../utils/storage';
+import { getCurrentUtcTimestamp } from '../utils/tools';
+import { BSV20Txo, OrdinalResponse, OrdinalTxo } from './ordTypes';
+import { StoredUtxo } from './useBsv';
+import { useNetwork } from './useNetwork';
+import { BSV20 } from './useOrds';
 
-export class GorillaPoolService {
-  constructor(private readonly chromeStorageService: ChromeStorageService) {}
-  getBaseUrl(network: NetWork) {
-    return network === ('mainnet' as NetWork) ? GP_BASE_URL : GP_TESTNET_BASE_URL;
-  }
+type GorillaPoolErrorMessage = {
+  message: string;
+};
 
-  getOrdUtxos = async (ordAddress: string): Promise<OrdinalResponse> => {
+export type GorillaPoolBroadcastResponse = {
+  txid?: string;
+  message?: string;
+};
+
+export type Token = {
+  txid: string;
+  vout: number;
+  height: number;
+  idx: number;
+  tick: string;
+  id: string;
+  sym: string;
+  icon: string;
+  max: string;
+  lim: string;
+  dec: number;
+  amt: string;
+  supply: string;
+  status: number;
+  available: string;
+  pctMinted: number;
+  accounts: number;
+  pending: number;
+  included: boolean;
+  fundAddress: string;
+  fundTotal: number;
+  fundUsed: number;
+  fundBalance: number;
+};
+
+export type MarketResponse = {
+  txid: string;
+  vout: number;
+  outpoint: string;
+  owner: string;
+  script: string;
+  spend: string;
+  spendHeight: number;
+  spendIdx: number;
+  height: number;
+  idx: number;
+  op: string;
+  tick: string;
+  id: string;
+  sym: string;
+  dec: number;
+  icon: string;
+  amt: string;
+  status: number;
+  reason: string;
+  listing: boolean;
+  price: number;
+  pricePer: number;
+  payout: string;
+  sale: boolean;
+};
+
+export const useGorillaPool = () => {
+  const { network, isAddressOnRightNetwork } = useNetwork();
+
+  const getOrdinalsBaseUrl = () => {
+    return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
+  };
+
+  const getChainParams = (network: NetWork): ChainParams => {
+    return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
+  };
+
+  const getOrdUtxos = async (ordAddress: string): Promise<OrdinalResponse> => {
     try {
-      const network = this.chromeStorageService.getNetwork();
-      if (!isAddressOnRightNetwork(network, ordAddress)) return [];
+      if (!isAddressOnRightNetwork(ordAddress)) return [];
       const { data } = await axios.get<OrdinalTxo[]>(
-        `${this.getBaseUrl(network)}/api/txos/address/${ordAddress}/unspent?limit=1500&offset=0`,
+        `${getOrdinalsBaseUrl()}/api/txos/address/${ordAddress}/unspent?limit=1500&offset=0`,
       );
       return data;
     } catch (error) {
@@ -38,19 +101,19 @@ export class GorillaPoolService {
     }
   };
 
-  broadcastWithGorillaPool = async (txhex: string): Promise<GorillaPoolBroadcastResponse> => {
+  const broadcastWithGorillaPool = async (txhex: string): Promise<GorillaPoolBroadcastResponse> => {
     try {
-      const network = this.chromeStorageService.getNetwork();
       const encoded = Buffer.from(txhex, 'hex').toString('base64');
-      const res = await axios.post<string | GorillaPoolErrorMessage>(`${this.getBaseUrl(network)}/api/tx`, {
+      const res = await axios.post<string | GorillaPoolErrorMessage>(`${getOrdinalsBaseUrl()}/api/tx`, {
         rawtx: encoded,
       });
       if (res.status === 200 && typeof res.data === 'string') {
-        await this.updateStoredPaymentUtxos(txhex);
+        await updateStoredPaymentUtxos(txhex);
         return { txid: res.data };
       } else {
         return res.data as GorillaPoolErrorMessage;
       }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.log(error);
@@ -58,10 +121,9 @@ export class GorillaPoolService {
     }
   };
 
-  submitTx = async (txid: string) => {
+  const submitTx = async (txid: string) => {
     try {
-      const network = this.chromeStorageService.getNetwork();
-      const res = await axios.post(`${this.getBaseUrl(network)}/api/tx/${txid}/submit`);
+      const res = await axios.post(`${getOrdinalsBaseUrl()}/api/tx/${txid}/submit`);
 
       if (res.status !== 0) {
         console.error('submitTx failed: ', txid);
@@ -71,10 +133,9 @@ export class GorillaPoolService {
     }
   };
 
-  getUtxoByOutpoint = async (outpoint: string): Promise<OrdinalTxo> => {
+  const getUtxoByOutpoint = async (outpoint: string): Promise<OrdinalTxo> => {
     try {
-      const network = this.chromeStorageService.getNetwork();
-      const { data } = await axios.get(`${this.getBaseUrl(network)}/api/txos/${outpoint}?script=true`);
+      const { data } = await axios.get(`${getOrdinalsBaseUrl()}/api/txos/${outpoint}?script=true`);
       const ordUtxo: OrdinalTxo = data;
       if (!ordUtxo.script) throw Error('No script when fetching by outpoint');
       ordUtxo.script = Buffer.from(ordUtxo.script, 'base64').toString('hex');
@@ -84,10 +145,9 @@ export class GorillaPoolService {
     }
   };
 
-  getMarketData = async (outpoint: string) => {
+  const getMarketData = async (outpoint: string) => {
     try {
-      const network = this.chromeStorageService.getNetwork();
-      const res = await axios.get(`${this.getBaseUrl(network)}/api/inscriptions/${outpoint}?script=true`);
+      const res = await axios.get(`${getOrdinalsBaseUrl()}/api/inscriptions/${outpoint}?script=true`);
       const data = res.data as OrdinalTxo;
       if (!data?.script || !data.origin?.outpoint.toString()) throw new Error('Could not get listing script');
       return { script: data.script, origin: data.origin.outpoint.toString() };
@@ -96,10 +156,9 @@ export class GorillaPoolService {
     }
   };
 
-  getBsv20Balances = async (ordAddress: string) => {
-    const network = this.chromeStorageService.getNetwork();
-    if (!isAddressOnRightNetwork(network, ordAddress)) return [];
-    const res = await axios.get(`${this.getBaseUrl(network)}/api/bsv20/${ordAddress}/balance`);
+  const getBsv20Balances = async (ordAddress: string) => {
+    if (!isAddressOnRightNetwork(ordAddress)) return [];
+    const res = await axios.get(`${getOrdinalsBaseUrl()}/api/bsv20/${ordAddress}/balance`);
 
     const bsv20List: Array<BSV20> = res.data.map(
       (b: {
@@ -139,16 +198,15 @@ export class GorillaPoolService {
     return bsv20List;
   };
 
-  getBSV20Utxos = async (tick: string, address: string): Promise<BSV20Txo[] | undefined> => {
+  const getBSV20Utxos = async (tick: string, address: string): Promise<BSV20Txo[] | undefined> => {
     try {
-      const network = this.chromeStorageService.getNetwork();
       if (!address) {
         return [];
       }
 
       const url = isBSV20v2(tick)
-        ? `${this.getBaseUrl(network)}/api/bsv20/${address}/id/${tick}`
-        : `${this.getBaseUrl(network)}/api/bsv20/${address}/tick/${tick}`;
+        ? `${getOrdinalsBaseUrl()}/api/bsv20/${address}/id/${tick}`
+        : `${getOrdinalsBaseUrl()}/api/bsv20/${address}/tick/${tick}`;
 
       const r = await axios.get(url);
 
@@ -163,12 +221,11 @@ export class GorillaPoolService {
     }
   };
 
-  getBsv20Details = async (tick: string) => {
+  const getBsv20Details = async (tick: string) => {
     try {
-      const network = this.chromeStorageService.getNetwork();
       const url = isBSV20v2(tick)
-        ? `${this.getBaseUrl(network)}/api/bsv20/id/${tick}`
-        : `${this.getBaseUrl(network)}/api/bsv20/tick/${tick}`;
+        ? `${getOrdinalsBaseUrl()}/api/bsv20/id/${tick}`
+        : `${getOrdinalsBaseUrl()}/api/bsv20/tick/${tick}`;
 
       const r = await axios.get<Token>(url);
 
@@ -178,13 +235,12 @@ export class GorillaPoolService {
     }
   };
 
-  getLockedBsvUtxos = async (address: string) => {
+  const getLockedBsvUtxos = async (address: string) => {
     try {
-      const network = this.chromeStorageService.getNetwork();
-      if (!isAddressOnRightNetwork(network, address)) return [];
-      //TODO: use this instead of test endpoint - `${this.getBaseUrl(network)}/api/locks/address/${address}/unspent?limit=100&offset=0`
+      if (!isAddressOnRightNetwork(address)) return [];
+      //TODO: use this instead of test endpoint - `${getOrdinalsBaseUrl()}/api/locks/address/${address}/unspent?limit=100&offset=0`
       const { data } = await axios.get(
-        `${this.getBaseUrl(network)}/api/locks/address/${address}/unspent?limit=100&offset=0`,
+        `${getOrdinalsBaseUrl()}/api/locks/address/${address}/unspent?limit=100&offset=0`,
       );
       const lockedUtxos: OrdinalTxo[] = data;
       return lockedUtxos.filter((utxo) => !utxo.data?.bsv20);
@@ -193,15 +249,14 @@ export class GorillaPoolService {
     }
   };
 
-  getSpentTxids = async (outpoints: string[]): Promise<Map<string, string>> => {
+  const getSpentTxids = async (outpoints: string[]): Promise<Map<string, string>> => {
     try {
-      const network = this.chromeStorageService.getNetwork();
       const chunks = chunkedStringArray(outpoints, 50);
       const spentTxids = new Map<string, string>();
       for (const chunk of chunks) {
         try {
           //TODO: updata url to be dynamic for testnet
-          const res = await axios.post(`${this.getBaseUrl(network)}/api/spends`, chunk);
+          const res = await axios.post(`${getOrdinalsBaseUrl()}/api/spends`, chunk);
           const txids = res.data as string[];
           txids.forEach((txid, i) => {
             spentTxids.set(chunk[i], txid);
@@ -217,10 +272,9 @@ export class GorillaPoolService {
     }
   };
 
-  getOrdContentByOriginOutpoint = async (originOutpoint: string) => {
+  const getOrdContentByOriginOutpoint = async (originOutpoint: string) => {
     try {
-      const network = this.chromeStorageService.getNetwork();
-      const res = await axios.get(`${this.getBaseUrl(network)}/content/${originOutpoint}?fuzzy=false`, {
+      const res = await axios.get(`${getOrdinalsBaseUrl()}/content/${originOutpoint}?fuzzy=false`, {
         responseType: 'arraybuffer',
       });
       return Buffer.from(res.data);
@@ -229,14 +283,13 @@ export class GorillaPoolService {
     }
   };
 
-  setDerivationTags = async (identityAddress: string, keys: Keys) => {
-    const taggedOrds = await this.getOrdUtxos(identityAddress);
+  const setDerivationTags = async (identityAddress: string, keys: Keys) => {
+    const taggedOrds = await getOrdUtxos(identityAddress);
     const tags: TaggedDerivationResponse[] = [];
-    const network = this.chromeStorageService.getNetwork();
     for (const ord of taggedOrds) {
       try {
         if (!ord.origin?.outpoint || ord.origin.data?.insc?.file.type !== 'panda/tag') continue;
-        const contentBuffer = await this.getOrdContentByOriginOutpoint(ord.origin.outpoint.toString());
+        const contentBuffer = await getOrdContentByOriginOutpoint(ord.origin.outpoint.toString());
         if (!contentBuffer || contentBuffer.length === 0) continue;
 
         const derivationTag = decryptUsingPrivKey(
@@ -257,20 +310,12 @@ export class GorillaPoolService {
       }
     }
 
-    const { account } = this.chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found!');
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [account.addresses.identityAddress]: {
-        ...account,
-        derivationTags: tags,
-      },
-    };
-    await this.chromeStorageService.updateNested(key, update);
+    await storage.set({ derivationTags: tags });
   };
 
-  getTxOut = async (txid: string, vout: number) => {
+  const getTxOut = async (txid: string, vout: number) => {
     try {
+      await init();
       const { data } = await axios.get(`${JUNGLE_BUS_URL}/v1/txo/get/${txid}_${vout}`, { responseType: 'arraybuffer' });
       return TxOut.from_hex(Buffer.from(data).toString('hex'));
     } catch (error) {
@@ -278,10 +323,17 @@ export class GorillaPoolService {
     }
   };
 
-  updateStoredPaymentUtxos = async (rawtx: string) => {
-    const { account } = this.chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found!');
-    const { addresses, paymentUtxos } = account;
+  const updateStoredPaymentUtxos = async (rawtx: string) => {
+    await init();
+    const localStorage = await new Promise<{
+      paymentUtxos: StoredUtxo[];
+      appState: { addresses: { bsvAddress: string } };
+    }>((resolve) => {
+      storage.get(['paymentUtxos', 'appState']).then((result) => resolve(result));
+    });
+
+    const { paymentUtxos, appState } = localStorage;
+    const { addresses } = appState;
     const { bsvAddress } = addresses;
 
     const tx = Transaction.from_hex(rawtx);
@@ -319,24 +371,15 @@ export class GorillaPoolService {
         });
       }
     }
-
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [account.addresses.identityAddress]: {
-        ...account,
-        paymentUtxos,
-      },
-    };
-    await this.chromeStorageService.updateNested(key, update);
+    await storage.set({ paymentUtxos });
     return paymentUtxos;
   };
 
-  getTokenPriceInSats = async (tokenIds: string[]) => {
-    const network = this.chromeStorageService.getNetwork();
+  const getTokenPriceInSats = async (tokenIds: string[]) => {
     const result: { id: string; satPrice: number }[] = [];
     for (const tokenId of tokenIds) {
       const { data } = await axios.get<MarketResponse[]>(
-        `${this.getBaseUrl(network)}/api/bsv20/market?sort=price_per_token&dir=asc&limit=1&offset=0&${
+        `${getOrdinalsBaseUrl()}/api/bsv20/market?sort=price_per_token&dir=asc&limit=1&offset=0&${
           tokenId.length > 30 ? 'id' : 'tick'
         }=${tokenId}`,
       );
@@ -346,4 +389,21 @@ export class GorillaPoolService {
     }
     return result;
   };
-}
+
+  return {
+    getOrdUtxos,
+    broadcastWithGorillaPool,
+    getUtxoByOutpoint,
+    getMarketData,
+    getBsv20Balances,
+    getBSV20Utxos,
+    getLockedBsvUtxos,
+    getSpentTxids,
+    submitTx,
+    getOrdContentByOriginOutpoint,
+    setDerivationTags,
+    getTxOut,
+    getBsv20Details,
+    getTokenPriceInSats,
+  };
+};

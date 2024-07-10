@@ -8,6 +8,7 @@ import { SnackbarProvider } from './contexts/SnackbarContext';
 import { useActivityDetector } from './hooks/useActivityDetector';
 import { useTheme } from './hooks/useTheme';
 import { useViewport } from './hooks/useViewport';
+import { useWalletLockState } from './hooks/useWalletLockState';
 import { AppsAndTools } from './pages/AppsAndTools';
 import { BsvWallet } from './pages/BsvWallet';
 import { CreateWallet } from './pages/onboarding/CreateWallet';
@@ -28,7 +29,7 @@ import { SignMessageRequest } from './pages/requests/SignMessageRequest';
 import { Settings } from './pages/Settings';
 import { ColorThemeProps } from './theme';
 import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
-import { useServiceContext } from './hooks/useServiceContext';
+import { useAppStateContext } from './hooks/useAppStateContext';
 
 const MainContainer = styled.div<{ $isMobile?: boolean }>`
   display: flex;
@@ -51,9 +52,9 @@ const Container = styled.div<ColorThemeProps>`
 `;
 
 export const App = () => {
+  const { isLocked } = useWalletLockState();
   const { isMobile } = useViewport();
   const { theme } = useTheme();
-  const { chromeStorageService, isLocked, isReady } = useServiceContext();
   const menuContext = useContext(BottomMenuContext);
   const {
     connectRequest,
@@ -68,20 +69,13 @@ export const App = () => {
     decryptRequest,
     clearRequest,
     popupId,
-    getStorageAndSetRequestState,
   } = useWeb3RequestContext();
 
-  const { account } = chromeStorageService.getCurrentAccountObject();
-  const whitelistedApps = account?.settings?.whitelist ?? [];
+  const { whitelistedApps } = useAppStateContext();
 
-  useActivityDetector(isLocked, chromeStorageService);
-
-  useEffect(() => {
-    getStorageAndSetRequestState(chromeStorageService);
-  }, [chromeStorageService, getStorageAndSetRequestState]);
+  useActivityDetector(isLocked);
 
   const handleUnlock = async () => {
-    //TODO: prob a better way to do this
     window.location.reload();
   };
 
@@ -97,10 +91,10 @@ export const App = () => {
 
   return (
     <MainContainer $isMobile={isMobile}>
-      <BottomMenuProvider network={chromeStorageService.getNetwork()}>
+      <BottomMenuProvider>
         <Container theme={theme}>
           <SnackbarProvider>
-            <Show when={!isLocked && isReady} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
+            <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
               <Router>
                 <Routes>
                   <Route path="/" element={<Start />} />

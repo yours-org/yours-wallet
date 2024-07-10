@@ -13,16 +13,18 @@ import { SpeedBump } from '../components/SpeedBump';
 import { ToggleSwitch } from '../components/ToggleSwitch';
 import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
+import { useKeys } from '../hooks/useKeys';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
-import { useServiceContext } from '../hooks/useServiceContext';
+import { useWalletLockState } from '../hooks/useWalletLockState';
+import { useAppStateContext } from '../hooks/useAppStateContext';
 import { WhitelistedApp } from '../inject';
 import { ColorThemeProps } from '../theme';
 import { sendMessage } from '../utils/chromeHelpers';
 import { SNACKBAR_TIMEOUT } from '../utils/constants';
-import { ChromeStorageObject } from '../services/types/chromeStorage.types';
-import { NetWork } from 'yours-wallet-provider';
+import { NetWork } from '../utils/network';
+import { storage } from '../utils/storage';
 
 const Content = styled.div`
   display: flex;
@@ -110,28 +112,34 @@ type DecisionType = 'sign-out' | 'export-keys' | 'export-keys-qr-code';
 export const Settings = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
+  const { lockWallet } = useWalletLockState();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, keysService, lockWallet } = useServiceContext();
+  const {
+    network,
+    updateNetwork,
+    isPasswordRequired,
+    updatePasswordRequirement,
+    updateNoApprovalLimit,
+    noApprovalLimit,
+  } = useAppStateContext();
   const [page, setPage] = useState<SettingsPage>('main');
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
-  const { socialProfile, storeSocialProfile } = useSocialProfile(chromeStorageService);
+  const { retrieveKeys } = useKeys();
+  const { socialProfile, storeSocialProfile } = useSocialProfile();
   const [exportKeysQrData, setExportKeysAsQrData] = useState('');
   const [shouldVisibleExportedKeys, setShouldVisibleExportedKeys] = useState(false);
+
   const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState(socialProfile.displayName);
   const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(socialProfile?.avatar);
-  const network = chromeStorageService.getNetwork();
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const noApprovalLimit = chromeStorageService.getCurrentAccountObject().account?.settings.noApprovalLimit ?? 0;
 
   useEffect(() => {
-    const getWhitelist = async (): Promise<WhitelistedApp[]> => {
+    const getWhitelist = async (): Promise<string[]> => {
+      const result = await storage.get(['whitelist']);
       try {
-        const { account } = chromeStorageService.getCurrentAccountObject();
-        if (!account) return [];
-        const { whitelist } = account.settings;
+        const { whitelist } = result;
         setConnectedApps(whitelist ?? []);
         return whitelist ?? [];
       } catch (error) {
@@ -141,24 +149,11 @@ export const Settings = () => {
     };
 
     getWhitelist();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRemoveDomain = async (domain: string) => {
+  const handleRemoveDomain = (domain: string) => {
     const newList = connectedApps.filter((app) => app.domain !== domain);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) return [];
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
-        ...account,
-        settings: {
-          ...account.settings,
-          whitelist: newList,
-        },
-      },
-    };
-    await chromeStorageService.updateNested(key, update);
+    storage.set({ whitelist: newList });
     setConnectedApps(newList);
   };
 
@@ -199,7 +194,7 @@ export const Settings = () => {
   }, [socialProfile]);
 
   const exportKeys = async (password: string) => {
-    const keys = await keysService.retrieveKeys(password);
+    const keys = await retrieveKeys(password);
 
     const keysToExport = {
       mnemonic: keys.mnemonic,
@@ -224,7 +219,7 @@ export const Settings = () => {
   };
 
   const exportKeysAsQrCode = async (password: string) => {
-    const keys = await keysService.retrieveKeys(password);
+    const keys = await retrieveKeys(password);
 
     const keysToExport = {
       mnemonic: keys.mnemonic,
@@ -245,7 +240,7 @@ export const Settings = () => {
   };
 
   const signOut = async () => {
-    await chromeStorageService.clear();
+    await storage.clear();
     setDecisionType(undefined);
     window.location.reload();
 
@@ -262,24 +257,12 @@ export const Settings = () => {
     setSelected('settings');
   }, [setSelected]);
 
-  const handleNetworkChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newNetwork = e.target.checked ? ('testnet' as NetWork) : ('mainnet' as NetWork);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found');
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
-        ...account,
-        settings: {
-          ...account.settings,
-          network: newNetwork,
-        },
-      },
-    };
-    await chromeStorageService.updateNested(key, update);
+  const handleNetworkChange = (e: any) => {
+    const network = e.target.checked ? NetWork.Testnet : NetWork.Mainnet;
+    updateNetwork(network);
 
     // The provider relies on appState in local storage to accurately return addresses. This is an easy way to handle making sure the state is always up to date.
-    addSnackbar(`Switching to ${newNetwork}`, 'info');
+    addSnackbar(`Switching to ${network}`, 'info');
     setTimeout(() => {
       window.location.reload();
     }, SNACKBAR_TIMEOUT - 500);
@@ -287,7 +270,7 @@ export const Settings = () => {
     sendMessage({
       action: 'networkChanged',
       params: {
-        network: newNetwork,
+        network,
       },
     });
   };
@@ -309,35 +292,6 @@ export const Settings = () => {
     }
   };
 
-  const handleUpdatePasswordRequirement = async (isRequired: boolean) => {
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found');
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
-        ...account,
-        isPasswordRequired: isRequired,
-      },
-    };
-    await chromeStorageService.updateNested(key, update);
-  };
-
-  const handleUpdateApprovalLimit = async (amount: number) => {
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found');
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
-        ...account,
-        settings: {
-          ...account.settings,
-          noApprovalLimit: amount,
-        },
-      },
-    };
-    await chromeStorageService.updateNested(key, update);
-  };
-
   const main = (
     <>
       <SettingsRow
@@ -355,9 +309,7 @@ export const Settings = () => {
       <SettingsRow
         name="Testnet Mode"
         description="Applies to balances and app connections"
-        jsxElement={
-          <ToggleSwitch theme={theme} on={network === ('testnet' as NetWork)} onChange={handleNetworkChange} />
-        }
+        jsxElement={<ToggleSwitch theme={theme} on={network === NetWork.Testnet} onChange={handleNetworkChange} />}
       />
       <SettingsRow
         name="Export Keys"
@@ -434,7 +386,7 @@ export const Settings = () => {
           <ToggleSwitch
             theme={theme}
             on={isPasswordRequired}
-            onChange={() => handleUpdatePasswordRequirement(!isPasswordRequired)}
+            onChange={() => updatePasswordRequirement(!isPasswordRequired)}
           />
         }
       />
@@ -446,7 +398,7 @@ export const Settings = () => {
             theme={theme}
             placeholder={String(noApprovalLimit)}
             type="number"
-            onChange={(e) => handleUpdateApprovalLimit(Number(e.target.value))}
+            onChange={(e) => updateNoApprovalLimit(Number(e.target.value))}
             value={noApprovalLimit}
             style={{ width: '5rem', margin: 0 }}
           />

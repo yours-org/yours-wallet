@@ -1,4 +1,4 @@
-import { P2PKHAddress, Transaction } from 'bsv-wasm-web';
+import init, { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
 import { Broadcast } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
@@ -8,12 +8,14 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { useBsv } from '../../hooks/useBsv';
+import { useGorillaPool } from '../../hooks/useGorillaPool';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
-import { useServiceContext } from '../../hooks/useServiceContext';
+import { storage } from '../../utils/storage';
 
 export type BroadcastResponse = {
   txid: string;
@@ -33,11 +35,8 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const { addSnackbar, message } = useSnackbar();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [satsOut, setSatsOut] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const { gorillaPoolService, keysService, bsvService, chromeStorageService } = useServiceContext();
-  const { updateBsvBalance, fundRawTx } = bsvService;
-  const { bsvAddress } = keysService;
-  // const { isProcessing, setIsProcessing, updateBsvBalance, fundRawTx, bsvAddress } = useBsv();
+  const { broadcastWithGorillaPool } = useGorillaPool();
+  const { isProcessing, setIsProcessing, updateBsvBalance, fundRawTx, bsvAddress } = useBsv();
 
   useEffect(() => {
     setSelected('bsv');
@@ -59,6 +58,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   useEffect(() => {
     if (!bsvAddress) return;
     (async () => {
+      await init();
       const tx = Transaction.from_hex(request.rawtx);
       let satsOut = 0;
       const changeScript = P2PKHAddress.from_string(bsvAddress).get_locking_script().to_hex();
@@ -99,7 +99,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       }
       rawtx = res.rawtx;
     }
-    const { txid, message } = await gorillaPoolService.broadcastWithGorillaPool(rawtx);
+    const { txid, message } = await broadcastWithGorillaPool(rawtx);
     if (!txid) {
       addSnackbar('Error broadcasting the raw tx!', 'error');
       setIsProcessing(false);
@@ -127,7 +127,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   };
 
   const clearRequest = async () => {
-    await chromeStorageService.remove('broadcastRequest');
+    await storage.remove('broadcastRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();
   };

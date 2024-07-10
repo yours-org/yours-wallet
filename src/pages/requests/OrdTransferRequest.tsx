@@ -8,12 +8,14 @@ import { Ordinal } from '../../components/Ordinal';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
+import { useOrds } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useServiceContext } from '../../hooks/useServiceContext';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
+import { storage } from '../../utils/storage';
 
 export type OrdTransferRequestProps = {
   request: TransferOrdinal;
@@ -24,24 +26,21 @@ export type OrdTransferRequestProps = {
 export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
-  // const { getOrdinals, transferOrdinal, getOrdinalsBaseUrl, ordinals } = useOrds();
-  const [isProcessing, setIsProcessing] = useState(false);
+  const { ordAddress, getOrdinals, isProcessing, transferOrdinal, setIsProcessing, getOrdinalsBaseUrl, ordinals } =
+    useOrds();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, ordinalService, keysService, gorillaPoolService } = useServiceContext();
-  const { ordAddress } = keysService;
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const network = chromeStorageService.getNetwork();
+  const { isPasswordRequired } = useAppStateContext();
 
   useEffect(() => {
     if (!successTxId) return;
     if (!message && ordAddress) {
       resetSendState();
-      ordinalService.getOrdinals(ordAddress);
+      getOrdinals();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successTxId, message, ordAddress]);
+  }, [successTxId, message, getOrdinals, ordAddress]);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -66,7 +65,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
       return;
     }
 
-    const transferRes = await ordinalService.transferOrdinal(request.address, request.outpoint, passwordConfirm);
+    const transferRes = await transferOrdinal(request.address, request.outpoint, passwordConfirm);
 
     if (!transferRes.txid || transferRes.error) {
       const message =
@@ -93,7 +92,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   };
 
   const clearRequest = async () => {
-    await chromeStorageService.remove('transferOrdinalRequest');
+    await storage.remove('transferOrdinalRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();
   };
@@ -109,9 +108,9 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Ordinal
-            inscription={ordinalService.ordinals.data.filter((ord) => ord.outpoint.toString() === request.outpoint)[0]}
+            inscription={ordinals.data.filter((ord) => ord.outpoint.toString() === request.outpoint)[0]}
             theme={theme}
-            url={`${gorillaPoolService.getBaseUrl(network)}/content/${request.origin}`}
+            url={`${getOrdinalsBaseUrl()}/content/${request.origin}`}
             selected={true}
           />
           <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>

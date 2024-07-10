@@ -1,8 +1,9 @@
 import styled from 'styled-components';
+import { OrdinalTxo } from '../hooks/ordTypes';
 import { ColorThemeProps, Theme } from '../theme';
 import { Text } from './Reusable';
 import { Show } from './Show';
-import { OrdinalTxo } from '../services/types/ordinal.types';
+import React from 'react';
 
 export type OrdinalDivProps = ColorThemeProps & {
   url: string;

@@ -1,4 +1,4 @@
-import { P2PKHAddress, Transaction } from 'bsv-wasm-web';
+import init, { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
 import { DefaultTheme, styled } from 'styled-components';
 import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
@@ -9,11 +9,13 @@ import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { useContracts } from '../../hooks/useContracts';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useServiceContext } from '../../hooks/useServiceContext';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { sleep } from '../../utils/sleep';
+import { storage } from '../../utils/storage';
 
 const TxInput = styled.div`
   border: 1px solid yellow;
@@ -112,6 +114,7 @@ const TxViewer = (props: { request: GetSignatures }) => {
   useEffect(() => {
     const setTheTx = async () => {
       try {
+        await init();
         const tx = Transaction.from_hex(request.rawtx);
         const numOuts = tx.get_noutputs();
         const outputs: { asm: string; satoshis: number }[] = [];
@@ -209,8 +212,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { setSelected } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, contractService } = useServiceContext();
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
+  const { isPasswordRequired } = useAppStateContext();
 
   const { request, onSignature, popupId } = props;
   //TODO: this type should just be the response from the provider. Figure out how to better handle error.
@@ -224,7 +226,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
         }
       | undefined;
   }>();
-  const [isProcessing, setIsProcessing] = useState(false);
+  const { isProcessing, setIsProcessing, getSignatures } = useContracts();
 
   useEffect(() => {
     setSelected('bsv');
@@ -255,7 +257,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       return;
     }
 
-    const getSigsRes = await contractService.getSignatures(request, passwordConfirm);
+    const getSigsRes = await getSignatures(request, passwordConfirm);
 
     if (getSigsRes?.error) {
       const message =
@@ -292,11 +294,11 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const rejectSigning = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     e.preventDefault();
     if (popupId) removeWindow(popupId);
-    await chromeStorageService.remove('getSignaturesRequest');
+    await storage.remove('getSignaturesRequest');
   };
 
   const clearRequest = async () => {
-    await chromeStorageService.remove('getSignaturesRequest');
+    await storage.remove('getSignaturesRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();
   };

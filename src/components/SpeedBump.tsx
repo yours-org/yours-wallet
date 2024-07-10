@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { styled } from 'styled-components';
-import { useServiceContext } from '../hooks/useServiceContext';
+import { useKeys } from '../hooks/useKeys';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useViewport } from '../hooks/useViewport';
 import { ColorThemeProps, Theme } from '../theme';
@@ -41,7 +41,7 @@ export const SpeedBump = (props: SpeedBumpProps) => {
   const [password, setPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const { addSnackbar } = useSnackbar();
-  const { keysService } = useServiceContext();
+  const { verifyPassword } = useKeys();
 
   const handleConfirm = async () => {
     if (!withPassword) {
@@ -57,7 +57,7 @@ export const SpeedBump = (props: SpeedBumpProps) => {
         return;
       }
 
-      const isVerified = await keysService.verifyPassword(password);
+      const isVerified = await verifyPassword(password);
       if (!isVerified) {
         addSnackbar('Invalid password!', 'error');
         return;

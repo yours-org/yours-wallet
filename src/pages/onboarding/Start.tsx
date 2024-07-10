@@ -9,7 +9,7 @@ import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useTheme } from '../../hooks/useTheme';
 import { ColorThemeProps } from '../../theme';
 import yoursLogo from '../../assets/yours-logo.png';
-import { useServiceContext } from '../../hooks/useServiceContext';
+import { useAppStateContext } from '../../hooks/useAppStateContext';
 
 const Content = styled.div`
   display: flex;
@@ -32,9 +32,7 @@ export const Start = () => {
   const navigate = useNavigate();
   const [showStart, setShowStart] = useState(false);
   const { hideMenu, showMenu } = useBottomMenu();
-  const { chromeStorageService } = useServiceContext();
-  const { account } = chromeStorageService.getCurrentAccountObject();
-  const encryptedKeys = account?.encryptedKeys;
+  const { encryptedKeys } = useAppStateContext();
 
   useEffect(() => {
     hideMenu();
@@ -52,8 +50,7 @@ export const Start = () => {
     }
 
     setShowStart(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [encryptedKeys]);
+  }, [encryptedKeys, navigate]);
 
   return (
     <Show when={showStart}>
