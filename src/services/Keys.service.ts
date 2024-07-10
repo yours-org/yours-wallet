@@ -200,13 +200,11 @@ export class KeysService {
   verifyPassword = async (password: string): Promise<boolean> => {
     const isRequired = this.chromeStorageService.isPasswordRequired();
     if (!isRequired) return true;
-    const result = await this.chromeStorageService.getAndSetStorage();
-    if (!result) return false;
-    const { salt, passKey } = result;
+    const { salt, passKey } = this.chromeStorageService.getCurrentAccountObject();
     if (!salt || !passKey) return false;
     try {
       const derivedKey = deriveKey(password, salt);
-      return derivedKey === result.passKey;
+      return derivedKey === passKey;
     } catch (error) {
       return false;
     }

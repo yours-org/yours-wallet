@@ -65,6 +65,7 @@ export interface ChromeStorageObject {
   salt: string;
   isLocked: boolean;
   colorTheme: Theme;
+  version?: number;
   connectRequest?: ConnectRequest;
   sendBsvRequest?: SendBsv[];
   transferOrdinalRequest?: TransferOrdinal;
@@ -96,3 +97,30 @@ export type CurrentAccountObject = Omit<
   | 'encryptRequest'
   | 'decryptRequest'
 > & { account: Account };
+
+type AppState = {
+  addresses: Addresses;
+  balance: Balance;
+  isLocked: boolean;
+  isPasswordRequired: boolean;
+  network: NetWork;
+  ordinals: Ordinal[];
+  pubKeys: PubKeys;
+};
+
+export type DeprecatedStorage = {
+  appState: AppState;
+  derivationTags: TaggedDerivationResponse[];
+  encryptedKeys: string;
+  exchangeRateCache: ExchangeRateCache;
+  socialProfile: SocialProfile;
+  noApprovalLimit: number;
+  lastActiveTime: number;
+  passKey: string;
+  network: NetWork;
+  paymentUtxos: StoredUtxo[];
+  salt: string;
+  whitelist: WhitelistedApp[];
+  colorTheme: Theme;
+  popupWindowId: number;
+};

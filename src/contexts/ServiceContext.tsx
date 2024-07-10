@@ -57,8 +57,8 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
       try {
         const initializedServices = await initializeServices();
         const { chromeStorageService, keysService, bsvService, ordinalService } = initializedServices;
-
         const { account } = chromeStorageService.getCurrentAccountObject();
+
         if (account) {
           const { bsvAddress, ordAddress } = account.addresses;
           if (bsvAddress && ordAddress) {
@@ -68,8 +68,8 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
             await ordinalService.getAndSetOrdinals(ordAddress);
           }
         }
-        setServices({ ...initializedServices, isLocked, isReady, lockWallet });
 
+        setServices({ ...initializedServices, isLocked, isReady, lockWallet });
         setIsReady(true);
       } catch (error) {
         console.error('Error initializing services:', error);
