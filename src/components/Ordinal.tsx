@@ -1,9 +1,8 @@
 import styled from 'styled-components';
-import { OrdinalTxo } from '../hooks/ordTypes';
+import { Ordinal as OrdinalType } from 'yours-wallet-provider';
 import { ColorThemeProps, Theme } from '../theme';
 import { Text } from './Reusable';
 import { Show } from './Show';
-import React from 'react';
 
 export type OrdinalDivProps = ColorThemeProps & {
   url: string;
@@ -91,7 +90,7 @@ export type OrdinalProps = {
   isTransfer?: boolean;
   selected?: boolean;
   size?: string;
-  inscription: OrdinalTxo;
+  inscription: OrdinalType;
   onClick?: () => void;
 };
 

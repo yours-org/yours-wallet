@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useState, ReactNode } from 'react';
 import {
   Broadcast,
   DecryptRequest,
@@ -11,8 +11,8 @@ import {
   TransferOrdinal,
 } from 'yours-wallet-provider';
 import { RequestParams } from '../inject';
-import { storage } from '../utils/storage';
-import { ChromeStorageObject } from './types/global.types';
+import { ChromeStorageService } from '../services/ChromeStorage.service';
+import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 
 export type Web3RequestContextProps = {
   connectRequest: RequestParams | undefined;
@@ -26,6 +26,7 @@ export type Web3RequestContextProps = {
   encryptRequest: EncryptRequest | undefined;
   decryptRequest: DecryptRequest | undefined;
   popupId: number | undefined;
+  getStorageAndSetRequestState: (chromeStorageService: ChromeStorageService) => void;
   clearRequest: (type: keyof Omit<Web3RequestContextProps, 'clearRequest'>) => void;
 };
 
@@ -59,42 +60,38 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     setDecryptRequest(undefined);
   };
 
-  useEffect(() => {
-    const handleRequestStates = async (result: Partial<ChromeStorageObject>) => {
-      const {
-        connectRequest,
-        sendBsvRequest,
-        transferOrdinalRequest,
-        purchaseOrdinalRequest,
-        signMessageRequest,
-        broadcastRequest,
-        getSignaturesRequest,
-        generateTaggedKeysRequest,
-        encryptRequest,
-        decryptRequest,
-        popupWindowId,
-      } = result;
+  const handleRequestStates = async (result: Partial<ChromeStorageObject>) => {
+    const {
+      connectRequest,
+      sendBsvRequest,
+      transferOrdinalRequest,
+      purchaseOrdinalRequest,
+      signMessageRequest,
+      broadcastRequest,
+      getSignaturesRequest,
+      generateTaggedKeysRequest,
+      encryptRequest,
+      decryptRequest,
+      popupWindowId,
+    } = result;
 
-      if (connectRequest) setConnectRequest(connectRequest);
-      if (sendBsvRequest) setSendBsvRequest(sendBsvRequest);
-      if (transferOrdinalRequest) setTransferOrdinalRequest(transferOrdinalRequest);
-      if (purchaseOrdinalRequest) setPurchaseOrdinalRequest(purchaseOrdinalRequest);
-      if (signMessageRequest) setSignMessageRequest(signMessageRequest);
-      if (broadcastRequest) setBroadcastRequest(broadcastRequest);
-      if (getSignaturesRequest) setGetSignaturesRequest(getSignaturesRequest);
-      if (generateTaggedKeysRequest) setGenerateTaggedKeysRequest(generateTaggedKeysRequest);
-      if (encryptRequest) setEncryptRequest(encryptRequest);
-      if (decryptRequest) setDecryptRequest(decryptRequest);
-      if (popupWindowId) setPopupId(popupWindowId);
-    };
+    if (connectRequest) setConnectRequest(connectRequest);
+    if (sendBsvRequest) setSendBsvRequest(sendBsvRequest);
+    if (transferOrdinalRequest) setTransferOrdinalRequest(transferOrdinalRequest);
+    if (purchaseOrdinalRequest) setPurchaseOrdinalRequest(purchaseOrdinalRequest);
+    if (signMessageRequest) setSignMessageRequest(signMessageRequest);
+    if (broadcastRequest) setBroadcastRequest(broadcastRequest);
+    if (getSignaturesRequest) setGetSignaturesRequest(getSignaturesRequest);
+    if (generateTaggedKeysRequest) setGenerateTaggedKeysRequest(generateTaggedKeysRequest);
+    if (encryptRequest) setEncryptRequest(encryptRequest);
+    if (decryptRequest) setDecryptRequest(decryptRequest);
+    if (popupWindowId) setPopupId(popupWindowId);
+  };
 
-    const getStorageAndSetRequestState = async () => {
-      const res: ChromeStorageObject = await storage.get(null); // passing null returns everything in storage
-      handleRequestStates(res);
-    };
-
-    getStorageAndSetRequestState();
-  }, []);
+  const getStorageAndSetRequestState = async (chromeStorageService: ChromeStorageService) => {
+    const res = await chromeStorageService.getAndSetStorage();
+    if (res) handleRequestStates(res);
+  };
 
   return (
     <Web3RequestContext.Provider
@@ -111,6 +108,7 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
         decryptRequest,
         clearRequest,
         popupId,
+        getStorageAndSetRequestState,
       }}
     >
       {children}

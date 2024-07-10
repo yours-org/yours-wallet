@@ -3,6 +3,7 @@
   "version": "3.3.0",
   "private": true,
   "dependencies": {
+    "@bsv/sdk": "^1.1.12",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
@@ -38,7 +39,7 @@
     "url": "^0.11.3",
     "util": "^0.12.5",
     "web-vitals": "^2.1.4",
-    "yours-wallet-provider": "^2.4.7"
+    "yours-wallet-provider": "^2.5.2"
   },
   "overrides": {
     "bsv-wasm": "$bsv-wasm",

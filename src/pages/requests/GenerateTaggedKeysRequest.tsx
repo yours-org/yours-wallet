@@ -8,19 +8,15 @@ import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
-import { useBsv } from '../../hooks/useBsv';
-import { useGorillaPool } from '../../hooks/useGorillaPool';
-import { useKeys } from '../../hooks/useKeys';
-import { useNetwork } from '../../hooks/useNetwork';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useAppStateContext } from '../../hooks/useAppStateContext';
+import { useServiceContext } from '../../hooks/useServiceContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { encryptUsingPrivKey } from '../../utils/crypto';
 import { truncate } from '../../utils/format';
 import { getPrivateKeyFromTag, getTaggedDerivationKeys, Keys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
-import { storage } from '../../utils/storage';
+import { getChainParams } from '../../services/serviceHelpers';
 
 export type GenerateTaggedKeysRequestProps = {
   request: TaggedDerivationRequest & { domain?: string };
@@ -39,14 +35,12 @@ export type TaggedDerivationResponse = {
 export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps) => {
   const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
-  const { network } = useNetwork();
-  const { isProcessing, setIsProcessing, sendBsv, getChainParams } = useBsv();
-  const { setDerivationTags } = useGorillaPool();
-  const { retrieveKeys } = useKeys();
+  const [isProcessing, setIsProcessing] = useState(false);
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useAppStateContext();
+  const { chromeStorageService, gorillaPoolService, keysService, bsvService } = useServiceContext();
+  const isPasswordRequired = chromeStorageService.isPasswordRequired();
 
   useEffect(() => {
     if (!successTxId) return;
@@ -73,7 +67,9 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
         return { error: 'no-keys' };
       }
 
-      const { derivationTags } = await storage.get(['derivationTags']);
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) throw Error('No account found');
+      const derivationTags = account.derivationTags ?? [];
 
       const existingTag = derivationTags.find(
         (res: TaggedDerivationResponse) =>
@@ -100,12 +96,13 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
         encryptedMessages[0],
         'panda/tag',
       );
-      const txid = await sendBsv([{ satoshis: 1, script: insScript.to_hex() }], password);
+      const txid = await bsvService.sendBsv([{ satoshis: 1, script: insScript.to_hex() }], password);
 
       if (!txid) {
         return { error: 'no-txid' };
       }
 
+      const network = chromeStorageService.getNetwork();
       const taggedAddress = P2PKHAddress.from_string(taggedKeys.address)
         .set_chain_params(getChainParams(network))
         .to_string();
@@ -146,7 +143,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       return;
     }
 
-    const keys = (await retrieveKeys(passwordConfirm)) as Keys;
+    const keys = (await keysService.retrieveKeys(passwordConfirm)) as Keys;
     const res = await createTaggedKeys(passwordConfirm, request as DerivationTag, keys);
     //TODO: look into this... doesn't seem optimal
     setIsProcessing(true); // sendBsv call in createTaggedKeys sets to false but it's still processing at this point
@@ -167,7 +164,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     }
 
     await sleep(3000); // give enough time for indexer to index newly created tag
-    await setDerivationTags(keys.identityAddress, keys);
+    await gorillaPoolService.setDerivationTags(keys.identityAddress, keys);
 
     setSuccessTxId(res.pubKey);
     setIsProcessing(false);
@@ -183,7 +180,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
   };
 
   const clearRequest = async () => {
-    await storage.remove('generateTaggedKeysRequest');
+    await chromeStorageService.remove('generateTaggedKeysRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();
   };

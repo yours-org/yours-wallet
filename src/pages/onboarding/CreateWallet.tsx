@@ -7,14 +7,13 @@ import { PageLoader } from '../../components/PageLoader';
 import { HeaderText, Text, YoursLogo } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useKeys } from '../../hooks/useKeys';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { ColorThemeProps } from '../../theme';
 import { sleep } from '../../utils/sleep';
 import copyIcon from '../../assets/copy-green.svg';
 import yoursLogo from '../../assets/yours-logo.png';
-import { useAppStateContext } from '../../hooks/useAppStateContext';
+import { useServiceContext } from '../../hooks/useServiceContext';
 
 const Content = styled.div`
   display: flex;
@@ -67,10 +66,9 @@ export const CreateWallet = () => {
   const [seedWords, setSeedWords] = useState<string[]>([]);
 
   const { addSnackbar } = useSnackbar();
-  const { generateSeedAndStoreEncrypted } = useKeys();
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
-  const { setEncryptedKeys } = useAppStateContext();
+  const { keysService } = useServiceContext();
 
   useEffect(() => {
     hideMenu();
@@ -97,11 +95,8 @@ export const CreateWallet = () => {
 
     // Some artificial delay for the loader
     await sleep(50);
-    const mnemonic = generateSeedAndStoreEncrypted(password);
+    const mnemonic = await keysService.generateSeedAndStoreEncrypted(password);
     setSeedWords(mnemonic.split(' '));
-
-    // Save the encrypted keys to context
-    setEncryptedKeys(mnemonic);
 
     setLoading(false);
     setStep(2);

@@ -1,49 +1,39 @@
-import init, { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
-import { useEffect, useState } from 'react';
-import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
+import { Hash, P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
+import { GetSignatures, Ordinal, SignatureResponse } from 'yours-wallet-provider';
 import { DUST, FEE_PER_BYTE, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
-import { OrdinalTxo } from './ordTypes';
-import { useGorillaPool } from './useGorillaPool';
-import { useKeys } from './useKeys';
+import { GorillaPoolService } from './GorillaPool.service';
+import { KeysService } from './Keys.service';
 
 const DEFAULT_SIGHASH_TYPE = 65; // SIGHASH_ALL | SIGHASH_FORKID
 
-export const useContracts = () => {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const { retrieveKeys, bsvAddress, ordAddress, verifyPassword, identityAddress } = useKeys();
-  const { broadcastWithGorillaPool } = useGorillaPool();
+export class ContractService {
+  constructor(
+    private readonly keysService: KeysService,
+    private readonly gorillaPoolService: GorillaPoolService,
+  ) {}
 
-  /**
-   *
-   * @param request An object containing the raw transaction hex and signature request informations.
-   * @param password The confirm password to unlock the private keys.
-   * @returns A promise which resolves to a list of `SignatureReponse` corresponding to the `request` or an error object if any.
-   */
-  const getSignatures = async (
+  getSignatures = async (
     request: GetSignatures,
     password: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ sigResponses?: SignatureResponse[]; error?: { message: string; cause?: any } }> => {
     try {
-      await init();
-
-      setIsProcessing(true);
-      const isAuthenticated = await verifyPassword(password);
+      const isAuthenticated = await this.keysService.verifyPassword(password);
       if (!isAuthenticated) {
         throw new Error('invalid-password');
       }
 
-      const keys = await retrieveKeys(password);
+      const keys = await this.keysService.retrieveKeys(password);
       const getPrivKeys = (address: string | string[]) => {
         const addresses = address instanceof Array ? address : [address];
         return addresses.map((addr) => {
-          if (addr === bsvAddress) {
+          if (addr === this.keysService.bsvAddress) {
             return keys?.walletWif && PrivateKey.from_wif(keys.walletWif);
           }
-          if (addr === ordAddress) {
+          if (addr === this.keysService.ordAddress) {
             return keys?.ordWif && PrivateKey.from_wif(keys.ordWif);
           }
-          if (addr === identityAddress) {
+          if (addr === this.keysService.identityAddress) {
             return keys?.identityWif && PrivateKey.from_wif(keys.identityWif);
           }
           throw new Error('unknown-address', { cause: addr });
@@ -99,21 +89,12 @@ export const useContracts = () => {
           cause: err.cause,
         },
       };
-    } finally {
-      setIsProcessing(false);
     }
   };
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const unlock = async (locks: OrdinalTxo[], currentBlockHeight: number) => {
+  unlock = async (locks: Ordinal[], currentBlockHeight: number) => {
     try {
-      await init();
-      setIsProcessing(true);
-
-      const keys = await retrieveKeys(undefined, true); // using below limit to bypass password
+      const keys = await this.keysService.retrieveKeys(undefined, true); // using below limit to bypass password
       if (!keys.identityWif || !keys.walletAddress) {
         throw Error('No keys');
       }
@@ -164,7 +145,7 @@ export const useContracts = () => {
 
       const rawTx = tx.to_hex();
 
-      const { txid } = await broadcastWithGorillaPool(rawTx);
+      const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
       if (!txid) return { error: 'broadcast-error' };
       return { txid };
 
@@ -172,15 +153,6 @@ export const useContracts = () => {
     } catch (error: any) {
       console.log(error);
       return { error: error.message ?? 'unknown' };
-    } finally {
-      setIsProcessing(false);
     }
   };
-
-  return {
-    isProcessing,
-    setIsProcessing,
-    getSignatures,
-    unlock,
-  };
-};
+}

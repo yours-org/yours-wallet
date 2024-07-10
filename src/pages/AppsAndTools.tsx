@@ -12,19 +12,16 @@ import { PageLoader } from '../components/PageLoader';
 import { HeaderText, Text } from '../components/Reusable';
 import { SettingsRow as AppsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
-import { OrdinalTxo } from '../hooks/ordTypes';
 import { useBottomMenu } from '../hooks/useBottomMenu';
-import { useBsv } from '../hooks/useBsv';
-import { useContracts } from '../hooks/useContracts';
-import { useGorillaPool } from '../hooks/useGorillaPool';
 import { useTheme } from '../hooks/useTheme';
-import { useWhatsOnChain } from '../hooks/useWhatsOnChain';
 import { ColorThemeProps } from '../theme';
 // import { BSV_DECIMAL_CONVERSION, YOURS_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
 import { BSV_DECIMAL_CONVERSION, featuredApps, YOURS_GITHUB_REPOS, YOURS_GITHUB_REPO } from '../utils/constants';
 import { truncate } from '../utils/format';
 // import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
+import { useServiceContext } from '../hooks/useServiceContext';
+import { Ordinal } from 'yours-wallet-provider';
 
 const Content = styled.div`
   display: flex;
@@ -130,17 +127,18 @@ type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unloc
 export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { setSelected, query } = useBottomMenu();
+  const { keysService, gorillaPoolService, wocService } = useServiceContext();
   // const { exchangeRate, identityAddress } = useBsv();
-  const { identityAddress } = useBsv();
-  const { getLockedBsvUtxos, getSpentTxids } = useGorillaPool();
-  const { getChainInfo } = useWhatsOnChain();
-  const { isProcessing, setIsProcessing } = useContracts();
+  const { identityAddress } = keysService;
+  const { getLockedBsvUtxos, getSpentTxids } = gorillaPoolService;
+  const { getChainInfo } = wocService;
+  const [isProcessing, setIsProcessing] = useState(false);
   const [page, setPage] = useState<AppsPage>(query === 'pending-locks' ? 'unlock' : 'main');
   // const [otherIsSelected, setOtherIsSelected] = useState(false);
   // const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   // const [satAmount, setSatAmount] = useState(0);
   // const [didSubmit, setDidSubmit] = useState(false);
-  const [lockedUtxos, setLockedUtxos] = useState<OrdinalTxo[]>([]);
+  const [lockedUtxos, setLockedUtxos] = useState<Ordinal[]>([]);
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
 
   const getLockData = async () => {

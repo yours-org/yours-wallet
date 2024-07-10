@@ -1,4 +1,5 @@
-import { useEffect, useContext } from 'react';
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+import React, { useContext, useEffect, useState } from 'react';
 import { MemoryRouter as Router, Route, Routes } from 'react-router-dom';
 import styled from 'styled-components';
 import { Show } from './components/Show';
@@ -8,7 +9,6 @@ import { SnackbarProvider } from './contexts/SnackbarContext';
 import { useActivityDetector } from './hooks/useActivityDetector';
 import { useTheme } from './hooks/useTheme';
 import { useViewport } from './hooks/useViewport';
-import { useWalletLockState } from './hooks/useWalletLockState';
 import { AppsAndTools } from './pages/AppsAndTools';
 import { BsvWallet } from './pages/BsvWallet';
 import { CreateWallet } from './pages/onboarding/CreateWallet';
@@ -28,8 +28,10 @@ import { OrdTransferRequest } from './pages/requests/OrdTransferRequest';
 import { SignMessageRequest } from './pages/requests/SignMessageRequest';
 import { Settings } from './pages/Settings';
 import { ColorThemeProps } from './theme';
+import { WhitelistedApp } from './inject';
+import { PageLoader } from './components/PageLoader';
+import { useServiceContext } from './hooks/useServiceContext';
 import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
-import { useAppStateContext } from './hooks/useAppStateContext';
 
 const MainContainer = styled.div<{ $isMobile?: boolean }>`
   display: flex;
@@ -39,6 +41,7 @@ const MainContainer = styled.div<{ $isMobile?: boolean }>`
   height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
   position: relative;
   padding: 0;
+  background-color: ${({ theme }) => theme.mainBackground};
 `;
 
 const Container = styled.div<ColorThemeProps>`
@@ -52,9 +55,9 @@ const Container = styled.div<ColorThemeProps>`
 `;
 
 export const App = () => {
-  const { isLocked } = useWalletLockState();
   const { isMobile } = useViewport();
   const { theme } = useTheme();
+  const { isLocked, isReady, chromeStorageService } = useServiceContext();
   const menuContext = useContext(BottomMenuContext);
   const {
     connectRequest,
@@ -69,13 +72,25 @@ export const App = () => {
     decryptRequest,
     clearRequest,
     popupId,
+    getStorageAndSetRequestState,
   } = useWeb3RequestContext();
+  const [whitelistedApps, setWhitelistedApps] = useState<WhitelistedApp[]>([]);
 
-  const { whitelistedApps } = useAppStateContext();
+  useEffect(() => {
+    if (isReady) {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      setWhitelistedApps(account?.settings?.whitelist ?? []);
+    }
+  }, [chromeStorageService, isReady]);
 
-  useActivityDetector(isLocked);
+  useActivityDetector(isLocked, isReady, chromeStorageService);
+
+  useEffect(() => {
+    isReady && getStorageAndSetRequestState(chromeStorageService);
+  }, [chromeStorageService, getStorageAndSetRequestState, isReady]);
 
   const handleUnlock = async () => {
+    //TODO: prob a better way to do this
     window.location.reload();
   };
 
@@ -89,9 +104,17 @@ export const App = () => {
     }
   }, [transferOrdinalRequest, purchaseOrdinalRequest, menuContext]);
 
+  if (!isReady) {
+    return (
+      <MainContainer $isMobile={isMobile} theme={theme}>
+        <PageLoader message="Loading..." theme={theme} />
+      </MainContainer>
+    );
+  }
+
   return (
-    <MainContainer $isMobile={isMobile}>
-      <BottomMenuProvider>
+    <MainContainer $isMobile={isMobile} theme={theme}>
+      <BottomMenuProvider network={chromeStorageService.getNetwork()}>
         <Container theme={theme}>
           <SnackbarProvider>
             <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
@@ -129,7 +152,6 @@ export const App = () => {
                           <>
                             <Show when={!!sendBsvRequest}>
                               <BsvSendRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                                 request={sendBsvRequest!}
                                 onResponse={() => clearRequest('sendBsvRequest')}
                                 popupId={popupId}
@@ -137,7 +159,6 @@ export const App = () => {
                             </Show>
                             <Show when={!!signMessageRequest}>
                               <SignMessageRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                                 request={signMessageRequest!}
                                 onSignature={() => clearRequest('signMessageRequest')}
                                 popupId={popupId}
@@ -145,7 +166,6 @@ export const App = () => {
                             </Show>
                             <Show when={!!broadcastRequest}>
                               <BroadcastRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                                 request={broadcastRequest!}
                                 onBroadcast={() => clearRequest('broadcastRequest')}
                                 popupId={popupId}
@@ -153,7 +173,6 @@ export const App = () => {
                             </Show>
                             <Show when={!!getSignaturesRequest}>
                               <GetSignaturesRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                                 request={getSignaturesRequest!}
                                 onSignature={() => clearRequest('getSignaturesRequest')}
                                 popupId={popupId}
@@ -161,7 +180,6 @@ export const App = () => {
                             </Show>
                             <Show when={!!generateTaggedKeysRequest}>
                               <GenerateTaggedKeysRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                                 request={generateTaggedKeysRequest!}
                                 onResponse={() => clearRequest('generateTaggedKeysRequest')}
                                 popupId={popupId}
@@ -169,7 +187,6 @@ export const App = () => {
                             </Show>
                             <Show when={!!encryptRequest}>
                               <EncryptRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                                 request={encryptRequest!}
                                 onEncrypt={() => clearRequest('encryptRequest')}
                                 popupId={popupId}
@@ -177,7 +194,6 @@ export const App = () => {
                             </Show>
                             <Show when={!!decryptRequest}>
                               <DecryptRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                                 request={decryptRequest!}
                                 onDecrypt={() => clearRequest('decryptRequest')}
                                 popupId={popupId}
@@ -199,7 +215,6 @@ export const App = () => {
                           <>
                             <Show when={!!purchaseOrdinalRequest}>
                               <OrdPurchaseRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                                 request={purchaseOrdinalRequest!}
                                 onResponse={() => clearRequest('purchaseOrdinalRequest')}
                                 popupId={popupId}
@@ -207,7 +222,6 @@ export const App = () => {
                             </Show>
                             <Show when={!!transferOrdinalRequest}>
                               <OrdTransferRequest
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                                 request={transferOrdinalRequest!}
                                 onResponse={() => clearRequest('transferOrdinalRequest')}
                                 popupId={popupId}

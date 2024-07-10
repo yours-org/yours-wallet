@@ -3,10 +3,10 @@ import logo from '../assets/yours-horizontal-logo.png';
 import { useTheme } from '../hooks/useTheme';
 import { GithubIcon, Text } from './Reusable';
 import activeCircle from '../assets/active-circle.png';
-import { useKeys } from '../hooks/useKeys';
 import { truncate } from '../utils/format';
 import gitHubIcon from '../assets/github.svg';
 import { useSnackbar } from '../hooks/useSnackbar';
+import { useServiceContext } from '../hooks/useServiceContext';
 
 const Container = styled.div`
   display: flex;
@@ -35,11 +35,11 @@ const Circle = styled.img`
 
 export const TopNav = () => {
   const { theme } = useTheme();
-  const { bsvAddress } = useKeys();
+  const { keysService } = useServiceContext();
   const { addSnackbar } = useSnackbar();
 
   const handleCopyToClipboard = () => {
-    navigator.clipboard.writeText(bsvAddress).then(() => {
+    navigator.clipboard.writeText(keysService.bsvAddress).then(() => {
       addSnackbar('Copied!', 'success');
     });
   };
@@ -57,7 +57,7 @@ export const TopNav = () => {
           theme={theme}
           onClick={handleCopyToClipboard}
         >
-          {truncate(bsvAddress, 5, 5)}
+          {truncate(keysService.bsvAddress, 5, 5)}
         </Text>
       </LogoWrapper>
       <GithubIcon
