@@ -17,6 +17,7 @@ import {
   Broadcast,
   InscribeRequest,
   SignMessage,
+  NetWork,
 } from 'yours-wallet-provider';
 import {
   CustomListenerName,
@@ -365,7 +366,7 @@ const processGetNetworkRequest = (sendResponse: CallbackResponse) => {
       sendResponse({
         type: YoursEventName.GET_NETWORK,
         success: true,
-        data: account.settings?.network ?? 'mainnet',
+        data: account.settings?.network ?? NetWork.Mainnet,
       });
     });
   } catch (error) {

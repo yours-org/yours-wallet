@@ -9,9 +9,9 @@ export const getCurrentUtcTimestamp = (): number => {
 
 export const isAddressOnRightNetwork = (network: NetWork, address: string) => {
   switch (network) {
-    case 'mainnet':
+    case NetWork.Mainnet:
       return address.startsWith('1');
-    case 'testnet':
+    case NetWork.Testnet:
       return !address.startsWith('1');
   }
 };
