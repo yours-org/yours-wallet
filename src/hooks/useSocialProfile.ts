@@ -13,11 +13,10 @@ export const useSocialProfile = (chromeStorageService: ChromeStorageService) => 
   useEffect(() => {
     const getSocialProfile = async (): Promise<SocialProfile> => {
       const { account } = chromeStorageService.getCurrentAccountObject();
-      if (!account) return socialProfile;
-      if (account.socialProfile) {
-        setSocialProfile(account.socialProfile);
-      }
-      return account.socialProfile;
+      const profile = account?.settings?.socialProfile;
+      if (!profile) return socialProfile;
+      setSocialProfile(profile);
+      return profile;
     };
 
     getSocialProfile();
@@ -27,11 +26,15 @@ export const useSocialProfile = (chromeStorageService: ChromeStorageService) => 
   const storeSocialProfile = async (profile: SocialProfile) => {
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (!account) throw new Error('No account found');
+    const accountSettings = account.settings;
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
       [account.addresses.identityAddress]: {
         ...account,
-        socialProfile: profile,
+        settings: {
+          ...accountSettings,
+          socialProfile: profile,
+        },
       },
     };
     await chromeStorageService.updateNested(key, update);

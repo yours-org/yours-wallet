@@ -22,6 +22,7 @@ import { ColorThemeProps } from '../../theme';
 import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { SupportedWalletImports } from '../../services/types/keys.types';
+import { NetWork } from 'yours-wallet-provider';
 
 const Content = styled.div`
   display: flex;
@@ -141,6 +142,7 @@ export const RestoreWallet = () => {
     await sleep(50);
     const mnemonic = await keysService.generateSeedAndStoreEncrypted(
       password,
+      NetWork.Mainnet,
       seedWords,
       walletDerivation,
       ordDerivation,

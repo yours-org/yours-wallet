@@ -280,11 +280,15 @@ export const Settings = () => {
     setIsPasswordRequired(isRequired);
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (!account) throw new Error('No account found');
+    const accountSettings = account.settings;
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
       [keysService.identityAddress]: {
         ...account,
-        isPasswordRequired: isRequired,
+        settings: {
+          ...accountSettings,
+          isPasswordRequired: isRequired,
+        },
       },
     };
     await chromeStorageService.updateNested(key, update);

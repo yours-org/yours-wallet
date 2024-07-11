@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ChainParams, P2PKHAddress, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
+import { P2PKHAddress, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { NetWork } from 'yours-wallet-provider';
 import {
   DEFAULT_RELAYX_ORD_PATH,
@@ -13,6 +13,7 @@ import { generateKeysFromTag, getKeys, getKeysFromWifs, Keys } from '../utils/ke
 import { isAddressOnRightNetwork } from '../utils/tools';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { GorillaPoolService } from './GorillaPool.service';
+import { getChainParams } from './serviceHelpers';
 import { Account, ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
 import { WocUtxo } from './types/whatsOnChain.types';
@@ -38,18 +39,24 @@ export class KeysService {
     this.identityPubKey = '';
   }
 
-  getChainParams = (network: NetWork): ChainParams =>
-    network === 'mainnet' ? ChainParams.mainnet() : ChainParams.testnet();
-
-  private storeEncryptedKeys = async (passKey: string, salt: string, keys: Keys, encryptedKeys: string) => {
+  private storeEncryptedKeys = async (
+    passKey: string,
+    salt: string,
+    keys: Keys,
+    encryptedKeys: string,
+    network: NetWork,
+  ) => {
     await this.chromeStorageService.update({ passKey, salt });
     const { account } = this.chromeStorageService.getCurrentAccountObject();
+    console.log('account:', account);
     const newAccount: Account = account ? account : DEFAULT_ACCOUNT;
+    console.log(keys);
     await this.chromeStorageService.update({ selectedAccount: keys.identityAddress });
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
       [keys.identityAddress]: {
         ...newAccount,
+        network,
         addresses: {
           bsvAddress: keys.walletAddress,
           identityAddress: keys.identityAddress,
@@ -68,6 +75,7 @@ export class KeysService {
 
   generateSeedAndStoreEncrypted = async (
     password: string,
+    network: NetWork = NetWork.Mainnet,
     mnemonic?: string,
     walletDerivation: string | null = null,
     ordDerivation: string | null = null,
@@ -85,12 +93,12 @@ export class KeysService {
         break;
     }
 
-    const keys = getKeys(mnemonic, walletDerivation, ordDerivation, identityDerivation);
+    const keys = getKeys(network, mnemonic, walletDerivation, ordDerivation, identityDerivation);
     if (mnemonic) {
       this.sweepLegacy(keys);
     }
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
-    await this.storeEncryptedKeys(passKey, salt, keys, encryptedKeys);
+    await this.storeEncryptedKeys(passKey, salt, keys, encryptedKeys, network);
     return keys.mnemonic;
   };
 
@@ -138,7 +146,7 @@ export class KeysService {
     const passKey = deriveKey(password, salt);
     const keys = getKeysFromWifs(wifs);
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
-    await this.storeEncryptedKeys(passKey, salt, keys as Keys, encryptedKeys);
+    await this.storeEncryptedKeys(passKey, salt, keys as Keys, encryptedKeys, NetWork.Mainnet);
     return keys;
   };
 
@@ -146,18 +154,20 @@ export class KeysService {
     const accountObj = this.chromeStorageService.getCurrentAccountObject();
     const { account, passKey } = accountObj;
     if (!account) throw new Error('No account found!');
-    const { encryptedKeys, isPasswordRequired, settings } = account;
+    if (!account.network) throw new Error('No network found!');
+    const { encryptedKeys } = account;
+    const { isPasswordRequired } = account.settings;
     try {
       if (!encryptedKeys || !passKey) throw new Error('No keys found!');
       const d = decrypt(encryptedKeys, passKey);
       const keys: Keys = JSON.parse(d);
 
       const walletAddr = P2PKHAddress.from_string(keys.walletAddress)
-        .set_chain_params(this.getChainParams(settings.network))
+        .set_chain_params(getChainParams(account.network))
         .to_string();
 
       const ordAddr = P2PKHAddress.from_string(keys.ordAddress)
-        .set_chain_params(this.getChainParams(settings.network))
+        .set_chain_params(getChainParams(account.network))
         .to_string();
 
       this.bsvAddress = walletAddr;
@@ -168,7 +178,7 @@ export class KeysService {
       // identity address not available with wif or 1sat import
       if (keys.identityAddress) {
         const identityAddr = P2PKHAddress.from_string(keys.identityAddress)
-          .set_chain_params(this.getChainParams(settings.network))
+          .set_chain_params(getChainParams(account.network))
           .to_string();
 
         this.identityAddress = identityAddr;

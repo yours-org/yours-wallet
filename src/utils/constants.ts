@@ -83,16 +83,20 @@ export const featuredApps = [
 ];
 
 export const DEFAULT_ACCOUNT = {
+  network: NetWork.Mainnet,
   addresses: { bsvAddress: '', ordAddress: '', identityAddress: '' },
   pubKeys: { bsvPubKey: '', ordPubKey: '', identityPubKey: '' },
-  settings: { network: NetWork.Mainnet, noApprovalLimit: 0, whitelist: [] },
+  settings: {
+    noApprovalLimit: 0,
+    whitelist: [],
+    isPasswordRequired: true,
+    socialProfile: { avatar: HOSTED_YOURS_IMAGE, displayName: 'Anon Panda' },
+  },
   balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
   encryptedKeys: '',
-  isPasswordRequired: true,
   derivationTags: [],
   icon: HOSTED_YOURS_IMAGE,
   name: 'Account 1',
   ordinals: [],
   paymentUtxos: [],
-  socialProfile: { avatar: HOSTED_YOURS_IMAGE, displayName: 'Anon Panda' },
 };

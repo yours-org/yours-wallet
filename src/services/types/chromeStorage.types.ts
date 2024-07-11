@@ -25,22 +25,22 @@ export type Dispatch<T> = (value: T) => void;
 export type Settings = {
   noApprovalLimit: number;
   whitelist: WhitelistedApp[];
-  network: NetWork;
+  isPasswordRequired: boolean;
+  socialProfile: SocialProfile;
 };
 
 export interface Account {
   name: string;
   icon: string;
+  network: NetWork;
   encryptedKeys: string; // See Keys type
   derivationTags: TaggedDerivationResponse[];
   settings: Settings;
   addresses: Addresses;
   balance: Balance;
-  isPasswordRequired: boolean;
   ordinals: Ordinal[]; // TODO: remove
   paymentUtxos: StoredUtxo[]; // TODO: remove
   pubKeys: PubKeys;
-  socialProfile: SocialProfile;
 }
 
 export type ExchangeRateCache = {

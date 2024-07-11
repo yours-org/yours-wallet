@@ -14,6 +14,8 @@ import { sleep } from '../../utils/sleep';
 import copyIcon from '../../assets/copy-green.svg';
 import yoursLogo from '../../assets/yours-logo.png';
 import { useServiceContext } from '../../hooks/useServiceContext';
+import { ToggleSwitch } from '../../components/ToggleSwitch';
+import { NetWork } from 'yours-wallet-provider';
 
 const Content = styled.div`
   display: flex;
@@ -57,15 +59,22 @@ const CopyIcon = styled.img`
   height: 0.85rem;
 `;
 
+const NetworkSelectWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  width: 87%;
+  margin: 0.5rem 0 3rem 0;
+`;
+
 export const CreateWallet = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const { addSnackbar } = useSnackbar();
+  const [network, setNetwork] = useState<NetWork>(NetWork.Mainnet);
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [step, setStep] = useState(1);
   const [seedWords, setSeedWords] = useState<string[]>([]);
-
-  const { addSnackbar } = useSnackbar();
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
   const { keysService } = useServiceContext();
@@ -78,8 +87,8 @@ export const CreateWallet = () => {
     };
   }, [hideMenu, showMenu]);
 
-  const handleKeyGeneration = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleKeyGeneration = async (event?: React.FormEvent<HTMLFormElement>) => {
+    event && event.preventDefault();
     setLoading(true);
     if (password.length < 8) {
       setLoading(false);
@@ -95,7 +104,7 @@ export const CreateWallet = () => {
 
     // Some artificial delay for the loader
     await sleep(50);
-    const mnemonic = await keysService.generateSeedAndStoreEncrypted(password);
+    const mnemonic = await keysService.generateSeedAndStoreEncrypted(password, network);
     setSeedWords(mnemonic.split(' '));
 
     setLoading(false);
@@ -130,9 +139,16 @@ export const CreateWallet = () => {
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
-          <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
-            Make sure you are in a safe place and no one is watching.
-          </Text>
+          <NetworkSelectWrapper>
+            <ToggleSwitch
+              theme={theme}
+              on={network === NetWork.Testnet}
+              onChange={() => setNetwork(network === NetWork.Mainnet ? NetWork.Testnet : NetWork.Mainnet)}
+            />
+            <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
+              {network === NetWork.Testnet ? 'Turn off for mainnet account' : 'Turn on for testnet account'}
+            </Text>
+          </NetworkSelectWrapper>
           <Button theme={theme} type="primary" label="Generate Seed" isSubmit />
           <Button theme={theme} type="secondary" label="Go back" onClick={() => navigate('/')} />
         </FormContainer>

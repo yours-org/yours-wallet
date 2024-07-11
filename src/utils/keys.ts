@@ -1,9 +1,10 @@
 import { Bn, Point } from '@ts-bitcoin/core';
 import * as bip39 from 'bip39';
 import { ExtendedPrivateKey, Hash, PrivateKey } from 'bsv-wasm-web';
-import { DerivationTag } from 'yours-wallet-provider';
+import { DerivationTag, NetWork } from 'yours-wallet-provider';
 import { WifKeys } from '../services/types/keys.types';
 import { DEFAULT_IDENTITY_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';
+import { convertAddressToTestnet } from './tools';
 
 export type Keys = {
   mnemonic: string;
@@ -46,6 +47,7 @@ export const generateKeysFromTag = (mnemonic: string, derivation: string) => {
 };
 
 export const getKeys = (
+  network: NetWork,
   validMnemonic?: string,
   walletDerivation: string | null = null,
   ordDerivation: string | null = null,
@@ -59,19 +61,22 @@ export const getKeys = (
   const wallet = generateKeysFromTag(mnemonic, walletDerivation || DEFAULT_WALLET_PATH);
   const ord = generateKeysFromTag(mnemonic, ordDerivation || DEFAULT_ORD_PATH);
   const identity = generateKeysFromTag(mnemonic, identityDerivation || DEFAULT_IDENTITY_PATH);
+  const walletAddress = network === NetWork.Testnet ? convertAddressToTestnet(wallet.address) : wallet.address;
+  const ordAddress = network === NetWork.Testnet ? convertAddressToTestnet(ord.address) : ord.address;
+  const identityAddress = network === NetWork.Testnet ? convertAddressToTestnet(identity.address) : identity.address;
 
   const keys: Keys = {
     mnemonic,
     walletWif: wallet.wif,
-    walletAddress: wallet.address,
+    walletAddress,
     walletPubKey: wallet.pubKey.to_hex(),
     walletDerivationPath: wallet.derivationPath,
     ordWif: ord.wif,
-    ordAddress: ord.address,
+    ordAddress,
     ordPubKey: ord.pubKey.to_hex(),
     ordDerivationPath: ord.derivationPath,
     identityWif: identity.wif,
-    identityAddress: identity.address,
+    identityAddress,
     identityPubKey: identity.pubKey.to_hex(),
     identityDerivationPath: identity.derivationPath,
   };

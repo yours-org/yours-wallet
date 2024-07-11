@@ -85,7 +85,11 @@ export class ChromeStorageService {
           settings: {
             noApprovalLimit: noApprovalLimit ?? 0,
             whitelist: whitelist ?? [],
-            network: network ?? appState.network ?? NetWork.Mainnet,
+            isPasswordRequired: appState.isPasswordRequired,
+            socialProfile: {
+              displayName: socialProfile?.displayName ?? 'Anon Panda',
+              avatar: socialProfile?.avatar ?? HOSTED_YOURS_IMAGE,
+            },
           },
           addresses: {
             bsvAddress: appState.addresses.bsvAddress,
@@ -97,7 +101,6 @@ export class ChromeStorageService {
             satoshis: appState.balance?.satoshis ?? 0,
             usdInCents: appState.balance?.usdInCents ?? 0,
           },
-          isPasswordRequired: appState.isPasswordRequired,
           ordinals: appState?.ordinals ?? [], // TODO: remove
           paymentUtxos: paymentUtxos ?? [], // TODO: remove
           pubKeys: {
@@ -105,10 +108,7 @@ export class ChromeStorageService {
             ordPubKey: appState.pubKeys.ordPubKey,
             identityPubKey: appState.pubKeys.identityPubKey,
           },
-          socialProfile: {
-            displayName: socialProfile?.displayName ?? 'Anon Panda',
-            avatar: socialProfile?.avatar ?? HOSTED_YOURS_IMAGE,
-          },
+          network: network ?? appState.network ?? NetWork.Mainnet,
         },
       },
       selectedAccount: appState.addresses.identityAddress,
@@ -197,11 +197,8 @@ export class ChromeStorageService {
       return NetWork.Mainnet;
     }
     const account = accounts[selectedAccount];
-    const { settings } = account;
-    if (!settings.network) {
-      return NetWork.Mainnet;
-    }
-    return settings.network;
+    const { network } = account;
+    return network ?? NetWork.Mainnet;
   };
 
   isPasswordRequired = (): boolean => {
@@ -213,9 +210,9 @@ export class ChromeStorageService {
       throw new Error('No account found!');
     }
     const account = accounts[selectedAccount];
-    if (account.isPasswordRequired === undefined) {
+    if (account.settings.isPasswordRequired === undefined) {
       return true;
     }
-    return account.isPasswordRequired;
+    return account.settings.isPasswordRequired;
   };
 }

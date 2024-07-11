@@ -366,7 +366,7 @@ const processGetNetworkRequest = (sendResponse: CallbackResponse) => {
       sendResponse({
         type: YoursEventName.GET_NETWORK,
         success: true,
-        data: account.settings?.network ?? NetWork.Mainnet,
+        data: account?.network ?? NetWork.Mainnet,
       });
     });
   } catch (error) {
@@ -660,8 +660,8 @@ const processGetSocialProfileRequest = (sendResponse: CallbackResponse) => {
     chromeStorageService.getAndSetStorage().then(() => {
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) throw Error('No account found!');
-      const displayName = account.socialProfile?.displayName ? account.socialProfile.displayName : 'Anon Panda';
-      const avatar = account.socialProfile?.avatar ? account.socialProfile.avatar : HOSTED_YOURS_IMAGE;
+      const displayName = account.settings?.socialProfile?.displayName ?? 'Anon Panda';
+      const avatar = account.settings?.socialProfile?.avatar ?? HOSTED_YOURS_IMAGE;
       sendResponse({
         type: YoursEventName.GET_SOCIAL_PROFILE,
         success: true,
