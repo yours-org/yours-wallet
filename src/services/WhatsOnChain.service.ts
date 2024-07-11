@@ -21,7 +21,7 @@ export class WhatsOnChainService {
   }
 
   getBaseUrl = (network: NetWork) => {
-    return network === ('mainnet' as NetWork) ? WOC_BASE_URL : WOC_TESTNET_BASE_URL;
+    return network === NetWork.Mainnet ? WOC_BASE_URL : WOC_TESTNET_BASE_URL;
   };
 
   getBsvBalance = async (address: string, pullFresh?: boolean): Promise<number | undefined> => {

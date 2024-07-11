@@ -85,7 +85,7 @@ export const featuredApps = [
 export const DEFAULT_ACCOUNT = {
   addresses: { bsvAddress: '', ordAddress: '', identityAddress: '' },
   pubKeys: { bsvPubKey: '', ordPubKey: '', identityPubKey: '' },
-  settings: { network: 'mainnet' as NetWork, noApprovalLimit: 0, whitelist: [] },
+  settings: { network: NetWork.Mainnet, noApprovalLimit: 0, whitelist: [] },
   balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
   encryptedKeys: '',
   isPasswordRequired: true,

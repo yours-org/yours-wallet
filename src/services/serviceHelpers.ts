@@ -2,7 +2,7 @@ import { ChainParams } from 'bsv-wasm-web';
 import { NetWork } from 'yours-wallet-provider';
 
 export const getChainParams = (network: NetWork): ChainParams => {
-  return network === ('mainnet' as NetWork) ? ChainParams.mainnet() : ChainParams.testnet();
+  return network === NetWork.Mainnet ? ChainParams.mainnet() : ChainParams.testnet();
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -21,7 +21,7 @@ import { ChromeStorageService } from './ChromeStorage.service';
 export class GorillaPoolService {
   constructor(private readonly chromeStorageService: ChromeStorageService) {}
   getBaseUrl(network: NetWork) {
-    return network === ('mainnet' as NetWork) ? GP_BASE_URL : GP_TESTNET_BASE_URL;
+    return network === NetWork.Mainnet ? GP_BASE_URL : GP_TESTNET_BASE_URL;
   }
 
   getOrdUtxos = async (ordAddress: string): Promise<OrdinalResponse> => {

@@ -194,12 +194,12 @@ export class ChromeStorageService {
     }
     const { accounts, selectedAccount } = this.storage as ChromeStorageObject;
     if (!accounts || !selectedAccount) {
-      return 'mainnet' as NetWork;
+      return NetWork.Mainnet;
     }
     const account = accounts[selectedAccount];
     const { settings } = account;
     if (!settings.network) {
-      return 'mainnet' as NetWork;
+      return NetWork.Mainnet;
     }
     return settings.network;
   };
