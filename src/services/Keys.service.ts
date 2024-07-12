@@ -46,17 +46,16 @@ export class KeysService {
     encryptedKeys: string,
     network: NetWork,
   ) => {
-    await this.chromeStorageService.update({ passKey, salt });
+    await this.chromeStorageService.update({ selectedAccount: keys.identityAddress, passKey, salt });
     const { account } = this.chromeStorageService.getCurrentAccountObject();
-    console.log('account:', account);
     const newAccount: Account = account ? account : DEFAULT_ACCOUNT;
-    console.log(keys);
-    await this.chromeStorageService.update({ selectedAccount: keys.identityAddress });
+    const totalAccounts = this.chromeStorageService.getAllAccounts().length;
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
       [keys.identityAddress]: {
         ...newAccount,
         network,
+        name: `Account ${totalAccounts + 1}`,
         addresses: {
           bsvAddress: keys.walletAddress,
           identityAddress: keys.identityAddress,
@@ -73,8 +72,25 @@ export class KeysService {
     await this.chromeStorageService.updateNested(key, update);
   };
 
+  private getPassKeyAndSalt = async (password: string, isNewWallet: boolean) => {
+    let acctObj: Partial<ChromeStorageObject> | undefined = {};
+    if (!isNewWallet) {
+      const isVerified = await this.verifyPassword(password);
+      if (!isVerified) throw new Error('Unauthorized!');
+      const accountObject = this.chromeStorageService.getCurrentAccountObject();
+      acctObj = accountObject;
+      if (!acctObj?.salt || !acctObj?.passKey) throw new Error('Credentials not found');
+    }
+    const salt = isNewWallet && !acctObj?.salt ? generateRandomSalt() : acctObj.salt;
+    if (!salt) throw new Error('Salt not found');
+    const passKey = isNewWallet ? deriveKey(password, salt) : acctObj.passKey;
+    if (!passKey) throw new Error('Passkey not found');
+    return { passKey, salt };
+  };
+
   generateSeedAndStoreEncrypted = async (
     password: string,
+    isNewWallet: boolean,
     network: NetWork = NetWork.Mainnet,
     mnemonic?: string,
     walletDerivation: string | null = null,
@@ -82,8 +98,7 @@ export class KeysService {
     identityDerivation: string | null = null,
     importWallet?: SupportedWalletImports,
   ) => {
-    const salt = generateRandomSalt();
-    const passKey = deriveKey(password, salt);
+    const { passKey, salt } = await this.getPassKeyAndSalt(password, isNewWallet);
     switch (importWallet) {
       case 'relayx':
         ordDerivation = DEFAULT_RELAYX_ORD_PATH;
@@ -141,9 +156,8 @@ export class KeysService {
     console.log('Change sweep:', txid);
   };
 
-  generateKeysFromWifAndStoreEncrypted = async (password: string, wifs: WifKeys) => {
-    const salt = generateRandomSalt();
-    const passKey = deriveKey(password, salt);
+  generateKeysFromWifAndStoreEncrypted = async (password: string, wifs: WifKeys, isNewWallet: boolean) => {
+    const { passKey, salt } = await this.getPassKeyAndSalt(password, isNewWallet);
     const keys = getKeysFromWifs(wifs);
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
     await this.storeEncryptedKeys(passKey, salt, keys as Keys, encryptedKeys, NetWork.Mainnet);

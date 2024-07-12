@@ -23,6 +23,7 @@ import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { SupportedWalletImports } from '../../services/types/keys.types';
 import { NetWork } from 'yours-wallet-provider';
+import { SettingsPage } from '../Settings';
 
 const Content = styled.div`
   display: flex;
@@ -96,7 +97,12 @@ const WalletText = styled(Text)`
   font-weight: 600;
 `;
 
-export const RestoreWallet = () => {
+export type RestoreAccountProps = {
+  onNavigateBack: (page: SettingsPage) => void;
+  newWallet?: boolean;
+};
+
+export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAccountProps) => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
@@ -124,45 +130,50 @@ export const RestoreWallet = () => {
   const handleExpertToggle = () => setIsExpertImport(!isExpertImport);
 
   const handleRestore = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setLoading(true);
-    if (password.length < 8) {
+    try {
+      event.preventDefault();
+      setLoading(true);
+      if (password.length < 8) {
+        addSnackbar('The password must be at least 8 characters!', 'error');
+        return;
+      }
+
+      if (password !== passwordConfirm) {
+        addSnackbar('The passwords do not match!', 'error');
+        return;
+      }
+
+      // Some artificial delay for the loader
+      await sleep(50);
+      const mnemonic = await keysService.generateSeedAndStoreEncrypted(
+        password,
+        newWallet,
+        NetWork.Mainnet,
+        seedWords,
+        walletDerivation,
+        ordDerivation,
+        identityDerivation,
+        importWallet,
+      );
+      if (!mnemonic) {
+        addSnackbar('An error occurred while restoring the wallet!', 'error');
+        return;
+      }
+
+      if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
+      setStep(4);
+    } catch (error) {
+      console.log(error);
+      addSnackbar('An error occurred while restoring the account!', 'error');
+    } finally {
       setLoading(false);
-      addSnackbar('The password must be at least 8 characters!', 'error');
-      return;
     }
-
-    if (password !== passwordConfirm) {
-      setLoading(false);
-      addSnackbar('The passwords do not match!', 'error');
-      return;
-    }
-
-    // Some artificial delay for the loader
-    await sleep(50);
-    const mnemonic = await keysService.generateSeedAndStoreEncrypted(
-      password,
-      NetWork.Mainnet,
-      seedWords,
-      walletDerivation,
-      ordDerivation,
-      identityDerivation,
-      importWallet,
-    );
-    if (!mnemonic) {
-      addSnackbar('An error occurred while restoring the wallet!', 'error');
-      return;
-    }
-
-    // setEncryptedKeys(mnemonic);
-    setLoading(false);
-    setStep(4);
   };
 
   const handleWalletSelection = (wallet?: SupportedWalletImports) => {
     setImportWallet(wallet);
     if (wallet === 'wif') {
-      navigate('/import-wallet');
+      newWallet ? navigate('/import-wallet') : onNavigateBack('import-wif');
       return;
     }
     setStep(2);
@@ -189,8 +200,10 @@ export const RestoreWallet = () => {
   const passwordStep = (
     <>
       <Content>
-        <HeaderText theme={theme}>Create a password</HeaderText>
-        <Text theme={theme}>This is used to unlock your wallet.</Text>
+        <HeaderText theme={theme}>{newWallet ? 'Create password' : 'Import Account'}</HeaderText>
+        <Text theme={theme}>
+          {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
+        </Text>
         <FormContainer onSubmit={handleRestore}>
           <Input
             theme={theme}
@@ -335,7 +348,12 @@ export const RestoreWallet = () => {
           Select the wallet you'd like to restore from
         </Text>
         {availableWallets(['yours', 'panda', 'relayx', 'twetch', undefined, 'wif'])}
-        <Button theme={theme} type="secondary" label="Go back" onClick={() => navigate('/')} />
+        <Button
+          theme={theme}
+          type="secondary"
+          label="Go back"
+          onClick={() => (newWallet ? navigate('/') : onNavigateBack('manage-accounts'))}
+        />
       </Content>
     </>
   );
@@ -363,7 +381,7 @@ export const RestoreWallet = () => {
   return (
     <>
       <Show when={loading}>
-        <PageLoader theme={theme} message="Restoring Wallet..." />
+        <PageLoader theme={theme} message="Restoring..." />
       </Show>
       <Show when={!loading && step === 1}>{selectImportWallet}</Show>
       <Show when={!loading && step === 2}>{enterSeedStep}</Show>

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -16,6 +15,7 @@ import yoursLogo from '../../assets/yours-logo.png';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import { NetWork } from 'yours-wallet-provider';
+import { useNavigate } from 'react-router-dom';
 
 const Content = styled.div`
   display: flex;
@@ -66,7 +66,12 @@ const NetworkSelectWrapper = styled.div`
   margin: 0.5rem 0 3rem 0;
 `;
 
-export const CreateWallet = () => {
+export type CreateAccountProps = {
+  onNavigateBack: () => void;
+  newWallet?: boolean;
+};
+
+export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccountProps) => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const { addSnackbar } = useSnackbar();
@@ -88,27 +93,37 @@ export const CreateWallet = () => {
   }, [hideMenu, showMenu]);
 
   const handleKeyGeneration = async (event?: React.FormEvent<HTMLFormElement>) => {
-    event && event.preventDefault();
-    setLoading(true);
-    if (password.length < 8) {
+    try {
+      event && event.preventDefault();
+      setLoading(true);
+      if (password.length < 8) {
+        addSnackbar('The password must be at least 8 characters!', 'error');
+        return;
+      }
+
+      if (password !== passwordConfirm) {
+        addSnackbar('The passwords do not match!', 'error');
+        return;
+      }
+
+      // Some artificial delay for the loader
+      await sleep(50);
+
+      const mnemonic = await keysService.generateSeedAndStoreEncrypted(password, newWallet, network);
+
+      if (!mnemonic) {
+        addSnackbar('An error occurred while restoring the wallet!', 'error');
+        return;
+      }
+
+      setSeedWords(mnemonic.split(' '));
+      setStep(2);
+    } catch (error) {
+      console.log(error);
+      addSnackbar('An error occurred while creating the account!', 'error');
+    } finally {
       setLoading(false);
-      addSnackbar('The password must be at least 8 characters!', 'error');
-      return;
     }
-
-    if (password !== passwordConfirm) {
-      setLoading(false);
-      addSnackbar('The passwords do not match!', 'error');
-      return;
-    }
-
-    // Some artificial delay for the loader
-    await sleep(50);
-    const mnemonic = await keysService.generateSeedAndStoreEncrypted(password, network);
-    setSeedWords(mnemonic.split(' '));
-
-    setLoading(false);
-    setStep(2);
   };
 
   const handleCopyToClipboard = (seed: string) => {
@@ -120,9 +135,9 @@ export const CreateWallet = () => {
   const passwordStep = (
     <>
       <Content>
-        <HeaderText theme={theme}>Create password</HeaderText>
+        <HeaderText theme={theme}>{newWallet ? 'Create password' : 'New Account'}</HeaderText>
         <Text style={{ marginBottom: '1rem' }} theme={theme}>
-          This will be used to unlock your wallet.
+          {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
         </Text>
         <FormContainer onSubmit={handleKeyGeneration}>
           <Input
@@ -149,8 +164,13 @@ export const CreateWallet = () => {
               {network === NetWork.Testnet ? 'Turn off for mainnet account' : 'Turn on for testnet account'}
             </Text>
           </NetworkSelectWrapper>
-          <Button theme={theme} type="primary" label="Generate Seed" isSubmit />
-          <Button theme={theme} type="secondary" label="Go back" onClick={() => navigate('/')} />
+          <Button theme={theme} type="primary" label={newWallet ? 'Generate Seed' : 'Create New Account'} isSubmit />
+          <Button
+            theme={theme}
+            type="secondary"
+            label="Go back"
+            onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
+          />
         </FormContainer>
       </Content>
     </>
@@ -186,10 +206,11 @@ export const CreateWallet = () => {
         <Button
           theme={theme}
           type="primary"
-          label="Next"
+          label={newWallet ? 'Next' : 'Finish'}
           onClick={() => {
-            setStep(3);
             setSeedWords([]);
+            if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
+            setStep(3);
           }}
         />
       </Content>

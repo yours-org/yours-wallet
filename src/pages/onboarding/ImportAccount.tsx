@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -14,6 +12,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { WifKeys } from '../../services/types/keys.types';
+import { useNavigate } from 'react-router-dom';
 
 const Content = styled.div`
   display: flex;
@@ -33,7 +32,12 @@ const FormContainer = styled.form`
   background: none;
 `;
 
-export const ImportWallet = () => {
+export type ImportAccountProps = {
+  onNavigateBack: () => void;
+  newWallet?: boolean;
+};
+
+export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccountProps) => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
@@ -89,19 +93,25 @@ export const ImportWallet = () => {
 
       // Some artificial delay for the loader
       await sleep(50);
-      const keys = await keysService.generateKeysFromWifAndStoreEncrypted(password, {
-        payPk,
-        ordPk,
-        identityPk,
-      });
+      const keys = await keysService.generateKeysFromWifAndStoreEncrypted(
+        password,
+        {
+          payPk,
+          ordPk,
+          identityPk,
+        },
+        newWallet,
+      );
       if (!keys) {
         addSnackbar('An error occurred while restoring the wallet!', 'error');
         return;
       }
 
+      if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
       setStep(3);
     } catch (error) {
       console.log(error);
+      addSnackbar('An error occurred while importing the account!', 'error');
     } finally {
       setLoading(false);
     }
@@ -150,10 +160,11 @@ export const ImportWallet = () => {
 
   const passwordStep = (
     <>
-      <BackButton onClick={() => navigate('/')} />
       <Content>
-        <HeaderText theme={theme}>Create a password</HeaderText>
-        <Text theme={theme}>This is used to unlock your wallet.</Text>
+        <HeaderText theme={theme}>{newWallet ? 'Create password' : 'Import Account'}</HeaderText>
+        <Text theme={theme}>
+          {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
+        </Text>
         <FormContainer onSubmit={handleImport}>
           <Input
             theme={theme}
@@ -171,6 +182,12 @@ export const ImportWallet = () => {
             style={{ marginBottom: '2rem' }}
           />
           <Button theme={theme} type="primary" label="Finish" isSubmit />
+          <Button
+            theme={theme}
+            type="secondary"
+            label="Go back"
+            onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
+          />
         </FormContainer>
       </Content>
     </>
@@ -178,7 +195,6 @@ export const ImportWallet = () => {
 
   const enterWifsStep = (
     <>
-      <BackButton onClick={() => navigate('/')} />
       <Content>
         <HeaderText theme={theme}>Import a WIF Wallet</HeaderText>
         <Text theme={theme}>Input assets directly from your WIF private keys or import a 1Sat JSON Wallet.</Text>
@@ -229,6 +245,12 @@ export const ImportWallet = () => {
           style={{ display: 'none' }}
           accept="application/json"
         />
+        <Button
+          theme={theme}
+          type="secondary"
+          label="Go back"
+          onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
+        />
       </Content>
     </>
   );
@@ -256,7 +278,7 @@ export const ImportWallet = () => {
   return (
     <>
       <Show when={loading}>
-        <PageLoader theme={theme} message="Importing Wallet..." />
+        <PageLoader theme={theme} message="Importing..." />
       </Show>
       <Show when={!loading && step === 1}>{enterWifsStep}</Show>
       <Show when={!loading && step === 2}>{passwordStep}</Show>
