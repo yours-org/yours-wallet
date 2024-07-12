@@ -10,7 +10,7 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { useServiceContext } from '../hooks/useServiceContext';
 import copyIcon from '../assets/copy.svg';
 import switchIcon from '../assets/chevrons.svg';
-import { Theme } from '../theme';
+import { ColorThemeProps } from '../theme';
 import { useNavigate } from 'react-router-dom';
 
 const Container = styled.div`
@@ -42,7 +42,7 @@ const Circle = styled.img`
   border-radius: 50%;
 `;
 
-const Dropdown = styled.div<{ theme: Theme }>`
+const Dropdown = styled.div<ColorThemeProps>`
   position: absolute;
   top: 3.5rem;
   left: 5rem;
@@ -54,6 +54,8 @@ const Dropdown = styled.div<{ theme: Theme }>`
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   z-index: 12;
   min-width: 15rem;
+  max-height: 18.75rem;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 `;
@@ -89,14 +91,14 @@ const DropDownIcon = styled.img`
   border-radius: 50%;
 `;
 
-const DropDownAccountName = styled.p<{ theme: Theme }>`
+const DropDownAccountName = styled.p<ColorThemeProps>`
   color: ${({ theme }) => theme.white};
   font-size: 0.85rem;
   font-weight: 600;
   margin: 0;
 `;
 
-const DropdownAddressText = styled.p<{ theme: Theme }>`
+const DropdownAddressText = styled.p<ColorThemeProps>`
   color: ${({ theme }) => theme.gray};
   font-size: 0.75rem;
   margin: 0;

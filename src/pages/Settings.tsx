@@ -287,6 +287,7 @@ export const Settings = () => {
 
   const handleSpeedBumpConfirm = (password?: string) => {
     if (decisionType === 'sign-out') {
+      // TODO: export master storage object with all necessary data to restore full wallet state for all accounts. Be sure to include decrypted password.
       signOut();
     }
 
@@ -363,9 +364,25 @@ export const Settings = () => {
         onClick={() => setPage('export-keys-options')}
         jsxElement={<ForwardButton />}
       />
-
       <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={lockWallet} />
-      <SettingsRow name="Sign Out" description="Sign out of Yours Wallet completely" onClick={handleSignOutIntent} />
+      <Text
+        style={{
+          margin: '1rem 0',
+          textAlign: 'left',
+          color: theme.white,
+          fontSize: '1rem',
+          fontWeight: 700,
+        }}
+        theme={theme}
+      >
+        Danger Zone
+      </Text>
+      <SettingsRow
+        style={{ backgroundColor: theme.errorRed + '40', border: '1px solid ' + theme.errorRed }}
+        name="Sign Out"
+        description="Sign out of Yours Wallet completely"
+        onClick={handleSignOutIntent}
+      />
     </>
   );
 

@@ -39,11 +39,12 @@ export type SettingsRowProp = {
   name: string;
   description: string;
   jsxElement?: JSX.Element;
+  style?: React.CSSProperties;
   onClick?: () => void;
 };
 
 export const SettingsRow = (props: SettingsRowProp) => {
-  const { name, description, onClick, jsxElement } = props;
+  const { name, description, onClick, jsxElement, style } = props;
   const { theme } = useTheme();
   const [containerColor, setContainerColor] = useState(theme.darkAccent);
 
@@ -54,6 +55,7 @@ export const SettingsRow = (props: SettingsRowProp) => {
       onMouseLeave={() => setContainerColor(theme.darkAccent)}
       onClick={onClick}
       $clickable={onClick ? 'true' : 'false'}
+      style={style}
     >
       <Content>
         <SettingName theme={theme}>{name}</SettingName>
