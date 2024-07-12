@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import x from '../assets/x.svg';
-import { BackButton } from '../components/BackButton';
 import { Button } from '../components/Button';
 import { ForwardButton } from '../components/ForwardButton';
 import { Input } from '../components/Input';
@@ -20,6 +19,10 @@ import { WhitelistedApp } from '../inject';
 import { ColorThemeProps } from '../theme';
 import { sendMessage } from '../utils/chromeHelpers';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { CreateAccount } from './onboarding/CreateAccount';
+import { RestoreAccount } from './onboarding/RestoreAccount';
+import { ImportAccount } from './onboarding/ImportAccount';
+import { AccountRow } from '../components/AccountRow';
 
 const Content = styled.div`
   display: flex;
@@ -97,6 +100,12 @@ const PageWrapper = styled.div<{ $marginTop: string }>`
 
 type SettingsPage =
   | 'main'
+  | 'manage-accounts'
+  | 'create-account'
+  | 'restore-account'
+  | 'import-wif'
+  | 'account-list'
+  | 'edit-account'
   | 'connected-apps'
   | 'social-profile'
   | 'export-keys-options'
@@ -117,6 +126,8 @@ export const Settings = () => {
   const [exportKeysQrData, setExportKeysAsQrData] = useState('');
   const [shouldVisibleExportedKeys, setShouldVisibleExportedKeys] = useState(false);
   const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState(socialProfile.displayName);
+  const [enteredAccountName, setEnteredAccountName] = useState('');
+  const [enteredAccountIcon, setEnteredAccountIcon] = useState('');
   const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(socialProfile?.avatar);
   const [isPasswordRequired, setIsPasswordRequired] = useState(chromeStorageService.isPasswordRequired());
   const [noApprovalLimit, setNoApprovalLimit] = useState(
@@ -186,6 +197,21 @@ export const Settings = () => {
       displayName: enteredSocialDisplayName,
       avatar: enteredSocialAvatar,
     });
+    setPage('main');
+  };
+
+  const handleAccountEditSave = async () => {
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) return;
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [account?.addresses.identityAddress]: {
+        ...account,
+        name: enteredAccountName,
+        icon: enteredAccountIcon,
+      },
+    };
+    await chromeStorageService.updateNested(key, update);
     setPage('main');
   };
 
@@ -314,6 +340,12 @@ export const Settings = () => {
   const main = (
     <>
       <SettingsRow
+        name="Manage Accounts"
+        description="Manage your accounts"
+        onClick={() => setPage('manage-accounts')}
+        jsxElement={<ForwardButton />}
+      />
+      <SettingsRow
         name="Connected Apps"
         description="Manage the apps you are connected to"
         onClick={() => setPage('connected-apps')}
@@ -334,6 +366,30 @@ export const Settings = () => {
 
       <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={lockWallet} />
       <SettingsRow name="Sign Out" description="Sign out of Yours Wallet completely" onClick={handleSignOutIntent} />
+    </>
+  );
+
+  const manageAccountsPage = (
+    <>
+      <SettingsRow
+        name="Create Account"
+        description="Create a new account"
+        jsxElement={<ForwardButton />}
+        onClick={() => setPage('create-account')}
+      />
+      <SettingsRow
+        name="Restore/Import"
+        description="Import or restore an existing account"
+        jsxElement={<ForwardButton />}
+        onClick={() => setPage('restore-account')}
+      />
+      <SettingsRow
+        name="Edit Account"
+        description="Edit an existing account"
+        jsxElement={<ForwardButton />}
+        onClick={() => setPage('account-list')}
+      />
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
     </>
   );
 
@@ -424,7 +480,6 @@ export const Settings = () => {
 
   const socialProfilePage = (
     <PageWrapper $marginTop="5rem">
-      <BackButton onClick={() => setPage('preferences')} />
       <SettingsText theme={theme}>Display Name</SettingsText>
       <Input
         theme={theme}
@@ -448,7 +503,60 @@ export const Settings = () => {
         style={{ marginTop: '1rem' }}
         onClick={handleSocialProfileSave}
       />
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('preferences')} />
     </PageWrapper>
+  );
+
+  const accountList = (
+    <>
+      {chromeStorageService.getAllAccounts().map((account) => {
+        return (
+          <AccountRow
+            key={account.addresses.identityAddress}
+            name={account.name}
+            icon={account.icon}
+            jsxElement={<ForwardButton />}
+            onClick={() => {
+              setEnteredAccountName(account.name);
+              setEnteredAccountIcon(account.icon);
+              setPage('edit-account');
+            }}
+          />
+        );
+      })}
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('manage-accounts')} />
+    </>
+  );
+
+  const editAccount = (
+    <>
+      <PageWrapper $marginTop="5rem">
+        <SettingsText theme={theme}>Label</SettingsText>
+        <Input
+          theme={theme}
+          placeholder="Account Label"
+          type="text"
+          onChange={(e) => setEnteredAccountName(e.target.value)}
+          value={enteredAccountName}
+        />
+        <SettingsText theme={theme}>Icon</SettingsText>
+        <Input
+          theme={theme}
+          placeholder="Account Icon"
+          type="text"
+          onChange={(e) => setEnteredAccountIcon(e.target.value)}
+          value={enteredAccountIcon}
+        />
+        <Button
+          theme={theme}
+          type="primary"
+          label="Save"
+          style={{ marginTop: '1rem' }}
+          onClick={handleAccountEditSave}
+        />
+        <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('account-list')} />
+      </PageWrapper>
+    </>
   );
 
   return (
@@ -468,6 +576,24 @@ export const Settings = () => {
       <Content>
         <TopNav />
         <Show when={page === 'main'}>{main}</Show>
+        <Show when={page === 'manage-accounts'}>{manageAccountsPage}</Show>
+        <Show when={page === 'create-account'}>
+          <PageWrapper $marginTop="3rem">
+            <CreateAccount onNavigateBack={() => setPage('manage-accounts')} />
+          </PageWrapper>
+        </Show>
+        <Show when={page === 'restore-account'}>
+          <PageWrapper $marginTop="1rem">
+            <RestoreAccount onNavigateBack={() => setPage('import-wif')} />
+          </PageWrapper>
+        </Show>
+        <Show when={page === 'import-wif'}>
+          <PageWrapper $marginTop="1rem">
+            <ImportAccount onNavigateBack={() => setPage('manage-accounts')} />
+          </PageWrapper>
+        </Show>
+        <Show when={page === 'account-list'}>{accountList}</Show>
+        <Show when={page === 'edit-account'}>{editAccount}</Show>
         <Show when={page === 'connected-apps'}>{connectedAppsPage}</Show>
         <Show when={page === 'preferences'}>{preferencesPage}</Show>
         <Show when={page === 'social-profile'}>{socialProfilePage}</Show>

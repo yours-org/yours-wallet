@@ -1,7 +1,7 @@
 import { NetWork } from 'yours-wallet-provider';
 import { HOSTED_YOURS_IMAGE } from '../utils/constants';
 import { deepMerge } from './serviceHelpers';
-import { ChromeStorageObject, CurrentAccountObject, DeprecatedStorage } from './types/chromeStorage.types';
+import { Account, ChromeStorageObject, CurrentAccountObject, DeprecatedStorage } from './types/chromeStorage.types';
 
 export class ChromeStorageService {
   storage: Partial<ChromeStorageObject> | undefined;
@@ -214,5 +214,23 @@ export class ChromeStorageService {
       return true;
     }
     return account.settings.isPasswordRequired;
+  };
+
+  getAllAccounts = (): Account[] => {
+    if (this.storage === null || this.storage === undefined) {
+      return [];
+    }
+    const { accounts } = this.storage as ChromeStorageObject;
+    if (!accounts) return [];
+    const accountsArray = Object.entries(accounts).map(([address, account]) => ({
+      ...account,
+      address,
+    }));
+
+    return accountsArray;
+  };
+
+  switchAccount = async (identityAddress: string): Promise<void> => {
+    await this.update({ selectedAccount: identityAddress });
   };
 }

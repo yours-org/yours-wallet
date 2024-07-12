@@ -11,9 +11,9 @@ import { useTheme } from './hooks/useTheme';
 import { useViewport } from './hooks/useViewport';
 import { AppsAndTools } from './pages/AppsAndTools';
 import { BsvWallet } from './pages/BsvWallet';
-import { CreateWallet } from './pages/onboarding/CreateWallet';
-import { ImportWallet } from './pages/onboarding/ImportWallet';
-import { RestoreWallet } from './pages/onboarding/RestoreWallet';
+import { CreateAccount } from './pages/onboarding/CreateAccount';
+import { ImportAccount } from './pages/onboarding/ImportAccount';
+import { RestoreAccount } from './pages/onboarding/RestoreAccount';
 import { Start } from './pages/onboarding/Start';
 import { OrdWallet } from './pages/OrdWallet';
 import { BroadcastRequest } from './pages/requests/BroadcastRequest';
@@ -121,9 +121,9 @@ export const App = () => {
               <Router>
                 <Routes>
                   <Route path="/" element={<Start />} />
-                  <Route path="/create-wallet" element={<CreateWallet />} />
-                  <Route path="/restore-wallet" element={<RestoreWallet />} />
-                  <Route path="/import-wallet" element={<ImportWallet />} />
+                  <Route path="/create-wallet" element={<CreateAccount onNavigateBack={() => null} newWallet />} />
+                  <Route path="/restore-wallet" element={<RestoreAccount onNavigateBack={() => null} newWallet />} />
+                  <Route path="/import-wallet" element={<ImportAccount onNavigateBack={() => null} newWallet />} />
                   <Route
                     path="/connect"
                     element={

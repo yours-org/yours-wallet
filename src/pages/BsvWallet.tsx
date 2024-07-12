@@ -30,7 +30,7 @@ import { sleep } from '../utils/sleep';
 import copyIcon from '../assets/copy.svg';
 import { AssetRow } from '../components/AssetRow';
 import lockIcon from '../assets/lock.svg';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useWeb3RequestContext } from '../hooks/useWeb3RequestContext';
 import { useServiceContext } from '../hooks/useServiceContext';
 
@@ -99,6 +99,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { isOrdRequest } = props;
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  const urlParams = new URLSearchParams(location.search);
+  const isReload = urlParams.get('reload') === 'true';
+  urlParams.delete('reload');
   const { setSelected, handleSelect } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>('main');
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
@@ -119,6 +123,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [bsvBalance, setBsvBalance] = useState<number>(getBsvBalance());
   const [exchangeRate, setExchangeRate] = useState<number>(getExchangeRate());
   const [lockData, setLockData] = useState(getLockData());
+
+  useEffect(() => {
+    if (isReload) window.location.reload();
+  });
 
   const refreshUtxos = async (showLoad = false) => {
     showLoad && setIsProcessing(true);
