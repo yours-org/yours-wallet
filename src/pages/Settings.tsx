@@ -98,7 +98,7 @@ const PageWrapper = styled.div<{ $marginTop: string }>`
   width: 100%;
 `;
 
-type SettingsPage =
+export type SettingsPage =
   | 'main'
   | 'manage-accounts'
   | 'create-account'
@@ -584,12 +584,12 @@ export const Settings = () => {
         </Show>
         <Show when={page === 'restore-account'}>
           <PageWrapper $marginTop="1rem">
-            <RestoreAccount onNavigateBack={() => setPage('import-wif')} />
+            <RestoreAccount onNavigateBack={(page: SettingsPage) => setPage(page)} />
           </PageWrapper>
         </Show>
         <Show when={page === 'import-wif'}>
           <PageWrapper $marginTop="1rem">
-            <ImportAccount onNavigateBack={() => setPage('manage-accounts')} />
+            <ImportAccount onNavigateBack={() => setPage('restore-account')} />
           </PageWrapper>
         </Show>
         <Show when={page === 'account-list'}>{accountList}</Show>

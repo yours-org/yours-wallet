@@ -23,6 +23,7 @@ import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { SupportedWalletImports } from '../../services/types/keys.types';
 import { NetWork } from 'yours-wallet-provider';
+import { SettingsPage } from '../Settings';
 
 const Content = styled.div`
   display: flex;
@@ -97,7 +98,7 @@ const WalletText = styled(Text)`
 `;
 
 export type RestoreAccountProps = {
-  onNavigateBack: () => void;
+  onNavigateBack: (page: SettingsPage) => void;
   newWallet?: boolean;
 };
 
@@ -172,7 +173,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   const handleWalletSelection = (wallet?: SupportedWalletImports) => {
     setImportWallet(wallet);
     if (wallet === 'wif') {
-      newWallet ? navigate('/import-wallet') : onNavigateBack();
+      newWallet ? navigate('/import-wallet') : onNavigateBack('import-wif');
       return;
     }
     setStep(2);
@@ -351,7 +352,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
           theme={theme}
           type="secondary"
           label="Go back"
-          onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
+          onClick={() => (newWallet ? navigate('/') : onNavigateBack('manage-accounts'))}
         />
       </Content>
     </>
