@@ -74,7 +74,7 @@ export class InscriptionIndexer extends Indexer {
       if (field.op > OP.OP_PUSHDATA4 && field.op <= OP.OP_16) {
         fieldNo = field.op - 80;
       } else if (field.data?.length) {
-        fieldNo = field.data![0];
+        fieldNo = field.data[0];
       }
       switch (fieldNo) {
         case 0:

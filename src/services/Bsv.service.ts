@@ -30,6 +30,7 @@ import { getChainParams } from './serviceHelpers';
 import { FundRawTxResponse, LockData, SendBsvResponse, UTXO } from './types/bsv.types';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { WhatsOnChainService } from './WhatsOnChain.service';
+import { TxoStore } from './txo-store';
 
 export class BsvService {
   private bsvBalance: number;
@@ -41,6 +42,7 @@ export class BsvService {
     private readonly wocService: WhatsOnChainService,
     private readonly contractService: ContractService,
     private readonly chromeStorageService: ChromeStorageService,
+    private readonly txoStore: TxoStore,
   ) {
     this.bsvBalance = 0;
     this.exchangeRate = 0;
@@ -275,6 +277,7 @@ export class BsvService {
   };
 
   updateBsvBalance = async (pullFresh?: boolean) => {
+    // const txos = await this.txoStore.getTxo
     const total = await this.wocService.getBsvBalance(this.keysService.bsvAddress, pullFresh);
     this.bsvBalance = total ?? 0;
     const balance = {

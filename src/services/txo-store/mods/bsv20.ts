@@ -11,7 +11,7 @@ export class Bsv20 {
   public dec?: number;
   public reason?: string;
 
-  toJSON(): any {
+  toJSON() {
     return {
       ...this,
       amt: this.amt.toString(),

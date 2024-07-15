@@ -179,6 +179,7 @@ export class ChromeStorageService {
       return this.storage;
     }
     return {
+      selectedAccount,
       account: accounts[selectedAccount],
       exchangeRateCache: this.storage.exchangeRateCache,
       isLocked: this.storage.isLocked,

@@ -33,12 +33,10 @@ export class TxoStore {
   constructor(
     public accountId: string,
     public indexers: Indexer[] = [],
-    public addresses = new Set<string>(),
     public broadcaster?: Broadcaster,
     public blocksService?: BlockHeaderService,
     public network: NetWork = NetWork.Mainnet,
   ) {
-    this.indexers.forEach((i) => (i.addresses = this.addresses));
     this.db = openDB<TxoSchema>(`txostore-${accountId}-${network}`, VERSION, {
       upgrade(db) {
         const txos = db.createObjectStore('txos', { keyPath: ['txid', 'vout'] });
@@ -126,6 +124,9 @@ export class TxoStore {
       block.height = tx.merklePath.blockHeight;
       block.idx = BigInt(idx);
       block.hash = (await this.blocksService?.getHashByHeight(tx.merklePath.blockHeight)) || '';
+      if (this.blocksService && !(await tx.merklePath.verify(txid, this.blocksService))) {
+        throw new Error('Invalid merkle proof');
+      }
     }
 
     const ctx: IndexContext = {
@@ -137,15 +138,20 @@ export class TxoStore {
     };
 
     for (const input of tx.inputs) {
-      if (!input.sourceTXID) input.sourceTXID = input.sourceTransaction!.id('hex') as string;
+      if (!input.sourceTXID) {
+        if (!input.sourceTransaction) {
+          throw new Error('Input missing source transaction');
+        }
+        input.sourceTXID = input.sourceTransaction.id('hex') as string;
+      }
       if (input.sourceTransaction) {
         if (await (await this.db).getKey('txns', input.sourceTXID)) {
           continue;
         }
         await this.ingest(input.sourceTransaction);
       } else {
-        input.sourceTransaction = await this.getTx(input.sourceTXID!, fromRemote);
-        if (!input.sourceTransaction) throw new Error(`Failed to get source tx ${input.sourceTXID!}`);
+        input.sourceTransaction = await this.getTx(input.sourceTXID, fromRemote);
+        if (!input.sourceTransaction) throw new Error(`Failed to get source tx ${input.sourceTXID}`);
       }
     }
 
@@ -195,12 +201,10 @@ export class TxoStore {
       txo.events = [];
       const spent = txo.spend ? '1' : '0';
       const sort = (txo.spend?.block?.height || txo.block?.height || Date.now()).toString(16).padStart(8, '0');
-      if (txo.owner && this.addresses.has(txo.owner)) {
-        Object.entries(txo.data).forEach(([tag, data]) => {
-          data.events.forEach((e) => {
-            txo.events.push(`${tag}:${e.id}:${e.value}:${spent}:${sort}:${txo.block?.idx}:${txo.vout}:${txo.satoshis}`);
-          });
-        });
+      for (const [tag, data] of Object.entries(txo.data)) {
+        for (const e of data.events) {
+          txo.events.push(`${tag}:${e.id}:${e.value}:${spent}:${sort}:${txo.block?.idx}:${txo.vout}:${txo.satoshis}`);
+        }
       }
       t.store.put(txo);
     }

@@ -8,17 +8,35 @@ import { ContractService } from '../services/Contract.service';
 import { BsvService } from '../services/Bsv.service';
 import { OrdinalService } from '../services/Ordinal.service';
 import { INACTIVITY_LIMIT } from '../utils/constants';
+import { TxoStore } from '../services/txo-store';
+import { BlockHeaderService } from '../services/block-headers';
+import { Indexer } from '../services/txo-store/models/indexer';
+import { FundIndexer } from '../services/txo-store/mods/fund';
 
 const initializeServices = async () => {
   await init();
   const chromeStorageService = new ChromeStorageService();
   await chromeStorageService.getAndSetStorage(); // Ensure the storage is initialized
 
+  const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
+
+  const indexers: Indexer[] = [new FundIndexer(new Set<string>([account?.addresses?.bsvAddress || '']))];
+  const network = chromeStorageService.getNetwork();
+  const blockHeaderService = new BlockHeaderService(network);
+  const txoStore = new TxoStore(selectedAccount || '', indexers, undefined, blockHeaderService, network);
+
   const wocService = new WhatsOnChainService(chromeStorageService);
   const gorillaPoolService = new GorillaPoolService(chromeStorageService);
   const keysService = new KeysService(gorillaPoolService, wocService, chromeStorageService);
   const contractService = new ContractService(keysService, gorillaPoolService);
-  const bsvService = new BsvService(keysService, gorillaPoolService, wocService, contractService, chromeStorageService);
+  const bsvService = new BsvService(
+    keysService,
+    gorillaPoolService,
+    wocService,
+    contractService,
+    chromeStorageService,
+    txoStore,
+  );
   const ordinalService = new OrdinalService(keysService, wocService, gorillaPoolService, chromeStorageService);
 
   return {
@@ -29,6 +47,7 @@ const initializeServices = async () => {
     wocService,
     gorillaPoolService,
     contractService,
+    txoStore,
   };
 };
 
@@ -56,7 +75,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const initServices = async () => {
       try {
         const initializedServices = await initializeServices();
-        const { chromeStorageService, keysService, bsvService, ordinalService } = initializedServices;
+        const { chromeStorageService, keysService, bsvService, ordinalService, txoStore } = initializedServices;
         const { account } = chromeStorageService.getCurrentAccountObject();
 
         if (account) {
@@ -66,6 +85,13 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
             await bsvService.rate();
             await bsvService.updateBsvBalance(true);
             await ordinalService.getAndSetOrdinals(ordAddress);
+          }
+          const resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=100`);
+          const txos = (await resp.json()) as { txid: string }[];
+          for (const txo of txos) {
+            const tx = await txoStore.getTx(txo.txid, true);
+            await txoStore.ingest(tx!, true);
+            console.log(txo.txid, 'ingested');
           }
         }
 

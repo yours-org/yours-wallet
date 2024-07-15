@@ -9,17 +9,15 @@ import { OrdLockIndexer } from './mods/ordlock';
 import { Bsv21Indexer } from './mods/bsv21';
 import { Bsv20Indexer } from './mods/bsv20';
 
-const addresses = new Set<string>(['13AGuUcJKJm5JaT9qssFxK8DETo3tAaa66', '1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ']);
-
 const indexers = [
-  new FundIndexer(),
-  new OrdLockIndexer(),
-  new InscriptionIndexer(),
-  new Bsv21Indexer(),
-  new Bsv20Indexer(),
-  new OriginIndexer(),
+  new FundIndexer(new Set<string>(['13AGuUcJKJm5JaT9qssFxK8DETo3tAaa66'])),
+  new OrdLockIndexer(new Set<string>(['1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
+  new InscriptionIndexer(new Set<string>(['13AGuUcJKJm5JaT9qssFxK8DETo3tAaa66', '1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
+  new Bsv21Indexer(new Set<string>(['1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
+  new Bsv20Indexer(new Set<string>(['1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
+  new OriginIndexer(new Set<string>(['1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
 ];
-const store = new TxoStore('test', indexers, addresses);
+const store = new TxoStore('test', indexers);
 
 const blockHeaderService = new BlockHeaderService();
 blockHeaderService.syncBlocks();
@@ -29,10 +27,6 @@ async function ingestBeef() {
     const beef = (document.getElementById('beef') as HTMLInputElement).value;
     if (!beef) return;
     const tx = Transaction.fromHexBEEF(beef);
-    // const valid = await tx.verify(blockHeaderService)
-    // if (!valid) {
-    //     throw new Error('Invalid beef')
-    // }
     console.log(await store.ingest(tx, true));
   } catch (e) {
     console.error(e);
@@ -47,10 +41,6 @@ async function ingestTxid() {
     if (!tx) {
       throw new Error('Tx not found');
     }
-    // const valid = await tx.verify(blockHeaderService)
-    // if (!valid) {
-    //     throw new Error('Invalid beef')
-    // }
     console.log(await store.ingest(tx, true));
   } catch (e) {
     console.error(e);

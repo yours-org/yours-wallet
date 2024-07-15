@@ -1,6 +1,5 @@
 import type { IndexContext } from './index-context';
 import { IndexData } from './index-data';
-import type { Txo } from './txo';
 
 export abstract class Indexer {
   tag = '';

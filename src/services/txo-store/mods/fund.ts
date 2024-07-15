@@ -4,7 +4,7 @@ import { IndexData } from '../models/index-data';
 import { parseAddress } from '../models/address';
 
 export class FundIndexer extends Indexer {
-  tag: string = 'fund';
+  tag = 'fund';
 
   parse(ctx: IndexContext, vout: number): IndexData | undefined {
     const txo = ctx.txos[vout];

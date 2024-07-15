@@ -5,6 +5,11 @@ import { NetWork } from 'yours-wallet-provider';
 const VERSION = 1;
 const PAGE_SIZE = 10000;
 
+const API = {
+  [NetWork.Mainnet]: 'https://ordinals.gorillapool.io',
+  [NetWork.Testnet]: 'https://test.ordinals.gorillapool.io',
+};
+
 export interface BlockHeader {
   hash: string;
   height: number;
@@ -49,7 +54,7 @@ export class BlockHeaderService implements ChainTracker {
     }
 
     try {
-      let resp = await fetch(`https://ordinals.gorillapool.io/api/blocks/list/${lastHeight}?limit=${PAGE_SIZE}`);
+      let resp = await fetch(`${API[this.network]}/api/blocks/list/${lastHeight}?limit=${PAGE_SIZE}`);
       let blocks = (await resp.json()) as BlockHeader[];
       do {
         console.log('Syncing from', lastHeight);
@@ -59,7 +64,7 @@ export class BlockHeaderService implements ChainTracker {
           lastHeight = block.height + 1;
         }
         await t.done;
-        resp = await fetch(`https://ordinals.gorillapool.io/api/blocks/list/${lastHeight}?limit=${PAGE_SIZE}`);
+        resp = await fetch(`${API[this.network]}/api/blocks/list/${lastHeight}?limit=${PAGE_SIZE}`);
         blocks = (await resp.json()) as BlockHeader[];
       } while (blocks.length == PAGE_SIZE);
     } catch (e) {

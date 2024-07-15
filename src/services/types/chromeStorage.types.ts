@@ -81,7 +81,6 @@ export interface ChromeStorageObject {
 export type CurrentAccountObject = Omit<
   ChromeStorageObject,
   | 'accounts'
-  | 'selectedAccount'
   | 'popupWindowId'
   | 'connectRequest'
   | 'sendBsvRequest'

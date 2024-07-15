@@ -1,6 +1,6 @@
 import { OP, Utils, type Script } from '@bsv/sdk';
 
-export function parseAddress(script: Script, offset: number = 0): string {
+export function parseAddress(script: Script, offset = 0): string {
   if (
     script.chunks[0 + offset]?.op === OP.OP_DUP &&
     script.chunks[1 + offset]?.op === OP.OP_HASH160 &&
