@@ -1,4 +1,3 @@
-import { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
 import { DefaultTheme, styled } from 'styled-components';
 import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
@@ -14,6 +13,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { sleep } from '../../utils/sleep';
+import { Hash, Transaction, Utils } from '@bsv/sdk';
 
 const TxInput = styled.div`
   border: 1px solid yellow;
@@ -112,16 +112,13 @@ const TxViewer = (props: { request: GetSignatures }) => {
   useEffect(() => {
     const setTheTx = async () => {
       try {
-        const tx = Transaction.from_hex(request.rawtx);
-        const numOuts = tx.get_noutputs();
-        const outputs: { asm: string; satoshis: number }[] = [];
-        for (let i = 0; i < numOuts; i++) {
-          const output = tx.get_output(i);
-          const asm = output?.get_script_pub_key().to_asm_string();
-          const satoshis = output?.get_satoshis();
-          if (!asm) throw new Error('Could not parse output and get asm string');
-          outputs.push({ asm, satoshis: Number(satoshis) });
-        }
+        const tx = Transaction.fromHex(request.rawtx);
+        // const numOuts = tx.get_noutputs();
+        const outputs: { asm: string; satoshis: number }[] = tx.outputs.map((o) => ({
+          asm: o.lockingScript.toASM(),
+          satoshis: o.satoshis || 0,
+        }));
+
         setTxOutputs(outputs);
       } catch (error) {
         console.error(error);
@@ -168,9 +165,7 @@ const TxViewer = (props: { request: GetSignatures }) => {
               const pubkeyHash = (/^OP_DUP OP_HASH160 ([0-9a-fA-F]{40}) OP_EQUALVERIFY OP_CHECKSIG$/.exec(asm) ||
                 [])[1];
               const isP2PKH = !!pubkeyHash;
-              const toAddr = pubkeyHash
-                ? P2PKHAddress.from_pubkey_hash(Uint8Array.from(Buffer.from(pubkeyHash, 'hex'))).to_string()
-                : 'Unknown Address';
+              const toAddr = pubkeyHash ? Utils.toBase58Check(Utils.toArray(pubkeyHash, 'hex')) : 'Unknown Address';
 
               return (
                 <TxOutput key={idx}>

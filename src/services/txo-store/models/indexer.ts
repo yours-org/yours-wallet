@@ -4,7 +4,7 @@ import { IndexData } from './index-data';
 export abstract class Indexer {
   tag = '';
 
-  constructor(public addresses = new Set<string>()) {}
+  constructor(public owners = new Set<string>()) {}
 
   parse(ctx: IndexContext, vout: number): IndexData | undefined {
     return;

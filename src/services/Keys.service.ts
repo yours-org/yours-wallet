@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { P2PKHAddress, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { NetWork } from 'yours-wallet-provider';
 import {
   DEFAULT_RELAYX_ORD_PATH,
@@ -13,11 +12,11 @@ import { generateKeysFromTag, getKeys, getKeysFromWifs, Keys } from '../utils/ke
 import { isAddressOnRightNetwork } from '../utils/tools';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { GorillaPoolService } from './GorillaPool.service';
-import { getChainParams } from './serviceHelpers';
 import { Account, ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
 import { WocUtxo } from './types/whatsOnChain.types';
 import { WhatsOnChainService } from './WhatsOnChain.service';
+import { Utils } from '@bsv/sdk';
 
 export class KeysService {
   bsvAddress: string;
@@ -118,42 +117,39 @@ export class KeysService {
   };
 
   sweepLegacy = async (keys: Keys) => {
-    const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
-    const network = this.chromeStorageService.getNetwork();
-    if (!isAddressOnRightNetwork(network, sweepWallet.address)) return;
-    const { data } = await axios.get<WocUtxo[]>(
-      `${this.wocService.getBaseUrl(network)}/address/${sweepWallet.address}/unspent`,
-    );
-    const utxos = data;
-    if (utxos.length === 0) return;
-    const tx = new Transaction(1, 0);
-    const changeAddress = P2PKHAddress.from_string(sweepWallet.address);
-
-    let satsIn = 0;
-    utxos.forEach((utxo: WocUtxo, vin: number) => {
-      const txin = new TxIn(Buffer.from(utxo.tx_hash, 'hex'), utxo.tx_pos, Script.from_hex(''));
-      tx.add_input(txin);
-      satsIn += utxo.value;
-      const sig = tx.sign(
-        sweepWallet.privKey,
-        SigHash.Input,
-        vin,
-        changeAddress.get_locking_script(),
-        BigInt(utxo.value),
-      );
-      const asm = `${sig.to_hex()} ${sweepWallet.pubKey.to_hex()}`;
-      txin?.set_unlocking_script(Script.from_asm_string(asm));
-      tx.set_input(vin, txin);
-    });
-
-    const size = tx.to_bytes().length + 34;
-    const fee = Math.ceil(size * FEE_PER_BYTE);
-    const changeAmount = satsIn - fee;
-    tx.add_output(new TxOut(BigInt(changeAmount), P2PKHAddress.from_string(keys.walletAddress).get_locking_script()));
-
-    const rawTx = tx.to_hex();
-    const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
-    console.log('Change sweep:', txid);
+    // const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
+    // const network = this.chromeStorageService.getNetwork();
+    // if (!isAddressOnRightNetwork(network, sweepWallet.address)) return;
+    // const { data } = await axios.get<WocUtxo[]>(
+    //   `${this.wocService.getBaseUrl(network)}/address/${sweepWallet.address}/unspent`,
+    // );
+    // const utxos = data;
+    // if (utxos.length === 0) return;
+    // const tx = new Transaction(1, 0);
+    // const changeAddress = P2PKHAddress.from_string(sweepWallet.address);
+    // let satsIn = 0;
+    // utxos.forEach((utxo: WocUtxo, vin: number) => {
+    //   const txin = new TxIn(Buffer.from(utxo.tx_hash, 'hex'), utxo.tx_pos, Script.from_hex(''));
+    //   tx.add_input(txin);
+    //   satsIn += utxo.value;
+    //   const sig = tx.sign(
+    //     sweepWallet.privKey,
+    //     SigHash.Input,
+    //     vin,
+    //     changeAddress.get_locking_script(),
+    //     BigInt(utxo.value),
+    //   );
+    //   const asm = `${sig.to_hex()} ${sweepWallet.pubKey.to_hex()}`;
+    //   txin?.set_unlocking_script(Script.from_asm_string(asm));
+    //   tx.set_input(vin, txin);
+    // });
+    // const size = tx.to_bytes().length + 34;
+    // const fee = Math.ceil(size * FEE_PER_BYTE);
+    // const changeAmount = satsIn - fee;
+    // tx.add_output(new TxOut(BigInt(changeAmount), P2PKHAddress.from_string(keys.walletAddress).get_locking_script()));
+    // const rawTx = tx.to_hex();
+    // const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
+    // console.log('Change sweep:', txid);
   };
 
   generateKeysFromWifAndStoreEncrypted = async (password: string, wifs: WifKeys, isNewWallet: boolean) => {
@@ -176,13 +172,13 @@ export class KeysService {
       const d = decrypt(encryptedKeys, passKey);
       const keys: Keys = JSON.parse(d);
 
-      const walletAddr = P2PKHAddress.from_string(keys.walletAddress)
-        .set_chain_params(getChainParams(account.network))
-        .to_string();
+      const walletAddr = Utils.toBase58Check(Utils.toArray(keys.walletAddress, 'hex'), [
+        account.network === NetWork.Mainnet ? 0 : 0x6f,
+      ]);
 
-      const ordAddr = P2PKHAddress.from_string(keys.ordAddress)
-        .set_chain_params(getChainParams(account.network))
-        .to_string();
+      const ordAddr = Utils.toBase58Check(Utils.toArray(keys.ordAddress, 'hex'), [
+        account.network === NetWork.Mainnet ? 0 : 0x6f,
+      ]);
 
       this.bsvAddress = walletAddr;
       this.ordAddress = ordAddr;
@@ -191,9 +187,9 @@ export class KeysService {
 
       // identity address not available with wif or 1sat import
       if (keys.identityAddress) {
-        const identityAddr = P2PKHAddress.from_string(keys.identityAddress)
-          .set_chain_params(getChainParams(account.network))
-          .to_string();
+        const identityAddr = Utils.toBase58Check(Utils.toArray(keys.identityAddress, 'hex'), [
+          account.network === NetWork.Mainnet ? 0 : 0x6f,
+        ]);
 
         this.identityAddress = identityAddr;
         this.identityPubKey = keys.identityPubKey;

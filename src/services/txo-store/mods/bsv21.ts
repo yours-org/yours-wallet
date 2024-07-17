@@ -1,8 +1,8 @@
 import type { IndexContext } from '../models/index-context';
 import { IndexData } from '../models/index-data';
 import { Indexer } from '../models/indexer';
-import type { Inscription } from './insc';
 import type { Txo } from '../models/txo';
+import { Ord } from './ord';
 
 export enum Bsv21Status {
   Invalid = -1,
@@ -43,9 +43,9 @@ export class Bsv21Indexer extends Indexer {
 
   parse(ctx: IndexContext, vout: number): IndexData | undefined {
     const txo = ctx.txos[vout];
-    const insc = txo.data.insc?.data as Inscription;
-    if (!insc || insc.file.type !== 'application/bsv-20') return;
-    const bsv21 = Bsv21.fromJSON(JSON.parse(insc.file.text));
+    const ord = txo.data.insc?.data as Ord;
+    if (!ord || ord.insc?.file.type !== 'application/bsv-20') return;
+    const bsv21 = Bsv21.fromJSON(JSON.parse(ord.insc!.file.text!));
     const data = new IndexData(bsv21);
     if (bsv21.amt <= 0n || bsv21.amt > 2 ** 64 - 1) return;
     switch (bsv21.op) {

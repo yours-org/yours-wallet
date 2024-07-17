@@ -1,5 +1,4 @@
 import React, { createContext, ReactNode, useCallback, useEffect, useState } from 'react';
-import init from 'bsv-wasm-web';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { WhatsOnChainService } from '../services/WhatsOnChain.service';
 import { GorillaPoolService } from '../services/GorillaPool.service';
@@ -12,15 +11,18 @@ import { TxoStore } from '../services/txo-store';
 import { BlockHeaderService } from '../services/block-headers';
 import { Indexer } from '../services/txo-store/models/indexer';
 import { FundIndexer } from '../services/txo-store/mods/fund';
+import { OrdIndexer } from '../services/txo-store/mods/ord';
 
 const initializeServices = async () => {
-  await init();
   const chromeStorageService = new ChromeStorageService();
   await chromeStorageService.getAndSetStorage(); // Ensure the storage is initialized
 
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
 
-  const indexers: Indexer[] = [new FundIndexer(new Set<string>([account?.addresses?.bsvAddress || '']))];
+  const indexers: Indexer[] = [
+    new FundIndexer(new Set<string>([account?.addresses?.bsvAddress || ''])),
+    new OrdIndexer(new Set<string>([account?.addresses?.ordAddress || ''])),
+  ];
   const network = chromeStorageService.getNetwork();
   const blockHeaderService = new BlockHeaderService(network);
   const txoStore = new TxoStore(selectedAccount || '', indexers, undefined, blockHeaderService, network);
@@ -37,7 +39,13 @@ const initializeServices = async () => {
     chromeStorageService,
     txoStore,
   );
-  const ordinalService = new OrdinalService(keysService, wocService, gorillaPoolService, chromeStorageService);
+  const ordinalService = new OrdinalService(
+    keysService,
+    wocService,
+    gorillaPoolService,
+    chromeStorageService,
+    txoStore,
+  );
 
   return {
     chromeStorageService,
@@ -62,6 +70,7 @@ export interface ServiceContextProps {
   isLocked: boolean;
   isReady: boolean;
   lockWallet: () => Promise<void>;
+  txoStore: TxoStore;
 }
 
 export const ServiceContext = createContext<ServiceContextProps | undefined>(undefined);
@@ -75,7 +84,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const initServices = async () => {
       try {
         const initializedServices = await initializeServices();
-        const { chromeStorageService, keysService, bsvService, ordinalService, txoStore } = initializedServices;
+        const { chromeStorageService, keysService, bsvService, ordinalService } = initializedServices;
         const { account } = chromeStorageService.getCurrentAccountObject();
 
         if (account) {
@@ -84,14 +93,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
             await keysService.retrieveKeys();
             await bsvService.rate();
             await bsvService.updateBsvBalance(true);
-            await ordinalService.getAndSetOrdinals(ordAddress);
-          }
-          const resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=100`);
-          const txos = (await resp.json()) as { txid: string }[];
-          for (const txo of txos) {
-            const tx = await txoStore.getTx(txo.txid, true);
-            await txoStore.ingest(tx!, true);
-            console.log(txo.txid, 'ingested');
+            // await ordinalService.getAndSetOrdinals(ordAddress);
           }
         }
 

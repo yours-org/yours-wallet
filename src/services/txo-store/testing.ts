@@ -2,8 +2,7 @@ import { Transaction } from '@bsv/sdk';
 import { BlockHeaderService } from '../block-headers';
 import { FundIndexer } from './mods/fund';
 import { TxoStore } from '.';
-import { OriginIndexer } from './mods/origin';
-import { InscriptionIndexer } from './mods/insc';
+import { OrdIndexer } from './mods/ord';
 import { TxoLookup } from './models/txo';
 import { OrdLockIndexer } from './mods/ordlock';
 import { Bsv21Indexer } from './mods/bsv21';
@@ -12,10 +11,9 @@ import { Bsv20Indexer } from './mods/bsv20';
 const indexers = [
   new FundIndexer(new Set<string>(['13AGuUcJKJm5JaT9qssFxK8DETo3tAaa66'])),
   new OrdLockIndexer(new Set<string>(['1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
-  new InscriptionIndexer(new Set<string>(['13AGuUcJKJm5JaT9qssFxK8DETo3tAaa66', '1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
+  new OrdIndexer(new Set<string>(['13AGuUcJKJm5JaT9qssFxK8DETo3tAaa66', '1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
   new Bsv21Indexer(new Set<string>(['1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
   new Bsv20Indexer(new Set<string>(['1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
-  new OriginIndexer(new Set<string>(['1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
 ];
 const store = new TxoStore('test', indexers);
 

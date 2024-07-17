@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { P2PKHAddress } from 'bsv-wasm-web';
 import { NetWork } from 'yours-wallet-provider';
 import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from '../utils/constants';
 import { isAddressOnRightNetwork } from '../utils/tools';
@@ -7,6 +6,7 @@ import { ChromeStorageService } from './ChromeStorage.service';
 import { StoredUtxo, UTXO } from './types/bsv.types';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { ChainInfo, WocUtxo } from './types/whatsOnChain.types';
+import { P2PKH } from '@bsv/sdk';
 
 export class WhatsOnChainService {
   apiKey: string;
@@ -55,7 +55,7 @@ export class WhatsOnChainService {
             satoshis: utxo.value,
             vout: utxo.tx_pos,
             txid: utxo.tx_hash,
-            script: P2PKHAddress.from_string(fromAddress).get_locking_script().to_hex(),
+            script: new P2PKH().lock(fromAddress).toHex(),
             spent: false,
             spentUnixTime: 0,
           } as StoredUtxo;

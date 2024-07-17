@@ -1,4 +1,3 @@
-import { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
 import { Broadcast } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
@@ -14,6 +13,7 @@ import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { useServiceContext } from '../../hooks/useServiceContext';
+import { Transaction } from '@bsv/sdk';
 
 export type BroadcastResponse = {
   txid: string;
@@ -35,7 +35,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const [satsOut, setSatsOut] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const { gorillaPoolService, keysService, bsvService, chromeStorageService } = useServiceContext();
-  const { updateBsvBalance, fundRawTx } = bsvService;
+  const { updateBsvBalance } = bsvService;
   const { bsvAddress } = keysService;
   // const { isProcessing, setIsProcessing, updateBsvBalance, fundRawTx, bsvAddress } = useBsv();
 
@@ -59,16 +59,16 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   useEffect(() => {
     if (!bsvAddress) return;
     (async () => {
-      const tx = Transaction.from_hex(request.rawtx);
-      let satsOut = 0;
-      const changeScript = P2PKHAddress.from_string(bsvAddress).get_locking_script().to_hex();
-      for (let index = 0; index < tx.get_noutputs(); index++) {
-        if (tx.get_output(index)?.get_script_pub_key_hex() !== changeScript) {
-          const output = tx.get_output(index);
-          if (!output) continue;
-          satsOut += Number(output.get_satoshis());
-        }
-      }
+      // const tx = Transaction.fromHex(request.rawtx);
+      const satsOut = 0;
+      // const changeScript = P2PKHAddress.from_string(bsvAddress).get_locking_script().to_hex();
+      // for (let index = 0; index < tx.get_noutputs(); index++) {
+      //   if (tx.get_output(index)?.get_script_pub_key_hex() !== changeScript) {
+      //     const output = tx.get_output(index);
+      //     if (!output) continue;
+      //     satsOut += Number(output.get_satoshis());
+      //   }
+      // }
       setSatsOut(satsOut);
     })();
   }, [bsvAddress, request.fund, request.rawtx]);
@@ -78,52 +78,52 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    let rawtx = request.rawtx;
-    if (request.fund) {
-      if (!passwordConfirm) {
-        addSnackbar('Must enter a password!', 'error');
-        setIsProcessing(false);
-        return;
-      }
+    // let rawtx = request.rawtx;
+    // if (request.fund) {
+    //   if (!passwordConfirm) {
+    //     addSnackbar('Must enter a password!', 'error');
+    //     setIsProcessing(false);
+    //     return;
+    //   }
 
-      const res = await fundRawTx(rawtx, passwordConfirm);
-      if (!res.rawtx || res.error) {
-        const message =
-          res.error === 'invalid-password'
-            ? 'Invalid Password!'
-            : 'An unknown error has occurred! Try again.' + res.error;
+    //   const res = await fundRawTx(rawtx, passwordConfirm);
+    //   if (!res.rawtx || res.error) {
+    //     const message =
+    //       res.error === 'invalid-password'
+    //         ? 'Invalid Password!'
+    //         : 'An unknown error has occurred! Try again.' + res.error;
 
-        addSnackbar(message, 'error');
-        setIsProcessing(false);
-        return;
-      }
-      rawtx = res.rawtx;
-    }
-    const { txid, message } = await gorillaPoolService.broadcastWithGorillaPool(rawtx);
-    if (!txid) {
-      addSnackbar('Error broadcasting the raw tx!', 'error');
-      setIsProcessing(false);
-      sendMessage({
-        action: 'broadcastResponse',
-        error: message ?? 'Unknown error',
-      });
-      onBroadcast();
-      return;
-    }
-    setTxid(txid);
-    sendMessage({
-      action: 'broadcastResponse',
-      txid,
-    });
+    //     addSnackbar(message, 'error');
+    //     setIsProcessing(false);
+    //     return;
+    //   }
+    //   rawtx = res.rawtx;
+    // }
+    // const { txid, message } = await gorillaPoolService.broadcastWithGorillaPool(rawtx);
+    // if (!txid) {
+    //   addSnackbar('Error broadcasting the raw tx!', 'error');
+    //   setIsProcessing(false);
+    //   sendMessage({
+    //     action: 'broadcastResponse',
+    //     error: message ?? 'Unknown error',
+    //   });
+    //   onBroadcast();
+    //   return;
+    // }
+    // setTxid(txid);
+    // sendMessage({
+    //   action: 'broadcastResponse',
+    //   txid,
+    // });
 
-    setIsProcessing(false);
-    addSnackbar('Successfully broadcasted the tx!', 'success');
-    onBroadcast();
-    setTimeout(async () => {
-      await updateBsvBalance(true).catch((e: unknown) => {
-        console.log(e);
-      });
-    }, 3000);
+    // setIsProcessing(false);
+    // addSnackbar('Successfully broadcasted the tx!', 'success');
+    // onBroadcast();
+    // setTimeout(async () => {
+    //   await updateBsvBalance(true).catch((e: unknown) => {
+    //     console.log(e);
+    //   });
+    // }, 3000);
   };
 
   const clearRequest = async () => {

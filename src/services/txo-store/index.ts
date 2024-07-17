@@ -93,7 +93,7 @@ export class TxoStore {
       if (lookup.owner && txo.owner != lookup.owner) continue;
       results.txos.push(txo);
       console.timeLog('findTxos', txo.txid, txo.vout);
-      if (results.txos.length >= limit) {
+      if (limit > 0 && results.txos.length >= limit) {
         console.timeEnd('findTxos');
         return results;
       }
@@ -181,9 +181,6 @@ export class TxoStore {
         const script = output.lockingScript.toBinary();
         // console.log('script', output.lockingScript.toBinary())
         txo = new Txo(txid, vout, BigInt(output.satoshis!), new Uint8Array(script));
-      }
-      if (!txo.owner) {
-        txo.owner = parseAddress(output.lockingScript, 0);
       }
 
       txo.block = block;

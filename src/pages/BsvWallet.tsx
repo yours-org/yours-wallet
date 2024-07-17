@@ -112,7 +112,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [amountType, setAmountType] = useState<AmountType>('bsv');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService } = useServiceContext();
+  const { chromeStorageService, keysService, bsvService, txoStore } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
@@ -130,10 +130,60 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const refreshUtxos = async (showLoad = false) => {
     showLoad && setIsProcessing(true);
-    await updateBsvBalance(true);
-    setBsvBalance(getBsvBalance());
-    setExchangeRate(getExchangeRate());
-    setLockData(getLockData());
+    // await updateBsvBalance(true);
+    // setBsvBalance(getBsvBalance());
+    // setExchangeRate(getExchangeRate());
+    // setLockData(getLockData());
+
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (account) {
+      const { bsvAddress, ordAddress } = account.addresses;
+      let resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=100`);
+      let txos = (await resp.json()) as { txid: string; origin: { outpoint: string } }[];
+      for (const txo of txos) {
+        const tx = await txoStore.getTx(txo.txid, true);
+        await txoStore.ingest(tx!, true);
+        console.log(txo.txid, 'ingested');
+      }
+      resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=100`);
+      txos = (await resp.json()) as { txid: string; origin: { outpoint: string } }[];
+      for (const txo of txos) {
+        if (txo.origin) {
+          const resp = await fetch(
+            `https://ordinals.gorillapool.io/api/inscriptions/${txo.origin.outpoint}/history?limit=100000`,
+          );
+          const txos = (await resp.json()) as { outpoint: string; origin: { outpoint: string } }[];
+          for await (const txo of txos) {
+            console.log('fast forward', txo.origin.outpoint, txo.outpoint);
+            const [txid] = txo.outpoint.split('_');
+            const tx = await txoStore.getTx(txid, true);
+            await txoStore.ingest(tx!, true);
+          }
+        } else {
+          const tx = await txoStore.getTx(txo.txid, true);
+          await txoStore.ingest(tx!, true);
+        }
+      }
+      resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
+      const balance = (await resp.json()) as { id?: string }[];
+      for await (const token of balance) {
+        if (!token.id) continue;
+        console.log('importing', token.id);
+        try {
+          resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
+          const txids = (await resp.json()) as string[];
+          for await (const txid of txids) {
+            console.log('importing', token.id, txid);
+            const tx = await txoStore.getTx(txid, true);
+            await txoStore.ingest(tx!, true);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      console.log('done importing');
+    }
     showLoad && setIsProcessing(false);
   };
 
@@ -148,17 +198,17 @@ export const BsvWallet = (props: BsvWalletProps) => {
     if (!identityAddress) return;
     if (!unlockAttempted) {
       (async () => {
-        const res = await unlockLockedCoins();
-        setUnlockAttempted(true);
-        if (res) {
-          if (res.error) addSnackbar('Error unlocking coins!', 'error');
-          if (res.txid) {
-            await refreshUtxos();
-            await unlockLockedCoins(true);
-            await sleep(1000);
-            addSnackbar('Successfully unlocked coins!', 'success');
-          }
-        }
+        // const res = await unlockLockedCoins();
+        // setUnlockAttempted(true);
+        // if (res) {
+        //   if (res.error) addSnackbar('Error unlocking coins!', 'error');
+        //   if (res.txid) {
+        //     await refreshUtxos();
+        //     await unlockLockedCoins(true);
+        //     await sleep(1000);
+        //     addSnackbar('Successfully unlocked coins!', 'success');
+        //   }
+        // }
       })();
     }
 

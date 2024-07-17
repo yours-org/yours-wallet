@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { P2PKHAddress, PrivateKey, Transaction, TxOut } from 'bsv-wasm-web';
 import { Bsv20, BSV20Txo, DerivationTag, NetWork, Ordinal, TaggedDerivationResponse } from 'yours-wallet-provider';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL, JUNGLE_BUS_URL } from '../utils/constants';
@@ -8,7 +7,6 @@ import { chunkedStringArray } from '../utils/format';
 import { getTaggedDerivationKeys, Keys } from '../utils/keys';
 import { isBSV20v2 } from '../utils/ordi';
 import { getCurrentUtcTimestamp, isAddressOnRightNetwork } from '../utils/tools';
-import { getChainParams } from './serviceHelpers';
 import {
   GorillaPoolBroadcastResponse,
   GorillaPoolErrorMessage,
@@ -230,105 +228,95 @@ export class GorillaPoolService {
   };
 
   setDerivationTags = async (identityAddress: string, keys: Keys) => {
-    const taggedOrds = await this.getOrdUtxos(identityAddress);
-    const tags: TaggedDerivationResponse[] = [];
-    const network = this.chromeStorageService.getNetwork();
-    for (const ord of taggedOrds) {
-      try {
-        if (!ord.origin?.outpoint || ord.origin.data?.insc?.file.type !== 'panda/tag') continue;
-        const contentBuffer = await this.getOrdContentByOriginOutpoint(ord.origin.outpoint.toString());
-        if (!contentBuffer || contentBuffer.length === 0) continue;
-
-        const derivationTag = decryptUsingPrivKey(
-          [Buffer.from(contentBuffer).toString('base64')],
-          PrivateKey.from_wif(keys.identityWif),
-        );
-
-        const parsedTag: DerivationTag = JSON.parse(Buffer.from(derivationTag[0], 'base64').toString('utf8'));
-        const taggedKeys = getTaggedDerivationKeys(parsedTag, keys.mnemonic);
-
-        const taggedAddress = P2PKHAddress.from_string(taggedKeys.address)
-          .set_chain_params(getChainParams(network))
-          .to_string();
-
-        tags.push({ tag: parsedTag, address: taggedAddress, pubKey: taggedKeys.pubKey.to_hex() });
-      } catch (error) {
-        console.log(error);
-      }
-    }
-
-    const { account } = this.chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found!');
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [account.addresses.identityAddress]: {
-        ...account,
-        derivationTags: tags,
-      },
-    };
-    await this.chromeStorageService.updateNested(key, update);
+    // const taggedOrds = await this.getOrdUtxos(identityAddress);
+    // const tags: TaggedDerivationResponse[] = [];
+    // const network = this.chromeStorageService.getNetwork();
+    // for (const ord of taggedOrds) {
+    //   try {
+    //     if (!ord.origin?.outpoint || ord.origin.data?.insc?.file.type !== 'panda/tag') continue;
+    //     const contentBuffer = await this.getOrdContentByOriginOutpoint(ord.origin.outpoint.toString());
+    //     if (!contentBuffer || contentBuffer.length === 0) continue;
+    //     const derivationTag = decryptUsingPrivKey(
+    //       [Buffer.from(contentBuffer).toString('base64')],
+    //       PrivateKey.from_wif(keys.identityWif),
+    //     );
+    //     const parsedTag: DerivationTag = JSON.parse(Buffer.from(derivationTag[0], 'base64').toString('utf8'));
+    //     const taggedKeys = getTaggedDerivationKeys(parsedTag, keys.mnemonic);
+    //     const taggedAddress = P2PKHAddress.from_string(taggedKeys.address)
+    //       .set_chain_params(getChainParams(network))
+    //       .to_string();
+    //     tags.push({ tag: parsedTag, address: taggedAddress, pubKey: taggedKeys.pubKey.to_hex() });
+    //   } catch (error) {
+    //     console.log(error);
+    //   }
+    // }
+    // const { account } = this.chromeStorageService.getCurrentAccountObject();
+    // if (!account) throw new Error('No account found!');
+    // const key: keyof ChromeStorageObject = 'accounts';
+    // const update: Partial<ChromeStorageObject['accounts']> = {
+    //   [account.addresses.identityAddress]: {
+    //     ...account,
+    //     derivationTags: tags,
+    //   },
+    // };
+    // await this.chromeStorageService.updateNested(key, update);
   };
 
   getTxOut = async (txid: string, vout: number) => {
     try {
-      const { data } = await axios.get(`${JUNGLE_BUS_URL}/v1/txo/get/${txid}_${vout}`, { responseType: 'arraybuffer' });
-      return TxOut.from_hex(Buffer.from(data).toString('hex'));
+      // const { data } = await axios.get(`${JUNGLE_BUS_URL}/v1/txo/get/${txid}_${vout}`, { responseType: 'arraybuffer' });
+      // return TxOut.from_hex(Buffer.from(data).toString('hex'));
     } catch (error) {
       console.log(error);
     }
   };
 
   updateStoredPaymentUtxos = async (rawtx: string) => {
-    const { account } = this.chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found!');
-    const { addresses, paymentUtxos } = account;
-    const { bsvAddress } = addresses;
-
-    const tx = Transaction.from_hex(rawtx);
-    const inputCount = tx.get_ninputs();
-    const outputCount = tx.get_noutputs();
-    const spends: string[] = [];
-
-    for (let i = 0; i < inputCount; i++) {
-      const txIn = tx.get_input(i);
-      if (!txIn) continue;
-      spends.push(`${txIn.get_prev_tx_id_hex()}_${txIn.get_vout()}`);
-    }
-    paymentUtxos.forEach((utxo) => {
-      if (spends.includes(`${utxo.txid}_${utxo.vout}`)) {
-        utxo.spent = true;
-        utxo.spentUnixTime = getCurrentUtcTimestamp();
-      }
-    });
-
-    const fundingScript = P2PKHAddress.from_string(bsvAddress).get_locking_script().to_hex();
-    const txid = tx.get_id_hex();
-
-    for (let i = 0; i < outputCount; i++) {
-      const txOut = tx.get_output(i);
-      if (!txOut) continue;
-      const outScript = txOut?.get_script_pub_key_hex();
-      if (outScript === fundingScript) {
-        paymentUtxos.push({
-          satoshis: Number(txOut.get_satoshis()),
-          script: fundingScript,
-          txid,
-          vout: i,
-          spent: false,
-          spentUnixTime: 0,
-        });
-      }
-    }
-
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [account.addresses.identityAddress]: {
-        ...account,
-        paymentUtxos,
-      },
-    };
-    await this.chromeStorageService.updateNested(key, update);
-    return paymentUtxos;
+    // const { account } = this.chromeStorageService.getCurrentAccountObject();
+    // if (!account) throw new Error('No account found!');
+    // const { addresses, paymentUtxos } = account;
+    // const { bsvAddress } = addresses;
+    // const tx = Transaction.from_hex(rawtx);
+    // const inputCount = tx.get_ninputs();
+    // const outputCount = tx.get_noutputs();
+    // const spends: string[] = [];
+    // for (let i = 0; i < inputCount; i++) {
+    //   const txIn = tx.get_input(i);
+    //   if (!txIn) continue;
+    //   spends.push(`${txIn.get_prev_tx_id_hex()}_${txIn.get_vout()}`);
+    // }
+    // paymentUtxos.forEach((utxo) => {
+    //   if (spends.includes(`${utxo.txid}_${utxo.vout}`)) {
+    //     utxo.spent = true;
+    //     utxo.spentUnixTime = getCurrentUtcTimestamp();
+    //   }
+    // });
+    // const fundingScript = P2PKHAddress.from_string(bsvAddress).get_locking_script().to_hex();
+    // const txid = tx.get_id_hex();
+    // for (let i = 0; i < outputCount; i++) {
+    //   const txOut = tx.get_output(i);
+    //   if (!txOut) continue;
+    //   const outScript = txOut?.get_script_pub_key_hex();
+    //   if (outScript === fundingScript) {
+    //     paymentUtxos.push({
+    //       satoshis: Number(txOut.get_satoshis()),
+    //       script: fundingScript,
+    //       txid,
+    //       vout: i,
+    //       spent: false,
+    //       spentUnixTime: 0,
+    //     });
+    //   }
+    // }
+    // const key: keyof ChromeStorageObject = 'accounts';
+    // const update: Partial<ChromeStorageObject['accounts']> = {
+    //   [account.addresses.identityAddress]: {
+    //     ...account,
+    //     paymentUtxos,
+    //   },
+    // };
+    // await this.chromeStorageService.updateNested(key, update);
+    // return paymentUtxos;
   };
 
   getTokenPriceInSats = async (tokenIds: string[]) => {

@@ -32,10 +32,10 @@ module.exports = function override(config) {
           originModule: 'path',
           replaceModule: 'path-browserify',
         },
-        {
-          originModule: 'bsv-wasm',
-          replaceModule: 'bsv-wasm-web',
-        },
+        // {
+        //   originModule: 'bsv-wasm',
+        //   replaceModule: 'bsv-wasm-web',
+        // },
       ],
     }),
     new webpack.ProvidePlugin({

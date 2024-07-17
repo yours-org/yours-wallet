@@ -1,5 +1,3 @@
-import { P2PKHAddress, PublicKey } from 'bsv-wasm-web';
-import { buildInscription } from 'js-1sat-ord-web';
 import { useEffect, useState } from 'react';
 import { DerivationTag, TaggedDerivationRequest } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
@@ -16,7 +14,8 @@ import { encryptUsingPrivKey } from '../../utils/crypto';
 import { truncate } from '../../utils/format';
 import { getPrivateKeyFromTag, getTaggedDerivationKeys, Keys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
-import { getChainParams } from '../../services/serviceHelpers';
+import { P2PKH, PublicKey, Utils } from '@bsv/sdk';
+import { OrdP2PKH } from 'js-1sat-ord';
 
 export type GenerateTaggedKeysRequestProps = {
   request: TaggedDerivationRequest & { domain?: string };
@@ -87,29 +86,25 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       const encryptedMessages = encryptUsingPrivKey(
         message,
         'utf8',
-        [PublicKey.from_hex(keys.identityPubKey)],
+        [PublicKey.fromString(keys.identityPubKey)],
         encryptPrivKey,
       );
 
-      const insScript = buildInscription(
-        P2PKHAddress.from_string(keys.identityAddress),
-        encryptedMessages[0],
-        'panda/tag',
-      );
-      const txid = await bsvService.sendBsv([{ satoshis: 1, script: insScript.to_hex() }], password);
+      const insScript = new OrdP2PKH().lock(keys.identityAddress, encryptedMessages[0], 'panda/tag');
+      const txid = await bsvService.sendBsv([{ satoshis: 1, script: insScript.toHex() }], password);
 
       if (!txid) {
         return { error: 'no-txid' };
       }
 
       const network = chromeStorageService.getNetwork();
-      const taggedAddress = P2PKHAddress.from_string(taggedKeys.address)
-        .set_chain_params(getChainParams(network))
-        .to_string();
+      const taggedAddress = Utils.toBase58Check(Utils.fromBase58Check(taggedKeys.address).data as number[], [
+        network === 'mainnet' ? 0 : 0x6f,
+      ]);
 
       return {
         address: taggedAddress,
-        pubKey: taggedKeys.pubKey.to_hex(),
+        pubKey: taggedKeys.pubKey.toString(),
         tag: derivationTag,
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
