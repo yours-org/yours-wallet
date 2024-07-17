@@ -1,4 +1,4 @@
-import { Broadcaster, MerklePath, Transaction } from '@bsv/sdk';
+import { MerklePath, Transaction } from '@bsv/sdk';
 import type { Indexer } from './models/indexer';
 import type { IndexContext } from './models/index-context';
 import { openDB, type DBSchema, type IDBPDatabase } from '@tempfix/idb';
@@ -9,6 +9,7 @@ import { Block } from './models/block';
 import { Spend } from './models/spend';
 import { Buffer } from 'buffer';
 import { NetWork } from 'yours-wallet-provider';
+import { TransactionService } from '../Transaction.service';
 
 const VERSION = 1;
 
@@ -24,6 +25,9 @@ export interface TxoSchema extends DBSchema {
   txns: {
     key: string;
     value: Txn;
+    indexes: {
+      status: [number, number];
+    };
   };
 }
 
@@ -32,7 +36,7 @@ export class TxoStore {
   constructor(
     public accountId: string,
     public indexers: Indexer[] = [],
-    public broadcaster?: Broadcaster,
+    public txService?: TransactionService,
     public blocksService?: BlockHeaderService,
     public network: NetWork = NetWork.Mainnet,
   ) {
@@ -41,7 +45,8 @@ export class TxoStore {
         const txos = db.createObjectStore('txos', { keyPath: ['txid', 'vout'] });
         txos.createIndex('events', 'events', { multiEntry: true });
         txos.createIndex('owner', 'owner');
-        db.createObjectStore('txns', { keyPath: 'txid' });
+        const txns = db.createObjectStore('txns', { keyPath: 'txid' });
+        txns.createIndex('status', ['status', 'block.height']);
       },
     });
   }
@@ -103,9 +108,9 @@ export class TxoStore {
   }
 
   async broadcast(tx: Transaction) {
-    if (!this.broadcaster) throw new Error('No broadcaster configured');
-    const resp = await this.broadcaster.broadcast(tx);
-    if (resp.status == 'success') {
+    if (!this.txService) throw new Error('No broadcaster configured');
+    const resp = await this.txService.broadcast(tx);
+    if (resp.status === 'success') {
       await this.ingest(tx);
     }
     return resp;

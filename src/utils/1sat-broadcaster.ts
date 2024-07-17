@@ -1,5 +1,6 @@
 import { Broadcaster, BroadcastFailure, BroadcastResponse, Transaction } from '@bsv/sdk';
 import { GP_BASE_URL } from './constants';
+import { Block } from '../services/txo-store/models/block';
 
 export class OneSatBroadcaster implements Broadcaster {
   async broadcast(tx: Transaction): Promise<BroadcastResponse | BroadcastFailure> {
@@ -23,5 +24,13 @@ export class OneSatBroadcaster implements Broadcaster {
       txid: body,
       message: 'Transaction broadcast successfully',
     } as BroadcastResponse;
+  }
+
+  async status(txid: string): Promise<Block | undefined> {
+    const resp = await fetch(`${GP_BASE_URL}/api/tx/${txid}`);
+    if (resp.status > 200) {
+      return undefined;
+    }
+    return resp.json();
   }
 }
