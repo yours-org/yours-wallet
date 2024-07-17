@@ -148,15 +148,8 @@ export const OrdWallet = () => {
   const { chromeStorageService, ordinalService, gorillaPoolService, keysService, bsvService } = useServiceContext();
   const [isProcessing, setIsProcessing] = useState(false);
   const { ordAddress } = keysService;
-  const {
-    getAndSetOrdinals,
-    transferOrdinal,
-    sendBSV20,
-    getBsv20s,
-    listOrdinalOnGlobalOrderbook,
-    cancelGlobalOrderbookListing,
-    getTokenName,
-  } = ordinalService;
+  const { transferOrdinal, getBsv20s, listOrdinalOnGlobalOrderbook, cancelGlobalOrderbookListing, getTokenName } =
+    ordinalService;
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const network = chromeStorageService.getNetwork();
   const [selectedOrdinal, setSelectedOrdinal] = useState<OrdinalType | undefined>();
@@ -187,13 +180,6 @@ export const OrdWallet = () => {
   }, [setSelected]);
 
   useEffect(() => {
-    if (ordAddress) {
-      getAndSetOrdinals(ordAddress);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordAddress]);
-
-  useEffect(() => {
     if (!successTxId) return;
     // if (!message) {
     resetSendState();
@@ -210,9 +196,6 @@ export const OrdWallet = () => {
     setIsProcessing(false);
     setSelectedOrdinal(undefined);
     setTokenSendAmount(null);
-    setTimeout(() => {
-      getAndSetOrdinals(ordAddress);
-    }, 500);
   };
 
   const getErrorMessage = (response: OrdOperationResponse) => {
@@ -537,7 +520,7 @@ export const OrdWallet = () => {
           setPageState('main');
           setTimeout(() => {
             setIsProcessing(false);
-            getAndSetOrdinals(ordAddress);
+            // getAndSetOrdinals(ordAddress);
           }, 500);
         }}
       />

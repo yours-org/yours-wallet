@@ -7,35 +7,23 @@ import {
   OrdinalData,
   OrdOperationResponse,
 } from './types/ordinal.types';
-import { WhatsOnChainService } from './WhatsOnChain.service';
-import {
-  BSV20_INDEX_FEE,
-  FEE_PER_BYTE,
-  FEE_SATS,
-  MAX_FEE_PER_TX,
-  O_LOCK_SUFFIX,
-  P2PKH_INPUT_SIZE,
-  P2PKH_OUTPUT_SIZE,
-  SCRYPT_PREFIX,
-} from '../utils/constants';
 import { sendOrdinals } from 'js-1sat-ord';
-import { createTransferP2PKH, createTransferV2P2PKH, isBSV20v2 } from '../utils/ordi';
 import { Bsv20, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
 import { UTXO } from './types/bsv.types';
-import { ChromeStorageObject } from './types/chromeStorage.types';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { TxoStore } from './txo-store';
 import { PrivateKey, Transaction } from '@bsv/sdk';
-import { TxoLookup } from './txo-store/models/txo';
+import { BsvService } from './Bsv.service';
+import { FEE_PER_KB } from '../utils/constants';
 
 export class OrdinalService {
   private ordinals: OrdinalData;
   private bsv20s: BSV20Data;
   constructor(
     private readonly keysService: KeysService,
-    private readonly wocService: WhatsOnChainService,
     private readonly gorillaPoolService: GorillaPoolService,
     private readonly chromeStorageService: ChromeStorageService,
+    private readonly bsvService: BsvService,
     private readonly txoStore: TxoStore,
   ) {
     this.ordinals = { initialized: false, data: [] };
@@ -45,35 +33,35 @@ export class OrdinalService {
   getOrdinals = (): OrdinalData => this.ordinals;
   getBsv20s = (): BSV20Data => this.bsv20s;
 
-  getAndSetOrdinals = async (ordAddress: string) => {
-    try {
-      //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
-      const ordList = await this.gorillaPoolService.getOrdUtxos(ordAddress);
-      this.ordinals = { initialized: true, data: ordList.filter((o) => o.satoshis === 1) };
+  // getAndSetOrdinals = async (ordAddress: string) => {
+  //   try {
+  //     //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
+  //     const ordList = await this.gorillaPoolService.getOrdUtxos(ordAddress);
+  //     this.ordinals = { initialized: true, data: ordList.filter((o) => o.satoshis === 1) };
 
-      const bsv20List: Array<Bsv20> = await this.gorillaPoolService.getBsv20Balances(ordAddress);
+  //     const bsv20List: Array<Bsv20> = await this.gorillaPoolService.getBsv20Balances(ordAddress);
 
-      // All the information currently used has been obtained from `getBsv20Balances`.
-      // If other information is needed later, call `cacheTokenInfos` to obtain more Tokens information.
-      // await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.id));
+  //     // All the information currently used has been obtained from `getBsv20Balances`.
+  //     // If other information is needed later, call `cacheTokenInfos` to obtain more Tokens information.
+  //     // await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.id));
 
-      const data = bsv20List.filter((o) => o.all.confirmed + o.all.pending > 0n && typeof o.dec === 'number');
-      this.bsv20s = { initialized: true, data };
-      const { account } = this.chromeStorageService.getCurrentAccountObject();
-      if (!account) throw Error('No account found!');
-      const key: keyof ChromeStorageObject = 'accounts';
-      const update: Partial<ChromeStorageObject['accounts']> = {
-        [this.keysService.identityAddress]: {
-          ...account,
-          ordinals: this.ordinals.initialized ? this.ordinals.data : account.ordinals || [],
-        },
-      };
-      await this.chromeStorageService.updateNested(key, update);
-      return this.ordinals;
-    } catch (error) {
-      console.error('getOrdinals failed:', error);
-    }
-  };
+  //     const data = bsv20List.filter((o) => o.all.confirmed + o.all.pending > 0n && typeof o.dec === 'number');
+  //     this.bsv20s = { initialized: true, data };
+  //     const { account } = this.chromeStorageService.getCurrentAccountObject();
+  //     if (!account) throw Error('No account found!');
+  //     const key: keyof ChromeStorageObject = 'accounts';
+  //     const update: Partial<ChromeStorageObject['accounts']> = {
+  //       [this.keysService.identityAddress]: {
+  //         ...account,
+  //         ordinals: this.ordinals.initialized ? this.ordinals.data : account.ordinals || [],
+  //       },
+  //     };
+  //     await this.chromeStorageService.updateNested(key, update);
+  //     return this.ordinals;
+  //   } catch (error) {
+  //     console.error('getOrdinals failed:', error);
+  //   }
+  // };
 
   transferOrdinal = async (
     destinationAddress: string,
@@ -96,21 +84,12 @@ export class OrdinalService {
       if (!keys?.ordAddress || !keys.ordWif || !keys.walletAddress || !keys.walletWif) {
         throw Error('No keys');
       }
-      const ordinalAddress = keys.ordAddress;
+
       const ordPk = PrivateKey.fromWif(keys.ordWif);
       const fundingAndChangeAddress = keys.walletAddress;
       const payPk = PrivateKey.fromWif(keys.walletWif);
 
-      const fundResult = await this.txoStore.searchTxos(
-        new TxoLookup('fund', 'address', fundingAndChangeAddress, false),
-      );
-      const paymentUtxos = fundResult.txos.map((t) => ({
-        txid: t.txid,
-        vout: t.vout,
-        satoshis: Number(t.satoshis),
-        script: Buffer.from(t.script).toString('base64'),
-      }));
-
+      const fundingUtxos = await this.bsvService.fundingTxos();
       const { tx } = await sendOrdinals({
         destinations: [{ address: destinationAddress }],
         ordinals: [
@@ -118,22 +97,20 @@ export class OrdinalService {
         ],
         ordPk,
         paymentPk: payPk,
-        paymentUtxos,
+        paymentUtxos: fundingUtxos.map((t) => ({
+          txid: t.txid,
+          vout: t.vout,
+          satoshis: Number(t.satoshis),
+          script: Buffer.from(t.script).toString('base64'),
+        })),
+        changeAddress: fundingAndChangeAddress,
+        satsPerKb: FEE_PER_KB,
       });
 
-      // result.tx
-      // // const broadcastResponse = await this.buildAndBroadcastOrdinalTx(
-      // //   fundingUtxo,
-      // //   formattedOrdUtxo,
-      // //   payPrivateKey,
-      // //   fundingAndChangeAddress,
-      // //   ordPrivateKey,
-      // //   destinationAddress,
-      // // );
-
-      // if (broadcastResponse?.txid) {
-      //   return { txid: broadcastResponse.txid };
-      // }
+      const response = await this.txoStore.broadcast(tx);
+      if (response?.txid) {
+        return { txid: response.txid };
+      }
 
       return { error: 'broadcast-failed' };
     } catch (error) {
@@ -173,33 +150,6 @@ export class OrdinalService {
     //   return { txid, rawTx, changeInfo: { change, changeVout } };
     // }
     return;
-  };
-
-  getOrdinalUtxos = async (ordAddress: string): Promise<Ordinal[] | undefined> => {
-    try {
-      if (!ordAddress) {
-        return [];
-      }
-
-      const results = await this.txoStore.searchTxos(new TxoLookup('ord', 'address', ordAddress, false));
-      return results.txos.map(
-        (t) =>
-          ({
-            txid: t.txid,
-            vout: t.vout,
-            outpoint: `${t.txid}_${t.vout}`,
-            satoshis: Number(t.satoshis),
-            script: Buffer.from(t.script).toString('base64'),
-            owner: t.owner,
-            spend: t.spend?.txid,
-            height: t.block?.height || 0 < 50000000 ? t.block?.height : 0,
-            idx: Number(t.block?.idx),
-            data: t.data,
-          }) as Ordinal,
-      );
-    } catch (error) {
-      console.error('getOrdinalUtxos failed:', error);
-    }
   };
 
   sendBSV20 = async (id: string, destinationAddress: string, amount: bigint, password: string) => {

@@ -51,14 +51,14 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request.outpoint]);
 
-  useEffect(() => {
-    if (!successTxId) return;
-    if (!message && ordAddress) {
-      resetSendState();
-      ordinalService.getAndSetOrdinals(ordAddress);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successTxId, message, ordAddress]);
+  // useEffect(() => {
+  //   if (!successTxId) return;
+  //   if (!message && ordAddress) {
+  //     resetSendState();
+  //     ordinalService.getAndSetOrdinals(ordAddress);
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [successTxId, message, ordAddress]);
 
   const resetSendState = () => {
     setPasswordConfirm('');

@@ -56,6 +56,7 @@ export class OrdIndexer extends Indexer {
     }
 
     const ord: Ord = {};
+    let owner = parseAddress(script, 0);
     if (fromPos !== undefined) {
       const insc = (ord.insc = {
         file: { hash: '', size: 0, type: '' },
@@ -66,12 +67,9 @@ export class OrdIndexer extends Indexer {
       for (let i = fromPos; i < script.chunks.length; i += 2) {
         const field = script.chunks[i];
         if (field.op == OP.OP_ENDIF) {
-          let owner = parseAddress(script, i + 1);
+          owner = parseAddress(script, i + 1);
           if (!txo.owner && script.chunks[i + 1]?.op == OP.OP_CODESEPARATOR) {
             owner = parseAddress(script, i + 1);
-          }
-          if (owner && this.owners.has(owner)) {
-            idxData.events.push({ id: 'owner', value: owner });
           }
           break;
         }
@@ -103,7 +101,7 @@ export class OrdIndexer extends Indexer {
               try {
                 insc.file.text = new TextDecoder('utf8', { fatal: true }).decode(Buffer.from(value.data));
                 const words = new Set<string>();
-                insc.file.text.split(' ').forEach((word) => {
+                insc.file.text.split(/\W+/).forEach((word) => {
                   if (word.length > 3 && word.length < 20) {
                     words.add(word);
                   }
@@ -134,9 +132,10 @@ export class OrdIndexer extends Indexer {
         }
       }
     }
-
     if (!ord.insc && txo.satoshis != 1n) return;
-
+    if (owner && this.owners.has(owner)) {
+      idxData.events.push({ id: 'owner', value: owner });
+    }
     let outSat = 0n;
     for (let i = 0; i < vout; i++) {
       outSat += ctx.txos[i].satoshis;
@@ -145,7 +144,7 @@ export class OrdIndexer extends Indexer {
     for (const spend of ctx.spends) {
       idxData.deps.push(`${spend.txid}_${spend.vout}`);
       if (inSat == outSat && spend.satoshis == 1n) {
-        if ((spend.data.ord?.data as Ord).origin) {
+        if ((spend.data.ord?.data as Ord)?.origin) {
           ord.origin = Object.assign({}, spend.data.ord?.data?.origin) as Origin;
           ord.origin.nonce++;
         }

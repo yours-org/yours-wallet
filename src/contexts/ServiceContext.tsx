@@ -41,9 +41,9 @@ const initializeServices = async () => {
   );
   const ordinalService = new OrdinalService(
     keysService,
-    wocService,
     gorillaPoolService,
     chromeStorageService,
+    bsvService,
     txoStore,
   );
 
@@ -84,7 +84,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const initServices = async () => {
       try {
         const initializedServices = await initializeServices();
-        const { chromeStorageService, keysService, bsvService, ordinalService } = initializedServices;
+        const { chromeStorageService, keysService, bsvService } = initializedServices;
         const { account } = chromeStorageService.getCurrentAccountObject();
 
         if (account) {

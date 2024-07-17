@@ -3,7 +3,7 @@ import { NetWork } from 'yours-wallet-provider';
 import {
   DEFAULT_RELAYX_ORD_PATH,
   DEFAULT_TWETCH_WALLET_PATH,
-  FEE_PER_BYTE,
+  FEE_PER_KB,
   SWEEP_PATH,
   DEFAULT_ACCOUNT,
 } from '../utils/constants';

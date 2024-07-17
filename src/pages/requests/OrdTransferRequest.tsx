@@ -30,18 +30,8 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const { chromeStorageService, ordinalService, keysService, gorillaPoolService } = useServiceContext();
-  const { ordAddress } = keysService;
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const network = chromeStorageService.getNetwork();
-
-  useEffect(() => {
-    if (!successTxId) return;
-    if (!message && ordAddress) {
-      resetSendState();
-      ordinalService.getAndSetOrdinals(ordAddress);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successTxId, message, ordAddress]);
 
   const resetSendState = () => {
     setPasswordConfirm('');

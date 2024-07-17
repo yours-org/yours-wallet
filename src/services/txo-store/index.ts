@@ -8,7 +8,6 @@ import { BlockHeaderService } from '../block-headers';
 import { Block } from './models/block';
 import { Spend } from './models/spend';
 import { Buffer } from 'buffer';
-import { parseAddress } from './models/address';
 import { NetWork } from 'yours-wallet-provider';
 
 const VERSION = 1;

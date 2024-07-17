@@ -1,5 +1,5 @@
 import { GetSignatures, Ordinal, SignatureResponse } from 'yours-wallet-provider';
-import { DUST, FEE_PER_BYTE, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
+import { DUST, FEE_PER_KB, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
 import { GorillaPoolService } from './GorillaPool.service';
 import { KeysService } from './Keys.service';
 
