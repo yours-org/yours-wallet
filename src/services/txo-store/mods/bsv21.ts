@@ -43,7 +43,9 @@ export class Bsv21Indexer extends Indexer {
 
   parse(ctx: IndexContext, vout: number): IndexData | undefined {
     const txo = ctx.txos[vout];
-    const ord = txo.data.insc?.data as Ord;
+    const ordIdxData = txo.data.ord as IndexData | undefined;
+    if (!ordIdxData) return;
+    const ord = ordIdxData.data as Ord;
     if (!ord || ord.insc?.file.type !== 'application/bsv-20') return;
     const bsv21 = Bsv21.fromJSON(JSON.parse(ord.insc!.file.text!));
     const data = new IndexData(bsv21);
@@ -63,7 +65,6 @@ export class Bsv21Indexer extends Indexer {
     if (!bsv21.id) {
       return;
     }
-    data.events.push({ id: 'op', value: bsv21.op });
     data.events.push({ id: 'id', value: bsv21.id });
     if (bsv21.contract) {
       data.events.push({ id: 'contract', value: bsv21.contract });
@@ -92,7 +93,7 @@ export class Bsv21Indexer extends Indexer {
       const bsv21 = txo.data?.bsv21;
       if (!bsv21 || !['transfer', 'burn'].includes(bsv21.data.op)) continue;
       let token: Bsv21 | undefined;
-      for (const spend of tokensIn[bsv21.data.id]) {
+      for (const spend of tokensIn[bsv21.data.id] || []) {
         token = spend.data.bsv21.data;
         bsv21.deps.push(`${spend.txid}_${spend.vout}`);
       }

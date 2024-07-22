@@ -67,9 +67,9 @@ export class OrdIndexer extends Indexer {
       for (let i = fromPos; i < script.chunks.length; i += 2) {
         const field = script.chunks[i];
         if (field.op == OP.OP_ENDIF) {
-          owner = parseAddress(script, i + 1);
-          if (!txo.owner && script.chunks[i + 1]?.op == OP.OP_CODESEPARATOR) {
-            owner = parseAddress(script, i + 1);
+          if (!owner) owner = parseAddress(script, i + 1);
+          if (!owner && script.chunks[i + 1]?.op == OP.OP_CODESEPARATOR) {
+            owner = parseAddress(script, i + 2);
           }
           break;
         }
@@ -133,9 +133,8 @@ export class OrdIndexer extends Indexer {
       }
     }
     if (!ord.insc && txo.satoshis != 1n) return;
-    if (owner && this.owners.has(owner)) {
-      idxData.events.push({ id: 'owner', value: owner });
-    }
+    if (owner && !txo.owner && this.owners.has(owner)) txo.owner = owner;
+
     let outSat = 0n;
     for (let i = 0; i < vout; i++) {
       outSat += ctx.txos[i].satoshis;

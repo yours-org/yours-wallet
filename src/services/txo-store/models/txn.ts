@@ -5,12 +5,13 @@ export enum TxnStatus {
   PENDING = 0,
   BROADCASTED = 1,
   CONFIRMED = 2,
+  IMMUTABLE = 3,
 }
 
 export interface Txn {
   txid: string;
   rawtx: Uint8Array;
-  proof: Uint8Array;
-  block?: Block;
+  proof?: Uint8Array;
+  block: Block;
   status: TxnStatus;
 }

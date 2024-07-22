@@ -145,6 +145,25 @@ export const BsvWallet = (props: BsvWalletProps) => {
         await txoStore.ingest(tx!, true);
         console.log(txo.txid, 'ingested');
       }
+
+      resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
+      const balance = (await resp.json()) as { id?: string }[];
+      for await (const token of balance) {
+        if (!token.id) continue;
+        console.log('importing', token.id);
+        try {
+          resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
+          const txids = (await resp.json()) as string[];
+          for await (const txid of txids) {
+            console.log('bsv21', token.id, txid);
+            const tx = await txoStore.getTx(txid, true);
+            await txoStore.ingest(tx!, true);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
       resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=100`);
       txos = (await resp.json()) as { txid: string; origin: { outpoint: string } }[];
       for (const txo of txos) {
@@ -162,23 +181,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
         } else {
           const tx = await txoStore.getTx(txo.txid, true);
           await txoStore.ingest(tx!, true);
-        }
-      }
-      resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
-      const balance = (await resp.json()) as { id?: string }[];
-      for await (const token of balance) {
-        if (!token.id) continue;
-        console.log('importing', token.id);
-        try {
-          resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
-          const txids = (await resp.json()) as string[];
-          for await (const txid of txids) {
-            console.log('importing', token.id, txid);
-            const tx = await txoStore.getTx(txid, true);
-            await txoStore.ingest(tx!, true);
-          }
-        } catch (e) {
-          console.error(e);
         }
       }
 

@@ -10,6 +10,7 @@ import { Spend } from './models/spend';
 import { Buffer } from 'buffer';
 import { NetWork } from 'yours-wallet-provider';
 import { TransactionService } from '../Transaction.service';
+import { GP_BASE_URL } from '../../utils/constants';
 
 const VERSION = 1;
 
@@ -40,6 +41,7 @@ export class TxoStore {
     public blocksService?: BlockHeaderService,
     public network: NetWork = NetWork.Mainnet,
   ) {
+    if (!accountId) throw new Error('empty-account-id');
     this.db = openDB<TxoSchema>(`txostore-${accountId}-${network}`, VERSION, {
       upgrade(db) {
         const txos = db.createObjectStore('txos', { keyPath: ['txid', 'vout'] });
@@ -52,31 +54,40 @@ export class TxoStore {
   }
 
   async getTx(txid: string, fromRemote = false): Promise<Transaction | undefined> {
-    let txn = await (await this.db).get('txns', txid);
+    const db = await this.db;
+    let txn = await db.get('txns', txid);
     if (txn) {
       const tx = Transaction.fromBinary(Array.from(new Uint8Array(txn.rawtx)));
-      tx.merklePath = MerklePath.fromBinary(Array.from(txn.proof));
+      if (txn.proof) {
+        tx.merklePath = MerklePath.fromBinary(Array.from(txn.proof));
+      }
       return tx;
     }
     if (!fromRemote) return;
+    const resp = await fetch(`${GP_BASE_URL}/api/tx/${txid}`);
     console.log('Fetching', txid);
-    const [rawtx, proof] = await Promise.all([
-      fetch(`https://junglebus.gorillapool.io/v1/transaction/get/${txid}/bin`).then((resp) => resp.arrayBuffer()),
-      fetch(`https://junglebus.gorillapool.io/v1/transaction/proof/${txid}`).then((resp) => resp.arrayBuffer()),
-    ]);
-    const tx = Transaction.fromBinary(Array.from(new Uint8Array(rawtx)));
-    tx.merklePath = MerklePath.fromBinary(Array.from(new Uint8Array(proof)));
+    if (!resp.ok) return;
+    if (resp.status !== 200) throw new Error(`Failed to fetch tx ${txid}`);
+    const { rawtx, proof } = await resp.json();
+    const buf = Buffer.from(rawtx, 'base64');
+    if (!buf.length) throw new Error(`Failed to fetch tx ${txid}`);
+    const tx = Transaction.fromBinary(Array.from(buf));
     txn = {
       txid,
-      rawtx: new Uint8Array(rawtx),
-      proof: new Uint8Array(proof),
-      block: new Block(
-        tx.merklePath.blockHeight,
-        BigInt(tx.merklePath.path[0].find((p) => p.hash == txid)?.offset || 0),
-      ),
+      rawtx: buf,
+      block: new Block(),
       status: TxnStatus.CONFIRMED,
     };
-    await (await this.db).put('txns', txn);
+    if (proof) {
+      txn.proof = Buffer.from(proof, 'base64');
+      tx.merklePath = MerklePath.fromBinary(Array.from(txn.proof));
+      txn.block.height = tx.merklePath.blockHeight;
+      txn.block.idx = BigInt(tx.merklePath.path[0].find((p) => p.hash == txid)?.offset || 0);
+      txn.status = TxnStatus.CONFIRMED;
+    } else {
+      txn.status = TxnStatus.BROADCASTED;
+    }
+    await db.put('txns', txn);
     return tx;
   }
 
@@ -118,6 +129,7 @@ export class TxoStore {
 
   async ingest(tx: Transaction, fromRemote = false): Promise<IndexContext> {
     const txid = tx.id('hex') as string;
+    console.log('Ingesting', txid);
     const block = {
       height: Date.now(),
       idx: 0n,
@@ -128,10 +140,21 @@ export class TxoStore {
       block.height = tx.merklePath.blockHeight;
       block.idx = BigInt(idx);
       block.hash = (await this.blocksService?.getHashByHeight(tx.merklePath.blockHeight)) || '';
-      if (this.blocksService && !(await tx.merklePath.verify(txid, this.blocksService))) {
-        throw new Error('Invalid merkle proof');
+      if (this.blocksService) {
+        try {
+          if (await tx.merklePath.verify(txid, this.blocksService)) {
+            block.height = Date.now();
+            block.idx = 0n;
+          } else {
+            throw new Error('Invalid proof');
+          }
+        } catch (e) {
+          console.error('Invalid proof', e);
+        }
       }
     }
+
+    const db = await this.db;
 
     const ctx: IndexContext = {
       txid,
@@ -149,7 +172,7 @@ export class TxoStore {
         input.sourceTXID = input.sourceTransaction.id('hex') as string;
       }
       if (input.sourceTransaction) {
-        if (await (await this.db).getKey('txns', input.sourceTXID)) {
+        if (await db.getKey('txns', input.sourceTXID)) {
           continue;
         }
         await this.ingest(input.sourceTransaction);
@@ -159,11 +182,11 @@ export class TxoStore {
       }
     }
 
-    const t = (await this.db).transaction('txos', 'readwrite');
+    const t = db.transaction('txos', 'readwrite');
     for await (const [vin, input] of tx.inputs.entries()) {
       const data = await t.store.get([input.sourceTXID!, input.sourceOutputIndex]);
       const spend = data
-        ? Txo.fromObject(data, this.indexers)
+        ? Txo.fromObject(data)
         : new Txo(
             input.sourceTXID!,
             input.sourceOutputIndex,
@@ -210,6 +233,13 @@ export class TxoStore {
       t.store.put(txo);
     }
     await t.done;
+    await db.put('txns', {
+      txid,
+      rawtx: new Uint8Array(tx.toBinary()),
+      block,
+      status: block.height < 50000000 ? TxnStatus.CONFIRMED : TxnStatus.BROADCASTED,
+      proof: tx.merklePath && Buffer.from(tx.merklePath.toBinary()),
+    });
     return ctx;
   }
 }

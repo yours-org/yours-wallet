@@ -12,6 +12,7 @@ import { BlockHeaderService } from '../services/block-headers';
 import { Indexer } from '../services/txo-store/models/indexer';
 import { FundIndexer } from '../services/txo-store/mods/fund';
 import { OrdIndexer } from '../services/txo-store/mods/ord';
+import { Bsv21Indexer } from '../services/txo-store/mods/bsv21';
 
 const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();
@@ -22,6 +23,7 @@ const initializeServices = async () => {
   const indexers: Indexer[] = [
     new FundIndexer(new Set<string>([account?.addresses?.bsvAddress || ''])),
     new OrdIndexer(new Set<string>([account?.addresses?.ordAddress || ''])),
+    new Bsv21Indexer(new Set<string>([account?.addresses?.ordAddress || ''])),
   ];
   const network = chromeStorageService.getNetwork();
   const blockHeaderService = new BlockHeaderService(network);

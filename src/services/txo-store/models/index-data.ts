@@ -7,7 +7,6 @@ export class IndexData {
     public data?: any,
     public deps: string[] = [],
     public events: Event[] = [],
-    // public owner?: string,
   ) {}
 
   toJSON() {
