@@ -254,7 +254,6 @@ export class BsvService {
       console.error(error);
       return false;
     }
-    return false;
   };
 
   // TODO: Either implement pullFresh or remove it

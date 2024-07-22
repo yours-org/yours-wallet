@@ -10,7 +10,6 @@ import { Spend } from './models/spend';
 import { Buffer } from 'buffer';
 import { NetWork } from 'yours-wallet-provider';
 import { TransactionService } from '../Transaction.service';
-import { GP_BASE_URL } from '../../utils/constants';
 
 const VERSION = 1;
 
@@ -37,7 +36,7 @@ export class TxoStore {
   constructor(
     public accountId: string,
     public indexers: Indexer[] = [],
-    public txService?: TransactionService,
+    public txService: TransactionService,
     public blocksService?: BlockHeaderService,
     public network: NetWork = NetWork.Mainnet,
   ) {
@@ -64,29 +63,13 @@ export class TxoStore {
       return tx;
     }
     if (!fromRemote) return;
-    const resp = await fetch(`${GP_BASE_URL}/api/tx/${txid}`);
-    console.log('Fetching', txid);
-    if (!resp.ok) return;
-    if (resp.status !== 200) throw new Error(`Failed to fetch tx ${txid}`);
-    const { rawtx, proof } = await resp.json();
-    const buf = Buffer.from(rawtx, 'base64');
-    if (!buf.length) throw new Error(`Failed to fetch tx ${txid}`);
-    const tx = Transaction.fromBinary(Array.from(buf));
-    txn = {
-      txid,
-      rawtx: buf,
-      block: new Block(),
-      status: TxnStatus.CONFIRMED,
-    };
-    if (proof) {
-      txn.proof = Buffer.from(proof, 'base64');
+    txn = await this.txService.fetch(txid);
+    if (!txn) return;
+    const tx = Transaction.fromBinary(Array.from(txn.rawtx));
+    if (txn.proof) {
       tx.merklePath = MerklePath.fromBinary(Array.from(txn.proof));
-      txn.block.height = tx.merklePath.blockHeight;
-      txn.block.idx = BigInt(tx.merklePath.path[0].find((p) => p.hash == txid)?.offset || 0);
-      txn.status = TxnStatus.CONFIRMED;
-    } else {
-      txn.status = TxnStatus.BROADCASTED;
     }
+
     await db.put('txns', txn);
     return tx;
   }
@@ -119,7 +102,6 @@ export class TxoStore {
   }
 
   async broadcast(tx: Transaction) {
-    if (!this.txService) throw new Error('No broadcaster configured');
     const resp = await this.txService.broadcast(tx);
     if (resp.status === 'success') {
       await this.ingest(tx);

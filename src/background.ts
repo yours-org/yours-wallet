@@ -34,8 +34,33 @@ import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { BlockHeaderService } from './services/block-headers';
+import { Indexer } from './services/txo-store/models/indexer';
+import { FundIndexer } from './services/txo-store/mods/fund';
+import { OrdIndexer } from './services/txo-store/mods/ord';
+import { Bsv21Indexer } from './services/txo-store/mods/bsv21';
+import { TxoStore } from './services/txo-store';
+import { OneSatTransactionService } from './services/txo-store/1satTxService';
+import { GP_BASE_URL } from './utils/constants';
 const chromeStorageService = new ChromeStorageService();
-chromeStorageService.getAndSetStorage();
+
+export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() => {
+  const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
+
+  const indexers: Indexer[] = [
+    new FundIndexer(new Set<string>([account?.addresses?.bsvAddress || ''])),
+    new OrdIndexer(new Set<string>([account?.addresses?.ordAddress || ''])),
+    new Bsv21Indexer(new Set<string>([account?.addresses?.ordAddress || ''])),
+  ];
+  const network = chromeStorageService.getNetwork();
+  const blockHeaderService = new BlockHeaderService(network);
+  return new TxoStore(
+    selectedAccount || '',
+    indexers,
+    new OneSatTransactionService(GP_BASE_URL),
+    blockHeaderService,
+    network,
+  );
+});
 
 console.log('Yours Wallet Background Script Running!');
 
@@ -59,6 +84,8 @@ const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 // only run in background worker
 if (self?.document === undefined) {
+  // TODO: start ingestion
+
   const mainBlockHeaderService = new BlockHeaderService(NetWork.Mainnet);
   mainBlockHeaderService.syncBlocks();
 

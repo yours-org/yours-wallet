@@ -4,8 +4,9 @@ export enum TxnStatus {
   INVALID = -1,
   PENDING = 0,
   BROADCASTED = 1,
-  CONFIRMED = 2,
-  IMMUTABLE = 3,
+  INGEST = 2,
+  CONFIRMED = 3,
+  IMMUTABLE = 4,
 }
 
 export interface Txn {

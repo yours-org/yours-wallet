@@ -8,31 +8,18 @@ import { BsvService } from '../services/Bsv.service';
 import { OrdinalService } from '../services/Ordinal.service';
 import { INACTIVITY_LIMIT } from '../utils/constants';
 import { TxoStore } from '../services/txo-store';
-import { BlockHeaderService } from '../services/block-headers';
-import { Indexer } from '../services/txo-store/models/indexer';
-import { FundIndexer } from '../services/txo-store/mods/fund';
-import { OrdIndexer } from '../services/txo-store/mods/ord';
-import { Bsv21Indexer } from '../services/txo-store/mods/bsv21';
+import { txoStorePromise } from '../background';
 
 const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();
   await chromeStorageService.getAndSetStorage(); // Ensure the storage is initialized
 
-  const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
-
-  const indexers: Indexer[] = [
-    new FundIndexer(new Set<string>([account?.addresses?.bsvAddress || ''])),
-    new OrdIndexer(new Set<string>([account?.addresses?.ordAddress || ''])),
-    new Bsv21Indexer(new Set<string>([account?.addresses?.ordAddress || ''])),
-  ];
-  const network = chromeStorageService.getNetwork();
-  const blockHeaderService = new BlockHeaderService(network);
-  const txoStore = new TxoStore(selectedAccount || '', indexers, undefined, blockHeaderService, network);
-
   const wocService = new WhatsOnChainService(chromeStorageService);
   const gorillaPoolService = new GorillaPoolService(chromeStorageService);
   const keysService = new KeysService(gorillaPoolService, wocService, chromeStorageService);
   const contractService = new ContractService(keysService, gorillaPoolService);
+  const txoStore = await txoStorePromise;
+
   const bsvService = new BsvService(
     keysService,
     gorillaPoolService,

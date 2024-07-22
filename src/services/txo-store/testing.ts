@@ -7,6 +7,8 @@ import { TxoLookup } from './models/txo';
 import { OrdLockIndexer } from './mods/ordlock';
 import { Bsv21Indexer } from './mods/bsv21';
 import { Bsv20Indexer } from './mods/bsv20';
+import { OneSatTransactionService } from './1satTxService';
+import { GP_BASE_URL } from '../../utils/constants';
 
 const indexers = [
   new FundIndexer(new Set<string>(['13AGuUcJKJm5JaT9qssFxK8DETo3tAaa66'])),
@@ -15,7 +17,7 @@ const indexers = [
   new Bsv21Indexer(new Set<string>(['1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
   new Bsv20Indexer(new Set<string>(['1FDHUkNu5QLH1XhdjJ3tpcEVSetB5QhnCZ'])),
 ];
-const store = new TxoStore('test', indexers);
+const store = new TxoStore('test', indexers, new OneSatTransactionService(GP_BASE_URL));
 
 const blockHeaderService = new BlockHeaderService();
 blockHeaderService.syncBlocks();
