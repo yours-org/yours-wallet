@@ -153,6 +153,7 @@ export class BsvService {
 
       let satsIn = 0;
       let fee = 0;
+      const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
       for await (const u of fundResults.txos || []) {
         tx.addInput({
           sourceTransaction: await this.txoStore.getTx(u.txid),
@@ -161,11 +162,11 @@ export class BsvService {
           unlockingScriptTemplate: new P2PKH().unlock(paymentPk),
         });
         satsIn += Number(u.satoshis);
-        fee = await tx.getFee();
+        fee = await feeModel.computeFee(tx);
         if (satsIn >= satsOut + fee) break;
       }
       if (satsIn < satsOut + fee) return { error: 'insufficient-funds' };
-      await tx.fee(new SatoshisPerKilobyte(FEE_PER_KB));
+      await tx.fee(feeModel);
       await tx.sign();
 
       // Size checker
