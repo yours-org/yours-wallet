@@ -131,16 +131,16 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const refreshUtxos = async (showLoad = false) => {
     showLoad && setIsProcessing(true);
-    // await updateBsvBalance(true);
-    // setBsvBalance(getBsvBalance());
-    // setExchangeRate(getExchangeRate());
-    // setLockData(getLockData());
+    await updateBsvBalance(true);
+    setBsvBalance(getBsvBalance());
+    setExchangeRate(getExchangeRate());
+    setLockData(getLockData());
 
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (account) {
       const { bsvAddress, ordAddress } = account.addresses;
-      let resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000`);
-      let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      const resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000`);
+      const txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
       await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height, t.idx)));
 
       // resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
@@ -162,21 +162,19 @@ export const BsvWallet = (props: BsvWalletProps) => {
       //   }
       // }
 
-      resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=10000`);
-      txos = await resp.json();
-      for (const txo of txos) {
-        if (txo.origin) {
-          resp = await fetch(
-            `https://ordinals.gorillapool.io/api/inscriptions/${txo.origin.outpoint}/history?limit=100000`,
-          );
-          txos = await resp.json();
-          await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height, t.idx)));
-        } else {
-          await txoStore.queue([new TxnIngest(txo.txid, txo.height, txo.idx)]);
-        }
-      }
-
-      await bsvService.updateBsvBalance();
+      // resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=10000`);
+      // txos = await resp.json();
+      // for (const txo of txos) {
+      //   if (txo.origin) {
+      //     resp = await fetch(
+      //       `https://ordinals.gorillapool.io/api/inscriptions/${txo.origin.outpoint}/history?limit=100000`,
+      //     );
+      //     txos = await resp.json();
+      //     await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height, t.idx)));
+      //   } else {
+      //     await txoStore.queue([new TxnIngest(txo.txid, txo.height, txo.idx)]);
+      //   }
+      // }
 
       console.log('done importing');
     }

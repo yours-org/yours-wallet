@@ -267,5 +267,6 @@ export class TxoStore {
     if (!txns.length) {
       await new Promise((r) => setTimeout(r, 1000));
     }
+    this.ingestQueue();
   }
 }
