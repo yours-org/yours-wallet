@@ -196,9 +196,13 @@ export class TxoStore {
       txo.events = [];
       ctx.txos.push(txo);
       this.indexers.forEach((i) => {
-        const data = i.parse && i.parse(ctx, vout);
-        if (data) {
-          txo.data[i.tag] = data;
+        try {
+          const data = i.parse && i.parse(ctx, vout);
+          if (data) {
+            txo.data[i.tag] = data;
+          }
+        } catch (e) {
+          console.error('indexer error: continuing', i.tag, e);
         }
       });
     }

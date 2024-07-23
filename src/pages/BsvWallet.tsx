@@ -138,13 +138,20 @@ export const BsvWallet = (props: BsvWalletProps) => {
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (account) {
       const { bsvAddress, ordAddress } = account.addresses;
-      const resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=100`);
+      const resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000`);
       const txos = (await resp.json()) as { txid: string; origin: { outpoint: string } }[];
       for (const txo of txos) {
         const tx = await txoStore.getTx(txo.txid, true);
         await txoStore.ingest(tx!, true);
         console.log(txo.txid, 'ingested');
       }
+      // const resp = await fetch(`https://junglebus.gorillapool.io/v1/address/get/${bsvAddress}/0`);
+      // const txns = (await resp.json()) as { transaction_id: string;}[];
+      // for (const txn of txns) {
+      //   const tx = await txoStore.getTx(txn.transaction_id, true);
+      //   await txoStore.ingest(tx!, true);
+      //   console.log(txn.transaction_id, 'ingested');
+      // }
 
       // resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
       // const balance = (await resp.json()) as { id?: string }[];
