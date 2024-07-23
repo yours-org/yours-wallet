@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DerivationTag, TaggedDerivationRequest } from 'yours-wallet-provider';
+import { DerivationTag, NetWork, TaggedDerivationRequest } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -16,6 +16,8 @@ import { getPrivateKeyFromTag, getTaggedDerivationKeys, Keys } from '../../utils
 import { sleep } from '../../utils/sleep';
 import { P2PKH, PublicKey, Utils } from '@bsv/sdk';
 import { OrdP2PKH } from 'js-1sat-ord';
+import { convertAddressToMainnet, convertAddressToTestnet } from '../../utils/tools';
+import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 
 export type GenerateTaggedKeysRequestProps = {
   request: TaggedDerivationRequest & { domain?: string };
@@ -98,15 +100,27 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       }
 
       const network = chromeStorageService.getNetwork();
-      const taggedAddress = Utils.toBase58Check(Utils.fromBase58Check(taggedKeys.address).data as number[], [
-        network === 'mainnet' ? 0 : 0x6f,
-      ]);
+      const taggedAddress =
+        network === NetWork.Mainnet
+          ? convertAddressToMainnet(taggedKeys.address)
+          : convertAddressToTestnet(taggedKeys.address);
 
-      return {
+      const newTag = {
         address: taggedAddress,
         pubKey: taggedKeys.pubKey.toString(),
         tag: derivationTag,
       };
+
+      const key: keyof ChromeStorageObject = 'accounts';
+      const update: Partial<ChromeStorageObject['accounts']> = {
+        [keysService.identityAddress]: {
+          ...account,
+          derivationTags: [...derivationTags, newTag],
+        },
+      };
+      await chromeStorageService.updateNested(key, update);
+
+      return newTag;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.log(error);
