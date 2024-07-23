@@ -173,7 +173,17 @@ export class TxoStore {
       }
     }
 
+    const txn = {
+      txid,
+      rawtx: new Uint8Array(tx.toBinary()),
+      block,
+      status: TxnStatus.PENDING,
+      proof: tx.merklePath && Buffer.from(tx.merklePath.toBinary()),
+    };
+    await db.put('txns', txn);
+
     const t = db.transaction('txos', 'readwrite');
+    const sort = (block?.height || Date.now()).toString(16).padStart(8, '0');
     for await (const [vin, input] of tx.inputs.entries()) {
       const data = await t.store.get([input.sourceTXID!, input.sourceOutputIndex]);
       const spend = data
@@ -186,8 +196,14 @@ export class TxoStore {
           );
 
       spend.spend = new Spend(txid, vin, block);
-      ctx.spends.push(spend);
+      spend.events = [];
+      for (const [tag, data] of Object.entries(spend.data)) {
+        for (const e of data.events) {
+          spend.events.push(`${tag}:${e.id}:${e.value}:1:${sort}:${block?.idx}:${spend.vout}:${spend.satoshis}`);
+        }
+      }
       t.store.put(spend);
+      ctx.spends.push(spend);
     }
 
     for await (const [vout, output] of tx.outputs.entries()) {
@@ -218,8 +234,8 @@ export class TxoStore {
     this.indexers.forEach((i) => i.save && i.save(ctx));
     for (const txo of ctx.txos) {
       txo.events = [];
-      const spent = txo.spend ? '1' : '0';
       const sort = (txo.spend?.block?.height || txo.block?.height || Date.now()).toString(16).padStart(8, '0');
+      const spent = txo.spend ? '1' : '0';
       for (const [tag, data] of Object.entries(txo.data)) {
         for (const e of data.events) {
           txo.events.push(`${tag}:${e.id}:${e.value}:${spent}:${sort}:${txo.block?.idx}:${txo.vout}:${txo.satoshis}`);
@@ -228,13 +244,8 @@ export class TxoStore {
       t.store.put(txo);
     }
     await t.done;
-    await db.put('txns', {
-      txid,
-      rawtx: new Uint8Array(tx.toBinary()),
-      block,
-      status: block.height < 50000000 ? TxnStatus.CONFIRMED : TxnStatus.BROADCASTED,
-      proof: tx.merklePath && Buffer.from(tx.merklePath.toBinary()),
-    });
+    txn.status = block.height < 50000000 ? TxnStatus.CONFIRMED : TxnStatus.BROADCASTED;
+    await db.put('txns', txn);
     return ctx;
   }
 
