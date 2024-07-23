@@ -10,6 +10,8 @@ export const JUNGLE_BUS_URL = 'https://junglebus.gorillapool.io';
 
 export const GP_TESTNET_BASE_URL = 'https://testnet.ordinals.gorillapool.io';
 export const GORILLA_POOL_ARC_URL = 'https://arc.gorillapool.io/v1';
+export const MAINNET_ADDRESS_PREFIX = 0x00;
+export const TESTNET_ADDRESS_PREFIX = 0x6f;
 export const BSV_DECIMAL_CONVERSION = 100000000;
 export const BSV20_INDEX_FEE = 1000;
 export const FEE_PER_KB = 50;

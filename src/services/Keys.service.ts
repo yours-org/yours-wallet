@@ -6,6 +6,8 @@ import {
   FEE_PER_KB,
   SWEEP_PATH,
   DEFAULT_ACCOUNT,
+  MAINNET_ADDRESS_PREFIX,
+  TESTNET_ADDRESS_PREFIX,
 } from '../utils/constants';
 import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto';
 import { generateKeysFromTag, getKeys, getKeysFromWifs, Keys } from '../utils/keys';
@@ -173,11 +175,11 @@ export class KeysService {
       const keys: Keys = JSON.parse(d);
 
       const walletAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.walletAddress).data as number[], [
-        account.network === NetWork.Mainnet ? 0 : 0x6f,
+        account.network === NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
       ]);
 
       const ordAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.ordAddress).data as number[], [
-        account.network === NetWork.Mainnet ? 0 : 0x6f,
+        account.network === NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
       ]);
 
       this.bsvAddress = walletAddr;
@@ -188,7 +190,7 @@ export class KeysService {
       // identity address not available with wif or 1sat import
       if (keys.identityAddress) {
         const identityAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.identityAddress).data as number[], [
-          account.network === NetWork.Mainnet ? 0 : 0x6f,
+          account.network === NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
         ]);
 
         this.identityAddress = identityAddr;

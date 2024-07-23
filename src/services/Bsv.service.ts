@@ -1,6 +1,12 @@
 import { OrdP2PKH } from 'js-1sat-ord';
-import { Ordinal, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
-import { BSV_DECIMAL_CONVERSION, FEE_PER_KB, MAX_BYTES_PER_TX } from '../utils/constants';
+import { NetWork, Ordinal, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
+import {
+  BSV_DECIMAL_CONVERSION,
+  FEE_PER_KB,
+  MAINNET_ADDRESS_PREFIX,
+  MAX_BYTES_PER_TX,
+  TESTNET_ADDRESS_PREFIX,
+} from '../utils/constants';
 import { removeBase64Prefix } from '../utils/format';
 import { getPrivateKeyFromTag, Keys } from '../utils/keys';
 import { ChromeStorageService } from './ChromeStorage.service';
@@ -104,7 +110,9 @@ export class BsvService {
       const paymentPk = PrivateKey.fromWif(keys.walletWif);
       const pubKey = paymentPk.toPublicKey();
       const network = this.chromeStorageService.getNetwork();
-      const fromAddress = pubKey.toAddress([network == 'mainnet' ? 0 : 0x6f]);
+      const fromAddress = pubKey.toAddress([
+        network == NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+      ]);
       const amount = request.reduce((a, r) => a + r.satoshis, 0);
 
       // Build tx
@@ -221,7 +229,9 @@ export class BsvService {
 
       const network = this.chromeStorageService.getNetwork();
       const publicKey = privateKey.toPublicKey();
-      const address = publicKey.toAddress([network == 'mainnet' ? 0 : 0x6f]);
+      const address = publicKey.toAddress([
+        network == NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+      ]);
 
       const msgHash = new BigNumber(BSM.magicHash(Utils.toArray(message, encoding)));
       const signature = ECDSA.sign(msgHash, privateKey, true);

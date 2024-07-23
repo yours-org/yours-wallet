@@ -1,5 +1,6 @@
 import { NetWork } from 'yours-wallet-provider';
 import { Utils } from '@bsv/sdk';
+import { MAINNET_ADDRESS_PREFIX, TESTNET_ADDRESS_PREFIX } from './constants';
 
 export const getCurrentUtcTimestamp = (): number => {
   const currentDate = new Date();
@@ -17,9 +18,9 @@ export const isAddressOnRightNetwork = (network: NetWork, address: string) => {
 };
 
 export const convertAddressToTestnet = (address: string) => {
-  return Utils.toBase58Check(Utils.fromBase58Check(address).data as number[], [0x6f]);
+  return Utils.toBase58Check(Utils.fromBase58Check(address).data as number[], [TESTNET_ADDRESS_PREFIX]);
 };
 
 export const convertAddressToMainnet = (address: string) => {
-  return Utils.toBase58Check(Utils.fromBase58Check(address).data as number[], [0x00]);
+  return Utils.toBase58Check(Utils.fromBase58Check(address).data as number[], [MAINNET_ADDRESS_PREFIX]);
 };
