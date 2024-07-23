@@ -139,9 +139,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (account) {
       const { bsvAddress, ordAddress } = account.addresses;
-      const resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000`);
+      const resp = await fetch(
+        `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
+      );
       const txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
-      await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height, t.idx)));
+      await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
 
       // resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
       // const balance = (await resp.json()) as { id?: string }[];
