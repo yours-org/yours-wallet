@@ -7,6 +7,7 @@ import { GP_BASE_URL } from '../../utils/constants';
 export class OneSatTransactionService implements TransactionService {
   constructor(public baseUrl: string) {}
   async broadcast(tx: Transaction): Promise<BroadcastResponse | BroadcastFailure> {
+    console.log('Broadcasting', tx.id('hex'), tx.toHex());
     const resp = await fetch(`${GP_BASE_URL}/api/tx/bin`, {
       method: 'POST',
       headers: {
