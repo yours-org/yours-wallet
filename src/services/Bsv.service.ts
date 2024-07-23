@@ -294,8 +294,6 @@ export class BsvService {
       new TxoLookup('fund', 'address', this.keysService.bsvAddress, false),
       0,
     );
-    console.log(this.keysService.bsvAddress);
-    console.log(results);
     return results.txos;
   };
 

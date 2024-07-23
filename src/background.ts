@@ -13,7 +13,6 @@ import {
   TaggedDerivationRequest,
   TaggedDerivationResponse,
   GetTaggedKeysRequest,
-  Utxo,
   Broadcast,
   InscribeRequest,
   SignMessage,
@@ -41,6 +40,7 @@ import { Bsv21Indexer } from './services/txo-store/mods/bsv21';
 import { TxoStore } from './services/txo-store';
 import { OneSatTransactionService } from './services/txo-store/1satTxService';
 import { GP_BASE_URL } from './utils/constants';
+import { TxoLookup } from './services/txo-store/models/txo';
 const chromeStorageService = new ChromeStorageService();
 
 export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() => {
@@ -474,28 +474,25 @@ if (self?.document === undefined) {
     }
   };
 
-  const processGetPaymentUtxos = async (sendResponse: CallbackResponse) => {
+  const processGetPaymentUtxos = (sendResponse: CallbackResponse) => {
     try {
-      chromeStorageService.getAndSetStorage().then(() => {
-        const { account } = chromeStorageService.getCurrentAccountObject();
-        if (!account) throw Error('No account found!');
-        const paymentUtxos = account.paymentUtxos;
+      chromeStorageService.getAndSetStorage().then(async () => {
+        const storageObj = chromeStorageService.getCurrentAccountObject();
+        const bsvAddress = storageObj.account?.addresses?.bsvAddress;
+        const txoStore = await txoStorePromise;
+        const results = await txoStore.searchTxos(new TxoLookup('fund', 'address', bsvAddress, false), 0);
+        const utxos = results.txos.map((txo) => {
+          return {
+            satoshis: Number(txo.satoshis),
+            script: Buffer.from(txo.script).toString('hex'),
+            txid: txo.txid,
+            vout: txo.vout,
+          };
+        });
         sendResponse({
           type: YoursEventName.GET_PAYMENT_UTXOS,
           success: true,
-          data:
-            paymentUtxos.length > 0
-              ? paymentUtxos
-                  .filter((u: Utxo & { spent: boolean }) => !u.spent)
-                  .map((utxo: Utxo) => {
-                    return {
-                      satoshis: utxo.satoshis,
-                      script: utxo.script,
-                      txid: utxo.txid,
-                      vout: utxo.vout,
-                    };
-                  })
-              : [],
+          data: utxos,
         });
       });
     } catch (error) {
