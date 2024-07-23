@@ -187,7 +187,7 @@ export class TxoStore {
     for await (const [vin, input] of tx.inputs.entries()) {
       const data = await t.store.get([input.sourceTXID!, input.sourceOutputIndex]);
       const spend = data
-        ? Txo.fromObject(data)
+        ? Txo.fromObject(data, this.indexers)
         : new Txo(
             input.sourceTXID!,
             input.sourceOutputIndex,
@@ -210,7 +210,7 @@ export class TxoStore {
       const data = await t.store.get([txid, vout]);
       let txo: Txo;
       if (data) {
-        txo = Txo.fromObject(data);
+        txo = Txo.fromObject(data, this.indexers);
       } else {
         const script = output.lockingScript.toBinary();
         // console.log('script', output.lockingScript.toBinary())
