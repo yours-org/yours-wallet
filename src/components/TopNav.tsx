@@ -12,6 +12,7 @@ import copyIcon from '../assets/copy.svg';
 import switchIcon from '../assets/chevrons.svg';
 import { ColorThemeProps } from '../theme';
 import { useNavigate } from 'react-router-dom';
+import { useBottomMenu } from '../hooks/useBottomMenu';
 
 const Container = styled.div`
   display: flex;
@@ -68,7 +69,7 @@ const DropdownItem = styled.div`
   cursor: pointer;
 
   &:hover {
-    background: ${({ theme }) => theme.hover};
+    background: ${({ theme }) => theme.white + '10'};
   }
 `;
 
@@ -112,6 +113,7 @@ const FlexContainer = styled.div`
 export const TopNav = () => {
   const { theme } = useTheme();
   const { chromeStorageService } = useServiceContext();
+  const { handleSelect } = useBottomMenu();
   const navigate = useNavigate();
   const { addSnackbar } = useSnackbar();
   const [dropdownVisible, setDropdownVisible] = useState(false);
@@ -212,6 +214,13 @@ export const TopNav = () => {
                 </FlexContainer>
               </DropdownItem>
             ))}
+            <DropdownItem key={'new-account'} theme={theme} onClick={() => handleSelect('settings', 'manage-accounts')}>
+              <FlexContainer>
+                <DropDownAccountName style={{ textAlign: 'left' }} theme={theme}>
+                  + Add New Account
+                </DropDownAccountName>
+              </FlexContainer>
+            </DropdownItem>
           </Dropdown>
         )}
       </LogoWrapper>

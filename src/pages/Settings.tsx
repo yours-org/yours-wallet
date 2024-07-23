@@ -115,10 +115,10 @@ type DecisionType = 'sign-out' | 'export-keys' | 'export-keys-qr-code';
 
 export const Settings = () => {
   const { theme } = useTheme();
-  const { setSelected } = useBottomMenu();
+  const { setSelected, query } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { chromeStorageService, keysService, lockWallet } = useServiceContext();
-  const [page, setPage] = useState<SettingsPage>('main');
+  const [page, setPage] = useState<SettingsPage>(query === 'manage-accounts' ? 'manage-accounts' : 'main');
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
