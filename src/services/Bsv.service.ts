@@ -242,14 +242,14 @@ export class BsvService {
 
   verifyMessage = async (
     message: string,
-    signatureHex: string,
+    signatureBase64: string,
     publicKeyHex: string,
     encoding: 'utf8' | 'hex' | 'base64' = 'utf8',
   ) => {
     try {
       const msgBuf = Buffer.from(message, encoding);
       const publicKey = PublicKey.fromString(publicKeyHex);
-      const signature = Signature.fromCompact(Utils.toArray(signatureHex, 'hex'));
+      const signature = Signature.fromCompact(Utils.toArray(signatureBase64, 'base64'));
       return BSM.verify(Array.from(msgBuf), signature, publicKey);
     } catch (error) {
       console.error(error);
