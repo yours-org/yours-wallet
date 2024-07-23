@@ -139,30 +139,30 @@ export const BsvWallet = (props: BsvWalletProps) => {
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (account) {
       const { bsvAddress, ordAddress } = account.addresses;
-      const resp = await fetch(
-        `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
-      );
-      const txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      let resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/history?limit=10000`);
+      let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
       await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
 
-      // resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
-      // const balance = (await resp.json()) as { id?: string }[];
-      // for await (const token of balance) {
-      //   if (!token.id) continue;
-      //   console.log('importing', token.id);
-      //   try {
-      //     resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
-      //     const txids = (await resp.json()) as string[];
-      //     for await (const txid of txids) {
+      resp = await fetch(
+        `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
+      );
+      txos = await resp.json();
+      await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
 
-      //       // console.log('bsv21', token.id, txid);
-      //       // const tx = await txoStore.getTx(txid, true);
-      //       // await txoStore.ingest(tx!, true);
-      //     }
-      //   } catch (e) {
-      //     console.error(e);
-      //   }
-      // }
+      resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
+      const balance = (await resp.json()) as { id?: string }[];
+      let counter = 50000000;
+      for await (const token of balance) {
+        if (!token.id) continue;
+        console.log('importing', token.id);
+        try {
+          resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
+          const txids = (await resp.json()) as string[];
+          await txoStore.queue(txids.map((txid) => new TxnIngest(txid, counter++, 0)));
+        } catch (e) {
+          console.error(e);
+        }
+      }
 
       // resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=10000`);
       // txos = await resp.json();

@@ -1,9 +1,8 @@
 import { GetSignatures, Ordinal, SignatureResponse } from 'yours-wallet-provider';
-import { DUST, FEE_PER_KB, LOCK_SUFFIX, SCRYPT_PREFIX } from '../utils/constants';
+import { DEFAULT_SIGHASH_TYPE } from '../utils/constants';
 import { GorillaPoolService } from './GorillaPool.service';
 import { KeysService } from './Keys.service';
-
-const DEFAULT_SIGHASH_TYPE = 65; // SIGHASH_ALL | SIGHASH_FORKID
+import { Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
 
 export class ContractService {
   constructor(
@@ -16,80 +15,99 @@ export class ContractService {
     password: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ sigResponses?: SignatureResponse[]; error?: { message: string; cause?: any } }> => {
-    // try {
-    //   const isAuthenticated = await this.keysService.verifyPassword(password);
-    //   if (!isAuthenticated) {
-    //     throw new Error('invalid-password');
-    //   }
+    try {
+      const isAuthenticated = await this.keysService.verifyPassword(password);
+      if (!isAuthenticated) {
+        throw new Error('invalid-password');
+      }
 
-    //   const keys = await this.keysService.retrieveKeys(password);
-    //   const getPrivKeys = (address: string | string[]) => {
-    //     const addresses = address instanceof Array ? address : [address];
-    //     return addresses.map((addr) => {
-    //       if (addr === this.keysService.bsvAddress) {
-    //         return keys?.walletWif && PrivateKey.from_wif(keys.walletWif);
-    //       }
-    //       if (addr === this.keysService.ordAddress) {
-    //         return keys?.ordWif && PrivateKey.from_wif(keys.ordWif);
-    //       }
-    //       if (addr === this.keysService.identityAddress) {
-    //         return keys?.identityWif && PrivateKey.from_wif(keys.identityWif);
-    //       }
-    //       throw new Error('unknown-address', { cause: addr });
-    //     });
-    //   };
+      const keys = await this.keysService.retrieveKeys(password);
+      const getPrivKeys = (address: string | string[]) => {
+        const addresses = address instanceof Array ? address : [address];
+        return addresses.map((addr) => {
+          if (addr === this.keysService.bsvAddress) {
+            return keys?.walletWif && PrivateKey.fromWif(keys.walletWif);
+          }
+          if (addr === this.keysService.ordAddress) {
+            return keys?.ordWif && PrivateKey.fromWif(keys.ordWif);
+          }
+          if (addr === this.keysService.identityAddress) {
+            return keys?.identityWif && PrivateKey.fromWif(keys.identityWif);
+          }
+          throw new Error('unknown-address', { cause: addr });
+        });
+      };
 
-    //   const tx = Transaction.from_hex(request.rawtx);
-    //   const sigResponses: SignatureResponse[] = request.sigRequests.flatMap((sigReq) => {
-    //     const privkeys = getPrivKeys(sigReq.address) as PrivateKey[];
-    //     if (!privkeys.length) throw new Error('no-private-key', { cause: sigReq.address });
-    //     return privkeys.map((privKey: PrivateKey) => {
-    //       const addr = privKey.to_public_key().to_address();
-    //       const script = sigReq.script ? Script.from_hex(sigReq.script) : addr.get_locking_script();
-    //       const txIn =
-    //         tx.get_input(sigReq.inputIndex) ||
-    //         new TxIn(Buffer.from(sigReq.prevTxid, 'hex'), sigReq.outputIndex, script);
-    //       txIn.set_prev_tx_id(Buffer.from(sigReq.prevTxid, 'hex'));
-    //       txIn.set_vout(sigReq.outputIndex);
-    //       txIn.set_satoshis(BigInt(sigReq.satoshis));
-    //       txIn.set_locking_script(script);
+      const tx = Transaction.fromHex(request.rawtx);
+      const sigResponses: SignatureResponse[] = request.sigRequests.flatMap((sigReq) => {
+        const privkeys = getPrivKeys(sigReq.address) as PrivateKey[];
+        if (!privkeys.length) throw new Error('no-private-key', { cause: sigReq.address });
+        return privkeys.map((privKey: PrivateKey) => {
+          // const script = sigReq.script ?
+          //   Script.fromHex(sigReq.script) :
+          //   new P2PKH().lock(privKey.toPublicKey().toAddress());
+          // const txIn =
+          //   tx.get_input(sigReq.inputIndex) ||
+          //   new TxIn(Buffer.from(sigReq.prevTxid, 'hex'), sigReq.outputIndex, script);
+          // txIn.set_prev_tx_id(Buffer.from(sigReq.prevTxid, 'hex'));
+          // txIn.set_vout(sigReq.outputIndex);
+          // txIn.set_satoshis(BigInt(sigReq.satoshis));
+          // txIn.set_locking_script(script);
+          // script.remove_codeseparators();
+          // const subScript = script;
+          // const sig = tx
+          //   .sign(
+          //     privKey,
+          //     sigReq.sigHashType || DEFAULT_SIGHASH_TYPE,
+          //     sigReq.inputIndex,
+          //     subScript,
+          //     BigInt(sigReq.satoshis),
+          //   )
+          //   .to_hex();
 
-    //       script.remove_codeseparators();
-    //       // TODO: support multiple OP_CODESEPARATORs and get subScript according to `csIdx`.
-    //       const subScript = script;
+          // TODO: support multiple OP_CODESEPARATORs and get subScript according to `csIdx`.
+          const preimage = TransactionSignature.format({
+            sourceTXID: sigReq.prevTxid,
+            sourceOutputIndex: sigReq.outputIndex,
+            sourceSatoshis: sigReq.satoshis,
+            transactionVersion: tx.version,
+            otherInputs: tx.inputs.filter((_, index) => index !== sigReq.inputIndex),
+            inputIndex: sigReq.inputIndex,
+            outputs: tx.outputs,
+            inputSequence: tx.inputs[sigReq.inputIndex].sequence,
+            subscript: sigReq.script
+              ? Script.fromHex(sigReq.script!)
+              : new P2PKH().lock(privKey.toPublicKey().toAddress()),
+            lockTime: tx.lockTime,
+            scope: sigReq.sigHashType || DEFAULT_SIGHASH_TYPE,
+          });
+          const rawSignature = privKey.sign(Hash.sha256(preimage));
+          const sig = new TransactionSignature(
+            rawSignature.r,
+            rawSignature.s,
+            sigReq.sigHashType || DEFAULT_SIGHASH_TYPE,
+          );
+          return {
+            sig: Utils.toHex(sig.toChecksigFormat()),
+            pubKey: privKey.toPublicKey().toString(),
+            inputIndex: sigReq.inputIndex,
+            sigHashType: sigReq.sigHashType || DEFAULT_SIGHASH_TYPE,
+            csIdx: sigReq.csIdx,
+          };
+        });
+      });
+      return Promise.resolve({ sigResponses });
 
-    //       const sig = tx
-    //         .sign(
-    //           privKey,
-    //           sigReq.sigHashType || DEFAULT_SIGHASH_TYPE,
-    //           sigReq.inputIndex,
-    //           subScript,
-    //           BigInt(sigReq.satoshis),
-    //         )
-    //         .to_hex();
-
-    //       return {
-    //         sig,
-    //         pubKey: privKey.to_public_key().to_hex(),
-    //         inputIndex: sigReq.inputIndex,
-    //         sigHashType: sigReq.sigHashType || DEFAULT_SIGHASH_TYPE,
-    //         csIdx: sigReq.csIdx,
-    //       };
-    //     });
-    //   });
-    //   return Promise.resolve({ sigResponses });
-
-    //   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    // } catch (err: any) {
-    //   console.error('getSignatures error', err);
-    //   return {
-    //     error: {
-    //       message: err.message ?? 'unknown',
-    //       cause: err.cause,
-    //     },
-    //   };
-    // }
-    return { error: { message: 'not-implemented' } };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      console.error('getSignatures error', err);
+      return {
+        error: {
+          message: err.message ?? 'unknown',
+          cause: err.cause,
+        },
+      };
+    }
   };
 
   unlock = async (locks: Ordinal[], currentBlockHeight: number) => {
