@@ -138,51 +138,53 @@ export const BsvWallet = (props: BsvWalletProps) => {
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (account) {
       const { bsvAddress, ordAddress } = account.addresses;
-      let resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=100`);
-      let txos = (await resp.json()) as { txid: string; origin: { outpoint: string } }[];
+      const resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=100`);
+      const txos = (await resp.json()) as { txid: string; origin: { outpoint: string } }[];
       for (const txo of txos) {
         const tx = await txoStore.getTx(txo.txid, true);
         await txoStore.ingest(tx!, true);
         console.log(txo.txid, 'ingested');
       }
 
-      resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
-      const balance = (await resp.json()) as { id?: string }[];
-      for await (const token of balance) {
-        if (!token.id) continue;
-        console.log('importing', token.id);
-        try {
-          resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
-          const txids = (await resp.json()) as string[];
-          for await (const txid of txids) {
-            console.log('bsv21', token.id, txid);
-            const tx = await txoStore.getTx(txid, true);
-            await txoStore.ingest(tx!, true);
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
+      // resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
+      // const balance = (await resp.json()) as { id?: string }[];
+      // for await (const token of balance) {
+      //   if (!token.id) continue;
+      //   console.log('importing', token.id);
+      //   try {
+      //     resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
+      //     const txids = (await resp.json()) as string[];
+      //     for await (const txid of txids) {
+      //       console.log('bsv21', token.id, txid);
+      //       const tx = await txoStore.getTx(txid, true);
+      //       await txoStore.ingest(tx!, true);
+      //     }
+      //   } catch (e) {
+      //     console.error(e);
+      //   }
+      // }
 
-      resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=100`);
-      txos = (await resp.json()) as { txid: string; origin: { outpoint: string } }[];
-      for (const txo of txos) {
-        if (txo.origin) {
-          const resp = await fetch(
-            `https://ordinals.gorillapool.io/api/inscriptions/${txo.origin.outpoint}/history?limit=100000`,
-          );
-          const txos = (await resp.json()) as { outpoint: string; origin: { outpoint: string } }[];
-          for await (const txo of txos) {
-            console.log('fast forward', txo.origin.outpoint, txo.outpoint);
-            const [txid] = txo.outpoint.split('_');
-            const tx = await txoStore.getTx(txid, true);
-            await txoStore.ingest(tx!, true);
-          }
-        } else {
-          const tx = await txoStore.getTx(txo.txid, true);
-          await txoStore.ingest(tx!, true);
-        }
-      }
+      // resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=100`);
+      // txos = (await resp.json()) as { txid: string; origin: { outpoint: string } }[];
+      // for (const txo of txos) {
+      //   if (txo.origin) {
+      //     const resp = await fetch(
+      //       `https://ordinals.gorillapool.io/api/inscriptions/${txo.origin.outpoint}/history?limit=100000`,
+      //     );
+      //     const txos = (await resp.json()) as { outpoint: string; origin: { outpoint: string } }[];
+      //     for await (const txo of txos) {
+      //       console.log('fast forward', txo.origin.outpoint, txo.outpoint);
+      //       const [txid] = txo.outpoint.split('_');
+      //       const tx = await txoStore.getTx(txid, true);
+      //       await txoStore.ingest(tx!, true);
+      //     }
+      //   } else {
+      //     const tx = await txoStore.getTx(txo.txid, true);
+      //     await txoStore.ingest(tx!, true);
+      //   }
+      // }
+
+      await bsvService.updateBsvBalance();
 
       console.log('done importing');
     }

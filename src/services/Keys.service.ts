@@ -172,11 +172,11 @@ export class KeysService {
       const d = decrypt(encryptedKeys, passKey);
       const keys: Keys = JSON.parse(d);
 
-      const walletAddr = Utils.toBase58Check(Utils.toArray(keys.walletAddress, 'hex'), [
+      const walletAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.walletAddress).data as number[], [
         account.network === NetWork.Mainnet ? 0 : 0x6f,
       ]);
 
-      const ordAddr = Utils.toBase58Check(Utils.toArray(keys.ordAddress, 'hex'), [
+      const ordAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.ordAddress).data as number[], [
         account.network === NetWork.Mainnet ? 0 : 0x6f,
       ]);
 
@@ -187,7 +187,7 @@ export class KeysService {
 
       // identity address not available with wif or 1sat import
       if (keys.identityAddress) {
-        const identityAddr = Utils.toBase58Check(Utils.toArray(keys.identityAddress, 'hex'), [
+        const identityAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.identityAddress).data as number[], [
           account.network === NetWork.Mainnet ? 0 : 0x6f,
         ]);
 

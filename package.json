@@ -39,10 +39,6 @@
     "web-vitals": "^2.1.4",
     "yours-wallet-provider": "^2.5.3"
   },
-  "overrides": {
-    "bsv-wasm": "$bsv-wasm",
-    "bsv-wasm-web": "$bsv-wasm-web"
-  },
   "scripts": {
     "start": "react-app-rewired start",
     "build": "react-app-rewired build",
