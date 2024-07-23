@@ -16,3 +16,12 @@ export interface Txn {
   block: Block;
   status: TxnStatus;
 }
+
+export class TxnIngest {
+  status = TxnStatus.INGEST;
+  constructor(
+    public txid: string,
+    public height: number,
+    public idx: number,
+  ) {}
+}

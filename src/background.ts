@@ -84,7 +84,9 @@ const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 // only run in background worker
 if (self?.document === undefined) {
-  // TODO: start ingestion
+  txoStorePromise.then((txoStore) => {
+    txoStore.ingestQueue();
+  });
 
   const mainBlockHeaderService = new BlockHeaderService(NetWork.Mainnet);
   mainBlockHeaderService.syncBlocks();

@@ -3,7 +3,7 @@ import type { Indexer } from './models/indexer';
 import type { IndexContext } from './models/index-context';
 import { openDB, type DBSchema, type IDBPDatabase } from '@tempfix/idb';
 import { Txo, TxoLookup, type TxoResults } from './models/txo';
-import { TxnStatus, type Txn } from './models/txn';
+import { TxnIngest, TxnStatus, type Txn } from './models/txn';
 import { BlockHeaderService } from '../block-headers';
 import { Block } from './models/block';
 import { Spend } from './models/spend';
@@ -29,6 +29,13 @@ export interface TxoSchema extends DBSchema {
       status: [number, number];
     };
   };
+  ingestQueue: {
+    key: string;
+    value: TxnIngest;
+    indexes: {
+      status: [number, number, number];
+    };
+  };
 }
 
 export class TxoStore {
@@ -48,6 +55,8 @@ export class TxoStore {
         txos.createIndex('owner', 'owner');
         const txns = db.createObjectStore('txns', { keyPath: 'txid' });
         txns.createIndex('status', ['status', 'block.height']);
+        const queue = db.createObjectStore('ingestQueue', { keyPath: 'txid' });
+        queue.createIndex('status', ['status', 'height', 'idx']);
       },
     });
   }
@@ -227,5 +236,36 @@ export class TxoStore {
       proof: tx.merklePath && Buffer.from(tx.merklePath.toBinary()),
     });
     return ctx;
+  }
+
+  async queue(ingests: TxnIngest[]) {
+    const db = await this.db;
+    const t = db.transaction('ingestQueue', 'readwrite');
+    for (const ingest of ingests) {
+      const txn = await t.store.get(ingest.txid);
+      if (txn) continue;
+      await t.store.put(ingest);
+    }
+    await t.done;
+  }
+
+  async ingestQueue() {
+    const db = await this.db;
+    const query: IDBKeyRange = IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Date.now()]);
+    const txns = await db.getAllFromIndex('ingestQueue', 'status', query, 100);
+    console.log('Ingesting', txns.length, 'txs');
+    for (const txn of txns) {
+      const tx = await this.getTx(txn.txid, true);
+      if (!tx) {
+        console.error('Failed to get tx', txn.txid);
+        continue;
+      }
+      await this.ingest(tx, true);
+      txn.status = TxnStatus.CONFIRMED;
+      await db.put('ingestQueue', txn);
+    }
+    if (!txns.length) {
+      await new Promise((r) => setTimeout(r, 1000));
+    }
   }
 }
