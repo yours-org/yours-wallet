@@ -13,7 +13,7 @@ import { ChromeStorageService } from './ChromeStorage.service';
 import { ContractService } from './Contract.service';
 import { GorillaPoolService } from './GorillaPool.service';
 import { KeysService } from './Keys.service';
-import { LockData, SendBsvResponse } from './types/bsv.types';
+import { FundRawTxResponse, LockData, SendBsvResponse } from './types/bsv.types';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { WhatsOnChainService } from './WhatsOnChain.service';
 import { TxoStore } from './txo-store';
@@ -299,53 +299,48 @@ export class BsvService {
     return results.txos;
   };
 
-  // fundRawTx = async (rawtx: string, password: string): Promise<FundRawTxResponse> => {
-  //   const isAuthenticated = await this.keysService.verifyPassword(password);
-  //   if (!isAuthenticated) {
-  //     return { error: 'invalid-password' };
-  //   }
+  fundRawTx = async (rawtx: string, password: string): Promise<FundRawTxResponse> => {
+    const isAuthenticated = await this.keysService.verifyPassword(password);
+    if (!isAuthenticated) {
+      return { error: 'invalid-password' };
+    }
 
-  //   const keys = await this.keysService.retrieveKeys(password);
-  //   if (!keys.walletWif) throw new Error('Missing keys');
-  //   const paymentPk = PrivateKey.fromWif(keys.walletWif);
+    const keys = await this.keysService.retrieveKeys(password);
+    if (!keys.walletWif) throw new Error('Missing keys');
+    const paymentPk = PrivateKey.fromWif(keys.walletWif);
+    const tx = Transaction.fromHex(rawtx);
 
-  //   let satsIn = 0;
-  //   let satsOut = 0;
-  //   const tx = Transaction.fromHex(rawtx);
-  //   let inputCount = tx.get_ninputs();
-  //   for (let i = 0; i < inputCount; i++) {
-  //     const txIn = tx.get_input(i);
-  //     if (!txIn) throw Error('Invalid input');
-  //     const txOut = await this.gorillaPoolService.getTxOut(txIn.get_prev_tx_id_hex(), txIn.get_vout());
-  //     if (!txOut) throw Error('Invalid output');
-  //     satsIn += Number(txOut.get_satoshis());
-  //   }
-  //   for (let i = 0; i < tx.get_noutputs(); i++) {
-  //     const output = tx.get_output(i);
-  //     if (!output) throw Error('Invalid output');
-  //     satsOut += Number(output.get_satoshis());
-  //   }
-  //   let size = rawtx.length / 2 + P2PKH_OUTPUT_SIZE;
-  //   let fee = Math.ceil(size * FEE_PER_BYTE);
-  //   const fundingUtxos = await this.wocService.getAndUpdateUtxoStorage(this.keysService.bsvAddress);
-  //   while (satsIn < satsOut + fee) {
-  //     const utxo = fundingUtxos.pop();
-  //     if (!utxo) throw Error('Insufficient funds');
-  //     const txIn = new TxIn(Buffer.from(utxo.txid, 'hex'), utxo.vout, Script.from_hex(''));
-  //     tx.add_input(txIn);
-  //     satsIn += Number(utxo.satoshis);
-  //     size += P2PKH_INPUT_SIZE;
-  //     fee = Math.ceil(size * FEE_PER_BYTE);
-  //     const sig = tx.sign(paymentPk, SigHash.Input, inputCount, Script.from_hex(utxo.script), BigInt(utxo.satoshis));
-  //     txIn.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
-  //     tx.set_input(inputCount++, txIn);
-  //   }
-  //   tx.add_output(
-  //     new TxOut(
-  //       BigInt(satsIn - satsOut - fee),
-  //       P2PKHAddress.from_string(this.keysService.bsvAddress).get_locking_script(),
-  //     ),
-  //   );
-  //   return { rawtx: tx.to_hex() };
-  // };
+    let satsIn = 0;
+    for (const input of tx.inputs) {
+      input.sourceTransaction = await this.txoStore.getTx(input.sourceTXID ?? '', true);
+      satsIn += input.sourceTransaction?.outputs[input.sourceOutputIndex]?.satoshis || 0;
+    }
+
+    const satsOut = tx.outputs.reduce((a, o) => a + (o.satoshis || 0), 0);
+    let fee = 0;
+    tx.addOutput({ change: true, lockingScript: new P2PKH().lock(this.keysService.bsvAddress) });
+
+    const fundResults = await this.txoStore.searchTxos(
+      new TxoLookup('fund', 'address', this.keysService.bsvAddress, false),
+      0,
+    );
+
+    const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+    for await (const u of fundResults.txos || []) {
+      tx.addInput({
+        sourceTransaction: await this.txoStore.getTx(u.txid),
+        sourceOutputIndex: u.vout,
+        sequence: 0xffffffff,
+        unlockingScriptTemplate: new P2PKH().unlock(paymentPk),
+      });
+      satsIn += Number(u.satoshis);
+      fee = await feeModel.computeFee(tx);
+      if (satsIn >= satsOut + fee) break;
+    }
+    if (satsIn < satsOut + fee) return { error: 'insufficient-funds' };
+    await tx.fee(feeModel);
+    await tx.sign();
+
+    return { rawtx: tx.toHex() };
+  };
 }
