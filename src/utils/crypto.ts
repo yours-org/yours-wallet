@@ -58,21 +58,8 @@ export const encryptUsingPrivKey = (
 ) => {
   const msgBuf = Utils.toArray(message, encoding);
   return pubKeys.map((pubKey) => Utils.toBase64(ECIES.electrumEncrypt(msgBuf, pubKey, privateKey)));
-
-  // const encryptedMessages = pubKeys.map((keys) => keys.encrypt_message(msgBuf, privateKey));
-  // return encryptedMessages.map((m) => Buffer.from(m.to_bytes()).toString('base64'));
-  // return [''];
 };
 
 export const decryptUsingPrivKey = (messages: string[], privateKey: PrivateKey) => {
   return messages.map((m) => Utils.toBase64(ECIES.electrumDecrypt(Utils.toArray(m, 'base64'), privateKey)));
-  // const decryptedMessages: string[] = [];
-  // for (const message of messages) {
-  //   const ciphertext = ECIESCiphertext.from_bytes(Buffer.from(message, 'base64'), true);
-  //   const pubKey = ciphertext.extract_public_key();
-  //   const decrypted = privateKey.decrypt_message(ciphertext, pubKey);
-  //   decryptedMessages.push(Buffer.from(decrypted).toString('base64'));
-  // }
-  // return decryptedMessages;
-  // return [''];
 };
