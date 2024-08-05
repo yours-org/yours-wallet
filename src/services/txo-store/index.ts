@@ -10,6 +10,7 @@ import { Spend } from './models/spend';
 import { Buffer } from 'buffer';
 import { NetWork } from 'yours-wallet-provider';
 import { TransactionService } from '../Transaction.service';
+import { GP_BASE_URL } from '../../utils/constants';
 
 const VERSION = 1;
 
@@ -20,6 +21,7 @@ export interface TxoSchema extends DBSchema {
     indexes: {
       events: string;
       owner: string;
+      spent: string;
     };
   };
   txns: {
@@ -47,12 +49,13 @@ export class TxoStore {
     public blocksService?: BlockHeaderService,
     public network: NetWork = NetWork.Mainnet,
   ) {
-    if (!accountId) throw new Error('empty-account-id');
+    // if (accountId) throw new Error('empty-account-id');
     this.db = openDB<TxoSchema>(`txostore-${accountId}-${network}`, VERSION, {
       upgrade(db) {
         const txos = db.createObjectStore('txos', { keyPath: ['txid', 'vout'] });
         txos.createIndex('events', 'events', { multiEntry: true });
         txos.createIndex('owner', 'owner');
+        txos.createIndex('spent', 'spent');
         const txns = db.createObjectStore('txns', { keyPath: 'txid' });
         txns.createIndex('status', ['status', 'block.height']);
         const queue = db.createObjectStore('ingestQueue', { keyPath: 'txid' });
@@ -108,6 +111,46 @@ export class TxoStore {
     delete results.nextPage;
     console.timeEnd('findTxos');
     return results;
+  }
+
+  async syncSpends() {
+    const db = await this.db;
+    const outpoints = await db.getAllKeysFromIndex('txos', 'spent', IDBKeyRange.only('0'));
+    for (let i = 0; i < outpoints.length; i += 50) {
+      await this.updateSpends(outpoints.slice(i, i + 50).map(([txid, vout]) => `${txid}_${vout}`));
+    }
+  }
+
+  private async updateSpends(outpoints: string[]) {
+    const db = await this.db;
+    const resp = await fetch(`${GP_BASE_URL}/api/spends`, {
+      method: 'POST',
+      body: JSON.stringify(outpoints),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    if (resp.status !== 200) {
+      console.error('Failed to get spends', resp.status, await resp.text());
+      return;
+    }
+    const spends = (await resp.json()) as string[];
+    const t = db.transaction('txos', 'readwrite');
+    for (const [i, outpoint] of outpoints.entries()) {
+      if (spends[i]) {
+        const [txid, vout] = outpoint.split('_');
+        const txoData = await db.get('txos', [txid, parseInt(vout, 10)]);
+        if (!txoData) {
+          console.error('Missing txo', txid, vout);
+          continue;
+        }
+        const txo = Txo.fromObject(txoData, this.indexers);
+        txo.setSpend(new Spend(spends[i], 0));
+        console.log('Updated spend', txid, vout, spends[i]);
+        t.store.put(txo);
+      }
+    }
+    await t.done;
   }
 
   async broadcast(tx: Transaction) {
@@ -195,7 +238,7 @@ export class TxoStore {
             Buffer.from(input.sourceTransaction!.outputs[input.sourceOutputIndex]!.lockingScript.toBinary()),
           );
 
-      spend.spend = new Spend(txid, vin, block);
+      spend.setSpend(new Spend(txid, vin, block));
       spend.events = [];
       for (const [tag, data] of Object.entries(spend.data)) {
         for (const e of data.events) {
@@ -264,18 +307,19 @@ export class TxoStore {
     const db = await this.db;
     const query: IDBKeyRange = IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Date.now()]);
     const txns = await db.getAllFromIndex('ingestQueue', 'status', query, 100);
-    console.log('Ingesting', txns.length, 'txs');
-    for (const txn of txns) {
-      const tx = await this.getTx(txn.txid, true);
-      if (!tx) {
-        console.error('Failed to get tx', txn.txid);
-        continue;
+    if (txns.length) {
+      console.log('Ingesting', txns.length, 'txs');
+      for (const txn of txns) {
+        const tx = await this.getTx(txn.txid, true);
+        if (!tx) {
+          console.error('Failed to get tx', txn.txid);
+          continue;
+        }
+        await this.ingest(tx, true);
+        txn.status = TxnStatus.CONFIRMED;
+        await db.put('ingestQueue', txn);
       }
-      await this.ingest(tx, true);
-      txn.status = TxnStatus.CONFIRMED;
-      await db.put('ingestQueue', txn);
-    }
-    if (!txns.length) {
+    } else {
       await new Promise((r) => setTimeout(r, 1000));
     }
     this.ingestQueue();

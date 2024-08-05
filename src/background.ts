@@ -41,6 +41,7 @@ import { TxoStore } from './services/txo-store';
 import { OneSatTransactionService } from './services/txo-store/1satTxService';
 import { GP_BASE_URL } from './utils/constants';
 import { TxoLookup } from './services/txo-store/models/txo';
+import { LockIndexer } from './services/txo-store/mods/lock';
 const chromeStorageService = new ChromeStorageService();
 
 export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() => {
@@ -50,6 +51,7 @@ export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() =
     new FundIndexer(new Set<string>([account?.addresses?.bsvAddress || ''])),
     new OrdIndexer(new Set<string>([account?.addresses?.ordAddress || ''])),
     new Bsv21Indexer(new Set<string>([account?.addresses?.ordAddress || ''])),
+    new LockIndexer(new Set<string>([account?.addresses?.identityAddress || ''])),
   ];
   const network = chromeStorageService.getNetwork();
   const blockHeaderService = new BlockHeaderService(network);

@@ -17,6 +17,11 @@ export interface Txn {
   status: TxnStatus;
 }
 
+export interface TxnStatusResponse {
+  status: TxnStatus;
+  proof?: Uint8Array;
+  message?: string;
+}
 export class TxnIngest {
   status = TxnStatus.INGEST;
   constructor(

@@ -1,10 +1,14 @@
+import { NetWork } from 'yours-wallet-provider';
 import type { IndexContext } from './index-context';
 import { IndexData } from './index-data';
 
 export abstract class Indexer {
   tag = '';
 
-  constructor(public owners = new Set<string>()) {}
+  constructor(
+    public owners = new Set<string>(),
+    public network = NetWork.Mainnet,
+  ) {}
 
   parse(ctx: IndexContext, vout: number): IndexData | undefined {
     return;

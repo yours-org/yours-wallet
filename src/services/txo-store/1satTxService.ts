@@ -1,14 +1,14 @@
 import { BroadcastFailure, BroadcastResponse, MerklePath, Transaction } from '@bsv/sdk';
 import { TransactionService } from '../Transaction.service';
 import { Block } from './models/block';
-import { Txn, TxnStatus } from './models/txn';
+import { Txn, TxnStatus, TxnStatusResponse } from './models/txn';
 import { GP_BASE_URL } from '../../utils/constants';
 
 export class OneSatTransactionService implements TransactionService {
-  constructor(public baseUrl: string) {}
+  constructor(public baseUrl = GP_BASE_URL) {}
   async broadcast(tx: Transaction): Promise<BroadcastResponse | BroadcastFailure> {
     console.log('Broadcasting', tx.id('hex'), tx.toHex());
-    const resp = await fetch(`${GP_BASE_URL}/api/tx/bin`, {
+    const resp = await fetch(`${this.baseUrl}/api/tx/bin`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/octet-stream',
@@ -30,16 +30,23 @@ export class OneSatTransactionService implements TransactionService {
     } as BroadcastResponse;
   }
 
-  async status(txid: string): Promise<Txn | undefined> {
-    const resp = await fetch(`${GP_BASE_URL}/api/tx/${txid}`);
-    if (resp.status > 200) {
-      return undefined;
+  async status(txid: string): Promise<TxnStatusResponse | undefined> {
+    const resp = await fetch(`${this.baseUrl}/api/tx/${txid}/proof`);
+    switch (resp.status) {
+      case 200:
+        return {
+          status: TxnStatus.CONFIRMED,
+          proof: Buffer.from(await resp.json(), 'base64'),
+        };
+      case 404:
+        return { status: TxnStatus.PENDING };
+      default:
+        return undefined;
     }
-    return resp.json();
   }
 
   async fetch(txid: string): Promise<Txn | undefined> {
-    const resp = await fetch(`${GP_BASE_URL}/api/tx/${txid}`);
+    const resp = await fetch(`${this.baseUrl}/api/tx/${txid}`);
     console.log('Fetching', txid);
     if (!resp.ok) return;
     if (resp.status !== 200) throw new Error(`Failed to fetch tx ${txid}`);

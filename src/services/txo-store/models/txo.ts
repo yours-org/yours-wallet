@@ -7,6 +7,7 @@ import { Buffer } from 'buffer';
 export class Txo {
   block?: Block;
   spend?: Spend;
+  spent = this.spend ? '1' : '0';
   data: { [tag: string]: IndexData } = {};
   events: string[] = [];
   owner?: string;
@@ -17,6 +18,11 @@ export class Txo {
     public satoshis: bigint,
     public script: Uint8Array,
   ) {}
+
+  setSpend(spend: Spend) {
+    this.spend = spend;
+    this.spent = spend ? '1' : '0';
+  }
 
   static fromObject(obj: any, indexers: Indexer[] = []): Txo {
     const txo = new Txo(obj.txid, obj.vout, obj.satoshis, obj.script);

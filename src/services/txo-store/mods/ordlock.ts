@@ -2,7 +2,6 @@ import type { IndexContext } from '../models/index-context';
 import { Indexer } from '../models/indexer';
 import { IndexData } from '../models/index-data';
 import { Script, Utils } from '@bsv/sdk';
-import { Listing } from '../models/listing';
 import { Buffer } from 'buffer';
 
 const PREFIX = Buffer.from(
@@ -14,6 +13,20 @@ const SUFFIX = Buffer.from(
   'hex',
 );
 
+export class Listing {
+  constructor(
+    public payout = new Uint8Array(0),
+    public price = 0n,
+  ) {}
+
+  toJSON() {
+    return {
+      payout: Buffer.from(this.payout).toString('base64'),
+      price: this.price.toString(),
+    };
+  }
+}
+
 export class OrdLockIndexer extends Indexer {
   tag = 'list';
 
@@ -22,7 +35,7 @@ export class OrdLockIndexer extends Indexer {
     const script = Buffer.from(txo.script);
     const prefixIdx = script.indexOf(PREFIX);
     if (prefixIdx === -1) return;
-    const suffixIdx = script.indexOf(SUFFIX, prefixIdx);
+    const suffixIdx = script.indexOf(SUFFIX, prefixIdx + PREFIX.length);
     if (suffixIdx === -1) return;
     const dataScript = Script.fromBinary(Array.from(script.subarray(prefixIdx + PREFIX.length, suffixIdx)));
     const listing = new Listing();
