@@ -125,7 +125,14 @@ export class BsvService {
             const { base64Data, mimeType, map } = req.inscription;
             const formattedBase64 = removeBase64Prefix(base64Data);
 
-            outScript = new OrdP2PKH().lock(req.address, formattedBase64, mimeType, map);
+            outScript = new OrdP2PKH().lock(
+              req.address,
+              {
+                dataB64: formattedBase64,
+                contentType: mimeType,
+              },
+              map,
+            );
           } else {
             outScript = new P2PKH().lock(req.address);
           }

@@ -13,13 +13,19 @@ export interface File {
   size: number;
   type: string;
   text?: string;
+  json?: { [key: string]: any };
+}
+
+export interface OriginData {
+  insc?: Inscription;
+  map?: { [key: string]: any };
 }
 
 export class Origin {
   constructor(
     public outpoint: string,
     public nonce: number,
-    public data: { [key: string]: any } = {},
+    public data: OriginData = {},
   ) {}
 }
 
@@ -110,6 +116,13 @@ export class OrdIndexer extends Indexer {
               } catch {
                 console.log('Error parsing text');
               }
+              if (insc.file.text) {
+                try {
+                  insc.file.json = JSON.parse(insc.file.text);
+                } catch {
+                  console.log('Error parsing json');
+                }
+              }
             }
             break;
           case 1:
@@ -133,7 +146,10 @@ export class OrdIndexer extends Indexer {
       }
     }
     if (!ord.insc && txo.satoshis != 1n) return;
-    if (owner && !txo.owner && this.owners.has(owner)) txo.owner = owner;
+    if (owner && !txo.owner && this.owners.has(owner)) {
+      txo.owner = owner;
+      idxData.events.push({ id: 'address', value: owner });
+    }
 
     let outSat = 0n;
     for (let i = 0; i < vout; i++) {
@@ -158,7 +174,7 @@ export class OrdIndexer extends Indexer {
     }
 
     if (ord.origin) {
-      ord.origin.data = txo.data;
+      ord.origin.data = txo.data.ord?.data?.origin?.data;
       if (txo.data.map) {
         ord.origin.data.map = Object.assign(ord.origin.data?.map || {}, txo.data.map.data);
       }

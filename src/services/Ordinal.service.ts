@@ -8,7 +8,7 @@ import {
   OrdOperationResponse,
 } from './types/ordinal.types';
 import { sendOrdinals } from 'js-1sat-ord';
-import { Bsv20, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
+import { Bsv20, Bsv21, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
 import { UTXO } from './types/bsv.types';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { TxoStore } from './txo-store';
@@ -32,36 +32,6 @@ export class OrdinalService {
 
   getOrdinals = (): OrdinalData => this.ordinals;
   getBsv20s = (): BSV20Data => this.bsv20s;
-
-  // getAndSetOrdinals = async (ordAddress: string) => {
-  //   try {
-  //     //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
-  //     const ordList = await this.gorillaPoolService.getOrdUtxos(ordAddress);
-  //     this.ordinals = { initialized: true, data: ordList.filter((o) => o.satoshis === 1) };
-
-  //     const bsv20List: Array<Bsv20> = await this.gorillaPoolService.getBsv20Balances(ordAddress);
-
-  //     // All the information currently used has been obtained from `getBsv20Balances`.
-  //     // If other information is needed later, call `cacheTokenInfos` to obtain more Tokens information.
-  //     // await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.id));
-
-  //     const data = bsv20List.filter((o) => o.all.confirmed + o.all.pending > 0n && typeof o.dec === 'number');
-  //     this.bsv20s = { initialized: true, data };
-  //     const { account } = this.chromeStorageService.getCurrentAccountObject();
-  //     if (!account) throw Error('No account found!');
-  //     const key: keyof ChromeStorageObject = 'accounts';
-  //     const update: Partial<ChromeStorageObject['accounts']> = {
-  //       [this.keysService.identityAddress]: {
-  //         ...account,
-  //         ordinals: this.ordinals.initialized ? this.ordinals.data : account.ordinals || [],
-  //       },
-  //     };
-  //     await this.chromeStorageService.updateNested(key, update);
-  //     return this.ordinals;
-  //   } catch (error) {
-  //     console.error('getOrdinals failed:', error);
-  //   }
-  // };
 
   transferOrdinal = async (
     destinationAddress: string,
@@ -624,7 +594,7 @@ export class OrdinalService {
     return { txid: '', error: undefined };
   };
 
-  getTokenName(b: Bsv20): string {
-    return b.sym || b.tick || 'Null';
+  getTokenName(b: Bsv20 | Bsv21): string {
+    return (b as Bsv21).sym || b.tick || 'Null';
   }
 }

@@ -92,7 +92,10 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
         encryptPrivKey,
       );
 
-      const insScript = new OrdP2PKH().lock(keys.identityAddress, encryptedMessages[0], 'panda/tag');
+      const insScript = new OrdP2PKH().lock(keys.identityAddress, {
+        dataB64: encryptedMessages[0],
+        contentType: 'panda/tag',
+      });
       const txid = await bsvService.sendBsv([{ satoshis: 1, script: insScript.toHex() }], password);
 
       if (!txid) {

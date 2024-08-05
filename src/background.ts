@@ -17,6 +17,8 @@ import {
   InscribeRequest,
   SignMessage,
   NetWork,
+  // Inscription,
+  Ordinal,
 } from 'yours-wallet-provider';
 import {
   CustomListenerName,
@@ -35,13 +37,14 @@ import { ChromeStorageService } from './services/ChromeStorage.service';
 import { BlockHeaderService } from './services/block-headers';
 import { Indexer } from './services/txo-store/models/indexer';
 import { FundIndexer } from './services/txo-store/mods/fund';
-import { OrdIndexer } from './services/txo-store/mods/ord';
+import { Ord, OrdIndexer, Origin } from './services/txo-store/mods/ord';
 import { Bsv21Indexer } from './services/txo-store/mods/bsv21';
 import { TxoStore } from './services/txo-store';
 import { OneSatTransactionService } from './services/txo-store/1satTxService';
 import { GP_BASE_URL } from './utils/constants';
 import { TxoLookup } from './services/txo-store/models/txo';
 import { LockIndexer } from './services/txo-store/mods/lock';
+import { OrdinalData } from './services/types/ordinal.types';
 const chromeStorageService = new ChromeStorageService();
 
 export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() => {
@@ -420,13 +423,50 @@ if (self?.document === undefined) {
 
   const processGetOrdinalsRequest = (sendResponse: CallbackResponse) => {
     try {
-      chromeStorageService.getAndSetStorage().then(() => {
-        const { account } = chromeStorageService.getCurrentAccountObject();
-        if (!account) throw Error('No account found!');
+      chromeStorageService.getAndSetStorage().then(async () => {
+        const storageObj = chromeStorageService.getCurrentAccountObject();
+        const bsvAddress = storageObj.account?.addresses?.ordAddress;
+        const txoStore = await txoStorePromise;
+        const results = await txoStore.searchTxos(new TxoLookup('ord', 'address', bsvAddress, false), 5);
+        console.log('results', results);
+
         sendResponse({
           type: YoursEventName.GET_ORDINALS,
           success: true,
-          data: account.ordinals ?? [],
+          data: results.txos.map(
+            (t) =>
+              ({
+                txid: t.txid,
+                vout: t.vout,
+                outpoint: `${t.txid}_${t.vout}`,
+                satoshis: Number(t.satoshis),
+                script: Buffer.from(t.script).toString('base64'),
+                owner: t.owner,
+                spend: '',
+                origin: t.data.ord?.data.origin && {
+                  outpoint: t.data.ord.data.origin.outpoint,
+                  nonce: Number(t.data.ord.data.origin.nonce),
+                  num: t.block.height < 50000000 && `${t.block.height}:${t.block.idx}:${t.vout}`,
+                  data: {
+                    insc: t.data.ord.data.origin.data?.insc,
+                    map: t.data.ord.data.origin.data?.map,
+                  },
+                },
+                height: t.block?.height,
+                idx: Number(t.block?.idx),
+                data: {
+                  insc: (t.data.ord.data as Ord).insc,
+                  list: t.data.list && {
+                    payout: Buffer.from(t.data.list.data.payout).toString('base64'),
+                    price: Number(t.data.list.data.price),
+                  },
+                  // bsv20: t.data.bsv20?.data,
+                  // bsv21: t.data.bsv21?.data,
+                  lock: t.data.lock?.data,
+                  // TODO: add map, sigma
+                },
+              }) as Ordinal,
+          ),
         });
       });
     } catch (error) {

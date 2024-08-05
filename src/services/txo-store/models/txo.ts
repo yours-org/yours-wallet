@@ -5,7 +5,7 @@ import { Spend } from './spend';
 import { Buffer } from 'buffer';
 
 export class Txo {
-  block?: Block;
+  block = new Block();
   spend?: Spend;
   spent = this.spend ? '1' : '0';
   data: { [tag: string]: IndexData } = {};

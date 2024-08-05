@@ -32,7 +32,7 @@ import { TopNav } from '../components/TopNav';
 import { AssetRow } from '../components/AssetRow';
 import { formatNumberWithCommasAndDecimals } from '../utils/format';
 import { ListOrdinal, OrdOperationResponse } from '../services/types/ordinal.types';
-import { Bsv20, Ordinal as OrdinalType } from 'yours-wallet-provider';
+import { Bsv20, Bsv21, Ordinal as OrdinalType } from 'yours-wallet-provider';
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -169,7 +169,7 @@ export const OrdWallet = () => {
   useEffect(() => {
     if (!bsv20s.data.length) return;
     (async () => {
-      const data = await gorillaPoolService.getTokenPriceInSats(bsv20s.data.map((d) => d?.id || ''));
+      const data = await gorillaPoolService.getTokenPriceInSats(bsv20s.data.map((d) => (d as Bsv21)?.id || ''));
       setPriceData(data);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -432,7 +432,7 @@ export const OrdWallet = () => {
               .map((b) => {
                 return (
                   <div
-                    key={b.id}
+                    key={(b as Bsv21).id}
                     style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
                     onClick={async () => {
                       setToken({
@@ -447,7 +447,7 @@ export const OrdWallet = () => {
                       icon={b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : ''}
                       ticker={getTokenName(b)}
                       usdBalance={
-                        (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
+                        (priceData.find((p) => p.id === (b as Bsv21).id)?.satPrice ?? 0) *
                         (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
                         Number(showAmount(b.all.confirmed, b.dec))
                       }
@@ -479,7 +479,7 @@ export const OrdWallet = () => {
                         icon={b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : ''}
                         ticker={getTokenName(b)}
                         usdBalance={
-                          (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
+                          (priceData.find((p) => p.id === (b as Bsv21).id)?.satPrice ?? 0) *
                           (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
                           Number(showAmount(b.all.confirmed, b.dec))
                         }
@@ -705,11 +705,11 @@ export const OrdWallet = () => {
               )}`}
             </Balance>
           </BSV20Container>
-          <Show when={isBSV20v2(token.info.id ?? '')}>
+          <Show when={isBSV20v2((token.info as Bsv21).id ?? '')}>
             <BSV20Container>
               <BSV20Id
                 theme={theme}
-                id={token.info.id ?? ''}
+                id={(token.info as Bsv21).id ?? ''}
                 onCopyTokenId={() => {
                   addSnackbar('Copied', 'success');
                 }}
