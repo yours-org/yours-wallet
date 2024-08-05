@@ -5,6 +5,7 @@ import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
+import { Ordinal as OrdType } from 'yours-wallet-provider';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
@@ -24,7 +25,6 @@ export type OrdTransferRequestProps = {
 export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
-  // const { getOrdinals, transferOrdinal, getOrdinalsBaseUrl, ordinals } = useOrds();
   const [isProcessing, setIsProcessing] = useState(false);
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
@@ -32,12 +32,20 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   const { chromeStorageService, ordinalService, keysService, gorillaPoolService } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const network = chromeStorageService.getNetwork();
+  const [ordinal, setOrdinal] = useState<OrdType | undefined>();
 
-  const resetSendState = () => {
-    setPasswordConfirm('');
-    setSuccessTxId('');
-    setIsProcessing(false);
-  };
+  useEffect(() => {
+    if (!ordinalService || !request?.outpoint) return;
+    ordinalService.getOrdinal(request.outpoint).then((ord) => {
+      setOrdinal(ord);
+    });
+  }, [ordinalService, request.outpoint]);
+
+  // const resetSendState = () => {
+  //   setPasswordConfirm('');
+  //   setSuccessTxId('');
+  //   setIsProcessing(false);
+  // };
 
   const handleTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -98,14 +106,14 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
         <ConfirmContent>
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
-          <Ordinal
-            inscription={
-              ordinalService.getOrdinals().data.filter((ord) => ord.outpoint.toString() === request.outpoint)[0]
-            }
-            theme={theme}
-            url={`${gorillaPoolService.getBaseUrl(network)}/content/${request.origin}`}
-            selected={true}
-          />
+          {ordinal && (
+            <Ordinal
+              inscription={ordinal}
+              theme={theme}
+              url={`${gorillaPoolService.getBaseUrl(network)}/content/${request.origin}`}
+              selected={true}
+            />
+          )}
           <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>
             <Text theme={theme} style={{ margin: '1rem 0' }}>
               {`Transfer to: ${truncate(request.address, 5, 5)}`}

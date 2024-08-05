@@ -62,7 +62,9 @@ export class OrdIndexer extends Indexer {
     }
 
     const ord: Ord = {};
-    let owner = parseAddress(script, 0);
+    let owner = txo.owner;
+    if (!owner) owner = parseAddress(script, 0);
+
     if (fromPos !== undefined) {
       const insc = (ord.insc = {
         file: { hash: '', size: 0, type: '' },
@@ -146,8 +148,8 @@ export class OrdIndexer extends Indexer {
       }
     }
     if (!ord.insc && txo.satoshis != 1n) return;
-    if (owner && !txo.owner && this.owners.has(owner)) {
-      txo.owner = owner;
+    if (owner && !txo.owner) txo.owner = owner;
+    if (txo.owner && this.owners.has(owner)) {
       idxData.events.push({ id: 'address', value: owner });
     }
 

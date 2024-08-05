@@ -148,11 +148,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
       // let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
       // await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
 
-      // let resp = await fetch(
-      //   `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
-      // );
-      // let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
-      // await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
+      let resp = await fetch(
+        `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
+      );
+      let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
 
       // resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
       // const balance = (await resp.json()) as { id?: string }[];
@@ -169,8 +169,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
       //   }
       // }
 
-      let resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=10`);
-      let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=10`);
+      txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
       for (const txo of txos) {
         if (txo.origin) {
           resp = await fetch(

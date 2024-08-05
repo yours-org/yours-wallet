@@ -21,28 +21,27 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   useEffect(() => {
     if (!isReady) return;
 
-    const ordinals = ordinalService.getOrdinals();
-    const { colorTheme } = chromeStorageService.getCurrentAccountObject();
+    ordinalService.getOrdinals().then(async (ordinals) => {
+      const { colorTheme } = chromeStorageService.getCurrentAccountObject();
 
-    if (colorTheme) {
-      setTheme(colorTheme);
-    }
+      if (colorTheme) {
+        setTheme(colorTheme);
+      }
 
-    if (!ordinals.initialized) return;
+      const themeOrds = ordinals.filter((ord) =>
+        whiteListedColorThemeCollections.includes(ord.origin?.data?.map?.subTypeData?.collectionId),
+      );
 
-    const themeOrds = ordinals.data.filter((ord) =>
-      whiteListedColorThemeCollections.includes(ord.origin?.data?.map?.subTypeData?.collectionId),
-    );
+      if (themeOrds.length > 0) {
+        const themeOrd = themeOrds[0]; // User that holds multiple themes in wallet is not yet supported so will always use index 0
+        const colorTheme = JSON.parse(themeOrd.origin?.data?.map?.colorTheme) as Theme;
 
-    if (themeOrds.length > 0) {
-      const themeOrd = themeOrds[0]; // User that holds multiple themes in wallet is not yet supported so will always use index 0
-      const colorTheme = JSON.parse(themeOrd.origin?.data?.map?.colorTheme) as Theme;
-
-      setTheme(colorTheme);
-      chromeStorageService.update({ colorTheme });
-    } else {
-      chromeStorageService.remove('colorTheme');
-    }
+        setTheme(colorTheme);
+        chromeStorageService.update({ colorTheme });
+      } else {
+        chromeStorageService.remove('colorTheme');
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady, chromeStorageService, ordinalService]);
 

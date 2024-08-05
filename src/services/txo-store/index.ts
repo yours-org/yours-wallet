@@ -139,7 +139,7 @@ export class TxoStore {
     for (const [i, outpoint] of outpoints.entries()) {
       if (spends[i]) {
         const [txid, vout] = outpoint.split('_');
-        const txoData = await db.get('txos', [txid, parseInt(vout, 10)]);
+        const txoData = await t.store.get([txid, parseInt(vout, 10)]);
         if (!txoData) {
           console.error('Missing txo', txid, vout);
           continue;

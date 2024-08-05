@@ -5,6 +5,7 @@ import { BackButton } from '../components/BackButton';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Ordinal } from '../components/Ordinal';
+import { Ordinal as OrdType } from 'yours-wallet-provider';
 import { PageLoader } from '../components/PageLoader';
 import { QrCode } from '../components/QrCode';
 import {
@@ -163,7 +164,7 @@ export const OrdWallet = () => {
   const [token, setToken] = useState<Token | null>(null);
   const [tokenSendAmount, setTokenSendAmount] = useState<bigint | null>(null);
   const [priceData, setPriceData] = useState<{ id: string; satPrice: number }[]>([]);
-  const ordinals = ordinalService.getOrdinals();
+  const [ordinals, setOrdinals] = useState<OrdType[]>([]);
   const bsv20s = getBsv20s();
 
   useEffect(() => {
@@ -187,6 +188,17 @@ export const OrdWallet = () => {
     // }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message]);
+
+  const loadOrdinals = async () => {
+    if (!ordinalService) return;
+    const ordinals = await ordinalService.getOrdinals();
+    setOrdinals(ordinals);
+  };
+
+  useEffect(() => {
+    loadOrdinals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const resetSendState = () => {
     setReceiveAddress('');
@@ -245,6 +257,7 @@ export const OrdWallet = () => {
 
     setSuccessTxId(transferRes.txid);
     addSnackbar('Transfer Successful!', 'success');
+    loadOrdinals();
   };
 
   const handleListOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -286,6 +299,7 @@ export const OrdWallet = () => {
 
     setSuccessTxId(listRes.txid);
     addSnackbar('Listing Successful!', 'success');
+    loadOrdinals();
   };
 
   const handleCancelListing = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -309,6 +323,7 @@ export const OrdWallet = () => {
 
     setSuccessTxId(cancelRes.txid);
     addSnackbar('Successfully canceled the listing!', 'success');
+    loadOrdinals();
   };
 
   const handleSendBSV20 = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -350,6 +365,7 @@ export const OrdWallet = () => {
 
     // setSuccessTxId(sendBSV20Res.txid);
     // addSnackbar('Tokens Sent!', 'success');
+    // loadOrdinals();
   };
 
   const handleCopyToClipboard = () => {
@@ -377,7 +393,7 @@ export const OrdWallet = () => {
         theme={theme}
         type="primary"
         label="Transfer"
-        disabled={ordinals.data.length === 0 || !selectedOrdinal}
+        disabled={ordinals.length === 0 || !selectedOrdinal}
         onClick={async () => {
           if (!selectedOrdinal?.outpoint.toString()) {
             addSnackbar('You must select an ordinal to transfer!', 'info');
@@ -390,7 +406,7 @@ export const OrdWallet = () => {
         theme={theme}
         type="primary"
         label="List"
-        disabled={ordinals.data.length === 0 || !selectedOrdinal}
+        disabled={ordinals.length === 0 || !selectedOrdinal}
         onClick={async () => {
           if (!selectedOrdinal?.outpoint.toString()) {
             addSnackbar('You must select an ordinal to list!', 'info');
@@ -520,7 +536,7 @@ export const OrdWallet = () => {
           setPageState('main');
           setTimeout(() => {
             setIsProcessing(false);
-            // getAndSetOrdinals(ordAddress);
+            loadOrdinals();
           }, 500);
         }}
       />
@@ -614,7 +630,7 @@ export const OrdWallet = () => {
   const nft = (
     <>
       <Show
-        when={ordinals.initialized && ordinals.data.length > 0}
+        when={ordinals.length > 0}
         whenFalseContent={
           <NoInscriptionWrapper>
             <Text
@@ -630,7 +646,7 @@ export const OrdWallet = () => {
         }
       >
         <OrdinalsList>
-          {ordinals.data
+          {ordinals
             .filter((o) => o.origin?.data?.insc?.file.type !== 'application/bsv-20')
             .map((ord) => {
               return (
