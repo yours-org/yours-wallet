@@ -94,35 +94,13 @@ export class BsvService {
   };
 
   unlockLockedCoins = async (balanceOnly = false) => {
-    // if (!this.keysService.identityAddress) return;
-    // const chainInfo = await this.wocService.getChainInfo();
-    // let lockedTxos = await this.gorillaPoolService.getLockedBsvUtxos(this.keysService.identityAddress);
-    // const blockHeight = Number(chainInfo?.blocks);
-    // const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
-    // const spentTxids = await this.gorillaPoolService.getSpentTxids(outpoints);
-    // lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
-    // if (lockedTxos.length > 0) {
-    //   const lockTotal = lockedTxos.reduce((a: number, utxo: Ordinal) => a + utxo.satoshis, 0);
-    //   let unlockableTotal = 0;
-    //   const theBlocksCoinsUnlock: number[] = [];
-    //   lockedTxos.forEach((txo) => {
-    //     const theBlockCoinsUnlock = Number(txo?.data?.lock?.until);
-    //     theBlocksCoinsUnlock.push(theBlockCoinsUnlock);
-    //     if (theBlockCoinsUnlock <= blockHeight) {
-    //       unlockableTotal += txo.satoshis;
-    //     }
-    //   });
-    //   this.lockData = {
-    //     totalLocked: lockTotal,
-    //     unlockable: unlockableTotal,
-    //     nextUnlock: theBlocksCoinsUnlock.sort((a, b) => a - b)[0],
-    //   };
-    //   if (balanceOnly) return;
-    //   const txos = lockedTxos.filter((i) => Number(i.data?.lock?.until) <= blockHeight);
-    //   if (txos.length > 0) {
-    //     return await this.contractService.unlock(txos, blockHeight);
-    //   }
-    // }
+    if (!this.keysService.identityAddress) return;
+    const blockHeight = await this.getCurrentHeight();
+    const lockedTxos = await this.getLockedTxos();
+    const txos = lockedTxos.filter((i) => Number(i.data.lock?.data.until) <= blockHeight);
+    if (txos.length > 0) {
+      return await this.contractService.unlock(txos, blockHeight);
+    }
   };
 
   // TODO: Reimplement SendAll

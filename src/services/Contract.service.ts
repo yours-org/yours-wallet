@@ -1,13 +1,15 @@
-import { GetSignatures, Ordinal, SignatureResponse } from 'yours-wallet-provider';
+import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
 import { DEFAULT_SIGHASH_TYPE } from '../utils/constants';
-import { GorillaPoolService } from './GorillaPool.service';
 import { KeysService } from './Keys.service';
-import { Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
+import { fromUtxo, Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
+import { Txo } from './txo-store/models/txo';
+import LockTemplate from './txo-store/template/lock';
+import { TxoStore } from './txo-store';
 
 export class ContractService {
   constructor(
     private readonly keysService: KeysService,
-    private readonly gorillaPoolService: GorillaPoolService,
+    private readonly txoStore: TxoStore,
   ) {}
 
   getSignatures = async (
@@ -110,58 +112,40 @@ export class ContractService {
     }
   };
 
-  unlock = async (locks: Ordinal[], currentBlockHeight: number) => {
-    // try {
-    //   const keys = await this.keysService.retrieveKeys(undefined, true); // using below limit to bypass password
-    //   if (!keys.identityWif || !keys.walletAddress) {
-    //     throw Error('No keys');
-    //   }
-    //   const lockPk = PrivateKey.from_wif(keys.identityWif);
-    //   const lockPkh = Hash.hash_160(lockPk.to_public_key().to_bytes()).to_bytes();
-    //   const walletAddress = P2PKHAddress.from_string(keys.walletAddress);
-    //   const tx = new Transaction(1, 0);
-    //   tx.set_nlocktime(currentBlockHeight);
-    //   let satsIn = 0;
-    //   let size = 0;
-    //   for (const lock of locks) {
-    //     const txin = new TxIn(Buffer.from(lock.txid, 'hex'), lock.vout, Script.from_hex(''));
-    //     txin?.set_sequence(0);
-    //     tx.add_input(txin);
-    //     satsIn += lock.satoshis;
-    //     size += 1500;
-    //   }
-    //   const fee = Math.ceil(size * FEE_PER_BYTE);
-    //   if (fee > satsIn) {
-    //     return { error: 'insufficient-funds' };
-    //   }
-    //   const change = satsIn - fee;
-    //   if (change > DUST) {
-    //     tx.add_output(new TxOut(BigInt(change), walletAddress.get_locking_script()));
-    //   }
-    //   for (const [vin, lock] of locks.entries()) {
-    //     if (!lock?.data?.lock?.until) continue;
-    //     const fragment = Script.from_asm_string(
-    //       Buffer.from(lockPkh).toString('hex') +
-    //         ' ' +
-    //         Buffer.from(lock.data.lock.until.toString(16).padStart(6, '0'), 'hex').reverse().toString('hex'),
-    //     );
-    //     const script = Script.from_hex(SCRYPT_PREFIX + fragment.to_hex() + LOCK_SUFFIX);
-    //     const preimage = tx.sighash_preimage(SigHash.InputsOutputs, vin, script, BigInt(lock.satoshis));
-    //     const sig = tx.sign(lockPk, SigHash.InputsOutputs, vin, script, BigInt(lock.satoshis));
-    //     const asm = `${sig.to_hex()} ${lockPk.to_public_key().to_hex()} ${Buffer.from(preimage).toString('hex')}`;
-    //     const txin = tx.get_input(vin);
-    //     if (!txin) throw Error('no-txin');
-    //     txin?.set_unlocking_script(Script.from_asm_string(asm));
-    //     tx.set_input(vin, txin);
-    //   }
-    //   const rawTx = tx.to_hex();
-    //   const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
-    //   if (!txid) return { error: 'broadcast-error' };
-    //   return { txid };
-    //   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    // } catch (error: any) {
-    //   console.log(error);
-    //   return { error: error.message ?? 'unknown' };
-    // }
+  unlock = async (locks: Txo[], currentBlockHeight: number) => {
+    try {
+      const keys = await this.keysService.retrieveKeys(undefined, true); // using below limit to bypass password
+      if (!keys.identityWif || !keys.walletAddress) {
+        throw Error('No keys');
+      }
+      const lockPk = PrivateKey.fromWif(keys.identityWif);
+      const lockPkh = Hash.hash160(lockPk.toPublicKey().toHash());
+      // const walletAddress = P2PKHAddress.from_string(keys.walletAddress;
+      const tx = new Transaction();
+      tx.lockTime = currentBlockHeight;
+      for (const lock of locks) {
+        const input = fromUtxo(
+          {
+            txid: lock.txid,
+            vout: lock.vout,
+            satoshis: Number(lock.satoshis),
+            script: Utils.toHex([...lock.script]),
+          },
+          new LockTemplate().unlock(lockPk, 'all', false, Number(lock.satoshis), Script.fromBinary([...lock.script])),
+        );
+        input.sequence = 0;
+        tx.addInput(input);
+      }
+
+      const response = await this.txoStore.broadcast(tx);
+      if (response?.txid) {
+        return { txid: response.txid };
+      }
+
+      return { error: 'broadcast-failed' };
+    } catch (error) {
+      console.error('transferOrdinal failed:', error);
+      return { error: JSON.stringify(error) };
+    }
   };
 }

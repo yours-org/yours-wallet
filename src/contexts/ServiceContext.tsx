@@ -17,8 +17,8 @@ const initializeServices = async () => {
   const wocService = new WhatsOnChainService(chromeStorageService);
   const gorillaPoolService = new GorillaPoolService(chromeStorageService);
   const keysService = new KeysService(gorillaPoolService, wocService, chromeStorageService);
-  const contractService = new ContractService(keysService, gorillaPoolService);
   const txoStore = await txoStorePromise;
+  const contractService = new ContractService(keysService, txoStore);
 
   const bsvService = new BsvService(
     keysService,
