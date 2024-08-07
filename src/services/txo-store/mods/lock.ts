@@ -34,7 +34,14 @@ export class LockIndexer extends Indexer {
     ]);
     const until = parseInt(Buffer.from(dataScript.chunks[1]!.data!).reverse().toString('hex'), 16);
     if (this.owners.has(owner)) {
-      return new IndexData(new Lock(until), [], [{ id: 'until', value: until.toString().padStart(7, '0') }]);
+      return new IndexData(
+        new Lock(until),
+        [],
+        [
+          { id: 'until', value: until.toString().padStart(7, '0') },
+          { id: 'address', value: owner },
+        ],
+      );
     }
   }
 }

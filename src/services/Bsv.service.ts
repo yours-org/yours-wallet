@@ -1,5 +1,5 @@
 import { OrdP2PKH } from 'js-1sat-ord';
-import { NetWork, Ordinal, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
+import { NetWork, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
 import {
   BSV_DECIMAL_CONVERSION,
   FEE_PER_KB,
@@ -31,11 +31,12 @@ import {
   Transaction,
   Utils,
 } from '@bsv/sdk';
+import { Lock } from './txo-store/mods/lock';
 
 export class BsvService {
   private bsvBalance: number;
   private exchangeRate: number;
-  private lockData: LockData;
+  // private lockData: LockData;
   constructor(
     private readonly keysService: KeysService,
     private readonly gorillaPoolService: GorillaPoolService,
@@ -46,12 +47,46 @@ export class BsvService {
   ) {
     this.bsvBalance = 0;
     this.exchangeRate = 0;
-    this.lockData = { totalLocked: 0, unlockable: 0, nextUnlock: 0 };
+    // this.lockData = { totalLocked: 0, unlockable: 0, nextUnlock: 0 };
   }
 
   getBsvBalance = () => this.bsvBalance;
   getExchangeRate = () => this.exchangeRate;
-  getLockData = () => this.lockData;
+  getLockData = async (): Promise<LockData> => {
+    const lockData = {
+      totalLocked: 0,
+      unlockable: 0,
+      nextUnlock: 0,
+    };
+
+    const lockTxos = await this.getLockedTxos();
+    for (const txo of lockTxos) {
+      const height = await this.getCurrentHeight();
+      const lock = txo.data.lock?.data as Lock;
+      if (!lock) continue;
+      lockData.totalLocked += Number(txo.satoshis);
+      if (lock.until <= height) {
+        lockData.unlockable += Number(txo.satoshis);
+      } else if (!lockData.nextUnlock || lock.until < lockData.nextUnlock) {
+        lockData.nextUnlock = lock.until;
+      }
+    }
+    return lockData;
+  };
+
+  getCurrentHeight = async () => {
+    if (!this.txoStore.blocksService) return 0;
+    const header = await this.txoStore.blocksService.getCurrentBlock();
+    return header?.height || 0;
+  };
+
+  getLockedTxos = async () => {
+    const lockTxos = await this.txoStore.searchTxos(
+      new TxoLookup('lock', 'address', this.keysService.identityAddress, false),
+      0,
+    );
+    return lockTxos.txos;
+  };
 
   rate = async () => {
     const r = await this.wocService.getExchangeRate();
@@ -59,35 +94,35 @@ export class BsvService {
   };
 
   unlockLockedCoins = async (balanceOnly = false) => {
-    if (!this.keysService.identityAddress) return;
-    const chainInfo = await this.wocService.getChainInfo();
-    let lockedTxos = await this.gorillaPoolService.getLockedBsvUtxos(this.keysService.identityAddress);
-    const blockHeight = Number(chainInfo?.blocks);
-    const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
-    const spentTxids = await this.gorillaPoolService.getSpentTxids(outpoints);
-    lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
-    if (lockedTxos.length > 0) {
-      const lockTotal = lockedTxos.reduce((a: number, utxo: Ordinal) => a + utxo.satoshis, 0);
-      let unlockableTotal = 0;
-      const theBlocksCoinsUnlock: number[] = [];
-      lockedTxos.forEach((txo) => {
-        const theBlockCoinsUnlock = Number(txo?.data?.lock?.until);
-        theBlocksCoinsUnlock.push(theBlockCoinsUnlock);
-        if (theBlockCoinsUnlock <= blockHeight) {
-          unlockableTotal += txo.satoshis;
-        }
-      });
-      this.lockData = {
-        totalLocked: lockTotal,
-        unlockable: unlockableTotal,
-        nextUnlock: theBlocksCoinsUnlock.sort((a, b) => a - b)[0],
-      };
-      if (balanceOnly) return;
-      const txos = lockedTxos.filter((i) => Number(i.data?.lock?.until) <= blockHeight);
-      if (txos.length > 0) {
-        return await this.contractService.unlock(txos, blockHeight);
-      }
-    }
+    // if (!this.keysService.identityAddress) return;
+    // const chainInfo = await this.wocService.getChainInfo();
+    // let lockedTxos = await this.gorillaPoolService.getLockedBsvUtxos(this.keysService.identityAddress);
+    // const blockHeight = Number(chainInfo?.blocks);
+    // const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
+    // const spentTxids = await this.gorillaPoolService.getSpentTxids(outpoints);
+    // lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
+    // if (lockedTxos.length > 0) {
+    //   const lockTotal = lockedTxos.reduce((a: number, utxo: Ordinal) => a + utxo.satoshis, 0);
+    //   let unlockableTotal = 0;
+    //   const theBlocksCoinsUnlock: number[] = [];
+    //   lockedTxos.forEach((txo) => {
+    //     const theBlockCoinsUnlock = Number(txo?.data?.lock?.until);
+    //     theBlocksCoinsUnlock.push(theBlockCoinsUnlock);
+    //     if (theBlockCoinsUnlock <= blockHeight) {
+    //       unlockableTotal += txo.satoshis;
+    //     }
+    //   });
+    //   this.lockData = {
+    //     totalLocked: lockTotal,
+    //     unlockable: unlockableTotal,
+    //     nextUnlock: theBlocksCoinsUnlock.sort((a, b) => a - b)[0],
+    //   };
+    //   if (balanceOnly) return;
+    //   const txos = lockedTxos.filter((i) => Number(i.data?.lock?.until) <= blockHeight);
+    //   if (txos.length > 0) {
+    //     return await this.contractService.unlock(txos, blockHeight);
+    //   }
+    // }
   };
 
   // TODO: Reimplement SendAll

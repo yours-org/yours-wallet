@@ -34,6 +34,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useWeb3RequestContext } from '../hooks/useWeb3RequestContext';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { TxnIngest } from '../services/txo-store/models/txn';
+import { LockData } from '../services/types/bsv.types';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -123,38 +124,34 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { getBsvBalance, getExchangeRate, getLockData, unlockLockedCoins, updateBsvBalance, sendBsv } = bsvService;
   const [bsvBalance, setBsvBalance] = useState<number>(getBsvBalance());
   const [exchangeRate, setExchangeRate] = useState<number>(getExchangeRate());
-  const [lockData, setLockData] = useState(getLockData());
+  const [lockData, setLockData] = useState<LockData>();
 
   useEffect(() => {
     if (isReload) window.location.reload();
-  });
+  }, [isReload]);
+
+  const loadLocks = async () => {
+    if (!bsvService) return;
+    const lockData = await bsvService.getLockData();
+    setLockData(lockData);
+  };
+
+  useEffect(() => {
+    loadLocks && loadLocks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refreshUtxos = async (showLoad = false) => {
     showLoad && setIsProcessing(true);
     await updateBsvBalance(true);
     setBsvBalance(getBsvBalance());
     setExchangeRate(getExchangeRate());
-    setLockData(getLockData());
+    loadLocks && loadLocks();
 
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (account) {
       const { bsvAddress, ordAddress, identityAddress } = account.addresses;
-      // let resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/history?limit=10000`);
-      // let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
-      // await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
-      // let resp = await fetch(
-      //   `https://ordinals.gorillapool.io/api/locks/address/${identityAddress}/unspent?limit=10000`,
-      // );
-      // let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
-      // await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
-
-      let resp = await fetch(
-        `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
-      );
-      let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
-      await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
-
-      // resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
+      // let resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
       // const balance = (await resp.json()) as { id?: string }[];
       // let counter = 50000000;
       // for await (const token of balance) {
@@ -169,24 +166,33 @@ export const BsvWallet = (props: BsvWalletProps) => {
       //   }
       // }
 
-      resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=10`);
-      txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
-      for (const txo of txos) {
-        if (txo.origin) {
-          resp = await fetch(
-            `https://ordinals.gorillapool.io/api/inscriptions/${txo.origin.outpoint}/history?limit=10000`,
-          );
-          txos = await resp.json();
-          await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height, t.idx)));
-        } else {
-          await txoStore.queue([new TxnIngest(txo.txid, txo.height, txo.idx)]);
-        }
-      }
-      // resp = await fetch(`https://ordinals.gorillapool.io/api/locks/address/${identityAddress}/unspent?limit=10000`);
-      // txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      // let resp = await fetch(
+      //   `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
+      // );
+      // let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
       // await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
 
-      await txoStore.syncSpends();
+      // resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=10000`);
+      // txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      // for (const txo of txos) {
+      //   if (txo.origin) {
+      //     resp = await fetch(
+      //       `https://ordinals.gorillapool.io/api/inscriptions/${txo.origin.outpoint}/history?limit=10000`,
+      //     );
+      //     txos = await resp.json();
+      //     await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height, t.idx)));
+      //   } else {
+      //     await txoStore.queue([new TxnIngest(txo.txid, txo.height, txo.idx)]);
+      //   }
+      // }
+
+      const resp = await fetch(
+        `https://ordinals.gorillapool.io/api/locks/address/${identityAddress}/unspent?limit=10000`,
+      );
+      const txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
+
+      // await txoStore.syncSpends();
       console.log('done importing');
     }
     showLoad && setIsProcessing(false);
@@ -389,17 +395,19 @@ export const BsvWallet = (props: BsvWalletProps) => {
           <Button theme={theme} type="primary" label="Send" onClick={() => setPageState('send')} />
         </ButtonContainer>
         <AssetRow balance={bsvBalance} icon={bsvCoin} ticker="BSV" usdBalance={bsvBalance * exchangeRate} />
-        <Show when={lockData.totalLocked > 0}>
-          <AssetRow
-            ticker="Total Locked"
-            balance={lockData.totalLocked / BSV_DECIMAL_CONVERSION}
-            usdBalance={Number((lockData.unlockable / BSV_DECIMAL_CONVERSION).toFixed(3))}
-            icon={lockIcon}
-            isLock
-            nextUnlock={lockData?.nextUnlock}
-            onClick={() => handleSelect('apps', 'pending-locks')}
-          />
-        </Show>
+        {lockData && (
+          <Show when={lockData.totalLocked > 0}>
+            <AssetRow
+              ticker="Total Locked"
+              balance={lockData.totalLocked / BSV_DECIMAL_CONVERSION}
+              usdBalance={Number((lockData.unlockable / BSV_DECIMAL_CONVERSION).toFixed(3))}
+              icon={lockIcon}
+              isLock
+              nextUnlock={lockData?.nextUnlock}
+              onClick={() => handleSelect('apps', 'pending-locks')}
+            />
+          </Show>
+        )}
       </MiddleContainer>
     </MainContent>
   );

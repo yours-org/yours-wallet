@@ -42,6 +42,6 @@ export class OrdLockIndexer extends Indexer {
     listing.payout = Buffer.from(dataScript.chunks[1]!.data!);
     listing.price = new DataView(Buffer.from(dataScript.chunks[1]!.data!).buffer).getBigInt64(0, true);
     txo.owner = dataScript.chunks[0]?.data && Utils.toBase58Check(Array.from(dataScript.chunks[0]!.data!));
-    return new IndexData(listing);
+    return new IndexData(listing, undefined, [{ id: 'price', value: listing.price.toString(16).padStart(16, '0') }]);
   }
 }

@@ -1,3 +1,4 @@
+/* eslint-disable no-case-declarations */
 import type { IndexContext } from '../models/index-context';
 import { IndexData } from '../models/index-data';
 import { Indexer } from '../models/indexer';
@@ -18,6 +19,7 @@ export class Bsv21 {
   public dec = 0;
   public sym?: string;
   public icon?: string;
+  public supply?: bigint;
   public contract?: string;
   public reason?: string;
 
@@ -54,6 +56,7 @@ export class Bsv21Indexer extends Indexer {
       case 'deploy+mint':
         if (bsv21.dec > 18) return;
         bsv21.id = `${txo.txid}_${txo.vout}`;
+        bsv21.supply = bsv21.amt;
         bsv21.status = Bsv21Status.Valid;
         break;
       case 'transfer':
@@ -65,9 +68,12 @@ export class Bsv21Indexer extends Indexer {
     if (!bsv21.id) {
       return;
     }
-    data.events.push({ id: 'id', value: bsv21.id });
-    if (bsv21.contract) {
-      data.events.push({ id: 'contract', value: bsv21.contract });
+    if (txo.owner && this.owners.has(txo.owner)) {
+      data.events.push({ id: 'address', value: txo.owner });
+      data.events.push({ id: 'id', value: bsv21.id });
+      if (bsv21.contract) {
+        data.events.push({ id: 'contract', value: bsv21.contract });
+      }
     }
 
     return data;
@@ -105,6 +111,7 @@ export class Bsv21Indexer extends Indexer {
         bsv21.data.sym = token.sym;
         bsv21.data.icon = token.icon;
         bsv21.data.contract = token.contract;
+        bsv21.data.supply = token.supply;
       }
 
       if (!tokensOut[bsv21.data.id]) {

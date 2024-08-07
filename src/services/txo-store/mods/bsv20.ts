@@ -8,8 +8,9 @@ export class Bsv20 {
   public tick = '';
   public op = '';
   public amt = 0n;
-  public dec?: number;
+  public dec = 0;
   public reason?: string;
+  public fundAddress = '';
 
   toJSON() {
     return {

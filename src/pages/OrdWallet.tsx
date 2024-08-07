@@ -5,7 +5,7 @@ import { BackButton } from '../components/BackButton';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Ordinal } from '../components/Ordinal';
-import { Ordinal as OrdType } from 'yours-wallet-provider';
+import { BSV20Txo, Ordinal as OrdType } from 'yours-wallet-provider';
 import { PageLoader } from '../components/PageLoader';
 import { QrCode } from '../components/QrCode';
 import {
@@ -165,12 +165,13 @@ export const OrdWallet = () => {
   const [tokenSendAmount, setTokenSendAmount] = useState<bigint | null>(null);
   const [priceData, setPriceData] = useState<{ id: string; satPrice: number }[]>([]);
   const [ordinals, setOrdinals] = useState<OrdType[]>([]);
-  const bsv20s = getBsv20s();
+  const [bsv20s, setBsv20s] = useState<Bsv20[]>([]);
+  // const bsv20s = getBsv20s();
 
   useEffect(() => {
-    if (!bsv20s.data.length) return;
+    if (!bsv20s.length) return;
     (async () => {
-      const data = await gorillaPoolService.getTokenPriceInSats(bsv20s.data.map((d) => (d as Bsv21)?.id || ''));
+      const data = await gorillaPoolService.getTokenPriceInSats(bsv20s.map((d) => (d as Bsv21)?.id || ''));
       setPriceData(data);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,6 +190,12 @@ export const OrdWallet = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message]);
 
+  const loadBsv20s = async () => {
+    if (!ordinalService) return;
+    const bsv20s = await ordinalService.getBsv20s();
+    setBsv20s(bsv20s);
+  };
+
   const loadOrdinals = async () => {
     if (!ordinalService) return;
     const ordinals = await ordinalService.getOrdinals();
@@ -197,6 +204,7 @@ export const OrdWallet = () => {
 
   useEffect(() => {
     loadOrdinals();
+    loadBsv20s();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -421,7 +429,7 @@ export const OrdWallet = () => {
   const ft = (
     <>
       <Show
-        when={bsv20s.initialized && bsv20s.data.length > 0}
+        when={bsv20s.length > 0}
         whenFalseContent={
           <NoInscriptionWrapper>
             <Text
@@ -443,7 +451,7 @@ export const OrdWallet = () => {
             </SubHeaderText>
           </BSV20Header>
           <div style={{ width: '100%' }}>
-            {bsv20s.data
+            {bsv20s
               .filter((d) => d.all.confirmed > 0n)
               .map((b) => {
                 return (
@@ -473,14 +481,14 @@ export const OrdWallet = () => {
               })}
           </div>
 
-          <Show when={bsv20s.data.filter((d) => d.all.pending > 0n).length > 0}>
+          <Show when={bsv20s.filter((d) => d.all.pending > 0n).length > 0}>
             <BSV20Header style={{ marginTop: '2rem' }}>
               <SubHeaderText style={{ marginLeft: '1rem', color: theme.gray }} theme={theme}>
                 Pending
               </SubHeaderText>
             </BSV20Header>
             <div style={{ width: '100%' }}>
-              {bsv20s.data
+              {bsv20s
                 .filter((d) => d.all.pending > 0n)
                 .map((b) => {
                   return (

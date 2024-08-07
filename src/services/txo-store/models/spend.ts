@@ -4,7 +4,7 @@ export class Spend {
   constructor(
     public txid: string,
     public vin: number,
-    public block?: Block,
+    public block = new Block(),
   ) {}
 
   toJSON() {

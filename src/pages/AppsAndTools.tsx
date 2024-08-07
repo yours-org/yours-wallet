@@ -22,6 +22,7 @@ import { truncate } from '../utils/format';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { Ordinal } from 'yours-wallet-provider';
+import { Txo } from '../services/txo-store/models/txo';
 
 const Content = styled.div`
   display: flex;
@@ -127,7 +128,7 @@ type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unloc
 export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { setSelected, query } = useBottomMenu();
-  const { keysService, gorillaPoolService, wocService } = useServiceContext();
+  const { keysService, gorillaPoolService, wocService, bsvService } = useServiceContext();
   // const { exchangeRate, identityAddress } = useBsv();
   const { identityAddress } = keysService;
   const { getLockedBsvUtxos, getSpentTxids } = gorillaPoolService;
@@ -138,20 +139,13 @@ export const AppsAndTools = () => {
   // const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   // const [satAmount, setSatAmount] = useState(0);
   // const [didSubmit, setDidSubmit] = useState(false);
-  const [lockedUtxos, setLockedUtxos] = useState<Ordinal[]>([]);
+  const [lockedUtxos, setLockedUtxos] = useState<Txo[]>([]);
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
 
   const getLockData = async () => {
     setIsProcessing(true);
-    if (!identityAddress) throw Error('Identity address missing!');
-    const chainInfo = await getChainInfo();
-    let lockedTxos = await getLockedBsvUtxos(identityAddress);
-    const blockHeight = Number(chainInfo?.blocks);
-    if (blockHeight) setCurrentBlockHeight(blockHeight);
-    const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
-    const spentTxids = await getSpentTxids(outpoints);
-    lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
-    if (lockedTxos.length > 0) setLockedUtxos(lockedTxos);
+    setCurrentBlockHeight(await bsvService.getCurrentHeight());
+    setLockedUtxos(await bsvService.getLockedTxos());
     setIsProcessing(false);
   };
 
@@ -228,9 +222,9 @@ export const AppsAndTools = () => {
       </HeaderText>
       {headerLockDetailsRow}
       {lockedUtxos
-        .sort((a, b) => Number(a.data?.lock?.until) - Number(b.data?.lock?.until))
+        .sort((a, b) => Number(a.data.lock?.data.until) - Number(b.data.lock?.data.until))
         .map((u) => {
-          const blocksRemaining = Number(u.data?.lock?.until) - currentBlockHeight;
+          const blocksRemaining = Number(u.data.lock?.data.until) - currentBlockHeight;
           return (
             <LockDetailsContainer key={u.txid}>
               <LockDetailsText style={{ textAlign: 'left' }} theme={theme}>
@@ -241,8 +235,8 @@ export const AppsAndTools = () => {
               </LockDetailsText>
               <LockDetailsText style={{ textAlign: 'right' }} theme={theme}>
                 {u.satoshis < 1000
-                  ? `${u.satoshis} ${u.satoshis > 1 ? 'sats' : 'sat'}`
-                  : `${u.satoshis / BSV_DECIMAL_CONVERSION} BSV`}
+                  ? `${u.satoshis} ${u.satoshis > 1n ? 'sats' : 'sat'}`
+                  : `${Number(u.satoshis) / BSV_DECIMAL_CONVERSION} BSV`}
               </LockDetailsText>
             </LockDetailsContainer>
           );

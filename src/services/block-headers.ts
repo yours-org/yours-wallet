@@ -90,4 +90,10 @@ export class BlockHeaderService implements ChainTracker {
     const db = await this.db;
     return (await db.getFromIndex('headers', 'byHash', hash))?.height;
   }
+
+  async getCurrentBlock(): Promise<BlockHeader | undefined> {
+    const db = await this.db;
+    const cursor = await db.transaction('headers').store.openCursor(null, 'prev');
+    return cursor?.value;
+  }
 }

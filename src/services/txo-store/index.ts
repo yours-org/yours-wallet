@@ -96,20 +96,16 @@ export class TxoStore {
     const start = from || dbkey;
     const query: IDBKeyRange = IDBKeyRange.bound(start, dbkey + '\uffff', true, false);
     const results: TxoResults = { txos: [] };
-    console.time('findTxos');
     for await (const cursor of db.transaction('txos').store.index('events').iterate(query)) {
       const txo = Txo.fromObject(cursor.value, this.indexers);
       results.nextPage = cursor.key;
       if (lookup.owner && txo.owner != lookup.owner) continue;
       results.txos.push(txo);
-      console.timeLog('findTxos', txo.txid, txo.vout);
       if (limit > 0 && results.txos.length >= limit) {
-        console.timeEnd('findTxos');
         return results;
       }
     }
     delete results.nextPage;
-    console.timeEnd('findTxos');
     return results;
   }
 
@@ -226,7 +222,6 @@ export class TxoStore {
     await db.put('txns', txn);
 
     const t = db.transaction('txos', 'readwrite');
-    const sort = (block?.height || Date.now()).toString(16).padStart(8, '0');
     for await (const [vin, input] of tx.inputs.entries()) {
       const data = await t.store.get([input.sourceTXID!, input.sourceOutputIndex]);
       const spend = data
@@ -239,12 +234,6 @@ export class TxoStore {
           );
 
       spend.setSpend(new Spend(txid, vin, block));
-      spend.events = [];
-      for (const [tag, data] of Object.entries(spend.data)) {
-        for (const e of data.events) {
-          spend.events.push(`${tag}:${e.id}:${e.value}:1:${sort}:${block?.idx}:${spend.vout}:${spend.satoshis}`);
-        }
-      }
       t.store.put(spend);
       ctx.spends.push(spend);
     }
@@ -319,6 +308,7 @@ export class TxoStore {
         txn.status = TxnStatus.CONFIRMED;
         await db.put('ingestQueue', txn);
       }
+      // await this.syncSpends();
     } else {
       await new Promise((r) => setTimeout(r, 1000));
     }

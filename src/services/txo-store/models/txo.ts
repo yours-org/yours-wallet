@@ -22,6 +22,13 @@ export class Txo {
   setSpend(spend: Spend) {
     this.spend = spend;
     this.spent = spend ? '1' : '0';
+    this.events = [];
+    const sort = spend.block.height.toString(16).padStart(8, '0');
+    for (const [tag, data] of Object.entries(this.data)) {
+      for (const e of data.events) {
+        this.events.push(`${tag}:${e.id}:${e.value}:1:${sort}:${spend.block?.idx}:${this.vout}:${this.satoshis}`);
+      }
+    }
   }
 
   static fromObject(obj: any, indexers: Indexer[] = []): Txo {
