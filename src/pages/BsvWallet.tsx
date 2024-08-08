@@ -166,11 +166,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
       //   }
       // }
 
-      // let resp = await fetch(
-      //   `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
-      // );
-      // let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
-      // await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
+      let resp = await fetch(
+        `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
+      );
+      let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
 
       // resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=10000`);
       // txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
@@ -186,13 +186,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
       //   }
       // }
 
-      const resp = await fetch(
-        `https://ordinals.gorillapool.io/api/locks/address/${identityAddress}/unspent?limit=10000`,
-      );
-      const txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      resp = await fetch(`https://ordinals.gorillapool.io/api/locks/address/${identityAddress}/unspent?limit=10000`);
+      txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
       await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
 
-      // await txoStore.syncSpends();
+      await txoStore.syncSpends();
       console.log('done importing');
     }
     showLoad && setIsProcessing(false);

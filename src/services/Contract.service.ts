@@ -119,8 +119,6 @@ export class ContractService {
         throw Error('No keys');
       }
       const lockPk = PrivateKey.fromWif(keys.identityWif);
-      const lockPkh = Hash.hash160(lockPk.toPublicKey().toHash());
-      // const walletAddress = P2PKHAddress.from_string(keys.walletAddress;
       const tx = new Transaction();
       tx.lockTime = currentBlockHeight;
       for (const lock of locks) {
