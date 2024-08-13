@@ -36,7 +36,7 @@ export class OrdinalService {
 
   getOrdinals = async (): Promise<Ordinal[]> => {
     const ordinals = await this.txoStore.searchTxos(
-      new TxoLookup('ord', 'address', this.keysService.ordAddress, false),
+      new TxoLookup('ord', false, 'address', this.keysService.ordAddress),
       0,
     );
     return ordinals.txos.map(mapOrdinal);
@@ -51,7 +51,7 @@ export class OrdinalService {
 
   getBsv20s = async (): Promise<Bsv20[]> => {
     const bsv20s = await this.txoStore.searchTxos(
-      new TxoLookup('bsv21', 'address', this.keysService.ordAddress, false),
+      new TxoLookup('bsv21', false, 'address', this.keysService.ordAddress),
       0,
     );
 
@@ -150,7 +150,7 @@ export class OrdinalService {
       const ordPk = PrivateKey.fromWif(keys.ordWif);
       const fundingUtxos = await this.bsvService.fundingTxos();
 
-      const bsv21Utxos = await this.txoStore.searchTxos(new TxoLookup('bsv21', 'id', id, false), 0);
+      const bsv21Utxos = await this.txoStore.searchTxos(new TxoLookup('bsv21', false, 'id', id), 0);
       const tokenUtxos: TokenUtxo[] = [];
       let tokensIn = 0n;
       let bsv21: Bsv21Type | undefined;
@@ -215,7 +215,7 @@ export class OrdinalService {
       const ordPk = PrivateKey.fromWif(keys.ordWif);
 
       const fundResults = await this.txoStore.searchTxos(
-        new TxoLookup('fund', 'address', this.keysService.bsvAddress, false),
+        new TxoLookup('fund', false, 'address', this.keysService.bsvAddress),
         0,
       );
 
@@ -270,7 +270,7 @@ export class OrdinalService {
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
       const fundResults = await this.txoStore.searchTxos(
-        new TxoLookup('fund', 'address', this.keysService.bsvAddress, false),
+        new TxoLookup('fund', false, 'address', this.keysService.bsvAddress),
         0,
       );
 
@@ -327,7 +327,7 @@ export class OrdinalService {
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
       const fundResults = await this.txoStore.searchTxos(
-        new TxoLookup('fund', 'address', this.keysService.bsvAddress, false),
+        new TxoLookup('fund', false, 'address', this.keysService.bsvAddress),
         0,
       );
 

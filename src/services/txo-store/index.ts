@@ -266,11 +266,11 @@ export class TxoStore {
     this.indexers.forEach((i) => i.save && i.save(ctx));
     for (const txo of ctx.txos) {
       txo.events = [];
-      const sort = (txo.spend?.block?.height || txo.block?.height || Date.now()).toString(16).padStart(8, '0');
       const spent = txo.spend ? '1' : '0';
+      const sort = (txo.spend?.block?.height || txo.block?.height || Date.now()).toString(16).padStart(8, '0');
       for (const [tag, data] of Object.entries(txo.data)) {
         for (const e of data.events) {
-          txo.events.push(`${tag}:${e.id}:${e.value}:${spent}:${sort}:${txo.block?.idx}:${txo.vout}:${txo.satoshis}`);
+          txo.events.push(`${spent}:${tag}:${e.id}:${e.value}:${sort}:${txo.block?.idx}:${txo.vout}:${txo.satoshis}`);
         }
       }
       t.store.put(txo);

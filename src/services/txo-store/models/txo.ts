@@ -70,25 +70,22 @@ export class Txo {
 export class TxoLookup {
   constructor(
     public indexer: string,
+    public spent = false,
     public id?: string,
     public value?: string,
-    public spent?: boolean,
     public owner?: string,
   ) {}
 
   toQueryKey(): string {
-    return TxoLookup.buildQueryKey(this.indexer, this.id, this.value, this.spent);
+    return TxoLookup.buildQueryKey(this.indexer, this.spent, this.id, this.value);
   }
 
-  static buildQueryKey(tag: string, id?: string, value?: string, spent?: boolean): string {
-    let key = `${tag}`;
+  static buildQueryKey(tag: string, spent = false, id?: string, value?: string): string {
+    let key = `${spent ? '1' : '0'}:${tag}`;
     if (id) {
       key += `:${id}`;
       if (value) {
         key += `:${value}`;
-        if (spent !== undefined) {
-          key += `:${spent ? '1' : '0'}`;
-        }
       }
     }
     return key;

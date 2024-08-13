@@ -122,7 +122,7 @@ async function search() {
   const id = (document.getElementById('id') as HTMLInputElement).value;
   const value = (document.getElementById('value') as HTMLInputElement).value;
   const spent = (document.getElementById('unspent') as HTMLInputElement).checked ? false : undefined;
-  const results = await store.searchTxos(new TxoLookup(indexer, id, value, spent));
+  const results = await store.searchTxos(new TxoLookup(indexer, spent, id, value));
 
   (document.getElementById('inventory') as HTMLDivElement).innerHTML = JSON.stringify(results.txos, null, 2);
 }

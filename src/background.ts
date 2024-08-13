@@ -429,7 +429,7 @@ if (self?.document === undefined) {
         const storageObj = chromeStorageService.getCurrentAccountObject();
         const bsvAddress = storageObj.account?.addresses?.ordAddress;
         const txoStore = await txoStorePromise;
-        const results = await txoStore.searchTxos(new TxoLookup('ord', 'address', bsvAddress, false), 5);
+        const results = await txoStore.searchTxos(new TxoLookup('ord', false, 'address', bsvAddress), 100);
         console.log('results', results);
 
         sendResponse({
@@ -491,7 +491,7 @@ if (self?.document === undefined) {
         const storageObj = chromeStorageService.getCurrentAccountObject();
         const bsvAddress = storageObj.account?.addresses?.bsvAddress;
         const txoStore = await txoStorePromise;
-        const results = await txoStore.searchTxos(new TxoLookup('fund', 'address', bsvAddress, false), 0);
+        const results = await txoStore.searchTxos(new TxoLookup('fund', false, 'address', bsvAddress), 0);
         const utxos = results.txos.map((txo) => {
           return {
             satoshis: Number(txo.satoshis),
