@@ -298,13 +298,17 @@ export class TxoStore {
     const txns = await db.getAllFromIndex('ingestQueue', 'status', query, 100);
     if (txns.length) {
       console.log('Ingesting', txns.length, 'txs');
+      const outpoints: string[] = [];
       for (const txn of txns) {
         const tx = await this.getTx(txn.txid, true);
         if (!tx) {
           console.error('Failed to get tx', txn.txid);
           continue;
         }
-        await this.ingest(tx, true);
+        const idxData = await this.ingest(tx, true);
+        for (const txo of idxData.txos) {
+          outpoints.push(`${txo.txid}_${txo.vout}`);
+        }
         txn.status = TxnStatus.CONFIRMED;
         await db.put('ingestQueue', txn);
       }

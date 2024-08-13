@@ -151,6 +151,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (account) {
       const { bsvAddress, ordAddress, identityAddress } = account.addresses;
+      /*
+       * Ordinals
+       */
+
       // let resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
       // const balance = (await resp.json()) as { id?: string }[];
       // let counter = 50000000;
@@ -166,12 +170,18 @@ export const BsvWallet = (props: BsvWalletProps) => {
       //   }
       // }
 
+      /*
+       * BSV
+       */
       let resp = await fetch(
         `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
       );
       let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
       await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
 
+      /*
+       * BSV21
+       */
       // resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=10000`);
       // txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
       // for (const txo of txos) {
@@ -186,6 +196,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
       //   }
       // }
 
+      /*
+       * Locks
+       */
       resp = await fetch(`https://ordinals.gorillapool.io/api/locks/address/${identityAddress}/unspent?limit=10000`);
       txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
       await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
