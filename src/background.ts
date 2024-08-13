@@ -1122,27 +1122,9 @@ if (self?.document === undefined) {
     if (account) {
       const { bsvAddress, ordAddress, identityAddress } = account.addresses;
       /*
-       * BSV21
-       */
-      let resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
-      const balance = (await resp.json()) as { id?: string }[];
-      let counter = 50000000;
-      for await (const token of balance) {
-        if (!token.id) continue;
-        console.log('importing', token.id);
-        try {
-          resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
-          const txids = (await resp.json()) as string[];
-          await txoStore.queue(txids.map((txid) => new TxnIngest(txid, counter++, 0)));
-        } catch (e) {
-          console.error(e);
-        }
-      }
-
-      /*
        * BSV
        */
-      resp = await fetch(
+      let resp = await fetch(
         `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
       );
       let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
@@ -1172,7 +1154,23 @@ if (self?.document === undefined) {
       txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
       await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
 
-      await txoStore.syncSpends();
+      /*
+       * BSV21
+       */
+      resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
+      const balance = (await resp.json()) as { id?: string }[];
+      let counter = 50000000;
+      for await (const token of balance) {
+        if (!token.id) continue;
+        console.log('importing', token.id);
+        try {
+          resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
+          const txids = (await resp.json()) as string[];
+          await txoStore.queue(txids.map((txid) => new TxnIngest(txid, counter++, 0)));
+        } catch (e) {
+          console.error(e);
+        }
+      }
       console.log('done importing');
     }
   };

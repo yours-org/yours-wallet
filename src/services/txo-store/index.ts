@@ -158,7 +158,7 @@ export class TxoStore {
     return resp;
   }
 
-  async ingest(tx: Transaction, fromRemote = false): Promise<IndexContext> {
+  async ingest(tx: Transaction, fromRemote = false, checkSpends = false): Promise<IndexContext> {
     const txid = tx.id('hex') as string;
     console.log('Ingesting', txid);
     const block = {
@@ -279,6 +279,9 @@ export class TxoStore {
     await t.done;
     txn.status = block.height < 50000000 ? TxnStatus.CONFIRMED : TxnStatus.BROADCASTED;
     await db.put('txns', txn);
+    if (checkSpends) {
+      this.updateSpends(ctx.txos.map((txo) => `${txo.txid}_${txo.vout}`));
+    }
     return ctx;
   }
 
@@ -316,7 +319,7 @@ export class TxoStore {
           console.error('Failed to get tx', txn.txid);
           continue;
         }
-        const idxData = await this.ingest(tx, true);
+        const idxData = await this.ingest(tx, true, true);
         for (const txo of idxData.txos) {
           outpoints.push(`${txo.txid}_${txo.vout}`);
         }
@@ -326,7 +329,6 @@ export class TxoStore {
           this.notifyQueueStats({ length: await this.getQueueLength() });
         }
       }
-      // await this.syncSpends();
     } else {
       await new Promise((r) => setTimeout(r, 1000));
     }
