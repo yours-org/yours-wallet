@@ -30,7 +30,7 @@ import {
 } from './inject';
 import { EncryptResponse } from './pages/requests/EncryptRequest';
 import { DecryptResponse } from './pages/requests/DecryptRequest';
-import { removeWindow } from './utils/chromeHelpers';
+import { removeWindow, sendMessage } from './utils/chromeHelpers';
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
@@ -47,6 +47,7 @@ import { LockIndexer } from './services/txo-store/mods/lock';
 import { mapOrdinal } from './utils/providerHelper';
 import { OrdLockIndexer } from './services/txo-store/mods/ordlock';
 import { TxnIngest } from './services/txo-store/models/txn';
+import { QueueTrackerMessage } from './hooks/useQueueTracker';
 const chromeStorageService = new ChromeStorageService();
 
 export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() => {
@@ -68,7 +69,8 @@ export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() =
     blockHeaderService,
     network,
     (queueStats: { length: number }) => {
-      console.log('TODO: Implement queue stats', queueStats);
+      const message: QueueTrackerMessage = { action: YoursEventName.QUEUE_STATUS_UPDATE, data: queueStats };
+      sendMessage(message);
     },
   );
   return txoStore;
@@ -133,7 +135,11 @@ if (self?.document === undefined) {
     return whitelist.map((i: WhitelistedApp) => i.domain).includes(requestingDomain);
   };
 
-  const authorizeRequest = async (message: { params: { domain: string } }): Promise<boolean> => {
+  const authorizeRequest = async (message: {
+    action: YoursEventName;
+    params: { domain: string };
+  }): Promise<boolean> => {
+    if (message.action === YoursEventName.QUEUE_STATUS_UPDATE) return true;
     const { params } = message;
     return await verifyAccess(params.domain);
   };

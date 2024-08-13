@@ -61,7 +61,8 @@ export enum YoursEventName {
   GENERATE_TAGGED_KEYS_RESPONSE = 'generateTaggedKeysResponse',
   ENCRYPT_RESPONSE = 'encryptResponse',
   DECRYPT_RESPONSE = 'decryptResponse',
-  SYNC_UTXOS = 'syncUtxos',
+  SYNC_UTXOS = 'syncUtxos', // This is not exposed on the provider
+  QUEUE_STATUS_UPDATE = 'queueStatusUpdate', // This is not exposed on the provider
 }
 
 export enum CustomListenerName {
@@ -176,7 +177,7 @@ const createYoursEventEmitter = () => {
   const eventListeners = new Map<string, YoursEventListeners[]>(); // Object to store event listeners
   //TODO: networkChanged event will no longer be used and should be replaced with accountChanged
   // TODO: ensure these on events are still firing when they should
-  const whitelistedEvents: YoursEvents[] = ['signedOut', 'networkChanged']; // Whitelisted event names
+  const whitelistedEvents: YoursEvents[] = [YoursEventName.SIGNED_OUT, YoursEventName.NETWORK_CHANGED]; // Whitelisted event names
 
   const on = (eventName: YoursEvents, callback: YoursEventListeners) => {
     // Check if the provided event name is in the whitelist
