@@ -150,10 +150,12 @@ export class TxoStore {
     await t.done;
   }
 
-  async broadcast(tx: Transaction) {
+  async broadcast(tx: Transaction, dependencyTxids: string[] = []) {
     const resp = await this.txService.broadcast(tx);
     if (resp.status === 'success') {
-      await this.ingest(tx);
+      const ingests = dependencyTxids.map((txid) => new TxnIngest(txid, Date.now(), 0));
+      ingests.push(new TxnIngest(tx.id('hex') as string, Date.now(), 0));
+      await this.queue(ingests);
     }
     return resp;
   }
