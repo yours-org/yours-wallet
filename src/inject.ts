@@ -61,6 +61,7 @@ export enum YoursEventName {
   GENERATE_TAGGED_KEYS_RESPONSE = 'generateTaggedKeysResponse',
   ENCRYPT_RESPONSE = 'encryptResponse',
   DECRYPT_RESPONSE = 'decryptResponse',
+  SYNC_UTXOS = 'syncUtxos',
 }
 
 export enum CustomListenerName {

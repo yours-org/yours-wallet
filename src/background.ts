@@ -46,6 +46,7 @@ import { TxoLookup } from './services/txo-store/models/txo';
 import { LockIndexer } from './services/txo-store/mods/lock';
 import { mapOrdinal } from './utils/providerHelper';
 import { OrdLockIndexer } from './services/txo-store/mods/ordlock';
+import { TxnIngest } from './services/txo-store/models/txn';
 const chromeStorageService = new ChromeStorageService();
 
 export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() => {
@@ -60,13 +61,15 @@ export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() =
   ];
   const network = chromeStorageService.getNetwork();
   const blockHeaderService = new BlockHeaderService(network);
-  return new TxoStore(
+  const txoStore = new TxoStore(
     selectedAccount || '',
     indexers,
     new OneSatTransactionService(GP_BASE_URL),
     blockHeaderService,
     network,
+    (queueStats: { length: number }) => {},
   );
+  return txoStore;
 });
 
 console.log('Yours Wallet Background Script Running!');
@@ -151,6 +154,7 @@ if (self?.document === undefined) {
       YoursEventName.GENERATE_TAGGED_KEYS_RESPONSE,
       YoursEventName.ENCRYPT_RESPONSE,
       YoursEventName.DECRYPT_RESPONSE,
+      YoursEventName.SYNC_UTXOS,
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -177,6 +181,8 @@ if (self?.document === undefined) {
           return processEncryptResponse(message as EncryptResponse);
         case YoursEventName.DECRYPT_RESPONSE:
           return processDecryptResponse(message as DecryptResponse);
+        case YoursEventName.SYNC_UTXOS:
+          return processSyncUtxos();
         default:
           break;
       }
@@ -1106,6 +1112,67 @@ if (self?.document === undefined) {
     }
 
     return true;
+  };
+
+  const processSyncUtxos = async () => {
+    const txoStore = await txoStorePromise;
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (account) {
+      const { bsvAddress, ordAddress, identityAddress } = account.addresses;
+      /*
+       * BSV21
+       */
+      let resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
+      const balance = (await resp.json()) as { id?: string }[];
+      let counter = 50000000;
+      for await (const token of balance) {
+        if (!token.id) continue;
+        console.log('importing', token.id);
+        try {
+          resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
+          const txids = (await resp.json()) as string[];
+          await txoStore.queue(txids.map((txid) => new TxnIngest(txid, counter++, 0)));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      /*
+       * BSV
+       */
+      resp = await fetch(
+        `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
+      );
+      let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
+
+      /*
+       * Ordinals
+       */
+      resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=10000`);
+      txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      for (const txo of txos) {
+        if (txo.origin) {
+          resp = await fetch(
+            `https://ordinals.gorillapool.io/api/inscriptions/${txo.origin.outpoint}/history?limit=10000`,
+          );
+          txos = await resp.json();
+          await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height, t.idx)));
+        } else {
+          await txoStore.queue([new TxnIngest(txo.txid, txo.height, txo.idx)]);
+        }
+      }
+
+      /*
+       * Locks
+       */
+      resp = await fetch(`https://ordinals.gorillapool.io/api/locks/address/${identityAddress}/unspent?limit=10000`);
+      txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
+
+      await txoStore.syncSpends();
+      console.log('done importing');
+    }
   };
 
   // HANDLE WINDOW CLOSE *****************************************

@@ -48,6 +48,7 @@ export class TxoStore {
     public txService: TransactionService,
     public blocksService?: BlockHeaderService,
     public network: NetWork = NetWork.Mainnet,
+    public notifyQueueStats?: (queueStats: { length: number }) => void,
   ) {
     // if (accountId) throw new Error('empty-account-id');
     this.db = openDB<TxoSchema>(`txostore-${accountId}-${network}`, VERSION, {
@@ -281,6 +282,12 @@ export class TxoStore {
     return ctx;
   }
 
+  async getQueueLength() {
+    const db = await this.db;
+    const query: IDBKeyRange = IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Date.now()]);
+    return db.countFromIndex('ingestQueue', 'status', query);
+  }
+
   async queue(ingests: TxnIngest[]) {
     const db = await this.db;
     const t = db.transaction('ingestQueue', 'readwrite');
@@ -290,6 +297,10 @@ export class TxoStore {
       await t.store.put(ingest);
     }
     await t.done;
+
+    if (this.notifyQueueStats) {
+      this.notifyQueueStats({ length: await this.getQueueLength() });
+    }
   }
 
   async ingestQueue() {
@@ -311,6 +322,9 @@ export class TxoStore {
         }
         txn.status = TxnStatus.CONFIRMED;
         await db.put('ingestQueue', txn);
+        if (this.notifyQueueStats) {
+          this.notifyQueueStats({ length: await this.getQueueLength() });
+        }
       }
       // await this.syncSpends();
     } else {
