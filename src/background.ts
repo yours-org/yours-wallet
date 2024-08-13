@@ -67,7 +67,9 @@ export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() =
     new OneSatTransactionService(GP_BASE_URL),
     blockHeaderService,
     network,
-    (queueStats: { length: number }) => {},
+    (queueStats: { length: number }) => {
+      console.log('TODO: Implement queue stats', queueStats);
+    },
   );
   return txoStore;
 });
