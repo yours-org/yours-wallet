@@ -7,15 +7,16 @@ type QueueContextType = {
   showQueueBanner: boolean;
   updateBalance: boolean;
   theme: Theme;
+  isSyncing: boolean;
 };
 
 export const QueueContext = createContext<QueueContextType | null>(null);
 
-export const QueueProvider = ({ children }: { children: ReactNode; onUpdateBalance?: () => void }) => {
-  const { queueLength, showQueueBanner, theme, updateBalance } = useQueueTracker();
+export const QueueProvider = ({ children }: { children: ReactNode }) => {
+  const { queueLength, showQueueBanner, theme, updateBalance, isSyncing } = useQueueTracker();
 
   return (
-    <QueueContext.Provider value={{ queueLength, showQueueBanner, theme, updateBalance }}>
+    <QueueContext.Provider value={{ queueLength, showQueueBanner, theme, updateBalance, isSyncing }}>
       {children}
     </QueueContext.Provider>
   );

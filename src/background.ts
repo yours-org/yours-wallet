@@ -1127,7 +1127,7 @@ if (self?.document === undefined) {
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (account) {
       const { bsvAddress, ordAddress, identityAddress } = account.addresses;
-/*
+      /*
        * BSV
        */
       let resp = await fetch(
@@ -1135,7 +1135,7 @@ if (self?.document === undefined) {
       );
       let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
       await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
-      
+
       /*
        * Locks
        */
@@ -1154,11 +1154,11 @@ if (self?.document === undefined) {
         console.log('importing', token.id);
         try {
           resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
-          const txids = (await resp.json()) as {[score: string]: string};
+          const txids = (await resp.json()) as { [score: string]: string };
           const ingest = Object.entries(txids).map(([score, txid]) => {
             const [height, idx] = score.split('.').map(Number);
             return new TxnIngest(txid, height, idx || 0);
-          })
+          });
           await txoStore.queue(ingest);
         } catch (e) {
           console.error(e);
@@ -1170,7 +1170,7 @@ if (self?.document === undefined) {
        */
       resp = await fetch(`https://ordinals.gorillapool.io/api/inscriptions/address/${ordAddress}/txids`);
       txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
-      await txoStore.queue(txos.map(t => new TxnIngest(t.txid, t.height || Date.now(), t.idx || 0)));
+      await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx || 0)));
       // for (const txo of txos) {
       //   if (txo.origin) {
       //     resp = await fetch(

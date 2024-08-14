@@ -35,13 +35,14 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
   const { isMobile } = useViewport();
-
   const { keysService, chromeStorageService } = useServiceContext();
 
   const handleUnlock = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isProcessing) return;
     setIsProcessing(true);
     await sleep(25);
+
     const isVerified = await keysService.verifyPassword(password);
     if (isVerified) {
       setVerificationFailed(false);
@@ -50,7 +51,6 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       onUnlock();
     } else {
       setVerificationFailed(true);
-      setPassword('');
       setTimeout(() => {
         setVerificationFailed(false);
         setIsProcessing(false);
@@ -74,12 +74,13 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           onChange={(e) => setPassword(e.target.value)}
           shake={verificationFailed ? 'true' : 'false'}
           autoFocus
+          onKeyDown={(e) => e.stopPropagation()}
         />
         <Button
           theme={theme}
           type="secondary-outline"
           label={isProcessing ? 'Unlocking...' : 'Unlock'}
-          disabled={isProcessing}
+          disabled={isProcessing || password === ''}
           isSubmit
         />
       </FormContainer>
