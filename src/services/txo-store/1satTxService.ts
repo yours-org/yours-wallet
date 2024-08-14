@@ -1,7 +1,6 @@
-import { BroadcastFailure, BroadcastResponse, MerklePath, Transaction } from '@bsv/sdk';
+import { BroadcastFailure, BroadcastResponse, MerklePath, Transaction, Utils } from '@bsv/sdk';
 import { TransactionService } from '../Transaction.service';
-import { Block } from './models/block';
-import { Txn, TxnStatus, TxnStatusResponse } from './models/txn';
+import { TxnStatus, TxnStatusResponse } from './models/txn';
 import { GP_BASE_URL } from '../../utils/constants';
 
 export class OneSatTransactionService implements TransactionService {
@@ -36,7 +35,7 @@ export class OneSatTransactionService implements TransactionService {
       case 200:
         return {
           status: TxnStatus.CONFIRMED,
-          proof: Buffer.from(await resp.json(), 'base64'),
+          proof: [...Buffer.from(await resp.arrayBuffer())],
         };
       case 404:
         return { status: TxnStatus.PENDING };
@@ -45,29 +44,32 @@ export class OneSatTransactionService implements TransactionService {
     }
   }
 
-  async fetch(txid: string): Promise<Txn | undefined> {
+  async fetch(txid: string): Promise<Transaction> {
     const resp = await fetch(`${this.baseUrl}/api/tx/${txid}`);
     console.log('Fetching', txid);
-    if (!resp.ok) return;
-    if (resp.status !== 200) throw new Error(`Failed to fetch tx ${txid}`);
-    const { rawtx, proof } = await resp.json();
-    const buf = Buffer.from(rawtx, 'base64');
-    if (!buf.length) throw new Error(`Failed to fetch tx ${txid}`);
-    const txn = {
-      txid,
-      rawtx: buf,
-      block: new Block(),
-      status: TxnStatus.CONFIRMED,
-    } as Txn;
-    if (proof) {
-      txn.proof = Buffer.from(proof, 'base64');
-      txn.status = TxnStatus.CONFIRMED;
-      const merklePath = MerklePath.fromBinary(Array.from(txn.proof));
-      txn.block.height = merklePath.blockHeight;
-      txn.block.idx = BigInt(merklePath.path[0].find((p) => p.hash == txid)?.offset || 0);
-    } else {
-      txn.status = TxnStatus.BROADCASTED;
+    if (resp.status !== 200) throw new Error(`${resp.status} - Failed to fetch tx ${txid}`);
+    const beef = await resp.arrayBuffer();
+    return Transaction.fromBEEF([...Buffer.from(beef)]);
+  }
+
+  async batchFetch(txids: string[]): Promise<Transaction[]> {
+    const resp = await fetch(`${this.baseUrl}/api/tx/batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(txids),
+    });
+    if (resp.status !== 200) throw new Error(`${resp.status} - Failed to fetch txs: ${await resp.text()}`);
+    const beefs = await resp.arrayBuffer();
+    const reader = new Utils.Reader([...Buffer.from(beefs)]);
+    const txs: Transaction[] = [];
+    while (reader.pos < beefs.byteLength) {
+      const len = reader.readVarIntNum();
+      const beef = reader.read(len);
+      const tx = Transaction.fromBEEF(beef);
+      txs.push(tx);
     }
-    return txn;
+    return txs;
   }
 }

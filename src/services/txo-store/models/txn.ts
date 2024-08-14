@@ -4,26 +4,27 @@ export enum TxnStatus {
   INVALID = -1,
   PENDING = 0,
   BROADCASTED = 1,
-  INGEST = 2,
-  CONFIRMED = 3,
-  IMMUTABLE = 4,
+  DOWNLOAD = 2,
+  INGEST = 3,
+  CONFIRMED = 4,
+  IMMUTABLE = 5,
 }
 
 export interface Txn {
   txid: string;
-  rawtx: Uint8Array;
-  proof?: Uint8Array;
+  rawtx: number[];
+  proof?: number[];
   block: Block;
   status: TxnStatus;
 }
 
 export interface TxnStatusResponse {
   status: TxnStatus;
-  proof?: Uint8Array;
+  proof?: number[];
   message?: string;
 }
 export class TxnIngest {
-  status = TxnStatus.INGEST;
+  status = TxnStatus.DOWNLOAD;
   constructor(
     public txid: string,
     public height: number,

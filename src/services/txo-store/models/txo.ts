@@ -16,7 +16,7 @@ export class Txo {
     public txid: string,
     public vout: number,
     public satoshis: bigint,
-    public script: Uint8Array,
+    public script: number[],
   ) {}
 
   setSpend(spend: Spend) {

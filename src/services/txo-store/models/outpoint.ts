@@ -1,10 +1,10 @@
-import { Buffer } from 'buffer';
+import { Utils } from '@bsv/sdk';
 export class Outpoint {
-  txid: Uint8Array;
+  txid: number[];
   vout: number;
 
-  constructor(txidOrOutpoint: string | Uint8Array, vout?: number) {
-    const buf = typeof txidOrOutpoint == 'string' ? new Uint8Array(Buffer.from(txidOrOutpoint, 'hex')) : txidOrOutpoint;
+  constructor(txidOrOutpoint: string | number[], vout?: number) {
+    const buf = typeof txidOrOutpoint == 'string' ? Utils.toArray(txidOrOutpoint, 'hex') : txidOrOutpoint;
 
     if (vout !== undefined) {
       this.txid = buf;
@@ -12,24 +12,20 @@ export class Outpoint {
       return;
     }
 
-    this.txid = buf.slice(0, 32);
-    const view = new DataView(buf.buffer);
-    this.vout = view.getUint32(32, true);
+    const reader = new Utils.Reader(buf);
+    this.txid = reader.read(32).reverse();
+    this.vout = reader.readInt32LE();
   }
 
   toString(): string {
-    return `${Buffer.from(this.txid).reverse().toString('hex')}_${this.vout}`;
+    return `${Utils.toHex(this.txid)}_${this.vout}`;
   }
 
-  txidString(): string {
-    return Buffer.from(this.txid).reverse().toString('hex');
-  }
-
-  toBytes(): Uint8Array {
-    const b = Buffer.alloc(36);
-    Buffer.from(this.txid).copy(b, 0);
-    b.writeUInt32LE(this.vout, 32);
-    return b;
+  toBytes(): number[] {
+    const writer = new Utils.Writer();
+    writer.write([...this.txid].reverse());
+    writer.writeUInt32LE(this.vout);
+    return writer.toArray();
   }
 
   toJSON() {
@@ -40,10 +36,10 @@ export class Outpoint {
     return new Outpoint(json);
   }
 
-  static fromProperties(txid: string | Uint8Array, vout: number) {
-    if (typeof txid === 'string') {
-      txid = Buffer.from(txid, 'hex');
-    }
-    return new Outpoint(txid);
-  }
+  // static fromProperties(txid: string | Uint8Array, vout: number) {
+  //   if (typeof txid === 'string') {
+  //     txid = Buffer.from(txid, 'hex');
+  //   }
+  //   return new Outpoint(txid);
+  // }
 }

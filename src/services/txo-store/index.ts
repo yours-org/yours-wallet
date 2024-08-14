@@ -11,6 +11,7 @@ import { Buffer } from 'buffer';
 import { NetWork } from 'yours-wallet-provider';
 import { TransactionService } from '../Transaction.service';
 import { GP_BASE_URL } from '../../utils/constants';
+import { stat } from 'fs';
 
 const VERSION = 1;
 
@@ -41,10 +42,18 @@ export interface TxnSchema extends DBSchema {
       status: [number, number];
     };
   };
+  downloadQueue: {
+    key: string;
+    value: TxnIngest;
+    indexes: {
+      status: [number, number, number];
+    };
+  };
 }
 export class TxoStore {
   txoDb: Promise<IDBPDatabase<TxoSchema>>;
   txnDb: Promise<IDBPDatabase<TxnSchema>>;
+  queueLength = 0;
   constructor(
     public accountId: string,
     public indexers: Indexer[] = [],
@@ -68,6 +77,8 @@ export class TxoStore {
       upgrade(db) {
         const txns = db.createObjectStore('txns', { keyPath: 'txid' });
         txns.createIndex('status', ['status', 'block.height']);
+        const queue = db.createObjectStore('downloadQueue', { keyPath: 'txid' });
+        queue.createIndex('status', ['status', 'height', 'idx']);
       },
     });
   }
@@ -76,22 +87,71 @@ export class TxoStore {
     const db = await this.txnDb;
     let txn = await db.get('txns', txid);
     if (txn) {
-      const tx = Transaction.fromBinary(Array.from(new Uint8Array(txn.rawtx)));
+      const tx = Transaction.fromBinary(txn.rawtx);
       if (txn.proof) {
         tx.merklePath = MerklePath.fromBinary(Array.from(txn.proof));
       }
       return tx;
     }
     if (!fromRemote) return;
-    txn = await this.txService.fetch(txid);
-    if (!txn) return;
-    const tx = Transaction.fromBinary(Array.from(txn.rawtx));
-    if (txn.proof) {
-      tx.merklePath = MerklePath.fromBinary(Array.from(txn.proof));
+    const tx = await this.txService.fetch(txid);
+    txn = {
+      txid,
+      rawtx: tx.toBinary(),
+      block: new Block(),
+      status: TxnStatus.PENDING,
+    };
+    if (tx.merklePath) {
+      const txHash = tx.hash('hex');
+      txn.block.height = tx.merklePath.blockHeight;
+      txn.block.idx = BigInt(tx.merklePath.path[0].find((p) => p.hash == txHash)?.offset || 0);
+      txn.proof = tx.merklePath.toBinary();
+      txn.status = TxnStatus.CONFIRMED;
     }
-
     await db.put('txns', txn);
     return tx;
+  }
+
+  async getTxs(txids: string[], fromRemote = false): Promise<(Txn | undefined)[]> {
+    const db = await this.txnDb;
+    const t = db.transaction('txns', 'readonly');
+    const txns = await Promise.all(txids.map((txid) => t.store.get(txid)));
+    await t.done;
+    const missing: string[] = [];
+    const txById: { [txid: string]: Txn } = {};
+    for (const [i, txn] of txns.entries()) {
+      if (txn && txn.rawtx) {
+        txById[txn.txid] = txn;
+      } else {
+        missing.push(txids[i]);
+      }
+    }
+
+    if (missing.length && fromRemote) {
+      const results = await this.txService.batchFetch(missing);
+      const t = db.transaction('txns', 'readwrite');
+      await Promise.all(
+        results.map((tx) => {
+          const txn: Txn = {
+            txid: tx.id('hex') as string,
+            rawtx: tx.toBinary(),
+            block: new Block(),
+            status: TxnStatus.PENDING,
+          };
+          if (tx.merklePath) {
+            const txHash = tx.hash('hex');
+            txn.block.height = tx.merklePath.blockHeight;
+            txn.block.idx = BigInt(tx.merklePath.path[0].find((p) => p.hash == txHash)?.offset || 0);
+            txn.proof = tx.merklePath.toBinary();
+            txn.status = TxnStatus.CONFIRMED;
+          }
+          txById[txn.txid] = txn;
+          t.store.put(txn);
+        }),
+      );
+      await t.done;
+    }
+    return txids.map((txid) => txById[txid]);
   }
 
   async getTxo(txid: string, vout: number): Promise<Txo | undefined> {
@@ -180,9 +240,8 @@ export class TxoStore {
     } as Block;
     if (tx.merklePath) {
       const txHash = tx.hash('hex');
-      const idx = tx.merklePath.path[0].find((p) => p.hash == txHash)?.offset || 0;
       block.height = tx.merklePath.blockHeight;
-      block.idx = BigInt(idx);
+      block.idx = BigInt(tx.merklePath.path[0].find((p) => p.hash == txHash)?.offset || 0);
       block.hash = (await this.blocksService?.getHashByHeight(tx.merklePath.blockHeight)) || '';
       if (this.blocksService) {
         try {
@@ -229,10 +288,10 @@ export class TxoStore {
 
     const txn = {
       txid,
-      rawtx: new Uint8Array(tx.toBinary()),
+      rawtx: tx.toBinary(),
       block,
       status: TxnStatus.PENDING,
-      proof: tx.merklePath && Buffer.from(tx.merklePath.toBinary()),
+      proof: tx.merklePath && tx.merklePath.toBinary(),
     };
     await txnDb.put('txns', txn);
 
@@ -245,7 +304,7 @@ export class TxoStore {
             input.sourceTXID!,
             input.sourceOutputIndex,
             BigInt(input.sourceTransaction!.outputs[input.sourceOutputIndex]!.satoshis!),
-            Buffer.from(input.sourceTransaction!.outputs[input.sourceOutputIndex]!.lockingScript.toBinary()),
+            input.sourceTransaction!.outputs[input.sourceOutputIndex]!.lockingScript.toBinary(),
           );
 
       spend.setSpend(new Spend(txid, vin, block));
@@ -261,7 +320,7 @@ export class TxoStore {
       } else {
         const script = output.lockingScript.toBinary();
         // console.log('script', output.lockingScript.toBinary())
-        txo = new Txo(txid, vout, BigInt(output.satoshis!), new Uint8Array(script));
+        txo = new Txo(txid, vout, BigInt(output.satoshis!), script);
       }
 
       txo.block = block;
@@ -300,14 +359,27 @@ export class TxoStore {
   }
 
   async getQueueLength() {
-    const db = await this.txoDb;
-    const query: IDBKeyRange = IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Date.now()]);
-    return db.countFromIndex('ingestQueue', 'status', query);
+    const txnDb = await this.txnDb;
+    const txoDb = await this.txoDb;
+    // const query: IDBKeyRange = ;
+    const [txs, txos] = await Promise.all([
+      txnDb.countFromIndex(
+        'downloadQueue',
+        'status',
+        IDBKeyRange.bound([TxnStatus.DOWNLOAD, 0], [TxnStatus.DOWNLOAD, Date.now()]),
+      ),
+      txoDb.countFromIndex(
+        'ingestQueue',
+        'status',
+        IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Date.now()]),
+      ),
+    ]);
+    return (this.queueLength = txs + txos);
   }
 
   async queue(ingests: TxnIngest[]) {
-    const db = await this.txoDb;
-    const t = db.transaction('ingestQueue', 'readwrite');
+    const db = await this.txnDb;
+    const t = db.transaction('downloadQueue', 'readwrite');
     for (const ingest of ingests) {
       // const txn = await t.store.get(ingest.txid);
       // if (txn) continue;
@@ -320,15 +392,21 @@ export class TxoStore {
     }
   }
 
+  async processQueue() {
+    this.ingestTxns();
+    // this.ingestQueue();
+  }
+
   async ingestQueue() {
+    await this.getQueueLength();
     const db = await this.txoDb;
     const query: IDBKeyRange = IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Date.now()]);
-    const txns = await db.getAllFromIndex('ingestQueue', 'status', query, 100);
-    if (txns.length) {
-      console.log('Ingesting', txns.length, 'txs');
+    const ingests = await db.getAllFromIndex('ingestQueue', 'status', query, 100);
+    if (ingests.length) {
+      console.log('Ingesting', ingests.length, 'txs');
       const outpoints: string[] = [];
-      for (const txn of txns) {
-        const tx = await this.getTx(txn.txid, true);
+      for await (const txn of ingests) {
+        const tx = await this.getTx(txn.txid);
         if (!tx) {
           console.error('Failed to get tx', txn.txid);
           continue;
@@ -338,14 +416,51 @@ export class TxoStore {
           outpoints.push(`${txo.txid}_${txo.vout}`);
         }
         txn.status = TxnStatus.CONFIRMED;
-        await db.put('ingestQueue', txn);
+        await db.delete('ingestQueue', txn.txid);
         if (this.notifyQueueStats) {
-          this.notifyQueueStats({ length: await this.getQueueLength() });
+          this.notifyQueueStats({ length: this.queueLength });
         }
       }
     } else {
       await new Promise((r) => setTimeout(r, 1000));
     }
     this.ingestQueue();
+  }
+
+  async ingestTxns() {
+    try {
+      await this.getQueueLength();
+      const txnDb = await this.txnDb;
+      const txoDb = await this.txoDb;
+      const query: IDBKeyRange = IDBKeyRange.bound([TxnStatus.DOWNLOAD, 0], [TxnStatus.DOWNLOAD, Date.now()]);
+      const ingests = await txnDb.getAllFromIndex('downloadQueue', 'status', query, 25);
+
+      if (ingests.length) {
+        console.log('Ingesting', ingests.length, 'txs');
+        const txns = await this.getTxs(
+          ingests.map((i) => i.txid),
+          true,
+        );
+        for await (const [i, txn] of txns.entries()) {
+          if (!txn) {
+            console.error('Failed to get tx', ingests[i].txid);
+            continue;
+          }
+
+          ingests[i].status = TxnStatus.INGEST;
+          await txoDb.put('ingestQueue', ingests[i]);
+          await txnDb.delete('downloadQueue', ingests[i].txid);
+          if (this.notifyQueueStats) {
+            this.notifyQueueStats({ length: this.queueLength });
+          }
+        }
+      } else {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    } catch (e) {
+      console.error('Failed to ingest txs', e);
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    this.ingestTxns();
   }
 }

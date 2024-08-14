@@ -1,4 +1,4 @@
-import { Hash, OP } from '@bsv/sdk';
+import { Hash, OP, Utils } from '@bsv/sdk';
 import type { IndexContext } from '../models/index-context';
 import { Indexer } from '../models/indexer';
 import { IndexData } from '../models/index-data';
@@ -132,9 +132,11 @@ export class OrdIndexer extends Indexer {
             idxData.events.push({ id: 'type', value: insc.file.type });
             break;
           case 3:
+            if (!value.data || value.data.length != 36) break;
             try {
-              const parent = new Outpoint(new Uint8Array(value.data || []));
-              if (!ctx.spends.find((s) => s.txid == parent.txidString() && s.vout == parent.vout)) continue;
+              const parent = new Outpoint(value.data);
+              const parentTxid = Utils.toHex(parent.txid);
+              if (!ctx.spends.find((s) => s.txid == parentTxid && s.vout == parent.vout)) continue;
               insc.parent = parent.toString();
               idxData.events.push({ id: 'parent', value: parent.toString() });
             } catch {

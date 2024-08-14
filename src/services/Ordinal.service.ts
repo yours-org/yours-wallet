@@ -391,6 +391,6 @@ export class OrdinalService {
   };
 
   getTokenName(b: Bsv20 | Bsv21): string {
-    return (b as Bsv21).id || (b as Bsv20).tick || 'Null';
+    return (b as Bsv21).sym || (b as Bsv20).tick || 'Null';
   }
 }

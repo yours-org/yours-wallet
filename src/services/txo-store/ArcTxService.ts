@@ -1,4 +1,4 @@
-import { BroadcastFailure, BroadcastResponse, MerklePath, Transaction } from '@bsv/sdk';
+import { BroadcastFailure, BroadcastResponse, MerklePath, Transaction, Utils } from '@bsv/sdk';
 import { TransactionService } from '../Transaction.service';
 import { Txn, TxnStatus, TxnStatusResponse } from './models/txn';
 
@@ -47,7 +47,7 @@ export class ArcSatTransactionService implements TransactionService {
       case 'MINED':
         return {
           status: TxnStatus.CONFIRMED,
-          proof: Buffer.from(body.merkleProof, 'hex'),
+          proof: Utils.toArray(body.merkleProof, 'hex'),
         };
       case 'REJECTED':
         return {
@@ -61,7 +61,11 @@ export class ArcSatTransactionService implements TransactionService {
     }
   }
 
-  async fetch(txid: string): Promise<Txn | undefined> {
+  async fetch(txid: string): Promise<Transaction> {
+    throw new Error('Method not implemented.');
+  }
+
+  async batchFetch(txids: string[]): Promise<Transaction[]> {
     throw new Error('Method not implemented.');
   }
 }

@@ -1,7 +1,7 @@
 import type { IndexContext } from '../models/index-context';
 import { Indexer } from '../models/indexer';
 import { IndexData } from '../models/index-data';
-import { Script, Utils } from '@bsv/sdk';
+import { BigNumber, Script, Utils } from '@bsv/sdk';
 import { Buffer } from 'buffer';
 
 const PREFIX = Buffer.from(
@@ -15,7 +15,7 @@ const SUFFIX = Buffer.from(
 
 export class Listing {
   constructor(
-    public payout = new Uint8Array(0),
+    public payout: number[] = [],
     public price = 0n,
   ) {}
 
@@ -39,8 +39,9 @@ export class OrdLockIndexer extends Indexer {
     if (suffixIdx === -1) return;
     const dataScript = Script.fromBinary(Array.from(script.subarray(prefixIdx + PREFIX.length, suffixIdx)));
     const listing = new Listing();
-    listing.payout = Buffer.from(dataScript.chunks[1]!.data!);
-    listing.price = new DataView(Buffer.from(dataScript.chunks[1]!.data!).buffer).getBigInt64(0, true);
+    if (!dataScript.chunks[1]!.data || !dataScript.chunks[1]!.data) return;
+    listing.payout = dataScript.chunks[1]!.data;
+    listing.price = BigInt(new BigNumber(dataScript.chunks[1]!.data!).toNumber());
     txo.owner = dataScript.chunks[0]?.data && Utils.toBase58Check(Array.from(dataScript.chunks[0]!.data!));
     return new IndexData(listing, undefined, [{ id: 'price', value: listing.price.toString(16).padStart(16, '0') }]);
   }
