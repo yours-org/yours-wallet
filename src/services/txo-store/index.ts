@@ -374,7 +374,7 @@ export class TxoStore {
         IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Date.now()]),
       ),
     ]);
-    this.queueLength = txs + txos
+    this.queueLength = txs + txos;
     return this.queueLength;
   }
 

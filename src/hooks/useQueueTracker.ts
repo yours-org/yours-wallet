@@ -15,6 +15,7 @@ export const useQueueTracker = () => {
   const [isSyncing, setIsSyncing] = useState(true);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const twoSecondsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const handleQueueStatusUpdate = (message: QueueTrackerMessage) => {
@@ -30,7 +31,20 @@ export const useQueueTracker = () => {
           }, 5000);
         }
 
-        // Reset the timeout whenever a new event is received
+        // Clear the 2-second timeout if a new event is received
+        if (twoSecondsTimeoutRef.current) {
+          clearTimeout(twoSecondsTimeoutRef.current);
+          twoSecondsTimeoutRef.current = null;
+        }
+
+        if (message.data.length === 0) {
+          // Set a timeout to delay setting isSyncing to false
+          twoSecondsTimeoutRef.current = setTimeout(() => {
+            setIsSyncing(false);
+          }, 2000);
+        }
+
+        // Reset the hide banner timeout whenever a new event is received
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
@@ -38,7 +52,6 @@ export const useQueueTracker = () => {
         // Hide the banner after 5 seconds if no new events and indicate syncing is done
         timeoutRef.current = setTimeout(() => {
           setShowQueueBanner(false);
-          setIsSyncing(false);
 
           // Clear the interval and stop updating the balance after sync is complete
           if (intervalRef.current) {
@@ -62,7 +75,11 @@ export const useQueueTracker = () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      if (twoSecondsTimeoutRef.current) {
+        clearTimeout(twoSecondsTimeoutRef.current);
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { queueLength, showQueueBanner, updateBalance, theme, isSyncing };

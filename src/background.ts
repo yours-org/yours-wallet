@@ -72,7 +72,7 @@ export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() =
     network,
     (queueStats: { length: number }) => {
       const message: QueueTrackerMessage = { action: YoursEventName.QUEUE_STATUS_UPDATE, data: queueStats };
-      try{
+      try {
         sendMessage(message);
         // eslint-disable-next-line no-empty
       } catch (e) {}
@@ -1146,7 +1146,7 @@ if (self?.document === undefined) {
        * Locks
        */
       resp = await fetch(`https://ordinals.gorillapool.io/api/locks/address/${identityAddress}/unspent?limit=10000`);
-      txos = (await resp.json())
+      txos = await resp.json();
       txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx)));
       await txoStore.queue(txns);
 
@@ -1176,7 +1176,7 @@ if (self?.document === undefined) {
        * Ordinals
        */
       resp = await fetch(`https://ordinals.gorillapool.io/api/inscriptions/address/${ordAddress}/txids`);
-      txos = (await resp.json())
+      txos = await resp.json();
       txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx)));
       await txoStore.queue(txns);
 
