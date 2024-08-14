@@ -1,5 +1,5 @@
 import { validate } from 'bitcoin-address-validation';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import bsvCoin from '../assets/bsv-coin.svg';
 import switchAsset from '../assets/switch-asset.svg';
@@ -37,6 +37,7 @@ import { TxnIngest } from '../services/txo-store/models/txn';
 import { LockData } from '../services/types/bsv.types';
 import { sendMessage } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
+import { QueueContext } from '../contexts/QueueContext';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -104,6 +105,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const queueContext = useContext(QueueContext);
   const urlParams = new URLSearchParams(location.search);
   const isReload = urlParams.get('reload') === 'true';
   urlParams.delete('reload');
@@ -127,6 +129,18 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [bsvBalance, setBsvBalance] = useState<number>(getBsvBalance());
   const [exchangeRate, setExchangeRate] = useState<number>(getExchangeRate());
   const [lockData, setLockData] = useState<LockData>();
+
+  const getAndSetBsvBalance = async () => {
+    await updateBsvBalance(true);
+    setBsvBalance(getBsvBalance());
+  };
+
+  useEffect(() => {
+    if (queueContext?.updateBalance) {
+      getAndSetBsvBalance();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queueContext]);
 
   useEffect(() => {
     if (isReload) window.location.reload();

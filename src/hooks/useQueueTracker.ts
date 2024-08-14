@@ -11,26 +11,36 @@ export const useQueueTracker = () => {
   const { theme } = useTheme();
   const [queueLength, setQueueLength] = useState(0);
   const [showQueueBanner, updateShowQueueBanner] = useState(false);
+  const [updateBalance, setUpdateBalance] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const handleQueueStatusUpdate = (message: QueueTrackerMessage) => {
       if (message.action === YoursEventName.QUEUE_STATUS_UPDATE) {
-        console.log('Queue Status Update:', message.data);
-
-        // Update the queue length state
         setQueueLength(message.data.length);
-
-        // Set the state to true as we're receiving updates
         updateShowQueueBanner(true);
 
-        // Clear the existing timeout, if any
+        // Start the toggle mechanism for updating the balance
+        if (!intervalRef.current) {
+          intervalRef.current = setInterval(() => {
+            setUpdateBalance((prev) => !prev);
+          }, 2000);
+        }
+
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
 
         timeoutRef.current = setTimeout(() => {
           updateShowQueueBanner(false);
+
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+
+          setUpdateBalance(false);
         }, 3000);
       }
     };
@@ -39,13 +49,15 @@ export const useQueueTracker = () => {
     chrome.runtime.onMessage.addListener(handleQueueStatusUpdate);
 
     return () => {
-      // Clean up the listener and the timeout when the component unmounts
       chrome.runtime.onMessage.removeListener(handleQueueStatusUpdate);
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     };
   }, []);
 
-  return { queueLength, showQueueBanner, theme };
+  return { queueLength, showQueueBanner, updateBalance, theme };
 };
