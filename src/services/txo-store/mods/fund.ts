@@ -37,6 +37,9 @@ export class FundIndexer extends Indexer {
         await txoStore.queue(txns);
         const t = txoDb.transaction('txos', 'readwrite');
         for (const u of utxos) {
+          if (u.satoshis <= 1) {
+            continue;
+          }
           const txo = new Txo(
             u.txid,
             u.vout,
