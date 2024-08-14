@@ -374,7 +374,8 @@ export class TxoStore {
         IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Date.now()]),
       ),
     ]);
-    return (this.queueLength = txs + txos);
+    this.queueLength = txs + txos
+    return this.queueLength;
   }
 
   async queue(ingests: TxnIngest[]) {
@@ -393,8 +394,8 @@ export class TxoStore {
   }
 
   async processQueue() {
-    this.ingestTxns();
-    // this.ingestQueue();
+    this.downloadTxns();
+    this.ingestQueue();
   }
 
   async ingestQueue() {
@@ -418,7 +419,7 @@ export class TxoStore {
         txn.status = TxnStatus.CONFIRMED;
         await db.delete('ingestQueue', txn.txid);
         if (this.notifyQueueStats) {
-          this.notifyQueueStats({ length: this.queueLength });
+          this.notifyQueueStats({ length: --this.queueLength });
         }
       }
     } else {
@@ -427,7 +428,7 @@ export class TxoStore {
     this.ingestQueue();
   }
 
-  async ingestTxns() {
+  async downloadTxns() {
     try {
       await this.getQueueLength();
       const txnDb = await this.txnDb;
@@ -451,7 +452,7 @@ export class TxoStore {
           await txoDb.put('ingestQueue', ingests[i]);
           await txnDb.delete('downloadQueue', ingests[i].txid);
           if (this.notifyQueueStats) {
-            this.notifyQueueStats({ length: this.queueLength });
+            this.notifyQueueStats({ length: --this.queueLength });
           }
         }
       } else {
@@ -461,6 +462,6 @@ export class TxoStore {
       console.error('Failed to ingest txs', e);
       await new Promise((r) => setTimeout(r, 1000));
     }
-    this.ingestTxns();
+    this.downloadTxns();
   }
 }

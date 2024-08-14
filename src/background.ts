@@ -72,7 +72,10 @@ export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() =
     network,
     (queueStats: { length: number }) => {
       const message: QueueTrackerMessage = { action: YoursEventName.QUEUE_STATUS_UPDATE, data: queueStats };
-      sendMessage(message);
+      try{
+        sendMessage(message);
+        // eslint-disable-next-line no-empty
+      } catch (e) {}
     },
   );
   return txoStore;
@@ -1135,16 +1138,16 @@ if (self?.document === undefined) {
       let resp = await fetch(
         `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
       );
-      let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
-      let txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx));
+      let txos = (await resp.json()) as { txid: string; height: number; idx: string; origin: { outpoint: string } }[];
+      let txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx)));
       await txoStore.queue(txns);
 
       /*
        * Locks
        */
       resp = await fetch(`https://ordinals.gorillapool.io/api/locks/address/${identityAddress}/unspent?limit=10000`);
-      txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
-      txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx));
+      txos = (await resp.json())
+      txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx)));
       await txoStore.queue(txns);
 
       /*
@@ -1173,8 +1176,8 @@ if (self?.document === undefined) {
        * Ordinals
        */
       resp = await fetch(`https://ordinals.gorillapool.io/api/inscriptions/address/${ordAddress}/txids`);
-      txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
-      txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx));
+      txos = (await resp.json())
+      txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx)));
       await txoStore.queue(txns);
 
       console.log('done importing');
