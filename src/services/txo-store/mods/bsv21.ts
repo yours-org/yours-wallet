@@ -1,9 +1,14 @@
 /* eslint-disable no-case-declarations */
+import { BSV20Txo, Bsv21 as Bsv21Type } from 'yours-wallet-provider';
+import { TxoStore } from '..';
 import type { IndexContext } from '../models/index-context';
 import { IndexData } from '../models/index-data';
 import { Indexer } from '../models/indexer';
-import type { Txo } from '../models/txo';
+import { Txo, TxoStatus } from '../models/txo';
 import { Ord } from './ord';
+import { Utils } from '@bsv/sdk';
+import { TxnIngest } from '../models/txn';
+import { Block } from '../models/block';
 
 export enum Bsv21Status {
   Invalid = -1,
@@ -132,5 +137,77 @@ export class Bsv21Indexer extends Indexer {
 
   fromObj(obj: IndexData): IndexData {
     return new IndexData(Bsv21.fromJSON(obj.data), obj.deps);
+  }
+
+  async sync(txoStore: TxoStore): Promise<void> {
+    const limit = 100;
+    const txoDb = await txoStore.txoDb;
+    for await (const owner of this.owners) {
+      let resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${owner}/balance`);
+      const balance = (await resp.json()) as Bsv21Type[];
+      for await (const token of balance) {
+        if (!token.id) continue;
+        console.log('importing', token.id);
+        resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}/ancestors`);
+        const txids = (await resp.json()) as { [score: string]: string };
+        let txns = Object.entries(txids).map(([score, txid]) => {
+          const [height, idx] = score.split('.').map(Number);
+          return new TxnIngest(txid, height, idx || 0, true);
+        });
+        await txoStore.queue(txns);
+        // try {
+        let offset = 0;
+        let utxos: BSV20Txo[] = [];
+        do {
+          resp = await fetch(
+            `https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}?limit=${limit}&offset=${offset}`,
+          );
+          const deps = (await resp.json()) as { [txid: string]: string[] };
+
+          resp = await fetch(
+            `https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}?limit=${limit}&offset=${offset}`,
+          );
+          utxos = (await resp.json()) as BSV20Txo[];
+          txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx, false));
+          await txoStore.queue(txns);
+          const t = txoDb.transaction('txos', 'readwrite');
+          for (const u of utxos) {
+            const txo = new Txo(u.txid, u.vout, 1n, Utils.toArray(u.script, 'base64'), TxoStatus.Assumed);
+            if (u.height) {
+              txo.block = new Block(u.height, BigInt(u.idx || 0));
+            }
+            txo.data.bsv21 = new IndexData(
+              Bsv21.fromJSON({
+                id: token.id,
+                amt: u.amt,
+                dec: token.dec,
+                sym: token.sym,
+                op: u.op!,
+                status: u.status,
+                icon: token.icon,
+              }),
+              deps[u.txid] || [],
+              [
+                { id: 'address', value: owner },
+                { id: 'id', value: token.id },
+              ],
+            );
+            if (u.listing && u.payout && u.price) {
+              txo.data.list = new IndexData(
+                {
+                  payout: Utils.toArray(u.payout, 'base64'),
+                  price: BigInt(u.price),
+                },
+                undefined,
+                [{ id: 'price', value: BigInt(u.price).toString(16).padStart(16, '0') }],
+              );
+            }
+            t.store.put(txo.toObject());
+          }
+          await t.done;
+          offset += limit;
+        } while (utxos.length == 100);
+      }
+    }
   }
 }

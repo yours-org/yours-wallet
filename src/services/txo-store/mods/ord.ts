@@ -1,10 +1,16 @@
-import { Hash, OP, Utils } from '@bsv/sdk';
+import { Hash, OP, P2PKH, Utils } from '@bsv/sdk';
 import type { IndexContext } from '../models/index-context';
 import { Indexer } from '../models/indexer';
 import { IndexData } from '../models/index-data';
 import { Outpoint } from '../models/outpoint';
 import { Buffer } from 'buffer';
 import { parseAddress } from '../models/address';
+import { TxoStore } from '..';
+import { Ordinal } from 'yours-wallet-provider';
+import { TxnIngest } from '../models/txn';
+import { Txo, TxoStatus } from '../models/txo';
+import type { Event } from '../models/event';
+import { Block } from '../models/block';
 
 const ORD = Buffer.from('ord');
 
@@ -193,5 +199,75 @@ export class OrdIndexer extends Indexer {
     const ord: Ord = {};
     Object.assign(ord, obj.data);
     return new IndexData(ord, obj.deps);
+  }
+
+  async sync(txoStore: TxoStore): Promise<void> {
+    const limit = 10000;
+    const txoDb = await txoStore.txoDb;
+    for await (const owner of this.owners) {
+      let txos: { txid: string; idx: string; height?: number }[] = [];
+      let offset = 0;
+      do {
+        const resp = await fetch(
+          `https://ordinals.gorillapool.io/api/inscriptions/address/${owner}/ancestors?limit=${limit}&offset=${offset}`,
+        );
+        txos = await resp.json();
+        const txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx), true));
+        await txoStore.queue(txns);
+      } while (txos.length == limit);
+      let utxos: Ordinal[] = [];
+      offset = 0;
+      do {
+        const url = `https://ordinals.gorillapool.io/api/txos/address/${owner}/unspent?limit=${limit}&offset=${offset}&bsv20=false`;
+        const resp = await fetch(url);
+        utxos = await resp.json();
+
+        const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx, false));
+        await txoStore.queue(txns);
+
+        const t = txoDb.transaction('txos', 'readwrite');
+        for (const u of utxos) {
+          const ord: Ord = {};
+          const events: Event[] = [{ id: 'address', value: owner }];
+          if (u.origin?.data?.insc && u.origin?.data?.insc?.file) {
+            ord.insc = { file: u.origin.data.insc.file };
+            if (ord.insc.file.type) {
+              events.push({ id: 'type', value: ord.insc.file.type });
+            }
+          }
+          if (u.origin) {
+            ord.origin = new Origin(u.origin.outpoint, 0);
+            events.push({ id: 'origin', value: ord.origin.outpoint });
+          }
+
+          if (!ord.origin && !ord.insc) continue;
+          const txo = new Txo(
+            u.txid,
+            u.vout,
+            1n,
+            new P2PKH().lock(Utils.fromBase58Check(owner).data).toBinary(),
+            TxoStatus.Assumed,
+          );
+          if (u.height) {
+            txo.block = new Block(u.height, BigInt(u.idx || 0));
+          }
+          txo.data[this.tag] = new IndexData(ord, undefined, events);
+          if (u.data?.list && u.data?.list.payout && u.data?.list.price) {
+            const price = BigInt(u.data.list.price);
+            txo.data.list = new IndexData(
+              {
+                payout: Utils.toArray(u.data.list.payout, 'base64'),
+                price,
+              },
+              undefined,
+              [{ id: 'price', value: price.toString(16).padStart(16, '0') }],
+            );
+          }
+          t.store.put(txo.toObject());
+        }
+        await t.done;
+        offset += limit;
+      } while (utxos.length == 100);
+    }
   }
 }

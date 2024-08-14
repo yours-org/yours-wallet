@@ -25,6 +25,13 @@ export interface TxoSchema extends DBSchema {
       spent: string;
     };
   };
+  downloadQueue: {
+    key: string;
+    value: TxnIngest;
+    indexes: {
+      status: [number, number, number];
+    };
+  };
   ingestQueue: {
     key: string;
     value: TxnIngest;
@@ -40,13 +47,6 @@ export interface TxnSchema extends DBSchema {
     value: Txn;
     indexes: {
       status: [number, number];
-    };
-  };
-  downloadQueue: {
-    key: string;
-    value: TxnIngest;
-    indexes: {
-      status: [number, number, number];
     };
   };
 }
@@ -69,16 +69,16 @@ export class TxoStore {
         txos.createIndex('events', 'events', { multiEntry: true });
         txos.createIndex('owner', 'owner');
         txos.createIndex('spent', 'spent');
-        const queue = db.createObjectStore('ingestQueue', { keyPath: 'txid' });
-        queue.createIndex('status', ['status', 'height', 'idx']);
+        const ingestQueue = db.createObjectStore('ingestQueue', { keyPath: 'txid' });
+        ingestQueue.createIndex('status', ['status', 'height', 'idx']);
+        const downloadQueue = db.createObjectStore('downloadQueue', { keyPath: 'txid' });
+        downloadQueue.createIndex('status', ['status', 'height', 'idx']);
       },
     });
     this.txnDb = openDB<TxnSchema>(`txnstore-${network}`, VERSION, {
       upgrade(db) {
         const txns = db.createObjectStore('txns', { keyPath: 'txid' });
         txns.createIndex('status', ['status', 'block.height']);
-        const queue = db.createObjectStore('downloadQueue', { keyPath: 'txid' });
-        queue.createIndex('status', ['status', 'height', 'idx']);
       },
     });
   }
@@ -209,9 +209,9 @@ export class TxoStore {
           continue;
         }
         const txo = Txo.fromObject(txoData, this.indexers);
-        txo.setSpend(new Spend(spends[i], 0));
+        txo.spend = new Spend(spends[i], 0);
         console.log('Updated spend', txid, vout, spends[i]);
-        t.store.put(txo);
+        t.store.put(txo.toObject());
       }
     }
     await t.done;
@@ -231,7 +231,7 @@ export class TxoStore {
     return resp;
   }
 
-  async ingest(tx: Transaction, fromRemote = false, status = TxoStatus.Assumed): Promise<IndexContext> {
+  async ingest(tx: Transaction, fromRemote = false, status = TxoStatus.Validated): Promise<IndexContext> {
     const txid = tx.id('hex') as string;
     console.log('Ingesting', txid);
     const block = {
@@ -259,7 +259,6 @@ export class TxoStore {
 
     const txoDb = await this.txoDb;
     const txnDb = await this.txnDb;
-
     const ctx: IndexContext = {
       txid,
       tx,
@@ -305,10 +304,11 @@ export class TxoStore {
             input.sourceOutputIndex,
             BigInt(input.sourceTransaction!.outputs[input.sourceOutputIndex]!.satoshis!),
             input.sourceTransaction!.outputs[input.sourceOutputIndex]!.lockingScript.toBinary(),
+            status,
           );
 
-      spend.setSpend(new Spend(txid, vin, block));
-      t.store.put(spend);
+      spend.spend = new Spend(txid, vin, block);
+      t.store.put(spend.toObject());
       ctx.spends.push(spend);
     }
 
@@ -339,36 +339,35 @@ export class TxoStore {
     }
     this.indexers.forEach((i) => i.save && i.save(ctx));
 
-    const hasEvents: number[] = [];
+    // const hasEvents: number[] = [];
     for (const txo of ctx.txos) {
       txo.events = [];
       const spent = txo.spend ? '1' : '0';
       const sort = (txo.spend?.block?.height || txo.block?.height || Date.now()).toString(16).padStart(8, '0');
-      let hasEvent = false;
+      // let hasEvent = false;
       for (const [tag, data] of Object.entries(txo.data)) {
-        hasEvent = true;
+        // hasEvent = true;
         for (const e of data.events) {
           txo.events.push(`${spent}:${tag}:${e.id}:${e.value}:${sort}:${txo.block?.idx}:${txo.vout}:${txo.satoshis}`);
         }
       }
-      hasEvents.push(txo.vout);
-      t.store.put(txo);
+      // hasEvents.push(txo.vout);
+      t.store.put(txo.toObject());
     }
     await t.done;
     txn.status = block.height < 50000000 ? TxnStatus.CONFIRMED : TxnStatus.BROADCASTED;
     await txnDb.put('txns', txn);
-    if (checkSpends && hasEvents.length) {
-      this.updateSpends(hasEvents.map((vout) => `${txid}_${vout}`));
-    }
+    // if (checkSpends && hasEvents.length) {
+    //   this.updateSpends(hasEvents.map((vout) => `${txid}_${vout}`));
+    // }
     return ctx;
   }
 
   async getQueueLength() {
-    const txnDb = await this.txnDb;
     const txoDb = await this.txoDb;
-    // const query: IDBKeyRange = ;
+
     const [txs, txos] = await Promise.all([
-      txnDb.countFromIndex(
+      txoDb.countFromIndex(
         'downloadQueue',
         'status',
         IDBKeyRange.bound([TxnStatus.DOWNLOAD, 0], [TxnStatus.DOWNLOAD, Date.now()]),
@@ -384,7 +383,7 @@ export class TxoStore {
   }
 
   async queue(ingests: TxnIngest[]) {
-    const db = await this.txnDb;
+    const db = await this.txoDb;
     const t = db.transaction('downloadQueue', 'readwrite');
     for (const ingest of ingests) {
       await t.store.put(ingest);
@@ -396,6 +395,11 @@ export class TxoStore {
     }
   }
 
+  async sync() {
+    for (const indexer of this.indexers) {
+      await indexer.sync(this);
+    }
+  }
   async processQueue() {
     this.downloadTxns();
     this.ingestQueue();
@@ -414,7 +418,7 @@ export class TxoStore {
           console.error('Failed to get tx', txn.txid);
           continue;
         }
-        const idxData = await this.ingest(tx, true, false);
+        const idxData = await this.ingest(tx, true, txn.isDep ? TxoStatus.Dep : TxoStatus.Validated);
         for (const txo of idxData.txos) {
           outpoints.push(`${txo.txid}_${txo.vout}`);
         }
@@ -435,10 +439,9 @@ export class TxoStore {
 
   async downloadTxns(returnOnDone = false) {
     try {
-      const txnDb = await this.txnDb;
       const txoDb = await this.txoDb;
       const query: IDBKeyRange = IDBKeyRange.bound([TxnStatus.DOWNLOAD, 0], [TxnStatus.DOWNLOAD, Date.now()]);
-      const ingests = await txnDb.getAllFromIndex('downloadQueue', 'status', query, 25);
+      const ingests = await txoDb.getAllFromIndex('downloadQueue', 'status', query, 25);
 
       if (ingests.length) {
         console.log('Ingesting', ingests.length, 'txs');
@@ -446,16 +449,18 @@ export class TxoStore {
           ingests.map((i) => i.txid),
           true,
         );
-        for await (const [i, txn] of txns.entries()) {
+        const t = txoDb.transaction(['ingestQueue', 'downloadQueue'], 'readwrite');
+        for (const [i, txn] of txns.entries()) {
           if (!txn) {
             console.error('Failed to get tx', ingests[i].txid);
             continue;
           }
 
           ingests[i].status = TxnStatus.INGEST;
-          await txoDb.put('ingestQueue', ingests[i]);
-          await txnDb.delete('downloadQueue', ingests[i].txid);
+          await t.objectStore('ingestQueue').put(ingests[i]);
+          await t.objectStore('downloadQueue').delete(ingests[i].txid);
         }
+        await t.done;
         if (this.notifyQueueStats) {
           this.notifyQueueStats({ length: await this.getQueueLength() });
         }

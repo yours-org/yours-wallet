@@ -25,27 +25,30 @@ export class Txo {
     public status = TxoStatus.Dep,
   ) {}
 
-  setSpend(spend: Spend) {
-    this.spend = spend;
-    const spent = spend ? '1' : '0';
-    this.events = [];
-    // const sort = spend.block.height.toString(16).padStart(8, '0');
-    // for (const [tag, data] of Object.entries(this.data)) {
-    //   for (const e of data.events) {
-    //     this.events.push(`${tag}:${e.id}:${e.value}:${spent}:${sort}:${spend.block?.idx}:${this.vout}:${this.satoshis}`);
-    //   }
-    // }
-  }
+  // setSpend(spend: Spend) {
+  //   this.spend = spend;
+  //   // const spent = spend ? '1' : '0';
+  //   this.events = [];
+  //   // const sort = spend.block.height.toString(16).padStart(8, '0');
+  //   // for (const [tag, data] of Object.entries(this.data)) {
+  //   //   for (const e of data.events) {
+  //   //     this.events.push(`${tag}:${e.id}:${e.value}:${sort}:${spend.block?.idx}:${this.vout}:${this.satoshis}`);
+  //   //   }
+  //   // }
+  // }
 
   toObject(): any {
     this.events = [];
     const sort = this.block.height.toString(16).padStart(8, '0');
-    const spent = this.spend ? '1' : '0';
-    for (const [tag, data] of Object.entries(this.data)) {
-      for (const e of data.events) {
-        this.events.push(`${tag}:${e.id}:${e.value}:${spent}:${sort}:${this.block?.idx}:${this.vout}:${this.satoshis}`);
+    // const spent = this.spend ? '1' : '0';
+    if (!this.spend) {
+      for (const [tag, data] of Object.entries(this.data)) {
+        for (const e of data.events) {
+          this.events.push(`${tag}:${e.id}:${e.value}:${sort}:${this.block?.idx}:${this.vout}:${this.satoshis}`);
+        }
       }
     }
+    return this;
   }
 
   static fromObject(obj: any, indexers: Indexer[] = []): Txo {
@@ -87,18 +90,18 @@ export class Txo {
 export class TxoLookup {
   constructor(
     public indexer: string,
-    public spent = false,
+    // public spent = false,
     public id?: string,
     public value?: string,
     public owner?: string,
   ) {}
 
   toQueryKey(): string {
-    return TxoLookup.buildQueryKey(this.indexer, this.spent, this.id, this.value);
+    return TxoLookup.buildQueryKey(this.indexer, this.id, this.value);
   }
 
-  static buildQueryKey(tag: string, spent = false, id?: string, value?: string): string {
-    let key = `${spent ? '1' : '0'}:${tag}`;
+  static buildQueryKey(tag: string, id?: string, value?: string): string {
+    let key = tag;
     if (id) {
       key += `:${id}`;
       if (value) {

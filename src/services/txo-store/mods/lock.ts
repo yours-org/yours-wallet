@@ -3,7 +3,12 @@ import { Indexer } from '../models/indexer';
 import { IndexData } from '../models/index-data';
 import { Script, Utils } from '@bsv/sdk';
 import { MAINNET_ADDRESS_PREFIX, TESTNET_ADDRESS_PREFIX } from '../../../utils/constants';
-import { lockPrefix, lockSuffix } from '../template/lock';
+import LockTemplate, { lockPrefix, lockSuffix } from '../template/lock';
+import { TxoStore } from '..';
+import { Ordinal } from 'yours-wallet-provider';
+import { Txo, TxoStatus } from '../models/txo';
+import { TxnIngest } from '../models/txn';
+import { Block } from '../models/block';
 
 const PREFIX = Buffer.from(lockPrefix, 'hex');
 
@@ -37,6 +42,48 @@ export class LockIndexer extends Indexer {
           { id: 'address', value: owner },
         ],
       );
+    }
+  }
+
+  async sync(txoStore: TxoStore): Promise<void> {
+    const limit = 10000;
+    const txoDb = await txoStore.txoDb;
+    for await (const owner of this.owners) {
+      let offset = 0;
+      let utxos: Ordinal[] = [];
+      do {
+        const resp = await fetch(
+          `https://ordinals.gorillapool.io/api/locks/address/${owner}/unspent?limit=${limit}&offset=${offset}`,
+        );
+        utxos = (await resp.json()) as Ordinal[];
+        const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx, false));
+        await txoStore.queue(txns);
+        const t = txoDb.transaction('txos', 'readwrite');
+        for (const u of utxos) {
+          if (!u.data?.lock || !u.data.lock.until) continue;
+          const txo = new Txo(
+            u.txid,
+            u.vout,
+            BigInt(u.satoshis),
+            new LockTemplate().lock(owner, u.data.lock.until).toBinary(),
+            TxoStatus.Assumed,
+          );
+          if (u.height) {
+            txo.block = new Block(u.height, BigInt(u.idx || 0));
+          }
+          txo.data[this.tag] = new IndexData(
+            new Lock(u.data.lock.until),
+            [],
+            [
+              { id: 'until', value: u.data.lock.until.toString().padStart(7, '0') },
+              { id: 'address', value: owner },
+            ],
+          );
+          t.store.put(txo.toObject());
+        }
+        await t.done;
+        offset += limit;
+      } while (utxos.length == 100);
     }
   }
 }

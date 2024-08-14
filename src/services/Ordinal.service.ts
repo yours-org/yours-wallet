@@ -35,10 +35,7 @@ export class OrdinalService {
   }
 
   getOrdinals = async (): Promise<Ordinal[]> => {
-    const ordinals = await this.txoStore.searchTxos(
-      new TxoLookup('ord', false, 'address', this.keysService.ordAddress),
-      0,
-    );
+    const ordinals = await this.txoStore.searchTxos(new TxoLookup('ord', 'address', this.keysService.ordAddress), 0);
     return ordinals.txos.map(mapOrdinal);
   };
 
@@ -50,10 +47,7 @@ export class OrdinalService {
   };
 
   getBsv20s = async (): Promise<Bsv21[]> => {
-    const bsv20s = await this.txoStore.searchTxos(
-      new TxoLookup('bsv21', false, 'address', this.keysService.ordAddress),
-      0,
-    );
+    const bsv20s = await this.txoStore.searchTxos(new TxoLookup('bsv21', 'address', this.keysService.ordAddress), 0);
 
     const tokens: { [id: string]: Bsv21 } = {};
     for (const txo of bsv20s.txos) {
@@ -152,7 +146,7 @@ export class OrdinalService {
       const ordPk = PrivateKey.fromWif(keys.ordWif);
       const fundingUtxos = await this.bsvService.fundingTxos();
 
-      const bsv21Utxos = await this.txoStore.searchTxos(new TxoLookup('bsv21', false, 'id', id), 0);
+      const bsv21Utxos = await this.txoStore.searchTxos(new TxoLookup('bsv21', 'id', id), 0);
       const tokenUtxos: TokenUtxo[] = [];
       let tokensIn = 0n;
       let bsv21: Bsv21Type | undefined;
@@ -217,7 +211,7 @@ export class OrdinalService {
       const ordPk = PrivateKey.fromWif(keys.ordWif);
 
       const fundResults = await this.txoStore.searchTxos(
-        new TxoLookup('fund', false, 'address', this.keysService.bsvAddress),
+        new TxoLookup('fund', 'address', this.keysService.bsvAddress),
         0,
       );
 
@@ -272,7 +266,7 @@ export class OrdinalService {
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
       const fundResults = await this.txoStore.searchTxos(
-        new TxoLookup('fund', false, 'address', this.keysService.bsvAddress),
+        new TxoLookup('fund', 'address', this.keysService.bsvAddress),
         0,
       );
 
@@ -329,7 +323,7 @@ export class OrdinalService {
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
       const fundResults = await this.txoStore.searchTxos(
-        new TxoLookup('fund', false, 'address', this.keysService.bsvAddress),
+        new TxoLookup('fund', 'address', this.keysService.bsvAddress),
         0,
       );
 

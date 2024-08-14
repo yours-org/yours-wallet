@@ -82,7 +82,7 @@ export class BsvService {
 
   getLockedTxos = async () => {
     const lockTxos = await this.txoStore.searchTxos(
-      new TxoLookup('lock', false, 'address', this.keysService.identityAddress),
+      new TxoLookup('lock', 'address', this.keysService.identityAddress),
       0,
     );
     return lockTxos.txos;
@@ -175,7 +175,7 @@ export class BsvService {
       });
 
       const fundResults = await this.txoStore.searchTxos(
-        new TxoLookup('fund', false, 'address', this.keysService.bsvAddress),
+        new TxoLookup('fund', 'address', this.keysService.bsvAddress),
         0,
       );
 
@@ -310,10 +310,7 @@ export class BsvService {
   };
 
   fundingTxos = async () => {
-    const results = await this.txoStore.searchTxos(
-      new TxoLookup('fund', false, 'address', this.keysService.bsvAddress),
-      0,
-    );
+    const results = await this.txoStore.searchTxos(new TxoLookup('fund', 'address', this.keysService.bsvAddress), 0);
     return results.txos;
   };
 
@@ -339,7 +336,7 @@ export class BsvService {
     tx.addOutput({ change: true, lockingScript: new P2PKH().lock(this.keysService.bsvAddress) });
 
     const fundResults = await this.txoStore.searchTxos(
-      new TxoLookup('fund', false, 'address', this.keysService.bsvAddress),
+      new TxoLookup('fund', 'address', this.keysService.bsvAddress),
       0,
     );
 
