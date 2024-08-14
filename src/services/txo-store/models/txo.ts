@@ -4,10 +4,15 @@ import type { Indexer } from './indexer';
 import { Spend } from './spend';
 import { Buffer } from 'buffer';
 
+export enum TxoStatus {
+  Dep = 1,
+  Assumed = 2,
+  Validated = 3,
+}
+
 export class Txo {
   block = new Block();
   spend?: Spend;
-  spent = this.spend ? '1' : '0';
   data: { [tag: string]: IndexData } = {};
   events: string[] = [];
   owner?: string;
@@ -17,16 +22,28 @@ export class Txo {
     public vout: number,
     public satoshis: bigint,
     public script: number[],
+    public status = TxoStatus.Dep,
   ) {}
 
   setSpend(spend: Spend) {
     this.spend = spend;
-    this.spent = spend ? '1' : '0';
+    const spent = spend ? '1' : '0';
     this.events = [];
-    const sort = spend.block.height.toString(16).padStart(8, '0');
+    // const sort = spend.block.height.toString(16).padStart(8, '0');
+    // for (const [tag, data] of Object.entries(this.data)) {
+    //   for (const e of data.events) {
+    //     this.events.push(`${tag}:${e.id}:${e.value}:${spent}:${sort}:${spend.block?.idx}:${this.vout}:${this.satoshis}`);
+    //   }
+    // }
+  }
+
+  toObject(): any {
+    this.events = [];
+    const sort = this.block.height.toString(16).padStart(8, '0');
+    const spent = this.spend ? '1' : '0';
     for (const [tag, data] of Object.entries(this.data)) {
       for (const e of data.events) {
-        this.events.push(`${tag}:${e.id}:${e.value}:1:${sort}:${spend.block?.idx}:${this.vout}:${this.satoshis}`);
+        this.events.push(`${tag}:${e.id}:${e.value}:${spent}:${sort}:${this.block?.idx}:${this.vout}:${this.satoshis}`);
       }
     }
   }

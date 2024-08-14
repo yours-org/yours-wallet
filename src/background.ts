@@ -1139,7 +1139,7 @@ if (self?.document === undefined) {
         `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
       );
       let txos = (await resp.json()) as { txid: string; height: number; idx: string; origin: { outpoint: string } }[];
-      let txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx)));
+      let txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx), true));
       await txoStore.queue(txns);
 
       /*
@@ -1147,7 +1147,7 @@ if (self?.document === undefined) {
        */
       resp = await fetch(`https://ordinals.gorillapool.io/api/locks/address/${identityAddress}/unspent?limit=10000`);
       txos = await resp.json();
-      txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx)));
+      txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx), true));
       await txoStore.queue(txns);
 
       /*

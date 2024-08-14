@@ -1,4 +1,5 @@
 import type { Block } from './block';
+import { TxoStatus } from './txo';
 
 export enum TxnStatus {
   INVALID = -1,
@@ -29,5 +30,6 @@ export class TxnIngest {
     public txid: string,
     public height: number,
     public idx: number,
+    public isDep = false,
   ) {}
 }
