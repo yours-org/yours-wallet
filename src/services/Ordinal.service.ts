@@ -49,13 +49,13 @@ export class OrdinalService {
     return mapOrdinal(txo);
   };
 
-  getBsv20s = async (): Promise<Bsv20[]> => {
+  getBsv20s = async (): Promise<Bsv21[]> => {
     const bsv20s = await this.txoStore.searchTxos(
       new TxoLookup('bsv21', false, 'address', this.keysService.ordAddress),
       0,
     );
 
-    const tokens: { [id: string]: Bsv20 } = {};
+    const tokens: { [id: string]: Bsv21 } = {};
     for (const txo of bsv20s.txos) {
       const bsv21 = txo.data.bsv21?.data as Bsv21Type;
       if (!bsv21) continue;
@@ -70,6 +70,8 @@ export class OrdinalService {
           listed: { confirmed: 0n, pending: 0n },
           status: 1,
           icon: bsv21.icon,
+          id: bsv21.id || '',
+          sym: bsv21.sym || '',
         };
         tokens[bsv21.id] = token;
       }
@@ -389,6 +391,6 @@ export class OrdinalService {
   };
 
   getTokenName(b: Bsv20 | Bsv21): string {
-    return (b as Bsv21).sym || (b as Bsv20).tick || 'Null';
+    return (b as Bsv21).id || (b as Bsv20).tick || 'Null';
   }
 }

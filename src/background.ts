@@ -1127,7 +1127,7 @@ if (self?.document === undefined) {
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (account) {
       const { bsvAddress, ordAddress, identityAddress } = account.addresses;
-      /*
+/*
        * BSV
        */
       let resp = await fetch(
@@ -1135,24 +1135,7 @@ if (self?.document === undefined) {
       );
       let txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
       await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), t.idx)));
-
-      /*
-       * Ordinals
-       */
-      resp = await fetch(`https://ordinals.gorillapool.io/api/txos/address/${ordAddress}/unspent?limit=10000`);
-      txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
-      for (const txo of txos) {
-        if (txo.origin) {
-          resp = await fetch(
-            `https://ordinals.gorillapool.io/api/inscriptions/${txo.origin.outpoint}/history?limit=10000`,
-          );
-          txos = await resp.json();
-          await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height, t.idx)));
-        } else {
-          await txoStore.queue([new TxnIngest(txo.txid, txo.height, txo.idx)]);
-        }
-      }
-
+      
       /*
        * Locks
        */
@@ -1165,18 +1148,41 @@ if (self?.document === undefined) {
        */
       resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
       const balance = (await resp.json()) as { id?: string }[];
-      let counter = 50000000;
       for await (const token of balance) {
+        // if(token.id !== '00017fdc119c09b1c07102c8e01642a336c5cad8c1d2f8d91188fad27e9b5eb7_0') continue
         if (!token.id) continue;
         console.log('importing', token.id);
         try {
           resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
-          const txids = (await resp.json()) as string[];
-          await txoStore.queue(txids.map((txid) => new TxnIngest(txid, counter++, 0)));
+          const txids = (await resp.json()) as {[score: string]: string};
+          const ingest = Object.entries(txids).map(([score, txid]) => {
+            const [height, idx] = score.split('.').map(Number);
+            return new TxnIngest(txid, height, idx || 0);
+          })
+          await txoStore.queue(ingest);
         } catch (e) {
           console.error(e);
         }
       }
+
+      /*
+       * Ordinals
+       */
+      resp = await fetch(`https://ordinals.gorillapool.io/api/inscriptions/address/${ordAddress}/txids`);
+      txos = (await resp.json()) as { txid: string; height: number; idx: number; origin: { outpoint: string } }[];
+      await txoStore.queue(txos.map(t => new TxnIngest(t.txid, t.height || Date.now(), t.idx || 0)));
+      // for (const txo of txos) {
+      //   if (txo.origin) {
+      //     resp = await fetch(
+      //       `https://ordinals.gorillapool.io/api/inscriptions/${txo.origin.outpoint}/history?limit=10000`,
+      //     );
+      //     txos = await resp.json();
+      //     await txoStore.queue(txos.map((t) => new TxnIngest(t.txid, t.height, t.idx)));
+      //   } else {
+      //     await txoStore.queue([new TxnIngest(txo.txid, txo.height, txo.idx)]);
+      //   }
+      // }
+
       console.log('done importing');
     }
   };

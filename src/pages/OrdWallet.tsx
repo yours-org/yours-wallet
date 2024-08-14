@@ -193,6 +193,7 @@ export const OrdWallet = () => {
   const loadBsv20s = async () => {
     if (!ordinalService) return;
     const bsv20s = await ordinalService.getBsv20s();
+    console.log({ bsv20s });
     setBsv20s(bsv20s);
   };
 

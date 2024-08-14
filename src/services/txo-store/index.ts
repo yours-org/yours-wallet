@@ -24,13 +24,6 @@ export interface TxoSchema extends DBSchema {
       spent: string;
     };
   };
-  txns: {
-    key: string;
-    value: Txn;
-    indexes: {
-      status: [number, number];
-    };
-  };
   ingestQueue: {
     key: string;
     value: TxnIngest;
@@ -40,8 +33,18 @@ export interface TxoSchema extends DBSchema {
   };
 }
 
+export interface TxnSchema extends DBSchema {
+  txns: {
+    key: string;
+    value: Txn;
+    indexes: {
+      status: [number, number];
+    };
+  };
+}
 export class TxoStore {
-  db: Promise<IDBPDatabase<TxoSchema>>;
+  txoDb: Promise<IDBPDatabase<TxoSchema>>;
+  txnDb: Promise<IDBPDatabase<TxnSchema>>;
   constructor(
     public accountId: string,
     public indexers: Indexer[] = [],
@@ -51,22 +54,26 @@ export class TxoStore {
     public notifyQueueStats?: (queueStats: { length: number }) => void,
   ) {
     // if (accountId) throw new Error('empty-account-id');
-    this.db = openDB<TxoSchema>(`txostore-${accountId}-${network}`, VERSION, {
+    this.txoDb = openDB<TxoSchema>(`txostore-${accountId}-${network}`, VERSION, {
       upgrade(db) {
         const txos = db.createObjectStore('txos', { keyPath: ['txid', 'vout'] });
         txos.createIndex('events', 'events', { multiEntry: true });
         txos.createIndex('owner', 'owner');
         txos.createIndex('spent', 'spent');
-        const txns = db.createObjectStore('txns', { keyPath: 'txid' });
-        txns.createIndex('status', ['status', 'block.height']);
         const queue = db.createObjectStore('ingestQueue', { keyPath: 'txid' });
         queue.createIndex('status', ['status', 'height', 'idx']);
+      },
+    });
+    this.txnDb = openDB<TxnSchema>(`txnstore-${network}`, VERSION, {
+      upgrade(db) {
+        const txns = db.createObjectStore('txns', { keyPath: 'txid' });
+        txns.createIndex('status', ['status', 'block.height']);
       },
     });
   }
 
   async getTx(txid: string, fromRemote = false): Promise<Transaction | undefined> {
-    const db = await this.db;
+    const db = await this.txnDb;
     let txn = await db.get('txns', txid);
     if (txn) {
       const tx = Transaction.fromBinary(Array.from(new Uint8Array(txn.rawtx)));
@@ -88,11 +95,11 @@ export class TxoStore {
   }
 
   async getTxo(txid: string, vout: number): Promise<Txo | undefined> {
-    return (await this.db).get('txos', [txid, vout]);
+    return (await this.txoDb).get('txos', [txid, vout]);
   }
 
   async searchTxos(lookup: TxoLookup, limit = 10, from?: string): Promise<TxoResults> {
-    const db = await this.db;
+    const db = await this.txoDb;
     const dbkey = lookup.toQueryKey();
     const start = from || dbkey;
     const query: IDBKeyRange = IDBKeyRange.bound(start, dbkey + '\uffff', true, false);
@@ -111,7 +118,7 @@ export class TxoStore {
   }
 
   async syncSpends() {
-    const db = await this.db;
+    const db = await this.txoDb;
     const outpoints = await db.getAllKeysFromIndex('txos', 'spent', IDBKeyRange.only('0'));
     for (let i = 0; i < outpoints.length; i += 50) {
       await this.updateSpends(outpoints.slice(i, i + 50).map(([txid, vout]) => `${txid}_${vout}`));
@@ -119,7 +126,7 @@ export class TxoStore {
   }
 
   private async updateSpends(outpoints: string[]) {
-    const db = await this.db;
+    const db = await this.txoDb;
     const resp = await fetch(`${GP_BASE_URL}/api/spends`, {
       method: 'POST',
       body: JSON.stringify(outpoints),
@@ -153,9 +160,13 @@ export class TxoStore {
   async broadcast(tx: Transaction, dependencyTxids: string[] = []) {
     const resp = await this.txService.broadcast(tx);
     if (resp.status === 'success') {
-      const ingests = dependencyTxids.map((txid) => new TxnIngest(txid, Date.now(), 0));
-      ingests.push(new TxnIngest(tx.id('hex') as string, Date.now(), 0));
-      await this.queue(ingests);
+      if (!dependencyTxids.length) {
+        await this.ingest(tx);
+      } else {
+        const ingests = dependencyTxids.map((txid) => new TxnIngest(txid, Date.now(), 0));
+        ingests.push(new TxnIngest(tx.id('hex') as string, Date.now(), 0));
+        await this.queue(ingests);
+      }
     }
     return resp;
   }
@@ -187,7 +198,8 @@ export class TxoStore {
       }
     }
 
-    const db = await this.db;
+    const txoDb = await this.txoDb;
+    const txnDb = await this.txnDb;
 
     const ctx: IndexContext = {
       txid,
@@ -205,7 +217,7 @@ export class TxoStore {
         input.sourceTXID = input.sourceTransaction.id('hex') as string;
       }
       if (input.sourceTransaction) {
-        if (await db.getKey('txns', input.sourceTXID)) {
+        if (await txnDb.getKey('txns', input.sourceTXID)) {
           continue;
         }
         await this.ingest(input.sourceTransaction);
@@ -222,9 +234,9 @@ export class TxoStore {
       status: TxnStatus.PENDING,
       proof: tx.merklePath && Buffer.from(tx.merklePath.toBinary()),
     };
-    await db.put('txns', txn);
+    await txnDb.put('txns', txn);
 
-    const t = db.transaction('txos', 'readwrite');
+    const t = txoDb.transaction('txos', 'readwrite');
     for await (const [vin, input] of tx.inputs.entries()) {
       const data = await t.store.get([input.sourceTXID!, input.sourceOutputIndex]);
       const spend = data
@@ -280,7 +292,7 @@ export class TxoStore {
     }
     await t.done;
     txn.status = block.height < 50000000 ? TxnStatus.CONFIRMED : TxnStatus.BROADCASTED;
-    await db.put('txns', txn);
+    await txnDb.put('txns', txn);
     if (checkSpends) {
       this.updateSpends(ctx.txos.map((txo) => `${txo.txid}_${txo.vout}`));
     }
@@ -288,17 +300,17 @@ export class TxoStore {
   }
 
   async getQueueLength() {
-    const db = await this.db;
+    const db = await this.txoDb;
     const query: IDBKeyRange = IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Date.now()]);
     return db.countFromIndex('ingestQueue', 'status', query);
   }
 
   async queue(ingests: TxnIngest[]) {
-    const db = await this.db;
+    const db = await this.txoDb;
     const t = db.transaction('ingestQueue', 'readwrite');
     for (const ingest of ingests) {
-      const txn = await t.store.get(ingest.txid);
-      if (txn) continue;
+      // const txn = await t.store.get(ingest.txid);
+      // if (txn) continue;
       await t.store.put(ingest);
     }
     await t.done;
@@ -309,7 +321,7 @@ export class TxoStore {
   }
 
   async ingestQueue() {
-    const db = await this.db;
+    const db = await this.txoDb;
     const query: IDBKeyRange = IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Date.now()]);
     const txns = await db.getAllFromIndex('ingestQueue', 'status', query, 100);
     if (txns.length) {

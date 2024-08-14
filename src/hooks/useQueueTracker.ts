@@ -25,7 +25,7 @@ export const useQueueTracker = () => {
         if (!intervalRef.current) {
           intervalRef.current = setInterval(() => {
             setUpdateBalance((prev) => !prev);
-          }, 2000);
+          }, 5000);
         }
 
         if (timeoutRef.current) {
@@ -40,7 +40,7 @@ export const useQueueTracker = () => {
             intervalRef.current = null;
           }
 
-          setUpdateBalance(false);
+          setUpdateBalance(true);
         }, 3000);
       }
     };
