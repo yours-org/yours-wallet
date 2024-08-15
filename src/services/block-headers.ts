@@ -91,9 +91,14 @@ export class BlockHeaderService implements ChainTracker {
     return (await db.getFromIndex('headers', 'byHash', hash))?.height;
   }
 
-  async getCurrentBlock(): Promise<BlockHeader | undefined> {
+  async getSyncedBlock(): Promise<BlockHeader | undefined> {
     const db = await this.db;
     const cursor = await db.transaction('headers').store.openCursor(null, 'prev');
     return cursor?.value;
   }
+
+  async getChaintip(): Promise<BlockHeader> {
+    let resp = await fetch(`${API[this.network]}/api/blocks/tip`);
+    return resp.json();
+  }  
 }

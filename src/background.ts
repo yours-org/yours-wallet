@@ -50,17 +50,21 @@ const chromeStorageService = new ChromeStorageService();
 
 export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() => {
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
-
-  // TODO: Add network to constructor call.
-  const indexers: Indexer[] = [
-    new FundIndexer(new Set<string>([account?.addresses?.bsvAddress || '']), undefined, TxoStatus.CONFIRMED),
-    new LockIndexer(new Set<string>([account?.addresses?.identityAddress || '']), undefined, TxoStatus.CONFIRMED),
-    new OrdLockIndexer(new Set<string>([account?.addresses?.ordAddress || ''])),
-    new OrdIndexer(new Set<string>([account?.addresses?.ordAddress || '']), undefined, TxoStatus.CONFIRMED),
-    new Bsv21Indexer(new Set<string>([account?.addresses?.ordAddress || ''])),
-  ];
   const network = chromeStorageService.getNetwork();
   const blockHeaderService = new BlockHeaderService(network);
+
+  // TODO: move this into a function
+  let {bsvAddress, identityAddress, ordAddress} = account?.addresses || {}
+  if(!bsvAddress) bsvAddress = ''
+  if(!identityAddress) identityAddress = ''
+  if(!ordAddress) ordAddress = ''
+  const indexers: Indexer[] = [
+    new FundIndexer(new Set<string>([bsvAddress, ordAddress]), network, TxoStatus.CONFIRMED),
+    new LockIndexer(new Set<string>([identityAddress]), network, TxoStatus.CONFIRMED),
+    new OrdLockIndexer(new Set<string>([ordAddress]), network),
+    new OrdIndexer(new Set<string>([bsvAddress, ordAddress]), network, TxoStatus.CONFIRMED),
+    new Bsv21Indexer(new Set<string>([ordAddress]), network),
+  ];
   const txoStore = new TxoStore(
     selectedAccount || '',
     indexers,
@@ -445,7 +449,8 @@ if (self?.document === undefined) {
         const storageObj = chromeStorageService.getCurrentAccountObject();
         const bsvAddress = storageObj.account?.addresses?.ordAddress;
         const txoStore = await txoStorePromise;
-        const results = await txoStore.searchTxos(new TxoLookup('ord', 'address', bsvAddress), 100);
+        const results = await txoStore.searchTxos(new TxoLookup('ord'), 100);
+        // const results = await txoStore.searchTxos(new TxoLookup('ord', 'address', bsvAddress), 100);
         console.log('results', results);
 
         sendResponse({
@@ -507,7 +512,8 @@ if (self?.document === undefined) {
         const storageObj = chromeStorageService.getCurrentAccountObject();
         const bsvAddress = storageObj.account?.addresses?.bsvAddress;
         const txoStore = await txoStorePromise;
-        const results = await txoStore.searchTxos(new TxoLookup('fund', 'address', bsvAddress), 0);
+        const results = await txoStore.searchTxos(new TxoLookup('fund'), 0);
+        // const results = await txoStore.searchTxos(new TxoLookup('fund', 'address', bsvAddress), 0);
         const utxos = results.txos.map((txo) => {
           return {
             satoshis: Number(txo.satoshis),

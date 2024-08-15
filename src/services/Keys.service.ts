@@ -18,7 +18,7 @@ import { Account, ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
 import { WocUtxo } from './types/whatsOnChain.types';
 import { WhatsOnChainService } from './WhatsOnChain.service';
-import { Utils } from '@bsv/sdk';
+import { PrivateKey, Utils } from '@bsv/sdk';
 
 export class KeysService {
   bsvAddress: string;
@@ -217,6 +217,15 @@ export class KeysService {
       console.error('Error in retrieveKeys:', error);
       throw new Error('Failed to retrieve keys');
     }
+  };
+
+  retrievePrivateKeyMap = async (password?: string, isBelowNoApprovalLimit?: boolean): Promise<Map<string, PrivateKey>> => {
+    const keys = await this.retrieveKeys(password, isBelowNoApprovalLimit);
+    const pkMap = new Map<string, PrivateKey>();
+    if (keys.walletAddress && keys.walletWif) pkMap.set(keys.walletAddress, PrivateKey.fromWif(keys.walletWif))
+    if (keys.ordAddress && keys.ordWif) pkMap.set(keys.ordAddress, PrivateKey.fromWif(keys.ordWif))
+    if (keys.identityAddress && keys.identityWif) pkMap.set(keys.identityAddress, PrivateKey.fromWif(keys.identityWif))
+    return pkMap;
   };
 
   verifyPassword = async (password: string): Promise<boolean> => {

@@ -45,6 +45,7 @@ export class TxoStore {
   txoDb: Promise<IDBPDatabase<TxoSchema>>;
   txnDb: Promise<IDBPDatabase<TxnSchema>>;
   queueLength = 0;
+  private cancel = false;
   constructor(
     public accountId: string,
     public indexers: Indexer[] = [],
@@ -328,6 +329,10 @@ export class TxoStore {
     this.processIngests();
   }
 
+  async cancelQueue() {
+    this.cancel = true;
+  }
+
   async processIngests(returnOnDone = false) {
     const db = await this.txoDb;
     const query = IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Number.MAX_SAFE_INTEGER]);
@@ -349,9 +354,12 @@ export class TxoStore {
       if (this.notifyQueueStats) {
         this.notifyQueueStats({ length: await this.getQueueLength() });
       }
-    } else if (!returnOnDone) {
+    } else {
       await new Promise((r) => setTimeout(r, 1000));
-    } else return;
+    }
+    if (this.cancel) {
+      return;
+    }
     this.processIngests();
   }
 
@@ -382,6 +390,9 @@ export class TxoStore {
     } catch (e) {
       console.error('Failed to ingest txs', e);
       await new Promise((r) => setTimeout(r, 1000));
+    }
+    if (this.cancel) {
+      return;
     }
     this.processDownloads();
   }

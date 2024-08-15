@@ -22,7 +22,6 @@ const initializeServices = async () => {
 
   const bsvService = new BsvService(
     keysService,
-    gorillaPoolService,
     wocService,
     contractService,
     chromeStorageService,
@@ -30,7 +29,6 @@ const initializeServices = async () => {
   );
   const ordinalService = new OrdinalService(
     keysService,
-    gorillaPoolService,
     chromeStorageService,
     bsvService,
     txoStore,

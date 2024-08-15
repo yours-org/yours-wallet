@@ -23,7 +23,6 @@ import {
   BSM,
   ECDSA,
   P2PKH,
-  PrivateKey,
   PublicKey,
   SatoshisPerKilobyte,
   Script,
@@ -36,10 +35,8 @@ import { Lock } from './txo-store/mods/lock';
 export class BsvService {
   private bsvBalance: number;
   private exchangeRate: number;
-  // private lockData: LockData;
   constructor(
     private readonly keysService: KeysService,
-    private readonly gorillaPoolService: GorillaPoolService,
     private readonly wocService: WhatsOnChainService,
     private readonly contractService: ContractService,
     private readonly chromeStorageService: ChromeStorageService,
@@ -47,7 +44,6 @@ export class BsvService {
   ) {
     this.bsvBalance = 0;
     this.exchangeRate = 0;
-    // this.lockData = { totalLocked: 0, unlockable: 0, nextUnlock: 0 };
   }
 
   getBsvBalance = () => this.bsvBalance;
@@ -76,13 +72,14 @@ export class BsvService {
 
   getCurrentHeight = async () => {
     if (!this.txoStore.blocksService) return 0;
-    const header = await this.txoStore.blocksService.getCurrentBlock();
+    const header = await this.txoStore.blocksService.getSyncedBlock();
     return header?.height || 0;
   };
 
   getLockedTxos = async () => {
     const lockTxos = await this.txoStore.searchTxos(
-      new TxoLookup('lock', 'address', this.keysService.identityAddress),
+      new TxoLookup('lock'),
+      // new TxoLookup('lock', 'address', this.keysService.identityAddress),
       0,
     );
     return lockTxos.txos;
@@ -119,13 +116,9 @@ export class BsvService {
       // let feeSats = 20;
       const isBelowNoApprovalLimit = Number(bsvSendAmount) <= Number(noApprovalLimit);
       const keys = await this.keysService.retrieveKeys(password, isBelowNoApprovalLimit);
-      if (!keys?.walletWif || !keys.walletPubKey) throw Error('Undefined key');
-      const paymentPk = PrivateKey.fromWif(keys.walletWif);
-      const pubKey = paymentPk.toPublicKey();
-      const network = this.chromeStorageService.getNetwork();
-      const fromAddress = pubKey.toAddress([
-        network == NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
-      ]);
+      if (!keys?.walletAddress) throw Error('Undefined key');
+      const changeAddress = keys.walletAddress;
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
       const amount = request.reduce((a, r) => a + r.satoshis, 0);
 
       // Build tx
@@ -170,12 +163,13 @@ export class BsvService {
       });
 
       tx.addOutput({
-        lockingScript: new P2PKH().lock(fromAddress),
+        lockingScript: new P2PKH().lock(changeAddress),
         change: true,
       });
 
       const fundResults = await this.txoStore.searchTxos(
-        new TxoLookup('fund', 'address', this.keysService.bsvAddress),
+        new TxoLookup('fund'),
+        // new TxoLookup('fund', 'address', this.keysService.bsvAddress),
         0,
       );
 
@@ -183,11 +177,13 @@ export class BsvService {
       let fee = 0;
       const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
       for await (const u of fundResults.txos || []) {
+        const pk = pkMap.get(u.owner || '');
+        if (!pk) continue;
         tx.addInput({
           sourceTransaction: await this.txoStore.getTx(u.txid),
           sourceOutputIndex: u.vout,
           sequence: 0xffffffff,
-          unlockingScriptTemplate: new P2PKH().unlock(paymentPk),
+          unlockingScriptTemplate: new P2PKH().unlock(pk),
         });
         satsIn += Number(u.satoshis);
         fee = await feeModel.computeFee(tx);
@@ -310,7 +306,8 @@ export class BsvService {
   };
 
   fundingTxos = async () => {
-    const results = await this.txoStore.searchTxos(new TxoLookup('fund', 'address', this.keysService.bsvAddress), 0);
+    const results = await this.txoStore.searchTxos(new TxoLookup('fund'), 0);
+    // const results = await this.txoStore.searchTxos(new TxoLookup('fund', 'address', this.keysService.bsvAddress), 0);
     return results.txos;
   };
 
@@ -320,9 +317,7 @@ export class BsvService {
       return { error: 'invalid-password' };
     }
 
-    const keys = await this.keysService.retrieveKeys(password);
-    if (!keys.walletWif) throw new Error('Missing keys');
-    const paymentPk = PrivateKey.fromWif(keys.walletWif);
+    const pkMap = await this.keysService.retrievePrivateKeyMap(password);
     const tx = Transaction.fromHex(rawtx);
 
     let satsIn = 0;
@@ -336,17 +331,20 @@ export class BsvService {
     tx.addOutput({ change: true, lockingScript: new P2PKH().lock(this.keysService.bsvAddress) });
 
     const fundResults = await this.txoStore.searchTxos(
-      new TxoLookup('fund', 'address', this.keysService.bsvAddress),
+      new TxoLookup('fund'),
+      // new TxoLookup('fund', 'address', this.keysService.bsvAddress),
       0,
     );
 
     const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
     for await (const u of fundResults.txos || []) {
+      const pk = pkMap.get(u.owner || '');
+      if (!pk) continue;
       tx.addInput({
         sourceTransaction: await this.txoStore.getTx(u.txid),
         sourceOutputIndex: u.vout,
         sequence: 0xffffffff,
-        unlockingScriptTemplate: new P2PKH().unlock(paymentPk),
+        unlockingScriptTemplate: new P2PKH().unlock(pk),
       });
       satsIn += Number(u.satoshis);
       fee = await feeModel.computeFee(tx);

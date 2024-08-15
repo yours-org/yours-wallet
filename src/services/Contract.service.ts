@@ -114,14 +114,12 @@ export class ContractService {
 
   unlock = async (locks: Txo[], currentBlockHeight: number) => {
     try {
-      const keys = await this.keysService.retrieveKeys(undefined, true); // using below limit to bypass password
-      if (!keys.identityWif || !keys.walletAddress) {
-        throw Error('No keys');
-      }
-      const lockPk = PrivateKey.fromWif(keys.identityWif);
+      const pkMap = await this.keysService.retrievePrivateKeyMap(undefined, true);
       const tx = new Transaction();
       tx.lockTime = currentBlockHeight;
       for (const lock of locks) {
+        const pk = pkMap.get(lock.owner || '');
+        if (!pk) continue;
         const input = fromUtxo(
           {
             txid: lock.txid,
@@ -129,7 +127,7 @@ export class ContractService {
             satoshis: Number(lock.satoshis),
             script: Utils.toHex([...lock.script]),
           },
-          new LockTemplate().unlock(lockPk, 'all', false, Number(lock.satoshis), Script.fromBinary([...lock.script])),
+          new LockTemplate().unlock(pk, 'all', false, Number(lock.satoshis), Script.fromBinary([...lock.script])),
         );
         input.sequence = 0;
         tx.addInput(input);
