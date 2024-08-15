@@ -370,7 +370,7 @@ export class TxoStore {
           }
         }
         const missingTxids = Object.keys(missing);
-        if (missing) {
+        if (missingTxids.length) {
           const results = await this.txService.batchFetch(missingTxids);
           const tTxn = txnDb.transaction('txns', 'readwrite');
           await Promise.all([
