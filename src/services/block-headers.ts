@@ -98,7 +98,7 @@ export class BlockHeaderService implements ChainTracker {
   }
 
   async getChaintip(): Promise<BlockHeader> {
-    let resp = await fetch(`${API[this.network]}/api/blocks/tip`);
+    const resp = await fetch(`${API[this.network]}/api/blocks/tip`);
     return resp.json();
   }
 }

@@ -42,19 +42,32 @@ export interface TxnSchema extends DBSchema {
   };
 }
 export class TxoStore {
-  txoDb: Promise<IDBPDatabase<TxoSchema>>;
-  txnDb: Promise<IDBPDatabase<TxnSchema>>;
+  // txoDb: Promise<IDBPDatabase<TxoSchema>>;
+  // txnDb: Promise<IDBPDatabase<TxnSchema>>;
   queueLength = 0;
   private destroyStore = false;
   constructor(
     public accountId: string,
-    public indexers: Indexer[] = [],
+    public indexers: Indexer[],
     public txService: TransactionService,
+    public txoDb: IDBPDatabase<TxoSchema>,
+    public txnDb: IDBPDatabase<TxnSchema>,
     public blocksService?: BlockHeaderService,
     public network: NetWork = NetWork.Mainnet,
     public notifyQueueStats?: (queueStats: { length: number }) => void,
+  ) {}
+
+  static async init(
+    accountId: string,
+    indexers: Indexer[],
+    txService: TransactionService,
+    blocksService: BlockHeaderService,
+    notifyQueueStats?: (queueStats: { length: number }) => void,
+    network: NetWork = NetWork.Mainnet,
   ) {
-    this.txoDb = openDB<TxoSchema>(`txostore-${accountId}-${network}`, TXO_DB_VERSION, {
+    if (!accountId) throw new Error('Missing accountId');
+
+    const txoDb = await openDB<TxoSchema>(`txostore-${accountId}-${network}`, TXO_DB_VERSION, {
       upgrade(db) {
         const txos = db.createObjectStore('txos', { keyPath: ['txid', 'vout'] });
         txos.createIndex('events', 'events', { multiEntry: true });
@@ -63,23 +76,33 @@ export class TxoStore {
         ingestQueue.createIndex('status', ['status', 'height', 'idx']);
       },
     });
-    this.txnDb = openDB<TxnSchema>(`txnstore-${network}`, TXN_DB_VERSION, {
+    const txnDb = await openDB<TxnSchema>(`txnstore-${network}`, TXN_DB_VERSION, {
       upgrade(db) {
         const txns = db.createObjectStore('txns', { keyPath: 'txid' });
         txns.createIndex('status', ['status', 'block.height']);
       },
     });
-  }
 
-  async init() {}
+    const txoStore = new TxoStore(
+      accountId,
+      indexers,
+      txService,
+      txoDb,
+      txnDb,
+      blocksService,
+      network,
+      notifyQueueStats,
+    );
+    txoStore.processQueue();
+    return txoStore;
+  }
 
   async destroy() {
     this.destroyStore = true;
   }
 
   async getTx(txid: string, fromRemote = false): Promise<Transaction | undefined> {
-    const db = await this.txnDb;
-    let txn = await db.get('txns', txid);
+    let txn = await this.txnDb.get('txns', txid);
     if (txn) {
       const tx = Transaction.fromBinary(txn.rawtx);
       if (txn.proof) {
@@ -102,21 +125,20 @@ export class TxoStore {
       txn.proof = tx.merklePath.toBinary();
       txn.status = TxnStatus.CONFIRMED;
     }
-    await db.put('txns', txn);
+    await this.txnDb.put('txns', txn);
     return tx;
   }
 
   async getTxo(txid: string, vout: number): Promise<Txo | undefined> {
-    return (await this.txoDb).get('txos', [txid, vout]);
+    return this.txoDb.get('txos', [txid, vout]);
   }
 
   async searchTxos(lookup: TxoLookup, limit = 10, from?: string): Promise<TxoResults> {
-    const db = await this.txoDb;
     const dbkey = lookup.toQueryKey();
     const start = from || dbkey;
     const query: IDBKeyRange = IDBKeyRange.bound(start, dbkey + '\uffff', true, false);
     const results: TxoResults = { txos: [] };
-    for await (const cursor of db.transaction('txos').store.index('events').iterate(query)) {
+    for await (const cursor of this.txoDb.transaction('txos').store.index('events').iterate(query)) {
       const txo = Txo.fromObject(cursor.value, this.indexers);
       results.nextPage = cursor.key;
       if (lookup.owner && txo.owner != lookup.owner) continue;
@@ -130,7 +152,6 @@ export class TxoStore {
   }
 
   private async updateSpends(outpoints: string[]) {
-    const db = await this.txoDb;
     const resp = await fetch(`${GP_BASE_URL}/api/spends`, {
       method: 'POST',
       body: JSON.stringify(outpoints),
@@ -143,7 +164,7 @@ export class TxoStore {
       return;
     }
     const spends = (await resp.json()) as string[];
-    const t = db.transaction('txos', 'readwrite');
+    const t = this.txoDb.transaction('txos', 'readwrite');
     for (const [i, outpoint] of outpoints.entries()) {
       if (spends[i]) {
         const [txid, vout] = outpoint.split('_');
@@ -203,8 +224,6 @@ export class TxoStore {
       }
     }
 
-    const txoDb = await this.txoDb;
-    const txnDb = await this.txnDb;
     const ctx: IndexContext = {
       txid,
       tx,
@@ -221,7 +240,7 @@ export class TxoStore {
         input.sourceTXID = input.sourceTransaction.id('hex') as string;
       }
       if (input.sourceTransaction) {
-        if (await txnDb.getKey('txns', input.sourceTXID)) {
+        if (await this.txnDb.getKey('txns', input.sourceTXID)) {
           continue;
         }
         await this.ingest(input.sourceTransaction);
@@ -238,9 +257,9 @@ export class TxoStore {
       status: TxnStatus.PENDING,
       proof: tx.merklePath && tx.merklePath.toBinary(),
     };
-    await txnDb.put('txns', txn);
+    await this.txnDb.put('txns', txn);
 
-    const t = txoDb.transaction('txos', 'readwrite');
+    const t = this.txoDb.transaction('txos', 'readwrite');
     for await (const [vin, input] of tx.inputs.entries()) {
       const data = await t.store.get([input.sourceTXID!, input.sourceOutputIndex]);
       const spend = data
@@ -290,7 +309,7 @@ export class TxoStore {
     }
     await t.done;
     txn.status = block.height < 50000000 ? TxnStatus.CONFIRMED : TxnStatus.BROADCASTED;
-    await txnDb.put('txns', txn);
+    await this.txnDb.put('txns', txn);
     if (fromRemote && checkSpends) {
       await this.updateSpends(ctx.txos.map((t) => `${t.txid}_${t.vout}`));
     }
@@ -298,9 +317,7 @@ export class TxoStore {
   }
 
   async getQueueLength() {
-    const txoDb = await this.txoDb;
-
-    this.queueLength = await txoDb.countFromIndex(
+    this.queueLength = await this.txoDb.countFromIndex(
       'ingestQueue',
       'status',
       IDBKeyRange.bound([0], [Number.MAX_SAFE_INTEGER]),
@@ -309,8 +326,7 @@ export class TxoStore {
   }
 
   async queue(ingests: TxnIngest[]) {
-    const db = await this.txoDb;
-    const t = db.transaction('ingestQueue', 'readwrite');
+    const t = this.txoDb.transaction('ingestQueue', 'readwrite');
     for (const ingest of ingests) {
       await t.store.put(ingest);
     }
@@ -335,10 +351,9 @@ export class TxoStore {
     this.processIngests();
   }
 
-  async processIngests(returnOnDone = false) {
-    const db = await this.txoDb;
+  async processIngests() {
     const query = IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Number.MAX_SAFE_INTEGER]);
-    const ingests = await db.getAllFromIndex('ingestQueue', 'status', query, 100);
+    const ingests = await this.txoDb.getAllFromIndex('ingestQueue', 'status', query, 100);
     if (ingests.length) {
       console.log('Ingesting', ingests.length, 'txs');
       for await (const ingest of ingests) {
@@ -348,7 +363,7 @@ export class TxoStore {
           continue;
         }
         await this.ingest(tx, true, ingest.isDep ? TxoStatus.DEPENDENCY : TxoStatus.CONFIRMED, ingest.checkSpends);
-        await db.delete('ingestQueue', ingest.txid);
+        await this.txoDb.delete('ingestQueue', ingest.txid);
         if (this.notifyQueueStats) {
           this.notifyQueueStats({ length: --this.queueLength });
         }
@@ -367,12 +382,11 @@ export class TxoStore {
 
   async processDownloads(returnOnDone = false) {
     try {
-      const txoDb = await this.txoDb;
       const query = IDBKeyRange.bound([TxnStatus.DOWNLOAD, 0], [TxnStatus.DOWNLOAD, Number.MAX_SAFE_INTEGER]);
-      const ingests = await txoDb.getAllFromIndex('ingestQueue', 'status', query, 25);
+      const ingests = await this.txoDb.getAllFromIndex('ingestQueue', 'status', query, 25);
       if (ingests.length) {
         await this.ensureTxns(ingests.map((i) => i.txid));
-        const downloadQueue = txoDb.transaction('ingestQueue', 'readwrite');
+        const downloadQueue = this.txoDb.transaction('ingestQueue', 'readwrite');
         await Promise.all([
           ...ingests.map((i) => {
             if (i.downloadOnly) {
@@ -400,9 +414,8 @@ export class TxoStore {
   }
 
   async ensureTxns(txids: string[]) {
-    const db = await this.txnDb;
     console.log('Downloading', txids.length, 'txs');
-    const t = db.transaction('txns', 'readonly');
+    const t = this.txnDb.transaction('txns', 'readonly');
     const foundTxids = await Promise.all([...txids.map((txid) => t.store.getKey(txid).catch(() => null)), t.done]);
     const missing: { [txid: string]: boolean } = {};
     for (const [i, txid] of txids.entries()) {
@@ -411,7 +424,7 @@ export class TxoStore {
     const missingTxids = Object.keys(missing);
     if (missingTxids.length) {
       const results = await this.txService.batchFetch(missingTxids);
-      const tTxn = db.transaction('txns', 'readwrite');
+      const tTxn = this.txnDb.transaction('txns', 'readwrite');
       await Promise.all([
         ...results.map(async (tx) => {
           const txn: Txn = {

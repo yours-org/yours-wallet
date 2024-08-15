@@ -48,7 +48,7 @@ import { OrdLockIndexer } from './services/txo-store/mods/ordlock';
 import { QueueTrackerMessage } from './hooks/useQueueTracker';
 const chromeStorageService = new ChromeStorageService();
 
-export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() => {
+export const txoStorePromise = chromeStorageService.getAndSetStorage().then(async () => {
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
   const network = chromeStorageService.getNetwork();
 
@@ -64,12 +64,11 @@ export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() =
     new OrdIndexer(new Set<string>([bsvAddress, ordAddress]), network, TxoStatus.CONFIRMED),
     new Bsv21Indexer(new Set<string>([ordAddress]), network),
   ];
-  const txoStore = new TxoStore(
+  const txoStore = await TxoStore.init(
     selectedAccount || '',
     indexers,
     new OneSatTransactionService(GP_BASE_URL),
     mainBlockHeaderService,
-    network,
     (queueStats: { length: number }) => {
       const message: QueueTrackerMessage = { action: YoursEventName.QUEUE_STATUS_UPDATE, data: queueStats };
       try {
@@ -77,6 +76,7 @@ export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() =
         // eslint-disable-next-line no-empty
       } catch (e) {}
     },
+    network,
   );
   return txoStore;
 });
