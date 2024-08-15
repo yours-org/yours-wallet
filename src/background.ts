@@ -51,7 +51,6 @@ const chromeStorageService = new ChromeStorageService();
 export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() => {
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
   const network = chromeStorageService.getNetwork();
-  const blockHeaderService = new BlockHeaderService(network);
 
   // TODO: move this into a function
   let { bsvAddress, identityAddress, ordAddress } = account?.addresses || {};
@@ -69,7 +68,7 @@ export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() =
     selectedAccount || '',
     indexers,
     new OneSatTransactionService(GP_BASE_URL),
-    blockHeaderService,
+    mainBlockHeaderService,
     network,
     (queueStats: { length: number }) => {
       const message: QueueTrackerMessage = { action: YoursEventName.QUEUE_STATUS_UPDATE, data: queueStats };
@@ -102,16 +101,16 @@ let popupWindowId: number | undefined;
 
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
+export const mainBlockHeaderService = new BlockHeaderService(NetWork.Mainnet);
+// export const testBlockHeaderService = new BlockHeaderService(NetWork.Testnet);
+
 // only run in background worker
 if (self?.document === undefined) {
   txoStorePromise.then((txoStore) => {
     setTimeout(() => txoStore.processQueue(), 5000);
   });
 
-  const mainBlockHeaderService = new BlockHeaderService(NetWork.Mainnet);
   mainBlockHeaderService.syncBlocks();
-
-  // const testBlockHeaderService = new BlockHeaderService(NetWork.Testnet);
   // testBlockHeaderService.syncBlocks();
 
   const launchPopUp = () => {
