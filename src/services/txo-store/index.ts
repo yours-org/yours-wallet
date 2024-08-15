@@ -259,7 +259,7 @@ export class TxoStore {
       } else {
         const script = output.lockingScript.toBinary();
         // console.log('script', output.lockingScript.toBinary())
-        txo = new Txo(txid, vout, BigInt(output.satoshis!), script);
+        txo = new Txo(txid, vout, BigInt(output.satoshis!), script, status);
       }
       txo.status = status;
 
@@ -324,11 +324,11 @@ export class TxoStore {
     if (this.queueLength && this.notifyQueueStats) {
       this.notifyQueueStats({ length: this.queueLength });
     }
-    this.downloadTxns();
-    this.ingestQueue();
+    this.processDownloads();
+    this.processIngests();
   }
 
-  async ingestQueue(returnOnDone = false) {
+  async processIngests(returnOnDone = false) {
     const db = await this.txoDb;
     const query = IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Number.MAX_SAFE_INTEGER]);
     const ingests = await db.getAllFromIndex('ingestQueue', 'status', query, 100);
@@ -352,55 +352,27 @@ export class TxoStore {
     } else if (!returnOnDone) {
       await new Promise((r) => setTimeout(r, 1000));
     } else return;
-    this.ingestQueue();
+    this.processIngests();
   }
 
-  async downloadTxns(returnOnDone = false) {
+  async processDownloads(returnOnDone = false) {
     try {
       const txoDb = await this.txoDb;
-      const txnDb = await this.txnDb;
       const query = IDBKeyRange.bound([TxnStatus.DOWNLOAD, 0], [TxnStatus.DOWNLOAD, Number.MAX_SAFE_INTEGER]);
       const ingests = await txoDb.getAllFromIndex('ingestQueue', 'status', query, 25);
       if (ingests.length) {
-        console.log('Downloading', ingests.length, 'txs');
-        const missing: { [txid: string]: TxnIngest } = {};
-        const t = txnDb.transaction('txns', 'readonly');
-        const foundTxids = await Promise.all([...ingests.map((i) => t.store.getKey(i.txid)), t.done]);
-        for (const [i, ingest] of ingests.entries()) {
-          const foundTxid = foundTxids[i];
-          if (foundTxid) {
-            ingest.status = TxnStatus.INGEST;
-          } else {
-            missing[ingest.txid] = ingest;
-          }
-        }
-        const missingTxids = Object.keys(missing);
-        if (missingTxids.length) {
-          const results = await this.txService.batchFetch(missingTxids);
-          const tTxn = txnDb.transaction('txns', 'readwrite');
-          await Promise.all([
-            ...results.map(async (tx) => {
-              const txn: Txn = {
-                txid: tx.id('hex') as string,
-                rawtx: tx.toBinary(),
-                block: new Block(),
-                status: TxnStatus.PENDING,
-              };
-              if (tx.merklePath) {
-                const txHash = tx.hash('hex');
-                txn.block.height = tx.merklePath.blockHeight;
-                txn.block.idx = BigInt(tx.merklePath.path[0].find((p) => p.hash == txHash)?.offset || 0);
-                txn.proof = tx.merklePath.toBinary();
-                txn.status = TxnStatus.CONFIRMED;
-              }
-              missing[txn.txid]!.status = TxnStatus.INGEST;
-              await tTxn.store.put(txn);
-            }),
-            tTxn.done,
-          ]);
-        }
-        const tTxo = txoDb.transaction('ingestQueue', 'readwrite');
-        await Promise.all([...ingests.map((i) => tTxo.store.put(i)), tTxo.done]);
+        await this.ensureTxns(ingests.map((i) => i.txid));
+        const downloadQueue = txoDb.transaction('ingestQueue', 'readwrite');
+        await Promise.all([
+          ...ingests.map((i) => {
+            if (i.downloadOnly) {
+              return downloadQueue.store.delete(i.txid);
+            }
+            i.status = TxnStatus.INGEST;
+            return downloadQueue.store.put(i);
+          }),
+          downloadQueue.done,
+        ]);
         if (this.notifyQueueStats) {
           this.notifyQueueStats({ length: await this.getQueueLength() });
         }
@@ -411,6 +383,42 @@ export class TxoStore {
       console.error('Failed to ingest txs', e);
       await new Promise((r) => setTimeout(r, 1000));
     }
-    this.downloadTxns();
+    this.processDownloads();
+  }
+
+  async ensureTxns(txids: string[]) {
+    const db = await this.txnDb;
+    console.log('Downloading', txids.length, 'txs');
+    const t = db.transaction('txns', 'readonly');
+    const foundTxids = await Promise.all([...txids.map((txid) => t.store.getKey(txid).catch(() => null)), t.done]);
+    const missing: { [txid: string]: boolean } = {};
+    for (const [i, txid] of txids.entries()) {
+      if (!foundTxids[i]) missing[txid] = true;
+    }
+    const missingTxids = Object.keys(missing);
+    if (missingTxids.length) {
+      const results = await this.txService.batchFetch(missingTxids);
+      const tTxn = db.transaction('txns', 'readwrite');
+      await Promise.all([
+        ...results.map(async (tx) => {
+          const txn: Txn = {
+            txid: tx.id('hex') as string,
+            rawtx: tx.toBinary(),
+            block: new Block(),
+            status: TxnStatus.PENDING,
+          };
+          if (tx.merklePath) {
+            const txHash = tx.hash('hex');
+            txn.block.height = tx.merklePath.blockHeight;
+            txn.block.idx = BigInt(tx.merklePath.path[0].find((p) => p.hash == txHash)?.offset || 0);
+            txn.proof = tx.merklePath.toBinary();
+            txn.status = TxnStatus.CONFIRMED;
+          }
+          if (!missing[txn.txid]) throw new Error('Missing txid: ' + txn.txid);
+          await tTxn.store.put(txn);
+        }),
+        tTxn.done,
+      ]);
+    }
   }
 }

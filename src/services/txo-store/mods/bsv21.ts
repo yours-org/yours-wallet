@@ -166,22 +166,23 @@ export class Bsv21Indexer extends Indexer {
         let offset = 0;
         let utxos: BSV20Txo[] = [];
         do {
-          let deps: { [txid: string]: string[] } = {};
-          if (this.syncMode !== TxoStatus.TRUSTED) {
-            resp = await fetch(
-              `https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}?limit=${limit}&offset=${offset}`,
-            );
-            deps = await resp.json();
-          }
+          // let deps: { [txid: string]: string[] } = {};
+          // if (this.syncMode !== TxoStatus.TRUSTED) {
+          //   resp = await fetch(
+          //     `https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}/deps?limit=${limit}&offset=${offset}`,
+          //   );
+          //   deps = await resp.json();
+          // }
 
           resp = await fetch(
-            `https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}?limit=${limit}&offset=${offset}`,
+            `https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}?limit=${limit}&offset=${offset}&includePending=true`,
           );
           utxos = (await resp.json()) as BSV20Txo[];
-          if (this.syncMode !== TxoStatus.TRUSTED) {
-            const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx || 0, false, true));
-            await txoStore.queue(txns);
-          }
+          const ingests = utxos.map(
+            (u) => new TxnIngest(u.txid, u.height, u.idx || 0, false, true, this.syncMode === TxoStatus.TRUSTED),
+          );
+          await txoStore.queue(ingests);
+
           const t = txoDb.transaction('txos', 'readwrite');
           for (const u of utxos) {
             const txo = new Txo(u.txid, u.vout, 1n, Utils.toArray(u.script, 'base64'), TxoStatus.TRUSTED);
@@ -198,7 +199,7 @@ export class Bsv21Indexer extends Indexer {
                 status: u.status,
                 icon: token.icon,
               }),
-              deps[u.txid] || [],
+              undefined, //deps[u.txid] || [],
               [
                 { id: 'address', value: owner },
                 { id: 'id', value: token.id },
@@ -218,7 +219,7 @@ export class Bsv21Indexer extends Indexer {
           }
           await t.done;
           offset += limit;
-        } while (utxos.length == 100);
+        } while (utxos.length == limit);
       }
     }
   }

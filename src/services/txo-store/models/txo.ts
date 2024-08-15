@@ -22,13 +22,13 @@ export class Txo {
     public vout: number,
     public satoshis: bigint,
     public script: number[],
-    public status = TxoStatus.CONFIRMED,
+    public status: TxoStatus,
   ) {}
 
   toObject(): any {
     this.events = [];
     const sort = this.block.height.toString(16).padStart(8, '0');
-    if (!this.spend || this.status == TxoStatus.DEPENDENCY) {
+    if (!this.spend && this.status !== TxoStatus.DEPENDENCY) {
       for (const [tag, data] of Object.entries(this.data)) {
         for (const e of data.events) {
           this.events.push(`${tag}:${e.id}:${e.value}:${sort}:${this.block?.idx}:${this.vout}:${this.satoshis}`);
@@ -39,7 +39,7 @@ export class Txo {
   }
 
   static fromObject(obj: any, indexers: Indexer[] = []): Txo {
-    const txo = new Txo(obj.txid, obj.vout, obj.satoshis, obj.script);
+    const txo = new Txo(obj.txid, obj.vout, obj.satoshis, obj.script, obj.status);
     txo.block = obj.block && new Block(obj.block.height, obj.block.idx, obj.block.hash);
     txo.spend =
       obj.spend &&
@@ -54,8 +54,8 @@ export class Txo {
         txo.data[idx.tag] = idx.fromObj(obj.data[idx.tag]);
       }
     }
-
     txo.events = obj.events;
+    txo.status = obj.status;
     return txo;
   }
 

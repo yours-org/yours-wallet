@@ -223,10 +223,10 @@ export class OrdIndexer extends Indexer {
         const url = `https://ordinals.gorillapool.io/api/txos/address/${owner}/unspent?limit=${limit}&offset=${offset}&bsv20=false`;
         const resp = await fetch(url);
         utxos = await resp.json();
-        if (this.syncMode !== TxoStatus.TRUSTED) {
-          const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx || 0, false, true));
-          await txoStore.queue(txns);
-        }
+        const ingests = utxos.map(
+          (u) => new TxnIngest(u.txid, u.height, u.idx || 0, false, true, this.syncMode === TxoStatus.TRUSTED),
+        );
+        await txoStore.queue(ingests);
 
         const t = txoDb.transaction('txos', 'readwrite');
         for (const u of utxos) {
@@ -270,7 +270,7 @@ export class OrdIndexer extends Indexer {
         }
         await t.done;
         offset += limit;
-      } while (utxos.length == 100);
+      } while (utxos.length == limit);
     }
   }
 }

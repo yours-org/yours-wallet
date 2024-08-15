@@ -31,6 +31,7 @@ export class TxnIngest {
     public idx: number,
     public isDep = false,
     public checkSpends = false,
+    public downloadOnly = false,
   ) {
     if (typeof idx == 'string') {
       this.idx = parseInt(idx);
