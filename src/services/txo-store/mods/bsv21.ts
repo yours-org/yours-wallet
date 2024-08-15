@@ -153,31 +153,38 @@ export class Bsv21Indexer extends Indexer {
       for await (const token of balance) {
         if (!token.id) continue;
         console.log('importing', token.id);
-        resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}/ancestors`);
-        const txids = (await resp.json()) as { [score: string]: string };
-        let txns = Object.entries(txids).map(([score, txid]) => {
-          const [height, idx] = score.split('.').map(Number);
-          return new TxnIngest(txid, height, idx || 0, true);
-        });
-        await txoStore.queue(txns);
+        if (this.syncMode !== TxoStatus.TRUSTED) {
+          resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}/ancestors`);
+          const txids = (await resp.json()) as { [score: string]: string };
+          const txns = Object.entries(txids).map(([score, txid]) => {
+            const [height, idx] = score.split('.').map(Number);
+            return new TxnIngest(txid, height, idx || 0, true);
+          });
+          await txoStore.queue(txns);
+        }
         // try {
         let offset = 0;
         let utxos: BSV20Txo[] = [];
         do {
-          resp = await fetch(
-            `https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}?limit=${limit}&offset=${offset}`,
-          );
-          const deps = (await resp.json()) as { [txid: string]: string[] };
+          let deps: { [txid: string]: string[] } = {};
+          if (this.syncMode !== TxoStatus.TRUSTED) {
+            resp = await fetch(
+              `https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}?limit=${limit}&offset=${offset}`,
+            );
+            deps = await resp.json();
+          }
 
           resp = await fetch(
             `https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}?limit=${limit}&offset=${offset}`,
           );
           utxos = (await resp.json()) as BSV20Txo[];
-          txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx || 0, false));
-          await txoStore.queue(txns);
+          if (this.syncMode !== TxoStatus.TRUSTED) {
+            const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx || 0, false, true));
+            await txoStore.queue(txns);
+          }
           const t = txoDb.transaction('txos', 'readwrite');
           for (const u of utxos) {
-            const txo = new Txo(u.txid, u.vout, 1n, Utils.toArray(u.script, 'base64'), TxoStatus.Assumed);
+            const txo = new Txo(u.txid, u.vout, 1n, Utils.toArray(u.script, 'base64'), TxoStatus.TRUSTED);
             if (u.height) {
               txo.block = new Block(u.height, BigInt(u.idx || 0));
             }

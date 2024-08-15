@@ -168,7 +168,12 @@ export class TxoStore {
     return resp;
   }
 
-  async ingest(tx: Transaction, fromRemote = false, status = TxoStatus.Validated): Promise<IndexContext> {
+  async ingest(
+    tx: Transaction,
+    fromRemote = false,
+    status = TxoStatus.CONFIRMED,
+    checkSpends = false,
+  ): Promise<IndexContext> {
     const txid = tx.id('hex') as string;
     console.log('Ingesting', txid);
     const block = {
@@ -279,7 +284,7 @@ export class TxoStore {
     await t.done;
     txn.status = block.height < 50000000 ? TxnStatus.CONFIRMED : TxnStatus.BROADCASTED;
     await txnDb.put('txns', txn);
-    if (fromRemote && status == TxoStatus.Validated && txn.status == TxnStatus.CONFIRMED) {
+    if (fromRemote && checkSpends) {
       await this.updateSpends(ctx.txos.map((t) => `${t.txid}_${t.vout}`));
     }
     return ctx;
@@ -329,14 +334,14 @@ export class TxoStore {
     const ingests = await db.getAllFromIndex('ingestQueue', 'status', query, 100);
     if (ingests.length) {
       console.log('Ingesting', ingests.length, 'txs');
-      for await (const txn of ingests) {
-        const tx = await this.getTx(txn.txid);
+      for await (const ingest of ingests) {
+        const tx = await this.getTx(ingest.txid);
         if (!tx) {
-          console.error('Failed to get tx', txn.txid);
+          console.error('Failed to get tx', ingest.txid);
           continue;
         }
-        await this.ingest(tx, true, txn.isDep ? TxoStatus.Dep : TxoStatus.Validated);
-        await db.delete('ingestQueue', txn.txid);
+        await this.ingest(tx, true, ingest.isDep ? TxoStatus.DEPENDENCY : TxoStatus.CONFIRMED, ingest.checkSpends);
+        await db.delete('ingestQueue', ingest.txid);
         if (this.notifyQueueStats) {
           this.notifyQueueStats({ length: --this.queueLength });
         }

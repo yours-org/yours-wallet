@@ -56,7 +56,7 @@ export class LockIndexer extends Indexer {
           `https://ordinals.gorillapool.io/api/locks/address/${owner}/unspent?limit=${limit}&offset=${offset}`,
         );
         utxos = (await resp.json()) as Ordinal[];
-        const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx || 0));
+        const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx || 0, false, true));
         await txoStore.queue(txns);
         const t = txoDb.transaction('txos', 'readwrite');
         for (const u of utxos) {
@@ -66,7 +66,7 @@ export class LockIndexer extends Indexer {
             u.vout,
             BigInt(u.satoshis),
             new LockTemplate().lock(owner, u.data.lock.until).toBinary(),
-            TxoStatus.Assumed,
+            TxoStatus.TRUSTED,
           );
           if (u.height) {
             txo.block = new Block(u.height, BigInt(u.idx || 0));

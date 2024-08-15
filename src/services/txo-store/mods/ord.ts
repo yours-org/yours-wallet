@@ -207,23 +207,26 @@ export class OrdIndexer extends Indexer {
     for await (const owner of this.owners) {
       let txos: { txid: string; idx: string; height?: number }[] = [];
       let offset = 0;
-      do {
-        const resp = await fetch(
-          `https://ordinals.gorillapool.io/api/inscriptions/address/${owner}/ancestors?limit=${limit}&offset=${offset}`,
-        );
-        txos = await resp.json();
-        const txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx || '0'), true));
-        await txoStore.queue(txns);
-      } while (txos.length == limit);
+      if (this.syncMode !== TxoStatus.TRUSTED) {
+        do {
+          const resp = await fetch(
+            `https://ordinals.gorillapool.io/api/inscriptions/address/${owner}/ancestors?limit=${limit}&offset=${offset}`,
+          );
+          txos = await resp.json();
+          const txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx || '0'), true));
+          await txoStore.queue(txns);
+        } while (txos.length == limit);
+      }
       let utxos: Ordinal[] = [];
       offset = 0;
       do {
         const url = `https://ordinals.gorillapool.io/api/txos/address/${owner}/unspent?limit=${limit}&offset=${offset}&bsv20=false`;
         const resp = await fetch(url);
         utxos = await resp.json();
-
-        const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx || 0));
-        await txoStore.queue(txns);
+        if (this.syncMode !== TxoStatus.TRUSTED) {
+          const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx || 0, false, true));
+          await txoStore.queue(txns);
+        }
 
         const t = txoDb.transaction('txos', 'readwrite');
         for (const u of utxos) {
@@ -246,7 +249,7 @@ export class OrdIndexer extends Indexer {
             u.vout,
             1n,
             new P2PKH().lock(Utils.fromBase58Check(owner).data).toBinary(),
-            TxoStatus.Assumed,
+            TxoStatus.TRUSTED,
           );
           if (u.height) {
             txo.block = new Block(u.height, BigInt(u.idx || 0));

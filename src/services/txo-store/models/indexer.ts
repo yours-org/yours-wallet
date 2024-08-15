@@ -2,6 +2,7 @@ import { NetWork } from 'yours-wallet-provider';
 import type { IndexContext } from './index-context';
 import { IndexData } from './index-data';
 import { TxoStore } from '..';
+import { TxoStatus } from './txo';
 
 export abstract class Indexer {
   tag = '';
@@ -9,6 +10,7 @@ export abstract class Indexer {
   constructor(
     public owners = new Set<string>(),
     public network = NetWork.Mainnet,
+    public syncMode = TxoStatus.TRUSTED,
   ) {}
 
   parse(ctx: IndexContext, vout: number): IndexData | undefined {

@@ -5,9 +5,9 @@ import { Spend } from './spend';
 import { Buffer } from 'buffer';
 
 export enum TxoStatus {
-  Dep = 0,
-  Assumed = 1,
-  Validated = 2,
+  TRUSTED = 0,
+  DEPENDENCY = 1,
+  CONFIRMED = 2,
 }
 
 export class Txo {
@@ -22,13 +22,13 @@ export class Txo {
     public vout: number,
     public satoshis: bigint,
     public script: number[],
-    public status = TxoStatus.Validated,
+    public status = TxoStatus.CONFIRMED,
   ) {}
 
   toObject(): any {
     this.events = [];
     const sort = this.block.height.toString(16).padStart(8, '0');
-    if (!this.spend || this.status == TxoStatus.Dep) {
+    if (!this.spend || this.status == TxoStatus.DEPENDENCY) {
       for (const [tag, data] of Object.entries(this.data)) {
         for (const e of data.events) {
           this.events.push(`${tag}:${e.id}:${e.value}:${sort}:${this.block?.idx}:${this.vout}:${this.satoshis}`);

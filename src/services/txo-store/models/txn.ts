@@ -1,5 +1,4 @@
 import type { Block } from './block';
-import { TxoStatus } from './txo';
 
 export enum TxnStatus {
   INVALID = -1,
@@ -31,6 +30,7 @@ export class TxnIngest {
     public height: number,
     public idx: number,
     public isDep = false,
+    public checkSpends = false,
   ) {
     if (typeof idx == 'string') {
       this.idx = parseInt(idx);

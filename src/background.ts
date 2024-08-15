@@ -18,7 +18,6 @@ import {
   SignMessage,
   NetWork,
   // Inscription,
-  Ordinal,
 } from 'yours-wallet-provider';
 import {
   CustomListenerName,
@@ -42,23 +41,22 @@ import { Bsv21Indexer } from './services/txo-store/mods/bsv21';
 import { TxoStore } from './services/txo-store';
 import { OneSatTransactionService } from './services/txo-store/1satTxService';
 import { GP_BASE_URL } from './utils/constants';
-import { TxoLookup } from './services/txo-store/models/txo';
+import { TxoLookup, TxoStatus } from './services/txo-store/models/txo';
 import { LockIndexer } from './services/txo-store/mods/lock';
 import { mapOrdinal } from './utils/providerHelper';
 import { OrdLockIndexer } from './services/txo-store/mods/ordlock';
-import { TxnIngest } from './services/txo-store/models/txn';
 import { QueueTrackerMessage } from './hooks/useQueueTracker';
-import { Transaction } from '@bsv/sdk';
 const chromeStorageService = new ChromeStorageService();
 
 export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() => {
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
 
+  // TODO: Add network to constructor call.
   const indexers: Indexer[] = [
-    new FundIndexer(new Set<string>([account?.addresses?.bsvAddress || ''])),
-    new LockIndexer(new Set<string>([account?.addresses?.identityAddress || ''])),
+    new FundIndexer(new Set<string>([account?.addresses?.bsvAddress || '']), undefined, TxoStatus.CONFIRMED),
+    new LockIndexer(new Set<string>([account?.addresses?.identityAddress || '']), undefined, TxoStatus.CONFIRMED),
     new OrdLockIndexer(new Set<string>([account?.addresses?.ordAddress || ''])),
-    new OrdIndexer(new Set<string>([account?.addresses?.ordAddress || ''])),
+    new OrdIndexer(new Set<string>([account?.addresses?.ordAddress || '']), undefined, TxoStatus.CONFIRMED),
     new Bsv21Indexer(new Set<string>([account?.addresses?.ordAddress || ''])),
   ];
   const network = chromeStorageService.getNetwork();
