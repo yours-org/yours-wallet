@@ -31,5 +31,9 @@ export class TxnIngest {
     public height: number,
     public idx: number,
     public isDep = false,
-  ) {}
+  ) {
+    if (typeof idx == 'string') {
+      this.idx = parseInt(idx);
+    }
+  }
 }

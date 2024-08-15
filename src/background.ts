@@ -1130,55 +1130,6 @@ if (self?.document === undefined) {
     const txoStore = await txoStorePromise;
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (account) {
-      // const { bsvAddress, ordAddress, identityAddress } = account.addresses;
-      // /*
-      //  * BSV
-      //  */
-      // let resp = await fetch(
-      //   `https://ordinals.gorillapool.io/api/txos/address/${bsvAddress}/unspent?limit=10000&refresh=true`,
-      // );
-      // let txos = (await resp.json()) as { txid: string; height: number; idx: string; origin: { outpoint: string } }[];
-      // let txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx), true));
-      // await txoStore.queue(txns);
-
-      // /*
-      //  * Locks
-      //  */
-      // resp = await fetch(`https://ordinals.gorillapool.io/api/locks/address/${identityAddress}/unspent?limit=10000`);
-      // txos = await resp.json();
-      // txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx), true));
-      // await txoStore.queue(txns);
-
-      // /*
-      //  * BSV21
-      //  */
-      // resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/balance`);
-      // const balance = (await resp.json()) as { id?: string }[];
-      // for await (const token of balance) {
-      //   // if(token.id !== '00017fdc119c09b1c07102c8e01642a336c5cad8c1d2f8d91188fad27e9b5eb7_0') continue
-      //   if (!token.id) continue;
-      //   console.log('importing', token.id);
-      //   try {
-      //     resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${ordAddress}/id/${token.id}/txids`);
-      //     const txids = (await resp.json()) as { [score: string]: string };
-      //     txns = Object.entries(txids).map(([score, txid]) => {
-      //       const [height, idx] = score.split('.').map(Number);
-      //       return new TxnIngest(txid, height, idx || 0);
-      //     });
-      //     await txoStore.queue(txns);
-      //   } catch (e) {
-      //     console.error(e);
-      //   }
-      // }
-
-      // /*
-      //  * Ordinals
-      //  */
-      // resp = await fetch(`https://ordinals.gorillapool.io/api/inscriptions/address/${ordAddress}/txids`);
-      // txos = await resp.json();
-      // txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx)));
-      // await txoStore.queue(txns);
-
       await txoStore.sync();
 
       console.log('done importing');

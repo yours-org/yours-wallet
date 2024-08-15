@@ -5,9 +5,9 @@ import { Spend } from './spend';
 import { Buffer } from 'buffer';
 
 export enum TxoStatus {
-  Dep = 1,
-  Assumed = 2,
-  Validated = 3,
+  Dep = 0,
+  Assumed = 1,
+  Validated = 2,
 }
 
 export class Txo {
@@ -22,26 +22,13 @@ export class Txo {
     public vout: number,
     public satoshis: bigint,
     public script: number[],
-    public status = TxoStatus.Dep,
+    public status = TxoStatus.Validated,
   ) {}
-
-  // setSpend(spend: Spend) {
-  //   this.spend = spend;
-  //   // const spent = spend ? '1' : '0';
-  //   this.events = [];
-  //   // const sort = spend.block.height.toString(16).padStart(8, '0');
-  //   // for (const [tag, data] of Object.entries(this.data)) {
-  //   //   for (const e of data.events) {
-  //   //     this.events.push(`${tag}:${e.id}:${e.value}:${sort}:${spend.block?.idx}:${this.vout}:${this.satoshis}`);
-  //   //   }
-  //   // }
-  // }
 
   toObject(): any {
     this.events = [];
     const sort = this.block.height.toString(16).padStart(8, '0');
-    // const spent = this.spend ? '1' : '0';
-    if (!this.spend) {
+    if (!this.spend || this.status == TxoStatus.Dep) {
       for (const [tag, data] of Object.entries(this.data)) {
         for (const e of data.events) {
           this.events.push(`${tag}:${e.id}:${e.value}:${sort}:${this.block?.idx}:${this.vout}:${this.satoshis}`);

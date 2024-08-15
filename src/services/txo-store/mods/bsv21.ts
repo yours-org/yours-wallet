@@ -54,7 +54,12 @@ export class Bsv21Indexer extends Indexer {
     if (!ordIdxData) return;
     const ord = ordIdxData.data as Ord;
     if (!ord || ord.insc?.file.type !== 'application/bsv-20') return;
-    const bsv21 = Bsv21.fromJSON(JSON.parse(ord.insc!.file.text!));
+    let bsv21: Bsv21;
+    try {
+      bsv21 = Bsv21.fromJSON(JSON.parse(ord.insc!.file.text!));
+    } catch (e) {
+      return;
+    }
     const data = new IndexData(bsv21);
     if (bsv21.amt <= 0n || bsv21.amt > 2 ** 64 - 1) return;
     switch (bsv21.op) {
@@ -84,7 +89,7 @@ export class Bsv21Indexer extends Indexer {
     return data;
   }
 
-  save(ctx: IndexContext) {
+  preSave(ctx: IndexContext) {
     const balance: { [id: string]: bigint } = {};
     const tokensIn: { [id: string]: Txo[] } = {};
     for (const spend of ctx.spends) {
@@ -168,7 +173,7 @@ export class Bsv21Indexer extends Indexer {
             `https://ordinals.gorillapool.io/api/bsv20/${owner}/id/${token.id}?limit=${limit}&offset=${offset}`,
           );
           utxos = (await resp.json()) as BSV20Txo[];
-          txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx, false));
+          txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx || 0, false));
           await txoStore.queue(txns);
           const t = txoDb.transaction('txos', 'readwrite');
           for (const u of utxos) {

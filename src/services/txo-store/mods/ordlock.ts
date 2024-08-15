@@ -41,7 +41,7 @@ export class OrdLockIndexer extends Indexer {
     const listing = new Listing();
     if (!dataScript.chunks[1]!.data || !dataScript.chunks[1]!.data) return;
     listing.payout = dataScript.chunks[1]!.data;
-    listing.price = BigInt(new BigNumber(dataScript.chunks[1]!.data!).toNumber());
+    listing.price = BigInt(BigNumber.fromScriptNum(dataScript.chunks[1]!.data!).toString());
     txo.owner = dataScript.chunks[0]?.data && Utils.toBase58Check(Array.from(dataScript.chunks[0]!.data!));
     return new IndexData(listing, undefined, [{ id: 'price', value: listing.price.toString(16).padStart(16, '0') }]);
   }

@@ -15,7 +15,7 @@ export abstract class Indexer {
     return;
   }
 
-  save(ctx: IndexContext): void {
+  preSave(ctx: IndexContext): void {
     return;
   }
 

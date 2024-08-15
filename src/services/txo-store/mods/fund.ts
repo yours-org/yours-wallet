@@ -33,7 +33,7 @@ export class FundIndexer extends Indexer {
           `https://ordinals.gorillapool.io/api/txos/address/${owner}/unspent?limit=${limit}&offset=${offset}`,
         );
         utxos = await resp.json();
-        const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx, false));
+        const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx || 0));
         await txoStore.queue(txns);
         const t = txoDb.transaction('txos', 'readwrite');
         for (const u of utxos) {

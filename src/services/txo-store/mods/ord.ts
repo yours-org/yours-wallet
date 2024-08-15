@@ -212,7 +212,7 @@ export class OrdIndexer extends Indexer {
           `https://ordinals.gorillapool.io/api/inscriptions/address/${owner}/ancestors?limit=${limit}&offset=${offset}`,
         );
         txos = await resp.json();
-        const txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx), true));
+        const txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx || '0'), true));
         await txoStore.queue(txns);
       } while (txos.length == limit);
       let utxos: Ordinal[] = [];
@@ -222,7 +222,7 @@ export class OrdIndexer extends Indexer {
         const resp = await fetch(url);
         utxos = await resp.json();
 
-        const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx, false));
+        const txns = utxos.map((u) => new TxnIngest(u.txid, u.height, u.idx || 0));
         await txoStore.queue(txns);
 
         const t = txoDb.transaction('txos', 'readwrite');
