@@ -20,19 +20,8 @@ const initializeServices = async () => {
   const txoStore = await txoStorePromise;
   const contractService = new ContractService(keysService, txoStore);
 
-  const bsvService = new BsvService(
-    keysService,
-    wocService,
-    contractService,
-    chromeStorageService,
-    txoStore,
-  );
-  const ordinalService = new OrdinalService(
-    keysService,
-    chromeStorageService,
-    bsvService,
-    txoStore,
-  );
+  const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, txoStore);
+  const ordinalService = new OrdinalService(keysService, chromeStorageService, bsvService, txoStore);
 
   return {
     chromeStorageService,

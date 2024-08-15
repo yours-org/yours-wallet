@@ -26,8 +26,7 @@ export class OrdinalService {
     private readonly chromeStorageService: ChromeStorageService,
     private readonly bsvService: BsvService,
     private readonly txoStore: TxoStore,
-  ) {
-  }
+  ) {}
 
   getOrdinals = async (): Promise<Ordinal[]> => {
     const ordinals = await this.txoStore.searchTxos(new TxoLookup('ord'), 0);

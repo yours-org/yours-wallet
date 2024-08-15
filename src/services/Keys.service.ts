@@ -219,12 +219,15 @@ export class KeysService {
     }
   };
 
-  retrievePrivateKeyMap = async (password?: string, isBelowNoApprovalLimit?: boolean): Promise<Map<string, PrivateKey>> => {
+  retrievePrivateKeyMap = async (
+    password?: string,
+    isBelowNoApprovalLimit?: boolean,
+  ): Promise<Map<string, PrivateKey>> => {
     const keys = await this.retrieveKeys(password, isBelowNoApprovalLimit);
     const pkMap = new Map<string, PrivateKey>();
-    if (keys.walletAddress && keys.walletWif) pkMap.set(keys.walletAddress, PrivateKey.fromWif(keys.walletWif))
-    if (keys.ordAddress && keys.ordWif) pkMap.set(keys.ordAddress, PrivateKey.fromWif(keys.ordWif))
-    if (keys.identityAddress && keys.identityWif) pkMap.set(keys.identityAddress, PrivateKey.fromWif(keys.identityWif))
+    if (keys.walletAddress && keys.walletWif) pkMap.set(keys.walletAddress, PrivateKey.fromWif(keys.walletWif));
+    if (keys.ordAddress && keys.ordWif) pkMap.set(keys.ordAddress, PrivateKey.fromWif(keys.ordWif));
+    if (keys.identityAddress && keys.identityWif) pkMap.set(keys.identityAddress, PrivateKey.fromWif(keys.identityWif));
     return pkMap;
   };
 

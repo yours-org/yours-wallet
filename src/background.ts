@@ -54,10 +54,10 @@ export const txoStorePromise = chromeStorageService.getAndSetStorage().then(() =
   const blockHeaderService = new BlockHeaderService(network);
 
   // TODO: move this into a function
-  let {bsvAddress, identityAddress, ordAddress} = account?.addresses || {}
-  if(!bsvAddress) bsvAddress = ''
-  if(!identityAddress) identityAddress = ''
-  if(!ordAddress) ordAddress = ''
+  let { bsvAddress, identityAddress, ordAddress } = account?.addresses || {};
+  if (!bsvAddress) bsvAddress = '';
+  if (!identityAddress) identityAddress = '';
+  if (!ordAddress) ordAddress = '';
   const indexers: Indexer[] = [
     new FundIndexer(new Set<string>([bsvAddress, ordAddress]), network, TxoStatus.CONFIRMED),
     new LockIndexer(new Set<string>([identityAddress]), network, TxoStatus.CONFIRMED),
