@@ -1,10 +1,20 @@
-import { BroadcastFailure, BroadcastResponse, MerklePath, Transaction, Utils } from '@bsv/sdk';
-import { TransactionService } from '../Transaction.service';
-import { TxnStatus, TxnStatusResponse } from './models/txn';
-import { GP_BASE_URL } from '../../utils/constants';
+import { BroadcastFailure, BroadcastResponse, Transaction, Utils } from '@bsv/sdk';
+import { GP_BASE_URL } from '../utils/constants';
+import { BroadcastService, BroadcastStatusResponse, BroadcastStatus } from './broadcast-service/broadcast-service';
+import { InventoryService, TxLog } from './inv-store/inv-service';
+import { TxnService } from './txn-store/txn-service';
+import { BlockHeader, BlockHeaderService } from './block-store/block-service';
+import EventEmitter from 'events';
 
-export class OneSatTransactionService implements TransactionService {
-  constructor(public baseUrl = GP_BASE_URL) {}
+export class OneSatService
+  extends EventEmitter
+  implements BroadcastService, TxnService, BlockHeaderService, InventoryService
+{
+  private interval: NodeJS.Timeout | undefined;
+  public constructor(public baseUrl = GP_BASE_URL) {
+    super();
+  }
+
   async broadcast(tx: Transaction): Promise<BroadcastResponse | BroadcastFailure> {
     console.log('Broadcasting', tx.id('hex'), tx.toHex());
     const resp = await fetch(`${this.baseUrl}/api/tx/bin`, {
@@ -29,16 +39,16 @@ export class OneSatTransactionService implements TransactionService {
     } as BroadcastResponse;
   }
 
-  async status(txid: string): Promise<TxnStatusResponse | undefined> {
+  async status(txid: string): Promise<BroadcastStatusResponse | undefined> {
     const resp = await fetch(`${this.baseUrl}/api/tx/${txid}/proof`);
     switch (resp.status) {
       case 200:
         return {
-          status: TxnStatus.CONFIRMED,
+          status: BroadcastStatus.CONFIRMED,
           proof: [...Buffer.from(await resp.arrayBuffer())],
         };
       case 404:
-        return { status: TxnStatus.PENDING };
+        return { status: BroadcastStatus.MEMPOOL };
       default:
         return undefined;
     }
@@ -71,5 +81,28 @@ export class OneSatTransactionService implements TransactionService {
       txs.push(tx);
     }
     return txs;
+  }
+
+  async pollTxLogs(owner: string, fromHeight = 0): Promise<TxLog[]> {
+    const resp = await fetch(`${this.baseUrl}/api/tx/address/${owner}/from/${fromHeight}`);
+    return resp.json();
+  }
+
+  // async subscribe(owners: string[], fromHeight = 0, callback: (txLog: TxLog) => void): Promise<void> {
+  //   throw new Error('Method not implemented.');
+  // }
+
+  // async unsubscribe() {
+  //   return;
+  // }
+
+  async getBlocks(lastHeight: number, limit = 1000): Promise<BlockHeader[]> {
+    const resp = await fetch(`${this.baseUrl}/api/blocks/list/${lastHeight}?limit=${limit}`);
+    return resp.json();
+  }
+
+  async getChaintip(): Promise<BlockHeader> {
+    const resp = await fetch(`${this.baseUrl}/api/blocks/tip`);
+    return resp.json();
   }
 }

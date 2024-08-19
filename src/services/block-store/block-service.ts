@@ -1,14 +1,14 @@
 import type { ChainTracker } from '@bsv/sdk';
 import { openDB, type DBSchema, type IDBPDatabase } from '@tempfix/idb';
-import { NetWork } from 'yours-wallet-provider';
+import { Network, StoresServices } from '../stores-service';
 
 const VERSION = 1;
 const PAGE_SIZE = 10000;
 
-const API = {
-  [NetWork.Mainnet]: 'https://ordinals.gorillapool.io',
-  [NetWork.Testnet]: 'https://test.ordinals.gorillapool.io',
-};
+export interface BlockHeaderService {
+  getBlocks(lastHeight: number, limit: number): Promise<BlockHeader[]>;
+  getChaintip(): Promise<BlockHeader>;
+}
 
 export interface BlockHeader {
   hash: string;
@@ -31,19 +31,37 @@ export interface BlockSchema extends DBSchema {
   };
 }
 
-export class BlockHeaderService implements ChainTracker {
-  db: Promise<IDBPDatabase<BlockSchema>>;
-  syncInProgress = false;
-  constructor(public network: NetWork = NetWork.Mainnet) {
-    this.db = openDB<BlockSchema>(`blocks-${network}`, VERSION, {
+export class BlockStore implements ChainTracker {
+  private syncInProgress = false;
+  private stopSync = false;
+  private constructor(
+    public db: IDBPDatabase<BlockSchema>,
+    public services: StoresServices,
+  ) {}
+
+  static async init(
+    services: StoresServices,
+    network: Network = Network.Mainnet,
+    startSync = false,
+  ): Promise<BlockStore> {
+    const db = await openDB<BlockSchema>(`blocks-${network}`, VERSION, {
       upgrade(db) {
         const headers = db.createObjectStore('headers', { keyPath: 'height' });
         headers.createIndex('byHash', 'hash');
       },
     });
+
+    const store = new BlockStore(db, services);
+    if (startSync) store.sync();
+    return store;
   }
 
-  async syncBlocks() {
+  destroy() {
+    this.stopSync = true;
+    this.db.close();
+  }
+
+  async sync() {
     if (this.syncInProgress) return;
     this.syncInProgress = true;
     let lastHeight = 1;
@@ -54,8 +72,7 @@ export class BlockHeaderService implements ChainTracker {
     }
 
     try {
-      let resp = await fetch(`${API[this.network]}/api/blocks/list/${lastHeight}?limit=${PAGE_SIZE}`);
-      let blocks = (await resp.json()) as BlockHeader[];
+      let blocks = await this.services.blocks.getBlocks(lastHeight, PAGE_SIZE);
       do {
         console.log('Syncing from', lastHeight);
         const t = db.transaction('headers', 'readwrite');
@@ -64,14 +81,15 @@ export class BlockHeaderService implements ChainTracker {
           lastHeight = block.height + 1;
         }
         await t.done;
-        resp = await fetch(`${API[this.network]}/api/blocks/list/${lastHeight}?limit=${PAGE_SIZE}`);
-        blocks = (await resp.json()) as BlockHeader[];
+        blocks = await this.services.blocks.getBlocks(lastHeight, PAGE_SIZE);
+        if (this.stopSync) break;
       } while (blocks.length == PAGE_SIZE);
     } catch (e) {
       console.error(e);
     } finally {
+      this.stopSync = false;
       this.syncInProgress = false;
-      setTimeout(() => this.syncBlocks(), 1000 * 60);
+      setTimeout(() => this.sync(), 1000 * 60);
     }
   }
 
@@ -98,7 +116,6 @@ export class BlockHeaderService implements ChainTracker {
   }
 
   async getChaintip(): Promise<BlockHeader> {
-    const resp = await fetch(`${API[this.network]}/api/blocks/tip`);
-    return resp.json();
+    return this.services.blocks.getChaintip();
   }
 }

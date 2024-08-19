@@ -1,4 +1,3 @@
-import { GorillaPoolService } from './GorillaPool.service';
 import { KeysService } from './Keys.service';
 import { ListOrdinal, OrdOperationResponse } from './types/ordinal.types';
 import {
@@ -10,40 +9,38 @@ import {
   TokenUtxo,
   transferOrdTokens,
 } from 'js-1sat-ord';
-import { Bsv20, Bsv21, BSV20Txo, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
+import { Bsv20, Bsv21, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
 import { Bsv21 as Bsv21Type } from './txo-store/mods/bsv21';
 import { ChromeStorageService } from './ChromeStorage.service';
-import { TxoStore } from './txo-store';
 import { PrivateKey } from '@bsv/sdk';
 import { BsvService } from './Bsv.service';
 import { BSV20_INDEX_FEE, FEE_PER_KB } from '../utils/constants';
 import { TxoLookup } from './txo-store/models/txo';
 import { mapOrdinal } from '../utils/providerHelper';
+import { StoresService } from './stores-service';
 
 export class OrdinalService {
   constructor(
     private readonly keysService: KeysService,
     private readonly chromeStorageService: ChromeStorageService,
     private readonly bsvService: BsvService,
-    private readonly txoStore: TxoStore,
+    private readonly stores: StoresService,
   ) {}
 
   getOrdinals = async (): Promise<Ordinal[]> => {
-    const ordinals = await this.txoStore.searchTxos(new TxoLookup('ord'), 0);
-    // const ordinals = await this.txoStore.searchTxos(new TxoLookup('ord', 'address', this.keysService.ordAddress), 0);
+    const ordinals = await this.stores.txos.searchTxos(new TxoLookup('ord'), 0);
     return ordinals.txos.map(mapOrdinal);
   };
 
   getOrdinal = async (outpoint: string): Promise<Ordinal | undefined> => {
     const [txid, vout] = outpoint.split('_');
-    const txo = await this.txoStore.getTxo(txid, parseInt(vout, 10));
+    const txo = await this.stores.txos.getTxo(txid, parseInt(vout, 10));
     if (!txo) return;
     return mapOrdinal(txo);
   };
 
   getBsv20s = async (): Promise<Bsv21[]> => {
-    const bsv20s = await this.txoStore.searchTxos(new TxoLookup('bsv21'), 0);
-    // const bsv20s = await this.txoStore.searchTxos(new TxoLookup('bsv21', 'address', this.keysService.ordAddress), 0);
+    const bsv20s = await this.stores.txos.searchTxos(new TxoLookup('bsv21'), 0);
 
     const tokens: { [id: string]: Bsv21 } = {};
     for (const txo of bsv20s.txos) {
@@ -84,7 +81,7 @@ export class OrdinalService {
       }
 
       const [txid, vout] = outpoint.split('_');
-      const ordinal = await this.txoStore.getTxo(txid, parseInt(vout, 10));
+      const ordinal = await this.stores.txos.getTxo(txid, parseInt(vout, 10));
       if (!ordinal) {
         return { error: 'no-ordinal' };
       }
@@ -116,7 +113,7 @@ export class OrdinalService {
         satsPerKb: FEE_PER_KB,
       });
 
-      const response = await this.txoStore.broadcast(tx);
+      const response = await this.stores.txos.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
       }
@@ -142,7 +139,7 @@ export class OrdinalService {
       const ordPk = PrivateKey.fromWif(keys.ordWif);
       const fundingUtxos = await this.bsvService.fundingTxos();
 
-      const bsv21Utxos = await this.txoStore.searchTxos(new TxoLookup('bsv21', 'id', id), 0);
+      const bsv21Utxos = await this.stores.txos.searchTxos(new TxoLookup('bsv21', 'id', id), 0);
       const tokenUtxos: TokenUtxo[] = [];
       let tokensIn = 0n;
       let bsv21: Bsv21Type | undefined;
@@ -180,7 +177,7 @@ export class OrdinalService {
         paymentPk,
       });
 
-      const response = await this.txoStore.broadcast(tx);
+      const response = await this.stores.txos.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
       }
@@ -206,14 +203,14 @@ export class OrdinalService {
       const paymentPk = PrivateKey.fromWif(keys.walletWif);
       const ordPk = PrivateKey.fromWif(keys.ordWif);
 
-      const fundResults = await this.txoStore.searchTxos(
+      const fundResults = await this.stores.txos.searchTxos(
         new TxoLookup('fund'),
         // new TxoLookup('fund', 'address', this.keysService.bsvAddress),
         0,
       );
 
       const [ordTxid, vout] = outpoint.split('_');
-      const ordUtxo = await this.txoStore.getTxo(ordTxid, parseInt(vout));
+      const ordUtxo = await this.stores.txos.getTxo(ordTxid, parseInt(vout));
       if (!ordUtxo) return { error: 'no-ord-utxo' };
 
       const { tx } = await createOrdListings({
@@ -240,7 +237,7 @@ export class OrdinalService {
         ],
       });
 
-      const response = await this.txoStore.broadcast(tx);
+      const response = await this.stores.txos.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
       }
@@ -262,7 +259,7 @@ export class OrdinalService {
       const keys = await this.keysService.retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
-      const fundResults = await this.txoStore.searchTxos(
+      const fundResults = await this.stores.txos.searchTxos(
         new TxoLookup('fund'),
         // new TxoLookup('fund', 'address', this.keysService.bsvAddress),
         0,
@@ -275,7 +272,7 @@ export class OrdinalService {
       if (!listingTxid) {
         throw new Error('No listing txid');
       }
-      const listingUtxo = await this.txoStore.getTxo(listingTxid, parseInt(vout));
+      const listingUtxo = await this.stores.txos.getTxo(listingTxid, parseInt(vout));
       if (!listingUtxo) return { error: 'no-ord-utxo' };
 
       const { tx } = await cancelOrdListings({
@@ -297,7 +294,7 @@ export class OrdinalService {
         ],
       });
 
-      const response = await this.txoStore.broadcast(tx);
+      const response = await this.stores.txos.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
       }
@@ -320,7 +317,7 @@ export class OrdinalService {
       const keys = await this.keysService.retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
-      const fundResults = await this.txoStore.searchTxos(
+      const fundResults = await this.stores.txos.searchTxos(
         new TxoLookup('fund'),
         // new TxoLookup('fund', 'address', this.keysService.bsvAddress),
         0,
@@ -329,7 +326,7 @@ export class OrdinalService {
       const paymentPk = PrivateKey.fromWif(keys.walletWif);
 
       const [listingTxid, vout] = outpoint.split('_');
-      const listingTxo = await this.txoStore.getTxo(listingTxid, parseInt(vout));
+      const listingTxo = await this.stores.txos.getTxo(listingTxid, parseInt(vout));
       if (!listingTxo) return { error: 'no-ord-utxo' };
 
       if (!listingTxo?.data.list) {
@@ -370,7 +367,7 @@ export class OrdinalService {
         additionalPayments,
       });
 
-      const response = await this.txoStore.broadcast(tx);
+      const response = await this.stores.txos.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
       }

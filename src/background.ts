@@ -33,22 +33,20 @@ import { removeWindow, sendMessage } from './utils/chromeHelpers';
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { BlockHeaderService } from './services/block-headers';
 import { Indexer } from './services/txo-store/models/indexer';
 import { FundIndexer } from './services/txo-store/mods/fund';
 import { OrdIndexer } from './services/txo-store/mods/ord';
 import { Bsv21Indexer } from './services/txo-store/mods/bsv21';
-import { TxoStore } from './services/txo-store';
-import { OneSatTransactionService } from './services/txo-store/1satTxService';
-import { GP_BASE_URL } from './utils/constants';
 import { TxoLookup, TxoStatus } from './services/txo-store/models/txo';
 import { LockIndexer } from './services/txo-store/mods/lock';
 import { mapOrdinal } from './utils/providerHelper';
 import { OrdLockIndexer } from './services/txo-store/mods/ordlock';
 import { QueueTrackerMessage } from './hooks/useQueueTracker';
+import { Network, StoresService } from './services/stores-service';
+import { init1SatStores } from './services/1sat-service/1sat-stores';
 const chromeStorageService = new ChromeStorageService();
 
-export const txoStorePromise = chromeStorageService.getAndSetStorage().then(async () => {
+export const storesPromise = chromeStorageService.getAndSetStorage().then(async () => {
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
   const network = chromeStorageService.getNetwork();
 
@@ -57,6 +55,7 @@ export const txoStorePromise = chromeStorageService.getAndSetStorage().then(asyn
   if (!bsvAddress) bsvAddress = '';
   if (!identityAddress) identityAddress = '';
   if (!ordAddress) ordAddress = '';
+  const owners = new Set<string>([bsvAddress, identityAddress, ordAddress]);
   const indexers: Indexer[] = [
     new FundIndexer(new Set<string>([bsvAddress, ordAddress]), network, TxoStatus.CONFIRMED),
     new LockIndexer(new Set<string>([identityAddress]), network, TxoStatus.CONFIRMED),
@@ -64,21 +63,21 @@ export const txoStorePromise = chromeStorageService.getAndSetStorage().then(asyn
     new OrdIndexer(new Set<string>([bsvAddress, ordAddress]), network, TxoStatus.CONFIRMED),
     new Bsv21Indexer(new Set<string>([ordAddress]), network),
   ];
-  const txoStore = await TxoStore.init(
+  const stores = await init1SatStores(
     selectedAccount || '',
     indexers,
-    new OneSatTransactionService(GP_BASE_URL),
-    mainBlockHeaderService,
-    (queueStats: { length: number }) => {
-      const message: QueueTrackerMessage = { action: YoursEventName.QUEUE_STATUS_UPDATE, data: queueStats };
-      try {
-        sendMessage(message);
-        // eslint-disable-next-line no-empty
-      } catch (e) {}
-    },
-    network,
+    owners,
+    self?.document === undefined,
+    network == NetWork.Mainnet ? Network.Mainnet : Network.Testnet,
   );
-  return txoStore;
+  stores.on('queueStats', (queueStats: { length: number }) => {
+    const message: QueueTrackerMessage = { action: YoursEventName.QUEUE_STATUS_UPDATE, data: queueStats };
+    try {
+      sendMessage(message);
+      // eslint-disable-next-line no-empty
+    } catch (e) {}
+  });
+  return stores;
 });
 
 console.log('Yours Wallet Background Script Running!');
@@ -101,16 +100,15 @@ let popupWindowId: number | undefined;
 
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
-export const mainBlockHeaderService = new BlockHeaderService(NetWork.Mainnet);
+// export const mainBlockHeaderService = new BlockHeaderService(NetWork.Mainnet);
 // export const testBlockHeaderService = new BlockHeaderService(NetWork.Testnet);
 
 // only run in background worker
 if (self?.document === undefined) {
-  txoStorePromise.then((txoStore) => {
-    setTimeout(() => txoStore.processQueue(), 5000);
-  });
+  // storesPromise.then((store) => {
+  //   setTimeout(() => store.sync(), 5000);
+  // });
 
-  mainBlockHeaderService.syncBlocks();
   // testBlockHeaderService.syncBlocks();
 
   const launchPopUp = () => {
@@ -195,7 +193,8 @@ if (self?.document === undefined) {
         case YoursEventName.DECRYPT_RESPONSE:
           return processDecryptResponse(message as DecryptResponse);
         case YoursEventName.SYNC_UTXOS:
-          return processSyncUtxos();
+          // return processSyncUtxos();
+          break;
         default:
           break;
       }
@@ -445,11 +444,8 @@ if (self?.document === undefined) {
   const processGetOrdinalsRequest = (sendResponse: CallbackResponse) => {
     try {
       chromeStorageService.getAndSetStorage().then(async () => {
-        const storageObj = chromeStorageService.getCurrentAccountObject();
-        const bsvAddress = storageObj.account?.addresses?.ordAddress;
-        const txoStore = await txoStorePromise;
-        const results = await txoStore.searchTxos(new TxoLookup('ord'), 100);
-        // const results = await txoStore.searchTxos(new TxoLookup('ord', 'address', bsvAddress), 100);
+        const stores = await storesPromise;
+        const results = await stores.txos.searchTxos(new TxoLookup('ord'), 100);
         console.log('results', results);
 
         sendResponse({
@@ -510,9 +506,8 @@ if (self?.document === undefined) {
       chromeStorageService.getAndSetStorage().then(async () => {
         const storageObj = chromeStorageService.getCurrentAccountObject();
         const bsvAddress = storageObj.account?.addresses?.bsvAddress;
-        const txoStore = await txoStorePromise;
-        const results = await txoStore.searchTxos(new TxoLookup('fund'), 0);
-        // const results = await txoStore.searchTxos(new TxoLookup('fund', 'address', bsvAddress), 0);
+        const stores = await storesPromise;
+        const results = await stores.txos.searchTxos(new TxoLookup('fund'), 0);
         const utxos = results.txos.map((txo) => {
           return {
             satoshis: Number(txo.satoshis),
@@ -1129,15 +1124,15 @@ if (self?.document === undefined) {
     return true;
   };
 
-  const processSyncUtxos = async () => {
-    const txoStore = await txoStorePromise;
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (account) {
-      await txoStore.sync();
+  // const processSyncUtxos = async () => {
+  //   const stores = await storesPromise;
+  //   const { account } = chromeStorageService.getCurrentAccountObject();
+  //   if (account) {
+  //     await txoStore.sync();
 
-      console.log('done importing');
-    }
-  };
+  //     console.log('done importing');
+  //   }
+  // };
 
   // HANDLE WINDOW CLOSE *****************************************
   chrome.windows.onRemoved.addListener((closedWindowId) => {

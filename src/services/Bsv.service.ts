@@ -11,12 +11,10 @@ import { removeBase64Prefix } from '../utils/format';
 import { getPrivateKeyFromTag, Keys } from '../utils/keys';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { ContractService } from './Contract.service';
-import { GorillaPoolService } from './GorillaPool.service';
 import { KeysService } from './Keys.service';
 import { FundRawTxResponse, LockData, SendBsvResponse } from './types/bsv.types';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { WhatsOnChainService } from './WhatsOnChain.service';
-import { TxoStore } from './txo-store';
 import { TxoLookup } from './txo-store/models/txo';
 import {
   BigNumber,
@@ -31,6 +29,7 @@ import {
   Utils,
 } from '@bsv/sdk';
 import { Lock } from './txo-store/mods/lock';
+import { StoresService } from './stores-service';
 
 export class BsvService {
   private bsvBalance: number;
@@ -40,7 +39,7 @@ export class BsvService {
     private readonly wocService: WhatsOnChainService,
     private readonly contractService: ContractService,
     private readonly chromeStorageService: ChromeStorageService,
-    private readonly txoStore: TxoStore,
+    private readonly stores: StoresService,
   ) {
     this.bsvBalance = 0;
     this.exchangeRate = 0;
@@ -71,13 +70,12 @@ export class BsvService {
   };
 
   getCurrentHeight = async () => {
-    if (!this.txoStore.blocksService) return 0;
-    const header = await this.txoStore.blocksService.getSyncedBlock();
+    const header = await this.stores.blocks.getSyncedBlock();
     return header?.height || 0;
   };
 
   getLockedTxos = async () => {
-    const lockTxos = await this.txoStore.searchTxos(
+    const lockTxos = await this.stores.txos.searchTxos(
       new TxoLookup('lock'),
       // new TxoLookup('lock', 'address', this.keysService.identityAddress),
       0,
@@ -167,7 +165,7 @@ export class BsvService {
         change: true,
       });
 
-      const fundResults = await this.txoStore.searchTxos(
+      const fundResults = await this.stores.txos.searchTxos(
         new TxoLookup('fund'),
         // new TxoLookup('fund', 'address', this.keysService.bsvAddress),
         0,
@@ -180,7 +178,7 @@ export class BsvService {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
         tx.addInput({
-          sourceTransaction: await this.txoStore.getTx(u.txid),
+          sourceTransaction: await this.stores.txns.loadTx(u.txid),
           sourceOutputIndex: u.vout,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(pk),
@@ -197,7 +195,7 @@ export class BsvService {
       const bytes = tx.toBinary().length;
       if (bytes > MAX_BYTES_PER_TX) return { error: 'tx-size-too-large' };
 
-      const response = await this.txoStore.broadcast(tx);
+      const response = await this.stores.txns.broadcast(tx);
       if (response.status == 'error') return { error: response.description };
       if (isBelowNoApprovalLimit) {
         const { account } = this.chromeStorageService.getCurrentAccountObject();
@@ -306,8 +304,7 @@ export class BsvService {
   };
 
   fundingTxos = async () => {
-    const results = await this.txoStore.searchTxos(new TxoLookup('fund'), 0);
-    // const results = await this.txoStore.searchTxos(new TxoLookup('fund', 'address', this.keysService.bsvAddress), 0);
+    const results = await this.stores.txos.searchTxos(new TxoLookup('fund'), 0);
     return results.txos;
   };
 
@@ -322,7 +319,7 @@ export class BsvService {
 
     let satsIn = 0;
     for (const input of tx.inputs) {
-      input.sourceTransaction = await this.txoStore.getTx(input.sourceTXID ?? '', true);
+      input.sourceTransaction = await this.stores.txns.loadTx(input.sourceTXID ?? '', true);
       satsIn += input.sourceTransaction?.outputs[input.sourceOutputIndex]?.satoshis || 0;
     }
 
@@ -330,7 +327,7 @@ export class BsvService {
     let fee = 0;
     tx.addOutput({ change: true, lockingScript: new P2PKH().lock(this.keysService.bsvAddress) });
 
-    const fundResults = await this.txoStore.searchTxos(
+    const fundResults = await this.stores.txos.searchTxos(
       new TxoLookup('fund'),
       // new TxoLookup('fund', 'address', this.keysService.bsvAddress),
       0,
@@ -341,7 +338,7 @@ export class BsvService {
       const pk = pkMap.get(u.owner || '');
       if (!pk) continue;
       tx.addInput({
-        sourceTransaction: await this.txoStore.getTx(u.txid),
+        sourceTransaction: await this.stores.txns.loadTx(u.txid),
         sourceOutputIndex: u.vout,
         sequence: 0xffffffff,
         unlockingScriptTemplate: new P2PKH().unlock(pk),

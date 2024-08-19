@@ -7,8 +7,8 @@ import { ContractService } from '../services/Contract.service';
 import { BsvService } from '../services/Bsv.service';
 import { OrdinalService } from '../services/Ordinal.service';
 import { INACTIVITY_LIMIT } from '../utils/constants';
-import { TxoStore } from '../services/txo-store';
-import { txoStorePromise } from '../background';
+import { storesPromise } from '../background';
+import { StoresService } from '../services/stores-service';
 
 const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();
@@ -17,11 +17,11 @@ const initializeServices = async () => {
   const wocService = new WhatsOnChainService(chromeStorageService);
   const gorillaPoolService = new GorillaPoolService(chromeStorageService);
   const keysService = new KeysService(gorillaPoolService, wocService, chromeStorageService);
-  const txoStore = await txoStorePromise;
-  const contractService = new ContractService(keysService, txoStore);
+  const stores = await storesPromise;
+  const contractService = new ContractService(keysService, stores);
 
-  const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, txoStore);
-  const ordinalService = new OrdinalService(keysService, chromeStorageService, bsvService, txoStore);
+  const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, stores);
+  const ordinalService = new OrdinalService(keysService, chromeStorageService, bsvService, stores);
 
   return {
     chromeStorageService,
@@ -31,7 +31,7 @@ const initializeServices = async () => {
     wocService,
     gorillaPoolService,
     contractService,
-    txoStore,
+    stores,
   };
 };
 
@@ -46,7 +46,7 @@ export interface ServiceContextProps {
   isLocked: boolean;
   isReady: boolean;
   lockWallet: () => Promise<void>;
-  txoStore: TxoStore;
+  stores: StoresService;
 }
 
 export const ServiceContext = createContext<ServiceContextProps | undefined>(undefined);

@@ -1,4 +1,4 @@
-import { Block } from './block';
+import { Block } from '../../block-store/block';
 import { IndexData } from './index-data';
 import type { Indexer } from './indexer';
 import { Spend } from './spend';
@@ -64,12 +64,10 @@ export class Txo {
       ...this,
       script: Buffer.from(this.script).toString('base64'),
       satoshis: this.satoshis.toString(),
-      owner: this.owner,
       data: Object.entries(this.data).reduce((acc: { [tag: string]: any }, [tag, data]) => {
         acc[tag] = data.data;
         return acc;
       }, {}),
-      events: this.events,
     };
   }
 }

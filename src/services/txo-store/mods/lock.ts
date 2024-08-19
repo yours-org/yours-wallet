@@ -4,14 +4,14 @@ import { IndexData } from '../models/index-data';
 import { Script, Utils } from '@bsv/sdk';
 import { MAINNET_ADDRESS_PREFIX, TESTNET_ADDRESS_PREFIX } from '../../../utils/constants';
 import LockTemplate, { lockPrefix, lockSuffix } from '../template/lock';
-import { TxoStore } from '..';
-import { Ordinal } from 'yours-wallet-provider';
+import { NetWork, Ordinal } from 'yours-wallet-provider';
 import { Txo, TxoStatus } from '../models/txo';
-import { TxnIngest } from '../models/txn';
-import { Block } from '../models/block';
+import { Event } from '../models/event';
+import { TxoStore } from '../txo-store';
+import { Ingest } from '../models/ingest';
+import { Block } from '../../block-store/block';
 
 const PREFIX = Buffer.from(lockPrefix, 'hex');
-
 const SUFFIX = Buffer.from(lockSuffix, 'hex');
 
 export class Lock {
@@ -29,25 +29,22 @@ export class LockIndexer extends Indexer {
     if (suffixIdx === -1) return;
     const dataScript = Script.fromBinary(Array.from(script.subarray(prefixIdx + PREFIX.length, suffixIdx)));
     if (dataScript.chunks[0]?.data?.length != 20 || !dataScript.chunks[1]?.data) return;
-    const owner = Utils.toBase58Check(dataScript.chunks[0].data!, [
-      this.network === 'mainnet' ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
-    ]);
     const until = parseInt(Buffer.from(dataScript.chunks[1]!.data!).reverse().toString('hex'), 16);
-    if (this.owners.has(owner)) {
-      return new IndexData(
-        new Lock(until),
-        [],
-        [
-          { id: 'until', value: until.toString().padStart(7, '0') },
-          { id: 'address', value: owner },
-        ],
-      );
+    txo.owner = Utils.toBase58Check(dataScript.chunks[0].data!, [
+      this.network === NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+    ]);
+    const events: Event[] = [];
+    if (txo.owner && this.owners.has(txo.owner)) {
+      events.push({ id: 'until', value: until.toString().padStart(7, '0') });
+      events.push({ id: 'address', value: txo.owner });
     }
+    return new IndexData(new Lock(until), [], events);
   }
 
-  async sync(txoStore: TxoStore): Promise<void> {
+  async sync(txoStore: TxoStore): Promise<number> {
     const limit = 10000;
     const txoDb = await txoStore.txoDb;
+    let lastHeight = 0;
     for await (const owner of this.owners) {
       let offset = 0;
       let utxos: Ordinal[] = [];
@@ -58,7 +55,7 @@ export class LockIndexer extends Indexer {
         utxos = (await resp.json()) as Ordinal[];
 
         const ingests = utxos.map(
-          (u) => new TxnIngest(u.txid, u.height, u.idx || 0, false, true, this.syncMode == TxoStatus.TRUSTED),
+          (u) => new Ingest(u.txid, u.height, u.idx || 0, false, true, this.syncMode == TxoStatus.TRUSTED),
         );
         await txoStore.queue(ingests);
 
@@ -84,10 +81,12 @@ export class LockIndexer extends Indexer {
             ],
           );
           t.store.put(txo.toObject());
+          lastHeight = Math.max(lastHeight, u.height || 0);
         }
         await t.done;
         offset += limit;
       } while (utxos.length == 100);
     }
+    return lastHeight;
   }
 }

@@ -1,6 +1,6 @@
 import type { Transaction } from '@bsv/sdk';
-import type { Block } from './block';
 import type { Txo } from './txo';
+import { Block } from '../../block-store/block';
 
 export interface IndexContext {
   tx: Transaction;

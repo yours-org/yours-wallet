@@ -1,18 +1,16 @@
-import { MerklePath, Transaction } from '@bsv/sdk';
+import { Transaction } from '@bsv/sdk';
 import type { Indexer } from './models/indexer';
 import type { IndexContext } from './models/index-context';
 import { openDB, type DBSchema, type IDBPDatabase } from '@tempfix/idb';
 import { Txo, TxoLookup, TxoStatus, type TxoResults } from './models/txo';
-import { TxnIngest, TxnStatus, type Txn } from './models/txn';
-import { BlockHeaderService } from '../block-headers';
-import { Block } from './models/block';
 import { Spend } from './models/spend';
 import { NetWork } from 'yours-wallet-provider';
-import { TransactionService } from '../Transaction.service';
 import { GP_BASE_URL } from '../../utils/constants';
-
+import { Ingest, IngestStatus } from './models/ingest';
+import { Block } from '../block-store/block';
+import { TxnStore } from '../txn-store/txn-store';
+import { InventoryStore } from '../inv-store/inv-store';
 const TXO_DB_VERSION = 1;
-const TXN_DB_VERSION = 1;
 
 export interface TxoSchema extends DBSchema {
   txos: {
@@ -25,43 +23,38 @@ export interface TxoSchema extends DBSchema {
   };
   ingestQueue: {
     key: string;
-    value: TxnIngest;
+    value: Ingest;
     indexes: {
       status: [number, number, number];
     };
   };
-}
-
-export interface TxnSchema extends DBSchema {
-  txns: {
+  state: {
     key: string;
-    value: Txn;
-    indexes: {
-      status: [number, number];
+    value: {
+      key: string;
+      value: string;
     };
   };
 }
+
 export class TxoStore {
-  // txoDb: Promise<IDBPDatabase<TxoSchema>>;
-  // txnDb: Promise<IDBPDatabase<TxnSchema>>;
   queueLength = 0;
-  private destroyStore = false;
-  constructor(
-    public accountId: string,
-    public indexers: Indexer[],
-    public txService: TransactionService,
+  private destroyed = false;
+  private interval?: NodeJS.Timeout;
+  private constructor(
     public txoDb: IDBPDatabase<TxoSchema>,
-    public txnDb: IDBPDatabase<TxnSchema>,
-    public blocksService?: BlockHeaderService,
-    public network: NetWork = NetWork.Mainnet,
+    public indexers: Indexer[],
+    public txnStore: TxnStore,
+    public invStore: InventoryStore,
     public notifyQueueStats?: (queueStats: { length: number }) => void,
   ) {}
 
   static async init(
     accountId: string,
     indexers: Indexer[],
-    txService: TransactionService,
-    blocksService: BlockHeaderService,
+    txnStore: TxnStore,
+    invStore: InventoryStore,
+    startSync = false,
     notifyQueueStats?: (queueStats: { length: number }) => void,
     network: NetWork = NetWork.Mainnet,
   ) {
@@ -74,59 +67,29 @@ export class TxoStore {
         txos.createIndex('owner', 'owner');
         const ingestQueue = db.createObjectStore('ingestQueue', { keyPath: 'txid' });
         ingestQueue.createIndex('status', ['status', 'height', 'idx']);
-      },
-    });
-    const txnDb = await openDB<TxnSchema>(`txnstore-${network}`, TXN_DB_VERSION, {
-      upgrade(db) {
-        const txns = db.createObjectStore('txns', { keyPath: 'txid' });
-        txns.createIndex('status', ['status', 'block.height']);
+        db.createObjectStore('state', { keyPath: 'key' });
       },
     });
 
-    const txoStore = new TxoStore(
-      accountId,
-      indexers,
-      txService,
-      txoDb,
-      txnDb,
-      blocksService,
-      network,
-      notifyQueueStats,
-    );
-    txoStore.processQueue();
+    const txoStore = new TxoStore(txoDb, indexers, txnStore, invStore, notifyQueueStats);
+
+    if (startSync) {
+      const lastSync = await txoStore.txoDb.get('state', 'lastSync');
+      if (!lastSync) {
+        await txoStore.sync();
+        await txoStore.txoDb.put('state', { key: 'lastSync', value: Date.now().toString() });
+      }
+
+      invStore.sync();
+      txoStore.processQueue();
+    }
     return txoStore;
   }
 
   async destroy() {
-    this.destroyStore = true;
-  }
-
-  async getTx(txid: string, fromRemote = false): Promise<Transaction | undefined> {
-    let txn = await this.txnDb.get('txns', txid);
-    if (txn) {
-      const tx = Transaction.fromBinary(txn.rawtx);
-      if (txn.proof) {
-        tx.merklePath = MerklePath.fromBinary(Array.from(txn.proof));
-      }
-      return tx;
-    }
-    if (!fromRemote) return;
-    const tx = await this.txService.fetch(txid);
-    txn = {
-      txid,
-      rawtx: tx.toBinary(),
-      block: new Block(),
-      status: TxnStatus.PENDING,
-    };
-    if (tx.merklePath) {
-      const txHash = tx.hash('hex');
-      txn.block.height = tx.merklePath.blockHeight;
-      txn.block.idx = BigInt(tx.merklePath.path[0].find((p) => p.hash == txHash)?.offset || 0);
-      txn.proof = tx.merklePath.toBinary();
-      txn.status = TxnStatus.CONFIRMED;
-    }
-    await this.txnDb.put('txns', txn);
-    return tx;
+    this.destroyed = true;
+    if (this.interval) clearInterval(this.interval);
+    this.txoDb.close();
   }
 
   async getTxo(txid: string, vout: number): Promise<Txo | undefined> {
@@ -183,13 +146,13 @@ export class TxoStore {
   }
 
   async broadcast(tx: Transaction, dependencyTxids: string[] = []) {
-    const resp = await this.txService.broadcast(tx);
+    const resp = await this.txnStore.broadcast(tx);
     if (resp.status === 'success') {
       if (!dependencyTxids.length) {
         await this.ingest(tx);
       } else {
-        const ingests = dependencyTxids.map((txid) => new TxnIngest(txid, Date.now(), 0, true));
-        ingests.push(new TxnIngest(tx.id('hex') as string, Date.now(), 0, false));
+        const ingests = dependencyTxids.map((txid) => new Ingest(txid, Date.now(), 0, true));
+        ingests.push(new Ingest(tx.id('hex') as string, Date.now(), 0, false));
         await this.queue(ingests);
       }
     }
@@ -212,16 +175,6 @@ export class TxoStore {
       const txHash = tx.hash('hex');
       block.height = tx.merklePath.blockHeight;
       block.idx = BigInt(tx.merklePath.path[0].find((p) => p.hash == txHash)?.offset || 0);
-      block.hash = (await this.blocksService?.getHashByHeight(tx.merklePath.blockHeight)) || '';
-      if (this.blocksService) {
-        try {
-          if (!(await tx.merklePath.verify(txid, this.blocksService))) {
-            throw new Error('Invalid proof');
-          }
-        } catch (e) {
-          console.error('Invalid proof', e);
-        }
-      }
     }
 
     const ctx: IndexContext = {
@@ -240,24 +193,15 @@ export class TxoStore {
         input.sourceTXID = input.sourceTransaction.id('hex') as string;
       }
       if (input.sourceTransaction) {
-        if (await this.txnDb.getKey('txns', input.sourceTXID)) {
-          continue;
-        }
+        // if (await this.txnDb.getKey('txns', input.sourceTXID)) {
+        //   continue;
+        // }
         await this.ingest(input.sourceTransaction);
       } else {
-        input.sourceTransaction = await this.getTx(input.sourceTXID, fromRemote);
+        input.sourceTransaction = await this.txnStore.loadTx(input.sourceTXID, fromRemote);
         if (!input.sourceTransaction) throw new Error(`Failed to get source tx ${input.sourceTXID}`);
       }
     }
-
-    const txn = {
-      txid,
-      rawtx: tx.toBinary(),
-      block,
-      status: TxnStatus.PENDING,
-      proof: tx.merklePath && tx.merklePath.toBinary(),
-    };
-    await this.txnDb.put('txns', txn);
 
     const t = this.txoDb.transaction('txos', 'readwrite');
     for await (const [vin, input] of tx.inputs.entries()) {
@@ -308,8 +252,8 @@ export class TxoStore {
       t.store.put(txo.toObject());
     }
     await t.done;
-    txn.status = block.height < 50000000 ? TxnStatus.CONFIRMED : TxnStatus.BROADCASTED;
-    await this.txnDb.put('txns', txn);
+
+    await this.txnStore.saveTx(tx);
     if (fromRemote && checkSpends) {
       await this.updateSpends(ctx.txos.map((t) => `${t.txid}_${t.vout}`));
     }
@@ -320,12 +264,12 @@ export class TxoStore {
     this.queueLength = await this.txoDb.countFromIndex(
       'ingestQueue',
       'status',
-      IDBKeyRange.bound([0], [Number.MAX_SAFE_INTEGER]),
+      IDBKeyRange.bound([IngestStatus.DOWNLOAD], [IngestStatus.INGEST, Number.MAX_SAFE_INTEGER]),
     );
     return this.queueLength;
   }
 
-  async queue(ingests: TxnIngest[]) {
+  async queue(ingests: Ingest[]) {
     const t = this.txoDb.transaction('ingestQueue', 'readwrite');
     for (const ingest of ingests) {
       await t.store.put(ingest);
@@ -352,29 +296,30 @@ export class TxoStore {
   }
 
   async processIngests() {
-    const query = IDBKeyRange.bound([TxnStatus.INGEST, 0], [TxnStatus.INGEST, Number.MAX_SAFE_INTEGER]);
+    const query = IDBKeyRange.bound([IngestStatus.INGEST, 0], [IngestStatus.INGEST, Number.MAX_SAFE_INTEGER]);
     const ingests = await this.txoDb.getAllFromIndex('ingestQueue', 'status', query, 100);
     if (ingests.length) {
       console.log('Ingesting', ingests.length, 'txs');
       for await (const ingest of ingests) {
-        const tx = await this.getTx(ingest.txid);
+        const tx = await this.txnStore.loadTx(ingest.txid);
         if (!tx) {
           console.error('Failed to get tx', ingest.txid);
           continue;
         }
         await this.ingest(tx, true, ingest.isDep ? TxoStatus.DEPENDENCY : TxoStatus.CONFIRMED, ingest.checkSpends);
-        await this.txoDb.delete('ingestQueue', ingest.txid);
+        ingest.status = IngestStatus.CONFIRMED;
+        await this.txoDb.put('ingestQueue', ingest);
         if (this.notifyQueueStats) {
-          this.notifyQueueStats({ length: --this.queueLength });
+          this.notifyQueueStats({ length: await this.getQueueLength() });
         }
       }
-      if (this.notifyQueueStats) {
-        this.notifyQueueStats({ length: await this.getQueueLength() });
-      }
+      // if (this.notifyQueueStats) {
+      //   this.notifyQueueStats({ length:  });
+      // }
     } else {
       await new Promise((r) => setTimeout(r, 1000));
     }
-    if (this.destroyStore) {
+    if (this.destroyed) {
       return;
     }
     this.processIngests();
@@ -382,17 +327,14 @@ export class TxoStore {
 
   async processDownloads(returnOnDone = false) {
     try {
-      const query = IDBKeyRange.bound([TxnStatus.DOWNLOAD, 0], [TxnStatus.DOWNLOAD, Number.MAX_SAFE_INTEGER]);
+      const query = IDBKeyRange.bound([IngestStatus.DOWNLOAD, 0], [IngestStatus.DOWNLOAD, Number.MAX_SAFE_INTEGER]);
       const ingests = await this.txoDb.getAllFromIndex('ingestQueue', 'status', query, 25);
       if (ingests.length) {
-        await this.ensureTxns(ingests.map((i) => i.txid));
+        await this.txnStore.ensureTxns(ingests.map((i) => i.txid));
         const downloadQueue = this.txoDb.transaction('ingestQueue', 'readwrite');
         await Promise.all([
           ...ingests.map((i) => {
-            if (i.downloadOnly) {
-              return downloadQueue.store.delete(i.txid);
-            }
-            i.status = TxnStatus.INGEST;
+            i.status = i.downloadOnly ? IngestStatus.CONFIRMED : IngestStatus.INGEST;
             return downloadQueue.store.put(i);
           }),
           downloadQueue.done,
@@ -407,44 +349,9 @@ export class TxoStore {
       console.error('Failed to ingest txs', e);
       await new Promise((r) => setTimeout(r, 1000));
     }
-    if (this.destroyStore) {
+    if (this.destroyed) {
       return;
     }
     this.processDownloads();
-  }
-
-  async ensureTxns(txids: string[]) {
-    console.log('Downloading', txids.length, 'txs');
-    const t = this.txnDb.transaction('txns', 'readonly');
-    const foundTxids = await Promise.all([...txids.map((txid) => t.store.getKey(txid).catch(() => null)), t.done]);
-    const missing: { [txid: string]: boolean } = {};
-    for (const [i, txid] of txids.entries()) {
-      if (!foundTxids[i]) missing[txid] = true;
-    }
-    const missingTxids = Object.keys(missing);
-    if (missingTxids.length) {
-      const results = await this.txService.batchFetch(missingTxids);
-      const tTxn = this.txnDb.transaction('txns', 'readwrite');
-      await Promise.all([
-        ...results.map(async (tx) => {
-          const txn: Txn = {
-            txid: tx.id('hex') as string,
-            rawtx: tx.toBinary(),
-            block: new Block(),
-            status: TxnStatus.PENDING,
-          };
-          if (tx.merklePath) {
-            const txHash = tx.hash('hex');
-            txn.block.height = tx.merklePath.blockHeight;
-            txn.block.idx = BigInt(tx.merklePath.path[0].find((p) => p.hash == txHash)?.offset || 0);
-            txn.proof = tx.merklePath.toBinary();
-            txn.status = TxnStatus.CONFIRMED;
-          }
-          if (!missing[txn.txid]) throw new Error('Missing txid: ' + txn.txid);
-          await tTxn.store.put(txn);
-        }),
-        tTxn.done,
-      ]);
-    }
   }
 }

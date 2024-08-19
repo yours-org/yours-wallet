@@ -1,14 +1,14 @@
 /* eslint-disable no-case-declarations */
 import { BSV20Txo, Bsv21 as Bsv21Type } from 'yours-wallet-provider';
-import { TxoStore } from '..';
 import type { IndexContext } from '../models/index-context';
 import { IndexData } from '../models/index-data';
 import { Indexer } from '../models/indexer';
 import { Txo, TxoStatus } from '../models/txo';
 import { Ord } from './ord';
 import { Utils } from '@bsv/sdk';
-import { TxnIngest } from '../models/txn';
-import { Block } from '../models/block';
+import { TxoStore } from '../txo-store';
+import { Block } from '../../block-store/block';
+import { Ingest } from '../models/ingest';
 
 export enum Bsv21Status {
   Invalid = -1,
@@ -144,9 +144,10 @@ export class Bsv21Indexer extends Indexer {
     return new IndexData(Bsv21.fromJSON(obj.data), obj.deps);
   }
 
-  async sync(txoStore: TxoStore): Promise<void> {
+  async sync(txoStore: TxoStore): Promise<number> {
     const limit = 100;
     const txoDb = await txoStore.txoDb;
+    let lastHeight = 0;
     for await (const owner of this.owners) {
       let resp = await fetch(`https://ordinals.gorillapool.io/api/bsv20/${owner}/balance`);
       const balance = (await resp.json()) as Bsv21Type[];
@@ -158,7 +159,7 @@ export class Bsv21Indexer extends Indexer {
           const txids = (await resp.json()) as { [score: string]: string };
           const txns = Object.entries(txids).map(([score, txid]) => {
             const [height, idx] = score.split('.').map(Number);
-            return new TxnIngest(txid, height, idx || 0, true);
+            return new Ingest(txid, height, idx || 0, true);
           });
           await txoStore.queue(txns);
         }
@@ -179,7 +180,7 @@ export class Bsv21Indexer extends Indexer {
           );
           utxos = (await resp.json()) as BSV20Txo[];
           const ingests = utxos.map(
-            (u) => new TxnIngest(u.txid, u.height, u.idx || 0, false, true, this.syncMode === TxoStatus.TRUSTED),
+            (u) => new Ingest(u.txid, u.height, u.idx || 0, false, true, this.syncMode === TxoStatus.TRUSTED),
           );
           await txoStore.queue(ingests);
 
@@ -216,11 +217,13 @@ export class Bsv21Indexer extends Indexer {
               );
             }
             t.store.put(txo.toObject());
+            lastHeight = Math.max(lastHeight, u.height || 0);
           }
           await t.done;
           offset += limit;
         } while (utxos.length == limit);
       }
     }
+    return lastHeight;
   }
 }

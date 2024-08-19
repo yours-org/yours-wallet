@@ -20,6 +20,7 @@ module.exports = function override(config) {
     stream: require.resolve('stream-browserify'),
     buffer: require.resolve('buffer'),
     process: require.resolve('process'),
+    // evnets: require.resolve('events'),
     fs: false,
     os: false,
   };

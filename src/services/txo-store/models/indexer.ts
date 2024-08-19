@@ -1,8 +1,8 @@
 import { NetWork } from 'yours-wallet-provider';
 import type { IndexContext } from './index-context';
 import { IndexData } from './index-data';
-import { TxoStore } from '..';
 import { TxoStatus } from './txo';
+import { TxoStore } from '../txo-store';
 
 export abstract class Indexer {
   tag = '';
@@ -39,7 +39,7 @@ export abstract class Indexer {
     return obj;
   }
 
-  async sync(txoStore: TxoStore): Promise<void> {
-    return;
+  async sync(txoStore: TxoStore): Promise<number> {
+    return 0;
   }
 }

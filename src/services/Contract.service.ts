@@ -4,12 +4,12 @@ import { KeysService } from './Keys.service';
 import { fromUtxo, Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
 import { Txo } from './txo-store/models/txo';
 import LockTemplate from './txo-store/template/lock';
-import { TxoStore } from './txo-store';
+import { StoresService } from './stores-service';
 
 export class ContractService {
   constructor(
     private readonly keysService: KeysService,
-    private readonly txoStore: TxoStore,
+    private readonly stores: StoresService,
   ) {}
 
   getSignatures = async (
@@ -45,28 +45,6 @@ export class ContractService {
         const privkeys = getPrivKeys(sigReq.address) as PrivateKey[];
         if (!privkeys.length) throw new Error('no-private-key', { cause: sigReq.address });
         return privkeys.map((privKey: PrivateKey) => {
-          // const script = sigReq.script ?
-          //   Script.fromHex(sigReq.script) :
-          //   new P2PKH().lock(privKey.toPublicKey().toAddress());
-          // const txIn =
-          //   tx.get_input(sigReq.inputIndex) ||
-          //   new TxIn(Buffer.from(sigReq.prevTxid, 'hex'), sigReq.outputIndex, script);
-          // txIn.set_prev_tx_id(Buffer.from(sigReq.prevTxid, 'hex'));
-          // txIn.set_vout(sigReq.outputIndex);
-          // txIn.set_satoshis(BigInt(sigReq.satoshis));
-          // txIn.set_locking_script(script);
-          // script.remove_codeseparators();
-          // const subScript = script;
-          // const sig = tx
-          //   .sign(
-          //     privKey,
-          //     sigReq.sigHashType || DEFAULT_SIGHASH_TYPE,
-          //     sigReq.inputIndex,
-          //     subScript,
-          //     BigInt(sigReq.satoshis),
-          //   )
-          //   .to_hex();
-
           // TODO: support multiple OP_CODESEPARATORs and get subScript according to `csIdx`.
           const preimage = TransactionSignature.format({
             sourceTXID: sigReq.prevTxid,
@@ -133,7 +111,7 @@ export class ContractService {
         tx.addInput(input);
       }
 
-      const response = await this.txoStore.broadcast(tx);
+      const response = await this.stores.txns.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
       }

@@ -3,6 +3,7 @@ import { Indexer } from '../models/indexer';
 import { IndexData } from '../models/index-data';
 import { BigNumber, Script, Utils } from '@bsv/sdk';
 import { Buffer } from 'buffer';
+import { Event } from '../models/event';
 
 const PREFIX = Buffer.from(
   '2097dfd76851bf465e8f715593b217714858bbe9570ff3bd5e33840a34e20ff0262102ba79df5f8ae7604a9830f03c7933028186aede0675a16f025dc4f8be8eec0382201008ce7480da41702918d1ec8e6849ba32b4d65b1e40dc669c31a1e6306b266c0000',
@@ -43,6 +44,10 @@ export class OrdLockIndexer extends Indexer {
     listing.payout = dataScript.chunks[1]!.data;
     listing.price = BigInt(BigNumber.fromScriptNum(dataScript.chunks[1]!.data!).toString());
     txo.owner = dataScript.chunks[0]?.data && Utils.toBase58Check(Array.from(dataScript.chunks[0]!.data!));
-    return new IndexData(listing, undefined, [{ id: 'price', value: listing.price.toString(16).padStart(16, '0') }]);
+    const events: Event[] = [];
+    if (txo.owner && this.owners.has(txo.owner)) {
+      events.push({ id: 'price', value: listing.price.toString(16).padStart(16, '0') });
+    }
+    return new IndexData(listing, [], events);
   }
 }

@@ -34,7 +34,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [satsOut, setSatsOut] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { keysService, bsvService, chromeStorageService, txoStore } = useServiceContext();
+  const { keysService, bsvService, chromeStorageService, stores } = useServiceContext();
   const { updateBsvBalance } = bsvService;
   const { bsvAddress } = keysService;
   // const { isProcessing, setIsProcessing, updateBsvBalance, fundRawTx, bsvAddress } = useBsv();
@@ -57,11 +57,11 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   }, [message, txid]);
 
   useEffect(() => {
-    if (!bsvAddress || !txoStore) return;
+    if (!bsvAddress || !stores) return;
     (async () => {
       const tx = Transaction.fromHex(request.rawtx);
       for (const input of tx.inputs) {
-        input.sourceTransaction = await txoStore.getTx(input.sourceTXID ?? '', true);
+        input.sourceTransaction = await stores.txns.loadTx(input.sourceTXID ?? '', true);
       }
       let outSats = tx.getFee();
       const changePkh = Utils.fromBase58Check(bsvAddress, 'hex').data as string;
@@ -75,7 +75,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       }
       setSatsOut(outSats);
     })();
-  }, [bsvAddress, request.fund, request.rawtx, txoStore]);
+  }, [bsvAddress, request.fund, request.rawtx, stores]);
 
   const handleBroadcast = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -103,7 +103,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       }
       rawtx = res.rawtx;
     }
-    const resp = await txoStore.broadcast(Transaction.fromHex(rawtx));
+    const resp = await stores.txos.broadcast(Transaction.fromHex(rawtx));
     if (resp.status === 'error') {
       addSnackbar('Error broadcasting the raw tx!', 'error');
       setIsProcessing(false);

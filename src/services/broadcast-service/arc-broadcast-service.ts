@@ -1,8 +1,7 @@
-import { BroadcastFailure, BroadcastResponse, MerklePath, Transaction, Utils } from '@bsv/sdk';
-import { TransactionService } from '../Transaction.service';
-import { Txn, TxnStatus, TxnStatusResponse } from './models/txn';
+import { BroadcastFailure, BroadcastResponse, Transaction, Utils } from '@bsv/sdk';
+import { BroadcastService, BroadcastStatus, BroadcastStatusResponse } from './broadcast-service';
 
-export class ArcSatTransactionService implements TransactionService {
+export class ArcSatBroadcastService implements BroadcastService {
   constructor(
     public baseUrl: string,
     public apiKey?: string,
@@ -37,7 +36,7 @@ export class ArcSatTransactionService implements TransactionService {
     } as BroadcastResponse;
   }
 
-  async status(txid: string): Promise<TxnStatusResponse | undefined> {
+  async status(txid: string): Promise<BroadcastStatusResponse | undefined> {
     const resp = await fetch(`${this.baseUrl}/v1/tx/${txid}`);
     if (resp.status > 200) {
       return undefined;
@@ -46,17 +45,17 @@ export class ArcSatTransactionService implements TransactionService {
     switch (body.status) {
       case 'MINED':
         return {
-          status: TxnStatus.CONFIRMED,
+          status: BroadcastStatus.CONFIRMED,
           proof: Utils.toArray(body.merkleProof, 'hex'),
         };
       case 'REJECTED':
         return {
-          status: TxnStatus.INVALID,
+          status: BroadcastStatus.REJECTED,
           message: body.detail,
         };
       default:
         return {
-          status: TxnStatus.PENDING,
+          status: BroadcastStatus.MEMPOOL,
         };
     }
   }

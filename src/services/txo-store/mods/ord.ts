@@ -5,12 +5,12 @@ import { IndexData } from '../models/index-data';
 import { Outpoint } from '../models/outpoint';
 import { Buffer } from 'buffer';
 import { parseAddress } from '../models/address';
-import { TxoStore } from '..';
 import { Ordinal } from 'yours-wallet-provider';
-import { TxnIngest } from '../models/txn';
 import { Txo, TxoStatus } from '../models/txo';
 import type { Event } from '../models/event';
-import { Block } from '../models/block';
+import { TxoStore } from '../txo-store';
+import { Block } from '../../block-store/block';
+import { Ingest } from '../models/ingest';
 
 const ORD = Buffer.from('ord');
 
@@ -52,7 +52,6 @@ export class OrdIndexer extends Indexer {
   parse(ctx: IndexContext, vout: number): IndexData | undefined {
     const txo = ctx.txos[vout];
     const script = ctx.tx.outputs[vout].lockingScript;
-    const idxData = new IndexData();
     let fromPos: number | undefined;
     for (let i = 0; i < script.chunks.length; i++) {
       const chunk = script.chunks[i];
@@ -68,9 +67,10 @@ export class OrdIndexer extends Indexer {
     }
 
     const ord: Ord = {};
-    let owner = txo.owner;
-    if (!owner) owner = parseAddress(script, 0);
+    if (!txo.owner) txo.owner = parseAddress(script, 0);
 
+    const events: Event[] = [];
+    const deps: string[] = [];
     if (fromPos !== undefined) {
       const insc = (ord.insc = {
         file: { hash: '', size: 0, type: '' },
@@ -81,9 +81,9 @@ export class OrdIndexer extends Indexer {
       for (let i = fromPos; i < script.chunks.length; i += 2) {
         const field = script.chunks[i];
         if (field.op == OP.OP_ENDIF) {
-          if (!owner) owner = parseAddress(script, i + 1);
-          if (!owner && script.chunks[i + 1]?.op == OP.OP_CODESEPARATOR) {
-            owner = parseAddress(script, i + 2);
+          if (!txo.owner) txo.owner = parseAddress(script, i + 1);
+          if (!txo.owner && script.chunks[i + 1]?.op == OP.OP_CODESEPARATOR) {
+            txo.owner = parseAddress(script, i + 2);
           }
           break;
         }
@@ -110,7 +110,7 @@ export class OrdIndexer extends Indexer {
             insc.file.size = value.data?.length || 0;
             if (!value.data?.length) break;
             insc.file.hash = Buffer.from(Hash.sha256(value.data)).toString('hex');
-            idxData.events.push({ id: 'hash', value: insc.file.hash });
+            events.push({ id: 'hash', value: insc.file.hash });
             if (value.data?.length <= 1024) {
               try {
                 insc.file.text = new TextDecoder('utf8', { fatal: true }).decode(Buffer.from(value.data));
@@ -120,7 +120,7 @@ export class OrdIndexer extends Indexer {
                     words.add(word);
                   }
                 });
-                words.forEach((word) => idxData.events.push({ id: 'word', value: word }));
+                words.forEach((word) => events.push({ id: 'word', value: word }));
               } catch {
                 console.log('Error parsing text');
               }
@@ -135,7 +135,7 @@ export class OrdIndexer extends Indexer {
             break;
           case 1:
             insc.file.type = Buffer.from(value.data || []).toString();
-            idxData.events.push({ id: 'type', value: insc.file.type });
+            events.push({ id: 'type', value: insc.file.type });
             break;
           case 3:
             if (!value.data || value.data.length != 36) break;
@@ -144,7 +144,7 @@ export class OrdIndexer extends Indexer {
               const parentTxid = Utils.toHex(parent.txid);
               if (!ctx.spends.find((s) => s.txid == parentTxid && s.vout == parent.vout)) continue;
               insc.parent = parent.toString();
-              idxData.events.push({ id: 'parent', value: parent.toString() });
+              events.push({ id: 'parent', value: parent.toString() });
             } catch {
               console.log('Error parsing parent outpoint');
             }
@@ -156,18 +156,13 @@ export class OrdIndexer extends Indexer {
       }
     }
     if (!ord.insc && txo.satoshis != 1n) return;
-    if (owner && !txo.owner) txo.owner = owner;
-    if (txo.owner && this.owners.has(owner)) {
-      idxData.events.push({ id: 'address', value: owner });
-    }
-
     let outSat = 0n;
     for (let i = 0; i < vout; i++) {
       outSat += ctx.txos[i].satoshis;
     }
     let inSat = 0n;
     for (const spend of ctx.spends) {
-      idxData.deps.push(`${spend.txid}_${spend.vout}`);
+      deps.push(`${spend.txid}_${spend.vout}`);
       if (inSat == outSat && spend.satoshis == 1n) {
         if ((spend.data.ord?.data as Ord)?.origin) {
           ord.origin = Object.assign({}, spend.data.ord?.data?.origin) as Origin;
@@ -188,11 +183,14 @@ export class OrdIndexer extends Indexer {
       if (txo.data.map) {
         ord.origin.data.map = Object.assign(ord.origin.data?.map || {}, txo.data.map.data);
       }
-      idxData.events.push({ id: 'origin', value: ord.origin.outpoint });
+      events.push({ id: 'origin', value: ord.origin.outpoint });
     }
 
-    idxData.data = ord;
-    return idxData;
+    if (txo.owner && this.owners.has(txo.owner)) {
+      events.push({ id: 'address', value: txo.owner });
+      return new IndexData(ord, deps, events);
+    }
+    return new IndexData(ord);
   }
 
   fromObj(obj: IndexData): IndexData {
@@ -201,9 +199,10 @@ export class OrdIndexer extends Indexer {
     return new IndexData(ord, obj.deps);
   }
 
-  async sync(txoStore: TxoStore): Promise<void> {
+  async sync(txoStore: TxoStore): Promise<number> {
     const limit = 10000;
     const txoDb = await txoStore.txoDb;
+    let lastHeight = 0;
     for await (const owner of this.owners) {
       let txos: { txid: string; idx: string; height?: number }[] = [];
       let offset = 0;
@@ -213,7 +212,7 @@ export class OrdIndexer extends Indexer {
             `https://ordinals.gorillapool.io/api/inscriptions/address/${owner}/ancestors?limit=${limit}&offset=${offset}`,
           );
           txos = await resp.json();
-          const txns = txos.map((t) => new TxnIngest(t.txid, t.height || Date.now(), parseInt(t.idx || '0'), true));
+          const txns = txos.map((t) => new Ingest(t.txid, t.height || Date.now(), parseInt(t.idx || '0'), true));
           await txoStore.queue(txns);
         } while (txos.length == limit);
       }
@@ -224,7 +223,7 @@ export class OrdIndexer extends Indexer {
         const resp = await fetch(url);
         utxos = await resp.json();
         const ingests = utxos.map(
-          (u) => new TxnIngest(u.txid, u.height, u.idx || 0, false, true, this.syncMode === TxoStatus.TRUSTED),
+          (u) => new Ingest(u.txid, u.height, u.idx || 0, false, true, this.syncMode === TxoStatus.TRUSTED),
         );
         await txoStore.queue(ingests);
 
@@ -267,10 +266,12 @@ export class OrdIndexer extends Indexer {
             );
           }
           t.store.put(txo.toObject());
+          lastHeight = Math.max(lastHeight, u.height || 0);
         }
         await t.done;
         offset += limit;
       } while (utxos.length == limit);
     }
+    return lastHeight;
   }
 }

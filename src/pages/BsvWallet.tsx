@@ -33,7 +33,6 @@ import lockIcon from '../assets/lock.svg';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useWeb3RequestContext } from '../hooks/useWeb3RequestContext';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { TxnIngest } from '../services/txo-store/models/txn';
 import { LockData } from '../services/types/bsv.types';
 import { sendMessage } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
@@ -118,7 +117,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [amountType, setAmountType] = useState<AmountType>('bsv');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService, txoStore } = useServiceContext();
+  const { chromeStorageService, keysService, bsvService } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
