@@ -15,7 +15,6 @@ import { KeysService } from './Keys.service';
 import { FundRawTxResponse, LockData, SendBsvResponse } from './types/bsv.types';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { WhatsOnChainService } from './WhatsOnChain.service';
-import { TxoLookup } from './txo-store/models/txo';
 import {
   BigNumber,
   BSM,
@@ -28,8 +27,7 @@ import {
   Transaction,
   Utils,
 } from '@bsv/sdk';
-import { Lock } from './txo-store/mods/lock';
-import { StoresService } from './stores-service';
+import { CaseModSPV, Lock, TxoLookup } from 'ts-casemod-spv';
 
 export class BsvService {
   private bsvBalance: number;
@@ -39,7 +37,7 @@ export class BsvService {
     private readonly wocService: WhatsOnChainService,
     private readonly contractService: ContractService,
     private readonly chromeStorageService: ChromeStorageService,
-    private readonly stores: StoresService,
+    private readonly oneSatSPV: CaseModSPV,
   ) {
     this.bsvBalance = 0;
     this.exchangeRate = 0;
@@ -70,16 +68,12 @@ export class BsvService {
   };
 
   getCurrentHeight = async () => {
-    const header = await this.stores.blocks.getSyncedBlock();
+    const header = await this.oneSatSPV.getSyncedBlock();
     return header?.height || 0;
   };
 
   getLockedTxos = async () => {
-    const lockTxos = await this.stores.txos.searchTxos(
-      new TxoLookup('lock'),
-      // new TxoLookup('lock', 'address', this.keysService.identityAddress),
-      0,
-    );
+    const lockTxos = await this.oneSatSPV.search(new TxoLookup('lock'), 0);
     return lockTxos.txos;
   };
 
@@ -165,11 +159,7 @@ export class BsvService {
         change: true,
       });
 
-      const fundResults = await this.stores.txos.searchTxos(
-        new TxoLookup('fund'),
-        // new TxoLookup('fund', 'address', this.keysService.bsvAddress),
-        0,
-      );
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'), 0);
 
       let satsIn = 0;
       let fee = 0;
@@ -178,8 +168,8 @@ export class BsvService {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
         tx.addInput({
-          sourceTransaction: await this.stores.txns.loadTx(u.txid),
-          sourceOutputIndex: u.vout,
+          sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid),
+          sourceOutputIndex: u.outpoint.vout,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(pk),
         });
@@ -195,7 +185,7 @@ export class BsvService {
       const bytes = tx.toBinary().length;
       if (bytes > MAX_BYTES_PER_TX) return { error: 'tx-size-too-large' };
 
-      const response = await this.stores.txns.broadcast(tx);
+      const response = await this.oneSatSPV.broadcast(tx);
       if (response.status == 'error') return { error: response.description };
       if (isBelowNoApprovalLimit) {
         const { account } = this.chromeStorageService.getCurrentAccountObject();
@@ -304,7 +294,7 @@ export class BsvService {
   };
 
   fundingTxos = async () => {
-    const results = await this.stores.txos.searchTxos(new TxoLookup('fund'), 0);
+    const results = await this.oneSatSPV.search(new TxoLookup('fund'), 0);
     return results.txos;
   };
 
@@ -319,7 +309,7 @@ export class BsvService {
 
     let satsIn = 0;
     for (const input of tx.inputs) {
-      input.sourceTransaction = await this.stores.txns.loadTx(input.sourceTXID ?? '', true);
+      input.sourceTransaction = await this.oneSatSPV.getTx(input.sourceTXID ?? '', true);
       satsIn += input.sourceTransaction?.outputs[input.sourceOutputIndex]?.satoshis || 0;
     }
 
@@ -327,19 +317,15 @@ export class BsvService {
     let fee = 0;
     tx.addOutput({ change: true, lockingScript: new P2PKH().lock(this.keysService.bsvAddress) });
 
-    const fundResults = await this.stores.txos.searchTxos(
-      new TxoLookup('fund'),
-      // new TxoLookup('fund', 'address', this.keysService.bsvAddress),
-      0,
-    );
+    const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'), 0);
 
     const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
     for await (const u of fundResults.txos || []) {
       const pk = pkMap.get(u.owner || '');
       if (!pk) continue;
       tx.addInput({
-        sourceTransaction: await this.stores.txns.loadTx(u.txid),
-        sourceOutputIndex: u.vout,
+        sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid),
+        sourceOutputIndex: u.outpoint.vout,
         sequence: 0xffffffff,
         unlockingScriptTemplate: new P2PKH().unlock(pk),
       });

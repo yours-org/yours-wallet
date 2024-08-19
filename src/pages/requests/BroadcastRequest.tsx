@@ -14,6 +14,7 @@ import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { Transaction, Utils } from '@bsv/sdk';
+import { on } from 'events';
 
 export type BroadcastResponse = {
   txid: string;
@@ -34,7 +35,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [satsOut, setSatsOut] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { keysService, bsvService, chromeStorageService, stores } = useServiceContext();
+  const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
   const { updateBsvBalance } = bsvService;
   const { bsvAddress } = keysService;
   // const { isProcessing, setIsProcessing, updateBsvBalance, fundRawTx, bsvAddress } = useBsv();
@@ -57,11 +58,11 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   }, [message, txid]);
 
   useEffect(() => {
-    if (!bsvAddress || !stores) return;
+    if (!bsvAddress || !oneSatSPV) return;
     (async () => {
       const tx = Transaction.fromHex(request.rawtx);
       for (const input of tx.inputs) {
-        input.sourceTransaction = await stores.txns.loadTx(input.sourceTXID ?? '', true);
+        input.sourceTransaction = await oneSatSPV.getTx(input.sourceTXID ?? '', true);
       }
       let outSats = tx.getFee();
       const changePkh = Utils.fromBase58Check(bsvAddress, 'hex').data as string;
@@ -75,7 +76,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       }
       setSatsOut(outSats);
     })();
-  }, [bsvAddress, request.fund, request.rawtx, stores]);
+  }, [bsvAddress, request.fund, request.rawtx, oneSatSPV]);
 
   const handleBroadcast = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -103,7 +104,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       }
       rawtx = res.rawtx;
     }
-    const resp = await stores.txos.broadcast(Transaction.fromHex(rawtx));
+    const resp = await oneSatSPV.broadcast(Transaction.fromHex(rawtx));
     if (resp.status === 'error') {
       addSnackbar('Error broadcasting the raw tx!', 'error');
       setIsProcessing(false);

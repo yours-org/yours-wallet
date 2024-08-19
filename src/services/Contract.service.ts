@@ -2,14 +2,13 @@ import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
 import { DEFAULT_SIGHASH_TYPE } from '../utils/constants';
 import { KeysService } from './Keys.service';
 import { fromUtxo, Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
-import { Txo } from './txo-store/models/txo';
-import LockTemplate from './txo-store/template/lock';
-import { StoresService } from './stores-service';
+import { CaseModSPV, Txo } from 'ts-casemod-spv';
+import { LockTemplate } from 'ts-casemod-spv';
 
 export class ContractService {
   constructor(
     private readonly keysService: KeysService,
-    private readonly stores: StoresService,
+    private readonly oneSatSPV: CaseModSPV,
   ) {}
 
   getSignatures = async (
@@ -100,18 +99,18 @@ export class ContractService {
         if (!pk) continue;
         const input = fromUtxo(
           {
-            txid: lock.txid,
-            vout: lock.vout,
+            txid: lock.outpoint.txid,
+            vout: lock.outpoint.vout,
             satoshis: Number(lock.satoshis),
             script: Utils.toHex([...lock.script]),
           },
-          new LockTemplate().unlock(pk, 'all', false, Number(lock.satoshis), Script.fromBinary([...lock.script])),
+          new LockTemplate().unlock(pk, 'all', false, Number(lock.satoshis), Script.fromBinary(lock.script)),
         );
         input.sequence = 0;
         tx.addInput(input);
       }
 
-      const response = await this.stores.txns.broadcast(tx);
+      const response = await this.oneSatSPV.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
       }

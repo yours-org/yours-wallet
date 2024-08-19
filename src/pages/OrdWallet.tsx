@@ -5,7 +5,7 @@ import { BackButton } from '../components/BackButton';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Ordinal } from '../components/Ordinal';
-import { BSV20Txo, Ordinal as OrdType } from 'yours-wallet-provider';
+import { Ordinal as OrdType } from 'yours-wallet-provider';
 import { PageLoader } from '../components/PageLoader';
 import { QrCode } from '../components/QrCode';
 import {

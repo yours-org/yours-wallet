@@ -21,8 +21,7 @@ import { truncate } from '../utils/format';
 // import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { Ordinal } from 'yours-wallet-provider';
-import { Txo } from '../services/txo-store/models/txo';
+import { Txo } from 'ts-casemod-spv';
 
 const Content = styled.div`
   display: flex;
@@ -226,9 +225,9 @@ export const AppsAndTools = () => {
         .map((u) => {
           const blocksRemaining = Number(u.data.lock?.data.until) - currentBlockHeight;
           return (
-            <LockDetailsContainer key={u.txid}>
+            <LockDetailsContainer key={u.outpoint.txid}>
               <LockDetailsText style={{ textAlign: 'left' }} theme={theme}>
-                {truncate(u.txid, 4, 4)}
+                {truncate(u.outpoint.txid, 4, 4)}
               </LockDetailsText>
               <LockDetailsText style={{ textAlign: 'center' }} theme={theme}>
                 {blocksRemaining < 0 ? '0' : blocksRemaining}

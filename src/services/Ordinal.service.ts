@@ -10,43 +10,40 @@ import {
   transferOrdTokens,
 } from 'js-1sat-ord';
 import { Bsv20, Bsv21, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
-import { Bsv21 as Bsv21Type } from './txo-store/mods/bsv21';
 import { ChromeStorageService } from './ChromeStorage.service';
-import { PrivateKey } from '@bsv/sdk';
+import { PrivateKey, Utils } from '@bsv/sdk';
 import { BsvService } from './Bsv.service';
 import { BSV20_INDEX_FEE, FEE_PER_KB } from '../utils/constants';
-import { TxoLookup } from './txo-store/models/txo';
 import { mapOrdinal } from '../utils/providerHelper';
-import { StoresService } from './stores-service';
+import { Bsv21 as Bsv21Type, CaseModSPV, Outpoint, TxoLookup } from 'ts-casemod-spv';
 
 export class OrdinalService {
   constructor(
     private readonly keysService: KeysService,
     private readonly chromeStorageService: ChromeStorageService,
     private readonly bsvService: BsvService,
-    private readonly stores: StoresService,
+    private readonly oneSatSPV: CaseModSPV,
   ) {}
 
   getOrdinals = async (): Promise<Ordinal[]> => {
-    const ordinals = await this.stores.txos.searchTxos(new TxoLookup('ord'), 0);
+    const ordinals = await this.oneSatSPV.search(new TxoLookup('ord'), 0);
     return ordinals.txos.map(mapOrdinal);
   };
 
   getOrdinal = async (outpoint: string): Promise<Ordinal | undefined> => {
-    const [txid, vout] = outpoint.split('_');
-    const txo = await this.stores.txos.getTxo(txid, parseInt(vout, 10));
+    const txo = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
     if (!txo) return;
     return mapOrdinal(txo);
   };
 
   getBsv20s = async (): Promise<Bsv21[]> => {
-    const bsv20s = await this.stores.txos.searchTxos(new TxoLookup('bsv21'), 0);
+    const bsv20s = await this.oneSatSPV.search(new TxoLookup('bsv21'), 0);
 
     const tokens: { [id: string]: Bsv21 } = {};
     for (const txo of bsv20s.txos) {
       const bsv21 = txo.data.bsv21?.data as Bsv21Type;
       if (!bsv21) continue;
-      let token = tokens[bsv21.id];
+      let token = tokens[bsv21.id.toString()];
       if (!token) {
         token = {
           p: 'bsv-20',
@@ -57,10 +54,10 @@ export class OrdinalService {
           listed: { confirmed: 0n, pending: 0n },
           status: 1,
           icon: bsv21.icon,
-          id: bsv21.id || '',
+          id: bsv21.id.toString(),
           sym: bsv21.sym || '',
         };
-        tokens[bsv21.id] = token;
+        tokens[bsv21.id.toString()] = token;
       }
       token.all.confirmed += bsv21.amt;
       if (!txo.data.list) continue;
@@ -80,8 +77,7 @@ export class OrdinalService {
         return { error: 'invalid-password' };
       }
 
-      const [txid, vout] = outpoint.split('_');
-      const ordinal = await this.stores.txos.getTxo(txid, parseInt(vout, 10));
+      const ordinal = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
       if (!ordinal) {
         return { error: 'no-ordinal' };
       }
@@ -99,13 +95,18 @@ export class OrdinalService {
       const { tx } = await sendOrdinals({
         destinations: [{ address: destinationAddress }],
         ordinals: [
-          { txid, vout: parseInt(vout, 10), satoshis: 1, script: Buffer.from(ordinal.script).toString('base64') },
+          {
+            txid: ordinal.outpoint.txid,
+            vout: ordinal.outpoint.vout,
+            satoshis: 1,
+            script: Utils.toBase64(ordinal.script),
+          },
         ],
         ordPk,
         paymentPk: payPk,
         paymentUtxos: fundingUtxos.map((t) => ({
-          txid: t.txid,
-          vout: t.vout,
+          txid: t.outpoint.txid,
+          vout: t.outpoint.vout,
           satoshis: Number(t.satoshis),
           script: Buffer.from(t.script).toString('base64'),
         })),
@@ -113,7 +114,7 @@ export class OrdinalService {
         satsPerKb: FEE_PER_KB,
       });
 
-      const response = await this.stores.txos.broadcast(tx);
+      const response = await this.oneSatSPV.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
       }
@@ -139,7 +140,7 @@ export class OrdinalService {
       const ordPk = PrivateKey.fromWif(keys.ordWif);
       const fundingUtxos = await this.bsvService.fundingTxos();
 
-      const bsv21Utxos = await this.stores.txos.searchTxos(new TxoLookup('bsv21', 'id', id), 0);
+      const bsv21Utxos = await this.oneSatSPV.search(new TxoLookup('bsv21', 'id', id), 0);
       const tokenUtxos: TokenUtxo[] = [];
       let tokensIn = 0n;
       let bsv21: Bsv21Type | undefined;
@@ -148,12 +149,12 @@ export class OrdinalService {
         if (tokenUtxo.data?.list || !tokenUtxo.data.bsv21?.data) continue;
         bsv21 = tokenUtxo.data.bsv21.data as Bsv21Type;
         tokenUtxos.push({
-          txid: tokenUtxo.txid,
-          vout: tokenUtxo.vout,
+          txid: tokenUtxo.outpoint.txid,
+          vout: tokenUtxo.outpoint.vout,
           satoshis: 1,
           script: Buffer.from(tokenUtxo.script).toString('base64'),
           amt: bsv21.amt.toString(),
-          id: bsv21.id,
+          id: bsv21.id.toString(),
         });
         tokensIn += bsv21.amt;
       }
@@ -168,8 +169,8 @@ export class OrdinalService {
         tokenID: id,
         protocol: TokenType.BSV21,
         utxos: fundingUtxos.map((t) => ({
-          txid: t.txid,
-          vout: t.vout,
+          txid: t.outpoint.txid,
+          vout: t.outpoint.vout,
           satoshis: Number(t.satoshis),
           script: Buffer.from(t.script).toString('base64'),
         })),
@@ -177,7 +178,7 @@ export class OrdinalService {
         paymentPk,
       });
 
-      const response = await this.stores.txos.broadcast(tx);
+      const response = await this.oneSatSPV.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
       }
@@ -203,30 +204,24 @@ export class OrdinalService {
       const paymentPk = PrivateKey.fromWif(keys.walletWif);
       const ordPk = PrivateKey.fromWif(keys.ordWif);
 
-      const fundResults = await this.stores.txos.searchTxos(
-        new TxoLookup('fund'),
-        // new TxoLookup('fund', 'address', this.keysService.bsvAddress),
-        0,
-      );
-
-      const [ordTxid, vout] = outpoint.split('_');
-      const ordUtxo = await this.stores.txos.getTxo(ordTxid, parseInt(vout));
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'), 0);
+      const ordUtxo = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
       if (!ordUtxo) return { error: 'no-ord-utxo' };
 
       const { tx } = await createOrdListings({
         ordPk,
         paymentPk,
         utxos: fundResults.txos.map((t) => ({
-          txid: t.txid,
-          vout: t.vout,
+          txid: t.outpoint.txid,
+          vout: t.outpoint.vout,
           satoshis: Number(t.satoshis),
           script: Buffer.from(t.script).toString('base64'),
         })),
         listings: [
           {
             listingUtxo: {
-              txid: ordUtxo.txid,
-              vout: ordUtxo.vout,
+              txid: ordUtxo.outpoint.txid,
+              vout: ordUtxo.outpoint.vout,
               satoshis: Number(ordUtxo.satoshis),
               script: Buffer.from(ordUtxo.script).toString('base64'),
             },
@@ -237,7 +232,7 @@ export class OrdinalService {
         ],
       });
 
-      const response = await this.stores.txos.broadcast(tx);
+      const response = await this.oneSatSPV.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
       }
@@ -259,42 +254,34 @@ export class OrdinalService {
       const keys = await this.keysService.retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
-      const fundResults = await this.stores.txos.searchTxos(
-        new TxoLookup('fund'),
-        // new TxoLookup('fund', 'address', this.keysService.bsvAddress),
-        0,
-      );
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'), 0);
 
       const paymentPk = PrivateKey.fromWif(keys.walletWif);
       const ordPk = PrivateKey.fromWif(keys.ordWif);
 
-      const [listingTxid, vout] = outpoint.split('_');
-      if (!listingTxid) {
-        throw new Error('No listing txid');
-      }
-      const listingUtxo = await this.stores.txos.getTxo(listingTxid, parseInt(vout));
+      const listingUtxo = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
       if (!listingUtxo) return { error: 'no-ord-utxo' };
 
       const { tx } = await cancelOrdListings({
         ordPk,
         paymentPk,
         utxos: fundResults.txos.map((t) => ({
-          txid: t.txid,
-          vout: t.vout,
+          txid: t.outpoint.txid,
+          vout: t.outpoint.vout,
           satoshis: Number(t.satoshis),
           script: Buffer.from(t.script).toString('base64'),
         })),
         listingUtxos: [
           {
-            txid: listingUtxo.txid,
-            vout: listingUtxo.vout,
+            txid: listingUtxo.outpoint.txid,
+            vout: listingUtxo.outpoint.vout,
             satoshis: Number(listingUtxo.satoshis),
             script: Buffer.from(listingUtxo.script).toString('base64'),
           },
         ],
       });
 
-      const response = await this.stores.txos.broadcast(tx);
+      const response = await this.oneSatSPV.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
       }
@@ -317,16 +304,11 @@ export class OrdinalService {
       const keys = await this.keysService.retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
-      const fundResults = await this.stores.txos.searchTxos(
-        new TxoLookup('fund'),
-        // new TxoLookup('fund', 'address', this.keysService.bsvAddress),
-        0,
-      );
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'), 0);
 
       const paymentPk = PrivateKey.fromWif(keys.walletWif);
 
-      const [listingTxid, vout] = outpoint.split('_');
-      const listingTxo = await this.stores.txos.getTxo(listingTxid, parseInt(vout));
+      const listingTxo = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
       if (!listingTxo) return { error: 'no-ord-utxo' };
 
       if (!listingTxo?.data.list) {
@@ -350,16 +332,16 @@ export class OrdinalService {
         ordAddress: this.keysService.ordAddress,
         paymentPk,
         utxos: fundResults.txos.map((t) => ({
-          txid: t.txid,
-          vout: t.vout,
+          txid: t.outpoint.txid,
+          vout: t.outpoint.vout,
           satoshis: Number(t.satoshis),
           script: Buffer.from(t.script).toString('base64'),
         })),
         listing: {
           payout: payout,
           listingUtxo: {
-            txid: listingTxo.txid,
-            vout: listingTxo.vout,
+            txid: listingTxo.outpoint.txid,
+            vout: listingTxo.outpoint.vout,
             satoshis: Number(listingTxo.satoshis),
             script: Buffer.from(listingTxo.script).toString('base64'),
           },
@@ -367,7 +349,7 @@ export class OrdinalService {
         additionalPayments,
       });
 
-      const response = await this.stores.txos.broadcast(tx);
+      const response = await this.oneSatSPV.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
       }
