@@ -12,8 +12,8 @@ export const useBlockHeightTracker = () => {
 
   useEffect(() => {
     const handleBlockHeightUpdate = (message: BlockHeightTrackerMessage) => {
-      setShowSyncPage(true);
       if (message.action === YoursEventName.BLOCK_HEIGHT_UPDATE) {
+        setShowSyncPage(true);
         const percent = Math.round((message.data.lastHeight / message.data.currentHeight) * 100);
         setPercentageComplete(percent);
         if (percent >= 100) {
