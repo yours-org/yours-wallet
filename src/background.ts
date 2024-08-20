@@ -46,6 +46,7 @@ import {
   TxoLookup,
   TxoStatus,
 } from 'ts-casemod-spv';
+import { BlockHeightTrackerMessage } from './hooks/useBlockHeightTracker';
 const chromeStorageService = new ChromeStorageService();
 const initOneSatSPV = async () => {
   // return chromeStorageService.getAndSetStorage().then(async (): Promise<OneSatWebSPV> => {
@@ -86,7 +87,15 @@ const initOneSatSPV = async () => {
 
   const tip = await oneSatSPV.getChaintip();
   oneSatSPV.events.on('syncedBlockHeight', (lastHeight: number) => {
-    console.log(`Data: tip: ${tip?.height}, lastHeight: ${lastHeight}`);
+    // console.log(`Data: tip: ${tip?.height}, lastHeight: ${lastHeight}`);
+    try {
+      const message: BlockHeightTrackerMessage = {
+        action: YoursEventName.BLOCK_HEIGHT_UPDATE,
+        data: { currentHeight: tip?.height || 0, lastHeight },
+      };
+      sendMessage(message);
+      // eslint-disable-next-line no-empty
+    } catch (error) {}
   });
   oneSatSPV.events.on('destroyed', (message: string) => {
     console.log(message);
