@@ -37,6 +37,7 @@ import { LockData } from '../services/types/bsv.types';
 import { sendMessage } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
 import { QueueContext } from '../contexts/QueueContext';
+import { SendBsvResponse } from '../services/types/bsv.types';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -238,14 +239,23 @@ export const BsvWallet = (props: BsvWalletProps) => {
     setSatSendAmount(null);
   };
 
+  const isValidEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
     await sleep(25);
-    if (!validate(receiveAddress)) {
-      addSnackbar('You must enter a valid BSV address. Paymail not yet supported.', 'info');
+    let isPaymail = false;
+    if (!isValidEmail(receiveAddress) || !validate(receiveAddress)) {
+      addSnackbar('You must enter a valid BSV or Paymail address.', 'info');
       setIsProcessing(false);
       return;
+    }
+
+    if (isValidEmail(receiveAddress)) {
+      isPaymail = true;
     }
 
     if (!satSendAmount && !usdSendAmount) {
@@ -265,7 +275,13 @@ export const BsvWallet = (props: BsvWalletProps) => {
       satoshis = Math.ceil((usdSendAmount / exchangeRate) * BSV_DECIMAL_CONVERSION);
     }
 
-    const sendRes = await sendBsv([{ address: receiveAddress, satoshis }], passwordConfirm);
+    let sendRes: SendBsvResponse | undefined;
+    if (isPaymail) {
+      sendRes = await sendBsv([{ paymail: receiveAddress, satoshis }], passwordConfirm);
+    } else {
+      sendRes = await sendBsv([{ address: receiveAddress, satoshis }], passwordConfirm);
+    }
+
     if (!sendRes.txid || sendRes.error) {
       const message =
         sendRes.error === 'invalid-password'
@@ -394,7 +410,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
           <Input
             theme={theme}
-            placeholder="Enter Address"
+            placeholder="Enter Address or Paymail"
             type="text"
             onChange={(e) => setReceiveAddress(e.target.value)}
             value={receiveAddress}

@@ -3,6 +3,7 @@
   "version": "3.3.0",
   "private": true,
   "dependencies": {
+    "@bsv/paymail": "^1.0.2",
     "@bsv/sdk": "^1.1.12",
     "@tempfix/idb": "^8.0.3",
     "@testing-library/jest-dom": "^5.17.0",
@@ -21,7 +22,6 @@
     "caniuse-lite": "^1.0.30001636",
     "crypto-js": "^4.1.1",
     "eslint-plugin-react-refresh": "^0.4.7",
-    "events": "^3.3.0",
     "js-1sat-ord": "^0.1.41",
     "path-browserify": "^1.0.1",
     "promise-queue-manager": "^3.0.5",

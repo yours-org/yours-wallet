@@ -81,6 +81,11 @@ export const oneSatSPVPromise = chromeStorageService.getAndSetStorage().then(asy
       // eslint-disable-next-line no-empty
     } catch (e) {}
   });
+
+  const tip = await oneSatSPV.getChaintip();
+  oneSatSPV.events.on('syncedBlockHeight', (lastHeight: number) => {
+    console.log(`Data: tip: ${tip?.height}, lastHeight: ${lastHeight}`);
+  });
   return oneSatSPV;
 });
 

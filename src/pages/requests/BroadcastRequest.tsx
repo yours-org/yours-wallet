@@ -14,7 +14,6 @@ import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { Transaction, Utils } from '@bsv/sdk';
-import { on } from 'events';
 
 export type BroadcastResponse = {
   txid: string;

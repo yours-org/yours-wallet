@@ -28,6 +28,9 @@ import {
   Utils,
 } from '@bsv/sdk';
 import { CaseModSPV, Lock, TxoLookup } from 'ts-casemod-spv';
+// import { PaymailClient } from '@bsv/paymail/dist/esm/src/paymailClient';
+
+// const client = new PaymailClient();
 
 export class BsvService {
   private bsvBalance: number;
@@ -93,7 +96,12 @@ export class BsvService {
   };
 
   // TODO: Reimplement SendAll
-  sendBsv = async (request: SendBsv[], password: string, noApprovalLimit?: number): Promise<SendBsvResponse> => {
+  // TODO: Fix sendbsv type in provider
+  sendBsv = async (
+    request: (SendBsv & { paymail?: string })[],
+    password: string,
+    noApprovalLimit?: number,
+  ): Promise<SendBsvResponse> => {
     try {
       const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
       const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
@@ -116,7 +124,8 @@ export class BsvService {
       // Build tx
       const tx = new Transaction();
       let satsOut = 0;
-      request.forEach((req) => {
+      // const paymailRefs: { paymail: string; reference: string }[] = [];
+      for (const req of request) {
         let outScript: Script;
         if (req.address) {
           if (req.inscription) {
@@ -143,16 +152,29 @@ export class BsvService {
           } catch (e) {
             throw Error('Invalid data');
           }
-        } else {
+        } else if (!req.paymail) {
           throw Error('Invalid request');
         }
 
         satsOut += req.satoshis;
-        tx.addOutput({
-          satoshis: req.satoshis,
-          lockingScript: outScript,
-        });
-      });
+        if (!req.paymail) {
+          tx.addOutput({
+            satoshis: req.satoshis,
+            lockingScript: outScript!,
+          });
+        } else {
+          throw Error('Paymail not implemented');
+          // const p2pDestination = await client.getP2pPaymentDestination(req.paymail, req.satoshis);
+          // console.log(p2pDestination);
+          // paymailRefs.push({ paymail: req.paymail, reference: p2pDestination.reference });
+          // for (const output of p2pDestination.outputs) {
+          //   tx.addOutput({
+          //     satoshis: output.satoshis,
+          //     lockingScript: Script.fromHex(output.script),
+          //   });
+          // }
+        }
+      }
 
       tx.addOutput({
         lockingScript: new P2PKH().lock(changeAddress),
@@ -186,6 +208,12 @@ export class BsvService {
       if (bytes > MAX_BYTES_PER_TX) return { error: 'tx-size-too-large' };
 
       const response = await this.oneSatSPV.broadcast(tx);
+
+      // const txHex = tx.toHex();
+      // for (const ref of paymailRefs) {
+      //   await client.sendTransactionP2P(ref.paymail, txHex, ref.reference);
+      // }
+
       if (response.status == 'error') return { error: response.description };
       if (isBelowNoApprovalLimit) {
         const { account } = this.chromeStorageService.getCurrentAccountObject();
