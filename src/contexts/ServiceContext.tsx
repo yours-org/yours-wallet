@@ -7,8 +7,8 @@ import { ContractService } from '../services/Contract.service';
 import { BsvService } from '../services/Bsv.service';
 import { OrdinalService } from '../services/Ordinal.service';
 import { INACTIVITY_LIMIT } from '../utils/constants';
-import { oneSatSPVPromise } from '../background';
 import { CaseModSPV } from 'ts-casemod-spv';
+import { oneSatSPVPromise } from '../background';
 
 const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();

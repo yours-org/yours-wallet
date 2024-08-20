@@ -5,6 +5,7 @@
   "dependencies": {
     "@bsv/paymail": "^1.0.2",
     "@bsv/sdk": "^1.1.12",
+    "@ramonak/react-progress-bar": "^5.2.0",
     "@tempfix/idb": "^8.0.3",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",

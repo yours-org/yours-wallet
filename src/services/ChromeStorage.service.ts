@@ -1,4 +1,6 @@
 import { NetWork } from 'yours-wallet-provider';
+import { YoursEventName } from '../inject';
+import { sendMessage } from '../utils/chromeHelpers';
 import { HOSTED_YOURS_IMAGE } from '../utils/constants';
 import { deepMerge } from './serviceHelpers';
 import { Account, ChromeStorageObject, CurrentAccountObject, DeprecatedStorage } from './types/chromeStorage.types';
@@ -233,5 +235,6 @@ export class ChromeStorageService {
 
   switchAccount = async (identityAddress: string): Promise<void> => {
     await this.update({ selectedAccount: identityAddress });
+    sendMessage({ action: YoursEventName.SWITCH_ACCOUNT });
   };
 }

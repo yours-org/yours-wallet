@@ -47,8 +47,8 @@ import {
   TxoStatus,
 } from 'ts-casemod-spv';
 const chromeStorageService = new ChromeStorageService();
-
-export const oneSatSPVPromise = chromeStorageService.getAndSetStorage().then(async () => {
+const initOneSatSPV = async () => {
+  // return chromeStorageService.getAndSetStorage().then(async (): Promise<OneSatWebSPV> => {
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
   const network = chromeStorageService.getNetwork();
 
@@ -63,16 +63,18 @@ export const oneSatSPVPromise = chromeStorageService.getAndSetStorage().then(asy
     new LockIndexer(new Set<string>([identityAddress]), network, TxoStatus.CONFIRMED),
     new OrdLockIndexer(new Set<string>([ordAddress]), network),
     new OrdIndexer(new Set<string>([bsvAddress, ordAddress]), network, TxoStatus.CONFIRMED),
-    new Bsv21Indexer(new Set<string>([ordAddress]), network),
+    // new Bsv21Indexer(new Set<string>([ordAddress]), network),
   ];
 
   const oneSatSPV = await OneSatWebSPV.init(
     selectedAccount || '',
     indexers,
     owners,
-    false, //self?.document === undefined,
+    self?.document === undefined,
     network == NetWork.Mainnet ? NetWork.Mainnet : NetWork.Testnet,
   );
+
+  if (!oneSatSPV) throw Error('SPV not initialized!');
 
   oneSatSPV.events.on('queueStats', (queueStats: { length: number }) => {
     const message: QueueTrackerMessage = { action: YoursEventName.QUEUE_STATUS_UPDATE, data: queueStats };
@@ -86,8 +88,15 @@ export const oneSatSPVPromise = chromeStorageService.getAndSetStorage().then(asy
   oneSatSPV.events.on('syncedBlockHeight', (lastHeight: number) => {
     console.log(`Data: tip: ${tip?.height}, lastHeight: ${lastHeight}`);
   });
+  oneSatSPV.events.on('destroyed', (message: string) => {
+    console.log(message);
+  });
+
   return oneSatSPV;
-});
+  // });
+};
+
+export let oneSatSPVPromise = chromeStorageService.getAndSetStorage().then(() => initOneSatSPV());
 
 console.log('Yours Wallet Background Script Running!');
 
@@ -111,6 +120,22 @@ const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 // only run in background worker
 if (self?.document === undefined) {
+  const processSyncUtxos = async () => {
+    try {
+      const oneSatSPV = await oneSatSPVPromise;
+      if (!oneSatSPV) throw Error('SPV not initialized!');
+      await oneSatSPV.sync();
+      console.log('done importing');
+    } catch (error) {
+      console.error('Error during sync:', error);
+    }
+  };
+
+  const switchAccount = async () => {
+    (await oneSatSPVPromise).destroy();
+    oneSatSPVPromise = initOneSatSPV();
+  };
+
   const launchPopUp = () => {
     chrome.windows.create(
       {
@@ -166,6 +191,7 @@ if (self?.document === undefined) {
       YoursEventName.ENCRYPT_RESPONSE,
       YoursEventName.DECRYPT_RESPONSE,
       YoursEventName.SYNC_UTXOS,
+      YoursEventName.SWITCH_ACCOUNT,
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -194,6 +220,9 @@ if (self?.document === undefined) {
           return processDecryptResponse(message as DecryptResponse);
         case YoursEventName.SYNC_UTXOS:
           return processSyncUtxos();
+        case YoursEventName.SWITCH_ACCOUNT:
+          console.log('Received SWITCH_ACCOUNT event');
+          return switchAccount();
         default:
           break;
       }
@@ -444,7 +473,8 @@ if (self?.document === undefined) {
     try {
       chromeStorageService.getAndSetStorage().then(async () => {
         const oneSatSPV = await oneSatSPVPromise;
-        const results = await oneSatSPV.stores.txos!.storage.search(new TxoLookup('ord'), 100);
+        if (!oneSatSPV) throw Error('SPV not initialized!');
+        const results = await oneSatSPV.search(new TxoLookup('ord'), 100);
         console.log('results', results);
 
         sendResponse({
@@ -504,6 +534,7 @@ if (self?.document === undefined) {
     try {
       chromeStorageService.getAndSetStorage().then(async () => {
         const oneSatSPV = await oneSatSPVPromise;
+        if (!oneSatSPV) throw Error('SPV not initialized!');
         const results = await oneSatSPV.search(new TxoLookup('fund'), 0);
         const utxos = results.txos.map((txo) => {
           return {
@@ -1119,12 +1150,6 @@ if (self?.document === undefined) {
     }
 
     return true;
-  };
-
-  const processSyncUtxos = async () => {
-    const oneSatSPV = await oneSatSPVPromise;
-    await oneSatSPV.sync();
-    console.log('done importing');
   };
 
   // HANDLE WINDOW CLOSE *****************************************
