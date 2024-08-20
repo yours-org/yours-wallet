@@ -37,7 +37,7 @@ import { LockData } from '../services/types/bsv.types';
 import { sendMessage } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
 import { QueueContext } from '../contexts/QueueContext';
-import { SendBsvResponse } from '../services/types/bsv.types';
+import { InWalletBsvResponse } from '../services/types/bsv.types';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -148,7 +148,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const loadLocks = async () => {
     if (!bsvService) return;
-    const lockData = await bsvService.getLockData();
+    const lockData = await getLockData();
     setLockData(lockData);
   };
 
@@ -180,17 +180,17 @@ export const BsvWallet = (props: BsvWalletProps) => {
     if (!identityAddress) return;
     if (!unlockAttempted) {
       (async () => {
-        // const res = await unlockLockedCoins();
-        // setUnlockAttempted(true);
-        // if (res) {
-        //   if (res.error) addSnackbar('Error unlocking coins!', 'error');
-        //   if (res.txid) {
-        //     await refreshUtxos();
-        //     await unlockLockedCoins(true);
-        //     await sleep(1000);
-        //     addSnackbar('Successfully unlocked coins!', 'success');
-        //   }
-        // }
+        const res = await unlockLockedCoins();
+        setUnlockAttempted(true);
+        if (res) {
+          if (res.error) addSnackbar('Error unlocking coins!', 'error');
+          if (res.txid) {
+            await refreshUtxos();
+            await unlockLockedCoins(true);
+            await sleep(1000);
+            addSnackbar('Successfully unlocked coins!', 'success');
+          }
+        }
       })();
     }
 
@@ -275,7 +275,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
       satoshis = Math.ceil((usdSendAmount / exchangeRate) * BSV_DECIMAL_CONVERSION);
     }
 
-    let sendRes: SendBsvResponse | undefined;
+    let sendRes: InWalletBsvResponse | undefined;
     if (isPaymail) {
       sendRes = await sendBsv([{ paymail: receiveAddress, satoshis }], passwordConfirm);
     } else {

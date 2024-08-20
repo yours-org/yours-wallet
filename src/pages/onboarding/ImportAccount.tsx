@@ -50,6 +50,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
   const { keysService } = useServiceContext();
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
+  const [explicitlyDisableButton, setExplicitlyDisableButton] = useState(false);
   const hiddenFileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -66,11 +67,11 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
       setLoading(true);
       if (password.length < 8) {
         setLoading(false);
-        addSnackbar('The password must be at least 8 characters!', 'error');
+        addSnackbar(newWallet ? 'The password must be at least 8 characters!' : 'Invalid Password!', 'error');
         return;
       }
 
-      if (password !== passwordConfirm) {
+      if (newWallet && password !== passwordConfirm) {
         addSnackbar('The passwords do not match!', 'error');
         return;
       }
@@ -82,12 +83,14 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
 
       if (!identityPk) {
         setLoading(false);
+        setExplicitlyDisableButton(true);
         addSnackbar(
           'IMPORTANT: Since you did not provide an identity key, Yours Wallet will generate one for you, MAKE SURE TO BACK UP YOUR NEW YOURS WALLET!',
           'info',
-          7000,
+          4000,
         );
-        await sleep(7000);
+        await sleep(4000);
+        setExplicitlyDisableButton(false);
         setLoading(true);
       }
 
@@ -103,7 +106,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
         newWallet,
       );
       if (!keys) {
-        addSnackbar('An error occurred while restoring the wallet!', 'error');
+        addSnackbar('An error occurred while creating the account! Make sure your password is correct.', 'error');
         return;
       }
 
@@ -137,7 +140,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
             addSnackbar(
               'Invalid 1Sat Ord Wallet format. File contains seed phrase. Please use a different restore method using your seed phrase!',
               'error',
-              7000,
+              4000,
             );
             return;
           }
@@ -173,15 +176,17 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <Input
-            theme={theme}
-            placeholder="Confirm Password"
-            type="password"
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-            style={{ marginBottom: '2rem' }}
-          />
-          <Button theme={theme} type="primary" label="Finish" isSubmit />
+          <Show when={newWallet}>
+            <Input
+              theme={theme}
+              placeholder="Confirm Password"
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              style={{ marginBottom: '2rem' }}
+            />
+          </Show>
+          <Button theme={theme} type="primary" label="Finish" disabled={explicitlyDisableButton || loading} isSubmit />
           <Button
             theme={theme}
             type="secondary"

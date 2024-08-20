@@ -1,4 +1,4 @@
-// IMPORTANT NOTE: Uncomment everything that is commented back out to re-enable the sponser page should it ever make sense
+// IMPORTANT TODO NOTE: Uncomment everything that is commented back out to re-enable the sponser page should it ever make sense
 
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';

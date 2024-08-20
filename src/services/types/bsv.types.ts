@@ -10,7 +10,7 @@ export interface StoredUtxo extends UTXO {
   spentUnixTime: number;
 }
 
-export type SendBsvResponse = {
+export type InWalletBsvResponse = {
   txid?: string;
   rawtx?: string;
   error?: string;

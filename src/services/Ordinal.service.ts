@@ -13,6 +13,7 @@ import { Bsv20, Bsv21, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { PrivateKey, Utils } from '@bsv/sdk';
 import { BsvService } from './Bsv.service';
+//TODO: look into why BSV20_INDEX_FEE is not being used
 import { BSV20_INDEX_FEE, FEE_PER_KB } from '../utils/constants';
 import { mapOrdinal } from '../utils/providerHelper';
 import { Bsv21 as Bsv21Type, CaseModSPV, Outpoint, TxoLookup } from 'ts-casemod-spv';
@@ -20,6 +21,7 @@ import { Bsv21 as Bsv21Type, CaseModSPV, Outpoint, TxoLookup } from 'ts-casemod-
 export class OrdinalService {
   constructor(
     private readonly keysService: KeysService,
+    //TODO: Look into where this was being used previously and why it's not being used anymore
     private readonly chromeStorageService: ChromeStorageService,
     private readonly bsvService: BsvService,
     private readonly oneSatSPV: CaseModSPV,

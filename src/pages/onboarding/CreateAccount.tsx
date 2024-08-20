@@ -97,11 +97,11 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
       event && event.preventDefault();
       setLoading(true);
       if (password.length < 8) {
-        addSnackbar('The password must be at least 8 characters!', 'error');
+        addSnackbar(newWallet ? 'The password must be at least 8 characters!' : 'Invalid Password!', 'error');
         return;
       }
 
-      if (password !== passwordConfirm) {
+      if (newWallet && password !== passwordConfirm) {
         addSnackbar('The passwords do not match!', 'error');
         return;
       }
@@ -120,7 +120,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
       setStep(2);
     } catch (error) {
       console.log(error);
-      addSnackbar('An error occurred while creating the account!', 'error');
+      addSnackbar('An error occurred while creating the account! Make sure your password is correct.', 'error');
     } finally {
       setLoading(false);
     }
@@ -147,13 +147,15 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <Input
-            theme={theme}
-            placeholder="Confirm password"
-            type="password"
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-          />
+          <Show when={newWallet}>
+            <Input
+              theme={theme}
+              placeholder="Confirm password"
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+            />
+          </Show>
           <NetworkSelectWrapper>
             <ToggleSwitch
               theme={theme}
@@ -164,7 +166,13 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
               {network === NetWork.Testnet ? 'Turn off for mainnet account' : 'Turn on for testnet account'}
             </Text>
           </NetworkSelectWrapper>
-          <Button theme={theme} type="primary" label={newWallet ? 'Generate Seed' : 'Create New Account'} isSubmit />
+          <Button
+            theme={theme}
+            type="primary"
+            label={newWallet ? 'Generate Seed' : 'Create New Account'}
+            disabled={loading}
+            isSubmit
+          />
           <Button
             theme={theme}
             type="secondary"

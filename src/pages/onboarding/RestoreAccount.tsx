@@ -134,11 +134,11 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
       event.preventDefault();
       setLoading(true);
       if (password.length < 8) {
-        addSnackbar('The password must be at least 8 characters!', 'error');
+        addSnackbar(newWallet ? 'The password must be at least 8 characters!' : 'Invalid Password!', 'error');
         return;
       }
 
-      if (password !== passwordConfirm) {
+      if (newWallet && password !== passwordConfirm) {
         addSnackbar('The passwords do not match!', 'error');
         return;
       }
@@ -156,7 +156,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
         importWallet,
       );
       if (!mnemonic) {
-        addSnackbar('An error occurred while restoring the wallet!', 'error');
+        addSnackbar('An error occurred while creating the account! Make sure your password is correct.', 'error');
         return;
       }
 
@@ -212,15 +212,17 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <Input
-            theme={theme}
-            placeholder="Confirm Password"
-            type="password"
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-            style={{ marginBottom: '2rem' }}
-          />
-          <Button theme={theme} type="primary" label="Finish" isSubmit />
+          <Show when={newWallet}>
+            <Input
+              theme={theme}
+              placeholder="Confirm Password"
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              style={{ marginBottom: '2rem' }}
+            />
+          </Show>
+          <Button theme={theme} type="primary" label="Finish" disabled={loading} isSubmit />
           <Button theme={theme} type="secondary" label="Go back" onClick={() => setStep(2)} />
         </FormContainer>
       </Content>

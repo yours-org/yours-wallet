@@ -12,7 +12,7 @@ import { getPrivateKeyFromTag, Keys } from '../utils/keys';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { ContractService } from './Contract.service';
 import { KeysService } from './Keys.service';
-import { FundRawTxResponse, LockData, SendBsvResponse } from './types/bsv.types';
+import { FundRawTxResponse, LockData, InWalletBsvResponse } from './types/bsv.types';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { WhatsOnChainService } from './WhatsOnChain.service';
 import {
@@ -96,12 +96,7 @@ export class BsvService {
   };
 
   // TODO: Reimplement SendAll
-  // TODO: Fix sendbsv type in provider
-  sendBsv = async (
-    request: (SendBsv & { paymail?: string })[],
-    password: string,
-    noApprovalLimit?: number,
-  ): Promise<SendBsvResponse> => {
+  sendBsv = async (request: SendBsv[], password: string, noApprovalLimit?: number): Promise<InWalletBsvResponse> => {
     try {
       const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
       const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
