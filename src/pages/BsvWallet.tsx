@@ -373,7 +373,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         <BalanceContainer>
           <Icon src={bsvCoin} size="1rem" />
           <Text theme={theme} style={{ margin: '0' }}>
-            {bsvBalance}
+            {bsvBalance.toFixed(8)}
           </Text>
         </BalanceContainer>
         <ButtonContainer>

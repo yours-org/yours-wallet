@@ -175,11 +175,17 @@ const createYoursMethod = <T, P = RequestParams>(type: YoursEventName) => {
   };
 };
 
+// TODO: Sync with provider
+const whitelistedEvents: string[] = [
+  YoursEventName.SIGNED_OUT,
+  YoursEventName.NETWORK_CHANGED,
+  YoursEventName.SWITCH_ACCOUNT,
+]; // Whitelisted event names
+
 const createYoursEventEmitter = () => {
   const eventListeners = new Map<string, YoursEventListeners[]>(); // Object to store event listeners
   //TODO: networkChanged event will no longer be used and should be replaced with accountChanged
   // TODO: ensure these on events are still firing when they should
-  const whitelistedEvents: YoursEvents[] = [YoursEventName.SIGNED_OUT, YoursEventName.NETWORK_CHANGED]; // Whitelisted event names
 
   const on = (eventName: YoursEvents, callback: YoursEventListeners) => {
     // Check if the provided event name is in the whitelist
@@ -258,7 +264,7 @@ if (typeof window !== 'undefined') {
 
 // Utility function to filter and emit only whitelisted events
 const emitWhitelistedEvent = (action: YoursEventName, params: RequestParams) => {
-  if (action === YoursEventName.SIGNED_OUT || action === YoursEventName.NETWORK_CHANGED) {
+  if (whitelistedEvents.includes(action)) {
     emit(action as YoursEvents, params);
   }
 };

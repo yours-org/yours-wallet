@@ -48,6 +48,7 @@ import {
 } from 'ts-casemod-spv';
 import { BlockHeightTrackerMessage } from './hooks/useBlockHeightTracker';
 const chromeStorageService = new ChromeStorageService();
+const isInServiceWorker = self?.document === undefined;
 const initOneSatSPV = async () => {
   // return chromeStorageService.getAndSetStorage().then(async (): Promise<OneSatWebSPV> => {
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
@@ -63,7 +64,7 @@ const initOneSatSPV = async () => {
     new FundIndexer(new Set<string>([bsvAddress, ordAddress]), network, TxoStatus.CONFIRMED),
     new LockIndexer(new Set<string>([identityAddress]), network, TxoStatus.CONFIRMED),
     new OrdLockIndexer(new Set<string>([ordAddress]), network),
-    new OrdIndexer(new Set<string>([bsvAddress, ordAddress]), network, TxoStatus.CONFIRMED),
+    new OrdIndexer(new Set<string>([bsvAddress, ordAddress]), network, TxoStatus.TRUSTED),
     // new Bsv21Indexer(new Set<string>([ordAddress]), network),
   ];
 
@@ -71,7 +72,7 @@ const initOneSatSPV = async () => {
     selectedAccount || '',
     indexers,
     owners,
-    self?.document === undefined,
+    isInServiceWorker,
     network == NetWork.Mainnet ? NetWork.Mainnet : NetWork.Testnet,
   );
 
@@ -85,21 +86,20 @@ const initOneSatSPV = async () => {
     } catch (e) {}
   });
 
-  const tip = await oneSatSPV.getChaintip();
-  oneSatSPV.events.on('syncedBlockHeight', (lastHeight: number) => {
-    // console.log(`Data: tip: ${tip?.height}, lastHeight: ${lastHeight}`);
-    try {
-      const message: BlockHeightTrackerMessage = {
-        action: YoursEventName.BLOCK_HEIGHT_UPDATE,
-        data: { currentHeight: tip?.height || 0, lastHeight },
-      };
-      sendMessage(message);
-      // eslint-disable-next-line no-empty
-    } catch (error) {}
-  });
-  oneSatSPV.events.on('destroyed', (message: string) => {
-    console.log(message);
-  });
+  if (isInServiceWorker) {
+    const tip = await oneSatSPV.getChaintip();
+    oneSatSPV.events.on('syncedBlockHeight', (lastHeight: number) => {
+      // console.log(`Data: tip: ${tip?.height}, lastHeight: ${lastHeight}`);
+      try {
+        const message: BlockHeightTrackerMessage = {
+          action: YoursEventName.BLOCK_HEIGHT_UPDATE,
+          data: { currentHeight: tip?.height || 0, lastHeight },
+        };
+        sendMessage(message);
+        // eslint-disable-next-line no-empty
+      } catch (error) {}
+    });
+  }
 
   return oneSatSPV;
   // });
@@ -128,7 +128,7 @@ let popupWindowId: number | undefined;
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 // only run in background worker
-if (self?.document === undefined) {
+if (isInServiceWorker) {
   const processSyncUtxos = async () => {
     try {
       const oneSatSPV = await oneSatSPVPromise;
