@@ -87,7 +87,7 @@ export class GorillaPoolService {
       const network = this.chromeStorageService.getNetwork();
       const res = await axios.get(`${this.getBaseUrl(network)}/api/inscriptions/${outpoint}?script=true`);
       const data = res.data as Ordinal;
-      if (!data?.script || !data.origin?.outpoint.toString()) throw new Error('Could not get listing script');
+      if (!data?.script || !data.origin?.outpoint) throw new Error('Could not get listing script');
       return { script: data.script, origin: data.origin.outpoint.toString() };
     } catch (error) {
       throw new Error(`Error getting market data: ${JSON.stringify(error)}`);

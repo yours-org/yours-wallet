@@ -1,4 +1,5 @@
-import { Ord, Txo } from 'ts-casemod-spv';
+import { Utils } from '@bsv/sdk';
+import { Txo } from 'ts-casemod-spv';
 import { Ordinal } from 'yours-wallet-provider';
 
 export function mapOrdinal(t: Txo): Ordinal {
@@ -7,24 +8,24 @@ export function mapOrdinal(t: Txo): Ordinal {
     vout: t.outpoint.vout,
     outpoint: t.outpoint.toString(),
     satoshis: Number(t.satoshis),
-    script: Buffer.from(t.script).toString('base64'),
+    script: Utils.toBase64(t.script),
     owner: t.owner,
     spend: '',
-    origin: t.data.ord?.data.origin && {
-      outpoint: t.data.ord.data.origin.outpoint,
-      nonce: Number(t.data.ord.data.origin.nonce),
-      // num: t.block.height < 50000000 && `${t.block.height}:${t.block.idx}:${t.outpoint.vout}`,
+    origin: t.data.origin && {
+      outpoint: t.data.origin.data.outpoint,
+      nonce: Number(t.data.origin.data.nonce),
+      num: t.block.height < 50000000 ? `${t.block.height}:${t.block.idx}:${t.outpoint.vout}` : undefined,
       data: {
-        insc: t.data.ord.data.origin.data?.insc,
-        map: t.data.ord.data.origin.data?.map,
+        insc: t.data.origin.data?.insc,
+        map: t.data.origin.data?.map,
       },
     },
     height: t.block?.height,
     idx: Number(t.block?.idx),
     data: {
-      insc: (t.data.ord.data as Ord).insc,
+      insc: t.data.insc?.data,
       list: t.data.list && {
-        payout: Buffer.from(t.data.list.data.payout).toString('base64'),
+        payout: Utils.toBase58(t.data.list.data.payout),
         price: Number(t.data.list.data.price),
       },
       lock: t.data.lock?.data,

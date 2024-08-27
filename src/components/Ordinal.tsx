@@ -96,7 +96,7 @@ export type OrdinalProps = {
 
 export const Ordinal = (props: OrdinalProps) => {
   const { url, selected, isTransfer, size, inscription, theme, onClick } = props;
-  const contentType = inscription?.data?.insc?.file?.type;
+  const contentType = inscription?.origin?.data?.insc?.file?.type;
 
   const renderContent = () => {
     switch (true) {

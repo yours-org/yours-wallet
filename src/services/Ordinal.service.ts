@@ -28,8 +28,10 @@ export class OrdinalService {
   ) {}
 
   getOrdinals = async (): Promise<Ordinal[]> => {
-    const ordinals = await this.oneSatSPV.search(new TxoLookup('ord'), 0);
-    return ordinals.txos.map(mapOrdinal);
+    const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'));
+    const mapped = ordinals.txos.map(mapOrdinal);
+    console.log('Ordinals:', mapped);
+    return mapped;
   };
 
   getOrdinal = async (outpoint: string): Promise<Ordinal | undefined> => {
@@ -39,7 +41,7 @@ export class OrdinalService {
   };
 
   getBsv20s = async (): Promise<Bsv21[]> => {
-    const bsv20s = await this.oneSatSPV.search(new TxoLookup('bsv21'), 0);
+    const bsv20s = await this.oneSatSPV.search(new TxoLookup('bsv21'));
 
     const tokens: { [id: string]: Bsv21 } = {};
     for (const txo of bsv20s.txos) {
@@ -142,7 +144,7 @@ export class OrdinalService {
       const ordPk = PrivateKey.fromWif(keys.ordWif);
       const fundingUtxos = await this.bsvService.fundingTxos();
 
-      const bsv21Utxos = await this.oneSatSPV.search(new TxoLookup('bsv21', 'id', id), 0);
+      const bsv21Utxos = await this.oneSatSPV.search(new TxoLookup('bsv21', 'id', id));
       const tokenUtxos: TokenUtxo[] = [];
       let tokensIn = 0n;
       let bsv21: Bsv21Type | undefined;
@@ -206,7 +208,7 @@ export class OrdinalService {
       const paymentPk = PrivateKey.fromWif(keys.walletWif);
       const ordPk = PrivateKey.fromWif(keys.ordWif);
 
-      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'), 0);
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
       const ordUtxo = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
       if (!ordUtxo) return { error: 'no-ord-utxo' };
 
@@ -256,7 +258,7 @@ export class OrdinalService {
       const keys = await this.keysService.retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
-      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'), 0);
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
 
       const paymentPk = PrivateKey.fromWif(keys.walletWif);
       const ordPk = PrivateKey.fromWif(keys.ordWif);
@@ -306,7 +308,7 @@ export class OrdinalService {
       const keys = await this.keysService.retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
-      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'), 0);
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
 
       const paymentPk = PrivateKey.fromWif(keys.walletWif);
 

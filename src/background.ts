@@ -35,16 +35,17 @@ import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStor
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { mapOrdinal } from './utils/providerHelper';
 import { QueueTrackerMessage } from './hooks/useQueueTracker';
-import { Indexer } from 'ts-casemod-spv/dist/models/indexer';
 import {
   Bsv21Indexer,
   FundIndexer,
+  Indexer,
+  IndexMode,
+  InscriptionIndexer,
   LockIndexer,
   OneSatWebSPV,
-  OrdIndexer,
   OrdLockIndexer,
+  OriginIndexer,
   TxoLookup,
-  TxoStatus,
 } from 'ts-casemod-spv';
 import { BlockHeightTrackerMessage } from './hooks/useBlockHeightTracker';
 const chromeStorageService = new ChromeStorageService();
@@ -61,11 +62,12 @@ const initOneSatSPV = async () => {
   if (!ordAddress) ordAddress = '';
   const owners = new Set<string>([bsvAddress, identityAddress, ordAddress]);
   const indexers: Indexer[] = [
-    new FundIndexer(new Set<string>([bsvAddress, ordAddress]), network, TxoStatus.CONFIRMED),
-    new LockIndexer(new Set<string>([identityAddress]), network, TxoStatus.CONFIRMED),
-    new OrdLockIndexer(new Set<string>([ordAddress]), network),
-    new OrdIndexer(new Set<string>([bsvAddress, ordAddress]), network, TxoStatus.TRUSTED),
-    // new Bsv21Indexer(new Set<string>([ordAddress]), network),
+    new FundIndexer(new Set<string>([bsvAddress, ordAddress]), IndexMode.TrustAndVerify, network),
+    new LockIndexer(new Set<string>([identityAddress]), IndexMode.TrustAndVerify, network),
+    new OrdLockIndexer(new Set<string>([ordAddress]), IndexMode.TrustAndVerify, network),
+    new InscriptionIndexer(new Set<string>([bsvAddress, ordAddress]), IndexMode.TrustAndVerify, network),
+    new OriginIndexer(new Set<string>([bsvAddress, ordAddress]), IndexMode.TrustAndVerify, network),
+    new Bsv21Indexer(new Set<string>([ordAddress]), IndexMode.Trust, network),
   ];
 
   const oneSatSPV = await OneSatWebSPV.init(
@@ -483,7 +485,7 @@ if (isInServiceWorker) {
       chromeStorageService.getAndSetStorage().then(async () => {
         const oneSatSPV = await oneSatSPVPromise;
         if (!oneSatSPV) throw Error('SPV not initialized!');
-        const results = await oneSatSPV.search(new TxoLookup('ord'), 100);
+        const results = await oneSatSPV.search(new TxoLookup('origin'));
         console.log('results', results);
 
         sendResponse({
@@ -544,7 +546,7 @@ if (isInServiceWorker) {
       chromeStorageService.getAndSetStorage().then(async () => {
         const oneSatSPV = await oneSatSPVPromise;
         if (!oneSatSPV) throw Error('SPV not initialized!');
-        const results = await oneSatSPV.search(new TxoLookup('fund'), 0);
+        const results = await oneSatSPV.search(new TxoLookup('fund'));
         const utxos = results.txos.map((txo) => {
           return {
             txid: txo.outpoint.txid,

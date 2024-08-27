@@ -76,7 +76,7 @@ export class BsvService {
   };
 
   getLockedTxos = async () => {
-    const lockTxos = await this.oneSatSPV.search(new TxoLookup('lock'), 0);
+    const lockTxos = await this.oneSatSPV.search(new TxoLookup('lock'));
     return lockTxos.txos;
   };
 
@@ -176,7 +176,7 @@ export class BsvService {
         change: true,
       });
 
-      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'), 0);
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
 
       let satsIn = 0;
       let fee = 0;
@@ -317,7 +317,7 @@ export class BsvService {
   };
 
   fundingTxos = async () => {
-    const results = await this.oneSatSPV.search(new TxoLookup('fund'), 0);
+    const results = await this.oneSatSPV.search(new TxoLookup('fund'));
     return results.txos;
   };
 
@@ -340,7 +340,7 @@ export class BsvService {
     let fee = 0;
     tx.addOutput({ change: true, lockingScript: new P2PKH().lock(this.keysService.bsvAddress) });
 
-    const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'), 0);
+    const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
 
     const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
     for await (const u of fundResults.txos || []) {

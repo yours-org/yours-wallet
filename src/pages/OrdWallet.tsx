@@ -404,7 +404,7 @@ export const OrdWallet = () => {
         label="Transfer"
         disabled={ordinals.length === 0 || !selectedOrdinal}
         onClick={async () => {
-          if (!selectedOrdinal?.outpoint.toString()) {
+          if (!selectedOrdinal?.outpoint) {
             addSnackbar('You must select an ordinal to transfer!', 'info');
             return;
           }
@@ -417,7 +417,7 @@ export const OrdWallet = () => {
         label="List"
         disabled={ordinals.length === 0 || !selectedOrdinal}
         onClick={async () => {
-          if (!selectedOrdinal?.outpoint.toString()) {
+          if (!selectedOrdinal?.outpoint) {
             addSnackbar('You must select an ordinal to list!', 'info');
             return;
           }
@@ -563,7 +563,7 @@ export const OrdWallet = () => {
         <Ordinal
           theme={theme}
           inscription={selectedOrdinal as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinal?.origin?.outpoint.toString()}`}
+          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinal?.origin?.outpoint}`}
           isTransfer
         />
         <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>
@@ -616,7 +616,7 @@ export const OrdWallet = () => {
         <Ordinal
           theme={theme}
           inscription={selectedOrdinal as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinal?.origin?.outpoint.toString()}`}
+          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinal?.origin?.outpoint}`}
           selected
           isTransfer
         />
@@ -662,12 +662,12 @@ export const OrdWallet = () => {
                 <Ordinal
                   theme={theme}
                   inscription={ord}
-                  key={ord.origin?.outpoint.toString()}
-                  url={`${gorillaPoolService.getBaseUrl(network)}/content/${ord.origin?.outpoint.toString()}`}
-                  selected={selectedOrdinal?.origin?.outpoint.toString() === ord.origin?.outpoint.toString()}
+                  key={ord.origin?.outpoint}
+                  url={`${gorillaPoolService.getBaseUrl(network)}/content/${ord.origin?.outpoint}`}
+                  selected={selectedOrdinal?.origin?.outpoint === ord.origin?.outpoint}
                   onClick={() => {
                     setSelectedOrdinal(ord);
-                    setOrdinalOutpoint(ord.outpoint.toString());
+                    setOrdinalOutpoint(ord.outpoint);
                   }}
                 />
               );
@@ -684,7 +684,7 @@ export const OrdWallet = () => {
                 type="warn"
                 label="Cancel Listing"
                 onClick={async () => {
-                  if (!selectedOrdinal?.outpoint.toString()) {
+                  if (!selectedOrdinal?.outpoint) {
                     addSnackbar('You must select an ordinal to transfer!', 'info');
                     return;
                   }
@@ -816,7 +816,7 @@ export const OrdWallet = () => {
         <Ordinal
           theme={theme}
           inscription={selectedOrdinal as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinal?.origin?.outpoint.toString()}`}
+          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinal?.origin?.outpoint}`}
           selected
           isTransfer
         />

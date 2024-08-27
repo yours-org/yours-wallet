@@ -136,7 +136,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
           <Ordinal
             inscription={inscription as OrdinalType}
             theme={theme}
-            url={`${gorillaPoolService.getBaseUrl(network)}/content/${inscription?.origin?.outpoint.toString()}`}
+            url={`${gorillaPoolService.getBaseUrl(network)}/content/${inscription?.origin?.outpoint}`}
             selected={true}
           />
           <FormContainer noValidate onSubmit={(e) => handlePurchaseOrdinal(e)}>
