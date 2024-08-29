@@ -42,6 +42,7 @@ import {
   IndexMode,
   InscriptionIndexer,
   LockIndexer,
+  MapIndexer,
   OneSatWebSPV,
   OrdLockIndexer,
   OriginIndexer,
@@ -62,12 +63,13 @@ const initOneSatSPV = async () => {
   if (!ordAddress) ordAddress = '';
   const owners = new Set<string>([bsvAddress, identityAddress, ordAddress]);
   const indexers: Indexer[] = [
-    new FundIndexer(new Set<string>([bsvAddress, ordAddress]), IndexMode.TrustAndVerify, network),
-    new LockIndexer(new Set<string>([identityAddress]), IndexMode.TrustAndVerify, network),
-    new OrdLockIndexer(new Set<string>([ordAddress]), IndexMode.TrustAndVerify, network),
-    new InscriptionIndexer(new Set<string>([bsvAddress, ordAddress]), IndexMode.TrustAndVerify, network),
-    new OriginIndexer(new Set<string>([bsvAddress, ordAddress]), IndexMode.TrustAndVerify, network),
-    new Bsv21Indexer(new Set<string>([ordAddress]), IndexMode.Trust, network),
+    new FundIndexer(owners, IndexMode.TrustAndVerify, network),
+    new LockIndexer(owners, IndexMode.TrustAndVerify, network),
+    new OrdLockIndexer(owners, IndexMode.TrustAndVerify, network),
+    new InscriptionIndexer(owners, IndexMode.TrustAndVerify, network),
+    new MapIndexer(owners, IndexMode.Verify, network),
+    new OriginIndexer(owners, IndexMode.TrustAndVerify, network),
+    new Bsv21Indexer(owners, IndexMode.Trust, network),
   ];
 
   const oneSatSPV = await OneSatWebSPV.init(

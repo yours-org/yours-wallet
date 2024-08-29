@@ -92,8 +92,13 @@ export class ContractService {
   unlock = async (locks: Txo[], currentBlockHeight: number) => {
     try {
       const pkMap = await this.keysService.retrievePrivateKeyMap(undefined, true);
+      const bsvAddress = this.keysService.bsvAddress;
       const tx = new Transaction();
       tx.lockTime = currentBlockHeight;
+      tx.addOutput({
+        lockingScript: new P2PKH().lock(Utils.fromBase58(bsvAddress)),
+        change: true,
+      });
       for (const lock of locks) {
         const pk = pkMap.get(lock.owner || '');
         if (!pk) continue;
@@ -110,6 +115,8 @@ export class ContractService {
         tx.addInput(input);
       }
 
+      await tx.fee();
+      await tx.sign();
       const response = await this.oneSatSPV.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
@@ -117,7 +124,7 @@ export class ContractService {
 
       return { error: 'broadcast-failed' };
     } catch (error) {
-      console.error('transferOrdinal failed:', error);
+      console.error('unlock failed:', error);
       return { error: JSON.stringify(error) };
     }
   };

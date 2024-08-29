@@ -248,7 +248,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
     setIsProcessing(true);
     await sleep(25);
     let isPaymail = false;
-    if (!isValidEmail(receiveAddress) || !validate(receiveAddress)) {
+    if (!isValidEmail(receiveAddress) && !validate(receiveAddress)) {
       addSnackbar('You must enter a valid BSV or Paymail address.', 'info');
       setIsProcessing(false);
       return;
