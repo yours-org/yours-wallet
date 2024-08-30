@@ -167,7 +167,7 @@ export class OrdinalService {
       }
 
       const { tx } = await transferOrdTokens({
-        distributions: [{ address: destinationAddress, amt: Number(amount) }],
+        distributions: [{ address: destinationAddress, tokens: Number(amount) }],
         inputTokens: tokenUtxos,
         decimals: 0,
         tokenID: id,
