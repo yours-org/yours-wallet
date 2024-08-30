@@ -23,7 +23,7 @@ import { CreateAccount } from './onboarding/CreateAccount';
 import { RestoreAccount } from './onboarding/RestoreAccount';
 import { ImportAccount } from './onboarding/ImportAccount';
 import { AccountRow } from '../components/AccountRow';
-import { streamDataToZip } from '../utils/masterExporter';
+import { MasterBackupProgressEvent, streamDataToZip } from '../utils/masterExporter';
 
 const Content = styled.div`
   display: flex;
@@ -112,7 +112,7 @@ export type SettingsPage =
   | 'export-keys-options'
   | 'export-keys-qr'
   | 'preferences';
-type DecisionType = 'sign-out' | 'export-keys' | 'export-keys-qr-code';
+type DecisionType = 'sign-out' | 'export-master-backup' | 'export-keys' | 'export-keys-qr-code';
 
 export const Settings = () => {
   const { theme } = useTheme();
@@ -131,6 +131,8 @@ export const Settings = () => {
   const [enteredAccountIcon, setEnteredAccountIcon] = useState('');
   const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(socialProfile?.avatar);
   const [isPasswordRequired, setIsPasswordRequired] = useState(chromeStorageService.isPasswordRequired());
+  const [masterBackupProgress, setMasterBackupProgress] = useState(0);
+  const [masterBackupEventText, setMasterBackupEventText] = useState('');
   const [noApprovalLimit, setNoApprovalLimit] = useState(
     chromeStorageService.getCurrentAccountObject().account?.settings.noApprovalLimit ?? 0,
   );
@@ -174,6 +176,14 @@ export const Settings = () => {
   const handleSignOutIntent = () => {
     setDecisionType('sign-out');
     setSpeedBumpMessage('Make sure you have your seed phrase backed up!');
+    setShowSpeedBump(true);
+  };
+
+  const handleMasterBackupIntent = () => {
+    setDecisionType('export-master-backup');
+    setSpeedBumpMessage(
+      'You are about to download wallet data for all your accounts. Make sure you are in a safe place.',
+    );
     setShowSpeedBump(true);
   };
 
@@ -292,6 +302,11 @@ export const Settings = () => {
       signOut();
     }
 
+    if (decisionType === 'export-master-backup') {
+      handleMasterBackup();
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+    }
     if (decisionType === 'export-keys' && password) {
       exportKeys(password);
       setDecisionType(undefined);
@@ -340,7 +355,12 @@ export const Settings = () => {
   };
 
   const handleMasterBackup = async () => {
-    await streamDataToZip(oneSatSPV, chromeStorageService, (num) => console.log(num));
+    await streamDataToZip(oneSatSPV, chromeStorageService, (e: MasterBackupProgressEvent) => {
+      setMasterBackupEventText(e.message);
+      const progress = e.endValue && e.value ? Math.ceil((e.value / e.endValue) * 100) : 0;
+      setMasterBackupProgress(progress);
+    });
+    setMasterBackupEventText('');
   };
 
   const main = (
@@ -452,7 +472,9 @@ export const Settings = () => {
       <SettingsRow
         name="Master Backup"
         description="Download all wallet data for all accounts. Use this to restore your wallet on another device."
-        onClick={handleMasterBackup}
+        onClick={masterBackupEventText ? () => null : handleMasterBackupIntent}
+        masterBackupText={masterBackupEventText}
+        masterBackupProgress={masterBackupProgress}
       />
       <SettingsRow
         name="Download Keys"
@@ -596,7 +618,11 @@ export const Settings = () => {
           onCancel={handleCancel}
           onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
           showSpeedBump={showSpeedBump}
-          withPassword={decisionType === 'export-keys' || decisionType === 'export-keys-qr-code'}
+          withPassword={
+            decisionType === 'export-keys' ||
+            decisionType === 'export-keys-qr-code' ||
+            decisionType === 'export-master-backup'
+          }
         />
       }
     >
