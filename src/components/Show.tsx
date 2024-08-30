@@ -14,5 +14,5 @@ export type ShowProps = PropsWithChildren<{
  */
 export const Show = (props: ShowProps): JSX.Element | null => {
   const { when, whenFalseContent, children } = props;
-  return when ? <>{children}</> : whenFalseContent ?? null;
+  return when ? <>{children}</> : (whenFalseContent ?? null);
 };

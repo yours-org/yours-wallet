@@ -39,7 +39,18 @@ export class ContractService {
         });
       };
 
-      const tx = Transaction.fromHex(request.rawtx);
+      let tx: Transaction;
+      switch (request.format) {
+        case 'beef':
+          tx = Transaction.fromHexBEEF(request.rawtx);
+          break;
+        case 'ef':
+          tx = Transaction.fromHexEF(request.rawtx);
+          break;
+        default:
+          tx = Transaction.fromHex(request.rawtx);
+          break;
+      }
       const sigResponses: SignatureResponse[] = request.sigRequests.flatMap((sigReq) => {
         const privkeys = getPrivKeys(sigReq.address) as PrivateKey[];
         if (!privkeys.length) throw new Error('no-private-key', { cause: sigReq.address });

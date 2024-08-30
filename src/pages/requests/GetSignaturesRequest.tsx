@@ -13,7 +13,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { sleep } from '../../utils/sleep';
-import { Hash, Transaction, Utils } from '@bsv/sdk';
+import { Transaction, Utils } from '@bsv/sdk';
 
 const TxInput = styled.div`
   border: 1px solid yellow;

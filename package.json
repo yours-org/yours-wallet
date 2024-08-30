@@ -23,7 +23,9 @@
     "caniuse-lite": "^1.0.30001636",
     "crypto-js": "^4.1.1",
     "eslint-plugin-react-refresh": "^0.4.7",
+    "file-saver": "^2.0.5",
     "js-1sat-ord": "^0.1.41",
+    "jszip": "^3.10.1",
     "path-browserify": "^1.0.1",
     "promise-queue-manager": "^3.0.5",
     "qrcode": "^1.5.3",
@@ -40,7 +42,7 @@
     "url": "^0.11.3",
     "util": "^0.12.5",
     "web-vitals": "^2.1.4",
-    "yours-wallet-provider": "^3.1.6"
+    "yours-wallet-provider": "^3.2.1"
   },
   "scripts": {
     "start": "react-app-rewired start",
@@ -71,6 +73,7 @@
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@types/chrome": "^0.0.246",
     "@types/crypto-js": "^4.1.2",
+    "@types/file-saver": "^2.0.7",
     "@types/qrcode": "^1.5.2",
     "crypto-browserify": "^3.12.0",
     "husky": "^8.0.3",

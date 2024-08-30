@@ -103,7 +103,20 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       }
       rawtx = res.rawtx;
     }
-    const resp = await oneSatSPV.broadcast(Transaction.fromHex(rawtx));
+    let tx: Transaction;
+    switch (request.format) {
+      case 'beef':
+        tx = Transaction.fromHexBEEF(rawtx);
+        break;
+      case 'ef':
+        tx = Transaction.fromHexEF(rawtx);
+        break;
+      default:
+        tx = Transaction.fromHex(rawtx);
+        break;
+    }
+
+    const resp = await oneSatSPV.broadcast(tx);
     if (resp.status === 'error') {
       addSnackbar('Error broadcasting the raw tx!', 'error');
       setIsProcessing(false);

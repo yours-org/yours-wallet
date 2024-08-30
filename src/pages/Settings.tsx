@@ -23,6 +23,7 @@ import { CreateAccount } from './onboarding/CreateAccount';
 import { RestoreAccount } from './onboarding/RestoreAccount';
 import { ImportAccount } from './onboarding/ImportAccount';
 import { AccountRow } from '../components/AccountRow';
+import { streamDataToZip } from '../utils/masterExporter';
 
 const Content = styled.div`
   display: flex;
@@ -117,7 +118,7 @@ export const Settings = () => {
   const { theme } = useTheme();
   const { setSelected, query } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
-  const { chromeStorageService, keysService, lockWallet } = useServiceContext();
+  const { chromeStorageService, keysService, lockWallet, oneSatSPV } = useServiceContext();
   const [page, setPage] = useState<SettingsPage>(query === 'manage-accounts' ? 'manage-accounts' : 'main');
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
@@ -338,6 +339,10 @@ export const Settings = () => {
     await chromeStorageService.updateNested(key, update);
   };
 
+  const handleMasterBackup = async () => {
+    await streamDataToZip(oneSatSPV, chromeStorageService, (num) => console.log(num));
+  };
+
   const main = (
     <>
       <SettingsRow
@@ -445,13 +450,18 @@ export const Settings = () => {
   const exportKeyOptionsPage = (
     <>
       <SettingsRow
+        name="Master Backup"
+        description="Download all wallet data for all accounts. Use this to restore your wallet on another device."
+        onClick={handleMasterBackup}
+      />
+      <SettingsRow
         name="Download Keys"
-        description="Download your seed, private, and public keys"
+        description="Download your seed, private, and public keys for current account"
         onClick={handleExportKeysIntent}
       />
       <SettingsRow
         name="Export Keys as QR code"
-        description="Display private keys as QR code for mobile import"
+        description="Display private keys for current account as QR code for mobile import"
         onClick={handleExportKeysAsQrCodeIntent}
       />
       <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
