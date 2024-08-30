@@ -56,7 +56,6 @@ const initOneSatSPV = async () => {
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
   const network = chromeStorageService.getNetwork();
 
-  // TODO: move this into a function
   let { bsvAddress, identityAddress, ordAddress } = account?.addresses || {};
   if (!bsvAddress) bsvAddress = '';
   if (!identityAddress) identityAddress = '';
