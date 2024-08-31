@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { CaseModSPV } from 'ts-casemod-spv';
+import { CaseModSPV, Ingest, OneSatWebSPV } from 'ts-casemod-spv';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { sleep } from './sleep';
 import { formatNumberWithCommasAndDecimals } from './format';
@@ -21,6 +21,17 @@ export const streamDataToZip = async (
 ) => {
   const zip = new JSZip();
 
+  const zipAccountLogs = async (accountId: string, zip: JSZip): Promise<Ingest[]> => {
+    progress({ message: `Calculating dependencies for ${accountId}...` }); // UX thing again...
+    await sleep(1000); // UX thing again...
+    const spvWallet = await OneSatWebSPV.init(accountId, []);
+    const logs = await spvWallet.getBackupLogs();
+    zip.file(`${accountId}.json`, JSON.stringify(logs));
+    progress({ message: 'Account dependencies calculated successfully!' });
+    spvWallet.destroy();
+    await sleep(1000); // UX thing again...
+    return logs;
+  };
   const zipChromeObject = async (zip: JSZip) => {
     progress({ message: 'Gathering data for all accounts...' });
     await sleep(1000); // This is really just a UX thing to show user what we are doing...
@@ -38,9 +49,8 @@ export const streamDataToZip = async (
     await sleep(1000); // UX thing again...
   };
 
-  const zipTxns = async (zip: JSZip) => {
+  const zipTxns = async (txids: string[], zip: JSZip) => {
     progress({ message: 'Getting Txns data...' });
-    const txids = await oneSatSpv.getTxids();
     const txnFolder = zip.folder('txns');
     if (!txnFolder) throw new Error('Txn folder not found');
     let count = 0;
@@ -52,13 +62,13 @@ export const streamDataToZip = async (
         value: count,
         endValue,
       });
-      const tx = await oneSatSpv.getTx(txid);
+      const tx = await oneSatSpv.getBackupTx(txid);
       if (!tx) {
         console.error(`Failed to get tx with txid: ${txid}`);
         errorCount++;
         continue;
       }
-      txnFolder.file(`${txid}.bin`, Buffer.from(tx.toBinary()));
+      txnFolder.file(`${txid}.bin`, Buffer.from(tx));
       count++;
     }
     progress({
@@ -73,9 +83,16 @@ export const streamDataToZip = async (
   };
 
   try {
+    const accounts = chromeStorageService.getAllAccounts();
+    const txids = new Set<string>();
+    for (const account of accounts) {
+      const logs = await zipAccountLogs(account.addresses.identityAddress, zip);
+      logs.forEach((log) => txids.add(log.txid));
+    }
+
     await zipChromeObject(zip);
     await zipBlock(zip);
-    await zipTxns(zip);
+    await zipTxns(Array.from(txids), zip);
 
     // Generate zip file and trigger download
     progress({ message: 'Almost done, compressing data...' });
