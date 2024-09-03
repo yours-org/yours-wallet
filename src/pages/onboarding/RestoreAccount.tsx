@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import relayXLogo from '../../assets/relayx.svg';
 import twetchLogo from '../../assets/twetch.svg';
-import pandaLogo from '../../assets/panda.svg';
 import yoursWhiteLogo from '../../assets/yours-white-logo.svg';
 import yoursLogo from '../../assets/yours-logo.png';
 import otherWallet from '../../assets/other-wallet.svg';
 import wifWallet from '../../assets/wif-wallet.svg';
+import masterWallet from '../../assets/master-wallet.svg';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -176,6 +176,10 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
       newWallet ? navigate('/import-wallet') : onNavigateBack('import-wif');
       return;
     }
+    if (newWallet && wallet === 'master') {
+      navigate('/master-restore');
+      return;
+    }
     setStep(2);
   };
 
@@ -303,14 +307,6 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
                   <WalletText theme={theme}>Yours</WalletText>
                 </WalletWrapper>
               </Show>
-              <Show when={wallet === 'panda'}>
-                <WalletWrapper>
-                  <YoursWalletContainer theme={theme}>
-                    <WalletLogo src={pandaLogo} style={{ width: '1.25rem', margin: '0.25rem 0 0 0.1rem' }} />
-                  </YoursWalletContainer>
-                  <WalletText theme={theme}>Panda</WalletText>
-                </WalletWrapper>
-              </Show>
               <Show when={wallet === 'relayx'}>
                 <WalletWrapper>
                   <WalletLogo src={relayXLogo} />
@@ -335,6 +331,14 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
                   <WalletText theme={theme}>Restore with private key</WalletText>
                 </WalletWrapper>
               </Show>
+              <Show when={newWallet && wallet === 'master'}>
+                <WalletWrapper>
+                  <YoursWalletContainer theme={theme}>
+                    <WalletLogo src={masterWallet} style={{ width: '1.25rem' }} />
+                  </YoursWalletContainer>
+                  <WalletText theme={theme}>Restore from master backup</WalletText>
+                </WalletWrapper>
+              </Show>
             </>
           }
         />
@@ -349,7 +353,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
         <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
           Select the wallet you'd like to restore from
         </Text>
-        {availableWallets(['yours', 'panda', 'relayx', 'twetch', undefined, 'wif'])}
+        {availableWallets(['yours', 'relayx', 'twetch', undefined, 'wif', newWallet ? 'master' : undefined])}
         <Button
           theme={theme}
           type="secondary"

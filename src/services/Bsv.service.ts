@@ -317,7 +317,7 @@ export class BsvService {
   };
 
   fundingTxos = async () => {
-    const results = await this.oneSatSPV.search(new TxoLookup('fund'));
+    const results = await this.oneSatSPV.search(new TxoLookup('fund'), undefined, 0);
     return results.txos;
   };
 

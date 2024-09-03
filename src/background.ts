@@ -75,7 +75,7 @@ const initOneSatSPV = async () => {
     selectedAccount || '',
     indexers,
     owners,
-    isInServiceWorker,
+    isInServiceWorker && !!account,
     network == NetWork.Mainnet ? NetWork.Mainnet : NetWork.Testnet,
   );
 
@@ -98,7 +98,7 @@ const initOneSatSPV = async () => {
           action: YoursEventName.BLOCK_HEIGHT_UPDATE,
           data: { currentHeight: tip?.height || 0, lastHeight },
         };
-        sendMessage(message);
+        selectedAccount && sendMessage(message);
         // eslint-disable-next-line no-empty
       } catch (error) {}
     });

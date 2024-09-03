@@ -36,6 +36,7 @@ import { QueueProvider } from './contexts/QueueContext';
 import { QueueBanner } from './components/QueueBanner';
 import { BlockHeightProvider } from './contexts/BlockHeightContext';
 import { SyncingBlocks } from './components/SyncingBlocks';
+import { MasterRestore } from './pages/onboarding/MasterRestore';
 
 const MainContainer = styled.div<{ $isMobile?: boolean }>`
   display: flex;
@@ -135,6 +136,7 @@ export const App = () => {
                         element={<RestoreAccount onNavigateBack={() => null} newWallet />}
                       />
                       <Route path="/import-wallet" element={<ImportAccount onNavigateBack={() => null} newWallet />} />
+                      <Route path="/master-restore" element={<MasterRestore />} />
                       <Route
                         path="/connect"
                         element={
