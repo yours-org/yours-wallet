@@ -80,9 +80,10 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [step, setStep] = useState(1);
   const [seedWords, setSeedWords] = useState<string[]>([]);
+  const [identityAddress, setIdentityAddress] = useState('');
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
-  const { keysService } = useServiceContext();
+  const { keysService, chromeStorageService } = useServiceContext();
 
   useEffect(() => {
     hideMenu();
@@ -109,14 +110,19 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
       // Some artificial delay for the loader
       await sleep(50);
 
-      const mnemonic = await keysService.generateSeedAndStoreEncrypted(password, newWallet, network);
+      const keys = await keysService.generateSeedAndStoreEncrypted(password, newWallet, network);
 
-      if (!mnemonic) {
-        addSnackbar('An error occurred while restoring the wallet!', 'error');
+      if (!keys?.mnemonic) {
+        addSnackbar('An error occurred while creating the wallet!', 'error');
         return;
       }
+      setSeedWords(keys.mnemonic.split(' '));
 
-      setSeedWords(mnemonic.split(' '));
+      if (!keys.identityAddress) {
+        addSnackbar('An error occurred while getting the identity address!', 'error');
+        return;
+      }
+      setIdentityAddress(keys.identityAddress);
       setStep(2);
     } catch (error) {
       console.log(error);
@@ -215,8 +221,9 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
           theme={theme}
           type="primary"
           label={newWallet ? 'Next' : 'Finish'}
-          onClick={() => {
+          onClick={async () => {
             setSeedWords([]);
+            await chromeStorageService.switchAccount(identityAddress);
             if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
             setStep(3);
           }}

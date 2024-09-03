@@ -115,7 +115,7 @@ export class KeysService {
     }
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
     await this.storeEncryptedKeys(passKey, salt, keys, encryptedKeys, network);
-    return keys.mnemonic;
+    return keys;
   };
 
   sweepLegacy = async (keys: Keys) => {

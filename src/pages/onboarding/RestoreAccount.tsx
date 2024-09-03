@@ -117,7 +117,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   const [walletDerivation, setWalletDerivation] = useState<string | null>(null);
   const [ordDerivation, setOrdDerivation] = useState<string | null>(null);
   const [identityDerivation, setIdentityDerivation] = useState<string | null>(null);
-  const { keysService } = useServiceContext();
+  const { keysService, chromeStorageService } = useServiceContext();
 
   useEffect(() => {
     hideMenu();
@@ -145,7 +145,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
 
       // Some artificial delay for the loader
       await sleep(50);
-      const mnemonic = await keysService.generateSeedAndStoreEncrypted(
+      const keys = await keysService.generateSeedAndStoreEncrypted(
         password,
         newWallet,
         NetWork.Mainnet,
@@ -155,10 +155,16 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
         identityDerivation,
         importWallet,
       );
-      if (!mnemonic) {
+      if (!keys?.mnemonic) {
         addSnackbar('An error occurred while creating the account! Make sure your password is correct.', 'error');
         return;
       }
+
+      const chromeObject = await chromeStorageService.getAndSetStorage();
+      if (!chromeObject?.accounts) throw new Error('No accounts found!');
+      const objKeys = Object.keys(chromeObject.accounts);
+      if (!objKeys) throw new Error('Object identity address not found');
+      await chromeStorageService.switchAccount(objKeys[0]);
 
       if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
       setStep(4);

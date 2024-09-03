@@ -47,7 +47,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
   const [ordPk, setOrdPk] = useState('');
   const [identityPk, setIdentityPk] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { keysService } = useServiceContext();
+  const { keysService, chromeStorageService } = useServiceContext();
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
   const [explicitlyDisableButton, setExplicitlyDisableButton] = useState(false);
@@ -110,6 +110,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
         return;
       }
 
+      await chromeStorageService.switchAccount(keys.identityAddress || identityPk);
       if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
       setStep(3);
     } catch (error) {

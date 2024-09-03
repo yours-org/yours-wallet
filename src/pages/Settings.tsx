@@ -283,6 +283,7 @@ export const Settings = () => {
     setDecisionType(undefined);
     window.location.reload();
 
+    // TODO: we should kill any casemodSPV instances and destroy databases?
     sendMessage({
       action: 'signedOut',
     });
@@ -296,9 +297,8 @@ export const Settings = () => {
     setSelected('settings');
   }, [setSelected]);
 
-  const handleSpeedBumpConfirm = (password?: string) => {
+  const handleSpeedBumpConfirm = async (password?: string) => {
     if (decisionType === 'sign-out') {
-      // TODO: export master storage object with all necessary data to restore full wallet state for all accounts. Be sure to include decrypted password.
       signOut();
     }
 
