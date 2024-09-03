@@ -23,7 +23,7 @@ export const QueueBanner = () => {
 
   return (
     <Show when={showQueueBanner}>
-      {theme && queueLength && (
+      {theme && (
         <Banner theme={theme} $isSyncing={isSyncing}>
           <Show when={isSyncing} whenFalseContent={<>Your wallet is fully synced!</>}>
             SPV Wallet is syncing {formatNumberWithCommasAndDecimals(queueLength, 0)} transactions...

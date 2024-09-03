@@ -36,6 +36,7 @@ export const MasterRestore = () => {
         setLoading(true);
         await restoreMasterFromZip(oneSatSPV, chromeStorageService, handleProgress, file);
         addSnackbar('Restoration complete!', 'success');
+        handleSelect('bsv', 'reload');
       } catch (error) {
         console.error('Error restoring from ZIP file', error);
         addSnackbar('Error restoring from ZIP file!', 'error');

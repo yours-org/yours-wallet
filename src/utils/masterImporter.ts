@@ -96,7 +96,6 @@ export const restoreMasterFromZip = async (
       const logs = JSON.parse(accountData);
       const spvWallet = await OneSatWebSPV.init(account.addresses.identityAddress, [], owners);
       await spvWallet.restoreBackupLogs(logs);
-      spvWallet.destroy(); // TODO: to await or not?
       progress({ message: `Account logs for ${accountFile.name.replace('.json', '')} restored successfully!` });
     }
   };
@@ -112,7 +111,7 @@ export const restoreMasterFromZip = async (
     progress({ message: 'Chrome storage restored successfully!' });
     await sleep(1000);
     progress({ message: 'Master restore complete!' });
-    chromeStorageService.switchAccount(chromeObject.selectedAccount);
+    await chromeStorageService.switchAccount(chromeObject.selectedAccount);
   } catch (error) {
     console.error('Failed to restore zip file', error);
     progress({ message: 'Failed to restore backup, see console for details.' });

@@ -49,7 +49,7 @@ import {
   TxoLookup,
 } from 'ts-casemod-spv';
 import { BlockHeightTrackerMessage } from './hooks/useBlockHeightTracker';
-const chromeStorageService = new ChromeStorageService();
+let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
 const initOneSatSPV = async () => {
   // return chromeStorageService.getAndSetStorage().then(async (): Promise<OneSatWebSPV> => {
@@ -145,6 +145,8 @@ if (isInServiceWorker) {
 
   const switchAccount = async () => {
     (await oneSatSPVPromise).destroy();
+    chromeStorageService = new ChromeStorageService();
+    await chromeStorageService.getAndSetStorage();
     oneSatSPVPromise = initOneSatSPV();
   };
 
