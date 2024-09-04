@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { BLOCK_HEADER_SIZE, CaseModSPV, OneSatWebSPV } from 'ts-casemod-spv';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { formatNumberWithCommasAndDecimals } from './format';
 import { sleep } from './sleep';
 
 export type MasterBackupProgressEvent = {
@@ -21,7 +22,8 @@ export const restoreMasterFromZip = async (
   const zip = new JSZip();
 
   const readChromeStorage = async (zip: JSZip) => {
-    progress({ message: 'Reading Chrome storage...' });
+    progress({ message: 'Reading file storage...' });
+    await sleep(1000);
     const chromeObjectFile = zip.file('chromeStorage.json');
     if (chromeObjectFile) {
       const chromeObjectData = await chromeObjectFile.async('string');
@@ -39,17 +41,25 @@ export const restoreMasterFromZip = async (
       return;
     }
     progress({ message: 'Restoring blocks data...' });
+    await sleep(1000);
     const folder = zip.folder('blocks');
     if (folder) {
       const files = folder.file(/\.bin$/);
       let count = 0;
       for (const headersFile of files) {
         const blocksData = await headersFile.async('uint8array');
+        const endValue = (blocksData.length / BLOCK_HEADER_SIZE) * files.length;
         await oneSatSpv.restoreBlocks([...blocksData]);
         count += blocksData.length / BLOCK_HEADER_SIZE;
-        progress({ message: `Processed blocks ${count}` });
+        progress({
+          message: `Synced ${formatNumberWithCommasAndDecimals(count, 0)} blocks...`,
+          endValue,
+          value: count,
+        });
       }
+      await sleep(1000);
       progress({ message: 'Blocks data restored successfully!' });
+      await sleep(1000);
     } else {
       throw new Error('Blocks data not found in zip.');
     }
@@ -57,30 +67,27 @@ export const restoreMasterFromZip = async (
 
   const restoreTxns = async (zip: JSZip) => {
     progress({ message: 'Restoring transactions data...' });
+    await sleep(1000);
     const txnFolder = zip.folder('txns');
     if (txnFolder) {
       const txns = txnFolder.file(/\.bin$/);
       let count = 0;
       const endValue = txns.length;
-      console.time('import');
       for (const txnFile of txns) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const txid = txnFile.name.match(/txns\/([a-f0-9]*)\.bin/)![1]!;
-        console.time(txid);
         const txnData = await txnFile.async('uint8array');
-        console.timeLog(txid, 'read data');
         await oneSatSpv.restoreBackupTx(txid, Array.from(txnData));
-        console.timeLog(txid, 'restored data');
-        console.log(`Restored transaction with txid: ${txid}`);
-        count++;
         progress({
           message: `Restored ${count} of ${endValue} transactions...`,
           value: count,
           endValue,
         });
-        console.timeEnd(txid);
+        count++;
       }
-      console.timeEnd('import');
+      await sleep(1000);
       progress({ message: 'Transactions restored successfully!' });
+      await sleep(1000);
     } else {
       throw new Error('Transactions data not found in zip.');
     }
@@ -88,6 +95,7 @@ export const restoreMasterFromZip = async (
 
   const restoreAccountLogs = async (zip: JSZip, accounts: Account[]) => {
     progress({ message: 'Restoring account logs...' });
+    await sleep(1000);
     for (const account of accounts) {
       const accountFile = zip.file(`${account.addresses.identityAddress}.json`);
       if (!accountFile) throw new Error('Account file not found!');
@@ -100,7 +108,8 @@ export const restoreMasterFromZip = async (
       const logs = JSON.parse(accountData);
       const spvWallet = await OneSatWebSPV.init(account.addresses.identityAddress, [], owners);
       await spvWallet.restoreBackupLogs(logs);
-      progress({ message: `Account logs for ${accountFile.name.replace('.json', '')} restored successfully!` });
+      progress({ message: `Account logs for restored successfully!` });
+      await sleep(1000);
     }
   };
 
@@ -112,9 +121,10 @@ export const restoreMasterFromZip = async (
     await restoreAccountLogs(zipContent, Object.values(chromeObject.accounts));
 
     await chromeStorageService.update(chromeObject);
-    progress({ message: 'Chrome storage restored successfully!' });
+    progress({ message: 'Accounts restored successfully!' });
     await sleep(1000);
     progress({ message: 'Master restore complete!' });
+    await sleep(1000);
     await chromeStorageService.switchAccount(chromeObject.selectedAccount);
   } catch (error) {
     console.error('Failed to restore zip file', error);

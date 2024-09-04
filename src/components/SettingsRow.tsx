@@ -3,7 +3,7 @@ import { useTheme } from '../hooks/useTheme';
 import { HeaderText, Text } from './Reusable';
 import { useState } from 'react';
 import { Show } from './Show';
-import ProgressBar from './ProgressBar';
+import ProgressBar from '@ramonak/react-progress-bar';
 
 const Container = styled.div<{ color: string; $clickable: string }>`
   display: flex;
@@ -16,6 +16,12 @@ const Container = styled.div<{ color: string; $clickable: string }>`
   min-height: 3.5rem;
   margin: 0.25rem;
   cursor: ${(props) => (props.$clickable === 'true' ? 'pointer' : 'default')};
+`;
+
+const ProgressBarContainer = styled.div`
+  width: 100%;
+  border-radius: 1rem;
+  margin: 0.5rem 0;
 `;
 
 const Content = styled.div`
@@ -56,7 +62,16 @@ export const SettingsRow = (props: SettingsRowProp) => {
   const masterBackupContent = (
     <Content>
       <Description theme={theme}>{masterBackupText}</Description>
-      {masterBackupProgress && <ProgressBar progress={masterBackupProgress || 0} barColor={theme.primaryButton} />}
+      {masterBackupProgress && (
+        <ProgressBarContainer>
+          <ProgressBar
+            completed={masterBackupProgress}
+            bgColor={theme.primaryButton}
+            baseBgColor={'#f5f5f5'}
+            height="16px"
+          />
+        </ProgressBarContainer>
+      )}
     </Content>
   );
 

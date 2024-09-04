@@ -9,6 +9,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { restoreMasterFromZip } from '../../utils/masterImporter';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { useNavigate } from 'react-router-dom';
 
 const Content = styled.div`
   display: flex;
@@ -20,10 +21,13 @@ const Content = styled.div`
 export const MasterRestore = () => {
   const { theme } = useTheme();
   const { handleSelect } = useBottomMenu();
+  const navigate = useNavigate();
   const { chromeStorageService, oneSatSPV } = useServiceContext();
   const [loading, setLoading] = useState(false);
   const hiddenFileInput = useRef<HTMLInputElement>(null);
   const { addSnackbar } = useSnackbar();
+  const [loaderMessage, setLoaderMessage] = useState('Processing...');
+  const [progress, setProgress] = useState(0);
 
   const handleZipUploadClick = () => {
     hiddenFileInput.current?.click();
@@ -50,13 +54,14 @@ export const MasterRestore = () => {
   };
 
   const handleProgress = (event: { message: string; value?: number; endValue?: number }) => {
-    console.log(event.message); // You can update a UI element with this message if needed
+    setLoaderMessage(event.message);
+    setProgress(event.value && event.endValue ? Math.round((event.value / event.endValue) * 100) : 0);
   };
 
   return (
     <>
       <Show when={loading}>
-        <PageLoader theme={theme} message="Restoring..." />
+        <PageLoader theme={theme} message={loaderMessage} showProgressBar barProgress={progress} />
       </Show>
       <Show when={!loading}>
         <Content>
@@ -72,12 +77,7 @@ export const MasterRestore = () => {
             style={{ display: 'none' }}
             accept=".zip,application/zip"
           />
-          <Button
-            theme={theme}
-            type="secondary"
-            label="Go back"
-            onClick={() => handleSelect('settings', 'restore-account')}
-          />
+          <Button theme={theme} type="secondary" label="Go back" onClick={() => navigate('/restore-wallet')} />
         </Content>
       </Show>
     </>
