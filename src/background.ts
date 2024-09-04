@@ -52,7 +52,6 @@ import { BlockHeightTrackerMessage } from './hooks/useBlockHeightTracker';
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
 const initOneSatSPV = async () => {
-  // return chromeStorageService.getAndSetStorage().then(async (): Promise<OneSatWebSPV> => {
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
   const network = chromeStorageService.getNetwork();
 
@@ -206,11 +205,7 @@ if (isInServiceWorker) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
-    if (
-      [YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT, YoursEventName.NETWORK_CHANGED].includes(
-        message.action,
-      )
-    ) {
+    if ([YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT].includes(message.action)) {
       emitEventToActiveTabs(message);
     }
 
@@ -336,7 +331,7 @@ if (isInServiceWorker) {
 
   const emitEventToActiveTabs = (message: { action: YoursEventName; params: RequestParams }) => {
     const { action, params } = message;
-    chrome.tabs.query({ active: true }, function (tabs) {
+    chrome.tabs.query({}, function (tabs) {
       tabs.forEach(function (tab: chrome.tabs.Tab) {
         if (tab.id) {
           chrome.tabs.sendMessage(tab.id, { type: CustomListenerName.YOURS_EMIT_EVENT, action, params });

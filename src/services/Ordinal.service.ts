@@ -10,7 +10,6 @@ import {
   transferOrdTokens,
 } from 'js-1sat-ord';
 import { Bsv20, Bsv21, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
-import { ChromeStorageService } from './ChromeStorage.service';
 import { PrivateKey, Utils } from '@bsv/sdk';
 import { BsvService } from './Bsv.service';
 //TODO: look into why BSV20_INDEX_FEE is not being used
@@ -21,8 +20,6 @@ import { Bsv21 as Bsv21Type, CaseModSPV, Outpoint, TxoLookup } from 'ts-casemod-
 export class OrdinalService {
   constructor(
     private readonly keysService: KeysService,
-    //TODO: Look into where this was being used previously and why it's not being used anymore
-    private readonly chromeStorageService: ChromeStorageService,
     private readonly bsvService: BsvService,
     private readonly oneSatSPV: CaseModSPV,
   ) {}

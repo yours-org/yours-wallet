@@ -95,7 +95,6 @@ export const App = () => {
   }, [chromeStorageService, getStorageAndSetRequestState, isReady]);
 
   const handleUnlock = async () => {
-    //TODO: prob a better way to do this
     window.location.reload();
   };
 

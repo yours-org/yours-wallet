@@ -166,7 +166,7 @@ export const OrdWallet = () => {
   const [priceData, setPriceData] = useState<{ id: string; satPrice: number }[]>([]);
   const [ordinals, setOrdinals] = useState<OrdType[]>([]);
   const [bsv20s, setBsv20s] = useState<Bsv20[]>([]);
-  // const bsv20s = getBsv20s();
+  // const bsv20s = getBsv20s(); //TODO: this... david
 
   useEffect(() => {
     if (!bsv20s.length) return;

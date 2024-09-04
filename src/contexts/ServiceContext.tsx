@@ -1,7 +1,6 @@
 import React, { createContext, ReactNode, useCallback, useEffect, useState } from 'react';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { WhatsOnChainService } from '../services/WhatsOnChain.service';
-import { GorillaPoolService } from '../services/GorillaPool.service';
 import { KeysService } from '../services/Keys.service';
 import { ContractService } from '../services/Contract.service';
 import { BsvService } from '../services/Bsv.service';
@@ -9,6 +8,7 @@ import { OrdinalService } from '../services/Ordinal.service';
 import { INACTIVITY_LIMIT } from '../utils/constants';
 import { CaseModSPV } from 'ts-casemod-spv';
 import { oneSatSPVPromise } from '../background';
+import { GorillaPoolService } from '../services/GorillaPool.service';
 
 const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();
@@ -16,12 +16,12 @@ const initializeServices = async () => {
 
   const wocService = new WhatsOnChainService(chromeStorageService);
   const gorillaPoolService = new GorillaPoolService(chromeStorageService);
-  const keysService = new KeysService(gorillaPoolService, wocService, chromeStorageService);
   const oneSatSPV = await oneSatSPVPromise;
+  const keysService = new KeysService(chromeStorageService, oneSatSPV);
   const contractService = new ContractService(keysService, oneSatSPV);
 
   const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, oneSatSPV);
-  const ordinalService = new OrdinalService(keysService, chromeStorageService, bsvService, oneSatSPV);
+  const ordinalService = new OrdinalService(keysService, bsvService, oneSatSPV);
 
   return {
     chromeStorageService,
@@ -68,8 +68,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
           if (bsvAddress && ordAddress) {
             await keysService.retrieveKeys();
             await bsvService.rate();
-            await bsvService.updateBsvBalance(true);
-            // await ordinalService.getAndSetOrdinals(ordAddress);
+            await bsvService.updateBsvBalance();
           }
         }
 

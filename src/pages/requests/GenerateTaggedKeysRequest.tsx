@@ -14,7 +14,7 @@ import { encryptUsingPrivKey } from '../../utils/crypto';
 import { truncate } from '../../utils/format';
 import { getPrivateKeyFromTag, getTaggedDerivationKeys, Keys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
-import { P2PKH, PublicKey, Utils } from '@bsv/sdk';
+import { PublicKey } from '@bsv/sdk';
 import { OrdP2PKH } from 'js-1sat-ord';
 import { convertAddressToMainnet, convertAddressToTestnet } from '../../utils/tools';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
@@ -25,7 +25,6 @@ export type GenerateTaggedKeysRequestProps = {
   onResponse: () => void;
 };
 
-// TODO: Try to use the provider type here... need to figure out how to handle error
 export type TaggedDerivationResponse = {
   address?: string;
   pubKey?: string;
@@ -40,7 +39,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, gorillaPoolService, keysService, bsvService } = useServiceContext();
+  const { chromeStorageService, keysService, bsvService } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
 
   useEffect(() => {
@@ -133,6 +132,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
   };
 
   const handleGetTaggedKeys = async (e: React.FormEvent<HTMLFormElement>) => {
+    throw new Error('This does not work until we fix it');
     e.preventDefault();
     setIsProcessing(true);
 
@@ -176,9 +176,10 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     }
 
     await sleep(3000); // give enough time for indexer to index newly created tag
-    await gorillaPoolService.setDerivationTags(keys.identityAddress, keys);
+    //TODO: we plan to get rid of gorilla pool service so need to handle this.
+    // await gorillaPoolService.setDerivationTags(keys.identityAddress, keys);
 
-    setSuccessTxId(res.pubKey);
+    // setSuccessTxId(res.pubKey);
     setIsProcessing(false);
     addSnackbar('Successfully generated key!', 'success');
 

@@ -1,12 +1,9 @@
 import axios from 'axios';
 import { NetWork } from 'yours-wallet-provider';
-import { BSV_DECIMAL_CONVERSION, WOC_BASE_URL, WOC_TESTNET_BASE_URL } from '../utils/constants';
-import { isAddressOnRightNetwork } from '../utils/tools';
+import { WOC_BASE_URL, WOC_TESTNET_BASE_URL } from '../utils/constants';
 import { ChromeStorageService } from './ChromeStorage.service';
-import { StoredUtxo, UTXO } from './types/bsv.types';
-import { ChromeStorageObject } from './types/chromeStorage.types';
-import { ChainInfo, WocUtxo } from './types/whatsOnChain.types';
-import { P2PKH } from '@bsv/sdk';
+import { UTXO } from './types/bsv.types';
+import { ChainInfo } from './types/whatsOnChain.types';
 
 export class WhatsOnChainService {
   apiKey: string;
@@ -22,59 +19,6 @@ export class WhatsOnChainService {
 
   getBaseUrl = (network: NetWork) => {
     return network === NetWork.Mainnet ? WOC_BASE_URL : WOC_TESTNET_BASE_URL;
-  };
-
-  getBsvBalance = async (address: string, pullFresh?: boolean): Promise<number | undefined> => {
-    const utxos = await this.getAndUpdateUtxoStorage(address, pullFresh);
-    if (!utxos) return 0;
-
-    const sats = utxos.reduce((a, item) => a + item.satoshis, 0);
-    const bsvTotal = sats / BSV_DECIMAL_CONVERSION;
-    return bsvTotal;
-  };
-
-  getAndUpdateUtxoStorage = async (fromAddress: string, pullFresh?: boolean): Promise<StoredUtxo[]> => {
-    try {
-      const network = this.chromeStorageService.getNetwork();
-      if (!isAddressOnRightNetwork(network, fromAddress)) return [];
-      const { account } = this.chromeStorageService.getCurrentAccountObject();
-      if (!account) return [];
-      const { paymentUtxos } = account;
-
-      if (!pullFresh && paymentUtxos.length > 0) {
-        return paymentUtxos
-          .filter((utxo) => !utxo.spent)
-          .sort((a: StoredUtxo, b: StoredUtxo) => (a.satoshis > b.satoshis ? -1 : 1));
-      }
-
-      const { data } = await axios.get(`${this.getBaseUrl(network)}/address/${fromAddress}/unspent`, this.config);
-      const explorerUtxos: StoredUtxo[] = data
-        .filter((u: WocUtxo) => u.value !== 1) // Ensure we are never spending 1 sats
-        .map((utxo: WocUtxo) => {
-          return {
-            satoshis: utxo.value,
-            vout: utxo.tx_pos,
-            txid: utxo.tx_hash,
-            script: new P2PKH().lock(fromAddress).toHex(),
-            spent: false,
-            spentUnixTime: 0,
-          } as StoredUtxo;
-        });
-
-      const key: keyof ChromeStorageObject = 'accounts';
-      const update: Partial<ChromeStorageObject['accounts']> = {
-        [account.addresses.identityAddress]: {
-          ...account,
-          paymentUtxos: explorerUtxos,
-        },
-      };
-      await this.chromeStorageService.updateNested(key, update);
-
-      return explorerUtxos;
-    } catch (error) {
-      console.log(error);
-      return [];
-    }
   };
 
   getExchangeRate = async (): Promise<number | undefined> => {

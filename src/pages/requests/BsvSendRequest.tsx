@@ -159,7 +159,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         setIsProcessing(true);
         await processBsvSend();
         setIsProcessing(false);
-        await updateBsvBalance(true);
+        await updateBsvBalance();
       }, 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,7 +180,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     if (!successTxId) return;
     if (!message && bsvAddress) {
       resetSendState();
-      updateBsvBalance(true);
+      updateBsvBalance();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress, message, successTxId]);

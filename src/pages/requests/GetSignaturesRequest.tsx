@@ -208,7 +208,6 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
 
   const { request, onSignature, popupId } = props;
-  //TODO: this type should just be the response from the provider. Figure out how to better handle error.
   const [getSigsResponse, setGetSigsResponse] = useState<{
     sigResponses?: SignatureResponse[] | undefined;
     error?:

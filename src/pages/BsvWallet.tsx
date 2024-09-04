@@ -125,13 +125,19 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const [isProcessing, setIsProcessing] = useState(false);
   const { bsvAddress, identityAddress } = keysService;
-  const { getBsvBalance, getExchangeRate, getLockData, unlockLockedCoins, updateBsvBalance, sendBsv } = bsvService;
+  const { getBsvBalance, getExchangeRate, getLockData, unlockLockedCoins, updateBsvBalance, sendBsv, sendAllBsv } =
+    bsvService;
   const [bsvBalance, setBsvBalance] = useState<number>(getBsvBalance());
   const [exchangeRate, setExchangeRate] = useState<number>(getExchangeRate());
   const [lockData, setLockData] = useState<LockData>();
+  const [isSendAllBsv, setIsSendAllBsv] = useState(false);
+
+  useEffect(() => {
+    setIsSendAllBsv(satSendAmount == bsvBalance);
+  }, [satSendAmount, bsvBalance]);
 
   const getAndSetBsvBalance = async () => {
-    await updateBsvBalance(true);
+    await updateBsvBalance();
     setBsvBalance(getBsvBalance());
   };
 
@@ -159,7 +165,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const refreshUtxos = async (showLoad = false) => {
     showLoad && setIsProcessing(true);
-    await updateBsvBalance(true);
+    await updateBsvBalance();
     setBsvBalance(getBsvBalance());
     setExchangeRate(getExchangeRate());
     loadLocks && loadLocks();
@@ -186,7 +192,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           if (res.error) addSnackbar('Error unlocking coins!', 'error');
           if (res.txid) {
             await refreshUtxos();
-            await unlockLockedCoins(true);
+            await unlockLockedCoins();
             await sleep(1000);
             addSnackbar('Successfully unlocked coins!', 'success');
           }
@@ -277,9 +283,13 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
     let sendRes: InWalletBsvResponse | undefined;
     if (isPaymail) {
-      sendRes = await sendBsv([{ paymail: receiveAddress, satoshis }], passwordConfirm);
+      sendRes = isSendAllBsv
+        ? await sendAllBsv(receiveAddress, 'paymail', passwordConfirm)
+        : await sendBsv([{ paymail: receiveAddress, satoshis }], passwordConfirm);
     } else {
-      sendRes = await sendBsv([{ address: receiveAddress, satoshis }], passwordConfirm);
+      sendRes = isSendAllBsv
+        ? await sendAllBsv(receiveAddress, 'address', passwordConfirm)
+        : await sendBsv([{ address: receiveAddress, satoshis }], passwordConfirm);
     }
 
     if (!sendRes.txid || sendRes.error) {
@@ -350,7 +360,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         type="secondary"
         onClick={() => {
           setPageState('main');
-          updateBsvBalance(true);
+          updateBsvBalance();
         }}
       />
     </ReceiveContent>

@@ -1,24 +1,23 @@
-import axios from 'axios';
 import { NetWork } from 'yours-wallet-provider';
 import {
   DEFAULT_RELAYX_ORD_PATH,
   DEFAULT_TWETCH_WALLET_PATH,
-  FEE_PER_KB,
-  SWEEP_PATH,
   DEFAULT_ACCOUNT,
   MAINNET_ADDRESS_PREFIX,
   TESTNET_ADDRESS_PREFIX,
+  SWEEP_PATH,
+  FEE_PER_KB,
+  WOC_BASE_URL,
 } from '../utils/constants';
 import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto';
 import { generateKeysFromTag, getKeys, getKeysFromWifs, Keys } from '../utils/keys';
-import { isAddressOnRightNetwork } from '../utils/tools';
 import { ChromeStorageService } from './ChromeStorage.service';
-import { GorillaPoolService } from './GorillaPool.service';
 import { Account, ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
+import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction, Utils } from '@bsv/sdk';
+import { CaseModSPV } from 'ts-casemod-spv';
 import { WocUtxo } from './types/whatsOnChain.types';
-import { WhatsOnChainService } from './WhatsOnChain.service';
-import { PrivateKey, Utils } from '@bsv/sdk';
+import axios from 'axios';
 
 export class KeysService {
   bsvAddress: string;
@@ -28,9 +27,8 @@ export class KeysService {
   ordPubKey: string;
   identityPubKey: string;
   constructor(
-    private readonly gorillaPoolService: GorillaPoolService,
-    private readonly wocService: WhatsOnChainService,
     private readonly chromeStorageService: ChromeStorageService,
+    private readonly oneSatSPV: CaseModSPV,
   ) {
     this.bsvAddress = '';
     this.ordAddress = '';
@@ -119,39 +117,35 @@ export class KeysService {
   };
 
   sweepLegacy = async (keys: Keys) => {
-    // const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
-    // const network = this.chromeStorageService.getNetwork();
-    // if (!isAddressOnRightNetwork(network, sweepWallet.address)) return;
-    // const { data } = await axios.get<WocUtxo[]>(
-    //   `${this.wocService.getBaseUrl(network)}/address/${sweepWallet.address}/unspent`,
-    // );
-    // const utxos = data;
-    // if (utxos.length === 0) return;
-    // const tx = new Transaction(1, 0);
-    // const changeAddress = P2PKHAddress.from_string(sweepWallet.address);
-    // let satsIn = 0;
-    // utxos.forEach((utxo: WocUtxo, vin: number) => {
-    //   const txin = new TxIn(Buffer.from(utxo.tx_hash, 'hex'), utxo.tx_pos, Script.from_hex(''));
-    //   tx.add_input(txin);
-    //   satsIn += utxo.value;
-    //   const sig = tx.sign(
-    //     sweepWallet.privKey,
-    //     SigHash.Input,
-    //     vin,
-    //     changeAddress.get_locking_script(),
-    //     BigInt(utxo.value),
-    //   );
-    //   const asm = `${sig.to_hex()} ${sweepWallet.pubKey.to_hex()}`;
-    //   txin?.set_unlocking_script(Script.from_asm_string(asm));
-    //   tx.set_input(vin, txin);
-    // });
-    // const size = tx.to_bytes().length + 34;
-    // const fee = Math.ceil(size * FEE_PER_BYTE);
-    // const changeAmount = satsIn - fee;
-    // tx.add_output(new TxOut(BigInt(changeAmount), P2PKHAddress.from_string(keys.walletAddress).get_locking_script()));
-    // const rawTx = tx.to_hex();
-    // const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
-    // console.log('Change sweep:', txid);
+    try {
+      const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
+      const tx = new Transaction();
+      const outScript = new P2PKH().lock(keys.walletAddress);
+      tx.addOutput({ lockingScript: outScript, change: true });
+
+      const { data } = await axios.get<WocUtxo[]>(`${WOC_BASE_URL}/address/${sweepWallet.address}/unspent`);
+      const utxos = data;
+      if (utxos.length === 0) return;
+      const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+      for await (const u of utxos || []) {
+        tx.addInput({
+          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash),
+          sourceOutputIndex: u.tx_pos,
+          sequence: 0xffffffff,
+          unlockingScriptTemplate: new P2PKH().unlock(sweepWallet.privKey),
+        });
+      }
+      await tx.fee(feeModel);
+      await tx.sign();
+      const response = await this.oneSatSPV.broadcast(tx);
+      if (response.status == 'error') return { error: response.description };
+      const txid = tx.id('hex');
+      console.log('Change sweep:', txid);
+      return { txid, rawtx: Utils.toHex(tx.toBinary()) };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.log(error);
+    }
   };
 
   generateKeysFromWifAndStoreEncrypted = async (password: string, wifs: WifKeys, isNewWallet: boolean) => {

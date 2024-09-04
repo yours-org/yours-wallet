@@ -38,8 +38,6 @@ export interface Account {
   settings: Settings;
   addresses: Addresses;
   balance: Balance;
-  ordinals: Ordinal[]; // TODO: remove
-  paymentUtxos: StoredUtxo[]; // TODO: remove
   pubKeys: PubKeys;
 }
 

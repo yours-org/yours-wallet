@@ -103,8 +103,6 @@ export class ChromeStorageService {
             satoshis: appState.balance?.satoshis ?? 0,
             usdInCents: appState.balance?.usdInCents ?? 0,
           },
-          ordinals: appState?.ordinals ?? [], // TODO: remove
-          paymentUtxos: paymentUtxos ?? [], // TODO: remove
           pubKeys: {
             bsvPubKey: appState.pubKeys.bsvPubKey,
             ordPubKey: appState.pubKeys.ordPubKey,

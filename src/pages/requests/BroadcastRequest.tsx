@@ -137,7 +137,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
     addSnackbar('Successfully broadcasted the tx!', 'success');
     onBroadcast();
     setTimeout(async () => {
-      await updateBsvBalance(true).catch((e: unknown) => {
+      await updateBsvBalance().catch((e: unknown) => {
         console.log(e);
       });
     }, 3000);

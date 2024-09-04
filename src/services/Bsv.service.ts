@@ -85,7 +85,7 @@ export class BsvService {
     this.exchangeRate = r ?? 0;
   };
 
-  unlockLockedCoins = async (balanceOnly = false) => {
+  unlockLockedCoins = async () => {
     if (!this.keysService.identityAddress) return;
     const blockHeight = await this.getCurrentHeight();
     const lockedTxos = await this.getLockedTxos();
@@ -95,7 +95,42 @@ export class BsvService {
     }
   };
 
-  // TODO: Reimplement SendAll
+  sendAllBsv = async (destinationAddress: string, type: 'address' | 'paymail', password: string) => {
+    try {
+      const tx = new Transaction();
+      if (type === 'address') {
+        const outScript = new P2PKH().lock(destinationAddress);
+        tx.addOutput({ lockingScript: outScript, change: true });
+      } else if (type === 'paymail') {
+        //TODO: address paymail once PR merged
+        throw new Error('Paymail is not implemented!');
+      }
+
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+      const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
+      for await (const u of fundResults.txos || []) {
+        const pk = pkMap.get(u.owner || '');
+        if (!pk) continue;
+        tx.addInput({
+          sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid),
+          sourceOutputIndex: u.outpoint.vout,
+          sequence: 0xffffffff,
+          unlockingScriptTemplate: new P2PKH().unlock(pk),
+        });
+      }
+      await tx.fee(feeModel);
+      await tx.sign();
+      const response = await this.oneSatSPV.broadcast(tx);
+      if (response.status == 'error') return { error: response.description };
+      return { txid: tx.id('hex'), rawtx: Utils.toHex(tx.toBinary()) };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.log(error);
+      return { error: error.message ?? 'unknown' };
+    }
+  };
+
   sendBsv = async (request: SendBsv[], password: string, noApprovalLimit?: number): Promise<InWalletBsvResponse> => {
     try {
       const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
@@ -294,8 +329,7 @@ export class BsvService {
     }
   };
 
-  // TODO: Either implement pullFresh or remove it
-  updateBsvBalance = async (pullFresh?: boolean) => {
+  updateBsvBalance = async () => {
     const utxos = await this.fundingTxos();
     const total = utxos.reduce((a, item) => a + Number(item.satoshis), 0);
     this.bsvBalance = (total ?? 0) / BSV_DECIMAL_CONVERSION;

@@ -127,11 +127,9 @@ type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unloc
 export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { setSelected, query } = useBottomMenu();
-  const { keysService, gorillaPoolService, wocService, bsvService } = useServiceContext();
+  const { keysService, bsvService } = useServiceContext();
   // const { exchangeRate, identityAddress } = useBsv();
   const { identityAddress } = keysService;
-  const { getLockedBsvUtxos, getSpentTxids } = gorillaPoolService;
-  const { getChainInfo } = wocService;
   const [isProcessing, setIsProcessing] = useState(false);
   const [page, setPage] = useState<AppsPage>(query === 'pending-locks' ? 'unlock' : 'main');
   // const [otherIsSelected, setOtherIsSelected] = useState(false);
