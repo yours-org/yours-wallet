@@ -38,6 +38,7 @@ import { sendMessage } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
 import { QueueContext } from '../contexts/QueueContext';
 import { InWalletBsvResponse } from '../services/types/bsv.types';
+import { useQueueTracker } from '../hooks/useQueueTracker';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -105,7 +106,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const queueContext = useContext(QueueContext);
+  const { updateBalance } = useQueueTracker();
   const urlParams = new URLSearchParams(location.search);
   const isReload = urlParams.get('reload') === 'true';
   urlParams.delete('reload');
@@ -136,11 +137,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
   };
 
   useEffect(() => {
-    if (queueContext?.updateBalance) {
+    if (updateBalance) {
       getAndSetBsvBalance();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queueContext]);
+  }, [updateBalance]);
 
   useEffect(() => {
     if (isReload) window.location.reload();
