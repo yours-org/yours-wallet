@@ -28,7 +28,7 @@ export const streamDataToZip = async (
     const logs = await spvWallet.getBackupLogs();
     zip.file(`${accountId}.json`, JSON.stringify(logs));
     progress({ message: 'Account dependencies calculated successfully!' });
-    spvWallet.destroy(); // TODO: to await or not?
+    await spvWallet.destroy();
     await sleep(1000); // UX thing again...
     return logs;
   };

@@ -143,8 +143,26 @@ if (isInServiceWorker) {
     }
   };
 
+  const deleteAllIDBDatabases = async () => {
+    const dbs = await indexedDB.databases();
+    for (const db of dbs) {
+      if (db.name?.startsWith('block')) continue;
+      if (db.name) {
+        indexedDB.deleteDatabase(db.name);
+        console.log(`Deleted database: ${db.name}`);
+      }
+    }
+
+    console.log('All IndexedDB databases deleted.');
+  };
+
+  const signOut = async () => {
+    await (await oneSatSPVPromise).destroy();
+    await deleteAllIDBDatabases();
+  };
+
   const switchAccount = async () => {
-    (await oneSatSPVPromise).destroy();
+    await (await oneSatSPVPromise).destroy();
     chromeStorageService = new ChromeStorageService();
     await chromeStorageService.getAndSetStorage();
     oneSatSPVPromise = initOneSatSPV();
@@ -188,8 +206,12 @@ if (isInServiceWorker) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
-    if ([YoursEventName.SIGNED_OUT, YoursEventName.NETWORK_CHANGED].includes(message.action)) {
-      return emitEventToActiveTabs(message);
+    if (
+      [YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT, YoursEventName.NETWORK_CHANGED].includes(
+        message.action,
+      )
+    ) {
+      emitEventToActiveTabs(message);
     }
 
     const noAuthRequired = [
@@ -206,6 +228,7 @@ if (isInServiceWorker) {
       YoursEventName.DECRYPT_RESPONSE,
       YoursEventName.SYNC_UTXOS,
       YoursEventName.SWITCH_ACCOUNT,
+      YoursEventName.SIGNED_OUT,
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -237,6 +260,9 @@ if (isInServiceWorker) {
         case YoursEventName.SWITCH_ACCOUNT:
           console.log('Received SWITCH_ACCOUNT event');
           return switchAccount();
+        case YoursEventName.SIGNED_OUT:
+          console.log('Received Sign Out event');
+          return signOut();
         default:
           break;
       }

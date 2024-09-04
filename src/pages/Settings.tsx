@@ -15,7 +15,7 @@ import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { WhitelistedApp } from '../inject';
+import { WhitelistedApp, YoursEventName } from '../inject';
 import { ColorThemeProps } from '../theme';
 import { sendMessage } from '../utils/chromeHelpers';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
@@ -281,12 +281,10 @@ export const Settings = () => {
   const signOut = async () => {
     await chromeStorageService.clear();
     setDecisionType(undefined);
-    window.location.reload();
-
-    // TODO: we should kill any casemodSPV instances and destroy databases?
     sendMessage({
-      action: 'signedOut',
+      action: YoursEventName.SIGNED_OUT,
     });
+    window.location.reload();
   };
 
   const handleCancel = () => {

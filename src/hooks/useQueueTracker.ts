@@ -41,7 +41,7 @@ export const useQueueTracker = () => {
           // Set a timeout to delay setting isSyncing to false
           twoSecondsTimeoutRef.current = setTimeout(() => {
             setIsSyncing(false);
-          }, 2000);
+          }, 5000);
         }
 
         // Reset the hide banner timeout whenever a new event is received
@@ -60,7 +60,7 @@ export const useQueueTracker = () => {
           }
 
           setUpdateBalance(true);
-        }, 5000);
+        }, 8000);
       }
     };
 

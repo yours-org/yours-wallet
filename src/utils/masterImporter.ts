@@ -33,6 +33,11 @@ export const restoreMasterFromZip = async (
   };
 
   const restoreBlock = async (zip: JSZip) => {
+    const lastSyncedBlock = await oneSatSpv.getSyncedBlock();
+    if (lastSyncedBlock) {
+      await oneSatSpv.stores.blocks?.sync(true);
+      return;
+    }
     progress({ message: 'Restoring blocks data...' });
     const folder = zip.folder('blocks');
     if (folder) {

@@ -300,54 +300,56 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   const availableWallets = (wallets: (SupportedWalletImports | undefined)[]) => {
     return wallets.map((wallet) => {
       return (
-        <WalletRow
-          key={window.crypto.randomUUID()}
-          onClick={() => handleWalletSelection(wallet)}
-          element={
-            <>
-              <Show when={wallet === 'yours'}>
-                <WalletWrapper>
-                  <YoursWalletContainer theme={theme}>
-                    <WalletLogo src={yoursWhiteLogo} style={{ width: '1.25rem' }} />
-                  </YoursWalletContainer>
-                  <WalletText theme={theme}>Yours</WalletText>
-                </WalletWrapper>
-              </Show>
-              <Show when={wallet === 'relayx'}>
-                <WalletWrapper>
-                  <WalletLogo src={relayXLogo} />
-                  <WalletText theme={theme}>RelayX</WalletText>
-                </WalletWrapper>
-              </Show>
-              <Show when={wallet === 'twetch'}>
-                <WalletWrapper>
-                  <WalletLogo src={twetchLogo} />
-                  <WalletText theme={theme}>Twetch</WalletText>
-                </WalletWrapper>
-              </Show>
-              <Show when={!wallet}>
-                <WalletWrapper>
-                  <WalletLogo src={otherWallet} />
-                  <WalletText theme={theme}>Other</WalletText>
-                </WalletWrapper>
-              </Show>
-              <Show when={wallet === 'wif'}>
-                <WalletWrapper>
-                  <WalletLogo src={wifWallet} />
-                  <WalletText theme={theme}>Restore with private key</WalletText>
-                </WalletWrapper>
-              </Show>
-              <Show when={newWallet && wallet === 'master'}>
-                <WalletWrapper>
-                  <YoursWalletContainer theme={theme}>
-                    <WalletLogo src={masterWallet} style={{ width: '1.25rem' }} />
-                  </YoursWalletContainer>
-                  <WalletText theme={theme}>Restore from master backup</WalletText>
-                </WalletWrapper>
-              </Show>
-            </>
-          }
-        />
+        !!wallet && (
+          <WalletRow
+            key={window.crypto.randomUUID()}
+            onClick={() => handleWalletSelection(wallet)}
+            element={
+              <>
+                <Show when={wallet === 'yours'}>
+                  <WalletWrapper>
+                    <YoursWalletContainer theme={theme}>
+                      <WalletLogo src={yoursWhiteLogo} style={{ width: '1.25rem' }} />
+                    </YoursWalletContainer>
+                    <WalletText theme={theme}>Yours</WalletText>
+                  </WalletWrapper>
+                </Show>
+                <Show when={wallet === 'relayx'}>
+                  <WalletWrapper>
+                    <WalletLogo src={relayXLogo} />
+                    <WalletText theme={theme}>RelayX</WalletText>
+                  </WalletWrapper>
+                </Show>
+                <Show when={wallet === 'twetch'}>
+                  <WalletWrapper>
+                    <WalletLogo src={twetchLogo} />
+                    <WalletText theme={theme}>Twetch</WalletText>
+                  </WalletWrapper>
+                </Show>
+                <Show when={wallet === 'other'}>
+                  <WalletWrapper>
+                    <WalletLogo src={otherWallet} />
+                    <WalletText theme={theme}>Other</WalletText>
+                  </WalletWrapper>
+                </Show>
+                <Show when={wallet === 'wif'}>
+                  <WalletWrapper>
+                    <WalletLogo src={wifWallet} />
+                    <WalletText theme={theme}>Restore with private key</WalletText>
+                  </WalletWrapper>
+                </Show>
+                <Show when={newWallet && wallet === 'master'}>
+                  <WalletWrapper>
+                    <YoursWalletContainer theme={theme}>
+                      <WalletLogo src={masterWallet} style={{ width: '1.25rem' }} />
+                    </YoursWalletContainer>
+                    <WalletText theme={theme}>Restore from master backup</WalletText>
+                  </WalletWrapper>
+                </Show>
+              </>
+            }
+          />
+        )
       );
     });
   };
@@ -359,7 +361,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
         <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
           Select the wallet you'd like to restore from
         </Text>
-        {availableWallets(['yours', 'relayx', 'twetch', undefined, 'wif', newWallet ? 'master' : undefined])}
+        {availableWallets(['yours', 'relayx', 'twetch', 'wif', newWallet ? 'master' : undefined, 'other'])}
         <Button
           theme={theme}
           type="secondary"

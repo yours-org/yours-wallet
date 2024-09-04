@@ -1,5 +1,5 @@
 import { validate } from 'bitcoin-address-validation';
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import bsvCoin from '../assets/bsv-coin.svg';
 import switchAsset from '../assets/switch-asset.svg';
@@ -36,7 +36,6 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { LockData } from '../services/types/bsv.types';
 import { sendMessage } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
-import { QueueContext } from '../contexts/QueueContext';
 import { InWalletBsvResponse } from '../services/types/bsv.types';
 import { useQueueTracker } from '../hooks/useQueueTracker';
 
