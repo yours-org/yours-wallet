@@ -43,8 +43,12 @@ export const streamDataToZip = async (
 
   const zipBlock = async (zip: JSZip) => {
     progress({ message: 'Getting blocks data...' }); // UX thing again...
-    const blocks = await oneSatSpv.getAllBlocks();
-    zip.file('block.json', JSON.stringify(blocks));
+    const blocks = await oneSatSpv.getBlocksBackup();
+    const folder = zip.folder('blocks');
+    if (!folder) throw new Error('Blocks folder not found');
+    for (const [i, headers] of blocks.entries()) {
+      folder.file(`${i.toString().padStart(3, '0')}.bin`, Buffer.from(headers));
+    }
     progress({ message: 'Blocks data collected successfully!' });
     await sleep(1000); // UX thing again...
   };

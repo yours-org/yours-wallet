@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { CaseModSPV, OneSatWebSPV } from 'ts-casemod-spv';
+import { BLOCK_HEADER_SIZE, CaseModSPV, OneSatWebSPV } from 'ts-casemod-spv';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { sleep } from './sleep';
@@ -34,16 +34,15 @@ export const restoreMasterFromZip = async (
 
   const restoreBlock = async (zip: JSZip) => {
     progress({ message: 'Restoring blocks data...' });
-    const blocksFile = zip.file('block.json');
-    console.log('made it here');
-    if (blocksFile) {
-      const blocksData = await blocksFile.async('string');
-      console.log('made it here 2');
-      console.log(blocksData.slice(0, 100));
-      const blocks = JSON.parse(blocksData);
-      for (let i = 0; i < blocks.length; i += 10000) {
-        await oneSatSpv.restoreBlocks(blocks.slice(i, i + 10000));
-        progress({ message: `Processed blocks ${i}` });
+    const folder = zip.folder('blocks');
+    if (folder) {
+      const files = folder.file(/\.bin$/);
+      let count = 0;
+      for (const headersFile of files) {
+        const blocksData = await headersFile.async('uint8array');
+        await oneSatSpv.restoreBlocks([...blocksData]);
+        count += blocksData.length / BLOCK_HEADER_SIZE;
+        progress({ message: `Processed blocks ${count}` });
       }
       progress({ message: 'Blocks data restored successfully!' });
     } else {
@@ -60,11 +59,11 @@ export const restoreMasterFromZip = async (
       const endValue = txns.length;
       console.time('import');
       for (const txnFile of txns) {
-        const txid = txnFile.name.replace('.bin', '');
+        const txid = txnFile.name.match(/txns\/([a-f0-9]*)\.bin/)![1]!;
         console.time(txid);
         const txnData = await txnFile.async('uint8array');
         console.timeLog(txid, 'read data');
-        await oneSatSpv.restoreBackupTx(Array.from(txnData));
+        await oneSatSpv.restoreBackupTx(txid, Array.from(txnData));
         console.timeLog(txid, 'restored data');
         console.log(`Restored transaction with txid: ${txid}`);
         count++;
@@ -103,8 +102,8 @@ export const restoreMasterFromZip = async (
   try {
     const zipContent = await zip.loadAsync(file);
     const chromeObject = await readChromeStorage(zipContent);
-    // await restoreBlock(zipContent);
-    // await restoreTxns(zipContent);
+    await restoreBlock(zipContent);
+    await restoreTxns(zipContent);
     await restoreAccountLogs(zipContent, Object.values(chromeObject.accounts));
 
     await chromeStorageService.update(chromeObject);
