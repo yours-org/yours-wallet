@@ -103,6 +103,8 @@ export class KeysService {
         ordDerivation = DEFAULT_RELAYX_ORD_PATH;
         break;
       case 'twetch':
+        identityDerivation = DEFAULT_TWETCH_WALLET_PATH;
+        ordDerivation = DEFAULT_TWETCH_WALLET_PATH;
         walletDerivation = DEFAULT_TWETCH_WALLET_PATH;
         break;
     }
