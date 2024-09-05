@@ -147,7 +147,7 @@ export const OrdWallet = () => {
   const [tokenSendAmount, setTokenSendAmount] = useState<bigint | null>(null);
   const [priceData, setPriceData] = useState<{ id: string; satPrice: number }[]>([]);
   const [ordinals, setOrdinals] = useState<OrdType[]>([]);
-  const [bsv20s, setBsv20s] = useState<Bsv20[]>([]);
+  const [bsv20s, setBsv20s] = useState<(Bsv20 | Bsv21)[]>([]);
   // const bsv20s = getBsv20s(); //TODO: this... david
 
   useEffect(() => {

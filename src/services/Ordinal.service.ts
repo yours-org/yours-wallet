@@ -15,7 +15,7 @@ import { BsvService } from './Bsv.service';
 //TODO: look into why BSV20_INDEX_FEE is not being used
 import { BSV20_INDEX_FEE, FEE_PER_KB } from '../utils/constants';
 import { mapOrdinal } from '../utils/providerHelper';
-import { Bsv21 as Bsv21Type, CaseModSPV, Outpoint, TxoLookup } from 'ts-casemod-spv';
+import { Bsv20 as Bsv20Type, Bsv21 as Bsv21Type, CaseModSPV, Outpoint, TxoLookup, TxoSort } from 'ts-casemod-spv';
 
 export class OrdinalService {
   constructor(
@@ -25,7 +25,7 @@ export class OrdinalService {
   ) {}
 
   getOrdinals = async (): Promise<Ordinal[]> => {
-    const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'));
+    const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 0);
     const mapped = ordinals.txos.map(mapOrdinal);
     console.log('Ordinals:', mapped);
     return mapped;
@@ -37,11 +37,11 @@ export class OrdinalService {
     return mapOrdinal(txo);
   };
 
-  getBsv20s = async (): Promise<Bsv21[]> => {
-    const bsv20s = await this.oneSatSPV.search(new TxoLookup('bsv21'));
+  getBsv20s = async (): Promise<(Bsv20 | Bsv21)[]> => {
+    const bsv21s = await this.oneSatSPV.search(new TxoLookup('bsv21'));
 
-    const tokens: { [id: string]: Bsv21 } = {};
-    for (const txo of bsv20s.txos) {
+    const tokens: { [id: string]: Bsv20 | Bsv21 } = {};
+    for (const txo of bsv21s.txos) {
       const bsv21 = txo.data.bsv21?.data as Bsv21Type;
       if (!bsv21) continue;
       let token = tokens[bsv21.id.toString()];
@@ -63,6 +63,29 @@ export class OrdinalService {
       token.all.confirmed += bsv21.amt;
       if (!txo.data.list) continue;
       token.listed.confirmed += bsv21.amt;
+    }
+
+    const bsv20s = await this.oneSatSPV.search(new TxoLookup('bsv20'));
+    for (const txo of bsv20s.txos) {
+      const bsv20 = txo.data.bsv20?.data as Bsv20Type;
+      if (!bsv20) continue;
+      let token = tokens[bsv20.tick];
+      if (!token) {
+        token = {
+          p: 'bsv-20',
+          op: bsv20.op,
+          dec: bsv20.dec,
+          amt: bsv20.amt.toString(),
+          all: { confirmed: 0n, pending: 0n },
+          listed: { confirmed: 0n, pending: 0n },
+          status: 1,
+          tick: bsv20.tick,
+        };
+        tokens[bsv20.tick] = token;
+      }
+      token.all.confirmed += bsv20.amt;
+      if (!txo.data.list) continue;
+      token.listed.confirmed += bsv20.amt;
     }
     return Object.values(tokens);
   };
@@ -127,7 +150,7 @@ export class OrdinalService {
     }
   };
 
-  sendBSV20 = async (id: string, destinationAddress: string, amount: bigint, password: string) => {
+  sendBSV20 = async (idOrTick: string, destinationAddress: string, amount: bigint, password: string) => {
     try {
       const isAuthenticated = await this.keysService.verifyPassword(password);
       if (!isAuthenticated) {
@@ -141,23 +164,33 @@ export class OrdinalService {
       const ordPk = PrivateKey.fromWif(keys.ordWif);
       const fundingUtxos = await this.bsvService.fundingTxos();
 
-      const bsv21Utxos = await this.oneSatSPV.search(new TxoLookup('bsv21', 'id', id));
+      const tokenType = idOrTick.length > 64 ? TokenType.BSV21 : TokenType.BSV20;
+      const utxos =
+        tokenType === TokenType.BSV21
+          ? await this.oneSatSPV.search(new TxoLookup('bsv21', 'id', idOrTick, ordPk.toAddress().toString()))
+          : await this.oneSatSPV.search(new TxoLookup('bsv20', 'tick', idOrTick, ordPk.toAddress().toString()));
+
       const tokenUtxos: TokenUtxo[] = [];
       let tokensIn = 0n;
-      let bsv21: Bsv21Type | undefined;
-      for (const tokenUtxo of bsv21Utxos.txos) {
+      let token: Bsv20Type | Bsv21Type | undefined;
+      for (const tokenUtxo of utxos.txos) {
         if (tokensIn >= amount) break;
         if (tokenUtxo.data?.list || !tokenUtxo.data.bsv21?.data) continue;
-        bsv21 = tokenUtxo.data.bsv21.data as Bsv21Type;
-        tokenUtxos.push({
+        token = tokenUtxo.data.bsv21.data as Bsv20Type | Bsv21Type;
+        const t: TokenUtxo = {
           txid: tokenUtxo.outpoint.txid,
           vout: tokenUtxo.outpoint.vout,
           satoshis: 1,
           script: Buffer.from(tokenUtxo.script).toString('base64'),
-          amt: bsv21.amt.toString(),
-          id: bsv21.id.toString(),
-        });
-        tokensIn += bsv21.amt;
+          amt: token.amt.toString(),
+        };
+        if (tokenType === TokenType.BSV21) {
+          t.id = (token as Bsv21Type).id;
+        } else {
+          t.tick = (token as Bsv20Type).tick;
+        }
+        tokenUtxos.push(t);
+        tokensIn += token.amt;
       }
       if (tokensIn < amount) {
         return { error: 'insufficient-funds' };
@@ -167,8 +200,8 @@ export class OrdinalService {
         distributions: [{ address: destinationAddress, tokens: Number(amount) }],
         inputTokens: tokenUtxos,
         decimals: 0,
-        tokenID: id,
-        protocol: TokenType.BSV21,
+        tokenID: idOrTick,
+        protocol: tokenType,
         utxos: fundingUtxos.map((t) => ({
           txid: t.outpoint.txid,
           vout: t.outpoint.vout,

@@ -36,6 +36,7 @@ import { ChromeStorageService } from './services/ChromeStorage.service';
 import { mapOrdinal } from './utils/providerHelper';
 import { QueueTrackerMessage } from './hooks/useQueueTracker';
 import {
+  Bsv20Indexer,
   Bsv21Indexer,
   FundIndexer,
   Indexer,
@@ -68,6 +69,7 @@ const initOneSatSPV = async () => {
     new MapIndexer(owners, IndexMode.Verify, network),
     new OriginIndexer(owners, IndexMode.TrustAndVerify, network),
     new Bsv21Indexer(owners, IndexMode.Trust, network),
+    new Bsv20Indexer(owners, IndexMode.Trust, network),
   ];
 
   const oneSatSPV = await OneSatWebSPV.init(
