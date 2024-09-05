@@ -390,11 +390,19 @@ export const BsvWallet = (props: BsvWalletProps) => {
           <Button theme={theme} type="primary" label="Receive" onClick={() => setPageState('receive')} />
           <Button theme={theme} type="primary" label="Send" onClick={() => setPageState('send')} />
         </ButtonContainer>
-        <AssetRow balance={bsvBalance} icon={bsvCoin} ticker="BSV" usdBalance={bsvBalance * exchangeRate} />
+        <AssetRow
+          balance={bsvBalance}
+          icon={bsvCoin}
+          ticker="BSV"
+          usdBalance={bsvBalance * exchangeRate}
+          showPointer={false}
+        />
         {lockData && (
           <Show when={lockData.totalLocked > 0}>
             <AssetRow
+              animate
               ticker="Total Locked"
+              showPointer={true}
               balance={lockData.totalLocked / BSV_DECIMAL_CONVERSION}
               usdBalance={Number((lockData.unlockable / BSV_DECIMAL_CONVERSION).toFixed(3))}
               icon={lockIcon}

@@ -2,11 +2,11 @@ import { styled } from 'styled-components';
 import { useTheme } from '../hooks/useTheme';
 import { ColorThemeProps } from '../theme';
 import { HeaderText, Text } from './Reusable';
-import { formatNumberWithCommasAndDecimals, formatUSD } from '../utils/format';
+import { formatLargeNumber, formatUSD } from '../utils/format';
 import { Show } from './Show';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 
-const Container = styled.div<ColorThemeProps>`
+const Container = styled.div<ColorThemeProps & { $animate: boolean }>`
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -15,6 +15,11 @@ const Container = styled.div<ColorThemeProps>`
   width: 90%;
   border-radius: 0.5rem;
   margin: 0.25rem;
+  transition: transform 0.3s ease-in-out;
+
+  &:hover {
+    transform: ${({ $animate }) => ($animate ? 'scale(1.02)' : 'none')};
+  }
 `;
 
 const Icon = styled.img<{ size?: string }>`
@@ -49,17 +54,24 @@ export type AssetRowProps = {
   ticker: string;
   balance: number;
   usdBalance: number;
+  showPointer: boolean;
+  animate?: boolean;
   isLock?: boolean;
   nextUnlock?: number;
   onClick?: () => void;
 };
 
 export const AssetRow = (props: AssetRowProps) => {
-  const { icon, ticker, balance, usdBalance, isLock, nextUnlock, onClick } = props;
+  const { icon, ticker, balance, usdBalance, isLock, nextUnlock, onClick, showPointer, animate = false } = props;
   const { theme } = useTheme();
   const isDisplaySat = isLock && balance < 0.0001;
   return (
-    <Container style={{ cursor: isLock ? 'pointer' : undefined }} onClick={onClick} theme={theme}>
+    <Container
+      style={{ cursor: showPointer ? 'pointer' : undefined }}
+      onClick={onClick}
+      theme={theme}
+      $animate={animate}
+    >
       <TickerWrapper>
         <Show when={!!icon && icon.length > 0}>
           <Icon src={icon} />
@@ -75,7 +87,7 @@ export const AssetRow = (props: AssetRowProps) => {
       </TickerWrapper>
       <BalanceWrapper>
         <HeaderText style={{ textAlign: 'right', fontSize: '1rem' }} theme={theme}>
-          {`${formatNumberWithCommasAndDecimals(
+          {`${formatLargeNumber(
             isDisplaySat ? balance * BSV_DECIMAL_CONVERSION : balance,
             isDisplaySat ? 0 : 3,
           )}${isLock ? (isDisplaySat ? `${balance === 0.00000001 ? ' SAT' : ' SATS'}` : ' BSV') : ''}`}

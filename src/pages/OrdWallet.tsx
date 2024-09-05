@@ -7,16 +7,13 @@ import { Input } from '../components/Input';
 import { Ordinal } from '../components/Ordinal';
 import { Ordinal as OrdType } from 'yours-wallet-provider';
 import { PageLoader } from '../components/PageLoader';
-import { QrCode } from '../components/QrCode';
 import {
   ButtonContainer,
   ConfirmContent,
   FormContainer,
   HeaderText,
-  ReceiveContent,
   SubHeaderText,
   Text,
-  Warning,
 } from '../components/Reusable';
 import { Show } from '../components/Show';
 import Tabs from '../components/Tabs';
@@ -28,10 +25,9 @@ import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { isBSV20v2, normalize, showAmount } from '../utils/ordi';
 import { sleep } from '../utils/sleep';
 import { BSV20Id } from '../components/BSV20Id';
-import copyIcon from '../assets/copy.svg';
 import { TopNav } from '../components/TopNav';
 import { AssetRow } from '../components/AssetRow';
-import { formatNumberWithCommasAndDecimals } from '../utils/format';
+import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { ListOrdinal, OrdOperationResponse } from '../services/types/ordinal.types';
 import { Bsv20, Bsv21, Ordinal as OrdinalType } from 'yours-wallet-provider';
 
@@ -43,6 +39,7 @@ const OrdinalsList = styled.div`
   width: 100%;
   margin-top: 0.5rem;
   height: 25rem;
+  padding-bottom: 8rem;
 `;
 
 const BSV20List = styled.div`
@@ -121,21 +118,7 @@ const BSV20Container = styled.div`
   padding: 0 0;
 `;
 
-const CopyAddressWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  margin: 2rem 0;
-`;
-
-const StyledCopy = styled.img`
-  width: 1rem;
-  height: 1rem;
-  margin-right: 0.25rem;
-`;
-
-type PageState = 'main' | 'receive' | 'transfer' | 'list' | 'cancel' | 'sendBSV20';
+type PageState = 'main' | 'transfer' | 'list' | 'cancel' | 'sendBSV20';
 
 interface Token {
   isConfirmed: boolean;
@@ -146,9 +129,8 @@ export const OrdWallet = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>('main');
-  const { chromeStorageService, ordinalService, gorillaPoolService, keysService, bsvService } = useServiceContext();
+  const { chromeStorageService, ordinalService, gorillaPoolService, bsvService } = useServiceContext();
   const [isProcessing, setIsProcessing] = useState(false);
-  const { ordAddress } = keysService;
   const { transferOrdinal, getBsv20s, listOrdinalOnGlobalOrderbook, cancelGlobalOrderbookListing, getTokenName } =
     ordinalService;
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
@@ -337,6 +319,7 @@ export const OrdWallet = () => {
 
   const handleSendBSV20 = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    //TODO: this
     // setIsProcessing(true);
 
     // await sleep(25);
@@ -375,12 +358,6 @@ export const OrdWallet = () => {
     // setSuccessTxId(sendBSV20Res.txid);
     // addSnackbar('Tokens Sent!', 'success');
     // loadOrdinals();
-  };
-
-  const handleCopyToClipboard = () => {
-    navigator.clipboard.writeText(ordAddress).then(() => {
-      addSnackbar('Copied!', 'success');
-    });
   };
 
   const userSelectedAmount = (inputValue: string, token: Token) => {
@@ -468,9 +445,11 @@ export const OrdWallet = () => {
                     }}
                   >
                     <AssetRow
+                      animate
                       balance={Number(showAmount(b.all.confirmed, b.dec))}
+                      showPointer={true}
                       icon={b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : ''}
-                      ticker={getTokenName(b)}
+                      ticker={truncate(getTokenName(b), 10, 0)}
                       usdBalance={
                         (priceData.find((p) => p.id === (b as Bsv21).id)?.satPrice ?? 0) *
                         (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
@@ -500,7 +479,9 @@ export const OrdWallet = () => {
                       }}
                     >
                       <AssetRow
+                        animate
                         balance={Number(showAmount(b.all.pending, b.dec))}
+                        showPointer={true}
                         icon={b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : ''}
                         ticker={getTokenName(b)}
                         usdBalance={
@@ -516,40 +497,7 @@ export const OrdWallet = () => {
           </Show>
         </BSV20List>
       </Show>
-      <OrdButtonContainer>
-        <Button theme={theme} type="primary" label="Receive" onClick={() => setPageState('receive')} />
-      </OrdButtonContainer>
     </>
-  );
-
-  const receive = (
-    <ReceiveContent>
-      <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
-        Receive Ordinals
-      </HeaderText>
-      <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
-        Only send Ordinals and BSV20 to this address. <Warning theme={theme}>Do not send BSV here.</Warning>
-      </Text>
-      <QrCode address={ordAddress} onClick={handleCopyToClipboard} />
-      <CopyAddressWrapper onClick={handleCopyToClipboard}>
-        <StyledCopy src={copyIcon} />
-        <Text theme={theme} style={{ margin: '0', color: theme.white, fontSize: '0.75rem' }}>
-          {ordAddress}
-        </Text>
-      </CopyAddressWrapper>
-      <Button
-        label="Go back"
-        theme={theme}
-        type="secondary"
-        onClick={() => {
-          setPageState('main');
-          setTimeout(() => {
-            setIsProcessing(false);
-            loadOrdinals();
-          }, 500);
-        }}
-      />
-    </ReceiveContent>
   );
 
   const transfer = (
@@ -662,6 +610,7 @@ export const OrdWallet = () => {
                 <Ordinal
                   theme={theme}
                   inscription={ord}
+                  size={'6rem'}
                   key={ord.origin?.outpoint}
                   url={`${gorillaPoolService.getBaseUrl(network)}/content/${ord.origin?.outpoint}`}
                   selected={selectedOrdinal?.origin?.outpoint === ord.origin?.outpoint}
@@ -693,9 +642,7 @@ export const OrdWallet = () => {
               />
             </Show>
           }
-        >
-          <Button theme={theme} type="primary" label="Receive" onClick={() => setPageState('receive')} />
-        </Show>
+        ></Show>
       </OrdButtonContainer>
     </>
   );
@@ -875,7 +822,6 @@ export const OrdWallet = () => {
         <PageLoader theme={theme} message="Sending BSV20..." />
       </Show>
       <Show when={!isProcessing && pageState === 'main'}>{main}</Show>
-      <Show when={!isProcessing && pageState === 'receive'}>{receive}</Show>
       <Show when={!isProcessing && pageState === 'transfer'}>{transfer}</Show>
       <Show when={!isProcessing && pageState === 'sendBSV20'}>{sendBSV20View}</Show>
       <Show when={!isProcessing && pageState === 'list'}>{list}</Show>

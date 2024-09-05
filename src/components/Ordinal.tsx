@@ -82,6 +82,11 @@ export const FlexWrapper = styled.div`
   flex-direction: column;
   align-items: center;
   margin: 0.5rem;
+  transition: 0.3s ease-in-out;
+
+  &:hover {
+    transform: scale(1.02);
+  }
 `;
 
 export type OrdinalProps = {

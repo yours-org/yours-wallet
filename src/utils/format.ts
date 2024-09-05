@@ -60,3 +60,18 @@ export const removeBase64Prefix = (base64Data: string): string => {
 
   return base64Data;
 };
+
+export const formatLargeNumber = (number: number, decimalPlaces = 3): string => {
+  if (isNaN(number)) {
+    return 'Invalid Number';
+  }
+
+  if (number >= 1e9) {
+    return `${(number / 1e9).toFixed(decimalPlaces)} B`; // Billion
+  } else if (number >= 1e6) {
+    return `${(number / 1e6).toFixed(decimalPlaces)} M`; // Million
+  }
+
+  // For numbers below 1 million, use the existing formatting function
+  return formatNumberWithCommasAndDecimals(number, decimalPlaces);
+};
