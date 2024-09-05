@@ -29,7 +29,9 @@ export function mapOrdinal(t: Txo): Ordinal {
         price: Number(t.data.list.data.price),
       },
       lock: t.data.lock?.data,
-      // TODO: add map, sigma, bsv20, bsv21
+      map: t.data.map?.data,
+      bsv20: t.data.bsv20?.data || t.data.bsv21?.data,
+      // TODO: add sigma
     },
   };
 }
