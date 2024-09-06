@@ -342,10 +342,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const receive = (
     <ReceiveContent>
       <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
-        Receive BSV
+        Receive Assets
       </HeaderText>
       <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
-        Only send BSV to this address. <Warning theme={theme}>Do not send Ordinals or BSV20 here.</Warning>
+        You may safely send <Warning theme={theme}>BSV and Ordinals</Warning> to this address.
       </Text>
       <QrCode address={bsvAddress} onClick={handleCopyToClipboard} />
       <CopyAddressWrapper onClick={handleCopyToClipboard}>
