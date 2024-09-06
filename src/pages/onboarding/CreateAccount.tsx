@@ -86,12 +86,12 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
   const { keysService, chromeStorageService } = useServiceContext();
 
   useEffect(() => {
-    hideMenu();
+    newWallet && hideMenu();
 
     return () => {
       showMenu();
     };
-  }, [hideMenu, showMenu]);
+  }, [hideMenu, showMenu, newWallet]);
 
   const handleKeyGeneration = async (event?: React.FormEvent<HTMLFormElement>) => {
     try {

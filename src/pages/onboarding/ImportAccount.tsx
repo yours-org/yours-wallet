@@ -54,12 +54,12 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
   const hiddenFileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    hideMenu();
+    newWallet && hideMenu();
 
     return () => {
       showMenu();
     };
-  }, [hideMenu, showMenu]);
+  }, [hideMenu, showMenu, newWallet]);
 
   const handleImport = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -234,12 +234,9 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
           </Text>
           <Button theme={theme} type="primary" label="Next" isSubmit />
         </FormContainer>
-        <Text style={{ margin: '1rem' }} theme={theme}>
-          ------ OR ------
-        </Text>
         <Button
           theme={theme}
-          type="secondary"
+          type="secondary-outline"
           onClick={handleJsonUploadClick}
           label="Upload 1Sat JSON"
           style={{ margin: 0 }}

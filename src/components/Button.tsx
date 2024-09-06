@@ -4,6 +4,12 @@ import { Show } from './Show';
 
 export type ButtonStyles = 'primary' | 'secondary' | 'secondary-outline' | 'warn';
 
+const Container = styled.div`
+  display: flex;
+  justify-content: center;
+  width: 100%;
+`;
+
 const Primary = styled.button<ColorThemeProps>`
   width: 87%;
   height: 2.25rem;
@@ -86,7 +92,7 @@ export type ButtonProps = {
 export const Button = (props: ButtonProps) => {
   const { label, type, onClick, disabled, theme, isSubmit, style } = props;
   return (
-    <>
+    <Container>
       <Show when={type === 'primary'}>
         <Primary
           theme={theme}
@@ -128,6 +134,6 @@ export const Button = (props: ButtonProps) => {
           {label}
         </Warn>
       </Show>
-    </>
+    </Container>
   );
 };

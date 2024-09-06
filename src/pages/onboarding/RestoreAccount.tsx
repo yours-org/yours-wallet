@@ -120,12 +120,12 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   const { keysService, chromeStorageService } = useServiceContext();
 
   useEffect(() => {
-    hideMenu();
+    newWallet && hideMenu();
 
     return () => {
       showMenu();
     };
-  }, [hideMenu, showMenu]);
+  }, [hideMenu, showMenu, newWallet]);
 
   const handleExpertToggle = () => setIsExpertImport(!isExpertImport);
 
