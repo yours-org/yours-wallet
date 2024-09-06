@@ -16,7 +16,7 @@ import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { WhitelistedApp, YoursEventName } from '../inject';
-import { ColorThemeProps } from '../theme';
+import { ColorThemeProps } from '../theme.types';
 import { sendMessage } from '../utils/chromeHelpers';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { CreateAccount } from './onboarding/CreateAccount';
@@ -367,25 +367,25 @@ export const Settings = () => {
         name="Manage Accounts"
         description="Manage your accounts"
         onClick={() => setPage('manage-accounts')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
       />
       <SettingsRow
         name="Connected Apps"
         description="Manage the apps you are connected to"
         onClick={() => setPage('connected-apps')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
       />
       <SettingsRow
         name="Preferences"
         description="Manage your wallet preferences"
         onClick={() => setPage('preferences')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
       />
       <SettingsRow
         name="Export Keys"
         description="Download keys or export as QR code"
         onClick={() => setPage('export-keys-options')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
       />
       <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={lockWallet} />
       <Text
@@ -403,7 +403,7 @@ export const Settings = () => {
       <SettingsRow
         style={{ backgroundColor: theme.errorRed + '40', border: '1px solid ' + theme.errorRed }}
         name="Sign Out"
-        description="Sign out of Yours Wallet completely"
+        description={`Sign out of ${theme.settings.walletName} Wallet completely`}
         onClick={handleSignOutIntent}
       />
     </>
@@ -414,19 +414,19 @@ export const Settings = () => {
       <SettingsRow
         name="Create Account"
         description="Create a new account"
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
         onClick={() => setPage('create-account')}
       />
       <SettingsRow
         name="Restore/Import"
         description="Import or restore an existing account"
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
         onClick={() => setPage('restore-account')}
       />
       <SettingsRow
         name="Edit Account"
         description="Edit an existing account"
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
         onClick={() => setPage('account-list')}
       />
       <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
@@ -494,7 +494,7 @@ export const Settings = () => {
         name="Social Profile"
         description="Set your display name and avatar"
         onClick={() => setPage('social-profile')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
       />
       <SettingsRow
         name="Require Password"
@@ -562,7 +562,7 @@ export const Settings = () => {
             key={account.addresses.identityAddress}
             name={account.name}
             icon={account.icon}
-            jsxElement={<ForwardButton />}
+            jsxElement={<ForwardButton color={theme.white} />}
             onClick={() => {
               setEnteredAccountName(account.name);
               setEnteredAccountIcon(account.icon);

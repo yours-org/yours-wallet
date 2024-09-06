@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 import { Ordinal as OrdinalType } from 'yours-wallet-provider';
-import { ColorThemeProps, Theme } from '../theme';
+import { ColorThemeProps, Theme } from '../theme.types';
 import { Text } from './Reusable';
 import { Show } from './Show';
 

@@ -1,6 +1,6 @@
 import { InputHTMLAttributes } from 'react';
 import styled, { css, keyframes } from 'styled-components';
-import { Theme } from '../theme';
+import { Theme } from '../theme.types';
 
 const $shakeAnimation = keyframes`
   10%, 90% {

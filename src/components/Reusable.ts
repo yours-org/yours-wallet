@@ -1,5 +1,5 @@
 import styled, { css } from 'styled-components';
-import { ColorThemeProps } from '../theme';
+import { ColorThemeProps } from '../theme.types';
 
 export const HeaderText = styled.h1<ColorThemeProps>`
   font-size: 1.35rem;
@@ -89,9 +89,9 @@ export const ReceiveContent = styled(MainContent)`
   height: calc(100% - 3.75rem);
 `;
 
-export const YoursLogo = styled.img`
-  width: 5rem;
-  height: 5rem;
+export const StyledImage = styled.img<{ $size?: string }>`
+  width: ${({ $size }) => $size ?? '5rem'};
+  height: ${({ $size }) => $size ?? '5rem'};
 `;
 
 export const GithubIcon = styled.img`
@@ -102,4 +102,5 @@ export const GithubIcon = styled.img`
 
 export const Warning = styled.span<ColorThemeProps>`
   color: ${({ theme }) => theme.warning};
+  font-weight: 700;
 `;

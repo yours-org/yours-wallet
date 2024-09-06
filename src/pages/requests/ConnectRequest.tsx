@@ -7,7 +7,7 @@ import { BottomMenuContext } from '../../contexts/BottomMenuContext';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import greenCheck from '../../assets/green-check.svg';
-import { ColorThemeProps } from '../../theme';
+import { ColorThemeProps } from '../../theme.types';
 import { RequestParams, WhitelistedApp } from '../../inject';
 import { sendMessage } from '../../utils/chromeHelpers';
 import { useServiceContext } from '../../hooks/useServiceContext';

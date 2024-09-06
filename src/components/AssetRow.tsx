@@ -1,6 +1,6 @@
 import { styled } from 'styled-components';
 import { useTheme } from '../hooks/useTheme';
-import { ColorThemeProps } from '../theme';
+import { ColorThemeProps } from '../theme.types';
 import { HeaderText, Text } from './Reusable';
 import { formatLargeNumber, formatUSD } from '../utils/format';
 import { Show } from './Show';

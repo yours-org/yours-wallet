@@ -1,6 +1,6 @@
 import { createContext, ReactNode } from 'react';
 import { useQueueTracker } from '../hooks/useQueueTracker';
-import { Theme } from '../theme';
+import { Theme } from '../theme.types';
 
 type QueueContextType = {
   queueLength: number;

@@ -3,9 +3,8 @@ import { Show } from './Show';
 import ProgressBar from '@ramonak/react-progress-bar';
 import { useTheme } from '../hooks/useTheme';
 import { styled } from 'styled-components';
-import { ColorThemeProps } from '../theme';
-import { YoursLogo } from './Reusable';
-import yoursLogo from '../assets/yours-logo.png';
+import { ColorThemeProps } from '../theme.types';
+import { YoursIcon } from './YoursIcon';
 
 const Container = styled.div<ColorThemeProps>`
   display: flex;
@@ -41,7 +40,7 @@ export const SyncingBlocks = () => {
     <Show when={showSyncPage}>
       {percentCompleted !== 100 && (
         <Container theme={theme}>
-          <YoursLogo src={yoursLogo} />
+          <YoursIcon width="4rem" />
           <Title theme={theme}>Syncing Blocks...</Title>
           <Description theme={theme}>Yours SPV Wallet will be ready to use once this process is complete.</Description>
           <ProgressBar

@@ -29,87 +29,19 @@ import {
 } from './inject';
 import { EncryptResponse } from './pages/requests/EncryptRequest';
 import { DecryptResponse } from './pages/requests/DecryptRequest';
-import { removeWindow, sendMessage } from './utils/chromeHelpers';
+import { removeWindow } from './utils/chromeHelpers';
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { mapOrdinal } from './utils/providerHelper';
-import { QueueTrackerMessage } from './hooks/useQueueTracker';
-import {
-  Bsv20Indexer,
-  Bsv21Indexer,
-  FundIndexer,
-  Indexer,
-  IndexMode,
-  InscriptionIndexer,
-  LockIndexer,
-  MapIndexer,
-  OneSatWebSPV,
-  OrdLockIndexer,
-  OriginIndexer,
-  TxoLookup,
-} from 'ts-casemod-spv';
-import { BlockHeightTrackerMessage } from './hooks/useBlockHeightTracker';
+import { TxoLookup } from 'ts-casemod-spv';
+import { initOneSatSPV } from './initCaseMode';
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
-const initOneSatSPV = async () => {
-  const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
-  const network = chromeStorageService.getNetwork();
 
-  let { bsvAddress, identityAddress, ordAddress } = account?.addresses || {};
-  if (!bsvAddress) bsvAddress = '';
-  if (!identityAddress) identityAddress = '';
-  if (!ordAddress) ordAddress = '';
-  const owners = new Set<string>([bsvAddress, identityAddress, ordAddress]);
-  const indexers: Indexer[] = [
-    new FundIndexer(owners, IndexMode.TrustAndVerify, network),
-    new LockIndexer(owners, IndexMode.TrustAndVerify, network),
-    new OrdLockIndexer(owners, IndexMode.TrustAndVerify, network),
-    new InscriptionIndexer(owners, IndexMode.TrustAndVerify, network),
-    new MapIndexer(owners, IndexMode.Verify, network),
-    new OriginIndexer(owners, IndexMode.TrustAndVerify, network),
-    new Bsv21Indexer(owners, IndexMode.Trust, network),
-    new Bsv20Indexer(owners, IndexMode.Trust, network),
-  ];
-
-  const oneSatSPV = await OneSatWebSPV.init(
-    selectedAccount || '',
-    indexers,
-    owners,
-    isInServiceWorker && !!account,
-    network == NetWork.Mainnet ? NetWork.Mainnet : NetWork.Testnet,
-  );
-
-  if (!oneSatSPV) throw Error('SPV not initialized!');
-
-  oneSatSPV.events.on('queueStats', (queueStats: { length: number }) => {
-    const message: QueueTrackerMessage = { action: YoursEventName.QUEUE_STATUS_UPDATE, data: queueStats };
-    try {
-      sendMessage(message);
-      // eslint-disable-next-line no-empty
-    } catch (e) {}
-  });
-
-  if (isInServiceWorker) {
-    const tip = await oneSatSPV.getChaintip();
-    oneSatSPV.events.on('syncedBlockHeight', (lastHeight: number) => {
-      // console.log(`Data: tip: ${tip?.height}, lastHeight: ${lastHeight}`);
-      try {
-        const message: BlockHeightTrackerMessage = {
-          action: YoursEventName.BLOCK_HEIGHT_UPDATE,
-          data: { currentHeight: tip?.height || 0, lastHeight },
-        };
-        selectedAccount && sendMessage(message);
-        // eslint-disable-next-line no-empty
-      } catch (error) {}
-    });
-  }
-
-  return oneSatSPV;
-  // });
-};
-
-export let oneSatSPVPromise = chromeStorageService.getAndSetStorage().then(() => initOneSatSPV());
+export let oneSatSPVPromise = chromeStorageService
+  .getAndSetStorage()
+  .then(() => initOneSatSPV(chromeStorageService, isInServiceWorker));
 
 console.log('Yours Wallet Background Script Running!');
 
@@ -166,7 +98,7 @@ if (isInServiceWorker) {
     await (await oneSatSPVPromise).destroy();
     chromeStorageService = new ChromeStorageService();
     await chromeStorageService.getAndSetStorage();
-    oneSatSPVPromise = initOneSatSPV();
+    oneSatSPVPromise = initOneSatSPV(chromeStorageService, isInServiceWorker);
   };
 
   const launchPopUp = () => {
@@ -857,7 +789,7 @@ if (isInServiceWorker) {
           sendResponse({
             type: YoursEventName.GET_TAGGED_KEYS,
             success: false,
-            error: 'Unauthorized! Yours Wallet is locked.',
+            error: 'Unauthorized! Wallet is locked.',
           });
         }
 
@@ -950,7 +882,7 @@ if (isInServiceWorker) {
 
   const cleanup = (types: YoursEventName[]) => {
     chromeStorageService.getAndSetStorage().then((res) => {
-      // Here we allow 1 second for yours wallet ui to display success message before killing the window
+      // Here we allow 1 second for the wallet ui to display success message before killing the window
       setTimeout(() => {
         if (res?.popupWindowId) {
           removeWindow(res.popupWindowId);

@@ -3,19 +3,19 @@ import styled from 'styled-components';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
-import { HeaderText, Text, YoursLogo } from '../../components/Reusable';
+import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { ColorThemeProps } from '../../theme';
+import { ColorThemeProps } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import copyIcon from '../../assets/copy-green.svg';
-import yoursLogo from '../../assets/yours-logo.png';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import { NetWork } from 'yours-wallet-provider';
 import { useNavigate } from 'react-router-dom';
+import { YoursIcon } from '../../components/YoursIcon';
 
 const Content = styled.div`
   display: flex;
@@ -140,126 +140,121 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
 
   const passwordStep = (
     <>
-      <Content>
-        <HeaderText theme={theme}>{newWallet ? 'Create password' : 'New Account'}</HeaderText>
-        <Text style={{ marginBottom: '1rem' }} theme={theme}>
-          {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
-        </Text>
-        <FormContainer onSubmit={handleKeyGeneration}>
+      <HeaderText theme={theme}>{newWallet ? 'Create password' : 'New Account'}</HeaderText>
+      <Text style={{ marginBottom: '1rem' }} theme={theme}>
+        {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
+      </Text>
+      <FormContainer onSubmit={handleKeyGeneration}>
+        <Input
+          theme={theme}
+          placeholder="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <Show when={newWallet}>
           <Input
             theme={theme}
-            placeholder="Password"
+            placeholder="Confirm password"
             type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={passwordConfirm}
+            onChange={(e) => setPasswordConfirm(e.target.value)}
           />
-          <Show when={newWallet}>
-            <Input
-              theme={theme}
-              placeholder="Confirm password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
-          </Show>
-          <NetworkSelectWrapper>
-            <ToggleSwitch
-              theme={theme}
-              on={network === NetWork.Testnet}
-              onChange={() => setNetwork(network === NetWork.Mainnet ? NetWork.Testnet : NetWork.Mainnet)}
-            />
-            <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
-              {network === NetWork.Testnet ? 'Turn off for mainnet account' : 'Turn on for testnet account'}
-            </Text>
-          </NetworkSelectWrapper>
-          <Button
+        </Show>
+        <NetworkSelectWrapper>
+          <ToggleSwitch
             theme={theme}
-            type="primary"
-            label={newWallet ? 'Generate Seed' : 'Create New Account'}
-            disabled={loading}
-            isSubmit
+            on={network === NetWork.Testnet}
+            onChange={() => setNetwork(network === NetWork.Mainnet ? NetWork.Testnet : NetWork.Mainnet)}
           />
-          <Button
-            theme={theme}
-            type="secondary"
-            label="Go back"
-            onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
-          />
-        </FormContainer>
-      </Content>
+          <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
+            {network === NetWork.Testnet ? 'Turn off for mainnet account' : 'Turn on for testnet account'}
+          </Text>
+        </NetworkSelectWrapper>
+        <Button
+          theme={theme}
+          type="primary"
+          label={newWallet ? 'Generate Seed' : 'Create New Account'}
+          disabled={loading}
+          isSubmit
+        />
+        <Button
+          theme={theme}
+          type="secondary"
+          label="Go back"
+          onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
+        />
+      </FormContainer>
     </>
   );
 
   const copySeedStep = (
     <>
-      <Content>
-        <HeaderText theme={theme}>Your recovery phrase</HeaderText>
-        <Text theme={theme} style={{ marginBottom: '1rem' }}>
-          Safely write down and store your seed phrase in a safe place.
+      <HeaderText theme={theme}>Your recovery phrase</HeaderText>
+      <Text theme={theme} style={{ marginBottom: '1rem' }}>
+        Safely write down and store your seed phrase in a safe place.
+      </Text>
+      <SeedContainer theme={theme}>
+        <Text style={{ textAlign: 'left', width: '100%', margin: '0', color: theme.white }} theme={theme}>
+          {seedWords.join(' ').trim()}
         </Text>
-        <SeedContainer theme={theme}>
-          <Text style={{ textAlign: 'left', width: '100%', margin: '0', color: theme.white }} theme={theme}>
-            {seedWords.join(' ').trim()}
+        <CopyToClipboardContainer onClick={() => handleCopyToClipboard(seedWords.join(' ').trim())}>
+          <CopyIcon src={copyIcon} />
+          <Text
+            style={{
+              color: theme.primaryButton,
+              textDecoration: 'underline',
+              margin: '0 0 0 0.5rem',
+              textAlign: 'left',
+              fontSize: '0.75rem',
+            }}
+            theme={theme}
+          >
+            Copy to clipboard
           </Text>
-          <CopyToClipboardContainer onClick={() => handleCopyToClipboard(seedWords.join(' ').trim())}>
-            <CopyIcon src={copyIcon} />
-            <Text
-              style={{
-                color: theme.primaryButton,
-                textDecoration: 'underline',
-                margin: '0 0 0 0.5rem',
-                textAlign: 'left',
-                fontSize: '0.75rem',
-              }}
-              theme={theme}
-            >
-              Copy to clipboard
-            </Text>
-          </CopyToClipboardContainer>
-        </SeedContainer>
-        <Button
-          theme={theme}
-          type="primary"
-          label={newWallet ? 'Next' : 'Finish'}
-          onClick={async () => {
-            setSeedWords([]);
-            await chromeStorageService.switchAccount(identityAddress);
-            if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
-            setStep(3);
-          }}
-        />
-      </Content>
+        </CopyToClipboardContainer>
+      </SeedContainer>
+      <Button
+        theme={theme}
+        type="primary"
+        label={newWallet ? 'Next' : 'Finish'}
+        onClick={async () => {
+          setSeedWords([]);
+          await chromeStorageService.switchAccount(identityAddress);
+          if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
+          setStep(3);
+        }}
+      />
     </>
   );
 
   const successStep = (
     <>
-      <Content>
-        <YoursLogo src={yoursLogo} />
-        <HeaderText theme={theme}>Success!</HeaderText>
-        <Text theme={theme} style={{ marginBottom: '1rem' }}>
-          Your wallet is ready to go.
-        </Text>
-        <Button
-          theme={theme}
-          type="primary"
-          label="Enter"
-          onClick={() => {
-            window.location.reload();
-          }}
-        />
-      </Content>
+      <HeaderText theme={theme}>Success!</HeaderText>
+      <Text theme={theme} style={{ marginBottom: '1rem' }}>
+        Your wallet is ready to go.
+      </Text>
+      <Button
+        theme={theme}
+        type="primary"
+        label="Enter"
+        onClick={() => {
+          window.location.reload();
+        }}
+      />
     </>
   );
 
   return (
-    <>
-      <Show when={loading}>
-        <PageLoader theme={theme} message="Generating keys..." />
-      </Show>
-      <Show when={!loading && step === 1}>{passwordStep}</Show>
-      <Show when={!loading && step === 2}>{copySeedStep}</Show>
-      <Show when={!loading && step === 3}>{successStep}</Show>
-    </>
+    <Show when={!loading} whenFalseContent={<PageLoader theme={theme} message="Generating keys..." />}>
+      <Content>
+        <Show when={newWallet}>
+          <YoursIcon width="4rem" />
+        </Show>
+        <Show when={step === 1}>{passwordStep}</Show>
+        <Show when={step === 2}>{copySeedStep}</Show>
+        <Show when={step === 3}>{successStep}</Show>
+      </Content>
+    </Show>
   );
 };

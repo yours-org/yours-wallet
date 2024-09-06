@@ -16,7 +16,7 @@ import {
   Text,
 } from '../components/Reusable';
 import { Show } from '../components/Show';
-import Tabs from '../components/Tabs';
+import Tabs, { TabContent, TabList, TabsWrapper } from '../components/Tabs';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
@@ -131,8 +131,14 @@ export const OrdWallet = () => {
   const [pageState, setPageState] = useState<PageState>('main');
   const { chromeStorageService, ordinalService, gorillaPoolService, bsvService } = useServiceContext();
   const [isProcessing, setIsProcessing] = useState(false);
-  const { transferOrdinal, getBsv20s, listOrdinalOnGlobalOrderbook, cancelGlobalOrderbookListing, getTokenName } =
-    ordinalService;
+  const {
+    transferOrdinal,
+    getBsv20s,
+    listOrdinalOnGlobalOrderbook,
+    cancelGlobalOrderbookListing,
+    getTokenName,
+    getOrdinals,
+  } = ordinalService;
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const network = chromeStorageService.getNetwork();
   const [selectedOrdinal, setSelectedOrdinal] = useState<OrdinalType | undefined>();
@@ -148,7 +154,6 @@ export const OrdWallet = () => {
   const [priceData, setPriceData] = useState<{ id: string; satPrice: number }[]>([]);
   const [ordinals, setOrdinals] = useState<OrdType[]>([]);
   const [bsv20s, setBsv20s] = useState<(Bsv20 | Bsv21)[]>([]);
-  // const bsv20s = getBsv20s(); //TODO: this... david
 
   useEffect(() => {
     if (!bsv20s.length) return;
@@ -174,14 +179,14 @@ export const OrdWallet = () => {
 
   const loadBsv20s = async () => {
     if (!ordinalService) return;
-    const bsv20s = await ordinalService.getBsv20s();
+    const bsv20s = await getBsv20s();
     console.log({ bsv20s });
     setBsv20s(bsv20s);
   };
 
   const loadOrdinals = async () => {
     if (!ordinalService) return;
-    const ordinals = await ordinalService.getOrdinals();
+    const ordinals = await getOrdinals();
     setOrdinals(ordinals);
   };
 
@@ -417,7 +422,9 @@ export const OrdWallet = () => {
                 marginTop: '4rem',
               }}
             >
-              You don't have any tokens
+              {theme.settings.services.bsv20
+                ? "You don't have any tokens"
+                : 'Wallet configuration does not support tokens!'}
             </Text>
           </NoInscriptionWrapper>
         }
@@ -597,7 +604,9 @@ export const OrdWallet = () => {
                 marginTop: '4rem',
               }}
             >
-              You don't have any NFTs
+              {theme.settings.services.ordinals
+                ? "You don't have any NFTs"
+                : 'Wallet configuration does not support NFTs!'}
             </Text>
           </NoInscriptionWrapper>
         }
@@ -648,14 +657,26 @@ export const OrdWallet = () => {
   );
 
   const main = (
-    <Tabs tabIndex={tabIndex} selectTab={selectTab} theme={theme}>
-      <Tabs.Panel theme={theme} label="NFT">
-        {nft}
-      </Tabs.Panel>
-      <Tabs.Panel theme={theme} label="Tokens">
-        {ft}
-      </Tabs.Panel>
-    </Tabs>
+    <Show
+      when={theme.settings.services.ordinals && theme.settings.services.bsv20}
+      whenFalseContent={
+        <TabsWrapper>
+          <TabContent $addTopMargin>
+            <Show when={theme.settings.services.ordinals}>{nft}</Show>
+            <Show when={theme.settings.services.bsv20}>{ft}</Show>
+          </TabContent>
+        </TabsWrapper>
+      }
+    >
+      <Tabs tabIndex={tabIndex} selectTab={selectTab} theme={theme}>
+        <Tabs.Panel theme={theme} label="NFT">
+          {nft}
+        </Tabs.Panel>
+        <Tabs.Panel theme={theme} label="Tokens">
+          {ft}
+        </Tabs.Panel>
+      </Tabs>
+    </Show>
   );
 
   const sendBSV20View = (
@@ -798,6 +819,16 @@ export const OrdWallet = () => {
             Confirm global orderbook listing
           </Text>
           <Button theme={theme} type="primary" label="List Now" disabled={isProcessing} isSubmit />
+          <Button
+            theme={theme}
+            type="secondary"
+            label="Go back"
+            onClick={() => {
+              setPageState('main');
+              setBsvListAmount(null);
+              setBsvListAmount(null);
+            }}
+          />
         </FormContainer>
       </ConfirmContent>
     </ContentWrapper>

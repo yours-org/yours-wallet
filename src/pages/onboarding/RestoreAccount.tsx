@@ -3,27 +3,27 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import relayXLogo from '../../assets/relayx.svg';
 import twetchLogo from '../../assets/twetch.svg';
-import yoursWhiteLogo from '../../assets/yours-white-logo.svg';
-import yoursLogo from '../../assets/yours-logo.png';
+import yoursWhiteLogo from '../../assets/logos/white-logo.png';
 import otherWallet from '../../assets/other-wallet.svg';
 import wifWallet from '../../assets/wif-wallet.svg';
 import masterWallet from '../../assets/master-wallet.svg';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
-import { HeaderText, Text, YoursLogo } from '../../components/Reusable';
+import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import { WalletRow } from '../../components/WalletRow';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { ColorThemeProps } from '../../theme';
+import { ColorThemeProps } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { SupportedWalletImports } from '../../services/types/keys.types';
 import { NetWork } from 'yours-wallet-provider';
 import { SettingsPage } from '../Settings';
+import { YoursIcon } from '../../components/YoursIcon';
 
 const Content = styled.div`
   display: flex;
@@ -78,7 +78,7 @@ const YoursWalletContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: ${({ theme }) => theme.black};
+  background-color: #000000;
   width: 1.25rem;
   height: 1.25rem;
   padding: 0.5rem;
@@ -191,7 +191,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
 
   const getRestoreTitle = () => {
     return importWallet === 'yours'
-      ? 'Restore Yours wallet'
+      ? `Restore ${theme.settings.walletName} wallet`
       : importWallet === 'panda'
         ? 'Restore Panda wallet'
         : importWallet === 'relayx'
@@ -209,91 +209,87 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
 
   const passwordStep = (
     <>
-      <Content>
-        <HeaderText theme={theme}>{newWallet ? 'Create password' : 'Import Account'}</HeaderText>
-        <Text theme={theme}>
-          {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
-        </Text>
-        <FormContainer onSubmit={handleRestore}>
+      <HeaderText theme={theme}>{newWallet ? 'Create password' : 'Import Account'}</HeaderText>
+      <Text theme={theme}>
+        {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
+      </Text>
+      <FormContainer onSubmit={handleRestore}>
+        <Input
+          theme={theme}
+          placeholder="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <Show when={newWallet}>
           <Input
             theme={theme}
-            placeholder="Password"
+            placeholder="Confirm Password"
             type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={passwordConfirm}
+            onChange={(e) => setPasswordConfirm(e.target.value)}
+            style={{ marginBottom: '2rem' }}
           />
-          <Show when={newWallet}>
-            <Input
-              theme={theme}
-              placeholder="Confirm Password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-              style={{ marginBottom: '2rem' }}
-            />
-          </Show>
-          <Button theme={theme} type="primary" label="Finish" disabled={loading} isSubmit />
-          <Button theme={theme} type="secondary" label="Go back" onClick={() => setStep(2)} />
-        </FormContainer>
-      </Content>
+        </Show>
+        <Button theme={theme} type="primary" label="Finish" disabled={loading} isSubmit />
+        <Button theme={theme} type="secondary" label="Go back" onClick={() => setStep(2)} />
+      </FormContainer>
     </>
   );
 
   const enterSeedStep = (
     <>
-      <Content>
-        <HeaderText theme={theme}>{getRestoreTitle()}</HeaderText>
-        <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
-          {getRestoreDescription()}
-        </Text>
-        <FormContainer onSubmit={() => setStep(3)}>
-          <SeedInput
+      <HeaderText theme={theme}>{getRestoreTitle()}</HeaderText>
+      <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
+        {getRestoreDescription()}
+      </Text>
+      <FormContainer onSubmit={() => setStep(3)}>
+        <SeedInput
+          theme={theme}
+          placeholder="Enter secret recovery words"
+          onChange={(e) => setSeedWords(e.target.value)}
+          $isExpert={isExpertImport}
+        />
+        <Show when={isExpertImport}>
+          <Input
             theme={theme}
-            placeholder="Enter secret recovery words"
-            onChange={(e) => setSeedWords(e.target.value)}
-            $isExpert={isExpertImport}
+            placeholder="Wallet Derivation ex. m/44'/236'/0'/0/0"
+            type="text"
+            value={walletDerivation ?? ''}
+            onChange={(e) => setWalletDerivation(e.target.value)}
+            style={{ margin: '0.1rem', width: '85%' }}
           />
-          <Show when={isExpertImport}>
-            <Input
-              theme={theme}
-              placeholder="Wallet Derivation ex. m/44'/236'/0'/0/0"
-              type="text"
-              value={walletDerivation ?? ''}
-              onChange={(e) => setWalletDerivation(e.target.value)}
-              style={{ margin: '0.1rem', width: '85%' }}
-            />
-            <Input
-              theme={theme}
-              placeholder="Ordinal Derivation ex. m/44'/236'/1'/0/0"
-              type="text"
-              value={ordDerivation ?? ''}
-              onChange={(e) => setOrdDerivation(e.target.value)}
-              style={{ margin: '0.1rem', width: '85%' }}
-            />
-            <Input
-              theme={theme}
-              placeholder="Identity Derivation ex. m/0'/236'/0'/0/0"
-              type="text"
-              value={identityDerivation ?? ''}
-              onChange={(e) => setIdentityDerivation(e.target.value)}
-              style={{ margin: '0.1rem 0 1rem', width: '85%' }}
-            />
-          </Show>
-          <Show when={!importWallet}>
-            <ExpertImportWrapper>
-              <ToggleSwitch theme={theme} on={isExpertImport} onChange={handleExpertToggle} />
-              <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
-                Use custom derivations
-              </Text>
-            </ExpertImportWrapper>
-          </Show>
-          <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
-            Make sure you are in a safe place and no one is watching.
-          </Text>
-          <Button theme={theme} type="primary" label="Next" isSubmit />
-          <Button theme={theme} type="secondary" label="Go back" onClick={() => setStep(1)} />
-        </FormContainer>
-      </Content>
+          <Input
+            theme={theme}
+            placeholder="Ordinal Derivation ex. m/44'/236'/1'/0/0"
+            type="text"
+            value={ordDerivation ?? ''}
+            onChange={(e) => setOrdDerivation(e.target.value)}
+            style={{ margin: '0.1rem', width: '85%' }}
+          />
+          <Input
+            theme={theme}
+            placeholder="Identity Derivation ex. m/0'/236'/0'/0/0"
+            type="text"
+            value={identityDerivation ?? ''}
+            onChange={(e) => setIdentityDerivation(e.target.value)}
+            style={{ margin: '0.1rem 0 1rem', width: '85%' }}
+          />
+        </Show>
+        <Show when={!importWallet}>
+          <ExpertImportWrapper>
+            <ToggleSwitch theme={theme} on={isExpertImport} onChange={handleExpertToggle} />
+            <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
+              Use custom derivations
+            </Text>
+          </ExpertImportWrapper>
+        </Show>
+        <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
+          Make sure you are in a safe place and no one is watching.
+        </Text>
+        <Button theme={theme} type="primary" label="Next" isSubmit />
+        <Button theme={theme} type="secondary" label="Go back" onClick={() => setStep(1)} />
+      </FormContainer>
     </>
   );
 
@@ -309,9 +305,9 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
                 <Show when={wallet === 'yours'}>
                   <WalletWrapper>
                     <YoursWalletContainer theme={theme}>
-                      <WalletLogo src={yoursWhiteLogo} style={{ width: '1.25rem' }} />
+                      <WalletLogo src={yoursWhiteLogo} style={{ width: '1rem', height: 'auto' }} />
                     </YoursWalletContainer>
-                    <WalletText theme={theme}>Yours</WalletText>
+                    <WalletText theme={theme}>{theme.settings.walletName}</WalletText>
                   </WalletWrapper>
                 </Show>
                 <Show when={wallet === 'relayx'}>
@@ -356,51 +352,48 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
 
   const selectImportWallet = (
     <>
-      <Content>
-        <HeaderText theme={theme}>Restore a Wallet</HeaderText>
-        <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
-          Select the wallet you'd like to restore from
-        </Text>
-        {availableWallets(['yours', 'relayx', 'twetch', 'wif', newWallet ? 'master' : undefined, 'other'])}
-        <Button
-          theme={theme}
-          type="secondary"
-          label="Go back"
-          onClick={() => (newWallet ? navigate('/') : onNavigateBack('manage-accounts'))}
-        />
-      </Content>
+      <HeaderText theme={theme}>Restore a Wallet</HeaderText>
+      <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
+        Select the wallet you'd like to restore from
+      </Text>
+      {availableWallets(['yours', 'relayx', 'twetch', 'wif', newWallet ? 'master' : undefined, 'other'])}
+      <Button
+        theme={theme}
+        type="secondary"
+        label="Go back"
+        onClick={() => (newWallet ? navigate('/') : onNavigateBack('manage-accounts'))}
+      />
     </>
   );
 
   const successStep = (
     <>
-      <Content>
-        <YoursLogo src={yoursLogo} />
-        <HeaderText theme={theme}>Success!</HeaderText>
-        <Text theme={theme} style={{ marginBottom: '1rem' }}>
-          Your wallet has been restored.
-        </Text>
-        <Button
-          theme={theme}
-          type="primary"
-          label="Enter"
-          onClick={() => {
-            window.location.reload();
-          }}
-        />
-      </Content>
+      <HeaderText theme={theme}>Success!</HeaderText>
+      <Text theme={theme} style={{ marginBottom: '1rem' }}>
+        Your wallet has been restored.
+      </Text>
+      <Button
+        theme={theme}
+        type="primary"
+        label="Enter"
+        onClick={() => {
+          window.location.reload();
+        }}
+      />
     </>
   );
 
   return (
-    <>
-      <Show when={loading}>
-        <PageLoader theme={theme} message="Restoring..." />
-      </Show>
-      <Show when={!loading && step === 1}>{selectImportWallet}</Show>
-      <Show when={!loading && step === 2}>{enterSeedStep}</Show>
-      <Show when={!loading && step === 3}>{passwordStep}</Show>
-      <Show when={!loading && step === 4}>{successStep}</Show>
-    </>
+    <Show when={!loading} whenFalseContent={<PageLoader theme={theme} message="Restoring..." />}>
+      <Content>
+        <Show when={newWallet && step !== 1}>
+          <YoursIcon width="4rem" />
+        </Show>
+        <Show when={step === 1}>{selectImportWallet}</Show>
+        <Show when={step === 2}>{enterSeedStep}</Show>
+        <Show when={step === 3}>{passwordStep}</Show>
+        <Show when={step === 4}>{successStep}</Show>
+      </Content>
+    </Show>
   );
 };
