@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import externalLink from '../assets/external-link.svg';
 import { Button } from '../components/Button';
 import { ForwardButton as RightChevron } from '../components/ForwardButton';
 import { PageLoader } from '../components/PageLoader';
@@ -14,14 +13,15 @@ import { SettingsRow as AppsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useTheme } from '../hooks/useTheme';
-import { ColorThemeProps } from '../theme';
+import { ColorThemeProps } from '../theme.types';
 // import { BSV_DECIMAL_CONVERSION, YOURS_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
-import { BSV_DECIMAL_CONVERSION, featuredApps, YOURS_GITHUB_REPOS, YOURS_GITHUB_REPO } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, featuredApps } from '../utils/constants';
 import { truncate } from '../utils/format';
 // import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { Txo } from 'ts-casemod-spv';
+import { FaExternalLinkAlt } from 'react-icons/fa';
 
 const Content = styled.div`
   display: flex;
@@ -98,12 +98,6 @@ const DiscoverAppsText = styled(Text)<ColorThemeProps>`
   text-align: left;
 `;
 
-const ExternalLinkIcon = styled.img`
-  width: 1.25rem;
-  height: 1.25rem;
-  cursor: pointer;
-`;
-
 const LockDetailsContainer = styled.div`
   display: flex;
   align-items: center;
@@ -177,23 +171,27 @@ export const AppsAndTools = () => {
         onClick={() => setPage('sponsor')}
         jsxElement={<RightChevron />}
       /> */}
-      <AppsRow
-        name="Pending Locks"
-        description="View the pending coins you've locked"
-        onClick={() => setPage('unlock')}
-        jsxElement={<RightChevron />}
-      />
-      <AppsRow
-        name="Discover Apps"
-        description="Meet the apps using Yours Wallet"
-        onClick={() => setPage('discover-apps')}
-        jsxElement={<RightChevron />}
-      />
+      <Show when={theme.settings.services.locks}>
+        <AppsRow
+          name="Pending Locks"
+          description="View the pending coins you've locked"
+          onClick={() => setPage('unlock')}
+          jsxElement={<RightChevron color={theme.white} />}
+        />
+      </Show>
+      <Show when={theme.settings.services.apps}>
+        <AppsRow
+          name="Discover Apps"
+          description={`Meet the apps using ${theme.settings.walletName} Wallet`}
+          onClick={() => setPage('discover-apps')}
+          jsxElement={<RightChevron color={theme.white} />}
+        />
+      </Show>
       <AppsRow
         name="Contribute or integrate"
         description="All the tools you need to get involved"
-        onClick={() => window.open(YOURS_GITHUB_REPO, '_blank')}
-        jsxElement={<ExternalLinkIcon src={externalLink} />}
+        onClick={() => window.open(theme.settings.repo, '_blank')}
+        jsxElement={<FaExternalLinkAlt color={theme.white} size={'1rem'} style={{ margin: '0.5rem' }} />}
       />
     </>
   );
@@ -253,7 +251,7 @@ export const AppsAndTools = () => {
       <Show when={featuredApps.length > 0} whenFalseContent={<Text theme={theme}>No apps</Text>}>
         <Text theme={theme} style={{ marginBottom: 0 }}>
           If your app has integrated Yours Wallet but is not listed,{' '}
-          <a href={YOURS_GITHUB_REPOS} rel="noreferrer" target="_blank" style={{ color: theme.white }}>
+          <a href={theme.settings.repo} rel="noreferrer" target="_blank" style={{ color: theme.white }}>
             let us know!
           </a>
         </Text>
@@ -265,7 +263,7 @@ export const AppsAndTools = () => {
                   <AppIcon src={app.icon} />
                   <DiscoverAppsText theme={theme}>{app.name}</DiscoverAppsText>
                 </ImageAndDomain>
-                <ExternalLinkIcon src={externalLink} />
+                <FaExternalLinkAlt color={theme.white} size={'1rem'} style={{ margin: '0.5rem' }} />
               </DiscoverAppsRow>
             );
           })}

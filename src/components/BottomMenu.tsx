@@ -1,22 +1,11 @@
 import { styled } from 'styled-components';
-import { ColorThemeProps, Theme } from '../theme';
+import { ColorThemeProps, Theme } from '../theme.types';
 import { MenuItems } from '../contexts/BottomMenuContext';
 import { Badge, Text } from './Reusable';
 import { Show } from './Show';
 import { NetWork } from 'yours-wallet-provider';
-import {
-  FaAppStore,
-  FaBitcoin,
-  FaCoffee,
-  FaCog,
-  FaCoins,
-  FaHandsHelping,
-  FaHome,
-  FaList,
-  FaResearchgate,
-  FaSmileBeam,
-} from 'react-icons/fa';
-import { ComponentType, ReactElement } from 'react';
+import { FaCog, FaCoins, FaList, FaSmileBeam } from 'react-icons/fa';
+import { ComponentType } from 'react';
 
 const Container = styled.div<ColorThemeProps>`
   display: flex;
@@ -97,6 +86,7 @@ export default Menu;
 
 export const BottomMenu = (props: BottomMenuProps) => {
   const { selected, handleSelect, theme } = props;
+  const services = theme.settings.services;
 
   return (
     <Container theme={theme}>
@@ -107,13 +97,15 @@ export const BottomMenu = (props: BottomMenuProps) => {
         onClick={() => handleSelect('bsv')}
         opacity={selected === 'bsv' ? 1 : 0.6}
       />
-      <Menu
-        label="Ordinals"
-        theme={theme}
-        icon={FaList}
-        onClick={() => handleSelect('ords')}
-        opacity={selected === 'ords' ? 1 : 0.6}
-      />
+      <Show when={theme.settings.services.ordinals || theme.settings.services.bsv20}>
+        <Menu
+          label={services.ordinals && services.bsv20 ? 'Ordinals' : services.ordinals ? 'NFTs' : 'Tokens'}
+          theme={theme}
+          icon={FaList}
+          onClick={() => handleSelect('ords')}
+          opacity={selected === 'ords' ? 1 : 0.6}
+        />
+      </Show>
       <Menu
         label="Resources"
         theme={theme}

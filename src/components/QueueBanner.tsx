@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 import { useQueueTracker } from '../hooks/useQueueTracker';
-import { ColorThemeProps } from '../theme';
+import { ColorThemeProps } from '../theme.types';
 import { formatNumberWithCommasAndDecimals } from '../utils/format';
 import { Show } from './Show';
 
@@ -11,7 +11,7 @@ const Banner = styled.div<ColorThemeProps & { $isSyncing: boolean }>`
   font-size: 0.9rem;
   font-weight: 700;
   background-color: ${({ theme, $isSyncing }) => ($isSyncing ? theme.warning : theme.primaryButton)};
-  color: #333;
+  color: ${({ theme }) => theme.black};
   padding: 1rem 0.5rem;
   text-align: center;
   z-index: 1000;

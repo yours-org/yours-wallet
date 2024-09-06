@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import styled from 'styled-components';
 import { Button } from '../../components/Button';
 import { PageLoader } from '../../components/PageLoader';
-import { HeaderText, Text } from '../../components/Reusable';
+import { HeaderText, Text, StyledImage } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
@@ -10,6 +10,8 @@ import { useServiceContext } from '../../hooks/useServiceContext';
 import { restoreMasterFromZip } from '../../utils/masterImporter';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useNavigate } from 'react-router-dom';
+import yoursIcon from '../../assets/logos/icon.png';
+import { YoursIcon } from '../../components/YoursIcon';
 
 const Content = styled.div`
   display: flex;
@@ -55,31 +57,31 @@ export const MasterRestore = () => {
 
   const handleProgress = (event: { message: string; value?: number; endValue?: number }) => {
     setLoaderMessage(event.message);
-    setProgress(event.value && event.endValue ? Math.round((event.value / event.endValue) * 100) : 0);
+    const progressValue = event.value && event.endValue ? Math.round((event.value / event.endValue) * 100) : 0;
+    setProgress(progressValue > 100 ? 100 : progressValue);
   };
 
   return (
-    <>
-      <Show when={loading}>
-        <PageLoader theme={theme} message={loaderMessage} showProgressBar barProgress={progress} />
-      </Show>
-      <Show when={!loading}>
-        <Content>
-          <HeaderText theme={theme}>Restore from Backup</HeaderText>
-          <Text theme={theme} style={{ marginBottom: '1rem' }}>
-            Upload your backup ZIP file to restore your data.
-          </Text>
-          <Button theme={theme} type="primary" onClick={handleZipUploadClick} label="Upload ZIP" />
-          <input
-            type="file"
-            ref={hiddenFileInput}
-            onChange={handleFileRead}
-            style={{ display: 'none' }}
-            accept=".zip,application/zip"
-          />
-          <Button theme={theme} type="secondary" label="Go back" onClick={() => navigate('/restore-wallet')} />
-        </Content>
-      </Show>
-    </>
+    <Show
+      when={!loading}
+      whenFalseContent={<PageLoader theme={theme} message={loaderMessage} showProgressBar barProgress={progress} />}
+    >
+      <Content>
+        <YoursIcon width="4rem" />
+        <HeaderText theme={theme}>Restore from Backup</HeaderText>
+        <Text theme={theme} style={{ marginBottom: '1rem' }}>
+          Upload your backup ZIP file to restore your data.
+        </Text>
+        <Button theme={theme} type="primary" onClick={handleZipUploadClick} label="Upload ZIP" />
+        <input
+          type="file"
+          ref={hiddenFileInput}
+          onChange={handleFileRead}
+          style={{ display: 'none' }}
+          accept=".zip,application/zip"
+        />
+        <Button theme={theme} type="secondary" label="Go back" onClick={() => navigate('/restore-wallet')} />
+      </Content>
+    </Show>
   );
 };

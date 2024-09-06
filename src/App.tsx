@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import React, { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { MemoryRouter as Router, Route, Routes } from 'react-router-dom';
 import styled from 'styled-components';
 import { Show } from './components/Show';
@@ -27,7 +27,7 @@ import { OrdPurchaseRequest } from './pages/requests/OrdPurchaseRequest';
 import { OrdTransferRequest } from './pages/requests/OrdTransferRequest';
 import { SignMessageRequest } from './pages/requests/SignMessageRequest';
 import { Settings } from './pages/Settings';
-import { ColorThemeProps } from './theme';
+import { ColorThemeProps } from './theme.types';
 import { WhitelistedApp } from './inject';
 import { PageLoader } from './components/PageLoader';
 import { useServiceContext } from './hooks/useServiceContext';
@@ -38,12 +38,12 @@ import { BlockHeightProvider } from './contexts/BlockHeightContext';
 import { SyncingBlocks } from './components/SyncingBlocks';
 import { MasterRestore } from './pages/onboarding/MasterRestore';
 
-const MainContainer = styled.div<{ $isMobile?: boolean }>`
+const MainContainer = styled.div<ColorThemeProps & { $isMobile?: boolean }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: ${(props) => (props.$isMobile ? '100vw' : '22.5rem')};
-  height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
+  width: ${({ $isMobile }) => ($isMobile ? '100vw' : '22.5rem')};
+  height: ${({ $isMobile }) => ($isMobile ? '100vh' : '33.75rem')};
   position: relative;
   padding: 0;
   background-color: ${({ theme }) => theme.mainBackground};

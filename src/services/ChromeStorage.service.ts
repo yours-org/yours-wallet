@@ -70,7 +70,6 @@ export class ChromeStorageService {
       network,
       noApprovalLimit,
       passKey,
-      paymentUtxos,
       popupWindowId,
       salt,
       socialProfile,

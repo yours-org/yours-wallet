@@ -2,13 +2,13 @@ import { useState } from 'react';
 import styled from 'styled-components';
 import { useTheme } from '../hooks/useTheme';
 import { useViewport } from '../hooks/useViewport';
-import { ColorThemeProps } from '../theme';
+import { ColorThemeProps } from '../theme.types';
 import { sleep } from '../utils/sleep';
 import { Button } from './Button';
 import { Input } from './Input';
-import yoursLogo from '../assets/yours-logo.png';
-import { FormContainer, HeaderText, Text, YoursLogo } from './Reusable';
+import { FormContainer, HeaderText, Text } from './Reusable';
 import { useServiceContext } from '../hooks/useServiceContext';
+import { YoursIcon } from './YoursIcon';
 
 const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
   display: flex;
@@ -60,7 +60,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
 
   return (
     <Container $isMobile={isMobile} theme={theme}>
-      <YoursLogo src={yoursLogo} />
+      <YoursIcon width="4rem" />
       <HeaderText style={{ fontSize: '1.75rem' }} theme={theme}>
         Unlock Wallet
       </HeaderText>

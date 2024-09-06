@@ -11,7 +11,7 @@ import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { ColorThemeProps } from '../../theme';
+import { ColorThemeProps } from '../../theme.types';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';

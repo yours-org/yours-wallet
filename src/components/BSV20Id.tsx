@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { ColorThemeProps, Theme } from '../theme';
+import { ColorThemeProps, Theme } from '../theme.types';
 import { Text } from './Reusable';
 import { IconButton } from './IconButton';
 import copyIcon from '../assets/copy.svg';

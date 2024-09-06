@@ -23,7 +23,7 @@ import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
-import { ColorThemeProps } from '../theme';
+import { ColorThemeProps } from '../theme.types';
 import { BSV_DECIMAL_CONVERSION, HOSTED_YOURS_IMAGE } from '../utils/constants';
 import { formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
@@ -348,6 +348,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
         You may safely send <Warning theme={theme}>BSV and Ordinals</Warning> to this address.
       </Text>
       <QrCode address={bsvAddress} onClick={handleCopyToClipboard} />
+      <Text theme={theme} style={{ margin: '1rem 0 -1.25rem 0', fontWeight: 700 }}>
+        Scan or copy the address
+      </Text>
       <CopyAddressWrapper onClick={handleCopyToClipboard}>
         <StyledCopy src={copyIcon} />
         <Text theme={theme} style={{ margin: '0', color: theme.white, fontSize: '0.75rem' }}>
@@ -398,7 +401,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           showPointer={false}
         />
         {lockData && (
-          <Show when={lockData.totalLocked > 0}>
+          <Show when={theme.settings.services.locks && lockData.totalLocked > 0}>
             <AssetRow
               animate
               ticker="Total Locked"

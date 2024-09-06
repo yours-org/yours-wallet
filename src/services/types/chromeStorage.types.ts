@@ -17,7 +17,7 @@ import {
   SocialProfile,
 } from 'yours-wallet-provider';
 import { WhitelistedApp } from '../../inject';
-import { Theme } from '../../theme';
+import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
 
 export type Dispatch<T> = (value: T) => void;

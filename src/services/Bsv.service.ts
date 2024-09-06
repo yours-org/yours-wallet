@@ -77,7 +77,7 @@ export class BsvService {
 
   getLockedTxos = async () => {
     const lockTxos = await this.oneSatSPV.search(new TxoLookup('lock'));
-    return lockTxos.txos.filter((txo) => !txo.data.insc);
+    return lockTxos.txos.filter((txo) => txo.satoshis > 1n && !txo.data.insc);
   };
 
   rate = async () => {

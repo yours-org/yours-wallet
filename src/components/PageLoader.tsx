@@ -1,5 +1,5 @@
 import styled, { keyframes } from 'styled-components';
-import { ColorThemeProps, Theme } from '../theme';
+import { ColorThemeProps, Theme } from '../theme.types';
 import { Text } from './Reusable';
 import { Show } from './Show';
 import ProgressBar from '@ramonak/react-progress-bar';
@@ -10,11 +10,12 @@ const spin = keyframes`
   100% { transform: rotate(360deg); }
 `;
 
-export const LoaderContainer = styled.div`
+export const LoaderContainer = styled.div<ColorThemeProps>`
   display: flex;
   justify-content: center;
   flex-direction: column;
   align-items: center;
+  background-color: ${({ theme }) => theme.mainBackground};
   height: 100%;
   width: 100%;
   top: 0;
@@ -47,7 +48,7 @@ export type PageLoaderProps = {
 export const PageLoader = (props: PageLoaderProps) => {
   const { message, theme, showProgressBar = false, barProgress = 0 } = props;
   return (
-    <LoaderContainer>
+    <LoaderContainer theme={theme}>
       <YoursIcon width="3.5rem" />
       <Text theme={theme} style={{ fontSize: '1rem', color: theme.white }}>
         {message}

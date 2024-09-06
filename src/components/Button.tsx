@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { ColorThemeProps, Theme } from '../theme';
+import { ColorThemeProps, Theme } from '../theme.types';
 import { Show } from './Show';
 
 export type ButtonStyles = 'primary' | 'secondary' | 'secondary-outline' | 'warn';
@@ -43,7 +43,6 @@ const GradientBorderWrapper = styled.div<ColorThemeProps>`
   background: linear-gradient(45deg, ${({ theme }) => theme.lightAccent}, ${({ theme }) => theme.primaryButton});
   border-radius: 0.25rem;
   width: 87%;
-  margin: 0.5rem;
 `;
 
 const SecondaryOutline = styled(Primary)<{ $isOutline?: boolean }>`
