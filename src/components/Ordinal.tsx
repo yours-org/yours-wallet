@@ -61,7 +61,6 @@ const JsonWrapper = styled.div<OrdinalDivProps>`
   border-radius: 0.5rem;
   position: relative;
   background-color: ${(props) => props.theme.darkAccent};
-  margin: 0.5rem;
   cursor: pointer;
   border: ${(props) => (props.selected ? `0.1rem solid ${props.theme.lightAccent}` : undefined)};
   overflow: auto;
@@ -81,7 +80,7 @@ export const FlexWrapper = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 0.5rem;
+  margin: 0.25rem;
   transition: 0.3s ease-in-out;
 
   &:hover {

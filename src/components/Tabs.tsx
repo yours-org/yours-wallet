@@ -64,7 +64,7 @@ const Content = styled.div`
   flex-direction: column;
   align-items: center;
   width: 100%;
-  height: calc(100% - 3.75rem - 2.75rem);
+  height: calc(100% - 7rem);
 `;
 
 export type TabsProps = PropsWithChildren<{

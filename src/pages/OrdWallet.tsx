@@ -50,7 +50,7 @@ const BSV20List = styled.div`
   overflow-x: hidden;
   width: 100%;
   margin-top: 0.5rem;
-  height: calc(100% - 10rem);
+  height: calc(100% - 4rem);
 `;
 
 const NoInscriptionWrapper = styled.div`
@@ -610,7 +610,7 @@ export const OrdWallet = () => {
                 <Ordinal
                   theme={theme}
                   inscription={ord}
-                  size={'6rem'}
+                  size={'5.5rem'}
                   key={ord.origin?.outpoint}
                   url={`${gorillaPoolService.getBaseUrl(network)}/content/${ord.origin?.outpoint}`}
                   selected={selectedOrdinal?.origin?.outpoint === ord.origin?.outpoint}

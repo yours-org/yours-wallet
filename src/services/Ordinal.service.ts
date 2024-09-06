@@ -178,17 +178,13 @@ export class OrdinalService {
         if (tokenUtxo.data?.list || !tokenUtxo.data.bsv21?.data) continue;
         token = tokenUtxo.data.bsv21.data as Bsv20Type | Bsv21Type;
         const t: TokenUtxo = {
+          id: tokenType === TokenType.BSV21 ? (token as Bsv21Type).id : (token as Bsv20Type).tick,
           txid: tokenUtxo.outpoint.txid,
           vout: tokenUtxo.outpoint.vout,
           satoshis: 1,
           script: Buffer.from(tokenUtxo.script).toString('base64'),
           amt: token.amt.toString(),
         };
-        if (tokenType === TokenType.BSV21) {
-          t.id = (token as Bsv21Type).id;
-        } else {
-          t.tick = (token as Bsv20Type).tick;
-        }
         tokenUtxos.push(t);
         tokensIn += token.amt;
       }
