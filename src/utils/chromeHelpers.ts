@@ -1,16 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const sendMessage = (message: any) => {
-  chrome.runtime.sendMessage(message, () => {
-    if (chrome.runtime.lastError) {
-      throw new Error(chrome.runtime.lastError.message);
-    }
-  });
+  try {
+    chrome.runtime.sendMessage(message, () => {
+      if (chrome.runtime.lastError) {
+        console.warn(chrome.runtime.lastError.message);
+      }
+    });
+  } catch (error) {
+    console.error(error);
+  }
 };
 
 export const removeWindow = (windowId: number) => {
-  chrome.windows.remove(windowId, () => {
-    if (chrome.runtime.lastError) {
-      throw new Error(chrome.runtime.lastError.message);
-    }
-  });
+  try {
+    chrome.windows.remove(windowId, () => {
+      if (chrome.runtime.lastError) {
+        console.warn(chrome.runtime.lastError.message);
+      }
+    });
+  } catch (error) {
+    console.error(error);
+  }
 };
