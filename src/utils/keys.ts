@@ -1,6 +1,4 @@
-// import { Bn, Point } from '@ts-bitcoin/core';
 import * as bip39 from 'bip39';
-// import { ExtendedPrivateKey, Hash, PrivateKey } from 'bsv-wasm-web';
 import { DerivationTag, NetWork } from 'yours-wallet-provider';
 import { WifKeys } from '../services/types/keys.types';
 import { DEFAULT_IDENTITY_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';

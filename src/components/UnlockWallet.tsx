@@ -50,9 +50,9 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       setVerificationFailed(false);
       const timestamp = Date.now();
       await chromeStorageService.update({ lastActiveTime: timestamp });
-      onUnlock();
       const keys = (await keysService.retrieveKeys(password)) as Keys;
-      setDerivationTags(keys, oneSatSPV, chromeStorageService);
+      await setDerivationTags(keys, oneSatSPV, chromeStorageService);
+      onUnlock();
     } else {
       setVerificationFailed(true);
       setTimeout(() => {

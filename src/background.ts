@@ -35,7 +35,7 @@ import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStor
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { mapOrdinal } from './utils/providerHelper';
 import { TxoLookup } from 'spv-store';
-import { initOneSatSPV } from './initCaseMode';
+import { initOneSatSPV } from './initSPVStore';
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
 
