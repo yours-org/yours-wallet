@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
-import yoursLogo from '../assets/yours-logo.png';
+import walletIcon from '../assets/logos/icon.png';
 
-const Yoursmg = styled.img<{
+const YoursImg = styled.img<{
   $rotation: { x: number; y: number };
 }>`
   transition: transform 0.1s;
@@ -55,9 +55,9 @@ export const YoursIcon = (props: YoursIconProps) => {
   }, [animated]);
 
   return (
-    <Yoursmg
+    <YoursImg
       ref={imgRef}
-      src={yoursLogo}
+      src={walletIcon}
       width={width}
       alt="Yours Head"
       $rotation={rotation}

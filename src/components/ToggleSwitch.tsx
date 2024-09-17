@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 import { ChangeEvent } from 'react';
-import { ColorThemeProps, Theme } from '../theme';
+import { ColorThemeProps, Theme } from '../theme.types';
 
 const Label = styled.label`
   display: flex;

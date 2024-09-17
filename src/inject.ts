@@ -50,7 +50,6 @@ export enum YoursEventName {
   ENCRYPT = 'encryptRequest',
   DECRYPT = 'decryptRequest',
   SIGNED_OUT = 'signedOut',
-  NETWORK_CHANGED = 'networkChanged',
   USER_CONNECT_RESPONSE = 'userConnectResponse',
   SEND_BSV_RESPONSE = 'sendBsvResponse',
   TRANSFER_ORDINAL_RESPONSE = 'transferOrdinalResponse',
@@ -61,6 +60,10 @@ export enum YoursEventName {
   GENERATE_TAGGED_KEYS_RESPONSE = 'generateTaggedKeysResponse',
   ENCRYPT_RESPONSE = 'encryptResponse',
   DECRYPT_RESPONSE = 'decryptResponse',
+  SYNC_UTXOS = 'syncUtxos', // This is not exposed on the provider
+  QUEUE_STATUS_UPDATE = 'queueStatusUpdate', // This is not exposed on the provider
+  BLOCK_HEIGHT_UPDATE = 'blockHeightUpdate', // This is not exposed on the provider
+  SWITCH_ACCOUNT = 'switchAccount', // This is not exposed on the provider
 }
 
 export enum CustomListenerName {
@@ -171,11 +174,10 @@ const createYoursMethod = <T, P = RequestParams>(type: YoursEventName) => {
   };
 };
 
+const whitelistedEvents: string[] = [YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT]; // Whitelisted event names
+
 const createYoursEventEmitter = () => {
   const eventListeners = new Map<string, YoursEventListeners[]>(); // Object to store event listeners
-  //TODO: networkChanged event will no longer be used and should be replaced with accountChanged
-  // TODO: ensure these on events are still firing when they should
-  const whitelistedEvents: YoursEvents[] = ['signedOut', 'networkChanged']; // Whitelisted event names
 
   const on = (eventName: YoursEvents, callback: YoursEventListeners) => {
     // Check if the provided event name is in the whitelist
@@ -254,7 +256,7 @@ if (typeof window !== 'undefined') {
 
 // Utility function to filter and emit only whitelisted events
 const emitWhitelistedEvent = (action: YoursEventName, params: RequestParams) => {
-  if (action === YoursEventName.SIGNED_OUT || action === YoursEventName.NETWORK_CHANGED) {
+  if (whitelistedEvents.includes(action)) {
     emit(action as YoursEvents, params);
   }
 };

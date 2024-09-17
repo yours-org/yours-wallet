@@ -17,7 +17,7 @@ import {
   SocialProfile,
 } from 'yours-wallet-provider';
 import { WhitelistedApp } from '../../inject';
-import { Theme } from '../../theme';
+import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
 
 export type Dispatch<T> = (value: T) => void;
@@ -38,8 +38,6 @@ export interface Account {
   settings: Settings;
   addresses: Addresses;
   balance: Balance;
-  ordinals: Ordinal[]; // TODO: remove
-  paymentUtxos: StoredUtxo[]; // TODO: remove
   pubKeys: PubKeys;
 }
 
@@ -81,7 +79,6 @@ export interface ChromeStorageObject {
 export type CurrentAccountObject = Omit<
   ChromeStorageObject,
   | 'accounts'
-  | 'selectedAccount'
   | 'popupWindowId'
   | 'connectRequest'
   | 'sendBsvRequest'

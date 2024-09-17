@@ -3,7 +3,7 @@ import { styled } from 'styled-components';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useViewport } from '../hooks/useViewport';
-import { ColorThemeProps, Theme } from '../theme';
+import { ColorThemeProps, Theme } from '../theme.types';
 import { sleep } from '../utils/sleep';
 import { Button } from './Button';
 import { Input } from './Input';

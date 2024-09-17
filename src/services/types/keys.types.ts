@@ -11,4 +11,4 @@ export type WifKeys = {
   identityPk?: string;
 };
 
-export type SupportedWalletImports = 'relayx' | 'twetch' | 'panda' | 'yours' | 'wif'; // panda and yours are the same
+export type SupportedWalletImports = 'relayx' | 'twetch' | 'panda' | 'other' | 'yours' | 'wif' | 'master'; // panda and yours are the same

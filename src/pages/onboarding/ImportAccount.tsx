@@ -47,18 +47,19 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
   const [ordPk, setOrdPk] = useState('');
   const [identityPk, setIdentityPk] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { keysService } = useServiceContext();
+  const { keysService, chromeStorageService } = useServiceContext();
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
+  const [explicitlyDisableButton, setExplicitlyDisableButton] = useState(false);
   const hiddenFileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    hideMenu();
+    newWallet && hideMenu();
 
     return () => {
       showMenu();
     };
-  }, [hideMenu, showMenu]);
+  }, [hideMenu, showMenu, newWallet]);
 
   const handleImport = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -66,11 +67,11 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
       setLoading(true);
       if (password.length < 8) {
         setLoading(false);
-        addSnackbar('The password must be at least 8 characters!', 'error');
+        addSnackbar(newWallet ? 'The password must be at least 8 characters!' : 'Invalid Password!', 'error');
         return;
       }
 
-      if (password !== passwordConfirm) {
+      if (newWallet && password !== passwordConfirm) {
         addSnackbar('The passwords do not match!', 'error');
         return;
       }
@@ -82,12 +83,8 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
 
       if (!identityPk) {
         setLoading(false);
-        addSnackbar(
-          'IMPORTANT: Since you did not provide an identity key, Yours Wallet will generate one for you, MAKE SURE TO BACK UP YOUR NEW YOURS WALLET!',
-          'info',
-          7000,
-        );
-        await sleep(7000);
+        setExplicitlyDisableButton(true);
+        setExplicitlyDisableButton(false);
         setLoading(true);
       }
 
@@ -103,10 +100,11 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
         newWallet,
       );
       if (!keys) {
-        addSnackbar('An error occurred while restoring the wallet!', 'error');
+        addSnackbar('An error occurred while creating the account! Make sure your password is correct.', 'error');
         return;
       }
 
+      await chromeStorageService.switchAccount(keys.identityAddress || identityPk);
       if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
       setStep(3);
     } catch (error) {
@@ -137,7 +135,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
             addSnackbar(
               'Invalid 1Sat Ord Wallet format. File contains seed phrase. Please use a different restore method using your seed phrase!',
               'error',
-              7000,
+              4000,
             );
             return;
           }
@@ -160,19 +158,19 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
 
   const passwordStep = (
     <>
-      <Content>
-        <HeaderText theme={theme}>{newWallet ? 'Create password' : 'Import Account'}</HeaderText>
-        <Text theme={theme}>
-          {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
-        </Text>
-        <FormContainer onSubmit={handleImport}>
-          <Input
-            theme={theme}
-            placeholder="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+      <HeaderText theme={theme}>{newWallet ? 'Create password' : 'Import Account'}</HeaderText>
+      <Text theme={theme}>
+        {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
+      </Text>
+      <FormContainer onSubmit={handleImport}>
+        <Input
+          theme={theme}
+          placeholder="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <Show when={newWallet}>
           <Input
             theme={theme}
             placeholder="Confirm Password"
@@ -181,108 +179,104 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
             onChange={(e) => setPasswordConfirm(e.target.value)}
             style={{ marginBottom: '2rem' }}
           />
-          <Button theme={theme} type="primary" label="Finish" isSubmit />
-          <Button
-            theme={theme}
-            type="secondary"
-            label="Go back"
-            onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
-          />
-        </FormContainer>
-      </Content>
-    </>
-  );
-
-  const enterWifsStep = (
-    <>
-      <Content>
-        <HeaderText theme={theme}>Import a WIF Wallet</HeaderText>
-        <Text theme={theme}>Input assets directly from your WIF private keys or import a 1Sat JSON Wallet.</Text>
-        <FormContainer onSubmit={() => setStep(2)}>
-          <Input
-            theme={theme}
-            placeholder="Pay WIF private key"
-            type="text"
-            value={payPk}
-            onChange={(e) => setPayPk(e.target.value)}
-            style={{ margin: '0.25rem' }}
-          />
-          <Input
-            theme={theme}
-            placeholder="Ord WIF private key"
-            type="text"
-            value={ordPk}
-            onChange={(e) => setOrdPk(e.target.value)}
-            style={{ margin: '0.25rem' }}
-          />
-          <Input
-            theme={theme}
-            placeholder="Identity WIF private key"
-            type="text"
-            value={identityPk}
-            onChange={(e) => setIdentityPk(e.target.value)}
-            style={{ margin: '0.25rem' }}
-          />
-          <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
-            Make sure you are in a safe place and no one is watching.
-          </Text>
-          <Button theme={theme} type="primary" label="Next" isSubmit />
-        </FormContainer>
-        <Text style={{ margin: '1rem' }} theme={theme}>
-          ------ OR ------
-        </Text>
-        <Button
-          theme={theme}
-          type="secondary"
-          onClick={handleJsonUploadClick}
-          label="Upload 1Sat JSON"
-          style={{ margin: 0 }}
-        />
-        <input
-          type="file"
-          ref={hiddenFileInput}
-          onChange={handleFileRead}
-          style={{ display: 'none' }}
-          accept="application/json"
-        />
+        </Show>
+        <Button theme={theme} type="primary" label="Finish" disabled={explicitlyDisableButton || loading} isSubmit />
         <Button
           theme={theme}
           type="secondary"
           label="Go back"
           onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
         />
-      </Content>
+      </FormContainer>
+    </>
+  );
+
+  const enterWifsStep = (
+    <>
+      <HeaderText theme={theme}>Import a WIF Wallet</HeaderText>
+      <Text theme={theme}>Input assets directly from your WIF private keys or import a 1Sat JSON Wallet.</Text>
+      <FormContainer onSubmit={() => setStep(2)}>
+        <Input
+          theme={theme}
+          placeholder="Pay WIF private key"
+          type="text"
+          value={payPk}
+          onChange={(e) => setPayPk(e.target.value)}
+          style={{ margin: '0.25rem' }}
+        />
+        <Input
+          theme={theme}
+          placeholder="Ord WIF private key"
+          type="text"
+          value={ordPk}
+          onChange={(e) => setOrdPk(e.target.value)}
+          style={{ margin: '0.25rem' }}
+        />
+        <Input
+          theme={theme}
+          placeholder="Identity WIF private key"
+          type="text"
+          value={identityPk}
+          onChange={(e) => setIdentityPk(e.target.value)}
+          style={{ margin: '0.25rem' }}
+        />
+        <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
+          Make sure you are in a safe place and no one is watching.
+        </Text>
+        <Button theme={theme} type="primary" label="Next" isSubmit />
+      </FormContainer>
+      <Button
+        theme={theme}
+        type="secondary-outline"
+        onClick={handleJsonUploadClick}
+        label="Upload 1Sat JSON"
+        style={{ margin: 0 }}
+      />
+      <input
+        type="file"
+        ref={hiddenFileInput}
+        onChange={handleFileRead}
+        style={{ display: 'none' }}
+        accept="application/json"
+      />
+      <Button
+        theme={theme}
+        type="secondary"
+        label="Go back"
+        onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
+      />
     </>
   );
 
   const successStep = (
     <>
-      <Content>
-        <YoursIcon />
-        <HeaderText theme={theme}>Success!</HeaderText>
-        <Text theme={theme} style={{ marginBottom: '1rem' }}>
-          Your wallet has been imported.
-        </Text>
-        <Button
-          theme={theme}
-          type="primary"
-          label="Enter"
-          onClick={() => {
-            window.location.reload();
-          }}
-        />
-      </Content>
+      <HeaderText theme={theme}>Success!</HeaderText>
+      <Text theme={theme} style={{ marginBottom: '1rem' }}>
+        Your wallet has been imported.
+      </Text>
+      <Button
+        theme={theme}
+        type="primary"
+        label="Enter"
+        onClick={() => {
+          window.location.reload();
+        }}
+      />
     </>
   );
 
   return (
     <>
-      <Show when={loading}>
-        <PageLoader theme={theme} message="Importing..." />
+      <Show when={!loading} whenFalseContent={<PageLoader theme={theme} message="Importing..." />}>
+        <Content>
+          <Show when={newWallet}>
+            <YoursIcon width="4rem" />
+          </Show>
+          <Show when={step === 1}>{enterWifsStep}</Show>
+          <Show when={step === 2}>{passwordStep}</Show>
+          <Show when={step === 3}>{successStep}</Show>
+        </Content>
       </Show>
-      <Show when={!loading && step === 1}>{enterWifsStep}</Show>
-      <Show when={!loading && step === 2}>{passwordStep}</Show>
-      <Show when={!loading && step === 3}>{successStep}</Show>
     </>
   );
 };

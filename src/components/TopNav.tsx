@@ -1,6 +1,6 @@
 import { styled } from 'styled-components';
 import { useState, useEffect, useRef } from 'react';
-import logo from '../assets/yours-horizontal-logo.png';
+import logo from '../assets/logos/horizontal-logo.png';
 import { useTheme } from '../hooks/useTheme';
 import { GithubIcon, Text } from './Reusable';
 import activeCircle from '../assets/active-circle.png';
@@ -10,7 +10,7 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { useServiceContext } from '../hooks/useServiceContext';
 import copyIcon from '../assets/copy.svg';
 import switchIcon from '../assets/chevrons.svg';
-import { ColorThemeProps } from '../theme';
+import { ColorThemeProps } from '../theme.types';
 import { useNavigate } from 'react-router-dom';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 

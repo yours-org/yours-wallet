@@ -1,4 +1,3 @@
-import { PublicKey } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
 import { EncryptRequest as EncryptRequestType } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
@@ -15,6 +14,7 @@ import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { encryptUsingPrivKey } from '../../utils/crypto';
 import { getPrivateKeyFromTag, Keys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
+import { PublicKey } from '@bsv/sdk';
 
 export type EncryptResponse = {
   encryptedMessages: string[];
@@ -80,7 +80,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
     const encrypted = encryptUsingPrivKey(
       request.message,
       request.encoding,
-      request.pubKeys.map((key) => PublicKey.from_hex(key)),
+      request.pubKeys.map((key) => PublicKey.fromString(key)),
       PrivKey,
     );
 

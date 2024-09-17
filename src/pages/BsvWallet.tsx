@@ -23,7 +23,7 @@ import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
-import { ColorThemeProps } from '../theme';
+import { ColorThemeProps } from '../theme.types';
 import { BSV_DECIMAL_CONVERSION, HOSTED_YOURS_IMAGE } from '../utils/constants';
 import { formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
@@ -33,6 +33,12 @@ import lockIcon from '../assets/lock.svg';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useWeb3RequestContext } from '../hooks/useWeb3RequestContext';
 import { useServiceContext } from '../hooks/useServiceContext';
+import { LockData } from '../services/types/bsv.types';
+import { sendMessage } from '../utils/chromeHelpers';
+import { YoursEventName } from '../inject';
+import { InWalletBsvResponse } from '../services/types/bsv.types';
+import { useQueueTracker } from '../hooks/useQueueTracker';
+import { isValidEmail } from '../utils/tools';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -100,6 +106,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const { updateBalance } = useQueueTracker();
   const urlParams = new URLSearchParams(location.search);
   const isReload = urlParams.get('reload') === 'true';
   urlParams.delete('reload');
@@ -119,21 +126,54 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const [isProcessing, setIsProcessing] = useState(false);
   const { bsvAddress, identityAddress } = keysService;
-  const { getBsvBalance, getExchangeRate, getLockData, unlockLockedCoins, updateBsvBalance, sendBsv } = bsvService;
+  const { getBsvBalance, getExchangeRate, getLockData, unlockLockedCoins, updateBsvBalance, sendBsv, sendAllBsv } =
+    bsvService;
   const [bsvBalance, setBsvBalance] = useState<number>(getBsvBalance());
   const [exchangeRate, setExchangeRate] = useState<number>(getExchangeRate());
-  const [lockData, setLockData] = useState(getLockData());
+  const [lockData, setLockData] = useState<LockData>();
+  const [isSendAllBsv, setIsSendAllBsv] = useState(false);
+
+  useEffect(() => {
+    const bsvBalanceInSats = bsvBalance * BSV_DECIMAL_CONVERSION;
+    setIsSendAllBsv(satSendAmount === bsvBalanceInSats);
+  }, [satSendAmount, bsvBalance]);
+
+  const getAndSetBsvBalance = async () => {
+    await updateBsvBalance();
+    setBsvBalance(getBsvBalance());
+  };
+
+  useEffect(() => {
+    if (updateBalance) {
+      getAndSetBsvBalance();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateBalance]);
 
   useEffect(() => {
     if (isReload) window.location.reload();
-  });
+  }, [isReload]);
+
+  const loadLocks = async () => {
+    if (!bsvService) return;
+    const lockData = await getLockData();
+    setLockData(lockData);
+  };
+
+  useEffect(() => {
+    loadLocks && loadLocks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refreshUtxos = async (showLoad = false) => {
     showLoad && setIsProcessing(true);
-    await updateBsvBalance(true);
+    await updateBsvBalance();
     setBsvBalance(getBsvBalance());
     setExchangeRate(getExchangeRate());
-    setLockData(getLockData());
+    loadLocks && loadLocks();
+
+    sendMessage({ action: YoursEventName.SYNC_UTXOS });
+
     showLoad && setIsProcessing(false);
   };
 
@@ -154,7 +194,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           if (res.error) addSnackbar('Error unlocking coins!', 'error');
           if (res.txid) {
             await refreshUtxos();
-            await unlockLockedCoins(true);
+            await unlockLockedCoins();
             await sleep(1000);
             addSnackbar('Successfully unlocked coins!', 'success');
           }
@@ -211,10 +251,15 @@ export const BsvWallet = (props: BsvWalletProps) => {
     e.preventDefault();
     setIsProcessing(true);
     await sleep(25);
-    if (!validate(receiveAddress)) {
-      addSnackbar('You must enter a valid BSV address. Paymail not yet supported.', 'info');
+    let isPaymail = false;
+    if (!isValidEmail(receiveAddress) && !validate(receiveAddress)) {
+      addSnackbar('You must enter a valid BSV or Paymail address.', 'info');
       setIsProcessing(false);
       return;
+    }
+
+    if (isValidEmail(receiveAddress)) {
+      isPaymail = true;
     }
 
     if (!satSendAmount && !usdSendAmount) {
@@ -234,7 +279,17 @@ export const BsvWallet = (props: BsvWalletProps) => {
       satoshis = Math.ceil((usdSendAmount / exchangeRate) * BSV_DECIMAL_CONVERSION);
     }
 
-    const sendRes = await sendBsv([{ address: receiveAddress, satoshis }], passwordConfirm);
+    let sendRes: InWalletBsvResponse | undefined;
+    if (isPaymail) {
+      sendRes = isSendAllBsv
+        ? await sendAllBsv(receiveAddress, 'paymail', passwordConfirm)
+        : await sendBsv([{ paymail: receiveAddress, satoshis }], passwordConfirm);
+    } else {
+      sendRes = isSendAllBsv
+        ? await sendAllBsv(receiveAddress, 'address', passwordConfirm)
+        : await sendBsv([{ address: receiveAddress, satoshis }], passwordConfirm);
+    }
+
     if (!sendRes.txid || sendRes.error) {
       const message =
         sendRes.error === 'invalid-password'
@@ -243,8 +298,19 @@ export const BsvWallet = (props: BsvWalletProps) => {
             ? 'Insufficient Funds!'
             : sendRes.error === 'fee-too-high'
               ? 'Miner fee too high!'
-              : 'An unknown error has occurred! Try again.';
+              : sendRes.error === 'no-wallet-address'
+                ? 'No wallet address found!'
+                : sendRes.error === 'invalid-data'
+                  ? 'Invalid data!'
+                  : sendRes.error === 'invalid-request'
+                    ? 'Invalid request!'
+                    : sendRes.error === 'source-tx-not-found'
+                      ? 'Source transaction not found!'
+                      : sendRes.error === 'no-account'
+                        ? 'No account found!'
+                        : 'An unknown error has occurred! Try again.';
 
+      setIsProcessing(false);
       addSnackbar(message, 'error');
       setPasswordConfirm('');
       return;
@@ -285,12 +351,15 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const receive = (
     <ReceiveContent>
       <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
-        Receive BSV
+        Receive Assets
       </HeaderText>
       <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
-        Only send BSV to this address. <Warning theme={theme}>Do not send Ordinals or BSV20 here.</Warning>
+        You may safely send <Warning theme={theme}>BSV and Ordinals</Warning> to this address.
       </Text>
       <QrCode address={bsvAddress} onClick={handleCopyToClipboard} />
+      <Text theme={theme} style={{ margin: '1rem 0 -1.25rem 0', fontWeight: 700 }}>
+        Scan or copy the address
+      </Text>
       <CopyAddressWrapper onClick={handleCopyToClipboard}>
         <StyledCopy src={copyIcon} />
         <Text theme={theme} style={{ margin: '0', color: theme.white, fontSize: '0.75rem' }}>
@@ -303,7 +372,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         type="secondary"
         onClick={() => {
           setPageState('main');
-          updateBsvBalance(true);
+          updateBsvBalance();
         }}
       />
     </ReceiveContent>
@@ -326,25 +395,35 @@ export const BsvWallet = (props: BsvWalletProps) => {
         <BalanceContainer>
           <Icon src={bsvCoin} size="1rem" />
           <Text theme={theme} style={{ margin: '0' }}>
-            {bsvBalance}
+            {bsvBalance.toFixed(8)}
           </Text>
         </BalanceContainer>
         <ButtonContainer>
           <Button theme={theme} type="primary" label="Receive" onClick={() => setPageState('receive')} />
           <Button theme={theme} type="primary" label="Send" onClick={() => setPageState('send')} />
         </ButtonContainer>
-        <AssetRow balance={bsvBalance} icon={bsvCoin} ticker="BSV" usdBalance={bsvBalance * exchangeRate} />
-        <Show when={lockData.totalLocked > 0}>
-          <AssetRow
-            ticker="Total Locked"
-            balance={lockData.totalLocked / BSV_DECIMAL_CONVERSION}
-            usdBalance={Number((lockData.unlockable / BSV_DECIMAL_CONVERSION).toFixed(3))}
-            icon={lockIcon}
-            isLock
-            nextUnlock={lockData?.nextUnlock}
-            onClick={() => handleSelect('apps', 'pending-locks')}
-          />
-        </Show>
+        <AssetRow
+          balance={bsvBalance}
+          icon={bsvCoin}
+          ticker="BSV"
+          usdBalance={bsvBalance * exchangeRate}
+          showPointer={false}
+        />
+        {lockData && (
+          <Show when={theme.settings.services.locks && lockData.totalLocked > 0}>
+            <AssetRow
+              animate
+              ticker="Total Locked"
+              showPointer={true}
+              balance={lockData.totalLocked / BSV_DECIMAL_CONVERSION}
+              usdBalance={Number((lockData.unlockable / BSV_DECIMAL_CONVERSION).toFixed(3))}
+              icon={lockIcon}
+              isLock
+              nextUnlock={lockData?.nextUnlock}
+              onClick={() => handleSelect('apps', 'pending-locks')}
+            />
+          </Show>
+        )}
       </MiddleContainer>
     </MainContent>
   );
@@ -361,7 +440,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
           <Input
             theme={theme}
-            placeholder="Enter Address"
+            placeholder="Enter Address or Paymail"
             type="text"
             onChange={(e) => setReceiveAddress(e.target.value)}
             value={receiveAddress}

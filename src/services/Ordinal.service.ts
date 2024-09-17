@@ -1,75 +1,101 @@
-import { GorillaPoolService } from './GorillaPool.service';
-import { P2PKHAddress, PrivateKey, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { KeysService } from './Keys.service';
+import { ListOrdinal, OrdOperationResponse } from './types/ordinal.types';
 import {
-  BSV20Data,
-  BuildAndBroadcastResponse,
-  ListOrdinal,
-  OrdinalData,
-  OrdOperationResponse,
-} from './types/ordinal.types';
-import { WhatsOnChainService } from './WhatsOnChain.service';
-import {
-  BSV20_INDEX_FEE,
-  FEE_PER_BYTE,
-  FEE_SATS,
-  MAX_FEE_PER_TX,
-  O_LOCK_SUFFIX,
-  P2PKH_INPUT_SIZE,
-  P2PKH_OUTPUT_SIZE,
-  SCRYPT_PREFIX,
-} from '../utils/constants';
-import { sendOrdinal } from 'js-1sat-ord-web';
-import { createTransferP2PKH, createTransferV2P2PKH, isBSV20v2 } from '../utils/ordi';
-import { Bsv20, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
-import { UTXO } from './types/bsv.types';
-import { ChromeStorageObject } from './types/chromeStorage.types';
+  cancelOrdListings,
+  createOrdListings,
+  OrdP2PKH,
+  purchaseOrdListing,
+  TokenType,
+  TokenUtxo,
+  transferOrdTokens,
+} from 'js-1sat-ord';
+import { Bsv20, Bsv21, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
+import { P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction } from '@bsv/sdk';
+import { BsvService } from './Bsv.service';
+//TODO: look into why BSV20_INDEX_FEE is not being used
+import { BSV20_INDEX_FEE, FEE_PER_KB } from '../utils/constants';
+import { mapOrdinal } from '../utils/providerHelper';
+import { Bsv20 as Bsv20Type, Bsv21 as Bsv21Type, SPVStore, Outpoint, TxoLookup, TxoSort } from 'spv-store';
+import { isValidEmail } from '../utils/tools';
+//@ts-ignore
+import { PaymailClient } from '@bsv/paymail/client';
 import { ChromeStorageService } from './ChromeStorage.service';
+import { truncate } from '../utils/format';
+import theme from '../theme.json';
+
+const client = new PaymailClient();
 
 export class OrdinalService {
-  private ordinals: OrdinalData;
-  private bsv20s: BSV20Data;
   constructor(
     private readonly keysService: KeysService,
-    private readonly wocService: WhatsOnChainService,
-    private readonly gorillaPoolService: GorillaPoolService,
+    private readonly bsvService: BsvService,
+    private readonly oneSatSPV: SPVStore,
     private readonly chromeStorageService: ChromeStorageService,
-  ) {
-    this.ordinals = { initialized: false, data: [] };
-    this.bsv20s = { initialized: false, data: [] };
-  }
+  ) {}
 
-  getOrdinals = (): OrdinalData => this.ordinals;
-  getBsv20s = (): BSV20Data => this.bsv20s;
+  getOrdinals = async (): Promise<Ordinal[]> => {
+    const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 0);
+    const mapped = ordinals.txos.map(mapOrdinal);
+    return mapped;
+  };
 
-  getAndSetOrdinals = async (ordAddress: string) => {
-    try {
-      //TODO: Implement infinite scroll to handle instances where user has more than 100 items.
-      const ordList = await this.gorillaPoolService.getOrdUtxos(ordAddress);
-      this.ordinals = { initialized: true, data: ordList.filter((o) => o.satoshis === 1) };
+  getOrdinal = async (outpoint: string): Promise<Ordinal | undefined> => {
+    const txo = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
+    if (!txo) return;
+    return mapOrdinal(txo);
+  };
 
-      const bsv20List: Array<Bsv20> = await this.gorillaPoolService.getBsv20Balances(ordAddress);
+  getBsv20s = async (): Promise<(Bsv20 | Bsv21)[]> => {
+    const bsv21s = await this.oneSatSPV.search(new TxoLookup('bsv21'));
 
-      // All the information currently used has been obtained from `getBsv20Balances`.
-      // If other information is needed later, call `cacheTokenInfos` to obtain more Tokens information.
-      // await cacheTokenInfos(bsv20List.map((bsv20) => bsv20.id));
-
-      const data = bsv20List.filter((o) => o.all.confirmed + o.all.pending > 0n && typeof o.dec === 'number');
-      this.bsv20s = { initialized: true, data };
-      const { account } = this.chromeStorageService.getCurrentAccountObject();
-      if (!account) throw Error('No account found!');
-      const key: keyof ChromeStorageObject = 'accounts';
-      const update: Partial<ChromeStorageObject['accounts']> = {
-        [this.keysService.identityAddress]: {
-          ...account,
-          ordinals: this.ordinals.initialized ? this.ordinals.data : account.ordinals || [],
-        },
-      };
-      await this.chromeStorageService.updateNested(key, update);
-      return this.ordinals;
-    } catch (error) {
-      console.error('getOrdinals failed:', error);
+    const tokens: { [id: string]: Bsv20 | Bsv21 } = {};
+    for (const txo of bsv21s.txos) {
+      const bsv21 = txo.data.bsv21?.data as Bsv21Type;
+      if (!bsv21) continue;
+      let token = tokens[bsv21.id.toString()];
+      if (!token) {
+        token = {
+          p: 'bsv-20',
+          op: 'deploy+mint',
+          dec: bsv21.dec,
+          amt: bsv21.supply?.toString() || '',
+          all: { confirmed: 0n, pending: 0n },
+          listed: { confirmed: 0n, pending: 0n },
+          status: 1,
+          icon: bsv21.icon,
+          id: bsv21.id.toString(),
+          sym: bsv21.sym || '',
+        };
+        tokens[bsv21.id.toString()] = token;
+      }
+      token.all.confirmed += bsv21.amt;
+      if (!txo.data.list) continue;
+      token.listed.confirmed += bsv21.amt;
     }
+
+    const bsv20s = await this.oneSatSPV.search(new TxoLookup('bsv20'));
+    for (const txo of bsv20s.txos) {
+      const bsv20 = txo.data.bsv20?.data as Bsv20Type;
+      if (!bsv20) continue;
+      let token = tokens[bsv20.tick];
+      if (!token) {
+        token = {
+          p: 'bsv-20',
+          op: bsv20.op,
+          dec: bsv20.dec,
+          amt: bsv20.amt.toString(),
+          all: { confirmed: 0n, pending: 0n },
+          listed: { confirmed: 0n, pending: 0n },
+          status: 1,
+          tick: bsv20.tick,
+        };
+        tokens[bsv20.tick] = token;
+      }
+      token.all.confirmed += bsv20.amt;
+      if (!txo.data.list) continue;
+      token.listed.confirmed += bsv20.amt;
+    }
+    return Object.values(tokens);
   };
 
   transferOrdinal = async (
@@ -83,76 +109,97 @@ export class OrdinalService {
         return { error: 'invalid-password' };
       }
 
+      const ordinal = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
+      if (!ordinal) {
+        return { error: 'no-ordinal' };
+      }
+
       const keys = await this.keysService.retrieveKeys(password);
       if (!keys?.ordAddress || !keys.ordWif || !keys.walletAddress || !keys.walletWif) {
-        throw Error('No keys');
-      }
-      const ordinalAddress = keys.ordAddress;
-      const ordWifPk = keys.ordWif;
-      const fundingAndChangeAddress = keys.walletAddress;
-      const payWifPk = keys.walletWif;
-
-      const fundingUtxos = await this.wocService.getAndUpdateUtxoStorage(fundingAndChangeAddress);
-
-      if (!fundingUtxos || fundingUtxos.length === 0) {
-        return { error: 'insufficient-funds' };
+        return { error: 'no-keys' };
       }
 
-      const ordUtxos = await this.getOrdinalUtxos(ordinalAddress);
-      if (!ordUtxos) throw Error('No ord utxos!');
-      const ordUtxo = ordUtxos.find((o) => o.outpoint.toString() === outpoint);
+      const changeAddress = keys.walletAddress;
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
 
-      if (!ordUtxo) {
-        return { error: 'no-ord-utxo' };
+      // Build tx
+      const tx = new Transaction();
+      const paymailRefs: { paymail: string; reference: string }[] = [];
+      const u = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
+      if (!u) return { error: 'no-ordinal' };
+      const pk = pkMap.get(u.owner || '');
+      if (!pk) return { error: 'no-keys' };
+      const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
+      if (!sourceTransaction) {
+        console.log(`Could not find source transaction ${u.outpoint.txid}`);
+        return { error: 'source-tx-not-found' };
+      }
+      tx.addInput({
+        sourceTransaction,
+        sourceOutputIndex: u.outpoint.vout,
+        sequence: 0xffffffff,
+        unlockingScriptTemplate: new OrdP2PKH().unlock(pk),
+      });
+
+      if (isValidEmail(destinationAddress)) {
+        const p2pDestination = await client.getP2pOrdinalDestinations(destinationAddress, 1);
+        console.log(`P2P payment destination: ${p2pDestination}`);
+        paymailRefs.push({ paymail: destinationAddress, reference: p2pDestination.reference });
+
+        tx.addOutput({
+          satoshis: 1,
+          lockingScript: Script.fromHex(p2pDestination.outputs[0].script),
+        });
+      } else {
+        tx.addOutput({ satoshis: 1, lockingScript: new OrdP2PKH().lock(destinationAddress) });
       }
 
-      if (!ordUtxo.script) {
-        const ordRawTx = await this.wocService.getRawTxById(ordUtxo.txid);
-        if (!ordRawTx) throw Error('Could not get raw tx');
-        const tx = Transaction.from_hex(ordRawTx);
-        const out = tx.get_output(ordUtxo.vout);
-        const script = out?.get_script_pub_key();
-        if (script) {
-          ordUtxo.script = script.to_hex();
+      tx.addOutput({
+        lockingScript: new P2PKH().lock(changeAddress),
+        change: true,
+      });
+
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+
+      let satsIn = 0;
+      let fee = 0;
+      const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+      for await (const u of fundResults.txos || []) {
+        const pk = pkMap.get(u.owner || '');
+        if (!pk) continue;
+        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
+        if (!sourceTransaction) {
+          console.log(`Could not find source transaction ${u.outpoint.txid}`);
+          return { error: 'source-tx-not-found' };
         }
+        tx.addInput({
+          sourceTransaction,
+          sourceOutputIndex: u.outpoint.vout,
+          sequence: 0xffffffff,
+          unlockingScriptTemplate: new P2PKH().unlock(pk),
+        });
+        satsIn += Number(u.satoshis);
+        fee = await feeModel.computeFee(tx);
+        if (satsIn >= fee) break;
+      }
+      if (satsIn < fee) return { error: 'insufficient-funds' };
+      await tx.fee(feeModel);
+      await tx.sign();
+
+      const response = await this.oneSatSPV.broadcast(tx);
+      if (response?.txid) {
+        return { txid: response.txid };
       }
 
-      const fundingUtxo = this.wocService.getSuitableUtxo(fundingUtxos, FEE_SATS);
-
-      if (!fundingUtxo?.script) {
-        const fundingRawTx = await this.wocService.getRawTxById(fundingUtxo.txid);
-        if (!fundingRawTx) throw Error('Could not get raw tx');
-        const tx = Transaction.from_hex(fundingRawTx);
-        const out = tx.get_output(ordUtxo.vout);
-        const script = out?.get_script_pub_key();
-        if (script) {
-          fundingUtxo.script = script.to_hex();
-        }
-      }
-
-      if (!fundingUtxo.script || !ordUtxo.script) throw Error('Missing scripts!');
-
-      const payPrivateKey = PrivateKey.from_wif(payWifPk);
-      const ordPrivateKey = PrivateKey.from_wif(ordWifPk);
-
-      const formattedOrdUtxo: UTXO = {
-        satoshis: ordUtxo.satoshis,
-        script: ordUtxo.script,
-        txid: ordUtxo.txid,
-        vout: ordUtxo.vout,
-      };
-
-      const broadcastResponse = await this.buildAndBroadcastOrdinalTx(
-        fundingUtxo,
-        formattedOrdUtxo,
-        payPrivateKey,
-        fundingAndChangeAddress,
-        ordPrivateKey,
-        destinationAddress,
-      );
-
-      if (broadcastResponse?.txid) {
-        return { txid: broadcastResponse.txid };
+      const txHex = tx.toHex();
+      const chromeObj = this.chromeStorageService.getCurrentAccountObject();
+      if (!chromeObj.account) return { error: 'no-account' };
+      for (const ref of paymailRefs) {
+        console.log(`Sending P2P payment to ${ref.paymail} with reference ${ref.reference}`);
+        await client.sendOrdinalTransactionP2P(ref.paymail, txHex, ref.reference, {
+          sender: `${theme.settings.walletName} - ${truncate(chromeObj.account.addresses.bsvAddress, 4, 4)}`,
+          note: `P2P tx from ${theme.settings.walletName}`,
+        });
       }
 
       return { error: 'broadcast-failed' };
@@ -162,177 +209,73 @@ export class OrdinalService {
     }
   };
 
-  buildAndBroadcastOrdinalTx = async (
-    fundingUtxo: UTXO,
-    ordUtxo: UTXO,
-    payPrivateKey: PrivateKey,
-    fundingAndChangeAddress: string,
-    ordPrivateKey: PrivateKey,
-    destination: string,
-  ): Promise<BuildAndBroadcastResponse | undefined> => {
-    fundingUtxo.script = Script.from_hex(fundingUtxo.script).to_asm_string();
-    ordUtxo.script = Script.from_hex(ordUtxo.script).to_asm_string();
-    const sendRes = await sendOrdinal(
-      fundingUtxo,
-      ordUtxo,
-      payPrivateKey,
-      fundingAndChangeAddress,
-      FEE_PER_BYTE,
-      ordPrivateKey,
-      destination,
-    );
-
-    const rawTx = sendRes.to_hex();
-    const tx = Transaction.from_hex(rawTx);
-
-    const changeVout = tx.get_noutputs() ? tx.get_noutputs() - 1 : 1; // The change should be at vout position 1 if the other requests fail
-    const change = Number(tx.get_output(changeVout)?.get_satoshis()) ?? 0;
-    const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
-
-    if (txid) {
-      return { txid, rawTx, changeInfo: { change, changeVout } };
-    }
-  };
-
-  getOrdinalUtxos = async (ordAddress: string): Promise<Ordinal[] | undefined> => {
-    try {
-      if (!ordAddress) {
-        return [];
-      }
-      const utxos = await this.gorillaPoolService.getOrdUtxos(ordAddress);
-
-      return utxos;
-    } catch (error) {
-      console.error('getOrdinalUtxos failed:', error);
-    }
-  };
-
-  sendBSV20 = async (id: string, destinationAddress: string, amount: bigint, password: string) => {
-    let indexFee = BSV20_INDEX_FEE;
+  sendBSV20 = async (idOrTick: string, destinationAddress: string, amount: bigint, password: string) => {
     try {
       const isAuthenticated = await this.keysService.verifyPassword(password);
       if (!isAuthenticated) {
         return { error: 'invalid-password' };
       }
-
       const keys = await this.keysService.retrieveKeys(password);
       if (!keys?.ordAddress || !keys.ordWif || !keys.walletAddress || !keys.walletWif) {
         throw Error('No keys');
       }
-      const ordinalAddress = keys.ordAddress;
-      const ordWifPk = keys.ordWif;
-      const fundingAndChangeAddress = keys.walletAddress;
-      const payWifPk = keys.walletWif;
+      const paymentPk = PrivateKey.fromWif(keys.walletWif);
+      const ordPk = PrivateKey.fromWif(keys.ordWif);
+      const fundingUtxos = await this.bsvService.fundingTxos();
 
-      const paymentPk = PrivateKey.from_wif(payWifPk);
-      const ordPk = PrivateKey.from_wif(ordWifPk);
+      const tokenType = idOrTick.length > 64 ? TokenType.BSV21 : TokenType.BSV20;
+      const utxos =
+        tokenType === TokenType.BSV21
+          ? await this.oneSatSPV.search(new TxoLookup('bsv21', 'id', idOrTick, ordPk.toAddress().toString()))
+          : await this.oneSatSPV.search(new TxoLookup('bsv20', 'tick', idOrTick, ordPk.toAddress().toString()));
 
-      const fundingUtxos = await this.wocService.getAndUpdateUtxoStorage(fundingAndChangeAddress);
-
-      if (!fundingUtxos || fundingUtxos.length === 0) {
+      const tokenUtxos: TokenUtxo[] = [];
+      let tokensIn = 0n;
+      let token: Bsv20Type | Bsv21Type | undefined;
+      for (const tokenUtxo of utxos.txos) {
+        if (tokensIn >= amount) break;
+        if (tokenUtxo.data?.list || !tokenUtxo.data.bsv21?.data) continue;
+        token = tokenUtxo.data.bsv21.data as Bsv20Type | Bsv21Type;
+        const t: TokenUtxo = {
+          id: tokenType === TokenType.BSV21 ? (token as Bsv21Type).id : (token as Bsv20Type).tick,
+          txid: tokenUtxo.outpoint.txid,
+          vout: tokenUtxo.outpoint.vout,
+          satoshis: 1,
+          script: Buffer.from(tokenUtxo.script).toString('base64'),
+          amt: token.amt.toString(),
+        };
+        tokenUtxos.push(t);
+        tokensIn += token.amt;
+      }
+      if (tokensIn < amount) {
         return { error: 'insufficient-funds' };
       }
 
-      const tokenDetails = await this.gorillaPoolService.getBsv20Details(id);
+      const { tx } = await transferOrdTokens({
+        distributions: [{ address: destinationAddress, tokens: Number(amount) }],
+        inputTokens: tokenUtxos,
+        decimals: 0,
+        tokenID: idOrTick,
+        protocol: tokenType,
+        utxos: fundingUtxos.map((t) => ({
+          txid: t.outpoint.txid,
+          vout: t.outpoint.vout,
+          satoshis: Number(t.satoshis),
+          script: Buffer.from(t.script).toString('base64'),
+        })),
+        ordPk,
+        paymentPk,
+      });
 
-      if (!tokenDetails) {
-        return { error: 'token-details' };
+      const response = await this.oneSatSPV.broadcast(tx);
+      if (response?.txid) {
+        return { txid: response.txid };
       }
 
-      const bsv20Utxos = await this.gorillaPoolService.getBSV20Utxos(id, ordinalAddress);
-
-      if (!bsv20Utxos || bsv20Utxos.length === 0) throw Error('no-bsv20-utxo');
-
-      const isV2 = isBSV20v2(id);
-
-      //TODO: should consider updating this to only use what is required for the amount.
-      const tokenTotalAmt = bsv20Utxos.reduce((a, item) => {
-        return a + BigInt(item.amt);
-      }, 0n);
-
-      if (amount > tokenTotalAmt) {
-        return { error: 'insufficient-funds' };
-      }
-
-      const tokenChangeAmt = tokenTotalAmt - amount;
-
-      const tx = new Transaction(1, 0);
-      tx.add_output(
-        new TxOut(
-          1n,
-          isV2
-            ? createTransferV2P2PKH(destinationAddress, id, amount)
-            : createTransferP2PKH(destinationAddress, id, amount),
-        ),
-      );
-
-      if (tokenChangeAmt > 0n) {
-        indexFee += BSV20_INDEX_FEE;
-        tx.add_output(
-          new TxOut(
-            1n,
-            isV2
-              ? createTransferV2P2PKH(ordinalAddress, id, tokenChangeAmt)
-              : createTransferP2PKH(ordinalAddress, id, tokenChangeAmt),
-          ),
-        );
-      }
-
-      tx.add_output(
-        new TxOut(BigInt(indexFee), P2PKHAddress.from_string(tokenDetails.fundAddress).get_locking_script()),
-      );
-
-      const fundingUtxo = this.wocService.getSuitableUtxo(fundingUtxos, FEE_SATS + indexFee);
-      const totalInputSats = fundingUtxo.satoshis;
-      const change = totalInputSats - 1 - FEE_SATS - indexFee;
-
-      if (change > 0) {
-        tx.add_output(
-          new TxOut(BigInt(change), P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script()),
-        );
-      }
-
-      let idx = 0;
-      for (const u of bsv20Utxos || []) {
-        if (!u?.script) throw Error('No script');
-        const script = Script.from_bytes(Buffer.from(u.script, 'base64'));
-        const inTx = new TxIn(Buffer.from(u.txid, 'hex'), u.vout, Script.from_hex(''));
-        inTx.set_satoshis(BigInt(1));
-        inTx.set_locking_script(script);
-        tx.add_input(inTx);
-
-        const sig = tx.sign(ordPk, SigHash.InputOutputs, idx, script, BigInt(1));
-
-        inTx.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${ordPk.to_public_key().to_hex()}`));
-
-        tx.set_input(idx, inTx);
-        idx++;
-      }
-
-      const inTx = new TxIn(Buffer.from(fundingUtxo.txid, 'hex'), fundingUtxo.vout, Script.from_hex(''));
-      inTx.set_satoshis(BigInt(fundingUtxo.satoshis));
-      const fundingScript = Script.from_hex(fundingUtxo.script);
-      inTx.set_locking_script(fundingScript);
-      tx.add_input(inTx);
-
-      const sig = tx.sign(paymentPk, SigHash.InputOutputs, idx, fundingScript, BigInt(fundingUtxo.satoshis));
-
-      inTx.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
-      tx.set_input(idx, inTx);
-
-      // Fee checker
-      const finalSatsIn = tx.satoshis_in() ?? 0n;
-      const finalSatsOut = tx.satoshis_out() ?? 0n;
-      if (finalSatsIn - finalSatsOut > MAX_FEE_PER_TX) return { error: 'fee-too-high' };
-
-      const txhex = tx.to_hex();
-      const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(txhex);
-      if (!txid) return { error: 'broadcast-transaction-failed' };
-      return { txid };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      console.error('sendBSV20 failed:', error);
-      return { error: error.message ?? 'unknown' };
+      return { error: 'broadcast-failed' };
+    } catch (error) {
+      console.error('transferOrdinal failed:', error);
+      return { error: JSON.stringify(error) };
     }
   };
 
@@ -347,135 +290,51 @@ export class OrdinalService {
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
 
-      const fundingAndChangeAddress = this.keysService.bsvAddress;
-      const paymentPk = PrivateKey.from_wif(keys.walletWif);
-      const ordPk = PrivateKey.from_wif(keys.ordWif);
+      const paymentPk = PrivateKey.fromWif(keys.walletWif);
+      const ordPk = PrivateKey.fromWif(keys.ordWif);
 
-      const paymentUtxos = await this.wocService.getAndUpdateUtxoStorage(fundingAndChangeAddress);
-
-      if (!paymentUtxos.length) {
-        throw new Error('Could not retrieve paymentUtxos');
-      }
-
-      const totalSats = paymentUtxos.reduce((a: number, utxo: UTXO) => a + utxo.satoshis, 0);
-
-      if (totalSats < FEE_SATS) {
-        return { error: 'insufficient-funds' };
-      }
-
-      const paymentUtxo = this.wocService.getSuitableUtxo(paymentUtxos, FEE_SATS);
-
-      const ordUtxo = await this.gorillaPoolService.getUtxoByOutpoint(outpoint);
-
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+      const ordUtxo = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
       if (!ordUtxo) return { error: 'no-ord-utxo' };
 
-      const rawTx = await this.listOrdinal(
-        paymentUtxo,
-        ordUtxo,
-        paymentPk,
-        fundingAndChangeAddress,
+      const { tx } = await createOrdListings({
         ordPk,
-        this.keysService.ordAddress,
-        fundingAndChangeAddress,
-        Number(price),
-      );
+        paymentPk,
+        utxos: fundResults.txos.map((t) => ({
+          txid: t.outpoint.txid,
+          vout: t.outpoint.vout,
+          satoshis: Number(t.satoshis),
+          script: Buffer.from(t.script).toString('base64'),
+        })),
+        listings: [
+          {
+            listingUtxo: {
+              txid: ordUtxo.outpoint.txid,
+              vout: ordUtxo.outpoint.vout,
+              satoshis: Number(ordUtxo.satoshis),
+              script: Buffer.from(ordUtxo.script).toString('base64'),
+            },
+            price: Number(price),
+            payAddress: this.keysService.bsvAddress,
+            ordAddress: this.keysService.ordAddress,
+          },
+        ],
+      });
 
-      const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
-      if (!txid) return { error: 'broadcast-error' };
-      return { txid };
-    } catch (error) {
+      const response = await this.oneSatSPV.broadcast(tx);
+      if (response?.txid) {
+        return { txid: response.txid };
+      }
+
+      return { error: 'broadcast-failed' };
+    } catch (error: any) {
       console.log(error);
+      if (error.message?.includes('Not enough funds')) return { error: 'insufficient-funds' };
       return { error: JSON.stringify(error) };
     }
   };
 
-  createChangeOutput(tx: Transaction, changeAddress: string, paymentSatoshis: number) {
-    const changeaddr = P2PKHAddress.from_string(changeAddress);
-    const changeScript = changeaddr.get_locking_script();
-    const emptyOut = new TxOut(BigInt(1), changeScript);
-    const fee = Math.ceil(FEE_PER_BYTE * (tx.get_size() + emptyOut.to_bytes().byteLength));
-    const change = paymentSatoshis - fee;
-    const changeOut = new TxOut(BigInt(change), changeScript);
-    return changeOut;
-  }
-
-  async listOrdinal(
-    paymentUtxo: UTXO,
-    ordinal: Ordinal,
-    paymentPk: PrivateKey,
-    changeAddress: string,
-    ordPk: PrivateKey,
-    ordAddress: string,
-    payoutAddress: string,
-    satoshisPayout: number,
-  ) {
-    const tx = new Transaction(1, 0);
-    const t = ordinal.txid;
-    const txBuf = Buffer.from(t, 'hex');
-    const ordIn = new TxIn(txBuf, ordinal.vout, Script.from_hex(''));
-    tx.add_input(ordIn);
-
-    const utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_hex(''));
-
-    tx.add_input(utxoIn);
-
-    const payoutDestinationAddress = P2PKHAddress.from_string(payoutAddress);
-    const payOutput = new TxOut(BigInt(satoshisPayout), payoutDestinationAddress.get_locking_script());
-
-    const destinationAddress = P2PKHAddress.from_string(ordAddress);
-    const addressHex = destinationAddress.get_locking_script().to_asm_string().split(' ')[2];
-
-    const ordLockScript = `${Script.from_hex(
-      SCRYPT_PREFIX,
-    ).to_asm_string()} ${addressHex} ${payOutput.to_hex()} ${Script.from_hex(O_LOCK_SUFFIX).to_asm_string()}`;
-
-    const satOut = new TxOut(BigInt(1), Script.from_asm_string(ordLockScript));
-    tx.add_output(satOut);
-
-    const changeOut = this.createChangeOutput(tx, changeAddress, paymentUtxo.satoshis);
-    tx.add_output(changeOut);
-
-    if (!ordinal.script) {
-      const ordRawTxHex = await this.wocService.getRawTxById(ordinal.txid);
-      if (!ordRawTxHex) throw new Error('Could not get raw hex');
-      const tx = Transaction.from_hex(ordRawTxHex);
-      const out = tx.get_output(ordinal.vout);
-      ordinal.satoshis = Number(out?.get_satoshis());
-
-      const script = out?.get_script_pub_key();
-      if (script) {
-        ordinal.script = script.to_hex();
-      }
-    }
-
-    if (!ordinal.script) throw new Error('Script not found');
-
-    const sig = tx.sign(
-      ordPk,
-      SigHash.ALL | SigHash.FORKID,
-      0,
-      Script.from_hex(ordinal.script),
-      BigInt(ordinal.satoshis),
-    );
-
-    ordIn.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${ordPk.to_public_key().to_hex()}`));
-
-    tx.set_input(0, ordIn);
-
-    const sig2 = tx.sign(
-      paymentPk,
-      SigHash.ALL | SigHash.FORKID,
-      1,
-      P2PKHAddress.from_string(payoutAddress).get_locking_script(),
-      BigInt(paymentUtxo.satoshis),
-    );
-
-    utxoIn.set_unlocking_script(Script.from_asm_string(`${sig2.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
-    tx.set_input(1, utxoIn);
-    return tx.to_hex();
-  }
-
-  async cancelGlobalOrderbookListing(outpoint: string, password: string): Promise<OrdOperationResponse> {
+  cancelGlobalOrderbookListing = async (outpoint: string, password: string): Promise<OrdOperationResponse> => {
     try {
       const isAuthenticated = await this.keysService.verifyPassword(password);
       if (!isAuthenticated) {
@@ -484,75 +343,45 @@ export class OrdinalService {
       const keys = await this.keysService.retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
-      const fundingAndChangeAddress = this.keysService.bsvAddress;
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
 
-      const paymentUtxos = await this.wocService.getAndUpdateUtxoStorage(fundingAndChangeAddress);
+      const paymentPk = PrivateKey.fromWif(keys.walletWif);
+      const ordPk = PrivateKey.fromWif(keys.ordWif);
 
-      if (!paymentUtxos.length) {
-        throw new Error('Could not retrieve paymentUtxos');
-      }
+      const listingUtxo = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
+      if (!listingUtxo) return { error: 'no-ord-utxo' };
 
-      const paymentUtxo = this.wocService.getSuitableUtxo(paymentUtxos, FEE_SATS);
-
-      const paymentPk = PrivateKey.from_wif(keys.walletWif);
-      const ordinalPk = PrivateKey.from_wif(keys.ordWif);
-
-      const listingTxid = outpoint.split('_')[0];
-      if (!listingTxid) {
-        throw new Error('No listing txid');
-      }
-
-      const cancelTx = new Transaction(1, 0);
-
-      const { script } = await this.gorillaPoolService.getMarketData(outpoint);
-
-      const ordIn = new TxIn(Buffer.from(listingTxid, 'hex'), 0, Script.from_hex(''));
-      cancelTx.add_input(ordIn);
-
-      const utxoIn = new TxIn(Buffer.from(paymentUtxo.txid, 'hex'), paymentUtxo.vout, Script.from_hex(''));
-      cancelTx.add_input(utxoIn);
-
-      const destinationAddress = P2PKHAddress.from_string(this.keysService.ordAddress);
-      const satOut = new TxOut(BigInt(1), destinationAddress.get_locking_script());
-      cancelTx.add_output(satOut);
-
-      const changeOut = this.createChangeOutput(cancelTx, fundingAndChangeAddress, paymentUtxo.satoshis);
-      cancelTx.add_output(changeOut);
-
-      // sign listing to cancel
-      const sig = cancelTx.sign(
-        ordinalPk,
-        SigHash.SINGLE | SigHash.ANYONECANPAY | SigHash.FORKID,
-        0,
-        Script.from_bytes(Buffer.from(script, 'base64')),
-        BigInt(1),
-      );
-
-      ordIn.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${ordinalPk.to_public_key().to_hex()} OP_1`));
-
-      cancelTx.set_input(0, ordIn);
-
-      const sig2 = cancelTx.sign(
+      const { tx } = await cancelOrdListings({
+        ordPk,
         paymentPk,
-        SigHash.ALL | SigHash.FORKID,
-        1,
-        P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script(),
-        BigInt(paymentUtxo.satoshis),
-      );
+        utxos: fundResults.txos.map((t) => ({
+          txid: t.outpoint.txid,
+          vout: t.outpoint.vout,
+          satoshis: Number(t.satoshis),
+          script: Buffer.from(t.script).toString('base64'),
+        })),
+        listingUtxos: [
+          {
+            txid: listingUtxo.outpoint.txid,
+            vout: listingUtxo.outpoint.vout,
+            satoshis: Number(listingUtxo.satoshis),
+            script: Buffer.from(listingUtxo.script).toString('base64'),
+          },
+        ],
+      });
 
-      utxoIn.set_unlocking_script(Script.from_asm_string(`${sig2.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
+      const response = await this.oneSatSPV.broadcast(tx);
+      if (response?.txid) {
+        return { txid: response.txid };
+      }
 
-      cancelTx.set_input(1, utxoIn);
-      const rawTx = cancelTx.to_hex();
-
-      const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
-      if (!txid) return { error: 'broadcast-error' };
-      return { txid };
-    } catch (error) {
+      return { error: 'broadcast-failed' };
+    } catch (error: any) {
       console.log(error);
+      if (error.message?.includes('Not enough funds')) return { error: 'insufficient-funds' };
       return { error: JSON.stringify(error) };
     }
-  }
+  };
 
   purchaseGlobalOrderbookListing = async (purchaseOrdinal: PurchaseOrdinal & { password: string }) => {
     try {
@@ -564,145 +393,65 @@ export class OrdinalService {
       const keys = await this.keysService.retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
-      const fundingAndChangeAddress = this.keysService.bsvAddress;
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
 
-      const fundingUtxos = await this.wocService.getAndUpdateUtxoStorage(fundingAndChangeAddress);
+      const paymentPk = PrivateKey.fromWif(keys.walletWif);
 
-      if (!fundingUtxos.length) {
-        throw new Error('Could not retrieve funding UTXOs');
+      const listingTxo = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
+      if (!listingTxo) return { error: 'no-ord-utxo' };
+
+      if (!listingTxo?.data.list) {
+        return { error: 'no-listing-data' };
       }
 
-      const payPk = PrivateKey.from_wif(keys.walletWif);
-      const listing = await this.gorillaPoolService.getUtxoByOutpoint(outpoint);
-      const price = Number(listing.data?.list?.price);
-      const payout = listing.data?.list?.payout;
+      const price = Number(listingTxo.data?.list?.data.price);
+      const payout = listingTxo.data?.list?.data.payout;
+      if (!payout) return { error: 'bad-listing' };
 
-      if (!price || !payout) throw Error('Missing information!');
-      let satsIn = 0;
-      let satsOut = 0;
-
-      const purchaseTx = new Transaction(1, 0);
-
-      const listingInput = new TxIn(Buffer.from(listing.txid, 'hex'), listing.vout, Script.from_hex(''));
-      purchaseTx.add_input(listingInput);
-      satsIn += listing.satoshis;
-
-      // output 0
-      const buyerOutput = new TxOut(
-        BigInt(1),
-        P2PKHAddress.from_string(this.keysService.ordAddress).get_locking_script(),
-      );
-      purchaseTx.add_output(buyerOutput);
-      satsOut += 1;
-
-      // output 1
-      const payOutput = TxOut.from_hex(Buffer.from(payout, 'base64').toString('hex'));
-      purchaseTx.add_output(payOutput);
-      satsOut += price;
-
-      // output 2 - change
-      const dummyChangeOutput = new TxOut(
-        BigInt(0),
-        P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script(),
-      );
-      purchaseTx.add_output(dummyChangeOutput);
-
-      // output 3 - marketFee
+      const additionalPayments: { to: string; amount: number }[] = [];
       const marketFee = Math.ceil(price * (marketplaceRate ?? 0));
-      const dummyMarketFeeOutput = new TxOut(
-        BigInt(marketFee),
-        P2PKHAddress.from_string(marketplaceAddress ?? '').get_locking_script(),
-      );
-      purchaseTx.add_output(dummyMarketFeeOutput);
-      satsOut += marketFee;
 
-      const listingScript = listing.script;
-      if (!listingScript) throw Error('No listing script');
-      let preimage = purchaseTx.sighash_preimage(
-        SigHash.InputOutput,
-        0,
-        Script.from_bytes(Buffer.from(listingScript, 'hex')),
-        BigInt(1), //TODO: use amount from listing
-      );
-
-      listingInput.set_unlocking_script(
-        Script.from_asm_string(
-          `${purchaseTx.get_output(0)?.to_hex()} ${purchaseTx.get_output(2)?.to_hex()}${purchaseTx
-            .get_output(3)
-            ?.to_hex()} ${Buffer.from(preimage).toString('hex')} OP_0`,
-        ),
-      );
-      purchaseTx.set_input(0, listingInput);
-
-      let size = purchaseTx.to_bytes().length + P2PKH_INPUT_SIZE + P2PKH_OUTPUT_SIZE;
-      let fee = Math.ceil(size * FEE_PER_BYTE);
-      const inputs: UTXO[] = [];
-      while (satsIn < satsOut + fee) {
-        const utxo = fundingUtxos.pop();
-        if (!utxo) {
-          return { error: 'insufficient-funds' };
-        }
-        const fundingInput = new TxIn(Buffer.from(utxo.txid, 'hex'), utxo.vout, Script.from_hex(utxo.script));
-        purchaseTx.add_input(fundingInput);
-        inputs.push(utxo);
-        satsIn += utxo.satoshis;
-        size += P2PKH_INPUT_SIZE;
-        fee = Math.ceil(size * FEE_PER_BYTE);
+      if (marketFee > 0) {
+        additionalPayments.push({
+          to: marketplaceAddress ?? '',
+          amount: marketFee,
+        });
       }
-
-      const changeAmt = satsIn - (satsOut + fee);
-      const changeOutput = new TxOut(
-        BigInt(changeAmt),
-        P2PKHAddress.from_string(fundingAndChangeAddress).get_locking_script(),
-      );
-
-      purchaseTx.set_output(2, changeOutput);
-
-      preimage = purchaseTx.sighash_preimage(
-        SigHash.InputOutputs,
-        0,
-        Script.from_bytes(Buffer.from(listingScript, 'hex')),
-        BigInt(1),
-      );
-
-      listingInput.set_unlocking_script(
-        Script.from_asm_string(
-          `${purchaseTx.get_output(0)?.to_hex()} ${purchaseTx.get_output(2)?.to_hex()}${purchaseTx
-            .get_output(3)
-            ?.to_hex()} ${Buffer.from(preimage).toString('hex')} OP_0`,
-        ),
-      );
-      purchaseTx.set_input(0, listingInput);
-
-      inputs.forEach((utxo, idx) => {
-        const fundingInput = purchaseTx.get_input(idx + 1);
-        const sig = purchaseTx.sign(
-          payPk,
-          SigHash.InputOutputs,
-          1 + idx,
-          Script.from_hex(utxo.script),
-          BigInt(utxo.satoshis),
-        );
-
-        if (!fundingInput) throw Error('No funding input');
-
-        fundingInput.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${payPk.to_public_key().to_hex()}`));
-
-        purchaseTx.set_input(1 + idx, fundingInput);
+      const { tx } = await purchaseOrdListing({
+        ordAddress: this.keysService.ordAddress,
+        paymentPk,
+        utxos: fundResults.txos.map((t) => ({
+          txid: t.outpoint.txid,
+          vout: t.outpoint.vout,
+          satoshis: Number(t.satoshis),
+          script: Buffer.from(t.script).toString('base64'),
+        })),
+        listing: {
+          payout: payout,
+          listingUtxo: {
+            txid: listingTxo.outpoint.txid,
+            vout: listingTxo.outpoint.vout,
+            satoshis: Number(listingTxo.satoshis),
+            script: Buffer.from(listingTxo.script).toString('base64'),
+          },
+        },
+        additionalPayments,
       });
 
-      const rawTx = purchaseTx.to_hex();
+      const response = await this.oneSatSPV.broadcast(tx);
+      if (response?.txid) {
+        return { txid: response.txid };
+      }
 
-      const broadcastRes = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
-      if (!broadcastRes.txid) return { error: 'broadcast-error' };
-      return { txid: broadcastRes.txid };
-    } catch (error) {
+      return { error: 'broadcast-failed' };
+    } catch (error: any) {
       console.log(error);
+      if (error.message?.includes('Not enough funds')) return { error: 'insufficient-funds' };
       return { error: JSON.stringify(error) };
     }
   };
 
-  getTokenName(b: Bsv20): string {
-    return b.sym || b.tick || 'Null';
+  getTokenName(b: Bsv20 | Bsv21): string {
+    return (b as Bsv21).sym || (b as Bsv20).tick || 'Null';
   }
 }

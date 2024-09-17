@@ -33,12 +33,12 @@ export type ListOrdinal = {
   password: string;
 };
 
-export interface BSV20Data {
-  initialized: boolean;
-  data: Bsv20[];
-}
+// export interface BSV20Data {
+//   initialized: boolean;
+//   data: Bsv20[];
+// }
 
-export interface OrdinalData {
-  initialized: boolean;
-  data: Ordinal[];
-}
+// export interface OrdinalData {
+//   initialized: boolean;
+//   data: Ordinal[];
+// }

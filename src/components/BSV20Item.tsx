@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import styled from 'styled-components';
-import { Theme } from '../theme';
+import { Theme } from '../theme.types';
 import { GP_BASE_URL } from '../utils/constants';
 import { HeaderText, Text } from './Reusable';
 import { Show } from './Show';

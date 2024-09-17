@@ -1,8 +1,7 @@
-// IMPORTANT NOTE: Uncomment everything that is commented back out to re-enable the sponser page should it ever make sense
+// IMPORTANT TODO NOTE: Uncomment everything that is commented back out to re-enable the sponser page should it ever make sense
 
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import externalLink from '../assets/external-link.svg';
 import { Button } from '../components/Button';
 import { ForwardButton as RightChevron } from '../components/ForwardButton';
 import { PageLoader } from '../components/PageLoader';
@@ -14,14 +13,15 @@ import { SettingsRow as AppsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useTheme } from '../hooks/useTheme';
-import { ColorThemeProps } from '../theme';
+import { ColorThemeProps } from '../theme.types';
 // import { BSV_DECIMAL_CONVERSION, YOURS_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
-import { BSV_DECIMAL_CONVERSION, featuredApps, YOURS_GITHUB_REPOS, YOURS_GITHUB_REPO } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, featuredApps } from '../utils/constants';
 import { truncate } from '../utils/format';
 // import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { Ordinal } from 'yours-wallet-provider';
+import { Txo } from 'spv-store';
+import { FaExternalLinkAlt } from 'react-icons/fa';
 
 const Content = styled.div`
   display: flex;
@@ -98,12 +98,6 @@ const DiscoverAppsText = styled(Text)<ColorThemeProps>`
   text-align: left;
 `;
 
-const ExternalLinkIcon = styled.img`
-  width: 1.25rem;
-  height: 1.25rem;
-  cursor: pointer;
-`;
-
 const LockDetailsContainer = styled.div`
   display: flex;
   align-items: center;
@@ -127,31 +121,22 @@ type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unloc
 export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { setSelected, query } = useBottomMenu();
-  const { keysService, gorillaPoolService, wocService } = useServiceContext();
+  const { keysService, bsvService } = useServiceContext();
   // const { exchangeRate, identityAddress } = useBsv();
   const { identityAddress } = keysService;
-  const { getLockedBsvUtxos, getSpentTxids } = gorillaPoolService;
-  const { getChainInfo } = wocService;
   const [isProcessing, setIsProcessing] = useState(false);
   const [page, setPage] = useState<AppsPage>(query === 'pending-locks' ? 'unlock' : 'main');
   // const [otherIsSelected, setOtherIsSelected] = useState(false);
   // const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   // const [satAmount, setSatAmount] = useState(0);
   // const [didSubmit, setDidSubmit] = useState(false);
-  const [lockedUtxos, setLockedUtxos] = useState<Ordinal[]>([]);
+  const [lockedUtxos, setLockedUtxos] = useState<Txo[]>([]);
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
 
   const getLockData = async () => {
     setIsProcessing(true);
-    if (!identityAddress) throw Error('Identity address missing!');
-    const chainInfo = await getChainInfo();
-    let lockedTxos = await getLockedBsvUtxos(identityAddress);
-    const blockHeight = Number(chainInfo?.blocks);
-    if (blockHeight) setCurrentBlockHeight(blockHeight);
-    const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
-    const spentTxids = await getSpentTxids(outpoints);
-    lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
-    if (lockedTxos.length > 0) setLockedUtxos(lockedTxos);
+    setCurrentBlockHeight(await bsvService.getCurrentHeight());
+    setLockedUtxos(await bsvService.getLockedTxos());
     setIsProcessing(false);
   };
 
@@ -186,23 +171,27 @@ export const AppsAndTools = () => {
         onClick={() => setPage('sponsor')}
         jsxElement={<RightChevron />}
       /> */}
-      <AppsRow
-        name="Pending Locks"
-        description="View the pending coins you've locked"
-        onClick={() => setPage('unlock')}
-        jsxElement={<RightChevron />}
-      />
-      <AppsRow
-        name="Discover Apps"
-        description="Meet the apps using Yours Wallet"
-        onClick={() => setPage('discover-apps')}
-        jsxElement={<RightChevron />}
-      />
+      <Show when={theme.settings.services.locks}>
+        <AppsRow
+          name="Pending Locks"
+          description="View the pending coins you've locked"
+          onClick={() => setPage('unlock')}
+          jsxElement={<RightChevron color={theme.white} />}
+        />
+      </Show>
+      <Show when={theme.settings.services.apps}>
+        <AppsRow
+          name="Discover Apps"
+          description={`Meet the apps using ${theme.settings.walletName} Wallet`}
+          onClick={() => setPage('discover-apps')}
+          jsxElement={<RightChevron color={theme.white} />}
+        />
+      </Show>
       <AppsRow
         name="Contribute or integrate"
         description="All the tools you need to get involved"
-        onClick={() => window.open(YOURS_GITHUB_REPO, '_blank')}
-        jsxElement={<ExternalLinkIcon src={externalLink} />}
+        onClick={() => window.open(theme.settings.repo, '_blank')}
+        jsxElement={<FaExternalLinkAlt color={theme.white} size={'1rem'} style={{ margin: '0.5rem' }} />}
       />
     </>
   );
@@ -228,21 +217,21 @@ export const AppsAndTools = () => {
       </HeaderText>
       {headerLockDetailsRow}
       {lockedUtxos
-        .sort((a, b) => Number(a.data?.lock?.until) - Number(b.data?.lock?.until))
+        .sort((a, b) => Number(a.data.lock?.data.until) - Number(b.data.lock?.data.until))
         .map((u) => {
-          const blocksRemaining = Number(u.data?.lock?.until) - currentBlockHeight;
+          const blocksRemaining = Number(u.data.lock?.data.until) - currentBlockHeight;
           return (
-            <LockDetailsContainer key={u.txid}>
+            <LockDetailsContainer key={u.outpoint.txid}>
               <LockDetailsText style={{ textAlign: 'left' }} theme={theme}>
-                {truncate(u.txid, 4, 4)}
+                {truncate(u.outpoint.txid, 4, 4)}
               </LockDetailsText>
               <LockDetailsText style={{ textAlign: 'center' }} theme={theme}>
                 {blocksRemaining < 0 ? '0' : blocksRemaining}
               </LockDetailsText>
               <LockDetailsText style={{ textAlign: 'right' }} theme={theme}>
                 {u.satoshis < 1000
-                  ? `${u.satoshis} ${u.satoshis > 1 ? 'sats' : 'sat'}`
-                  : `${u.satoshis / BSV_DECIMAL_CONVERSION} BSV`}
+                  ? `${u.satoshis} ${u.satoshis > 1n ? 'sats' : 'sat'}`
+                  : `${Number(u.satoshis) / BSV_DECIMAL_CONVERSION} BSV`}
               </LockDetailsText>
             </LockDetailsContainer>
           );
@@ -262,7 +251,7 @@ export const AppsAndTools = () => {
       <Show when={featuredApps.length > 0} whenFalseContent={<Text theme={theme}>No apps</Text>}>
         <Text theme={theme} style={{ marginBottom: 0 }}>
           If your app has integrated Yours Wallet but is not listed,{' '}
-          <a href={YOURS_GITHUB_REPOS} rel="noreferrer" target="_blank" style={{ color: theme.white }}>
+          <a href={theme.settings.repo} rel="noreferrer" target="_blank" style={{ color: theme.white }}>
             let us know!
           </a>
         </Text>
@@ -274,7 +263,7 @@ export const AppsAndTools = () => {
                   <AppIcon src={app.icon} />
                   <DiscoverAppsText theme={theme}>{app.name}</DiscoverAppsText>
                 </ImageAndDomain>
-                <ExternalLinkIcon src={externalLink} />
+                <FaExternalLinkAlt color={theme.white} size={'1rem'} style={{ margin: '0.5rem' }} />
               </DiscoverAppsRow>
             );
           })}

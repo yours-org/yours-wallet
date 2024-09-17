@@ -1,23 +1,23 @@
-import axios from 'axios';
-import { P2PKHAddress, Script, SigHash, Transaction, TxIn, TxOut } from 'bsv-wasm-web';
 import { NetWork } from 'yours-wallet-provider';
 import {
   DEFAULT_RELAYX_ORD_PATH,
   DEFAULT_TWETCH_WALLET_PATH,
-  FEE_PER_BYTE,
-  SWEEP_PATH,
   DEFAULT_ACCOUNT,
+  MAINNET_ADDRESS_PREFIX,
+  TESTNET_ADDRESS_PREFIX,
+  SWEEP_PATH,
+  FEE_PER_KB,
+  WOC_BASE_URL,
 } from '../utils/constants';
 import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto';
 import { generateKeysFromTag, getKeys, getKeysFromWifs, Keys } from '../utils/keys';
-import { isAddressOnRightNetwork } from '../utils/tools';
 import { ChromeStorageService } from './ChromeStorage.service';
-import { GorillaPoolService } from './GorillaPool.service';
-import { getChainParams } from './serviceHelpers';
 import { Account, ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
+import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction, Utils } from '@bsv/sdk';
+import { SPVStore } from 'spv-store';
 import { WocUtxo } from './types/whatsOnChain.types';
-import { WhatsOnChainService } from './WhatsOnChain.service';
+import axios from 'axios';
 
 export class KeysService {
   bsvAddress: string;
@@ -27,9 +27,8 @@ export class KeysService {
   ordPubKey: string;
   identityPubKey: string;
   constructor(
-    private readonly gorillaPoolService: GorillaPoolService,
-    private readonly wocService: WhatsOnChainService,
     private readonly chromeStorageService: ChromeStorageService,
+    private readonly oneSatSPV: SPVStore,
   ) {
     this.bsvAddress = '';
     this.ordAddress = '';
@@ -104,6 +103,8 @@ export class KeysService {
         ordDerivation = DEFAULT_RELAYX_ORD_PATH;
         break;
       case 'twetch':
+        identityDerivation = DEFAULT_TWETCH_WALLET_PATH;
+        ordDerivation = DEFAULT_TWETCH_WALLET_PATH;
         walletDerivation = DEFAULT_TWETCH_WALLET_PATH;
         break;
     }
@@ -114,46 +115,39 @@ export class KeysService {
     }
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
     await this.storeEncryptedKeys(passKey, salt, keys, encryptedKeys, network);
-    return keys.mnemonic;
+    return keys;
   };
 
   sweepLegacy = async (keys: Keys) => {
-    const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
-    const network = this.chromeStorageService.getNetwork();
-    if (!isAddressOnRightNetwork(network, sweepWallet.address)) return;
-    const { data } = await axios.get<WocUtxo[]>(
-      `${this.wocService.getBaseUrl(network)}/address/${sweepWallet.address}/unspent`,
-    );
-    const utxos = data;
-    if (utxos.length === 0) return;
-    const tx = new Transaction(1, 0);
-    const changeAddress = P2PKHAddress.from_string(sweepWallet.address);
+    try {
+      const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
+      const tx = new Transaction();
+      const outScript = new P2PKH().lock(keys.walletAddress);
+      tx.addOutput({ lockingScript: outScript, change: true });
 
-    let satsIn = 0;
-    utxos.forEach((utxo: WocUtxo, vin: number) => {
-      const txin = new TxIn(Buffer.from(utxo.tx_hash, 'hex'), utxo.tx_pos, Script.from_hex(''));
-      tx.add_input(txin);
-      satsIn += utxo.value;
-      const sig = tx.sign(
-        sweepWallet.privKey,
-        SigHash.Input,
-        vin,
-        changeAddress.get_locking_script(),
-        BigInt(utxo.value),
-      );
-      const asm = `${sig.to_hex()} ${sweepWallet.pubKey.to_hex()}`;
-      txin?.set_unlocking_script(Script.from_asm_string(asm));
-      tx.set_input(vin, txin);
-    });
-
-    const size = tx.to_bytes().length + 34;
-    const fee = Math.ceil(size * FEE_PER_BYTE);
-    const changeAmount = satsIn - fee;
-    tx.add_output(new TxOut(BigInt(changeAmount), P2PKHAddress.from_string(keys.walletAddress).get_locking_script()));
-
-    const rawTx = tx.to_hex();
-    const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawTx);
-    console.log('Change sweep:', txid);
+      const { data } = await axios.get<WocUtxo[]>(`${WOC_BASE_URL}/address/${sweepWallet.address}/unspent`);
+      const utxos = data;
+      if (utxos.length === 0) return;
+      const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+      for await (const u of utxos || []) {
+        tx.addInput({
+          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash),
+          sourceOutputIndex: u.tx_pos,
+          sequence: 0xffffffff,
+          unlockingScriptTemplate: new P2PKH().unlock(sweepWallet.privKey),
+        });
+      }
+      await tx.fee(feeModel);
+      await tx.sign();
+      const response = await this.oneSatSPV.broadcast(tx);
+      if (response.status == 'error') return { error: response.description };
+      const txid = tx.id('hex');
+      console.log('Change sweep:', txid);
+      return { txid, rawtx: Utils.toHex(tx.toBinary()) };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.log(error);
+    }
   };
 
   generateKeysFromWifAndStoreEncrypted = async (password: string, wifs: WifKeys, isNewWallet: boolean) => {
@@ -176,13 +170,13 @@ export class KeysService {
       const d = decrypt(encryptedKeys, passKey);
       const keys: Keys = JSON.parse(d);
 
-      const walletAddr = P2PKHAddress.from_string(keys.walletAddress)
-        .set_chain_params(getChainParams(account.network))
-        .to_string();
+      const walletAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.walletAddress).data as number[], [
+        account.network === NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+      ]);
 
-      const ordAddr = P2PKHAddress.from_string(keys.ordAddress)
-        .set_chain_params(getChainParams(account.network))
-        .to_string();
+      const ordAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.ordAddress).data as number[], [
+        account.network === NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+      ]);
 
       this.bsvAddress = walletAddr;
       this.ordAddress = ordAddr;
@@ -191,9 +185,9 @@ export class KeysService {
 
       // identity address not available with wif or 1sat import
       if (keys.identityAddress) {
-        const identityAddr = P2PKHAddress.from_string(keys.identityAddress)
-          .set_chain_params(getChainParams(account.network))
-          .to_string();
+        const identityAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.identityAddress).data as number[], [
+          account.network === NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+        ]);
 
         this.identityAddress = identityAddr;
         this.identityPubKey = keys.identityPubKey;
@@ -219,6 +213,18 @@ export class KeysService {
       console.error('Error in retrieveKeys:', error);
       throw new Error('Failed to retrieve keys');
     }
+  };
+
+  retrievePrivateKeyMap = async (
+    password?: string,
+    isBelowNoApprovalLimit?: boolean,
+  ): Promise<Map<string, PrivateKey>> => {
+    const keys = await this.retrieveKeys(password, isBelowNoApprovalLimit);
+    const pkMap = new Map<string, PrivateKey>();
+    if (keys.walletAddress && keys.walletWif) pkMap.set(keys.walletAddress, PrivateKey.fromWif(keys.walletWif));
+    if (keys.ordAddress && keys.ordWif) pkMap.set(keys.ordAddress, PrivateKey.fromWif(keys.ordWif));
+    if (keys.identityAddress && keys.identityWif) pkMap.set(keys.identityAddress, PrivateKey.fromWif(keys.identityWif));
+    return pkMap;
   };
 
   verifyPassword = async (password: string): Promise<boolean> => {

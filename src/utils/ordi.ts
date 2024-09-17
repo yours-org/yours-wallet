@@ -1,4 +1,4 @@
-import { P2PKHAddress, Script } from 'bsv-wasm-web';
+import { P2PKH, Script, Utils } from '@bsv/sdk';
 
 export const ContentType = {
   BSV20: 'application/bsv-20',
@@ -57,7 +57,7 @@ export type BSV20_JSON = BSV20V1_JSON | BSV20V2_JSON;
 
 function isOrdinalAfterP2PKH(script: Script): boolean {
   const chunks = script
-    .to_asm_string()
+    .toASM()
     .split(' ')
     .map((c) => c.trim());
   return (
@@ -80,7 +80,7 @@ function isOrdinalAfterP2PKH(script: Script): boolean {
 
 function isOrdinalBeforeP2PKH(script: Script): boolean {
   const chunks = script
-    .to_asm_string()
+    .toASM()
     .split(' ')
     .map((c) => c.trim());
   return (
@@ -107,7 +107,7 @@ export function isOrdinalP2PKH(script: Script): boolean {
 
 function get_at(script: Script, index: number) {
   const chunks = script
-    .to_asm_string()
+    .toASM()
     .split(' ')
     .map((c) => c.trim());
   return chunks[index];
@@ -221,7 +221,7 @@ export function create(inscription: Inscription): Script {
       ? toByteString(inscription.content.toString('hex'))
       : toByteString(inscription.content);
   const asm = `OP_0 OP_IF 6f7264 OP_1 ${contentTypeBytes} OP_0 ${contentBytes} OP_ENDIF`;
-  return Script.from_asm_string(asm);
+  return Script.fromASM(asm);
 }
 
 export function createTransfer(tick: string, amt: bigint): Script {
@@ -237,8 +237,8 @@ export function createTransfer(tick: string, amt: bigint): Script {
 }
 
 export function createTransferP2PKH(address: string, tick: string, amt: bigint): Script {
-  return Script.from_hex(
-    P2PKHAddress.from_string(address).get_locking_script().to_hex() + createTransfer(tick, amt).to_hex(),
+  return Script.fromHex(
+    new P2PKH().lock(Utils.fromBase58Check(address).data).toHex() + createTransfer(tick, amt).toHex(),
   );
 }
 
@@ -255,8 +255,8 @@ export function createTransferV2(id: string, amt: bigint): Script {
 }
 
 export function createTransferV2P2PKH(address: string, id: string, amt: bigint): Script {
-  return Script.from_hex(
-    P2PKHAddress.from_string(address).get_locking_script().to_hex() + createTransferV2(id, amt).to_hex(),
+  return Script.fromHex(
+    new P2PKH().lock(Utils.fromBase58Check(address).data).toHex() + createTransferV2(id, amt).toHex(),
   );
 }
 

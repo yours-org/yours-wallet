@@ -1,25 +1,27 @@
 import React, { createContext, ReactNode, useCallback, useEffect, useState } from 'react';
-import init from 'bsv-wasm-web';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { WhatsOnChainService } from '../services/WhatsOnChain.service';
-import { GorillaPoolService } from '../services/GorillaPool.service';
 import { KeysService } from '../services/Keys.service';
 import { ContractService } from '../services/Contract.service';
 import { BsvService } from '../services/Bsv.service';
 import { OrdinalService } from '../services/Ordinal.service';
 import { INACTIVITY_LIMIT } from '../utils/constants';
+import { SPVStore } from 'spv-store';
+import { oneSatSPVPromise } from '../background';
+import { GorillaPoolService } from '../services/GorillaPool.service';
 
 const initializeServices = async () => {
-  await init();
   const chromeStorageService = new ChromeStorageService();
   await chromeStorageService.getAndSetStorage(); // Ensure the storage is initialized
 
   const wocService = new WhatsOnChainService(chromeStorageService);
   const gorillaPoolService = new GorillaPoolService(chromeStorageService);
-  const keysService = new KeysService(gorillaPoolService, wocService, chromeStorageService);
-  const contractService = new ContractService(keysService, gorillaPoolService);
-  const bsvService = new BsvService(keysService, gorillaPoolService, wocService, contractService, chromeStorageService);
-  const ordinalService = new OrdinalService(keysService, wocService, gorillaPoolService, chromeStorageService);
+  const oneSatSPV = await oneSatSPVPromise;
+  const keysService = new KeysService(chromeStorageService, oneSatSPV);
+  const contractService = new ContractService(keysService, oneSatSPV);
+
+  const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, oneSatSPV);
+  const ordinalService = new OrdinalService(keysService, bsvService, oneSatSPV, chromeStorageService);
 
   return {
     chromeStorageService,
@@ -29,6 +31,7 @@ const initializeServices = async () => {
     wocService,
     gorillaPoolService,
     contractService,
+    oneSatSPV,
   };
 };
 
@@ -43,6 +46,7 @@ export interface ServiceContextProps {
   isLocked: boolean;
   isReady: boolean;
   lockWallet: () => Promise<void>;
+  oneSatSPV: SPVStore;
 }
 
 export const ServiceContext = createContext<ServiceContextProps | undefined>(undefined);
@@ -56,7 +60,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const initServices = async () => {
       try {
         const initializedServices = await initializeServices();
-        const { chromeStorageService, keysService, bsvService, ordinalService } = initializedServices;
+        const { chromeStorageService, keysService, bsvService } = initializedServices;
         const { account } = chromeStorageService.getCurrentAccountObject();
 
         if (account) {
@@ -64,8 +68,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
           if (bsvAddress && ordAddress) {
             await keysService.retrieveKeys();
             await bsvService.rate();
-            await bsvService.updateBsvBalance(true);
-            await ordinalService.getAndSetOrdinals(ordAddress);
+            await bsvService.updateBsvBalance();
           }
         }
 

@@ -15,14 +15,15 @@ import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { WhitelistedApp } from '../inject';
-import { ColorThemeProps } from '../theme';
+import { WhitelistedApp, YoursEventName } from '../inject';
+import { ColorThemeProps } from '../theme.types';
 import { sendMessage } from '../utils/chromeHelpers';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { CreateAccount } from './onboarding/CreateAccount';
 import { RestoreAccount } from './onboarding/RestoreAccount';
 import { ImportAccount } from './onboarding/ImportAccount';
 import { AccountRow } from '../components/AccountRow';
+import { MasterBackupProgressEvent, streamDataToZip } from '../utils/masterExporter';
 
 const Content = styled.div`
   display: flex;
@@ -111,13 +112,13 @@ export type SettingsPage =
   | 'export-keys-options'
   | 'export-keys-qr'
   | 'preferences';
-type DecisionType = 'sign-out' | 'export-keys' | 'export-keys-qr-code';
+type DecisionType = 'sign-out' | 'export-master-backup' | 'export-keys' | 'export-keys-qr-code';
 
 export const Settings = () => {
   const { theme } = useTheme();
   const { setSelected, query } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
-  const { chromeStorageService, keysService, lockWallet } = useServiceContext();
+  const { chromeStorageService, keysService, lockWallet, oneSatSPV } = useServiceContext();
   const [page, setPage] = useState<SettingsPage>(query === 'manage-accounts' ? 'manage-accounts' : 'main');
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
@@ -130,6 +131,8 @@ export const Settings = () => {
   const [enteredAccountIcon, setEnteredAccountIcon] = useState('');
   const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(socialProfile?.avatar);
   const [isPasswordRequired, setIsPasswordRequired] = useState(chromeStorageService.isPasswordRequired());
+  const [masterBackupProgress, setMasterBackupProgress] = useState(0);
+  const [masterBackupEventText, setMasterBackupEventText] = useState('');
   const [noApprovalLimit, setNoApprovalLimit] = useState(
     chromeStorageService.getCurrentAccountObject().account?.settings.noApprovalLimit ?? 0,
   );
@@ -173,6 +176,14 @@ export const Settings = () => {
   const handleSignOutIntent = () => {
     setDecisionType('sign-out');
     setSpeedBumpMessage('Make sure you have your seed phrase backed up!');
+    setShowSpeedBump(true);
+  };
+
+  const handleMasterBackupIntent = () => {
+    setDecisionType('export-master-backup');
+    setSpeedBumpMessage(
+      'You are about to download wallet data for all your accounts. Make sure you are in a safe place.',
+    );
     setShowSpeedBump(true);
   };
 
@@ -270,11 +281,10 @@ export const Settings = () => {
   const signOut = async () => {
     await chromeStorageService.clear();
     setDecisionType(undefined);
-    window.location.reload();
-
     sendMessage({
-      action: 'signedOut',
+      action: YoursEventName.SIGNED_OUT,
     });
+    window.location.reload();
   };
 
   const handleCancel = () => {
@@ -285,12 +295,16 @@ export const Settings = () => {
     setSelected('settings');
   }, [setSelected]);
 
-  const handleSpeedBumpConfirm = (password?: string) => {
+  const handleSpeedBumpConfirm = async (password?: string) => {
     if (decisionType === 'sign-out') {
-      // TODO: export master storage object with all necessary data to restore full wallet state for all accounts. Be sure to include decrypted password.
       signOut();
     }
 
+    if (decisionType === 'export-master-backup') {
+      handleMasterBackup();
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+    }
     if (decisionType === 'export-keys' && password) {
       exportKeys(password);
       setDecisionType(undefined);
@@ -338,31 +352,40 @@ export const Settings = () => {
     await chromeStorageService.updateNested(key, update);
   };
 
+  const handleMasterBackup = async () => {
+    await streamDataToZip(oneSatSPV, chromeStorageService, (e: MasterBackupProgressEvent) => {
+      setMasterBackupEventText(e.message);
+      const progress = e.endValue && e.value ? Math.ceil((e.value / e.endValue) * 100) : 0;
+      setMasterBackupProgress(progress);
+    });
+    setMasterBackupEventText('');
+  };
+
   const main = (
     <>
       <SettingsRow
         name="Manage Accounts"
         description="Manage your accounts"
         onClick={() => setPage('manage-accounts')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
       />
       <SettingsRow
         name="Connected Apps"
         description="Manage the apps you are connected to"
         onClick={() => setPage('connected-apps')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
       />
       <SettingsRow
         name="Preferences"
         description="Manage your wallet preferences"
         onClick={() => setPage('preferences')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
       />
       <SettingsRow
         name="Export Keys"
         description="Download keys or export as QR code"
         onClick={() => setPage('export-keys-options')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
       />
       <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={lockWallet} />
       <Text
@@ -380,7 +403,7 @@ export const Settings = () => {
       <SettingsRow
         style={{ backgroundColor: theme.errorRed + '40', border: '1px solid ' + theme.errorRed }}
         name="Sign Out"
-        description="Sign out of Yours Wallet completely"
+        description={`Sign out of ${theme.settings.walletName} Wallet completely`}
         onClick={handleSignOutIntent}
       />
     </>
@@ -391,19 +414,19 @@ export const Settings = () => {
       <SettingsRow
         name="Create Account"
         description="Create a new account"
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
         onClick={() => setPage('create-account')}
       />
       <SettingsRow
         name="Restore/Import"
         description="Import or restore an existing account"
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
         onClick={() => setPage('restore-account')}
       />
       <SettingsRow
         name="Edit Account"
         description="Edit an existing account"
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
         onClick={() => setPage('account-list')}
       />
       <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
@@ -445,13 +468,20 @@ export const Settings = () => {
   const exportKeyOptionsPage = (
     <>
       <SettingsRow
+        name="Master Backup"
+        description="Download all wallet data for all accounts. Use this to restore your wallet on another device."
+        onClick={masterBackupEventText ? () => null : handleMasterBackupIntent}
+        masterBackupText={masterBackupEventText}
+        masterBackupProgress={masterBackupProgress}
+      />
+      <SettingsRow
         name="Download Keys"
-        description="Download your seed, private, and public keys"
+        description="Download your seed, private, and public keys for current account"
         onClick={handleExportKeysIntent}
       />
       <SettingsRow
         name="Export Keys as QR code"
-        description="Display private keys as QR code for mobile import"
+        description="Display private keys for current account as QR code for mobile import"
         onClick={handleExportKeysAsQrCodeIntent}
       />
       <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
@@ -464,7 +494,7 @@ export const Settings = () => {
         name="Social Profile"
         description="Set your display name and avatar"
         onClick={() => setPage('social-profile')}
-        jsxElement={<ForwardButton />}
+        jsxElement={<ForwardButton color={theme.white} />}
       />
       <SettingsRow
         name="Require Password"
@@ -532,7 +562,7 @@ export const Settings = () => {
             key={account.addresses.identityAddress}
             name={account.name}
             icon={account.icon}
-            jsxElement={<ForwardButton />}
+            jsxElement={<ForwardButton color={theme.white} />}
             onClick={() => {
               setEnteredAccountName(account.name);
               setEnteredAccountIcon(account.icon);
@@ -586,7 +616,11 @@ export const Settings = () => {
           onCancel={handleCancel}
           onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
           showSpeedBump={showSpeedBump}
-          withPassword={decisionType === 'export-keys' || decisionType === 'export-keys-qr-code'}
+          withPassword={
+            decisionType === 'export-keys' ||
+            decisionType === 'export-keys-qr-code' ||
+            decisionType === 'export-master-backup'
+          }
         />
       }
     >

@@ -1,4 +1,8 @@
+declare const chrome: any;
+
 import { NetWork } from 'yours-wallet-provider';
+import { YoursEventName } from '../inject';
+import { sendMessage } from '../utils/chromeHelpers';
 import { HOSTED_YOURS_IMAGE } from '../utils/constants';
 import { deepMerge } from './serviceHelpers';
 import { Account, ChromeStorageObject, CurrentAccountObject, DeprecatedStorage } from './types/chromeStorage.types';
@@ -21,7 +25,7 @@ export class ChromeStorageService {
 
   private get = async (keyOrKeys: string | string[] | null): Promise<Partial<ChromeStorageObject>> => {
     return new Promise<Partial<ChromeStorageObject>>((resolve, reject) => {
-      chrome.storage.local.get(keyOrKeys, (result) => {
+      chrome.storage.local.get(keyOrKeys, (result: any) => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
         } else {
@@ -68,7 +72,6 @@ export class ChromeStorageService {
       network,
       noApprovalLimit,
       passKey,
-      paymentUtxos,
       popupWindowId,
       salt,
       socialProfile,
@@ -101,8 +104,6 @@ export class ChromeStorageService {
             satoshis: appState.balance?.satoshis ?? 0,
             usdInCents: appState.balance?.usdInCents ?? 0,
           },
-          ordinals: appState?.ordinals ?? [], // TODO: remove
-          paymentUtxos: paymentUtxos ?? [], // TODO: remove
           pubKeys: {
             bsvPubKey: appState.pubKeys.bsvPubKey,
             ordPubKey: appState.pubKeys.ordPubKey,
@@ -179,6 +180,7 @@ export class ChromeStorageService {
       return this.storage;
     }
     return {
+      selectedAccount,
       account: accounts[selectedAccount],
       exchangeRateCache: this.storage.exchangeRateCache,
       isLocked: this.storage.isLocked,
@@ -232,5 +234,6 @@ export class ChromeStorageService {
 
   switchAccount = async (identityAddress: string): Promise<void> => {
     await this.update({ selectedAccount: identityAddress });
+    sendMessage({ action: YoursEventName.SWITCH_ACCOUNT });
   };
 }

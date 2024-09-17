@@ -1,4 +1,3 @@
-import { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
 import { Broadcast } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
@@ -14,6 +13,7 @@ import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { useServiceContext } from '../../hooks/useServiceContext';
+import { Transaction, Utils } from '@bsv/sdk';
 
 export type BroadcastResponse = {
   txid: string;
@@ -34,8 +34,8 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [satsOut, setSatsOut] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { gorillaPoolService, keysService, bsvService, chromeStorageService } = useServiceContext();
-  const { updateBsvBalance, fundRawTx } = bsvService;
+  const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
+  const { updateBsvBalance } = bsvService;
   const { bsvAddress } = keysService;
   // const { isProcessing, setIsProcessing, updateBsvBalance, fundRawTx, bsvAddress } = useBsv();
 
@@ -57,21 +57,25 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   }, [message, txid]);
 
   useEffect(() => {
-    if (!bsvAddress) return;
+    if (!bsvAddress || !oneSatSPV) return;
     (async () => {
-      const tx = Transaction.from_hex(request.rawtx);
-      let satsOut = 0;
-      const changeScript = P2PKHAddress.from_string(bsvAddress).get_locking_script().to_hex();
-      for (let index = 0; index < tx.get_noutputs(); index++) {
-        if (tx.get_output(index)?.get_script_pub_key_hex() !== changeScript) {
-          const output = tx.get_output(index);
+      const tx = Transaction.fromHex(request.rawtx);
+      for (const input of tx.inputs) {
+        input.sourceTransaction = await oneSatSPV.getTx(input.sourceTXID ?? '', true);
+      }
+      let outSats = tx.getFee();
+      const changePkh = Utils.fromBase58Check(bsvAddress, 'hex').data as string;
+      for (let index = 0; index < tx.outputs.length; index++) {
+        const outputPkh = Utils.toHex(tx.outputs[index]?.lockingScript?.chunks[2]?.data ?? []);
+        if (outputPkh !== changePkh) {
+          const output = tx.outputs[index];
           if (!output) continue;
-          satsOut += Number(output.get_satoshis());
+          outSats += output.satoshis || 0;
         }
       }
-      setSatsOut(satsOut);
+      setSatsOut(outSats);
     })();
-  }, [bsvAddress, request.fund, request.rawtx]);
+  }, [bsvAddress, request.fund, request.rawtx, oneSatSPV]);
 
   const handleBroadcast = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -86,7 +90,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
         return;
       }
 
-      const res = await fundRawTx(rawtx, passwordConfirm);
+      const res = await bsvService.fundRawTx(rawtx, passwordConfirm);
       if (!res.rawtx || res.error) {
         const message =
           res.error === 'invalid-password'
@@ -99,28 +103,41 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       }
       rawtx = res.rawtx;
     }
-    const { txid, message } = await gorillaPoolService.broadcastWithGorillaPool(rawtx);
-    if (!txid) {
+    let tx: Transaction;
+    switch (request.format) {
+      case 'beef':
+        tx = Transaction.fromHexBEEF(rawtx);
+        break;
+      case 'ef':
+        tx = Transaction.fromHexEF(rawtx);
+        break;
+      default:
+        tx = Transaction.fromHex(rawtx);
+        break;
+    }
+
+    const resp = await oneSatSPV.broadcast(tx);
+    if (resp.status === 'error') {
       addSnackbar('Error broadcasting the raw tx!', 'error');
       setIsProcessing(false);
       sendMessage({
         action: 'broadcastResponse',
-        error: message ?? 'Unknown error',
+        error: resp.description ?? 'Unknown error',
       });
       onBroadcast();
       return;
     }
-    setTxid(txid);
+    setTxid(resp.txid);
     sendMessage({
       action: 'broadcastResponse',
-      txid,
+      txid: resp.txid,
     });
 
     setIsProcessing(false);
     addSnackbar('Successfully broadcasted the tx!', 'success');
     onBroadcast();
     setTimeout(async () => {
-      await updateBsvBalance(true).catch((e: unknown) => {
+      await updateBsvBalance().catch((e: unknown) => {
         console.log(e);
       });
     }, 3000);

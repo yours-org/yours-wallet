@@ -1,10 +1,9 @@
 import styled, { keyframes } from 'styled-components';
 import { Text } from './Reusable';
 import { SnackbarType } from '../contexts/SnackbarContext';
-import { ColorThemeProps, Theme } from '../theme';
-import errorIcon from '../assets/error.svg';
-import infoIcon from '../assets/info-dark.svg';
-import successIcon from '../assets/success.svg';
+import { ColorThemeProps, Theme } from '../theme.types';
+import { FaCheckCircle, FaExclamation, FaInfoCircle } from 'react-icons/fa';
+import { Show } from './Show';
 
 type SnackBarColorTheme = ColorThemeProps & { color: string };
 
@@ -47,12 +46,6 @@ export const SnackBarContainer = styled.div<SnackBarColorTheme & { duration: num
   animation-fill-mode: forwards;
 `;
 
-const Image = styled.img`
-  width: 1rem;
-  height: 1rem;
-  margin: 1rem;
-`;
-
 export type SnackbarProps = {
   /** The message that should be displayed on the snackbar */
   message: string;
@@ -67,14 +60,22 @@ export const Snackbar = (props: SnackbarProps) => {
   return (
     <SnackBarContainer
       duration={duration}
-      color={type === 'error' ? theme.errorRed : type === 'info' ? theme.white : theme.lightAccent}
+      color={type === 'error' ? theme.errorRed : type === 'info' ? theme.warning : theme.lightAccent}
     >
-      <Image src={type === 'error' ? errorIcon : type === 'info' ? infoIcon : successIcon} />
+      <Show when={type === 'error'}>
+        <FaExclamation color={theme.black} size={'1.25rem'} style={{ margin: '0.5rem' }} />
+      </Show>
+      <Show when={type === 'info'}>
+        <FaInfoCircle color={theme.black} size={'1.25rem'} style={{ margin: '0.5rem' }} />
+      </Show>
+      <Show when={type === 'success'}>
+        <FaCheckCircle color={theme.black} size={'1.25rem'} style={{ margin: '0.5rem' }} />
+      </Show>
       <Text
         theme={theme}
         style={{
           margin: '1rem 0 1rem .25rem',
-          color: type === 'error' ? theme.white : theme.darkAccent,
+          color: theme.black,
           wordWrap: 'break-word',
           textAlign: 'left',
         }}

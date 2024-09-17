@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 import { Ordinal as OrdinalType } from 'yours-wallet-provider';
-import { ColorThemeProps, Theme } from '../theme';
+import { ColorThemeProps, Theme } from '../theme.types';
 import { Text } from './Reusable';
 import { Show } from './Show';
 
@@ -61,7 +61,6 @@ const JsonWrapper = styled.div<OrdinalDivProps>`
   border-radius: 0.5rem;
   position: relative;
   background-color: ${(props) => props.theme.darkAccent};
-  margin: 0.5rem;
   cursor: pointer;
   border: ${(props) => (props.selected ? `0.1rem solid ${props.theme.lightAccent}` : undefined)};
   overflow: auto;
@@ -81,7 +80,12 @@ export const FlexWrapper = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 0.5rem;
+  margin: 0.25rem;
+  transition: 0.3s ease-in-out;
+
+  &:hover {
+    transform: scale(1.02);
+  }
 `;
 
 export type OrdinalProps = {
@@ -138,13 +142,13 @@ export const Ordinal = (props: OrdinalProps) => {
       case contentType === 'text/plain':
         return (
           <TextWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <OrdText theme={theme}>{inscription.origin?.data?.insc?.text}</OrdText>
+            <OrdText theme={theme}>{inscription.origin?.data?.insc?.file?.text}</OrdText>
           </TextWrapper>
         );
       case contentType === 'application/json':
         return (
           <JsonWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <Json theme={theme}>{JSON.stringify(inscription.origin?.data?.insc?.json, null, 2)}</Json>
+            <Json theme={theme}>{JSON.stringify(inscription.origin?.data?.insc?.file?.json, null, 2)}</Json>
           </JsonWrapper>
         );
       default:

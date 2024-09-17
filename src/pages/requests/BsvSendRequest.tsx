@@ -11,7 +11,7 @@ import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { ColorThemeProps } from '../../theme';
+import { ColorThemeProps } from '../../theme.types';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
@@ -124,10 +124,19 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
               ? 'Insufficient Funds!'
               : sendRes.error === 'fee-too-high'
                 ? 'Miner fee too high!'
-                : sendRes.error === 'tx-size-too-large'
-                  ? 'Tx too big. 50MB max'
-                  : 'An unknown error has occurred! Try again.' + sendRes.error;
+                : sendRes.error === 'no-wallet-address'
+                  ? 'No wallet address found!'
+                  : sendRes.error === 'invalid-data'
+                    ? 'Invalid data!'
+                    : sendRes.error === 'invalid-request'
+                      ? 'Invalid request!'
+                      : sendRes.error === 'source-tx-not-found'
+                        ? 'Source transaction not found!'
+                        : sendRes.error === 'no-account'
+                          ? 'No account found!'
+                          : 'An unknown error has occurred! Try again.';
 
+        setIsProcessing(false);
         addSnackbar(message, 'error');
         return;
       }
@@ -159,7 +168,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         setIsProcessing(true);
         await processBsvSend();
         setIsProcessing(false);
-        await updateBsvBalance(true);
+        await updateBsvBalance();
       }, 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,7 +189,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     if (!successTxId) return;
     if (!message && bsvAddress) {
       resetSendState();
-      updateBsvBalance(true);
+      updateBsvBalance();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress, message, successTxId]);

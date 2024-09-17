@@ -2,13 +2,13 @@ import { useState } from 'react';
 import styled from 'styled-components';
 import { useTheme } from '../hooks/useTheme';
 import { useViewport } from '../hooks/useViewport';
-import { ColorThemeProps } from '../theme';
+import { ColorThemeProps } from '../theme.types';
 import { sleep } from '../utils/sleep';
 import { Button } from './Button';
 import { Input } from './Input';
-import yoursLogo from '../assets/yours-logo.png';
-import { FormContainer, HeaderText, Text, YoursLogo } from './Reusable';
+import { FormContainer, HeaderText, Text } from './Reusable';
 import { useServiceContext } from '../hooks/useServiceContext';
+import { YoursIcon } from './YoursIcon';
 
 const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
   display: flex;
@@ -35,13 +35,14 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
   const { isMobile } = useViewport();
-
   const { keysService, chromeStorageService } = useServiceContext();
 
   const handleUnlock = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isProcessing) return;
     setIsProcessing(true);
     await sleep(25);
+
     const isVerified = await keysService.verifyPassword(password);
     if (isVerified) {
       setVerificationFailed(false);
@@ -50,7 +51,6 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       onUnlock();
     } else {
       setVerificationFailed(true);
-      setPassword('');
       setTimeout(() => {
         setVerificationFailed(false);
         setIsProcessing(false);
@@ -60,7 +60,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
 
   return (
     <Container $isMobile={isMobile} theme={theme}>
-      <YoursLogo src={yoursLogo} />
+      <YoursIcon width="4rem" />
       <HeaderText style={{ fontSize: '1.75rem' }} theme={theme}>
         Unlock Wallet
       </HeaderText>
@@ -74,12 +74,13 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           onChange={(e) => setPassword(e.target.value)}
           shake={verificationFailed ? 'true' : 'false'}
           autoFocus
+          onKeyDown={(e) => e.stopPropagation()}
         />
         <Button
           theme={theme}
           type="secondary-outline"
           label={isProcessing ? 'Unlocking...' : 'Unlock'}
-          disabled={isProcessing}
+          disabled={isProcessing || password === ''}
           isSubmit
         />
       </FormContainer>

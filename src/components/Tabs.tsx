@@ -1,6 +1,6 @@
 import React, { PropsWithChildren } from 'react';
 import styled from 'styled-components';
-import { ColorThemeProps, Theme } from '../theme';
+import { ColorThemeProps, Theme } from '../theme.types';
 
 export type TabPanelProps = PropsWithChildren<{
   label: string;
@@ -13,16 +13,17 @@ const TabPanel = (props: TabPanelProps) => (
   </TabContent>
 );
 
-const TabContent = styled.div`
+export const TabContent = styled.div<{ $addTopMargin?: boolean }>`
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: calc(98%);
+  height: ${(props) => (props.$addTopMargin ? 'calc(98% - 4rem)' : 'calc(98%)')};
+  margin-top: ${(props) => (props.$addTopMargin ? '4rem' : undefined)};
 `;
 
-const TabsWrapper = styled.div`
+export const TabsWrapper = styled.div`
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -51,7 +52,7 @@ const TabButton = styled.button<ColorThemeProps & { $selected: boolean; $leftBut
   }
 `;
 
-const TabList = styled.div<ColorThemeProps>`
+export const TabList = styled.div<ColorThemeProps>`
   display: flex;
   flex-direction: row;
   width: 50%;
@@ -64,7 +65,7 @@ const Content = styled.div`
   flex-direction: column;
   align-items: center;
   width: 100%;
-  height: calc(100% - 3.75rem - 2.75rem);
+  height: calc(100% - 7rem);
 `;
 
 export type TabsProps = PropsWithChildren<{

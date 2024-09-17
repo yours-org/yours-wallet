@@ -1,94 +1,166 @@
-import {
-  BSM,
-  P2PKHAddress,
-  PrivateKey,
-  PublicKey,
-  Script,
-  SigHash,
-  Signature,
-  Transaction,
-  TxIn,
-  TxOut,
-} from 'bsv-wasm-web';
-import { buildInscription } from 'js-1sat-ord-web';
-import { Ordinal, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
+import { OrdP2PKH } from 'js-1sat-ord';
+import { NetWork, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
 import {
   BSV_DECIMAL_CONVERSION,
-  FEE_PER_BYTE,
+  FEE_PER_KB,
+  MAINNET_ADDRESS_PREFIX,
   MAX_BYTES_PER_TX,
-  MAX_FEE_PER_TX,
-  P2PKH_INPUT_SIZE,
-  P2PKH_OUTPUT_SIZE,
+  TESTNET_ADDRESS_PREFIX,
 } from '../utils/constants';
-import { removeBase64Prefix } from '../utils/format';
+import { removeBase64Prefix, truncate } from '../utils/format';
 import { getPrivateKeyFromTag, Keys } from '../utils/keys';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { ContractService } from './Contract.service';
-import { GorillaPoolService } from './GorillaPool.service';
 import { KeysService } from './Keys.service';
-import { getChainParams } from './serviceHelpers';
-import { FundRawTxResponse, LockData, SendBsvResponse, UTXO } from './types/bsv.types';
+import { FundRawTxResponse, LockData, InWalletBsvResponse } from './types/bsv.types';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { WhatsOnChainService } from './WhatsOnChain.service';
+import {
+  BigNumber,
+  BSM,
+  ECDSA,
+  P2PKH,
+  PublicKey,
+  SatoshisPerKilobyte,
+  Script,
+  Signature,
+  Transaction,
+  Utils,
+} from '@bsv/sdk';
+import { SPVStore, Lock, TxoLookup } from 'spv-store';
+import theme from '../theme.json';
+//@ts-ignore
+import { PaymailClient } from '@bsv/paymail/client';
+
+const client = new PaymailClient();
 
 export class BsvService {
   private bsvBalance: number;
   private exchangeRate: number;
-  private lockData: LockData;
   constructor(
     private readonly keysService: KeysService,
-    private readonly gorillaPoolService: GorillaPoolService,
     private readonly wocService: WhatsOnChainService,
     private readonly contractService: ContractService,
     private readonly chromeStorageService: ChromeStorageService,
+    private readonly oneSatSPV: SPVStore,
   ) {
     this.bsvBalance = 0;
     this.exchangeRate = 0;
-    this.lockData = { totalLocked: 0, unlockable: 0, nextUnlock: 0 };
   }
 
   getBsvBalance = () => this.bsvBalance;
   getExchangeRate = () => this.exchangeRate;
-  getLockData = () => this.lockData;
+  getLockData = async (): Promise<LockData> => {
+    const lockData = {
+      totalLocked: 0,
+      unlockable: 0,
+      nextUnlock: 0,
+    };
+
+    const lockTxos = await this.getLockedTxos();
+    for (const txo of lockTxos) {
+      const height = await this.getCurrentHeight();
+      const lock = txo.data.lock?.data as Lock;
+      if (!lock) continue;
+      lockData.totalLocked += Number(txo.satoshis);
+      if (lock.until <= height) {
+        lockData.unlockable += Number(txo.satoshis);
+      } else if (!lockData.nextUnlock || lock.until < lockData.nextUnlock) {
+        lockData.nextUnlock = lock.until;
+      }
+    }
+    return lockData;
+  };
+
+  getCurrentHeight = async () => {
+    const header = await this.oneSatSPV.getSyncedBlock();
+    return header?.height || 0;
+  };
+
+  getLockedTxos = async () => {
+    const lockTxos = await this.oneSatSPV.search(new TxoLookup('lock'));
+    return lockTxos.txos.filter((txo) => txo.satoshis > 1n && !txo.data.insc);
+  };
 
   rate = async () => {
     const r = await this.wocService.getExchangeRate();
     this.exchangeRate = r ?? 0;
   };
 
-  unlockLockedCoins = async (balanceOnly = false) => {
+  unlockLockedCoins = async () => {
     if (!this.keysService.identityAddress) return;
-    const chainInfo = await this.wocService.getChainInfo();
-    let lockedTxos = await this.gorillaPoolService.getLockedBsvUtxos(this.keysService.identityAddress);
-    const blockHeight = Number(chainInfo?.blocks);
-    const outpoints = lockedTxos.map((txo) => txo.outpoint.toString());
-    const spentTxids = await this.gorillaPoolService.getSpentTxids(outpoints);
-    lockedTxos = lockedTxos.filter((txo) => !spentTxids.get(txo.outpoint.toString()));
-    if (lockedTxos.length > 0) {
-      const lockTotal = lockedTxos.reduce((a: number, utxo: Ordinal) => a + utxo.satoshis, 0);
-      let unlockableTotal = 0;
-      const theBlocksCoinsUnlock: number[] = [];
-      lockedTxos.forEach((txo) => {
-        const theBlockCoinsUnlock = Number(txo?.data?.lock?.until);
-        theBlocksCoinsUnlock.push(theBlockCoinsUnlock);
-        if (theBlockCoinsUnlock <= blockHeight) {
-          unlockableTotal += txo.satoshis;
-        }
-      });
-      this.lockData = {
-        totalLocked: lockTotal,
-        unlockable: unlockableTotal,
-        nextUnlock: theBlocksCoinsUnlock.sort((a, b) => a - b)[0],
-      };
-      if (balanceOnly) return;
-      const txos = lockedTxos.filter((i) => Number(i.data?.lock?.until) <= blockHeight);
-      if (txos.length > 0) {
-        return await this.contractService.unlock(txos, blockHeight);
-      }
+    const blockHeight = await this.getCurrentHeight();
+    const lockedTxos = await this.getLockedTxos();
+    const txos = lockedTxos.filter((i) => Number(i.data.lock?.data.until) <= blockHeight);
+    if (txos.length > 0) {
+      return await this.contractService.unlock(txos, blockHeight);
     }
   };
 
-  sendBsv = async (request: SendBsv[], password: string, noApprovalLimit?: number): Promise<SendBsvResponse> => {
+  sendAllBsv = async (destinationAddress: string, type: 'address' | 'paymail', password: string) => {
+    try {
+      const tx = new Transaction();
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+      const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
+      for await (const u of fundResults.txos || []) {
+        const pk = pkMap.get(u.owner || '');
+        if (!pk) continue;
+        tx.addInput({
+          sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid),
+          sourceOutputIndex: u.outpoint.vout,
+          sequence: 0xffffffff,
+          unlockingScriptTemplate: new P2PKH().unlock(pk),
+        });
+      }
+
+      const paymailRefs: { paymail: string; reference: string }[] = [];
+      if (type === 'address') {
+        const outScript = new P2PKH().lock(destinationAddress);
+        tx.addOutput({ lockingScript: outScript, change: true });
+        await tx.fee(feeModel);
+      } else if (type === 'paymail') {
+        console.log('Sending P2P payment to', destinationAddress);
+        const dummyScript = new Script().writeBin(new Array(1000).fill(0));
+        tx.addOutput({ lockingScript: dummyScript, change: true });
+        await tx.fee(feeModel);
+        const satsOut = tx.outputs[0].satoshis;
+        console.log('satsOut', satsOut);
+        tx.outputs = [];
+        const p2pDestination = await client.getP2pPaymentDestination(destinationAddress, satsOut);
+        console.log(`P2P payment destination: ${p2pDestination}`);
+        paymailRefs.push({ paymail: destinationAddress, reference: p2pDestination.reference });
+        for (const output of p2pDestination.outputs) {
+          tx.addOutput({
+            satoshis: output.satoshis,
+            lockingScript: Script.fromHex(output.script),
+          });
+        }
+      }
+
+      await tx.sign();
+      const response = await this.oneSatSPV.broadcast(tx);
+      console.log(`Transaction broadcast response: ${response}`);
+      if (response.status == 'error') return { error: response.description };
+      const txHex = tx.toHex();
+      const chromeObj = this.chromeStorageService.getCurrentAccountObject();
+      if (!chromeObj.account) return { error: 'no-account' };
+      for (const ref of paymailRefs) {
+        console.log(`Sending P2P payment to ${ref.paymail} with reference ${ref.reference}`);
+        await client.sendTransactionP2P(ref.paymail, txHex, ref.reference, {
+          sender: `${theme.settings.walletName} - ${truncate(chromeObj.account.addresses.bsvAddress, 4, 4)}`,
+          note: `P2P tx from ${theme.settings.walletName}`,
+        });
+      }
+      return { txid: tx.id('hex'), rawtx: Utils.toHex(tx.toBinary()) };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.log(error);
+      return { error: error.message ?? 'unknown' };
+    }
+  };
+
+  sendBsv = async (request: SendBsv[], password: string, noApprovalLimit?: number): Promise<InWalletBsvResponse> => {
     try {
       const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
       const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
@@ -100,117 +172,136 @@ export class BsvService {
         }
       }
 
-      let feeSats = 20;
+      // let feeSats = 20;
       const isBelowNoApprovalLimit = Number(bsvSendAmount) <= Number(noApprovalLimit);
       const keys = await this.keysService.retrieveKeys(password, isBelowNoApprovalLimit);
-      if (!keys?.walletWif || !keys.walletPubKey) throw Error('Undefined key');
-      const paymentPk = PrivateKey.from_wif(keys.walletWif);
-      const pubKey = paymentPk.to_public_key();
-      const network = this.chromeStorageService.getNetwork();
-      const fromAddress = pubKey.to_address().set_chain_params(getChainParams(network)).to_string();
+      if (!keys?.walletAddress) return { error: 'no-wallet-address' };
+      const changeAddress = keys.walletAddress;
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
       const amount = request.reduce((a, r) => a + r.satoshis, 0);
 
-      // Format in and outs
-      const fundingUtxos = await this.wocService.getAndUpdateUtxoStorage(fromAddress);
-
-      if (!fundingUtxos) throw Error('No Utxos!');
-      const totalSats = fundingUtxos.reduce((a: number, item: UTXO) => a + item.satoshis, 0);
-
-      if (totalSats < amount) {
-        return { error: 'insufficient-funds' };
-      }
-
-      const sendAll = totalSats === amount;
-      const satsOut = sendAll ? totalSats - feeSats : amount;
-      const inputs = this.wocService.getInputs(fundingUtxos, satsOut, sendAll);
-
-      const totalInputSats = inputs.reduce((a, item) => a + item.satoshis, 0);
-
       // Build tx
-      const tx = new Transaction(1, 0);
-
-      request.forEach((req) => {
+      const tx = new Transaction();
+      let satsOut = 0;
+      const paymailRefs: { paymail: string; reference: string }[] = [];
+      for (const req of request) {
         let outScript: Script;
         if (req.address) {
           if (req.inscription) {
             const { base64Data, mimeType, map } = req.inscription;
             const formattedBase64 = removeBase64Prefix(base64Data);
-            outScript = buildInscription(P2PKHAddress.from_string(req.address), formattedBase64, mimeType, map);
-            feeSats += Math.ceil(outScript.to_bytes().byteLength * FEE_PER_BYTE);
+
+            outScript = new OrdP2PKH().lock(
+              req.address,
+              {
+                dataB64: formattedBase64,
+                contentType: mimeType,
+              },
+              map,
+            );
           } else {
-            outScript = P2PKHAddress.from_string(req.address).get_locking_script();
+            outScript = new P2PKH().lock(req.address);
           }
         } else if (req.script) {
-          outScript = Script.from_hex(req.script);
-          feeSats += Math.ceil(outScript.to_bytes().byteLength * FEE_PER_BYTE);
+          outScript = Script.fromHex(req.script);
         } else if ((req.data || []).length > 0) {
           const asm = `OP_0 OP_RETURN ${req.data?.join(' ')}`;
           try {
-            outScript = Script.from_asm_string(asm);
+            outScript = Script.fromASM(asm);
           } catch (e) {
-            throw Error('Invalid data');
+            return { error: 'invalid-data' };
           }
-        } else {
-          throw Error('Invalid request');
+        } else if (!req.paymail) {
+          return { error: 'invalid-request' };
         }
-        // TODO: In event where provider method calls this and happens to have multiple outputs that equal all sats available in users wallet, this tx will likely fail due to no fee to miner. Considering an edge case for now.
-        const outSats = sendAll && request.length === 1 ? satsOut : req.satoshis;
-        tx.add_output(new TxOut(BigInt(outSats), outScript));
+
+        satsOut += req.satoshis;
+        if (!req.paymail) {
+          tx.addOutput({
+            satoshis: req.satoshis,
+            lockingScript: outScript!,
+          });
+        } else {
+          const p2pDestination = await client.getP2pPaymentDestination(req.paymail, req.satoshis);
+          console.log(p2pDestination);
+          paymailRefs.push({ paymail: req.paymail, reference: p2pDestination.reference });
+          for (const output of p2pDestination.outputs) {
+            tx.addOutput({
+              satoshis: output.satoshis,
+              lockingScript: Script.fromHex(output.script),
+            });
+          }
+        }
+      }
+
+      tx.addOutput({
+        lockingScript: new P2PKH().lock(changeAddress),
+        change: true,
       });
 
-      let change = 0;
-      if (!sendAll) {
-        change = totalInputSats - satsOut - feeSats;
-        tx.add_output(new TxOut(BigInt(change), P2PKHAddress.from_string(fromAddress).get_locking_script()));
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+
+      let satsIn = 0;
+      let fee = 0;
+      const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+      for await (const u of fundResults.txos || []) {
+        const pk = pkMap.get(u.owner || '');
+        if (!pk) continue;
+        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
+        if (!sourceTransaction) {
+          console.log(`Could not find source transaction ${u.outpoint.txid}`);
+          return { error: 'source-tx-not-found' };
+          // continue;
+        }
+        tx.addInput({
+          sourceTransaction,
+          sourceOutputIndex: u.outpoint.vout,
+          sequence: 0xffffffff,
+          unlockingScriptTemplate: new P2PKH().unlock(pk),
+        });
+        satsIn += Number(u.satoshis);
+        fee = await feeModel.computeFee(tx);
+        if (satsIn >= satsOut + fee) break;
       }
-
-      // build txins from our inputs
-      let idx = 0;
-      for (const u of inputs || []) {
-        const inTx = new TxIn(Buffer.from(u.txid, 'hex'), u.vout, Script.from_hex(''));
-
-        inTx.set_satoshis(BigInt(u.satoshis));
-        tx.add_input(inTx);
-
-        const sig = tx.sign(paymentPk, SigHash.InputOutputs, idx, Script.from_hex(u.script), BigInt(u.satoshis));
-
-        inTx.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
-        tx.set_input(idx, inTx);
-        idx++;
-      }
-
-      // Fee checker
-      const finalSatsIn = tx.satoshis_in() ?? 0n;
-      const finalSatsOut = tx.satoshis_out() ?? 0n;
-      if (finalSatsIn - finalSatsOut > MAX_FEE_PER_TX) return { error: 'fee-too-high' };
+      if (satsIn < satsOut + fee) return { error: 'insufficient-funds' };
+      await tx.fee(feeModel);
+      await tx.sign();
 
       // Size checker
-      const bytes = tx.to_bytes().byteLength;
+      const bytes = tx.toBinary().length;
       if (bytes > MAX_BYTES_PER_TX) return { error: 'tx-size-too-large' };
 
-      const rawtx = tx.to_hex();
-      const { txid } = await this.gorillaPoolService.broadcastWithGorillaPool(rawtx);
-      if (txid) {
-        if (isBelowNoApprovalLimit) {
-          const { account } = this.chromeStorageService.getCurrentAccountObject();
-          if (!account) throw Error('No account found!');
-          const { noApprovalLimit } = account.settings;
-          const key: keyof ChromeStorageObject = 'accounts';
-          const update: Partial<ChromeStorageObject['accounts']> = {
-            [this.keysService.identityAddress]: {
-              ...account,
-              settings: {
-                ...account.settings,
-                noApprovalLimit: noApprovalLimit
-                  ? Number((noApprovalLimit - amount / BSV_DECIMAL_CONVERSION).toFixed(8))
-                  : 0,
-              },
-            },
-          };
-          await this.chromeStorageService.updateNested(key, update);
-        }
+      const response = await this.oneSatSPV.broadcast(tx);
+
+      const txHex = tx.toHex();
+      const chromeObj = this.chromeStorageService.getCurrentAccountObject();
+      if (!chromeObj.account) return { error: 'no-account' };
+      for (const ref of paymailRefs) {
+        console.log(`Sending P2P payment to ${ref.paymail} with reference ${ref.reference}`);
+        await client.sendTransactionP2P(ref.paymail, txHex, ref.reference, {
+          sender: `${theme.settings.walletName} - ${truncate(chromeObj.account.addresses.bsvAddress, 4, 4)}`,
+          note: `P2P tx from ${theme.settings.walletName}`,
+        });
       }
-      return { txid, rawtx };
+
+      if (response.status == 'error') return { error: response.description };
+      if (isBelowNoApprovalLimit) {
+        const { noApprovalLimit } = chromeObj.account.settings;
+        const key: keyof ChromeStorageObject = 'accounts';
+        const update: Partial<ChromeStorageObject['accounts']> = {
+          [this.keysService.identityAddress]: {
+            ...chromeObj.account,
+            settings: {
+              ...chromeObj.account.settings,
+              noApprovalLimit: noApprovalLimit
+                ? Number((noApprovalLimit - amount / BSV_DECIMAL_CONVERSION).toFixed(8))
+                : 0,
+            },
+          },
+        };
+        await this.chromeStorageService.updateNested(key, update);
+      }
+      return { txid: tx.id('hex'), rawtx: Utils.toHex(tx.toBinary()) };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.log(error);
@@ -232,54 +323,57 @@ export class BsvService {
       const derivationTag = messageToSign.tag ?? { label: 'panda', id: 'identity', domain: '', meta: {} };
       const privateKey = getPrivateKeyFromTag(derivationTag, keys);
 
-      if (!privateKey.to_wif()) {
+      if (!privateKey.toWif()) {
         return { error: 'key-type' };
       }
 
       const network = this.chromeStorageService.getNetwork();
-      const publicKey = privateKey.to_public_key();
-      const address = publicKey.to_address().set_chain_params(getChainParams(network)).to_string();
+      const publicKey = privateKey.toPublicKey();
+      const address = publicKey.toAddress([
+        network == NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+      ]);
 
-      const msgBuf = Buffer.from(message, encoding);
-      const signature = BSM.sign_message(privateKey, msgBuf);
+      const msgHash = new BigNumber(BSM.magicHash(Utils.toArray(message, encoding)));
+      const signature = ECDSA.sign(msgHash, privateKey, true);
+      const recovery = signature.CalculateRecoveryFactor(publicKey, msgHash);
+
       return {
         address,
-        pubKey: publicKey.to_hex(),
+        pubKey: publicKey.toString(),
         message: message,
-        sig: Buffer.from(signature.to_compact_hex(), 'hex').toString('base64'),
+        sig: signature.toCompact(recovery, true, 'base64') as string,
         derivationTag,
       };
     } catch (error) {
       console.log(error);
     }
+    return { error: 'not-implemented' };
   };
 
   verifyMessage = async (
     message: string,
-    signatureHex: string,
+    signatureBase64: string,
     publicKeyHex: string,
     encoding: 'utf8' | 'hex' | 'base64' = 'utf8',
   ) => {
     try {
-      const network = this.chromeStorageService.getNetwork();
       const msgBuf = Buffer.from(message, encoding);
-      const publicKey = PublicKey.from_hex(publicKeyHex);
-      const signature = Signature.from_compact_bytes(Buffer.from(signatureHex, 'hex'));
-      const address = publicKey.to_address().set_chain_params(getChainParams(network));
-
-      return address.verify_bitcoin_message(msgBuf, signature);
+      const publicKey = PublicKey.fromString(publicKeyHex);
+      const signature = Signature.fromCompact(Utils.toArray(signatureBase64, 'base64'));
+      return BSM.verify(Array.from(msgBuf), signature, publicKey);
     } catch (error) {
       console.error(error);
       return false;
     }
   };
 
-  updateBsvBalance = async (pullFresh?: boolean) => {
-    const total = await this.wocService.getBsvBalance(this.keysService.bsvAddress, pullFresh);
-    this.bsvBalance = total ?? 0;
+  updateBsvBalance = async () => {
+    const utxos = await this.fundingTxos();
+    const total = utxos.reduce((a, item) => a + Number(item.satoshis), 0);
+    this.bsvBalance = (total ?? 0) / BSV_DECIMAL_CONVERSION;
     const balance = {
       bsv: this.bsvBalance,
-      satoshis: Math.round(this.bsvBalance * BSV_DECIMAL_CONVERSION),
+      satoshis: total,
       usdInCents: Math.round(this.bsvBalance * this.exchangeRate * 100),
     };
     const { account } = this.chromeStorageService.getCurrentAccountObject();
@@ -294,53 +388,50 @@ export class BsvService {
     await this.chromeStorageService.updateNested(key, update);
   };
 
+  fundingTxos = async () => {
+    const results = await this.oneSatSPV.search(new TxoLookup('fund'), undefined, 0);
+    return results.txos;
+  };
+
   fundRawTx = async (rawtx: string, password: string): Promise<FundRawTxResponse> => {
     const isAuthenticated = await this.keysService.verifyPassword(password);
     if (!isAuthenticated) {
       return { error: 'invalid-password' };
     }
 
-    const keys = await this.keysService.retrieveKeys(password);
-    if (!keys.walletWif) throw new Error('Missing keys');
-    const paymentPk = PrivateKey.from_wif(keys.walletWif);
+    const pkMap = await this.keysService.retrievePrivateKeyMap(password);
+    const tx = Transaction.fromHex(rawtx);
 
     let satsIn = 0;
-    let satsOut = 0;
-    const tx = Transaction.from_hex(rawtx);
-    let inputCount = tx.get_ninputs();
-    for (let i = 0; i < inputCount; i++) {
-      const txIn = tx.get_input(i);
-      if (!txIn) throw Error('Invalid input');
-      const txOut = await this.gorillaPoolService.getTxOut(txIn.get_prev_tx_id_hex(), txIn.get_vout());
-      if (!txOut) throw Error('Invalid output');
-      satsIn += Number(txOut.get_satoshis());
+    for (const input of tx.inputs) {
+      input.sourceTransaction = await this.oneSatSPV.getTx(input.sourceTXID ?? '', true);
+      satsIn += input.sourceTransaction?.outputs[input.sourceOutputIndex]?.satoshis || 0;
     }
-    for (let i = 0; i < tx.get_noutputs(); i++) {
-      const output = tx.get_output(i);
-      if (!output) throw Error('Invalid output');
-      satsOut += Number(output.get_satoshis());
+
+    const satsOut = tx.outputs.reduce((a, o) => a + (o.satoshis || 0), 0);
+    let fee = 0;
+    tx.addOutput({ change: true, lockingScript: new P2PKH().lock(this.keysService.bsvAddress) });
+
+    const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+
+    const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+    for await (const u of fundResults.txos || []) {
+      const pk = pkMap.get(u.owner || '');
+      if (!pk) continue;
+      tx.addInput({
+        sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid),
+        sourceOutputIndex: u.outpoint.vout,
+        sequence: 0xffffffff,
+        unlockingScriptTemplate: new P2PKH().unlock(pk),
+      });
+      satsIn += Number(u.satoshis);
+      fee = await feeModel.computeFee(tx);
+      if (satsIn >= satsOut + fee) break;
     }
-    let size = rawtx.length / 2 + P2PKH_OUTPUT_SIZE;
-    let fee = Math.ceil(size * FEE_PER_BYTE);
-    const fundingUtxos = await this.wocService.getAndUpdateUtxoStorage(this.keysService.bsvAddress);
-    while (satsIn < satsOut + fee) {
-      const utxo = fundingUtxos.pop();
-      if (!utxo) throw Error('Insufficient funds');
-      const txIn = new TxIn(Buffer.from(utxo.txid, 'hex'), utxo.vout, Script.from_hex(''));
-      tx.add_input(txIn);
-      satsIn += Number(utxo.satoshis);
-      size += P2PKH_INPUT_SIZE;
-      fee = Math.ceil(size * FEE_PER_BYTE);
-      const sig = tx.sign(paymentPk, SigHash.Input, inputCount, Script.from_hex(utxo.script), BigInt(utxo.satoshis));
-      txIn.set_unlocking_script(Script.from_asm_string(`${sig.to_hex()} ${paymentPk.to_public_key().to_hex()}`));
-      tx.set_input(inputCount++, txIn);
-    }
-    tx.add_output(
-      new TxOut(
-        BigInt(satsIn - satsOut - fee),
-        P2PKHAddress.from_string(this.keysService.bsvAddress).get_locking_script(),
-      ),
-    );
-    return { rawtx: tx.to_hex() };
+    if (satsIn < satsOut + fee) return { error: 'insufficient-funds' };
+    await tx.fee(feeModel);
+    await tx.sign();
+
+    return { rawtx: tx.toHex() };
   };
 }

@@ -1,7 +1,5 @@
-import { P2PKHAddress, PublicKey } from 'bsv-wasm-web';
-import { buildInscription } from 'js-1sat-ord-web';
 import { useEffect, useState } from 'react';
-import { DerivationTag, TaggedDerivationRequest } from 'yours-wallet-provider';
+import { DerivationTag, NetWork, TaggedDerivationRequest } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -16,7 +14,10 @@ import { encryptUsingPrivKey } from '../../utils/crypto';
 import { truncate } from '../../utils/format';
 import { getPrivateKeyFromTag, getTaggedDerivationKeys, Keys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
-import { getChainParams } from '../../services/serviceHelpers';
+import { PublicKey } from '@bsv/sdk';
+import { OrdP2PKH } from 'js-1sat-ord';
+import { convertAddressToMainnet, convertAddressToTestnet } from '../../utils/tools';
+import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 
 export type GenerateTaggedKeysRequestProps = {
   request: TaggedDerivationRequest & { domain?: string };
@@ -24,7 +25,6 @@ export type GenerateTaggedKeysRequestProps = {
   onResponse: () => void;
 };
 
-// TODO: Try to use the provider type here... need to figure out how to handle error
 export type TaggedDerivationResponse = {
   address?: string;
   pubKey?: string;
@@ -39,7 +39,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, gorillaPoolService, keysService, bsvService } = useServiceContext();
+  const { chromeStorageService, keysService, bsvService } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
 
   useEffect(() => {
@@ -87,31 +87,42 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       const encryptedMessages = encryptUsingPrivKey(
         message,
         'utf8',
-        [PublicKey.from_hex(keys.identityPubKey)],
+        [PublicKey.fromString(keys.identityPubKey)],
         encryptPrivKey,
       );
 
-      const insScript = buildInscription(
-        P2PKHAddress.from_string(keys.identityAddress),
-        encryptedMessages[0],
-        'panda/tag',
-      );
-      const txid = await bsvService.sendBsv([{ satoshis: 1, script: insScript.to_hex() }], password);
+      const insScript = new OrdP2PKH().lock(keys.identityAddress, {
+        dataB64: encryptedMessages[0],
+        contentType: 'panda/tag',
+      });
+      const txid = await bsvService.sendBsv([{ satoshis: 1, script: insScript.toHex() }], password);
 
       if (!txid) {
         return { error: 'no-txid' };
       }
 
       const network = chromeStorageService.getNetwork();
-      const taggedAddress = P2PKHAddress.from_string(taggedKeys.address)
-        .set_chain_params(getChainParams(network))
-        .to_string();
+      const taggedAddress =
+        network === NetWork.Mainnet
+          ? convertAddressToMainnet(taggedKeys.address)
+          : convertAddressToTestnet(taggedKeys.address);
 
-      return {
+      const newTag = {
         address: taggedAddress,
-        pubKey: taggedKeys.pubKey.to_hex(),
+        pubKey: taggedKeys.pubKey.toString(),
         tag: derivationTag,
       };
+
+      const key: keyof ChromeStorageObject = 'accounts';
+      const update: Partial<ChromeStorageObject['accounts']> = {
+        [keysService.identityAddress]: {
+          ...account,
+          derivationTags: [...derivationTags, newTag],
+        },
+      };
+      await chromeStorageService.updateNested(key, update);
+
+      return newTag;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.log(error);
@@ -121,6 +132,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
   };
 
   const handleGetTaggedKeys = async (e: React.FormEvent<HTMLFormElement>) => {
+    throw new Error('This does not work until we fix it');
     e.preventDefault();
     setIsProcessing(true);
 
@@ -164,9 +176,10 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     }
 
     await sleep(3000); // give enough time for indexer to index newly created tag
-    await gorillaPoolService.setDerivationTags(keys.identityAddress, keys);
+    //TODO: we plan to get rid of gorilla pool service so need to handle this.
+    // await gorillaPoolService.setDerivationTags(keys.identityAddress, keys);
 
-    setSuccessTxId(res.pubKey);
+    // setSuccessTxId(res.pubKey);
     setIsProcessing(false);
     addSnackbar('Successfully generated key!', 'success');
 

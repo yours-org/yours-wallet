@@ -1,8 +1,14 @@
 import styled from 'styled-components';
-import { ColorThemeProps, Theme } from '../theme';
+import { ColorThemeProps, Theme } from '../theme.types';
 import { Show } from './Show';
 
 export type ButtonStyles = 'primary' | 'secondary' | 'secondary-outline' | 'warn';
+
+const Container = styled.div`
+  display: flex;
+  justify-content: center;
+  width: 100%;
+`;
 
 const Primary = styled.button<ColorThemeProps>`
   width: 87%;
@@ -10,13 +16,13 @@ const Primary = styled.button<ColorThemeProps>`
   background: linear-gradient(45deg, ${({ theme }) => theme.lightAccent}, ${({ theme }) => theme.primaryButton});
   color: ${({ theme }) => theme.mainBackground};
   border: none;
-  border-radius: 1.25rem;
+  border-radius: 0.25rem;
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-size: 0.85rem;
   font-weight: 700;
   margin: 0.5rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: 0.3s ease-in-out;
   transform: scale(1);
 
   &:disabled {
@@ -26,7 +32,7 @@ const Primary = styled.button<ColorThemeProps>`
   }
 
   &:hover {
-    transform: scale(1.025);
+    transform: scale(1.02);
   }
 `;
 
@@ -35,9 +41,8 @@ const GradientBorderWrapper = styled.div<ColorThemeProps>`
   align-items: center;
   padding: 1px; /* border thickness */
   background: linear-gradient(45deg, ${({ theme }) => theme.lightAccent}, ${({ theme }) => theme.primaryButton});
-  border-radius: 1.25rem;
+  border-radius: 0.25rem;
   width: 87%;
-  margin: 0.5rem;
 `;
 
 const SecondaryOutline = styled(Primary)<{ $isOutline?: boolean }>`
@@ -86,7 +91,7 @@ export type ButtonProps = {
 export const Button = (props: ButtonProps) => {
   const { label, type, onClick, disabled, theme, isSubmit, style } = props;
   return (
-    <>
+    <Container>
       <Show when={type === 'primary'}>
         <Primary
           theme={theme}
@@ -128,6 +133,6 @@ export const Button = (props: ButtonProps) => {
           {label}
         </Warn>
       </Show>
-    </>
+    </Container>
   );
 };

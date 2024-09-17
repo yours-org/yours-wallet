@@ -51,14 +51,14 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request.outpoint]);
 
-  useEffect(() => {
-    if (!successTxId) return;
-    if (!message && ordAddress) {
-      resetSendState();
-      ordinalService.getAndSetOrdinals(ordAddress);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successTxId, message, ordAddress]);
+  // useEffect(() => {
+  //   if (!successTxId) return;
+  //   if (!message && ordAddress) {
+  //     resetSendState();
+  //     ordinalService.getAndSetOrdinals(ordAddress);
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [successTxId, message, ordAddress]);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -136,7 +136,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
           <Ordinal
             inscription={inscription as OrdinalType}
             theme={theme}
-            url={`${gorillaPoolService.getBaseUrl(network)}/content/${inscription?.origin?.outpoint.toString()}`}
+            url={`${gorillaPoolService.getBaseUrl(network)}/content/${inscription?.origin?.outpoint}`}
             selected={true}
           />
           <FormContainer noValidate onSubmit={(e) => handlePurchaseOrdinal(e)}>

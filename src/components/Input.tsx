@@ -1,6 +1,6 @@
 import { InputHTMLAttributes } from 'react';
 import styled, { css, keyframes } from 'styled-components';
-import { Theme } from '../theme';
+import { Theme } from '../theme.types';
 
 const $shakeAnimation = keyframes`
   10%, 90% {
@@ -22,7 +22,7 @@ const $shakeAnimation = keyframes`
 
 const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
   background-color: ${({ theme }) => theme.gray + '10'};
-  border-radius: 1.25rem;
+  border-radius: 0.25rem;
   border: 1px solid ${({ theme }) => theme.gray + '50'};
   font-size: 0.85rem;
   width: 85%;
