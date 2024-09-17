@@ -18,6 +18,7 @@ import { PublicKey } from '@bsv/sdk';
 import { OrdP2PKH } from 'js-1sat-ord';
 import { convertAddressToMainnet, convertAddressToTestnet } from '../../utils/tools';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
+import { setDerivationTags } from '../../services/serviceHelpers';
 
 export type GenerateTaggedKeysRequestProps = {
   request: TaggedDerivationRequest & { domain?: string };
@@ -25,7 +26,7 @@ export type GenerateTaggedKeysRequestProps = {
   onResponse: () => void;
 };
 
-export type TaggedDerivationResponse = {
+export type InternalTaggedDerivationResponse = {
   address?: string;
   pubKey?: string;
   tag?: DerivationTag;
@@ -39,7 +40,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService } = useServiceContext();
+  const { chromeStorageService, keysService, bsvService, oneSatSPV } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
 
   useEffect(() => {
@@ -60,7 +61,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     password: string,
     derivationTag: DerivationTag,
     keys: Keys,
-  ): Promise<TaggedDerivationResponse> => {
+  ): Promise<InternalTaggedDerivationResponse> => {
     setIsProcessing(true);
     try {
       if (!keys?.mnemonic || !keys.identityPubKey || !keys.identityAddress) {
@@ -72,7 +73,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       const derivationTags = account.derivationTags ?? [];
 
       const existingTag = derivationTags.find(
-        (res: TaggedDerivationResponse) =>
+        (res: InternalTaggedDerivationResponse) =>
           res.tag?.domain === derivationTag.domain &&
           res.tag.label === derivationTag.label &&
           res.tag.id === derivationTag.id,
@@ -131,8 +132,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     }
   };
 
-  const handleGetTaggedKeys = async (e: React.FormEvent<HTMLFormElement>) => {
-    throw new Error('This does not work until we fix it');
+  const handleCreateTaggedKeys = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
 
@@ -176,10 +176,9 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     }
 
     await sleep(3000); // give enough time for indexer to index newly created tag
-    //TODO: we plan to get rid of gorilla pool service so need to handle this.
-    // await gorillaPoolService.setDerivationTags(keys.identityAddress, keys);
+    await setDerivationTags(keys, oneSatSPV, chromeStorageService);
 
-    // setSuccessTxId(res.pubKey);
+    setSuccessTxId(res.pubKey);
     setIsProcessing(false);
     addSnackbar('Successfully generated key!', 'success');
 
@@ -208,7 +207,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
         <ConfirmContent>
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
-          <FormContainer noValidate onSubmit={(e) => handleGetTaggedKeys(e)}>
+          <FormContainer noValidate onSubmit={(e) => handleCreateTaggedKeys(e)}>
             <Text theme={theme} style={{ margin: '1rem 0' }}>
               {`The app is requesting to generate a new set of tagged keys with label ${request.label} and id ${
                 request.id.length > 20 ? truncate(request.id, 5, 5) : request.id

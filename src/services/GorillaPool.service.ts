@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { NetWork, Ordinal } from 'yours-wallet-provider';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL } from '../utils/constants';
-import { Keys } from '../utils/keys';
 import { MarketResponse } from './types/gorillaPool.types';
 import { ChromeStorageService } from './ChromeStorage.service';
 
@@ -22,42 +21,6 @@ export class GorillaPoolService {
     } catch (e) {
       throw new Error(JSON.stringify(e));
     }
-  };
-
-  //TODO: revisit this...
-  setDerivationTags = async (identityAddress: string, keys: Keys) => {
-    // const taggedOrds = await this.getOrdUtxos(identityAddress);
-    // const tags: TaggedDerivationResponse[] = [];
-    // const network = this.chromeStorageService.getNetwork();
-    // for (const ord of taggedOrds) {
-    //   try {
-    //     if (!ord.origin?.outpoint || ord.origin.data?.insc?.file.type !== 'panda/tag') continue;
-    //     const contentBuffer = await this.getOrdContentByOriginOutpoint(ord.origin.outpoint.toString());
-    //     if (!contentBuffer || contentBuffer.length === 0) continue;
-    //     const derivationTag = decryptUsingPrivKey(
-    //       [Buffer.from(contentBuffer).toString('base64')],
-    //       PrivateKey.from_wif(keys.identityWif),
-    //     );
-    //     const parsedTag: DerivationTag = JSON.parse(Buffer.from(derivationTag[0], 'base64').toString('utf8'));
-    //     const taggedKeys = getTaggedDerivationKeys(parsedTag, keys.mnemonic);
-    //     const taggedAddress = P2PKHAddress.from_string(taggedKeys.address)
-    //       .set_chain_params(getChainParams(network))
-    //       .to_string();
-    //     tags.push({ tag: parsedTag, address: taggedAddress, pubKey: taggedKeys.pubKey.to_hex() });
-    //   } catch (error) {
-    //     console.log(error);
-    //   }
-    // }
-    // const { account } = this.chromeStorageService.getCurrentAccountObject();
-    // if (!account) throw new Error('No account found!');
-    // const key: keyof ChromeStorageObject = 'accounts';
-    // const update: Partial<ChromeStorageObject['accounts']> = {
-    //   [account.addresses.identityAddress]: {
-    //     ...account,
-    //     derivationTags: tags,
-    //   },
-    // };
-    // await this.chromeStorageService.updateNested(key, update);
   };
 
   getTokenPriceInSats = async (tokenIds: string[]) => {
