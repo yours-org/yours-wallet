@@ -123,7 +123,7 @@ type PageState = 'main' | 'transfer' | 'list' | 'cancel' | 'sendBSV20';
 
 interface Token {
   isConfirmed: boolean;
-  info: Bsv20;
+  info: Bsv20 | Bsv21;
 }
 
 export const OrdWallet = () => {
@@ -139,6 +139,7 @@ export const OrdWallet = () => {
     cancelGlobalOrderbookListing,
     getTokenName,
     getOrdinals,
+    sendBSV20,
   } = ordinalService;
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const network = chromeStorageService.getNetwork();
@@ -326,45 +327,49 @@ export const OrdWallet = () => {
 
   const handleSendBSV20 = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    //TODO: this
-    // setIsProcessing(true);
+    setIsProcessing(true);
 
-    // await sleep(25);
-    // if (!validate(receiveAddress)) {
-    //   addSnackbar('You must enter a valid 1Sat Ordinal address.', 'info');
-    //   setIsProcessing(false);
-    //   return;
-    // }
+    await sleep(25);
+    if (!validate(receiveAddress)) {
+      addSnackbar('You must enter a valid 1Sat Ordinal address.', 'info');
+      setIsProcessing(false);
+      return;
+    }
 
-    // if (!passwordConfirm && isPasswordRequired) {
-    //   addSnackbar('You must enter a password!', 'error');
-    //   setIsProcessing(false);
-    //   return;
-    // }
+    if (!passwordConfirm && isPasswordRequired) {
+      addSnackbar('You must enter a password!', 'error');
+      setIsProcessing(false);
+      return;
+    }
 
-    // if (token === null || tokenSendAmount === null) {
-    //   setIsProcessing(false);
-    //   return;
-    // }
+    if (token === null || tokenSendAmount === null) {
+      setIsProcessing(false);
+      return;
+    }
 
-    // if (!token.info.id) {
-    //   addSnackbar('Missing token ID!', 'error');
-    //   setIsProcessing(false);
-    //   return;
-    // }
+    if (!token.info.tick && !(token.info as Bsv21).id) {
+      addSnackbar('Missing token ID!', 'error');
+      setIsProcessing(false);
+      return;
+    }
 
-    // const sendBSV20Res = await sendBSV20(token.info.id, receiveAddress, BigInt(tokenSendAmount), passwordConfirm);
+    const sendBSV20Res = await sendBSV20(
+      token.info.tick || (token.info as Bsv21).id,
+      receiveAddress,
+      BigInt(tokenSendAmount),
+      passwordConfirm,
+    );
 
-    // if (!sendBSV20Res.txid || sendBSV20Res.error) {
-    //   const message = getErrorMessage(sendBSV20Res);
+    if (!sendBSV20Res.txid || sendBSV20Res.error) {
+      const message = getErrorMessage(sendBSV20Res);
+      setIsProcessing(false);
+      addSnackbar(message, 'error');
+      return;
+    }
 
-    //   addSnackbar(message, 'error');
-    //   return;
-    // }
-
-    // setSuccessTxId(sendBSV20Res.txid);
-    // addSnackbar('Tokens Sent!', 'success');
-    // loadOrdinals();
+    setSuccessTxId(sendBSV20Res.txid);
+    addSnackbar('Tokens Sent!', 'success');
+    loadOrdinals();
   };
 
   const userSelectedAmount = (inputValue: string, token: Token) => {

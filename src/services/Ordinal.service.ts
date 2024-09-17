@@ -217,7 +217,7 @@ export class OrdinalService {
       }
       const keys = await this.keysService.retrieveKeys(password);
       if (!keys?.ordAddress || !keys.ordWif || !keys.walletAddress || !keys.walletWif) {
-        throw Error('No keys');
+        return { error: 'no-keys' };
       }
       const paymentPk = PrivateKey.fromWif(keys.walletWif);
       const ordPk = PrivateKey.fromWif(keys.ordWif);
