@@ -30,6 +30,7 @@ import { AssetRow } from '../components/AssetRow';
 import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { ListOrdinal, OrdOperationResponse } from '../services/types/ordinal.types';
 import { Bsv20, Bsv21, Ordinal as OrdinalType } from 'yours-wallet-provider';
+import { isValidEmail } from '../utils/tools';
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -231,6 +232,7 @@ export const OrdWallet = () => {
     setIsProcessing(true);
 
     await sleep(25);
+    // if (!isValidEmail(receiveAddress) && !validate(receiveAddress)) {
     if (!validate(receiveAddress)) {
       addSnackbar('You must enter a valid 1Sat Ordinal address.', 'info');
       setIsProcessing(false);

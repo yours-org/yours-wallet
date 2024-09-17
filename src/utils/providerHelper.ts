@@ -1,5 +1,5 @@
 import { Utils } from '@bsv/sdk';
-import { Txo } from 'ts-casemod-spv';
+import { Txo } from 'spv-store';
 import { Ordinal } from 'yours-wallet-provider';
 
 export function mapOrdinal(t: Txo): Ordinal {

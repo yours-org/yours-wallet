@@ -3,7 +3,7 @@
   "version": "3.3.0",
   "private": true,
   "dependencies": {
-    "@bsv/paymail": "^1.0.2",
+    "@bsv/paymail": "^2.0.2",
     "@bsv/sdk": "^1.1.19",
     "@ramonak/react-progress-bar": "^5.2.0",
     "@tempfix/idb": "^8.0.3",
@@ -35,9 +35,9 @@
     "react-router-dom": "^6.16.0",
     "react-scripts": "^5.0.1",
     "replace-module-webpack-plugin": "^1.0.0",
+    "spv-store": "file:../ts-casemod-spv/spv-store-0.0.1.tgz",
     "stream-browserify": "^3.0.0",
     "styled-components": "^6.0.8",
-    "ts-casemod-spv": "file:../ts-casemod-spv/ts-casemod-spv-0.0.1.tgz",
     "ts-loader": "^9.5.1",
     "typescript": "^4.9.5",
     "url": "^0.11.3",
@@ -47,7 +47,7 @@
   },
   "scripts": {
     "start": "react-app-rewired start",
-    "build": "npm install ../ts-casemod-spv/ts-casemod-spv-0.0.1.tgz && react-app-rewired build",
+    "build": "npm install ../ts-casemod-spv/spv-store-0.0.1.tgz && react-app-rewired build",
     "test": "react-app-rewired test",
     "eject": "react-app-rewired eject",
     "format": "prettier --write ."

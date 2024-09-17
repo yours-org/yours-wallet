@@ -10,7 +10,7 @@ import {
   OneSatWebSPV,
   OrdLockIndexer,
   OriginIndexer,
-} from 'ts-casemod-spv';
+} from 'spv-store';
 import { NetWork } from 'yours-wallet-provider';
 import { BlockHeightTrackerMessage } from './hooks/useBlockHeightTracker';
 import { QueueTrackerMessage } from './hooks/useQueueTracker';

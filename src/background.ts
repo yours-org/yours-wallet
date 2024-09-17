@@ -34,7 +34,7 @@ import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { mapOrdinal } from './utils/providerHelper';
-import { TxoLookup } from 'ts-casemod-spv';
+import { TxoLookup } from 'spv-store';
 import { initOneSatSPV } from './initCaseMode';
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;

@@ -20,7 +20,7 @@ import { truncate } from '../utils/format';
 // import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { Txo } from 'ts-casemod-spv';
+import { Txo } from 'spv-store';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 
 const Content = styled.div`

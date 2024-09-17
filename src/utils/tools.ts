@@ -24,3 +24,7 @@ export const convertAddressToTestnet = (address: string) => {
 export const convertAddressToMainnet = (address: string) => {
   return Utils.toBase58Check(Utils.fromBase58Check(address).data as number[], [MAINNET_ADDRESS_PREFIX]);
 };
+
+export const isValidEmail = (email: string) => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};

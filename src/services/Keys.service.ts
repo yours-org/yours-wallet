@@ -15,7 +15,7 @@ import { ChromeStorageService } from './ChromeStorage.service';
 import { Account, ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction, Utils } from '@bsv/sdk';
-import { CaseModSPV } from 'ts-casemod-spv';
+import { SPVStore } from 'spv-store';
 import { WocUtxo } from './types/whatsOnChain.types';
 import axios from 'axios';
 
@@ -28,7 +28,7 @@ export class KeysService {
   identityPubKey: string;
   constructor(
     private readonly chromeStorageService: ChromeStorageService,
-    private readonly oneSatSPV: CaseModSPV,
+    private readonly oneSatSPV: SPVStore,
   ) {
     this.bsvAddress = '';
     this.ordAddress = '';

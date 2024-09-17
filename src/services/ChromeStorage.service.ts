@@ -1,3 +1,5 @@
+declare const chrome: any;
+
 import { NetWork } from 'yours-wallet-provider';
 import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
@@ -23,7 +25,7 @@ export class ChromeStorageService {
 
   private get = async (keyOrKeys: string | string[] | null): Promise<Partial<ChromeStorageObject>> => {
     return new Promise<Partial<ChromeStorageObject>>((resolve, reject) => {
-      chrome.storage.local.get(keyOrKeys, (result) => {
+      chrome.storage.local.get(keyOrKeys, (result: any) => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
         } else {

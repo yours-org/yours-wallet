@@ -7,7 +7,7 @@ import {
   MAX_BYTES_PER_TX,
   TESTNET_ADDRESS_PREFIX,
 } from '../utils/constants';
-import { removeBase64Prefix } from '../utils/format';
+import { removeBase64Prefix, truncate } from '../utils/format';
 import { getPrivateKeyFromTag, Keys } from '../utils/keys';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { ContractService } from './Contract.service';
@@ -27,10 +27,12 @@ import {
   Transaction,
   Utils,
 } from '@bsv/sdk';
-import { CaseModSPV, Lock, TxoLookup } from 'ts-casemod-spv';
-// import { PaymailClient } from '@bsv/paymail/dist/esm/src/paymailClient';
+import { SPVStore, Lock, TxoLookup } from 'spv-store';
+import theme from '../theme.json';
+//@ts-ignore
+import { PaymailClient } from '@bsv/paymail/client';
 
-// const client = new PaymailClient();
+const client = new PaymailClient();
 
 export class BsvService {
   private bsvBalance: number;
@@ -40,7 +42,7 @@ export class BsvService {
     private readonly wocService: WhatsOnChainService,
     private readonly contractService: ContractService,
     private readonly chromeStorageService: ChromeStorageService,
-    private readonly oneSatSPV: CaseModSPV,
+    private readonly oneSatSPV: SPVStore,
   ) {
     this.bsvBalance = 0;
     this.exchangeRate = 0;
@@ -98,14 +100,6 @@ export class BsvService {
   sendAllBsv = async (destinationAddress: string, type: 'address' | 'paymail', password: string) => {
     try {
       const tx = new Transaction();
-      if (type === 'address') {
-        const outScript = new P2PKH().lock(destinationAddress);
-        tx.addOutput({ lockingScript: outScript, change: true });
-      } else if (type === 'paymail') {
-        //TODO: address paymail once PR merged
-        throw new Error('Paymail is not implemented!');
-      }
-
       const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
       const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
       const pkMap = await this.keysService.retrievePrivateKeyMap(password);
@@ -119,10 +113,45 @@ export class BsvService {
           unlockingScriptTemplate: new P2PKH().unlock(pk),
         });
       }
-      await tx.fee(feeModel);
+
+      const paymailRefs: { paymail: string; reference: string }[] = [];
+      if (type === 'address') {
+        const outScript = new P2PKH().lock(destinationAddress);
+        tx.addOutput({ lockingScript: outScript, change: true });
+        await tx.fee(feeModel);
+      } else if (type === 'paymail') {
+        console.log('Sending P2P payment to', destinationAddress);
+        const dummyScript = new Script().writeBin(new Array(1000).fill(0));
+        tx.addOutput({ lockingScript: dummyScript, change: true });
+        await tx.fee(feeModel);
+        const satsOut = tx.outputs[0].satoshis;
+        console.log('satsOut', satsOut);
+        tx.outputs = [];
+        const p2pDestination = await client.getP2pPaymentDestination(destinationAddress, satsOut);
+        console.log(`P2P payment destination: ${p2pDestination}`);
+        paymailRefs.push({ paymail: destinationAddress, reference: p2pDestination.reference });
+        for (const output of p2pDestination.outputs) {
+          tx.addOutput({
+            satoshis: output.satoshis,
+            lockingScript: Script.fromHex(output.script),
+          });
+        }
+      }
+
       await tx.sign();
       const response = await this.oneSatSPV.broadcast(tx);
+      console.log(`Transaction broadcast response: ${response}`);
       if (response.status == 'error') return { error: response.description };
+      const txHex = tx.toHex();
+      const chromeObj = this.chromeStorageService.getCurrentAccountObject();
+      if (!chromeObj.account) return { error: 'no-account' };
+      for (const ref of paymailRefs) {
+        console.log(`Sending P2P payment to ${ref.paymail} with reference ${ref.reference}`);
+        await client.sendTransactionP2P(ref.paymail, txHex, ref.reference, {
+          sender: `${theme.settings.walletName} - ${truncate(chromeObj.account.addresses.bsvAddress, 4, 4)}`,
+          note: `P2P tx from ${theme.settings.walletName}`,
+        });
+      }
       return { txid: tx.id('hex'), rawtx: Utils.toHex(tx.toBinary()) };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
@@ -146,7 +175,7 @@ export class BsvService {
       // let feeSats = 20;
       const isBelowNoApprovalLimit = Number(bsvSendAmount) <= Number(noApprovalLimit);
       const keys = await this.keysService.retrieveKeys(password, isBelowNoApprovalLimit);
-      if (!keys?.walletAddress) throw Error('Undefined key');
+      if (!keys?.walletAddress) return { error: 'no-wallet-address' };
       const changeAddress = keys.walletAddress;
       const pkMap = await this.keysService.retrievePrivateKeyMap(password);
       const amount = request.reduce((a, r) => a + r.satoshis, 0);
@@ -154,7 +183,7 @@ export class BsvService {
       // Build tx
       const tx = new Transaction();
       let satsOut = 0;
-      // const paymailRefs: { paymail: string; reference: string }[] = [];
+      const paymailRefs: { paymail: string; reference: string }[] = [];
       for (const req of request) {
         let outScript: Script;
         if (req.address) {
@@ -180,10 +209,10 @@ export class BsvService {
           try {
             outScript = Script.fromASM(asm);
           } catch (e) {
-            throw Error('Invalid data');
+            return { error: 'invalid-data' };
           }
         } else if (!req.paymail) {
-          throw Error('Invalid request');
+          return { error: 'invalid-request' };
         }
 
         satsOut += req.satoshis;
@@ -193,16 +222,15 @@ export class BsvService {
             lockingScript: outScript!,
           });
         } else {
-          throw Error('Paymail not implemented');
-          // const p2pDestination = await client.getP2pPaymentDestination(req.paymail, req.satoshis);
-          // console.log(p2pDestination);
-          // paymailRefs.push({ paymail: req.paymail, reference: p2pDestination.reference });
-          // for (const output of p2pDestination.outputs) {
-          //   tx.addOutput({
-          //     satoshis: output.satoshis,
-          //     lockingScript: Script.fromHex(output.script),
-          //   });
-          // }
+          const p2pDestination = await client.getP2pPaymentDestination(req.paymail, req.satoshis);
+          console.log(p2pDestination);
+          paymailRefs.push({ paymail: req.paymail, reference: p2pDestination.reference });
+          for (const output of p2pDestination.outputs) {
+            tx.addOutput({
+              satoshis: output.satoshis,
+              lockingScript: Script.fromHex(output.script),
+            });
+          }
         }
       }
 
@@ -219,8 +247,14 @@ export class BsvService {
       for await (const u of fundResults.txos || []) {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
+        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
+        if (!sourceTransaction) {
+          console.log(`Could not find source transaction ${u.outpoint.txid}`);
+          return { error: 'source-tx-not-found' };
+          // continue;
+        }
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid),
+          sourceTransaction,
           sourceOutputIndex: u.outpoint.vout,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(pk),
@@ -239,22 +273,26 @@ export class BsvService {
 
       const response = await this.oneSatSPV.broadcast(tx);
 
-      // const txHex = tx.toHex();
-      // for (const ref of paymailRefs) {
-      //   await client.sendTransactionP2P(ref.paymail, txHex, ref.reference);
-      // }
+      const txHex = tx.toHex();
+      const chromeObj = this.chromeStorageService.getCurrentAccountObject();
+      if (!chromeObj.account) return { error: 'no-account' };
+      for (const ref of paymailRefs) {
+        console.log(`Sending P2P payment to ${ref.paymail} with reference ${ref.reference}`);
+        await client.sendTransactionP2P(ref.paymail, txHex, ref.reference, {
+          sender: `${theme.settings.walletName} - ${truncate(chromeObj.account.addresses.bsvAddress, 4, 4)}`,
+          note: `P2P tx from ${theme.settings.walletName}`,
+        });
+      }
 
       if (response.status == 'error') return { error: response.description };
       if (isBelowNoApprovalLimit) {
-        const { account } = this.chromeStorageService.getCurrentAccountObject();
-        if (!account) throw Error('No account found!');
-        const { noApprovalLimit } = account.settings;
+        const { noApprovalLimit } = chromeObj.account.settings;
         const key: keyof ChromeStorageObject = 'accounts';
         const update: Partial<ChromeStorageObject['accounts']> = {
           [this.keysService.identityAddress]: {
-            ...account,
+            ...chromeObj.account,
             settings: {
-              ...account.settings,
+              ...chromeObj.account.settings,
               noApprovalLimit: noApprovalLimit
                 ? Number((noApprovalLimit - amount / BSV_DECIMAL_CONVERSION).toFixed(8))
                 : 0,

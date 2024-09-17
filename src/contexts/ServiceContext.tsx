@@ -6,7 +6,7 @@ import { ContractService } from '../services/Contract.service';
 import { BsvService } from '../services/Bsv.service';
 import { OrdinalService } from '../services/Ordinal.service';
 import { INACTIVITY_LIMIT } from '../utils/constants';
-import { CaseModSPV } from 'ts-casemod-spv';
+import { SPVStore } from 'spv-store';
 import { oneSatSPVPromise } from '../background';
 import { GorillaPoolService } from '../services/GorillaPool.service';
 
@@ -21,7 +21,7 @@ const initializeServices = async () => {
   const contractService = new ContractService(keysService, oneSatSPV);
 
   const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, oneSatSPV);
-  const ordinalService = new OrdinalService(keysService, bsvService, oneSatSPV);
+  const ordinalService = new OrdinalService(keysService, bsvService, oneSatSPV, chromeStorageService);
 
   return {
     chromeStorageService,
@@ -46,7 +46,7 @@ export interface ServiceContextProps {
   isLocked: boolean;
   isReady: boolean;
   lockWallet: () => Promise<void>;
-  oneSatSPV: CaseModSPV;
+  oneSatSPV: SPVStore;
 }
 
 export const ServiceContext = createContext<ServiceContextProps | undefined>(undefined);

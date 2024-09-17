@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { BLOCK_HEADER_SIZE, CaseModSPV, OneSatWebSPV } from 'ts-casemod-spv';
+import { BLOCK_HEADER_SIZE, SPVStore, OneSatWebSPV } from 'spv-store';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { formatNumberWithCommasAndDecimals } from './format';
@@ -14,7 +14,7 @@ export type MasterBackupProgressEvent = {
 type MasterBackupProgress = (event: MasterBackupProgressEvent) => void;
 
 export const restoreMasterFromZip = async (
-  oneSatSpv: CaseModSPV,
+  oneSatSpv: SPVStore,
   chromeStorageService: ChromeStorageService,
   progress: MasterBackupProgress,
   file: File, // Assuming the ZIP file is passed in as a File object

@@ -3,31 +3,39 @@ import { ListOrdinal, OrdOperationResponse } from './types/ordinal.types';
 import {
   cancelOrdListings,
   createOrdListings,
+  OrdP2PKH,
   purchaseOrdListing,
-  sendOrdinals,
   TokenType,
   TokenUtxo,
   transferOrdTokens,
 } from 'js-1sat-ord';
 import { Bsv20, Bsv21, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
-import { PrivateKey, Utils } from '@bsv/sdk';
+import { P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction } from '@bsv/sdk';
 import { BsvService } from './Bsv.service';
 //TODO: look into why BSV20_INDEX_FEE is not being used
 import { BSV20_INDEX_FEE, FEE_PER_KB } from '../utils/constants';
 import { mapOrdinal } from '../utils/providerHelper';
-import { Bsv20 as Bsv20Type, Bsv21 as Bsv21Type, CaseModSPV, Outpoint, TxoLookup, TxoSort } from 'ts-casemod-spv';
+import { Bsv20 as Bsv20Type, Bsv21 as Bsv21Type, SPVStore, Outpoint, TxoLookup, TxoSort } from 'spv-store';
+import { isValidEmail } from '../utils/tools';
+//@ts-ignore
+import { PaymailClient } from '@bsv/paymail/client';
+import { ChromeStorageService } from './ChromeStorage.service';
+import { truncate } from '../utils/format';
+import theme from '../theme.json';
+
+const client = new PaymailClient();
 
 export class OrdinalService {
   constructor(
     private readonly keysService: KeysService,
     private readonly bsvService: BsvService,
-    private readonly oneSatSPV: CaseModSPV,
+    private readonly oneSatSPV: SPVStore,
+    private readonly chromeStorageService: ChromeStorageService,
   ) {}
 
   getOrdinals = async (): Promise<Ordinal[]> => {
     const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 0);
     const mapped = ordinals.txos.map(mapOrdinal);
-    console.log('Ordinals:', mapped);
     return mapped;
   };
 
@@ -108,39 +116,90 @@ export class OrdinalService {
 
       const keys = await this.keysService.retrieveKeys(password);
       if (!keys?.ordAddress || !keys.ordWif || !keys.walletAddress || !keys.walletWif) {
-        throw Error('No keys');
+        return { error: 'no-keys' };
       }
 
-      const ordPk = PrivateKey.fromWif(keys.ordWif);
-      const fundingAndChangeAddress = keys.walletAddress;
-      const payPk = PrivateKey.fromWif(keys.walletWif);
+      const changeAddress = keys.walletAddress;
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
 
-      const fundingUtxos = await this.bsvService.fundingTxos();
-      const { tx } = await sendOrdinals({
-        destinations: [{ address: destinationAddress }],
-        ordinals: [
-          {
-            txid: ordinal.outpoint.txid,
-            vout: ordinal.outpoint.vout,
-            satoshis: 1,
-            script: Utils.toBase64(ordinal.script),
-          },
-        ],
-        ordPk,
-        paymentPk: payPk,
-        paymentUtxos: fundingUtxos.map((t) => ({
-          txid: t.outpoint.txid,
-          vout: t.outpoint.vout,
-          satoshis: Number(t.satoshis),
-          script: Buffer.from(t.script).toString('base64'),
-        })),
-        changeAddress: fundingAndChangeAddress,
-        satsPerKb: FEE_PER_KB,
+      // Build tx
+      const tx = new Transaction();
+      const paymailRefs: { paymail: string; reference: string }[] = [];
+      const u = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
+      if (!u) return { error: 'no-ordinal' };
+      const pk = pkMap.get(u.owner || '');
+      if (!pk) return { error: 'no-keys' };
+      const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
+      if (!sourceTransaction) {
+        console.log(`Could not find source transaction ${u.outpoint.txid}`);
+        return { error: 'source-tx-not-found' };
+      }
+      tx.addInput({
+        sourceTransaction,
+        sourceOutputIndex: u.outpoint.vout,
+        sequence: 0xffffffff,
+        unlockingScriptTemplate: new OrdP2PKH().unlock(pk),
       });
+
+      if (isValidEmail(destinationAddress)) {
+        const p2pDestination = await client.getP2pOrdinalDestinations(destinationAddress, 1);
+        console.log(`P2P payment destination: ${p2pDestination}`);
+        paymailRefs.push({ paymail: destinationAddress, reference: p2pDestination.reference });
+
+        tx.addOutput({
+          satoshis: 1,
+          lockingScript: Script.fromHex(p2pDestination.outputs[0].script),
+        });
+      } else {
+        tx.addOutput({ satoshis: 1, lockingScript: new OrdP2PKH().lock(destinationAddress) });
+      }
+
+      tx.addOutput({
+        lockingScript: new P2PKH().lock(changeAddress),
+        change: true,
+      });
+
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+
+      let satsIn = 0;
+      let fee = 0;
+      const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+      for await (const u of fundResults.txos || []) {
+        const pk = pkMap.get(u.owner || '');
+        if (!pk) continue;
+        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
+        if (!sourceTransaction) {
+          console.log(`Could not find source transaction ${u.outpoint.txid}`);
+          return { error: 'source-tx-not-found' };
+        }
+        tx.addInput({
+          sourceTransaction,
+          sourceOutputIndex: u.outpoint.vout,
+          sequence: 0xffffffff,
+          unlockingScriptTemplate: new P2PKH().unlock(pk),
+        });
+        satsIn += Number(u.satoshis);
+        fee = await feeModel.computeFee(tx);
+        if (satsIn >= fee) break;
+      }
+      if (satsIn < fee) return { error: 'insufficient-funds' };
+      await tx.fee(feeModel);
+      await tx.sign();
 
       const response = await this.oneSatSPV.broadcast(tx);
       if (response?.txid) {
         return { txid: response.txid };
+      }
+
+      const txHex = tx.toHex();
+      const chromeObj = this.chromeStorageService.getCurrentAccountObject();
+      if (!chromeObj.account) return { error: 'no-account' };
+      for (const ref of paymailRefs) {
+        console.log(`Sending P2P payment to ${ref.paymail} with reference ${ref.reference}`);
+        await client.sendOrdinalTransactionP2P(ref.paymail, txHex, ref.reference, {
+          sender: `${theme.settings.walletName} - ${truncate(chromeObj.account.addresses.bsvAddress, 4, 4)}`,
+          note: `P2P tx from ${theme.settings.walletName}`,
+        });
       }
 
       return { error: 'broadcast-failed' };

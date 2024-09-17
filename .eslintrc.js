@@ -15,6 +15,7 @@ module.exports = {
   rules: {
     'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     '@typescript-eslint/no-var-requires': 'off', // Disable the rule that disallows require statements
+    '@typescript-eslint/ban-ts-comment': 'off', // Disable the rule that disallows @ts-ignore comments
   },
   settings: {
     react: {

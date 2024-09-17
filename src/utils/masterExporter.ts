@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { CaseModSPV, Ingest, OneSatWebSPV } from 'ts-casemod-spv';
+import { SPVStore, Ingest, OneSatWebSPV } from 'spv-store';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { sleep } from './sleep';
 import { formatNumberWithCommasAndDecimals } from './format';
@@ -15,7 +15,7 @@ type MasterBackupProgress = (event: MasterBackupProgressEvent) => void;
 
 // TODO: should probably handle errors?
 export const streamDataToZip = async (
-  oneSatSpv: CaseModSPV,
+  oneSatSpv: SPVStore,
   chromeStorageService: ChromeStorageService,
   progress: MasterBackupProgress,
 ) => {

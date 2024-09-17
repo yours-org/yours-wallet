@@ -38,6 +38,7 @@ import { sendMessage } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
 import { InWalletBsvResponse } from '../services/types/bsv.types';
 import { useQueueTracker } from '../hooks/useQueueTracker';
+import { isValidEmail } from '../utils/tools';
 
 const MiddleContainer = styled.div<ColorThemeProps>`
   display: flex;
@@ -133,7 +134,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [isSendAllBsv, setIsSendAllBsv] = useState(false);
 
   useEffect(() => {
-    setIsSendAllBsv(satSendAmount == bsvBalance);
+    const bsvBalanceInSats = bsvBalance * BSV_DECIMAL_CONVERSION;
+    setIsSendAllBsv(satSendAmount === bsvBalanceInSats);
   }, [satSendAmount, bsvBalance]);
 
   const getAndSetBsvBalance = async () => {
@@ -245,10 +247,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
     setSatSendAmount(null);
   };
 
-  const isValidEmail = (email: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
-
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -300,8 +298,19 @@ export const BsvWallet = (props: BsvWalletProps) => {
             ? 'Insufficient Funds!'
             : sendRes.error === 'fee-too-high'
               ? 'Miner fee too high!'
-              : 'An unknown error has occurred! Try again.';
+              : sendRes.error === 'no-wallet-address'
+                ? 'No wallet address found!'
+                : sendRes.error === 'invalid-data'
+                  ? 'Invalid data!'
+                  : sendRes.error === 'invalid-request'
+                    ? 'Invalid request!'
+                    : sendRes.error === 'source-tx-not-found'
+                      ? 'Source transaction not found!'
+                      : sendRes.error === 'no-account'
+                        ? 'No account found!'
+                        : 'An unknown error has occurred! Try again.';
 
+      setIsProcessing(false);
       addSnackbar(message, 'error');
       setPasswordConfirm('');
       return;
