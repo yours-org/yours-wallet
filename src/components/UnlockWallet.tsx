@@ -9,6 +9,8 @@ import { Input } from './Input';
 import { FormContainer, HeaderText, Text } from './Reusable';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursIcon } from './YoursIcon';
+import { setDerivationTags } from '../services/serviceHelpers';
+import { Keys } from '../utils/keys';
 
 const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
   display: flex;
@@ -35,7 +37,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
   const { isMobile } = useViewport();
-  const { keysService, chromeStorageService } = useServiceContext();
+  const { keysService, chromeStorageService, oneSatSPV } = useServiceContext();
 
   const handleUnlock = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -49,6 +51,8 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       const timestamp = Date.now();
       await chromeStorageService.update({ lastActiveTime: timestamp });
       onUnlock();
+      const keys = (await keysService.retrieveKeys(password)) as Keys;
+      setDerivationTags(keys, oneSatSPV, chromeStorageService);
     } else {
       setVerificationFailed(true);
       setTimeout(() => {
