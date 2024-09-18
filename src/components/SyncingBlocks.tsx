@@ -3,33 +3,34 @@ import { Show } from './Show';
 import ProgressBar from '@ramonak/react-progress-bar';
 import { useTheme } from '../hooks/useTheme';
 import { styled } from 'styled-components';
-import { ColorThemeProps } from '../theme.types';
+import { WhiteLabelTheme } from '../theme.types';
 import { YoursIcon } from './YoursIcon';
 
-const Container = styled.div<ColorThemeProps>`
+const Container = styled.div<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 100%;
   height: 100%;
-  background-color: ${({ theme }) => theme.black};
+  background-color: ${({ theme }) => theme.color.global.walletBackground};
   z-index: 1000;
   position: absolute;
 `;
 
-const Title = styled.h1<ColorThemeProps>`
+const Title = styled.h1<WhiteLabelTheme>`
   text-align: center;
   width: 100%;
-  color: ${({ theme }) => theme.white};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
   margin: 0 0 1rem 0;
 `;
 
-const Description = styled.p<ColorThemeProps>`
+const Description = styled.p<WhiteLabelTheme>`
   text-align: center;
   width: 80%;
   margin: -0.5rem 0 1rem 0;
-  color: ${({ theme }) => theme.gray};
+  color: ${({ theme }) => theme.color.global.gray};
 `;
 
 export const SyncingBlocks = () => {
@@ -45,8 +46,8 @@ export const SyncingBlocks = () => {
           <Description theme={theme}>Yours SPV Wallet will be ready to use once this process is complete.</Description>
           <ProgressBar
             completed={percentCompleted}
-            bgColor={theme.primaryButton}
-            baseBgColor="#f5f5f5"
+            bgColor={theme.color.component.progressBar}
+            baseBgColor={theme.color.component.progressBarTrack}
             height="16px"
             width="80vw"
           />

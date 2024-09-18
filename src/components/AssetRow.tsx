@@ -1,16 +1,16 @@
 import { styled } from 'styled-components';
 import { useTheme } from '../hooks/useTheme';
-import { ColorThemeProps } from '../theme.types';
+import { WhiteLabelTheme } from '../theme.types';
 import { HeaderText, Text } from './Reusable';
 import { formatLargeNumber, formatUSD } from '../utils/format';
 import { Show } from './Show';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 
-const Container = styled.div<ColorThemeProps & { $animate: boolean }>`
+const Container = styled.div<WhiteLabelTheme & { $animate: boolean }>`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: ${({ theme }) => theme.darkAccent};
+  background-color: ${({ theme }) => theme.color.global.row};
   padding: 1rem 0;
   width: 90%;
   border-radius: 0.5rem;

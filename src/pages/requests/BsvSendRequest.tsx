@@ -11,7 +11,7 @@ import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { ColorThemeProps } from '../../theme.types';
+import { WhiteLabelTheme } from '../../theme.types';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
@@ -19,7 +19,7 @@ import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendBsv } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
 
-const RequestDetailsContainer = styled.div<ColorThemeProps>`
+const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -27,7 +27,7 @@ const RequestDetailsContainer = styled.div<ColorThemeProps>`
   max-height: 10rem;
   overflow-y: auto;
   overflow-x: hidden;
-  background: ${({ theme }) => theme.darkAccent + '80'};
+  background: ${({ theme }) => theme.color.global.row + '80'};
   margin: 0.5rem;
 `;
 

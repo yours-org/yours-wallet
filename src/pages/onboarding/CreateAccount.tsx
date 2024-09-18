@@ -8,7 +8,7 @@ import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { ColorThemeProps } from '../../theme.types';
+import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import copyIcon from '../../assets/copy-green.svg';
 import { useServiceContext } from '../../hooks/useServiceContext';
@@ -35,18 +35,18 @@ const FormContainer = styled.form`
   background: none;
 `;
 
-const SeedContainer = styled.div<ColorThemeProps>`
+const SeedContainer = styled.div<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
-  background-color: ${({ theme }) => theme.darkAccent};
+  background-color: ${({ theme }) => theme.color.global.row};
   border-radius: 0.5rem;
-  border: 1px solid ${({ theme }) => theme.gray + '50'};
+  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
   width: 80%;
   padding: 1rem;
   margin: 0.5rem 0 1rem 0;
 `;
 
-const CopyToClipboardContainer = styled.div<ColorThemeProps>`
+const CopyToClipboardContainer = styled.div<WhiteLabelTheme>`
   display: flex;
   align-items: center;
   margin-top: 1.5rem;
@@ -195,14 +195,22 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
         Safely write down and store your seed phrase in a safe place.
       </Text>
       <SeedContainer theme={theme}>
-        <Text style={{ textAlign: 'left', width: '100%', margin: '0', color: theme.white }} theme={theme}>
+        <Text
+          style={{
+            textAlign: 'left',
+            width: '100%',
+            margin: '0',
+            color: theme.color.global.primaryTheme === 'light' ? theme.color.global.black : theme.color.global.white,
+          }}
+          theme={theme}
+        >
           {seedWords.join(' ').trim()}
         </Text>
         <CopyToClipboardContainer onClick={() => handleCopyToClipboard(seedWords.join(' ').trim())}>
           <CopyIcon src={copyIcon} />
           <Text
             style={{
-              color: theme.primaryButton,
+              color: theme.color.component.primaryButtonRightGradient,
               textDecoration: 'underline',
               margin: '0 0 0 0.5rem',
               textAlign: 'left',

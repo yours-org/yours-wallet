@@ -23,7 +23,7 @@ import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
-import { ColorThemeProps } from '../theme.types';
+import { WhiteLabelTheme } from '../theme.types';
 import { BSV_DECIMAL_CONVERSION, HOSTED_YOURS_IMAGE } from '../utils/constants';
 import { formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
@@ -40,7 +40,7 @@ import { InWalletBsvResponse } from '../services/types/bsv.types';
 import { useQueueTracker } from '../hooks/useQueueTracker';
 import { isValidEmail } from '../utils/tools';
 
-const MiddleContainer = styled.div<ColorThemeProps>`
+const MiddleContainer = styled.div<WhiteLabelTheme>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -362,7 +362,14 @@ export const BsvWallet = (props: BsvWalletProps) => {
       </Text>
       <CopyAddressWrapper onClick={handleCopyToClipboard}>
         <StyledCopy src={copyIcon} />
-        <Text theme={theme} style={{ margin: '0', color: theme.white, fontSize: '0.75rem' }}>
+        <Text
+          theme={theme}
+          style={{
+            margin: '0',
+            color: theme.color.global.primaryTheme === 'light' ? theme.color.global.black : theme.color.global.white,
+            fontSize: '0.75rem',
+          }}
+        >
           {bsvAddress}
         </Text>
       </CopyAddressWrapper>

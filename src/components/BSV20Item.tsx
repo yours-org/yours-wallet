@@ -83,13 +83,13 @@ export type BSV20ItemProps = {
 export const BSV20Item = (props: BSV20ItemProps) => {
   const { id, iconUrl, name, amount, theme, onClick, onCopyTokenId } = props;
 
-  const [containerColor, setContainerColor] = useState(theme.darkAccent);
+  const [containerColor, setContainerColor] = useState(theme.color.global.row);
 
   return (
     <Container
       color={containerColor}
-      onMouseEnter={() => (onClick ? setContainerColor(theme.darkAccent + '99') : undefined)}
-      onMouseLeave={() => setContainerColor(theme.darkAccent)}
+      onMouseEnter={() => (onClick ? setContainerColor(theme.color.global.row + '99') : undefined)}
+      onMouseLeave={() => setContainerColor(theme.color.global.row)}
       onClick={onClick}
       $clickable={onClick ? 'true' : 'false'}
     >

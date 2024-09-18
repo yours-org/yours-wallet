@@ -11,65 +11,63 @@ export type ThemeSettings = {
   services: ThemeServices;
 };
 
-export interface Theme {
-  darkAccent: string;
-  mainBackground: string;
-  lightAccent: string;
-  primaryButton: string;
+type GlobalColors = {
+  primaryTheme: 'light' | 'dark';
+  row: string;
+  walletBackground: string;
   white: string;
   black: string;
   gray: string;
-  errorRed: string;
-  warning: string;
+};
+
+type ComponentColors = {
+  bottomMenuBackground: string;
+  bottomMenuText: string;
+  ordinalSelectedBorder: string;
+  ordinalTypeUnsupported: string;
+  ordinalTypePlainText: string;
+  ordinalTypeJson: string;
+  pageLoaderSpinner: string;
+  pageLoaderSpinnerBorder: string;
+  pageLoaderText: string;
+  primaryButtonLeftGradient: string;
+  primaryButtonRightGradient: string;
+  primaryButtonText: string;
+  progressBar: string;
+  progressBarTrack: string;
+  queueBannerSyncing: string;
+  queueBannerSyncingText: string;
+  queueBannerSynced: string;
+  queueBannerSyncedText: string;
+  secondaryOutlineButtonGradientLeft: string;
+  secondaryOutlineButtonGradientRight: string;
+  secondaryOutlineButtonText: string;
+  snackbarError: string;
+  snackbarSuccess: string;
+  snackbarWarning: string;
+  snackbarWarningText: string;
+  snackbarErrorText: string;
+  snackbarSuccessText: string;
+  tabSelectedLeftGradient: string;
+  tabSelectedRightGradient: string;
+  tabSelectedText: string;
+  tabUnselected: string;
+  tabUnselectedText: string;
+  toggleSwitchOn: string;
+  warningButton: string;
+  warningButtonText: string;
+};
+
+export type ThemeColors = {
+  global: GlobalColors;
+  component: ComponentColors;
+};
+
+export interface Theme {
+  color: ThemeColors;
   settings: ThemeSettings;
 }
 
-export type ColorThemeProps = {
+export type WhiteLabelTheme = {
   theme: Theme;
 };
-
-// YOURS THEME
-// {
-//   darkAccent: '#17191E',
-//   mainBackground: '#010101',
-//   lightAccent: '#A1FF8B',
-//   primaryButton: '#34D399',
-//   white: '#FFFFFF',
-//   black: '#000000',
-//   gray: '#98A2B3',
-//   errorRed: '#FF4646',
-//   warning: '#F79009',
-//   settings: {
-//     walletName: 'Yours',
-//     repo: 'https://github.com/yours-org/yours-wallet',
-//     services: {
-//       locks: true,
-//       ordinals: true,
-//       bsv20: true,
-//       apps: true,
-//     },
-//   }
-// }
-
-// BSV ASSOCIATION THEME
-// {
-//   "darkAccent": "#E4E4E4",
-//   "mainBackground": "#FFFFFF",
-//   "lightAccent": "#0094d4",
-//   "primaryButton": "#0020A0",
-//   "white": "#000000",
-//   "black": "#FFFFFF",
-//   "gray": "#030303",
-//   "errorRed": "#FF0000",
-//   "warning": "#0020A0",
-//   "settings": {
-//     "walletName": "SPV",
-//     "repo": "https://github.com/bitcoin-sv",
-//     "services": {
-//       "locks": false,
-//       "ordinals": false,
-//       "bsv20": false,
-//       "apps": false
-//     }
-//   }
-// }

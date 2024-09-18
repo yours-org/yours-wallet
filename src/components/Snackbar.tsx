@@ -1,11 +1,11 @@
 import styled, { keyframes } from 'styled-components';
 import { Text } from './Reusable';
 import { SnackbarType } from '../contexts/SnackbarContext';
-import { ColorThemeProps, Theme } from '../theme.types';
+import { WhiteLabelTheme, Theme } from '../theme.types';
 import { FaCheckCircle, FaExclamation, FaInfoCircle } from 'react-icons/fa';
 import { Show } from './Show';
 
-type SnackBarColorTheme = ColorThemeProps & { color: string };
+type SnackBarColorTheme = WhiteLabelTheme & { color: string };
 
 const slideIn = keyframes`
   from {
@@ -38,7 +38,8 @@ export const SnackBarContainer = styled.div<SnackBarColorTheme & { duration: num
   margin: 1rem;
   border-radius: 0.5rem;
   background-color: ${({ color }) => color};
-  color: ${({ theme }) => theme.white};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
   z-index: 200;
   animation:
     ${slideIn} 0.25s ease-out,
@@ -60,22 +61,37 @@ export const Snackbar = (props: SnackbarProps) => {
   return (
     <SnackBarContainer
       duration={duration}
-      color={type === 'error' ? theme.errorRed : type === 'info' ? theme.warning : theme.lightAccent}
+      color={
+        type === 'error'
+          ? theme.color.component.snackbarError
+          : type === 'info'
+            ? theme.color.component.snackbarWarning
+            : theme.color.component.snackbarSuccess
+      }
     >
       <Show when={type === 'error'}>
-        <FaExclamation color={theme.black} size={'1.25rem'} style={{ margin: '0.5rem' }} />
+        <FaExclamation color={theme.color.component.snackbarErrorText} size={'1.25rem'} style={{ margin: '0.5rem' }} />
       </Show>
       <Show when={type === 'info'}>
-        <FaInfoCircle color={theme.black} size={'1.25rem'} style={{ margin: '0.5rem' }} />
+        <FaInfoCircle color={theme.color.component.snackbarWarningText} size={'1.25rem'} style={{ margin: '0.5rem' }} />
       </Show>
       <Show when={type === 'success'}>
-        <FaCheckCircle color={theme.black} size={'1.25rem'} style={{ margin: '0.5rem' }} />
+        <FaCheckCircle
+          color={theme.color.component.snackbarSuccessText}
+          size={'1.25rem'}
+          style={{ margin: '0.5rem' }}
+        />
       </Show>
       <Text
         theme={theme}
         style={{
           margin: '1rem 0 1rem .25rem',
-          color: theme.black,
+          color:
+            type === 'error'
+              ? theme.color.component.snackbarErrorText
+              : type === 'info'
+                ? theme.color.component.snackbarWarningText
+                : theme.color.component.snackbarSuccessText,
           wordWrap: 'break-word',
           textAlign: 'left',
         }}

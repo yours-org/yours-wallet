@@ -11,11 +11,11 @@ import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useServiceContext } from '../../hooks/useServiceContext';
-import { ColorThemeProps } from '../../theme.types';
+import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 
-const RequestDetailsContainer = styled.div<ColorThemeProps>`
+const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -23,7 +23,7 @@ const RequestDetailsContainer = styled.div<ColorThemeProps>`
   max-height: 10rem;
   overflow-y: auto;
   overflow-x: hidden;
-  background: ${({ theme }) => theme.darkAccent + '80'};
+  background: ${({ theme }) => theme.color.global.row + '80'};
   margin: 0.5rem;
 `;
 
@@ -135,7 +135,14 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
           </Show>
           <FormContainer noValidate onSubmit={(e) => handleSigning(e)}>
             <RequestDetailsContainer>
-              {<Text style={{ color: theme.white }}>{`Message: ${request.message}`}</Text>}
+              {
+                <Text
+                  style={{
+                    color:
+                      theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black,
+                  }}
+                >{`Message: ${request.message}`}</Text>
+              }
             </RequestDetailsContainer>
             <Show when={isPasswordRequired}>
               <Input

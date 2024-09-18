@@ -1,6 +1,6 @@
 import React, { PropsWithChildren } from 'react';
 import styled from 'styled-components';
-import { ColorThemeProps, Theme } from '../theme.types';
+import { WhiteLabelTheme, Theme } from '../theme.types';
 
 export type TabPanelProps = PropsWithChildren<{
   label: string;
@@ -31,7 +31,7 @@ export const TabsWrapper = styled.div`
   height: 100%;
 `;
 
-const TabButton = styled.button<ColorThemeProps & { $selected: boolean; $leftButton: boolean }>`
+const TabButton = styled.button<WhiteLabelTheme & { $selected: boolean; $leftButton: boolean }>`
   flex: 1;
   padding: 0.25rem 1rem;
   display: flex;
@@ -41,9 +41,12 @@ const TabButton = styled.button<ColorThemeProps & { $selected: boolean; $leftBut
   font-weight: 600;
   cursor: pointer;
   border-radius: ${(props) => (props.$leftButton ? '1rem 0 0 1rem' : '0 1rem 1rem 0 ')};
-  color: ${(props) => (props.$selected ? props.theme.mainBackground : props.theme.white)};
+  color: ${(props) =>
+    props.$selected ? props.theme.color.component.tabSelectedText : props.theme.color.component.tabUnselectedText};
   background: ${({ theme, $selected }) =>
-    $selected ? `linear-gradient(45deg, ${theme.lightAccent}, ${theme.primaryButton})` : theme.darkAccent};
+    $selected
+      ? `linear-gradient(45deg, ${theme.color.component.tabSelectedLeftGradient}, ${theme.color.component.tabSelectedRightGradient})`
+      : theme.color.component.tabUnselected};
   border: none;
   transition: background-color 0.2s ease-in-out;
 
@@ -52,7 +55,7 @@ const TabButton = styled.button<ColorThemeProps & { $selected: boolean; $leftBut
   }
 `;
 
-export const TabList = styled.div<ColorThemeProps>`
+export const TabList = styled.div<WhiteLabelTheme>`
   display: flex;
   flex-direction: row;
   width: 50%;

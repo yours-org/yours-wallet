@@ -13,7 +13,7 @@ import { SettingsRow as AppsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useTheme } from '../hooks/useTheme';
-import { ColorThemeProps } from '../theme.types';
+import { WhiteLabelTheme } from '../theme.types';
 // import { BSV_DECIMAL_CONVERSION, YOURS_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
 import { BSV_DECIMAL_CONVERSION, featuredApps } from '../utils/constants';
 import { truncate } from '../utils/format';
@@ -67,11 +67,11 @@ const ScrollableContainer = styled.div`
   margin-top: 1rem;
 `;
 
-const DiscoverAppsRow = styled.div<ColorThemeProps>`
+const DiscoverAppsRow = styled.div<WhiteLabelTheme>`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: ${({ theme }) => theme.darkAccent};
+  background-color: ${({ theme }) => theme.color.global.row};
   border-radius: 0.5rem;
   padding: 0.5rem;
   margin: 0.25rem;
@@ -91,8 +91,9 @@ const AppIcon = styled.img`
   border-radius: 0.5rem;
 `;
 
-const DiscoverAppsText = styled(Text)<ColorThemeProps>`
-  color: ${({ theme }) => theme.white};
+const DiscoverAppsText = styled(Text)<WhiteLabelTheme>`
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
   margin: 0;
   font-weight: 600;
   text-align: left;
@@ -106,9 +107,10 @@ const LockDetailsContainer = styled.div`
   width: 80%;
 `;
 
-const LockDetailsText = styled(Text)<ColorThemeProps>`
+const LockDetailsText = styled(Text)<WhiteLabelTheme>`
   margin: 0;
-  color: ${(props) => props.theme.white};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
 `;
 
 const LockDetailsHeaderText = styled(LockDetailsText)`
@@ -176,7 +178,11 @@ export const AppsAndTools = () => {
           name="Pending Locks"
           description="View the pending coins you've locked"
           onClick={() => setPage('unlock')}
-          jsxElement={<RightChevron color={theme.white} />}
+          jsxElement={
+            <RightChevron
+              color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+            />
+          }
         />
       </Show>
       <Show when={theme.settings.services.apps}>
@@ -184,14 +190,24 @@ export const AppsAndTools = () => {
           name="Discover Apps"
           description={`Meet the apps using ${theme.settings.walletName} Wallet`}
           onClick={() => setPage('discover-apps')}
-          jsxElement={<RightChevron color={theme.white} />}
+          jsxElement={
+            <RightChevron
+              color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+            />
+          }
         />
       </Show>
       <AppsRow
         name="Contribute or integrate"
         description="All the tools you need to get involved"
         onClick={() => window.open(theme.settings.repo, '_blank')}
-        jsxElement={<FaExternalLinkAlt color={theme.white} size={'1rem'} style={{ margin: '0.5rem' }} />}
+        jsxElement={
+          <FaExternalLinkAlt
+            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+            size={'1rem'}
+            style={{ margin: '0.5rem' }}
+          />
+        }
       />
     </>
   );
@@ -251,7 +267,14 @@ export const AppsAndTools = () => {
       <Show when={featuredApps.length > 0} whenFalseContent={<Text theme={theme}>No apps</Text>}>
         <Text theme={theme} style={{ marginBottom: 0 }}>
           If your app has integrated Yours Wallet but is not listed,{' '}
-          <a href={theme.settings.repo} rel="noreferrer" target="_blank" style={{ color: theme.white }}>
+          <a
+            href={theme.settings.repo}
+            rel="noreferrer"
+            target="_blank"
+            style={{
+              color: theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black,
+            }}
+          >
             let us know!
           </a>
         </Text>
@@ -263,7 +286,13 @@ export const AppsAndTools = () => {
                   <AppIcon src={app.icon} />
                   <DiscoverAppsText theme={theme}>{app.name}</DiscoverAppsText>
                 </ImageAndDomain>
-                <FaExternalLinkAlt color={theme.white} size={'1rem'} style={{ margin: '0.5rem' }} />
+                <FaExternalLinkAlt
+                  color={
+                    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black
+                  }
+                  size={'1rem'}
+                  style={{ margin: '0.5rem' }}
+                />
               </DiscoverAppsRow>
             );
           })}

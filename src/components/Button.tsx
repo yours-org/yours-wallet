@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { ColorThemeProps, Theme } from '../theme.types';
+import { WhiteLabelTheme, Theme } from '../theme.types';
 import { Show } from './Show';
 
 export type ButtonStyles = 'primary' | 'secondary' | 'secondary-outline' | 'warn';
@@ -10,11 +10,15 @@ const Container = styled.div`
   width: 100%;
 `;
 
-const Primary = styled.button<ColorThemeProps>`
+const Primary = styled.button<WhiteLabelTheme>`
   width: 87%;
   height: 2.25rem;
-  background: linear-gradient(45deg, ${({ theme }) => theme.lightAccent}, ${({ theme }) => theme.primaryButton});
-  color: ${({ theme }) => theme.mainBackground};
+  background: linear-gradient(
+    45deg,
+    ${({ theme }) => theme.color.component.primaryButtonLeftGradient},
+    ${({ theme }) => theme.color.component.primaryButtonRightGradient}
+  );
+  color: ${({ theme }) => theme.color.component.primaryButtonText};
   border: none;
   border-radius: 0.25rem;
   font-family: 'Inter', Arial, Helvetica, sans-serif;
@@ -28,7 +32,7 @@ const Primary = styled.button<ColorThemeProps>`
   &:disabled {
     cursor: not-allowed;
     opacity: 0.6;
-    background-color: ${({ theme }) => theme.primaryButton + '40'};
+    background-color: ${({ theme }) => theme.color.component.primaryButtonRightGradient + '40'};
   }
 
   &:hover {
@@ -36,11 +40,15 @@ const Primary = styled.button<ColorThemeProps>`
   }
 `;
 
-const GradientBorderWrapper = styled.div<ColorThemeProps>`
+const GradientBorderWrapper = styled.div<WhiteLabelTheme>`
   display: flex;
   align-items: center;
   padding: 1px; /* border thickness */
-  background: linear-gradient(45deg, ${({ theme }) => theme.lightAccent}, ${({ theme }) => theme.primaryButton});
+  background: linear-gradient(
+    45deg,
+    ${({ theme }) => theme.color.component.secondaryOutlineButtonGradientLeft},
+    ${({ theme }) => theme.color.component.secondaryOutlineButtonGradientRight}
+  );
   border-radius: 0.25rem;
   width: 87%;
 `;
@@ -48,16 +56,21 @@ const GradientBorderWrapper = styled.div<ColorThemeProps>`
 const SecondaryOutline = styled(Primary)<{ $isOutline?: boolean }>`
   width: 100%;
   height: 2.25rem;
-  background: ${({ theme }) => theme.mainBackground};
+  background: ${({ theme }) => theme.color.global.walletBackground};
   border: none;
-  color: ${(props) => (props.$isOutline ? props.theme.white : props.theme.gray)};
+  color: ${(props) =>
+    props.$isOutline
+      ? props.theme.color.global.primaryTheme === 'dark'
+        ? props.theme.color.global.white
+        : props.theme.color.global.black
+      : props.theme.color.global.gray};
   transition: none;
   transform: none;
   margin: 0;
 
   &:disabled {
     opacity: 1;
-    background-color: ${({ theme }) => theme.mainBackground};
+    background-color: ${({ theme }) => theme.color.global.walletBackground};
   }
 
   &:hover {
@@ -70,11 +83,11 @@ const Secondary = styled(SecondaryOutline)`
 `;
 
 const Warn = styled(Primary)`
-  background-color: ${({ theme }) => theme.errorRed + '95'};
-  color: ${({ theme }) => theme.white};
+  background-color: ${({ theme }) => theme.color.component.warningButton};
+  color: ${({ theme }) => theme.color.component.warningButtonText};
 
   &:disabled {
-    background-color: ${({ theme }) => theme.errorRed + '40'};
+    background-color: ${({ theme }) => theme.color.component.warningButton + '40'};
   }
 `;
 

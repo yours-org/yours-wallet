@@ -21,9 +21,9 @@ const $shakeAnimation = keyframes`
 `;
 
 const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
-  background-color: ${({ theme }) => theme.gray + '10'};
+  background-color: ${({ theme }) => theme.color.global.gray + '10'};
   border-radius: 0.25rem;
-  border: 1px solid ${({ theme }) => theme.gray + '50'};
+  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
   font-size: 0.85rem;
   width: 85%;
   height: 2rem;
@@ -31,7 +31,8 @@ const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
   margin: 0.5rem;
   outline: none;
   text-indent: 0.5rem;
-  color: ${({ theme }) => theme.white + '80'};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white + '80' : theme.color.global.black + '80'};
   animation: ${(props) =>
     props.$shake === 'true'
       ? css`
@@ -50,7 +51,7 @@ const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
   }
 
   &::placeholder {
-    color: ${({ theme }) => theme.gray};
+    color: ${({ theme }) => theme.color.global.gray};
   }
 `;
 

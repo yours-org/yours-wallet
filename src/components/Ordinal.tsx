@@ -1,10 +1,10 @@
 import styled from 'styled-components';
 import { Ordinal as OrdinalType } from 'yours-wallet-provider';
-import { ColorThemeProps, Theme } from '../theme.types';
+import { WhiteLabelTheme, Theme } from '../theme.types';
 import { Text } from './Reusable';
 import { Show } from './Show';
 
-export type OrdinalDivProps = ColorThemeProps & {
+export type OrdinalDivProps = WhiteLabelTheme & {
   url: string;
   selected?: boolean;
   size?: string;
@@ -19,7 +19,8 @@ const OrdinalWrapper = styled.div<OrdinalDivProps>`
   background-repeat: no-repeat;
   border-radius: 1.25rem;
   cursor: pointer;
-  border: ${(props) => (props.selected ? `0.1rem solid ${props.theme.lightAccent}` : undefined)};
+  border: ${(props) =>
+    props.selected ? `0.1rem solid ${props.theme.color.component.ordinalSelectedBorder}` : undefined};
 `;
 
 const StyledIFrame = styled.iframe<{ size?: string }>`
@@ -37,11 +38,11 @@ const TextWrapper = styled(OrdinalWrapper)`
   align-items: center;
   justify-content: center;
   overflow-x: auto;
-  background-color: ${(props) => props.theme.darkAccent};
+  background-color: ${(props) => props.theme.color.global.row};
 `;
 
 const OrdText = styled(Text)`
-  color: ${(props) => props.theme.primaryButton};
+  color: ${(props) => props.theme.color.component.ordinalTypePlainText};
   text-align: center;
   width: 100%;
   margin: 0;
@@ -49,7 +50,7 @@ const OrdText = styled(Text)`
 `;
 
 const UnsupportedText = styled(OrdText)`
-  color: ${(props) => props.theme.white};
+  color: ${(props) => props.theme.color.component.ordinalTypeUnsupported};
 `;
 
 const JsonWrapper = styled.div<OrdinalDivProps>`
@@ -60,16 +61,17 @@ const JsonWrapper = styled.div<OrdinalDivProps>`
   width: ${(props) => props.size ?? '6.5rem'};
   border-radius: 0.5rem;
   position: relative;
-  background-color: ${(props) => props.theme.darkAccent};
+  background-color: ${(props) => props.theme.color.global.row};
   cursor: pointer;
-  border: ${(props) => (props.selected ? `0.1rem solid ${props.theme.lightAccent}` : undefined)};
+  border: ${(props) =>
+    props.selected ? `0.1rem solid ${props.theme.color.component.ordinalSelectedBorder}` : undefined};
   overflow: auto;
 `;
 
-export const Json = styled.pre<ColorThemeProps>`
+export const Json = styled.pre<WhiteLabelTheme>`
   font-family: 'DM Mono', monospace;
   font-size: 0.65rem;
-  color: ${(props) => props.theme.primaryButton};
+  color: ${(props) => props.theme.color.component.ordinalTypeJson};
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;

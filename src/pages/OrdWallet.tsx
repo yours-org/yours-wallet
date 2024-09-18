@@ -16,7 +16,7 @@ import {
   Text,
 } from '../components/Reusable';
 import { Show } from '../components/Show';
-import Tabs, { TabContent, TabList, TabsWrapper } from '../components/Tabs';
+import Tabs, { TabContent, TabsWrapper } from '../components/Tabs';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
@@ -30,7 +30,7 @@ import { AssetRow } from '../components/AssetRow';
 import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { ListOrdinal, OrdOperationResponse } from '../services/types/ordinal.types';
 import { Bsv20, Bsv21, Ordinal as OrdinalType } from 'yours-wallet-provider';
-import { isValidEmail } from '../utils/tools';
+// import { isValidEmail } from '../utils/tools';
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -423,8 +423,9 @@ export const OrdWallet = () => {
         whenFalseContent={
           <NoInscriptionWrapper>
             <Text
+              theme={theme}
               style={{
-                color: theme.gray,
+                color: theme.color.global.gray,
                 fontSize: '1rem',
                 marginTop: '4rem',
               }}
@@ -438,7 +439,7 @@ export const OrdWallet = () => {
       >
         <BSV20List>
           <BSV20Header>
-            <SubHeaderText style={{ marginLeft: '1rem', color: theme.gray }} theme={theme}>
+            <SubHeaderText style={{ marginLeft: '1rem', color: theme.color.global.gray }} theme={theme}>
               Confirmed
             </SubHeaderText>
           </BSV20Header>
@@ -477,7 +478,7 @@ export const OrdWallet = () => {
 
           <Show when={bsv20s.filter((d) => d.all.pending > 0n).length > 0}>
             <BSV20Header style={{ marginTop: '2rem' }}>
-              <SubHeaderText style={{ marginLeft: '1rem', color: theme.gray }} theme={theme}>
+              <SubHeaderText style={{ marginLeft: '1rem', color: theme.color.global.gray }} theme={theme}>
                 Pending
               </SubHeaderText>
             </BSV20Header>
@@ -605,8 +606,9 @@ export const OrdWallet = () => {
         whenFalseContent={
           <NoInscriptionWrapper>
             <Text
+              theme={theme}
               style={{
-                color: theme.gray,
+                color: theme.color.global.gray,
                 fontSize: '1rem',
                 marginTop: '4rem',
               }}
@@ -626,7 +628,6 @@ export const OrdWallet = () => {
                 <Ordinal
                   theme={theme}
                   inscription={ord}
-                  size={'5.5rem'}
                   key={ord.origin?.outpoint}
                   url={`${gorillaPoolService.getBaseUrl(network)}/content/${ord.origin?.outpoint}`}
                   selected={selectedOrdinal?.origin?.outpoint === ord.origin?.outpoint}

@@ -17,7 +17,7 @@ import { WalletRow } from '../../components/WalletRow';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { ColorThemeProps } from '../../theme.types';
+import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { SupportedWalletImports } from '../../services/types/keys.types';
@@ -43,10 +43,10 @@ const FormContainer = styled.form`
   background: none;
 `;
 
-const SeedInput = styled.textarea<ColorThemeProps & { $isExpert: boolean }>`
-  background-color: ${({ theme }) => theme.darkAccent};
+const SeedInput = styled.textarea<WhiteLabelTheme & { $isExpert: boolean }>`
+  background-color: ${({ theme }) => theme.color.global.row};
   border-radius: 0.5rem;
-  border: 1px solid ${({ theme }) => theme.gray + '50'};
+  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
   width: 80%;
   height: 4rem;
   font-size: 0.85rem;
@@ -54,11 +54,13 @@ const SeedInput = styled.textarea<ColorThemeProps & { $isExpert: boolean }>`
   padding: 1rem;
   margin: 0.5rem;
   outline: none;
-  color: ${({ theme }) => theme.white + '80'};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black + '80'};
   resize: none;
 
   &::placeholder {
-    color: ${({ theme }) => theme.white + '80'};
+    color: ${({ theme }) =>
+      theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black + '80'};
   }
 `;
 
@@ -93,7 +95,8 @@ const WalletLogo = styled.img`
 const WalletText = styled(Text)`
   margin: 0 0 0 1rem;
   text-align: left;
-  color: ${({ theme }) => theme.white};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
   font-weight: 600;
 `;
 

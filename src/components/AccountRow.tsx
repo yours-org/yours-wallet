@@ -44,13 +44,13 @@ export type AccountRowProps = {
 export const AccountRow = (props: AccountRowProps) => {
   const { name, icon, onClick, jsxElement } = props;
   const { theme } = useTheme();
-  const [containerColor, setContainerColor] = useState(theme.darkAccent);
+  const [containerColor, setContainerColor] = useState(theme.color.global.row);
 
   return (
     <Container
       color={containerColor}
-      onMouseEnter={() => setContainerColor(theme.darkAccent + '99')}
-      onMouseLeave={() => setContainerColor(theme.darkAccent)}
+      onMouseEnter={() => setContainerColor(theme.color.global.row + '99')}
+      onMouseLeave={() => setContainerColor(theme.color.global.row)}
       onClick={onClick}
     >
       <Content>

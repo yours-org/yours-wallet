@@ -3,7 +3,7 @@ import { styled } from 'styled-components';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useViewport } from '../hooks/useViewport';
-import { ColorThemeProps, Theme } from '../theme.types';
+import { WhiteLabelTheme, Theme } from '../theme.types';
 import { sleep } from '../utils/sleep';
 import { Button } from './Button';
 import { Input } from './Input';
@@ -11,7 +11,7 @@ import { PageLoader } from './PageLoader';
 import { ButtonContainer, HeaderText, Text } from './Reusable';
 import { Show } from './Show';
 
-const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
+const Container = styled.div<WhiteLabelTheme & { $isMobile: boolean }>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -20,8 +20,9 @@ const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
   width: ${(props) => (props.$isMobile ? '100vw' : '22.5rem')};
   height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
   margin: 0;
-  background-color: ${({ theme }) => theme.mainBackground};
-  color: ${({ theme }) => theme.white};
+  background-color: ${({ theme }) => theme.color.global.walletBackground};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
   z-index: 100;
 `;
 

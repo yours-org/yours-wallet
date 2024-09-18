@@ -1,18 +1,20 @@
 import styled, { css } from 'styled-components';
-import { ColorThemeProps } from '../theme.types';
+import { WhiteLabelTheme } from '../theme.types';
 
-export const HeaderText = styled.h1<ColorThemeProps>`
+export const HeaderText = styled.h1<WhiteLabelTheme>`
   font-size: 1.35rem;
-  color: ${({ theme }) => theme.white};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 600;
   margin: 0.25rem 0;
   text-align: center;
 `;
 
-export const SubHeaderText = styled.h1<ColorThemeProps>`
+export const SubHeaderText = styled.h1<WhiteLabelTheme>`
   font-size: 1rem;
-  color: ${({ theme }) => theme.white};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 400;
   margin: 0.1rem 0;
@@ -25,9 +27,10 @@ export const Divider = styled.hr`
   margin: 1rem;
 `;
 
-export const Text = styled.p<ColorThemeProps>`
+export const Text = styled.p<WhiteLabelTheme>`
   font-size: 0.85rem;
-  color: ${({ theme }) => theme.gray ?? theme.white};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 400;
   margin: 0.25rem 0 1rem 0;
@@ -39,7 +42,8 @@ export const Badge = styled.button<{ $primary?: boolean }>`
   background: transparent;
   border-radius: 0.5rem;
   border: none;
-  color: ${({ theme }) => theme.white + '90'};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white + '90' : theme.color.global.black + '90'};
   margin: 0.5em 1em;
   padding: 0.25em 1em;
   ${() => css`
@@ -100,7 +104,7 @@ export const GithubIcon = styled.img`
   cursor: pointer;
 `;
 
-export const Warning = styled.span<ColorThemeProps>`
-  color: ${({ theme }) => theme.warning};
+export const Warning = styled.span<WhiteLabelTheme>`
+  color: ${({ theme }) => theme.color.component.snackbarWarning};
   font-weight: 700;
 `;

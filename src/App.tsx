@@ -27,7 +27,7 @@ import { OrdPurchaseRequest } from './pages/requests/OrdPurchaseRequest';
 import { OrdTransferRequest } from './pages/requests/OrdTransferRequest';
 import { SignMessageRequest } from './pages/requests/SignMessageRequest';
 import { Settings } from './pages/Settings';
-import { ColorThemeProps } from './theme.types';
+import { WhiteLabelTheme } from './theme.types';
 import { WhitelistedApp } from './inject';
 import { PageLoader } from './components/PageLoader';
 import { useServiceContext } from './hooks/useServiceContext';
@@ -38,24 +38,24 @@ import { BlockHeightProvider } from './contexts/BlockHeightContext';
 import { SyncingBlocks } from './components/SyncingBlocks';
 import { MasterRestore } from './pages/onboarding/MasterRestore';
 
-const MainContainer = styled.div<ColorThemeProps & { $isMobile?: boolean }>`
+const MainContainer = styled.div<WhiteLabelTheme & { $isMobile?: boolean }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: ${({ $isMobile }) => ($isMobile ? '100vw' : '22.5rem')};
+  width: ${({ $isMobile }) => ($isMobile ? '100vw' : '24.5rem')};
   height: ${({ $isMobile }) => ($isMobile ? '100vh' : '33.75rem')};
   position: relative;
   padding: 0;
-  background-color: ${({ theme }) => theme.mainBackground};
+  background-color: ${({ theme }) => theme.color.global.walletBackground};
 `;
 
-const Container = styled.div<ColorThemeProps>`
+const Container = styled.div<WhiteLabelTheme>`
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   height: 100%;
-  background-color: ${({ theme }) => theme.mainBackground};
+  background-color: ${({ theme }) => theme.color.global.walletBackground};
   position: relative;
 `;
 

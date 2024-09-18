@@ -7,7 +7,7 @@ import { BottomMenuContext } from '../../contexts/BottomMenuContext';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import greenCheck from '../../assets/green-check.svg';
-import { ColorThemeProps } from '../../theme.types';
+import { WhiteLabelTheme } from '../../theme.types';
 import { RequestParams, WhitelistedApp } from '../../inject';
 import { sendMessage } from '../../utils/chromeHelpers';
 import { useServiceContext } from '../../hooks/useServiceContext';
@@ -27,12 +27,12 @@ const Icon = styled.img<{ size: string }>`
   border-radius: 0.5rem;
 `;
 
-const PermissionsContainer = styled.div<ColorThemeProps>`
+const PermissionsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   padding: 1rem;
   width: 75%;
-  background-color: ${({ theme }) => theme.darkAccent};
+  background-color: ${({ theme }) => theme.color.global.row};
   border-radius: 0.75rem;
   margin: 1rem 0 1.5rem 0;
 `;
@@ -144,11 +144,27 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
         <PermissionsContainer theme={theme}>
           <Permission>
             <CheckMark style={{ marginRight: '1rem' }} src={greenCheck} />
-            <Text style={{ color: theme.white, margin: 0, textAlign: 'left' }}>View your wallet public keys</Text>
+            <Text
+              style={{
+                color: theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black,
+                margin: 0,
+                textAlign: 'left',
+              }}
+            >
+              View your wallet public keys
+            </Text>
           </Permission>
           <Permission>
             <CheckMark style={{ marginRight: '1rem' }} src={greenCheck} />
-            <Text style={{ color: theme.white, margin: 0, textAlign: 'left' }}>Request approval for transactions</Text>
+            <Text
+              style={{
+                color: theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black,
+                margin: 0,
+                textAlign: 'left',
+              }}
+            >
+              Request approval for transactions
+            </Text>
           </Permission>
         </PermissionsContainer>
         <Button

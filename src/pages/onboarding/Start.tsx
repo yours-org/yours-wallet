@@ -7,7 +7,7 @@ import { GithubIcon, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useTheme } from '../../hooks/useTheme';
-import { ColorThemeProps } from '../../theme.types';
+import { WhiteLabelTheme } from '../../theme.types';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { YoursIcon } from '../../components/YoursIcon';
 
@@ -18,9 +18,10 @@ const Content = styled.div`
   width: 100%;
 `;
 
-const TitleText = styled.h1<ColorThemeProps>`
+const TitleText = styled.h1<WhiteLabelTheme>`
   font-size: 2rem;
-  color: ${({ theme }) => theme.white};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 700;
   margin: 0.25rem 0;

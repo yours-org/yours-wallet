@@ -16,7 +16,7 @@ import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { WhitelistedApp, YoursEventName } from '../inject';
-import { ColorThemeProps } from '../theme.types';
+import { WhiteLabelTheme } from '../theme.types';
 import { sendMessage } from '../utils/chromeHelpers';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { CreateAccount } from './onboarding/CreateAccount';
@@ -35,19 +35,20 @@ const Content = styled.div`
   overflow-x: hidden;
 `;
 
-const ConnectedAppRow = styled.div<ColorThemeProps>`
+const ConnectedAppRow = styled.div<WhiteLabelTheme>`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: ${({ theme }) => theme.darkAccent};
+  background-color: ${({ theme }) => theme.color.global.row};
   border-radius: 0.5rem;
   padding: 0.5rem;
   margin: 0.25rem;
   width: 80%;
 `;
 
-const SettingsText = styled(Text)<ColorThemeProps>`
-  color: ${({ theme }) => theme.white};
+const SettingsText = styled(Text)<WhiteLabelTheme>`
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
   margin: 0;
   font-weight: 600;
   text-align: left;
@@ -367,32 +368,48 @@ export const Settings = () => {
         name="Manage Accounts"
         description="Manage your accounts"
         onClick={() => setPage('manage-accounts')}
-        jsxElement={<ForwardButton color={theme.white} />}
+        jsxElement={
+          <ForwardButton
+            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+          />
+        }
       />
       <SettingsRow
         name="Connected Apps"
         description="Manage the apps you are connected to"
         onClick={() => setPage('connected-apps')}
-        jsxElement={<ForwardButton color={theme.white} />}
+        jsxElement={
+          <ForwardButton
+            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+          />
+        }
       />
       <SettingsRow
         name="Preferences"
         description="Manage your wallet preferences"
         onClick={() => setPage('preferences')}
-        jsxElement={<ForwardButton color={theme.white} />}
+        jsxElement={
+          <ForwardButton
+            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+          />
+        }
       />
       <SettingsRow
         name="Export Keys"
         description="Download keys or export as QR code"
         onClick={() => setPage('export-keys-options')}
-        jsxElement={<ForwardButton color={theme.white} />}
+        jsxElement={
+          <ForwardButton
+            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+          />
+        }
       />
       <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={lockWallet} />
       <Text
         style={{
           margin: '1rem 0',
           textAlign: 'left',
-          color: theme.white,
+          color: theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black,
           fontSize: '1rem',
           fontWeight: 700,
         }}
@@ -401,7 +418,10 @@ export const Settings = () => {
         Danger Zone
       </Text>
       <SettingsRow
-        style={{ backgroundColor: theme.errorRed + '40', border: '1px solid ' + theme.errorRed }}
+        style={{
+          backgroundColor: theme.color.component.warningButton + '40',
+          border: '1px solid ' + theme.color.component.warningButton,
+        }}
         name="Sign Out"
         description={`Sign out of ${theme.settings.walletName} Wallet completely`}
         onClick={handleSignOutIntent}
@@ -414,19 +434,31 @@ export const Settings = () => {
       <SettingsRow
         name="Create Account"
         description="Create a new account"
-        jsxElement={<ForwardButton color={theme.white} />}
+        jsxElement={
+          <ForwardButton
+            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+          />
+        }
         onClick={() => setPage('create-account')}
       />
       <SettingsRow
         name="Restore/Import"
         description="Import or restore an existing account"
-        jsxElement={<ForwardButton color={theme.white} />}
+        jsxElement={
+          <ForwardButton
+            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+          />
+        }
         onClick={() => setPage('restore-account')}
       />
       <SettingsRow
         name="Edit Account"
         description="Edit an existing account"
-        jsxElement={<ForwardButton color={theme.white} />}
+        jsxElement={
+          <ForwardButton
+            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+          />
+        }
         onClick={() => setPage('account-list')}
       />
       <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
@@ -494,7 +526,11 @@ export const Settings = () => {
         name="Social Profile"
         description="Set your display name and avatar"
         onClick={() => setPage('social-profile')}
-        jsxElement={<ForwardButton color={theme.white} />}
+        jsxElement={
+          <ForwardButton
+            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+          />
+        }
       />
       <SettingsRow
         name="Require Password"
@@ -562,7 +598,11 @@ export const Settings = () => {
             key={account.addresses.identityAddress}
             name={account.name}
             icon={account.icon}
-            jsxElement={<ForwardButton color={theme.white} />}
+            jsxElement={
+              <ForwardButton
+                color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+              />
+            }
             onClick={() => {
               setEnteredAccountName(account.name);
               setEnteredAccountIcon(account.icon);

@@ -1,5 +1,5 @@
 import styled, { keyframes } from 'styled-components';
-import { ColorThemeProps, Theme } from '../theme.types';
+import { WhiteLabelTheme, Theme } from '../theme.types';
 import { Text } from './Reusable';
 import { Show } from './Show';
 import ProgressBar from '@ramonak/react-progress-bar';
@@ -10,12 +10,12 @@ const spin = keyframes`
   100% { transform: rotate(360deg); }
 `;
 
-export const LoaderContainer = styled.div<ColorThemeProps>`
+export const LoaderContainer = styled.div<WhiteLabelTheme>`
   display: flex;
   justify-content: center;
   flex-direction: column;
   align-items: center;
-  background-color: ${({ theme }) => theme.mainBackground};
+  background-color: ${({ theme }) => theme.color.global.walletBackground};
   height: 100%;
   width: 100%;
   top: 0;
@@ -29,9 +29,11 @@ const ProgressBarContainer = styled.div`
   margin: 0.25rem 0;
 `;
 
-export const Loader = styled.div<ColorThemeProps>`
-  border: 0.5rem solid ${({ theme }) => theme.white + '50'};
-  border-top: 0.5rem solid ${({ theme }) => theme.lightAccent};
+export const Loader = styled.div<WhiteLabelTheme>`
+  border: 0.5rem solid
+    ${({ theme }) =>
+      theme.color.global.primaryTheme === 'dark' ? theme.color.global.white + '50' : theme.color.global.black + '50'};
+  border-top: 0.5rem solid ${({ theme }) => theme.color.component.pageLoaderSpinner};
   border-radius: 50%;
   width: 2rem;
   height: 2rem;
@@ -50,12 +52,17 @@ export const PageLoader = (props: PageLoaderProps) => {
   return (
     <LoaderContainer theme={theme}>
       <YoursIcon width="3.5rem" />
-      <Text theme={theme} style={{ fontSize: '1rem', color: theme.white }}>
+      <Text theme={theme} style={{ fontSize: '1rem', color: theme.color.component.pageLoaderText }}>
         {message}
       </Text>
       <Show when={showProgressBar && barProgress > 0} whenFalseContent={<Loader theme={theme} />}>
         <ProgressBarContainer>
-          <ProgressBar completed={barProgress} bgColor={theme.primaryButton} baseBgColor={'#f5f5f5'} height="16px" />
+          <ProgressBar
+            completed={barProgress}
+            bgColor={theme.color.component.progressBar}
+            baseBgColor={theme.color.component.progressBarTrack}
+            height="16px"
+          />
         </ProgressBarContainer>
       </Show>
     </LoaderContainer>

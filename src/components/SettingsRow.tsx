@@ -42,6 +42,7 @@ const Description = styled(Text)`
   text-align: left;
   width: 100%;
   margin: 0;
+  color: ${({ theme }) => theme.color.global.gray};
 `;
 
 export type SettingsRowProp = {
@@ -57,7 +58,7 @@ export type SettingsRowProp = {
 export const SettingsRow = (props: SettingsRowProp) => {
   const { name, description, onClick, jsxElement, style, masterBackupText, masterBackupProgress } = props;
   const { theme } = useTheme();
-  const [containerColor, setContainerColor] = useState(theme.darkAccent);
+  const [containerColor, setContainerColor] = useState(theme.color.global.row);
 
   const masterBackupContent = (
     <Content>
@@ -66,8 +67,8 @@ export const SettingsRow = (props: SettingsRowProp) => {
         <ProgressBarContainer>
           <ProgressBar
             completed={masterBackupProgress}
-            bgColor={theme.primaryButton}
-            baseBgColor={'#f5f5f5'}
+            bgColor={theme.color.component.progressBar}
+            baseBgColor={theme.color.component.progressBarTrack}
             height="16px"
           />
         </ProgressBarContainer>
@@ -78,8 +79,8 @@ export const SettingsRow = (props: SettingsRowProp) => {
   return (
     <Container
       color={containerColor}
-      onMouseEnter={() => (onClick ? setContainerColor(theme.darkAccent + '99') : undefined)}
-      onMouseLeave={() => setContainerColor(theme.darkAccent)}
+      onMouseEnter={() => (onClick ? setContainerColor(theme.color.global.row + '99') : undefined)}
+      onMouseLeave={() => setContainerColor(theme.color.global.row)}
       onClick={onClick}
       $clickable={onClick ? 'true' : 'false'}
       style={style}

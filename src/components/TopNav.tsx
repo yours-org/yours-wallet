@@ -10,7 +10,7 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { useServiceContext } from '../hooks/useServiceContext';
 import copyIcon from '../assets/copy.svg';
 import switchIcon from '../assets/chevrons.svg';
-import { ColorThemeProps } from '../theme.types';
+import { WhiteLabelTheme } from '../theme.types';
 import { useNavigate } from 'react-router-dom';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 
@@ -43,14 +43,15 @@ const Circle = styled.img`
   border-radius: 50%;
 `;
 
-const Dropdown = styled.div<ColorThemeProps>`
+const Dropdown = styled.div<WhiteLabelTheme>`
   position: absolute;
   top: 3.5rem;
   left: 5rem;
-  color: ${({ theme }) => theme.white};
-  background: ${({ theme }) => theme.darkAccent + '90'};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
+  background: ${({ theme }) => theme.color.global.row + '90'};
   backdrop-filter: blur(10px);
-  border: 1px solid ${({ theme }) => theme.gray};
+  border: 1px solid ${({ theme }) => theme.color.global.gray};
   border-radius: 0.5rem;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   z-index: 12;
@@ -69,7 +70,8 @@ const DropdownItem = styled.div`
   cursor: pointer;
 
   &:hover {
-    background: ${({ theme }) => theme.white + '10'};
+    background: ${({ theme }) =>
+      theme.color.global.primaryTheme === 'dark' ? theme.color.global.white + '10' : theme.color.global.black + '10'};
   }
 `;
 
@@ -92,15 +94,16 @@ const DropDownIcon = styled.img`
   border-radius: 50%;
 `;
 
-const DropDownAccountName = styled.p<ColorThemeProps>`
-  color: ${({ theme }) => theme.white};
+const DropDownAccountName = styled.p<WhiteLabelTheme>`
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
   font-size: 0.85rem;
   font-weight: 600;
   margin: 0;
 `;
 
-const DropdownAddressText = styled.p<ColorThemeProps>`
-  color: ${({ theme }) => theme.gray};
+const DropdownAddressText = styled.p<WhiteLabelTheme>`
+  color: ${({ theme }) => theme.color.global.gray};
   font-size: 0.75rem;
   margin: 0;
 `;
@@ -174,7 +177,7 @@ export const TopNav = () => {
             style={{
               margin: '0 0.25rem 0 0.25rem',
               textAlign: 'left',
-              color: theme.white,
+              color: theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black,
               fontSize: '0.75rem',
               cursor: 'pointer',
               minWidth: 'fit-content',

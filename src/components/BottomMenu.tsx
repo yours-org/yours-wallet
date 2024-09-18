@@ -1,5 +1,5 @@
 import { styled } from 'styled-components';
-import { ColorThemeProps, Theme } from '../theme.types';
+import { WhiteLabelTheme, Theme } from '../theme.types';
 import { MenuItems } from '../contexts/BottomMenuContext';
 import { Badge, Text } from './Reusable';
 import { Show } from './Show';
@@ -7,7 +7,7 @@ import { NetWork } from 'yours-wallet-provider';
 import { FaCog, FaCoins, FaList, FaSmileBeam } from 'react-icons/fa';
 import { ComponentType } from 'react';
 
-const Container = styled.div<ColorThemeProps>`
+const Container = styled.div<WhiteLabelTheme>`
   display: flex;
   align-items: center;
   justify-content: space-evenly;
@@ -15,12 +15,12 @@ const Container = styled.div<ColorThemeProps>`
   height: 3.75rem;
   position: absolute;
   bottom: 0;
-  background: ${({ theme }) => theme.mainBackground};
-  color: ${({ theme }) => theme.white + '80'};
+  background: ${({ theme }) => theme.color.component.bottomMenuBackground};
+  color: ${({ theme }) => theme.color.component.bottomMenuText + '80'};
   z-index: 100;
 `;
 
-const MenuContainer = styled.div<ColorThemeProps>`
+const MenuContainer = styled.div<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -41,7 +41,7 @@ const ContentWrapper = styled.div`
 `;
 
 const StyledText = styled(Text)<{ $opacity: number }>`
-  color: ${({ theme }) => theme.white};
+  color: ${({ theme }) => theme.color.component.bottomMenuText};
   opacity: ${(props) => props.$opacity};
 `;
 
@@ -69,7 +69,7 @@ const Menu = (props: MenuProps) => {
     <MenuContainer>
       <ContentWrapper>
         <div onClick={onClick} style={{ opacity, cursor: 'pointer' }}>
-          <IconComponent opacity={opacity} size={iconSize} color={theme.white} />
+          <IconComponent opacity={opacity} size={iconSize} color={theme.color.component.bottomMenuText} />
         </div>
         <StyledText style={{ margin: 0, fontSize: '0.65rem' }} theme={theme} $opacity={opacity}>
           {label}
