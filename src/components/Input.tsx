@@ -32,7 +32,9 @@ const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
   outline: none;
   text-indent: 0.5rem;
   color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white + '80' : theme.color.global.black + '80'};
+    theme.color.global.primaryTheme === 'dark'
+      ? theme.color.global.contrast + '80'
+      : theme.color.global.neutral + '80'};
   animation: ${(props) =>
     props.$shake === 'true'
       ? css`

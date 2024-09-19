@@ -22,7 +22,7 @@ const Title = styled.h1<WhiteLabelTheme>`
   text-align: center;
   width: 100%;
   color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   margin: 0 0 1rem 0;
 `;
 

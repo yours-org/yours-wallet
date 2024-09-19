@@ -14,7 +14,9 @@ const Switch = styled.div<WhiteLabelTheme>`
   width: 2rem;
   height: 1rem;
   background: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'light' ? theme.color.global.black + '30' : theme.color.global.white + '30'};
+    theme.color.global.primaryTheme === 'light'
+      ? theme.color.global.neutral + '30'
+      : theme.color.global.contrast + '30'};
   border-radius: 2rem;
   padding: 0.25rem;
   transition: 300ms all;
@@ -28,7 +30,7 @@ const Switch = styled.div<WhiteLabelTheme>`
     border-radius: 2.1875rem;
     top: 50%;
     left: 0rem;
-    background: ${({ theme }) => (theme.color.global.primaryTheme === 'light' ? theme.color.global.black + '30' : theme.color.global.white + '30')};};
+    background: ${({ theme }) => (theme.color.global.primaryTheme === 'light' ? theme.color.global.neutral + '30' : theme.color.global.contrast + '30')};};
     transform: translate(0, -50%);
   }
 `;

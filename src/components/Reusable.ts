@@ -4,7 +4,7 @@ import { WhiteLabelTheme } from '../theme.types';
 export const HeaderText = styled.h1<WhiteLabelTheme>`
   font-size: 1.35rem;
   color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 600;
   margin: 0.25rem 0;
@@ -14,7 +14,7 @@ export const HeaderText = styled.h1<WhiteLabelTheme>`
 export const SubHeaderText = styled.h1<WhiteLabelTheme>`
   font-size: 1rem;
   color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 400;
   margin: 0.1rem 0;
@@ -30,7 +30,7 @@ export const Divider = styled.hr`
 export const Text = styled.p<WhiteLabelTheme>`
   font-size: 0.85rem;
   color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 400;
   margin: 0.25rem 0 1rem 0;
@@ -43,7 +43,9 @@ export const Badge = styled.button<{ $primary?: boolean }>`
   border-radius: 0.5rem;
   border: none;
   color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white + '90' : theme.color.global.black + '90'};
+    theme.color.global.primaryTheme === 'dark'
+      ? theme.color.global.contrast + '90'
+      : theme.color.global.neutral + '90'};
   margin: 0.5em 1em;
   padding: 0.25em 1em;
   ${() => css`

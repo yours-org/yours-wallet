@@ -93,7 +93,7 @@ const AppIcon = styled.img`
 
 const DiscoverAppsText = styled(Text)<WhiteLabelTheme>`
   color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   margin: 0;
   font-weight: 600;
   text-align: left;
@@ -110,7 +110,7 @@ const LockDetailsContainer = styled.div`
 const LockDetailsText = styled(Text)<WhiteLabelTheme>`
   margin: 0;
   color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
 `;
 
 const LockDetailsHeaderText = styled(LockDetailsText)`
@@ -180,7 +180,9 @@ export const AppsAndTools = () => {
           onClick={() => setPage('unlock')}
           jsxElement={
             <RightChevron
-              color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+              color={
+                theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+              }
             />
           }
         />
@@ -192,7 +194,9 @@ export const AppsAndTools = () => {
           onClick={() => setPage('discover-apps')}
           jsxElement={
             <RightChevron
-              color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+              color={
+                theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+              }
             />
           }
         />
@@ -203,7 +207,9 @@ export const AppsAndTools = () => {
         onClick={() => window.open(theme.settings.repo, '_blank')}
         jsxElement={
           <FaExternalLinkAlt
-            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
             size={'1rem'}
             style={{ margin: '0.5rem' }}
           />
@@ -272,7 +278,8 @@ export const AppsAndTools = () => {
             rel="noreferrer"
             target="_blank"
             style={{
-              color: theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black,
+              color:
+                theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
             }}
           >
             let us know!
@@ -288,7 +295,9 @@ export const AppsAndTools = () => {
                 </ImageAndDomain>
                 <FaExternalLinkAlt
                   color={
-                    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black
+                    theme.color.global.primaryTheme === 'dark'
+                      ? theme.color.global.contrast
+                      : theme.color.global.neutral
                   }
                   size={'1rem'}
                   style={{ margin: '0.5rem' }}

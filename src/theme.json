@@ -29,7 +29,7 @@
       "snackbarWarning": "#F79009",
       "snackbarWarningText": "#000000",
       "tabSelectedLeftGradient": "#A1FF8B",
-      "tabSelectedRightGradient": "#98A2B3",
+      "tabSelectedRightGradient": "#34D399",
       "tabSelectedText": "#010101",
       "tabUnselected": "#17191E",
       "tabUnselectedText": "#FFFFFF",
@@ -38,12 +38,12 @@
       "warningButtonText": "#FFFFFF"
     },
     "global": {
-      "black": "#000000",
+      "neutral": "#000000",
       "gray": "#98A2B3",
       "primaryTheme": "dark",
       "row": "#17191E",
       "walletBackground": "#010101",
-      "white": "#FFFFFF"
+      "contrast": "#FFFFFF"
     }
   },
   "settings": {

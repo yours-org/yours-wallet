@@ -22,7 +22,7 @@ const Container = styled.div<WhiteLabelTheme & { $isMobile: boolean }>`
   margin: 0;
   background-color: ${({ theme }) => theme.color.global.walletBackground};
   color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   z-index: 100;
 `;
 

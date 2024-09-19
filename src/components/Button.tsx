@@ -61,8 +61,8 @@ const SecondaryOutline = styled(Primary)<{ $isOutline?: boolean }>`
   color: ${(props) =>
     props.$isOutline
       ? props.theme.color.global.primaryTheme === 'dark'
-        ? props.theme.color.global.white
-        : props.theme.color.global.black
+        ? props.theme.color.global.contrast
+        : props.theme.color.global.neutral
       : props.theme.color.global.gray};
   transition: none;
   transform: none;

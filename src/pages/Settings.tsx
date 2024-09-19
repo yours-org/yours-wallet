@@ -48,7 +48,7 @@ const ConnectedAppRow = styled.div<WhiteLabelTheme>`
 
 const SettingsText = styled(Text)<WhiteLabelTheme>`
   color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   margin: 0;
   font-weight: 600;
   text-align: left;
@@ -370,7 +370,9 @@ export const Settings = () => {
         onClick={() => setPage('manage-accounts')}
         jsxElement={
           <ForwardButton
-            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
           />
         }
       />
@@ -380,7 +382,9 @@ export const Settings = () => {
         onClick={() => setPage('connected-apps')}
         jsxElement={
           <ForwardButton
-            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
           />
         }
       />
@@ -390,7 +394,9 @@ export const Settings = () => {
         onClick={() => setPage('preferences')}
         jsxElement={
           <ForwardButton
-            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
           />
         }
       />
@@ -400,7 +406,9 @@ export const Settings = () => {
         onClick={() => setPage('export-keys-options')}
         jsxElement={
           <ForwardButton
-            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
           />
         }
       />
@@ -409,7 +417,7 @@ export const Settings = () => {
         style={{
           margin: '1rem 0',
           textAlign: 'left',
-          color: theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black,
+          color: theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
           fontSize: '1rem',
           fontWeight: 700,
         }}
@@ -436,7 +444,9 @@ export const Settings = () => {
         description="Create a new account"
         jsxElement={
           <ForwardButton
-            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
           />
         }
         onClick={() => setPage('create-account')}
@@ -446,7 +456,9 @@ export const Settings = () => {
         description="Import or restore an existing account"
         jsxElement={
           <ForwardButton
-            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
           />
         }
         onClick={() => setPage('restore-account')}
@@ -456,7 +468,9 @@ export const Settings = () => {
         description="Edit an existing account"
         jsxElement={
           <ForwardButton
-            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
           />
         }
         onClick={() => setPage('account-list')}
@@ -528,7 +542,9 @@ export const Settings = () => {
         onClick={() => setPage('social-profile')}
         jsxElement={
           <ForwardButton
-            color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
           />
         }
       />
@@ -600,7 +616,9 @@ export const Settings = () => {
             icon={account.icon}
             jsxElement={
               <ForwardButton
-                color={theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black}
+                color={
+                  theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+                }
               />
             }
             onClick={() => {

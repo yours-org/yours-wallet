@@ -15,8 +15,8 @@ type GlobalColors = {
   primaryTheme: 'light' | 'dark';
   row: string;
   walletBackground: string;
-  white: string;
-  black: string;
+  contrast: string;
+  neutral: string;
   gray: string;
 };
 

@@ -139,7 +139,9 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
                 <Text
                   style={{
                     color:
-                      theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black,
+                      theme.color.global.primaryTheme === 'dark'
+                        ? theme.color.global.contrast
+                        : theme.color.global.neutral,
                   }}
                 >{`Message: ${request.message}`}</Text>
               }

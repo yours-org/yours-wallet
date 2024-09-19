@@ -146,7 +146,8 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
             <CheckMark style={{ marginRight: '1rem' }} src={greenCheck} />
             <Text
               style={{
-                color: theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black,
+                color:
+                  theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
                 margin: 0,
                 textAlign: 'left',
               }}
@@ -158,7 +159,8 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
             <CheckMark style={{ marginRight: '1rem' }} src={greenCheck} />
             <Text
               style={{
-                color: theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black,
+                color:
+                  theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
                 margin: 0,
                 textAlign: 'left',
               }}

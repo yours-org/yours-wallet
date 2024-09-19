@@ -55,12 +55,12 @@ const SeedInput = styled.textarea<WhiteLabelTheme & { $isExpert: boolean }>`
   margin: 0.5rem;
   outline: none;
   color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black + '80'};
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral + '80'};
   resize: none;
 
   &::placeholder {
     color: ${({ theme }) =>
-      theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black + '80'};
+      theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral + '80'};
   }
 `;
 
@@ -96,7 +96,7 @@ const WalletText = styled(Text)`
   margin: 0 0 0 1rem;
   text-align: left;
   color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.white : theme.color.global.black};
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   font-weight: 600;
 `;
 
