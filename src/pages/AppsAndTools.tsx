@@ -1,27 +1,23 @@
-// IMPORTANT TODO NOTE: Uncomment everything that is commented back out to re-enable the sponser page should it ever make sense
-
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { Button } from '../components/Button';
 import { ForwardButton as RightChevron } from '../components/ForwardButton';
 import { PageLoader } from '../components/PageLoader';
-// import yoursLogo from '../assets/yours-logo.png';
-// import { HeaderText, Text, YoursLogo } from '../components/Reusable';
-// import { HeaderText, Text } from '../components/Reusable';
+import yoursLogo from '../assets/logos/icon.png';
 import { HeaderText, Text } from '../components/Reusable';
 import { SettingsRow as AppsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useTheme } from '../hooks/useTheme';
 import { WhiteLabelTheme } from '../theme.types';
-// import { BSV_DECIMAL_CONVERSION, YOURS_DEV_WALLET, PROVIDER_DOCS_URL, featuredApps } from '../utils/constants';
-import { BSV_DECIMAL_CONVERSION, featuredApps } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, YOURS_DEV_WALLET, featuredApps } from '../utils/constants';
 import { truncate } from '../utils/format';
-// import { BsvSendRequest } from './requests/BsvSendRequest';
+import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { Txo } from 'spv-store';
 import { FaExternalLinkAlt } from 'react-icons/fa';
+import { Input } from '../components/Input';
 
 const Content = styled.div`
   display: flex;
@@ -41,19 +37,20 @@ const PageWrapper = styled.div<{ $marginTop: string }>`
   width: 100%;
 `;
 
-// const AmountsWrapper = styled.div`
-//   display: flex;
-//   align-items: center;
-//   justify-content: center;
-//   flex-wrap: wrap;
-// `;
+const AmountsWrapper = styled.div`
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+`;
 
-// const ButtonsWrapper = styled.div`
-//   display: flex;
-//   align-items: center;
-//   justify-content: center;
-//   width: 90%;
-// `;
+const ButtonsWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 90%;
+`;
 
 const ScrollableContainer = styled.div`
   display: flex;
@@ -123,15 +120,15 @@ type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unloc
 export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { setSelected, query } = useBottomMenu();
-  const { keysService, bsvService } = useServiceContext();
-  // const { exchangeRate, identityAddress } = useBsv();
-  const { identityAddress } = keysService;
+  const { keysService, bsvService, chromeStorageService } = useServiceContext();
+  const identityAddress = keysService.identityAddress;
+  const exchangeRate = chromeStorageService.getCurrentAccountObject().exchangeRateCache?.rate ?? 0;
   const [isProcessing, setIsProcessing] = useState(false);
   const [page, setPage] = useState<AppsPage>(query === 'pending-locks' ? 'unlock' : 'main');
-  // const [otherIsSelected, setOtherIsSelected] = useState(false);
-  // const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
-  // const [satAmount, setSatAmount] = useState(0);
-  // const [didSubmit, setDidSubmit] = useState(false);
+  const [otherIsSelected, setOtherIsSelected] = useState(false);
+  const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
+  const [satAmount, setSatAmount] = useState(0);
+  const [didSubmit, setDidSubmit] = useState(false);
   const [lockedUtxos, setLockedUtxos] = useState<Txo[]>([]);
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
 
@@ -153,26 +150,34 @@ export const AppsAndTools = () => {
     setSelected('apps');
   }, [setSelected]);
 
-  // useEffect(() => {
-  //   if (!satAmount) return;
-  //   setDidSubmit(true);
-  // }, [satAmount]);
+  useEffect(() => {
+    if (!satAmount) return;
+    setDidSubmit(true);
+  }, [satAmount]);
 
-  // const handleSubmit = (amount: number) => {
-  //   if (!amount || !exchangeRate) return;
+  const handleSubmit = (amount: number) => {
+    if (!amount || !exchangeRate) return;
 
-  //   const satAmount = Math.round((amount / exchangeRate) * BSV_DECIMAL_CONVERSION);
-  //   setSatAmount(satAmount);
-  // };
+    const satAmount = Math.round((amount / exchangeRate) * BSV_DECIMAL_CONVERSION);
+    setSatAmount(satAmount);
+  };
 
   const main = (
     <>
-      {/* <AppsRow
-        name="Make a Difference"
-        description="Fund Yours Wallet's open source developers"
-        onClick={() => setPage('sponsor')}
-        jsxElement={<RightChevron />}
-      /> */}
+      <Show when={theme.settings.walletName === 'Yours'}>
+        <AppsRow
+          name="Support Yours"
+          description="Fund Yours Wallet's open source developers"
+          onClick={() => setPage('sponsor')}
+          jsxElement={
+            <RightChevron
+              color={
+                theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+              }
+            />
+          }
+        />
+      </Show>
       <Show when={theme.settings.services.locks}>
         <AppsRow
           name="Pending Locks"
@@ -317,82 +322,81 @@ export const AppsAndTools = () => {
     </PageWrapper>
   );
 
-  // const generateButtons = (amounts: string[]) => {
-  //   return amounts.map((amt, idx) => {
-  //     return (
-  //       <Button
-  //         key={`${amt}_${idx}`}
-  //         theme={theme}
-  //         style={{ maxWidth: '5rem' }}
-  //         type="primary"
-  //         label={amt === 'Other' ? amt : `$${amt}`}
-  //         onClick={() => {
-  //           if (amt === 'Other') {
-  //             setOtherIsSelected(true);
-  //           } else {
-  //             handleSubmit(Number(amt));
-  //           }
-  //         }}
-  //       />
-  //     );
-  //   });
-  // };
+  const generateButtons = (amounts: string[]) => {
+    return amounts.map((amt, idx) => {
+      return (
+        <Button
+          key={`${amt}_${idx}`}
+          theme={theme}
+          type="primary"
+          label={amt === 'Other' ? amt : `$${amt}`}
+          onClick={() => {
+            if (amt === 'Other') {
+              setOtherIsSelected(true);
+            } else {
+              handleSubmit(Number(amt));
+            }
+          }}
+        />
+      );
+    });
+  };
 
-  // const sponsorPage = (
-  //   <PageWrapper $marginTop={'0'}>
-  //     <YoursLogo src={yoursLogo} />
-  //     <HeaderText theme={theme}>Fund Developers</HeaderText>
-  //     <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
-  //       Yours is an open-source initiative, consider supporting the devs.
-  //     </Text>
-  //     <Show
-  //       when={otherIsSelected}
-  //       whenFalseContent={
-  //         <AmountsWrapper>{generateButtons(['25', '50', '100', '250', '500', 'Other'])}</AmountsWrapper>
-  //       }
-  //     >
-  //       <Input
-  //         theme={theme}
-  //         placeholder={'Enter USD Amount'}
-  //         type="number"
-  //         step="1"
-  //         value={selectedAmount !== null && selectedAmount !== undefined ? selectedAmount : ''}
-  //         onChange={(e) => {
-  //           const inputValue = e.target.value;
-  //           if (inputValue === '') {
-  //             setSelectedAmount(null);
-  //           } else {
-  //             setSelectedAmount(Number(inputValue));
-  //           }
-  //         }}
-  //       />
-  //       <ButtonsWrapper>
-  //         <Button theme={theme} type="warn" label="Cancel" onClick={() => setOtherIsSelected(false)} />
-  //         <Button theme={theme} type="primary" label="Submit" onClick={() => handleSubmit(Number(selectedAmount))} />
-  //       </ButtonsWrapper>
-  //     </Show>
-  //     <Text theme={theme} style={{ width: '95%', margin: '2rem 0 1rem 0' }}>
-  //       Give Monthly through Yours Wallet's transparent Open Collective.
-  //     </Text>
-  //     <Button
-  //       theme={theme}
-  //       type="secondary-outline"
-  //       label="View Open Collective"
-  //       onClick={() => window.open('https://opencollective.com/panda-wallet', '_blank')}
-  //     />
-  //     <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
-  //   </PageWrapper>
-  // );
+  const sponsorPage = (
+    <PageWrapper $marginTop={'0'}>
+      <img src={yoursLogo} alt="Wallet Logo" style={{ width: '3rem', height: '3rem', margin: '0.5rem' }} />
+      <HeaderText theme={theme}>Support Project</HeaderText>
+      <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
+        Yours is an open-source initiative, consider supporting its continued development.
+      </Text>
+      <Show
+        when={otherIsSelected}
+        whenFalseContent={
+          <AmountsWrapper>{generateButtons(['25', '50', '100', '250', '500', 'Other'])}</AmountsWrapper>
+        }
+      >
+        <Input
+          theme={theme}
+          placeholder={'Enter USD Amount'}
+          type="number"
+          step="1"
+          value={selectedAmount !== null && selectedAmount !== undefined ? selectedAmount : ''}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+            const inputValue = e.target.value;
+            if (inputValue === '') {
+              setSelectedAmount(null);
+            } else {
+              setSelectedAmount(Number(inputValue));
+            }
+          }}
+        />
+        <ButtonsWrapper>
+          <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setOtherIsSelected(false)} />
+          <Button theme={theme} type="primary" label="Submit" onClick={() => handleSubmit(Number(selectedAmount))} />
+        </ButtonsWrapper>
+      </Show>
+      <Text theme={theme} style={{ width: '95%', margin: '2rem 0 1rem 0' }}>
+        Give Monthly through Yours Wallet's transparent Open Collective.
+      </Text>
+      <Button
+        theme={theme}
+        type="secondary-outline"
+        label="View Open Collective"
+        onClick={() => window.open('https://opencollective.com/panda-wallet', '_blank')}
+      />
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
+    </PageWrapper>
+  );
 
-  // const thankYouSponsorPage = (
-  //   <PageWrapper $marginTop={'8rem'}>
-  //     <BackButton onClick={() => setPage('main')} />
-  //     <HeaderText theme={theme}>🙏 Thank You</HeaderText>
-  //     <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
-  //       Your contribution has been received.
-  //     </Text>
-  //   </PageWrapper>
-  // );
+  const thankYouSponsorPage = (
+    <PageWrapper $marginTop={'8rem'}>
+      <HeaderText theme={theme}>🙏 Thank You</HeaderText>
+      <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
+        Your contribution has been received.
+      </Text>
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
+    </PageWrapper>
+  );
 
   return (
     <Content>
@@ -401,13 +405,13 @@ export const AppsAndTools = () => {
         <PageLoader theme={theme} message={'Gathering info...'} />
       </Show>
       <Show when={page === 'main'}>{main}</Show>
-      {/* <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show> */}
-      {/* <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show> */}
+      <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show>
+      <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show>
       <Show when={!isProcessing && page === 'unlock'}>{unlockPage}</Show>
       <Show when={page === 'discover-apps'}>{discoverAppsPage}</Show>
-      {/* <Show when={page === 'sponsor' && didSubmit}>
+      <Show when={page === 'sponsor' && didSubmit}>
         <BsvSendRequest
-          web3Request={[{ address: YOURS_DEV_WALLET, satoshis: satAmount }]}
+          request={[{ address: YOURS_DEV_WALLET, satoshis: satAmount }]}
           popupId={undefined}
           onResponse={() => {
             setDidSubmit(false);
@@ -415,7 +419,7 @@ export const AppsAndTools = () => {
           }}
           requestWithinApp
         />
-      </Show> */}
+      </Show>
     </Content>
   );
 };

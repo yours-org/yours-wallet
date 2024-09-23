@@ -1,6 +1,6 @@
 import React, { ReactNode, createContext } from 'react';
 import { Theme } from '../theme.types';
-import walletTheme from '../theme.json';
+import { theme } from '../theme';
 
 export interface ThemeContextProps {
   theme: Theme;
@@ -13,6 +13,5 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  const theme = walletTheme as Theme;
   return <ThemeContext.Provider value={{ theme }}>{children}</ThemeContext.Provider>;
 };

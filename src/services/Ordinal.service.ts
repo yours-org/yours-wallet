@@ -21,7 +21,7 @@ import { isValidEmail } from '../utils/tools';
 import { PaymailClient } from '@bsv/paymail/client';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { truncate } from '../utils/format';
-import theme from '../theme.json';
+import { theme } from '../theme';
 
 const client = new PaymailClient();
 

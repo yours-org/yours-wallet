@@ -243,7 +243,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
             style={{ cursor: 'pointer', margin: '0.75rem 0' }}
           >{`Available Balance: ${getBsvBalance()}`}</Text>
           <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
-            <RequestDetailsContainer>{web3Details()}</RequestDetailsContainer>
+            <RequestDetailsContainer theme={theme}>{web3Details()}</RequestDetailsContainer>
             <Show when={isPasswordRequired}>
               <Input
                 theme={theme}
