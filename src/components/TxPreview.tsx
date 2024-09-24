@@ -8,6 +8,7 @@ import { GP_BASE_URL } from '../utils/constants';
 import { convertToTokenValue, formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { mapOrdinal } from '../utils/providerHelper';
 import { Show } from './Show';
+import lockImage from '../assets/lock.svg';
 
 const Container = styled.div`
   display: flex;
@@ -45,10 +46,10 @@ const RowData = styled.div<WhiteLabelTheme>`
     theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
 `;
 
-const NftImage = styled.img`
-  width: 50px;
-  height: 50px;
-  border-radius: 0.25rem;
+const NftImage = styled.img<{ $isCircle: boolean }>`
+  width: ${({ $isCircle }) => ($isCircle ? '2rem' : '2.75rem')};
+  height: ${({ $isCircle }) => ($isCircle ? '2rem' : '2.75rem')};
+  border-radius: ${({ $isCircle }) => ($isCircle ? '50%' : '0.25rem')};
   margin: 0 0.25rem 0 0.5rem;
 `;
 
@@ -69,11 +70,9 @@ type TxPreviewProps = {
 
 const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
   const { theme } = useTheme();
+  const labelMaxLength = 20;
   const [mappedInputs, setMappedInputs] = useState<Ordinal[]>([]);
   const [mappedOutputs, setMappedOutputs] = useState<Ordinal[]>([]);
-  console.log('mappedInputs', mappedInputs);
-  console.log('mappedOutputs', mappedOutputs);
-  console.log('sym', mappedInputs[0]?.data?.bsv20?.sym);
 
   useEffect(() => {
     if (!txData) return;
@@ -81,18 +80,23 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
     setMappedOutputs(txData?.txos.map((txo: Txo) => mapOrdinal(txo)));
   }, [txData]);
 
+  console.log('mappedInputs', mappedInputs);
+  console.log('mappedOutputs', mappedOutputs);
+
   const renderNftOrTokenImage = (ordinal: Ordinal) => {
     const inscriptionWithOutpoint =
       ordinal?.origin?.data?.insc?.file.type.startsWith('image') && !!ordinal.origin.outpoint;
     const bsv20WithIcon = !!ordinal?.data?.bsv20 && !!ordinal.data.bsv20.icon;
+    const isLock = !!ordinal?.data?.lock;
 
     if (inscriptionWithOutpoint) {
-      return <NftImage src={`${GP_BASE_URL}/content/${ordinal.origin?.outpoint}`} alt="NFT" />;
+      return <NftImage $isCircle={false} src={`${GP_BASE_URL}/content/${ordinal.origin?.outpoint}`} alt="NFT" />;
     }
 
     if (bsv20WithIcon) {
       return (
         <NftImage
+          $isCircle
           src={
             ordinal.data.bsv20?.icon?.startsWith('https://')
               ? ordinal.data.bsv20.icon
@@ -101,6 +105,10 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
           alt="Token"
         />
       );
+    }
+
+    if (isLock) {
+      return <NftImage $isCircle src={lockImage} alt="Lock" />;
     }
     return null;
   };
@@ -125,16 +133,23 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
               <Show
                 when={!!input.data.bsv20}
                 whenFalseContent={
-                  <>
-                    {formatNumberWithCommasAndDecimals(input.satoshis, 0)} {input.satoshis > 1 ? 'sats' : 'sat'}
-                  </>
+                  <Show
+                    when={!!input.origin?.data?.map?.name}
+                    whenFalseContent={
+                      <>
+                        {formatNumberWithCommasAndDecimals(input.satoshis, 0)} {input.satoshis > 1 ? 'sats' : 'sat'}
+                      </>
+                    }
+                  >
+                    {input.origin?.data?.map?.name && truncate(input.origin.data.map.name, labelMaxLength, 0)}
+                  </Show>
                 }
               >
                 {formatNumberWithCommasAndDecimals(
                   convertToTokenValue(Number(input.data.bsv20?.amt), Number(input.data.bsv20?.dec)),
                   Number(input.data.bsv20?.dec),
                 )}{' '}
-                {input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT'}
+                {truncate(input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT', labelMaxLength, 0)}
               </Show>
             </RowData>
             {renderNftOrTokenImage(input)}
@@ -155,16 +170,23 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
               <Show
                 when={!!output.data.bsv20}
                 whenFalseContent={
-                  <>
-                    {formatNumberWithCommasAndDecimals(output.satoshis, 0)} {output.satoshis > 1 ? 'sats' : 'sat'}
-                  </>
+                  <Show
+                    when={!!output.origin?.data?.map?.name}
+                    whenFalseContent={
+                      <>
+                        {formatNumberWithCommasAndDecimals(output.satoshis, 0)} {output.satoshis > 1 ? 'sats' : 'sat'}
+                      </>
+                    }
+                  >
+                    {output.origin?.data?.map?.name && truncate(output.origin.data.map.name, labelMaxLength, 0)}
+                  </Show>
                 }
               >
                 {formatNumberWithCommasAndDecimals(
                   convertToTokenValue(Number(output.data.bsv20?.amt), Number(output.data.bsv20?.dec)),
                   Number(output.data.bsv20?.dec),
                 )}{' '}
-                {output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT'}
+                {truncate(output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT', labelMaxLength, 0)}
               </Show>
             </RowData>
             {renderNftOrTokenImage(output)}

@@ -1,30 +1,8 @@
 import { Utils } from '@bsv/sdk';
-import { Bsv20, Bsv21, Txo } from 'spv-store';
+import { Txo } from 'spv-store';
 import { Ordinal } from 'yours-wallet-provider';
 
 export function mapOrdinal(t: Txo): Ordinal {
-  const bsv20Data = t.data.bsv20?.data as Bsv20;
-  const bsv21Data = t.data.bsv21?.data as Bsv21;
-
-  console.log('bsv21Data:', bsv21Data);
-  if (bsv21Data?.icon) {
-    console.log('bsv21Data.icon:', bsv21Data.icon);
-  } else {
-    console.log('bsv21Data.icon is undefined');
-  }
-  const tokenData = bsv21Data && {
-    amt: Number(bsv21Data.amt),
-    supply: Number(bsv21Data.supply),
-    icon: bsv21Data.icon,
-    id: bsv21Data.id,
-    dec: bsv21Data.dec,
-    op: bsv21Data.op,
-    status: bsv21Data.status,
-    sym: bsv21Data.sym,
-  };
-
-  console.log('tokenData', tokenData);
-
   return {
     txid: t.outpoint.txid,
     vout: t.outpoint.vout,
@@ -52,7 +30,7 @@ export function mapOrdinal(t: Txo): Ordinal {
       },
       lock: t.data.lock?.data,
       map: t.data.map?.data,
-      bsv20: tokenData as any,
+      bsv20: t.data.bsv20?.data || t.data.bsv21?.data,
       // TODO: add sigma
     },
   };
