@@ -9,7 +9,7 @@ import {
   TokenUtxo,
   transferOrdTokens,
 } from 'js-1sat-ord';
-import { Bsv20, Bsv21, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
+import { Bsv20, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction } from '@bsv/sdk';
 import { BsvService } from './Bsv.service';
 //TODO: look into why BSV20_INDEX_FEE is not being used
@@ -45,10 +45,10 @@ export class OrdinalService {
     return mapOrdinal(txo);
   };
 
-  getBsv20s = async (): Promise<(Bsv20 | Bsv21)[]> => {
+  getBsv20s = async (): Promise<Bsv20[]> => {
     const bsv21s = await this.oneSatSPV.search(new TxoLookup('bsv21'));
 
-    const tokens: { [id: string]: Bsv20 | Bsv21 } = {};
+    const tokens: { [id: string]: Bsv20 } = {};
     for (const txo of bsv21s.txos) {
       const bsv21 = txo.data.bsv21?.data as Bsv21Type;
       if (!bsv21) continue;
@@ -451,7 +451,7 @@ export class OrdinalService {
     }
   };
 
-  getTokenName(b: Bsv20 | Bsv21): string {
-    return (b as Bsv21).sym || (b as Bsv20).tick || 'Null';
+  getTokenName(b: Bsv20): string {
+    return b.sym || b.tick || 'Null';
   }
 }

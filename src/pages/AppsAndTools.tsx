@@ -15,9 +15,12 @@ import { truncate } from '../utils/format';
 import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { Txo } from 'spv-store';
+import { IndexContext, Txo } from 'spv-store';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 import { Input } from '../components/Input';
+import TxPreview from '../components/TxPreview';
+import { TransactionFormat } from 'yours-wallet-provider';
+import { getTxFromRawTxFormat } from '../utils/tools';
 
 const Content = styled.div`
   display: flex;
@@ -115,12 +118,25 @@ const LockDetailsHeaderText = styled(LockDetailsText)`
   font-weight: 600;
 `;
 
-type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unlock';
+const Dropdown = styled.select`
+  width: 80%;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+`;
+
+const TextArea = styled.textarea`
+  width: 80%;
+  height: 150px;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+`;
+
+type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unlock' | 'decode-broadcast' | 'decode';
 
 export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { setSelected, query } = useBottomMenu();
-  const { keysService, bsvService, chromeStorageService } = useServiceContext();
+  const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
   const identityAddress = keysService.identityAddress;
   const exchangeRate = chromeStorageService.getCurrentAccountObject().exchangeRateCache?.rate ?? 0;
   const [isProcessing, setIsProcessing] = useState(false);
@@ -131,6 +147,9 @@ export const AppsAndTools = () => {
   const [didSubmit, setDidSubmit] = useState(false);
   const [lockedUtxos, setLockedUtxos] = useState<Txo[]>([]);
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
+  const [txData, setTxData] = useState<IndexContext>();
+  const [rawTx, setRawTx] = useState<string | number[]>('');
+  const [transactionFormat, setTransactionFormat] = useState<TransactionFormat>('tx');
 
   const getLockData = async () => {
     setIsProcessing(true);
@@ -162,6 +181,16 @@ export const AppsAndTools = () => {
     setSatAmount(satAmount);
   };
 
+  const handleDecode = async () => {
+    setIsProcessing(true);
+    const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
+    const data = await oneSatSPV.parseTx(tx);
+    setTxData(data);
+    console.log(data);
+    setIsProcessing(false);
+    setPage('decode');
+  };
+
   const main = (
     <>
       <Show when={theme.settings.walletName === 'Yours'}>
@@ -178,6 +207,18 @@ export const AppsAndTools = () => {
           }
         />
       </Show>
+      <AppsRow
+        name="Decode/Broadcast"
+        description="Decode and broadcast raw transactions"
+        onClick={() => setPage('decode-broadcast')}
+        jsxElement={
+          <RightChevron
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
+          />
+        }
+      />
       <Show when={theme.settings.services.locks}>
         <AppsRow
           name="Pending Locks"
@@ -398,12 +439,67 @@ export const AppsAndTools = () => {
     </PageWrapper>
   );
 
+  const decodeOrBroadcastPage = (
+    <PageWrapper $marginTop={'0'}>
+      <HeaderText theme={theme}>Decode/Broadcast</HeaderText>
+      <Text theme={theme}>Decode or broadcast a raw transaction in various formats</Text>
+
+      <Dropdown
+        onChange={(e) =>
+          setTransactionFormat(e.target.value === 'hex' ? 'tx' : e.target.value === 'beef' ? 'beef' : 'ef')
+        }
+      >
+        <option value="hex">Raw Hex</option>
+        <option value="beef">BEEF</option>
+        <option value="extended">Extended Format</option>
+      </Dropdown>
+
+      <TextArea placeholder="Paste your raw transaction" onChange={(e) => setRawTx(e.target.value)} />
+
+      <ButtonsWrapper>
+        <Button theme={theme} type="secondary-outline" label="Decode" onClick={handleDecode} />
+        <Button
+          theme={theme}
+          type="primary"
+          label="Broadcast"
+          onClick={() => {
+            /* TODO: Implement broadcast logic */
+          }}
+        />
+      </ButtonsWrapper>
+    </PageWrapper>
+  );
+
+  console.log('txData', txData);
+
+  const decode = !!txData && (
+    <>
+      <TxPreview txData={txData} />
+      <ButtonsWrapper>
+        <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setPage('main')} />
+        <Button
+          theme={theme}
+          type="primary"
+          label="Broadcast"
+          onClick={() => {
+            /* TODO: Implement broadcast */
+          }}
+        />
+      </ButtonsWrapper>
+    </>
+  );
+
   return (
     <Content>
       <TopNav />
       <Show when={isProcessing && page === 'unlock'}>
         <PageLoader theme={theme} message={'Gathering info...'} />
       </Show>
+      <Show when={isProcessing && page === 'decode-broadcast'}>
+        <PageLoader theme={theme} message={'Decoding transaction...'} />
+      </Show>
+      <Show when={!isProcessing && page === 'decode-broadcast'}>{decodeOrBroadcastPage}</Show>
+      <Show when={page === 'decode'}>{decode}</Show>
       <Show when={page === 'main'}>{main}</Show>
       <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show>
       <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show>

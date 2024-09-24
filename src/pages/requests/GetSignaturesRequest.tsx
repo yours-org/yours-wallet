@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { DefaultTheme, styled } from 'styled-components';
 import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
@@ -13,180 +12,9 @@ import { useTheme } from '../../hooks/useTheme';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { sleep } from '../../utils/sleep';
-import { Transaction, Utils } from '@bsv/sdk';
-
-const TxInput = styled.div`
-  border: 1px solid yellow;
-  margin: 0.5rem 0;
-  padding: 0.5rem;
-  width: 85%;
-`;
-
-const TxOutput = styled.div`
-  border: 1px solid green;
-  margin: 0.5rem 0;
-  padding: 0.5rem;
-  width: 85%;
-`;
-
-const TxContainer = styled.div`
-  max-height: 10rem;
-  overflow-y: auto;
-  overflow-x: hidden;
-`;
-
-const TxInputsContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-`;
-
-const TxOutputsContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-`;
-
-const InputContent = (props: {
-  idx: number;
-  tag: string;
-  addr: string | string[];
-  sats: number;
-  theme?: DefaultTheme | undefined;
-}) => {
-  return (
-    <div style={{ color: props.theme?.color || 'white' }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          paddingTop: '0.2rem',
-        }}
-      >
-        <span>#{props.idx}</span>
-        <span>{props.tag}</span>
-        <span>{props.sats} sats</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <div>Signer:</div>
-        <div style={{ overflowX: 'scroll', padding: '0.5rem 0 0.5rem 0.5rem' }}>{props.addr}</div>
-      </div>
-    </div>
-  );
-};
-
-const OutputContent = (props: {
-  idx: number;
-  tag: string;
-  addr: string | string[];
-  sats: number;
-  theme?: DefaultTheme | undefined;
-}) => {
-  return (
-    <div style={{ color: props.theme?.color || 'white' }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          paddingTop: '0.2rem',
-        }}
-      >
-        <span>#{props.idx}</span>
-        <span>{props.tag}</span>
-        <span>{props.sats} sats</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <div>Payee:</div>
-        <div style={{ overflowX: 'scroll', padding: '0.5rem 0 0.5rem 0.5rem' }}>{props.addr}</div>
-      </div>
-    </div>
-  );
-};
-
-const TxViewer = (props: { request: GetSignatures }) => {
-  const { theme } = useTheme();
-  const [showDetail, setShowDetail] = useState(false);
-  const { request } = props;
-  const [txOutputs, setTxOutputs] = useState<{ asm: string; satoshis: number }[]>([]);
-
-  useEffect(() => {
-    const setTheTx = async () => {
-      try {
-        const tx = Transaction.fromHex(request.rawtx);
-        // const numOuts = tx.get_noutputs();
-        const outputs: { asm: string; satoshis: number }[] = tx.outputs.map((o) => ({
-          asm: o.lockingScript.toASM(),
-          satoshis: o.satoshis || 0,
-        }));
-
-        setTxOutputs(outputs);
-      } catch (error) {
-        console.error(error);
-      }
-    };
-    setTheTx();
-  }, [request.rawtx]);
-
-  return (
-    <TxContainer>
-      <Show when={!showDetail}>
-        <Button
-          theme={theme}
-          type="secondary"
-          label="Details"
-          onClick={() => setShowDetail(!showDetail)}
-          style={{ marginTop: '0' }}
-        />
-      </Show>
-
-      <Show when={showDetail}>
-        <TxInputsContainer>
-          <Text theme={theme} style={{ margin: '0.5rem 0' }}>
-            Inputs To Sign
-          </Text>
-          {request.sigRequests.map((sigReq) => (
-            <TxInput key={sigReq.inputIndex}>
-              <InputContent
-                idx={sigReq.inputIndex}
-                tag={sigReq.script ? 'nonStandard' : 'P2PKH'}
-                addr={[sigReq.address].flat().join(', ')}
-                sats={sigReq.satoshis}
-                theme={theme}
-              />
-            </TxInput>
-          ))}
-        </TxInputsContainer>
-        <TxOutputsContainer>
-          <Text theme={theme} style={{ margin: '0.5rem 0' }}>
-            Outputs
-          </Text>
-          {txOutputs.length > 0 ? (
-            txOutputs.map(({ asm, satoshis }, idx: number) => {
-              const pubkeyHash = (/^OP_DUP OP_HASH160 ([0-9a-fA-F]{40}) OP_EQUALVERIFY OP_CHECKSIG$/.exec(asm) ||
-                [])[1];
-              const isP2PKH = !!pubkeyHash;
-              const toAddr = pubkeyHash ? Utils.toBase58Check(Utils.toArray(pubkeyHash, 'hex')) : 'Unknown Address';
-
-              return (
-                <TxOutput key={idx}>
-                  <OutputContent
-                    idx={idx}
-                    tag={isP2PKH ? 'P2PKH' : 'nonStandard'}
-                    addr={toAddr}
-                    sats={satoshis}
-                    theme={theme}
-                  />
-                </TxOutput>
-              );
-            })
-          ) : (
-            <>Parsing Tx ...</>
-          )}
-        </TxOutputsContainer>
-      </Show>
-    </TxContainer>
-  );
-};
+import TxPreview from '../../components/TxPreview';
+import { IndexContext } from 'spv-store';
+import { getTxFromRawTxFormat } from '../../utils/tools';
 
 export type GetSignaturesResponse = {
   sigResponses?: SignatureResponse[];
@@ -204,9 +32,9 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { setSelected } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, contractService } = useServiceContext();
+  const { chromeStorageService, contractService, oneSatSPV } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
-
+  const [txData, setTxData] = useState<IndexContext>();
   const { request, onSignature, popupId } = props;
   const [getSigsResponse, setGetSigsResponse] = useState<{
     sigResponses?: SignatureResponse[] | undefined;
@@ -219,6 +47,15 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       | undefined;
   }>();
   const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      if (!request.rawtx || !oneSatSPV) return;
+      const tx = getTxFromRawTxFormat(request.rawtx, request.format || 'tx');
+      const parsedTx = await oneSatSPV.parseTx(tx);
+      setTxData(parsedTx);
+    })();
+  }, [oneSatSPV, request]);
 
   useEffect(() => {
     setSelected('bsv');
@@ -300,7 +137,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       <Show when={isProcessing}>
         <PageLoader theme={theme} message="Signing Transaction..." />
       </Show>
-      <Show when={!isProcessing && !!request}>
+      <Show when={!isProcessing && !!request && !!txData}>
         <ConfirmContent>
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Sign Transaction</HeaderText>
@@ -308,7 +145,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
             The app is requesting signatures for a transaction.
           </Text>
           <FormContainer noValidate onSubmit={(e) => handleSigning(e)}>
-            <TxViewer request={request} />
+            {txData && <TxPreview txData={txData} inputsToSign={request.sigRequests.map((r) => r.inputIndex)} />}
             <Show when={isPasswordRequired}>
               <Input
                 theme={theme}

@@ -106,7 +106,7 @@ if (isInServiceWorker) {
       {
         url: chrome.runtime.getURL('index.html'),
         type: 'popup',
-        width: 360,
+        width: 392,
         height: 567,
       },
       (window) => {

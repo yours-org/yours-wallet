@@ -75,3 +75,7 @@ export const formatLargeNumber = (number: number, decimalPlaces = 3): string => 
   // For numbers below 1 million, use the existing formatting function
   return formatNumberWithCommasAndDecimals(number, decimalPlaces);
 };
+
+export const convertToTokenValue = (balance: number, decimals: number): number => {
+  return balance / Math.pow(10, decimals);
+};

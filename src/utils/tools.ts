@@ -1,5 +1,5 @@
-import { NetWork } from 'yours-wallet-provider';
-import { Utils } from '@bsv/sdk';
+import { NetWork, TransactionFormat } from 'yours-wallet-provider';
+import { Transaction, Utils } from '@bsv/sdk';
 import { MAINNET_ADDRESS_PREFIX, TESTNET_ADDRESS_PREFIX } from './constants';
 
 export const getCurrentUtcTimestamp = (): number => {
@@ -27,4 +27,14 @@ export const convertAddressToMainnet = (address: string) => {
 
 export const isValidEmail = (email: string) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
+export const getTxFromRawTxFormat = (rawTx: string | number[], format: TransactionFormat) => {
+  const tx =
+    format === 'tx'
+      ? Transaction.fromHex(rawTx as string)
+      : format === 'beef'
+        ? Transaction.fromBEEF(rawTx as number[])
+        : Transaction.fromEF(rawTx as number[]);
+  return tx;
 };

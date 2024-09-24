@@ -14,6 +14,9 @@ import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { Transaction, Utils } from '@bsv/sdk';
+import { getTxFromRawTxFormat } from '../../utils/tools';
+import { IndexContext } from 'spv-store';
+import TxPreview from '../../components/TxPreview';
 
 export type BroadcastResponse = {
   txid: string;
@@ -34,10 +37,19 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [satsOut, setSatsOut] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [txData, setTxData] = useState<IndexContext>();
   const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
   const { updateBsvBalance } = bsvService;
   const { bsvAddress } = keysService;
-  // const { isProcessing, setIsProcessing, updateBsvBalance, fundRawTx, bsvAddress } = useBsv();
+
+  useEffect(() => {
+    (async () => {
+      if (!request.rawtx || !oneSatSPV) return;
+      const tx = getTxFromRawTxFormat(request.rawtx, request.format || 'tx');
+      const parsedTx = await oneSatSPV.parseTx(tx);
+      setTxData(parsedTx);
+    })();
+  }, [oneSatSPV, request]);
 
   useEffect(() => {
     setSelected('bsv');
@@ -154,7 +166,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       <Show when={isProcessing}>
         <PageLoader theme={theme} message="Broadcasting transaction..." />
       </Show>
-      <Show when={!isProcessing && !!request}>
+      <Show when={!isProcessing && !!request && !!txData}>
         <ConfirmContent>
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Broadcast Raw Tx</HeaderText>
@@ -171,9 +183,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
                 onChange={(e) => setPasswordConfirm(e.target.value)}
               />
             </Show>
-            <Text theme={theme} style={{ margin: '1rem' }}>
-              Double check details before sending.
-            </Text>
+            {txData && <TxPreview txData={txData} />}
             <Button
               theme={theme}
               type="primary"

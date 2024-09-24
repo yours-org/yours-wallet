@@ -1,0 +1,178 @@
+import { useEffect, useState } from 'react';
+import { IndexContext, Txo } from 'spv-store';
+import styled from 'styled-components';
+import { Ordinal } from 'yours-wallet-provider';
+import { useTheme } from '../hooks/useTheme';
+import { WhiteLabelTheme } from '../theme.types';
+import { GP_BASE_URL } from '../utils/constants';
+import { convertToTokenValue, formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
+import { mapOrdinal } from '../utils/providerHelper';
+import { Show } from './Show';
+
+const Container = styled.div`
+  display: flex;
+  flex-direction: column;
+  width: 90%;
+`;
+
+const SectionHeader = styled.h3<WhiteLabelTheme>`
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  font-weight: 900;
+  margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+`;
+
+const Row = styled.div<WhiteLabelTheme & { $toSign: boolean }>`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  background-color: ${({ theme }) => theme.color.global.row};
+  border: ${({ theme, $toSign }) => ($toSign ? `1px solid ${theme.color.component.snackbarSuccess}` : 'none')};
+  border-radius: 0.25rem;
+`;
+
+const Index = styled.div<WhiteLabelTheme>`
+  font-weight: bold;
+  color: ${({ theme }) => theme.color.global.gray};
+  margin-right: 0.5rem;
+`;
+
+const RowData = styled.div<WhiteLabelTheme>`
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+`;
+
+const NftImage = styled.img`
+  width: 50px;
+  height: 50px;
+  border-radius: 0.25rem;
+  margin: 0 0.25rem 0 0.5rem;
+`;
+
+const AmountImageWrapper = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const IndexOwnerWrapper = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+type TxPreviewProps = {
+  txData: IndexContext;
+  inputsToSign?: number[];
+};
+
+const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
+  const { theme } = useTheme();
+  const [mappedInputs, setMappedInputs] = useState<Ordinal[]>([]);
+  const [mappedOutputs, setMappedOutputs] = useState<Ordinal[]>([]);
+  console.log('mappedInputs', mappedInputs);
+  console.log('mappedOutputs', mappedOutputs);
+  console.log('sym', mappedInputs[0]?.data?.bsv20?.sym);
+
+  useEffect(() => {
+    if (!txData) return;
+    setMappedInputs(txData?.spends.map((txo: Txo) => mapOrdinal(txo)));
+    setMappedOutputs(txData?.txos.map((txo: Txo) => mapOrdinal(txo)));
+  }, [txData]);
+
+  const renderNftOrTokenImage = (ordinal: Ordinal) => {
+    const inscriptionWithOutpoint =
+      ordinal?.origin?.data?.insc?.file.type.startsWith('image') && !!ordinal.origin.outpoint;
+    const bsv20WithIcon = !!ordinal?.data?.bsv20 && !!ordinal.data.bsv20.icon;
+
+    if (inscriptionWithOutpoint) {
+      return <NftImage src={`${GP_BASE_URL}/content/${ordinal.origin?.outpoint}`} alt="NFT" />;
+    }
+
+    if (bsv20WithIcon) {
+      return (
+        <NftImage
+          src={
+            ordinal.data.bsv20?.icon?.startsWith('https://')
+              ? ordinal.data.bsv20.icon
+              : `${GP_BASE_URL}/content/${ordinal.data.bsv20?.icon}`
+          }
+          alt="Token"
+        />
+      );
+    }
+    return null;
+  };
+
+  return (
+    <Container>
+      <SectionHeader theme={theme}>Inputs</SectionHeader>
+      {mappedInputs.map((input: Ordinal, index: number) => (
+        <Row $toSign={!!inputsToSign?.includes(index)} key={index} theme={theme}>
+          <IndexOwnerWrapper>
+            <Index theme={theme}>#{index}</Index>
+            {input.owner && <RowData theme={theme}>{truncate(input.owner, 6, 6)}</RowData>}
+            {!!inputsToSign?.includes(index) && (
+              <RowData style={{ marginLeft: '0.5rem' }} theme={theme}>
+                ✍️
+              </RowData>
+            )}
+          </IndexOwnerWrapper>
+
+          <AmountImageWrapper>
+            <RowData theme={theme}>
+              <Show
+                when={!!input.data.bsv20}
+                whenFalseContent={
+                  <>
+                    {formatNumberWithCommasAndDecimals(input.satoshis, 0)} {input.satoshis > 1 ? 'sats' : 'sat'}
+                  </>
+                }
+              >
+                {formatNumberWithCommasAndDecimals(
+                  convertToTokenValue(Number(input.data.bsv20?.amt), Number(input.data.bsv20?.dec)),
+                  Number(input.data.bsv20?.dec),
+                )}{' '}
+                {input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT'}
+              </Show>
+            </RowData>
+            {renderNftOrTokenImage(input)}
+          </AmountImageWrapper>
+        </Row>
+      ))}
+
+      <SectionHeader theme={theme}>Outputs</SectionHeader>
+      {mappedOutputs.map((output: Ordinal, index: number) => (
+        <Row $toSign={false} key={index} theme={theme}>
+          <IndexOwnerWrapper>
+            <Index theme={theme}>#{index}</Index>
+            {output.owner && <RowData theme={theme}>{truncate(output.owner, 6, 6)}</RowData>}
+          </IndexOwnerWrapper>
+
+          <AmountImageWrapper>
+            <RowData theme={theme}>
+              <Show
+                when={!!output.data.bsv20}
+                whenFalseContent={
+                  <>
+                    {formatNumberWithCommasAndDecimals(output.satoshis, 0)} {output.satoshis > 1 ? 'sats' : 'sat'}
+                  </>
+                }
+              >
+                {formatNumberWithCommasAndDecimals(
+                  convertToTokenValue(Number(output.data.bsv20?.amt), Number(output.data.bsv20?.dec)),
+                  Number(output.data.bsv20?.dec),
+                )}{' '}
+                {output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT'}
+              </Show>
+            </RowData>
+            {renderNftOrTokenImage(output)}
+          </AmountImageWrapper>
+        </Row>
+      ))}
+    </Container>
+  );
+};
+
+export default TxPreview;
