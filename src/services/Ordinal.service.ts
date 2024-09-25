@@ -15,7 +15,7 @@ import { BsvService } from './Bsv.service';
 //TODO: look into why BSV20_INDEX_FEE is not being used
 import { BSV20_INDEX_FEE, FEE_PER_KB } from '../utils/constants';
 import { mapOrdinal } from '../utils/providerHelper';
-import { Bsv20 as Bsv20Type, Bsv21 as Bsv21Type, SPVStore, Outpoint, TxoLookup, TxoSort, Bsv21 } from 'spv-store';
+import { Bsv20 as Bsv20Type, Bsv21 as Bsv21Type, SPVStore, Outpoint, TxoLookup, TxoSort } from 'spv-store';
 import { isValidEmail } from '../utils/tools';
 //@ts-ignore
 import { PaymailClient } from '@bsv/paymail/client';
@@ -51,7 +51,7 @@ export class OrdinalService {
     return mapOrdinal(txo);
   };
 
-  getBsv20s = async (): Promise<(Bsv20 | Bsv21)[]> => {
+  getBsv20s = async (): Promise<Bsv20[]> => {
     return this.gorillaPoolService.getBsv20Balances([this.keysService.bsvAddress, this.keysService.ordAddress]);
   };
 
