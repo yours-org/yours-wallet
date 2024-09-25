@@ -15,13 +15,14 @@ import { BsvService } from './Bsv.service';
 //TODO: look into why BSV20_INDEX_FEE is not being used
 import { BSV20_INDEX_FEE, FEE_PER_KB } from '../utils/constants';
 import { mapOrdinal } from '../utils/providerHelper';
-import { Bsv20 as Bsv20Type, Bsv21 as Bsv21Type, SPVStore, Outpoint, TxoLookup, TxoSort } from 'spv-store';
+import { Bsv20 as Bsv20Type, Bsv21 as Bsv21Type, SPVStore, Outpoint, TxoLookup, TxoSort, Bsv21 } from 'spv-store';
 import { isValidEmail } from '../utils/tools';
 //@ts-ignore
 import { PaymailClient } from '@bsv/paymail/client';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { truncate } from '../utils/format';
 import { theme } from '../theme';
+import { GorillaPoolService } from './GorillaPool.service';
 
 const client = new PaymailClient();
 
@@ -31,6 +32,7 @@ export class OrdinalService {
     private readonly bsvService: BsvService,
     private readonly oneSatSPV: SPVStore,
     private readonly chromeStorageService: ChromeStorageService,
+    private readonly gorillaPoolService: GorillaPoolService,
   ) {}
 
   getOrdinals = async (): Promise<Ordinal[]> => {
@@ -49,57 +51,8 @@ export class OrdinalService {
     return mapOrdinal(txo);
   };
 
-  getBsv20s = async (): Promise<Bsv20[]> => {
-    const bsv21s = await this.oneSatSPV.search(new TxoLookup('bsv21'));
-
-    const tokens: { [id: string]: Bsv20 } = {};
-    for (const txo of bsv21s.txos) {
-      const bsv21 = txo.data.bsv21?.data as Bsv21Type;
-      if (!bsv21) continue;
-      let token = tokens[bsv21.id.toString()];
-      if (!token) {
-        token = {
-          p: 'bsv-20',
-          op: 'deploy+mint',
-          dec: bsv21.dec,
-          amt: bsv21.supply?.toString() || '',
-          all: { confirmed: 0n, pending: 0n },
-          listed: { confirmed: 0n, pending: 0n },
-          status: 1,
-          icon: bsv21.icon,
-          id: bsv21.id.toString(),
-          sym: bsv21.sym || '',
-        };
-        tokens[bsv21.id.toString()] = token;
-      }
-      token.all.confirmed += bsv21.amt;
-      if (!txo.data.list) continue;
-      token.listed.confirmed += bsv21.amt;
-    }
-
-    const bsv20s = await this.oneSatSPV.search(new TxoLookup('bsv20'));
-    for (const txo of bsv20s.txos) {
-      const bsv20 = txo.data.bsv20?.data as Bsv20Type;
-      if (!bsv20) continue;
-      let token = tokens[bsv20.tick];
-      if (!token) {
-        token = {
-          p: 'bsv-20',
-          op: bsv20.op,
-          dec: bsv20.dec,
-          amt: bsv20.amt.toString(),
-          all: { confirmed: 0n, pending: 0n },
-          listed: { confirmed: 0n, pending: 0n },
-          status: 1,
-          tick: bsv20.tick,
-        };
-        tokens[bsv20.tick] = token;
-      }
-      token.all.confirmed += bsv20.amt;
-      if (!txo.data.list) continue;
-      token.listed.confirmed += bsv20.amt;
-    }
-    return Object.values(tokens);
+  getBsv20s = async (): Promise<(Bsv20 | Bsv21)[]> => {
+    return this.gorillaPoolService.getBsv20Balances([this.keysService.bsvAddress, this.keysService.ordAddress]);
   };
 
   transferOrdinal = async (
@@ -228,28 +181,28 @@ export class OrdinalService {
       const fundingUtxos = await this.bsvService.fundingTxos();
 
       const tokenType = idOrTick.length > 64 ? TokenType.BSV21 : TokenType.BSV20;
-      const utxos =
-        tokenType === TokenType.BSV21
-          ? await this.oneSatSPV.search(new TxoLookup('bsv21', 'id', idOrTick, ordPk.toAddress().toString()))
-          : await this.oneSatSPV.search(new TxoLookup('bsv20', 'tick', idOrTick, ordPk.toAddress().toString()));
+
+      const tokenDetails = await this.gorillaPoolService.getBsv20Details(idOrTick);
+
+      const bsv20Utxos = await this.gorillaPoolService.getBSV20Utxos(idOrTick, [keys.ordAddress, keys.walletAddress]);
+      if (!bsv20Utxos || bsv20Utxos.length === 0) throw Error('no-bsv20-utxo');
 
       const tokenUtxos: TokenUtxo[] = [];
       let tokensIn = 0n;
       let token: Bsv20Type | Bsv21Type | undefined;
-      for (const tokenUtxo of utxos.txos) {
+      for (const tokenUtxo of bsv20Utxos) {
         if (tokensIn >= amount) break;
-        if (tokenUtxo.data?.list || !tokenUtxo.data.bsv21?.data) continue;
-        token = tokenUtxo.data.bsv21.data as Bsv20Type | Bsv21Type;
+        // token = tokenUtxo.data.bsv21.data as Bsv20Type | Bsv21Type;
         const t: TokenUtxo = {
           id: tokenType === TokenType.BSV21 ? (token as Bsv21Type).id : (token as Bsv20Type).tick,
-          txid: tokenUtxo.outpoint.txid,
-          vout: tokenUtxo.outpoint.vout,
+          txid: tokenUtxo.txid,
+          vout: tokenUtxo.vout,
           satoshis: 1,
-          script: Buffer.from(tokenUtxo.script).toString('base64'),
-          amt: token.amt.toString(),
+          script: Buffer.from(tokenUtxo.script!).toString('base64'),
+          amt: tokenUtxo.amt,
         };
         tokenUtxos.push(t);
-        tokensIn += token.amt;
+        tokensIn += BigInt(tokenUtxo.amt);
       }
       if (tokensIn < amount) {
         return { error: 'insufficient-funds' };
@@ -261,6 +214,12 @@ export class OrdinalService {
         decimals: 0,
         tokenID: idOrTick,
         protocol: tokenType,
+        additionalPayments: [
+          {
+            to: tokenDetails?.fundAddress || '',
+            amount: BSV20_INDEX_FEE * 2,
+          },
+        ],
         utxos: fundingUtxos.map((t) => ({
           txid: t.outpoint.txid,
           vout: t.outpoint.vout,

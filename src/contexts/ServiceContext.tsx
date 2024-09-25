@@ -21,7 +21,13 @@ const initializeServices = async () => {
   const contractService = new ContractService(keysService, oneSatSPV);
 
   const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, oneSatSPV);
-  const ordinalService = new OrdinalService(keysService, bsvService, oneSatSPV, chromeStorageService);
+  const ordinalService = new OrdinalService(
+    keysService,
+    bsvService,
+    oneSatSPV,
+    chromeStorageService,
+    gorillaPoolService,
+  );
 
   return {
     chromeStorageService,

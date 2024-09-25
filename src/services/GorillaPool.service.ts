@@ -1,8 +1,9 @@
 import axios from 'axios';
-import { NetWork, Ordinal } from 'yours-wallet-provider';
+import { Bsv20, BSV20Txo, Bsv21, NetWork, Ordinal } from 'yours-wallet-provider';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL } from '../utils/constants';
-import { MarketResponse } from './types/gorillaPool.types';
+import { MarketResponse, Token } from './types/gorillaPool.types';
 import { ChromeStorageService } from './ChromeStorage.service';
+import { isBSV20v2 } from '../utils/ordi';
 
 export class GorillaPoolService {
   constructor(private readonly chromeStorageService: ChromeStorageService) {}
@@ -37,5 +38,88 @@ export class GorillaPoolService {
       }
     }
     return result;
+  };
+
+  getBsv20Balances = async (addresses: string[]) => {
+    const network = this.chromeStorageService.getNetwork();
+    const url = `${this.getBaseUrl(network)}/api/bsv20/balance?addresses=${addresses.join('&addresses=')}`;
+    const res = await axios.get(url);
+
+    const bsv20List: Array<Bsv20 | Bsv21> = res.data.map(
+      (b: {
+        all: {
+          confirmed: string;
+          pending: string;
+        };
+        listed: {
+          confirmed: string;
+          pending: string;
+        };
+        tick?: string;
+        sym?: string;
+        id?: string;
+        icon?: string;
+        dec: number;
+      }) => {
+        const id = (b.tick || b.id) as string;
+        return {
+          id: id,
+          tick: b.tick,
+          sym: b.sym || null,
+          icon: b.icon || null,
+          dec: b.dec,
+          all: {
+            confirmed: BigInt(b.all.confirmed),
+            pending: BigInt(b.all.pending),
+          },
+          listed: {
+            confirmed: BigInt(b.all.confirmed),
+            pending: BigInt(b.all.pending),
+          },
+        };
+      },
+    );
+
+    return bsv20List;
+  };
+
+  getBSV20Utxos = async (tick: string, addresses: string[] = []): Promise<BSV20Txo[] | undefined> => {
+    try {
+      const network = this.chromeStorageService.getNetwork();
+
+      const utxos: BSV20Txo[] = [];
+      await Promise.all(
+        addresses.map(async (address) => {
+          const url = isBSV20v2(tick)
+            ? `${this.getBaseUrl(network)}/api/bsv20/${address}/id/${tick}`
+            : `${this.getBaseUrl(network)}/api/bsv20/${address}/tick/${tick}`;
+
+          const r = await axios.get(url);
+          (r.data as BSV20Txo[]).forEach((utxo) => {
+            if (utxo.status === 1 && !utxo.listing) utxos.push(utxo);
+          });
+        }),
+      );
+
+      return utxos;
+    } catch (error) {
+      console.error('getBSV20Utxos', error);
+      return [];
+    }
+  };
+
+  getBsv20Details = async (tick: string) => {
+    try {
+      const network = this.chromeStorageService.getNetwork();
+      const url = isBSV20v2(tick)
+        ? `${this.getBaseUrl(network)}/api/bsv20/id/${tick}`
+        : `${this.getBaseUrl(network)}/api/bsv20/tick/${tick}`;
+
+      const r = await axios.get<Token>(url);
+
+      return r.data;
+    } catch (error) {
+      console.error('getBsv20Details', error);
+    }
   };
 }
