@@ -16,6 +16,7 @@ import TxPreview from '../../components/TxPreview';
 import { IndexContext } from 'spv-store';
 import { getTxFromRawTxFormat } from '../../utils/tools';
 import { styled } from 'styled-components';
+import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 
 const Wrapper = styled(ConfirmContent)`
   max-height: calc(100vh - 8rem);
@@ -38,9 +39,11 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { setSelected, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, contractService, oneSatSPV } = useServiceContext();
+  const { chromeStorageService, contractService, oneSatSPV, keysService } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const [txData, setTxData] = useState<IndexContext>();
+  const { bsvAddress, ordAddress, identityAddress } = keysService;
+  const [satsOut, setSatsOut] = useState(0);
   const { request, onSignature, popupId } = props;
   const [getSigsResponse, setGetSigsResponse] = useState<{
     sigResponses?: SignatureResponse[] | undefined;
@@ -54,6 +57,36 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   }>();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!bsvAddress || !ordAddress || !identityAddress || !oneSatSPV || !txData) return;
+    (async () => {
+      console.log(bsvAddress, ordAddress, identityAddress);
+      // how much did the user put in to the tx
+      let userSatsOut = txData.spends.reduce((acc, spend) => {
+        console.log(`Spend owner: ${spend.owner}`);
+        console.log(`Spend satoshis: ${spend.satoshis}`);
+        if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
+          return acc + spend.satoshis;
+        }
+        return acc;
+      }, 0n);
+
+      // how much did the user get back from the tx
+      userSatsOut = txData.txos.reduce((acc, txo) => {
+        console.log(`Txo owner: ${txo.owner}`);
+        console.log(`Txo satoshis: ${txo.satoshis}`);
+        if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
+          return acc - txo.satoshis;
+        }
+        return acc;
+      }, userSatsOut);
+
+      console.log(`User sats: ${userSatsOut}`);
+      setSatsOut(Number(userSatsOut));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txData]);
 
   useEffect(() => {
     (async () => {
@@ -165,7 +198,13 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
                 onChange={(e) => setPasswordConfirm(e.target.value)}
               />
             </Show>
-            <Button theme={theme} type="primary" label="Sign the transaction" isSubmit disabled={isProcessing} />
+            <Button
+              theme={theme}
+              type="primary"
+              label={`Sign Tx - ${satsOut / BSV_DECIMAL_CONVERSION} BSV`}
+              isSubmit
+              disabled={isProcessing}
+            />
             <Button
               theme={theme}
               type="secondary"
