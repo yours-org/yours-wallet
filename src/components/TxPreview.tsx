@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { IndexContext, Txo } from 'spv-store';
 import styled from 'styled-components';
 import { Ordinal } from 'yours-wallet-provider';
@@ -9,6 +8,7 @@ import { convertToTokenValue, formatNumberWithCommasAndDecimals, truncate } from
 import { mapOrdinal } from '../utils/providerHelper';
 import { Show } from './Show';
 import lockImage from '../assets/lock.svg';
+import { useMemo } from 'react';
 
 const Container = styled.div`
   display: flex;
@@ -63,6 +63,12 @@ const IndexOwnerWrapper = styled.div`
   align-items: center;
 `;
 
+const Label = styled.div<WhiteLabelTheme>`
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  text-align: right;
+`;
+
 type TxPreviewProps = {
   txData: IndexContext;
   inputsToSign?: number[];
@@ -71,14 +77,8 @@ type TxPreviewProps = {
 const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
   const { theme } = useTheme();
   const labelMaxLength = 20;
-  const [mappedInputs, setMappedInputs] = useState<Ordinal[]>([]);
-  const [mappedOutputs, setMappedOutputs] = useState<Ordinal[]>([]);
-
-  useEffect(() => {
-    if (!txData) return;
-    setMappedInputs(txData?.spends.map((txo: Txo) => mapOrdinal(txo)));
-    setMappedOutputs(txData?.txos.map((txo: Txo) => mapOrdinal(txo)));
-  }, [txData]);
+  const mappedInputs = useMemo(() => txData?.spends.map((txo: Txo) => mapOrdinal(txo)), [txData]);
+  const mappedOutputs = useMemo(() => txData?.txos.map((txo: Txo) => mapOrdinal(txo)), [txData]);
 
   console.log('mappedInputs', mappedInputs);
   console.log('mappedOutputs', mappedOutputs);
@@ -120,7 +120,7 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
         <Row $toSign={!!inputsToSign?.includes(index)} key={index} theme={theme}>
           <IndexOwnerWrapper>
             <Index theme={theme}>#{index}</Index>
-            {input.owner && <RowData theme={theme}>{truncate(input.owner, 6, 6)}</RowData>}
+            {<RowData theme={theme}>{input.owner ? truncate(input.owner, 6, 6) : 'Script/Contract'}</RowData>}
             {!!inputsToSign?.includes(index) && (
               <RowData style={{ marginLeft: '0.5rem' }} theme={theme}>
                 ✍️
@@ -136,20 +136,24 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
                   <Show
                     when={!!input.origin?.data?.map?.name}
                     whenFalseContent={
-                      <>
+                      <Label theme={theme}>
                         {formatNumberWithCommasAndDecimals(input.satoshis, 0)} {input.satoshis > 1 ? 'sats' : 'sat'}
-                      </>
+                      </Label>
                     }
                   >
-                    {input.origin?.data?.map?.name && truncate(input.origin.data.map.name, labelMaxLength, 0)}
+                    <Label>
+                      {input.origin?.data?.map?.name && truncate(input.origin.data.map.name, labelMaxLength, 0)}
+                    </Label>
                   </Show>
                 }
               >
-                {formatNumberWithCommasAndDecimals(
-                  convertToTokenValue(Number(input.data.bsv20?.amt), Number(input.data.bsv20?.dec)),
-                  Number(input.data.bsv20?.dec),
-                )}{' '}
-                {truncate(input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT', labelMaxLength, 0)}
+                <Label theme={theme}>
+                  {formatNumberWithCommasAndDecimals(
+                    convertToTokenValue(Number(input.data.bsv20?.amt), Number(input.data.bsv20?.dec)),
+                    Number(input.data.bsv20?.dec),
+                  )}{' '}
+                  {truncate(input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT', labelMaxLength, 0)}
+                </Label>
               </Show>
             </RowData>
             {renderNftOrTokenImage(input)}
@@ -162,7 +166,7 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
         <Row $toSign={false} key={index} theme={theme}>
           <IndexOwnerWrapper>
             <Index theme={theme}>#{index}</Index>
-            {output.owner && <RowData theme={theme}>{truncate(output.owner, 6, 6)}</RowData>}
+            {<RowData theme={theme}>{output.owner ? truncate(output.owner, 6, 6) : 'Script/Contract'}</RowData>}
           </IndexOwnerWrapper>
 
           <AmountImageWrapper>
@@ -173,20 +177,24 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
                   <Show
                     when={!!output.origin?.data?.map?.name}
                     whenFalseContent={
-                      <>
+                      <Label theme={theme}>
                         {formatNumberWithCommasAndDecimals(output.satoshis, 0)} {output.satoshis > 1 ? 'sats' : 'sat'}
-                      </>
+                      </Label>
                     }
                   >
-                    {output.origin?.data?.map?.name && truncate(output.origin.data.map.name, labelMaxLength, 0)}
+                    <Label>
+                      {output.origin?.data?.map?.name && truncate(output.origin.data.map.name, labelMaxLength, 0)}
+                    </Label>
                   </Show>
                 }
               >
-                {formatNumberWithCommasAndDecimals(
-                  convertToTokenValue(Number(output.data.bsv20?.amt), Number(output.data.bsv20?.dec)),
-                  Number(output.data.bsv20?.dec),
-                )}{' '}
-                {truncate(output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT', labelMaxLength, 0)}
+                <Label theme={theme}>
+                  {formatNumberWithCommasAndDecimals(
+                    convertToTokenValue(Number(output.data.bsv20?.amt), Number(output.data.bsv20?.dec)),
+                    Number(output.data.bsv20?.dec),
+                  )}{' '}
+                  {truncate(output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT', labelMaxLength, 0)}
+                </Label>
               </Show>
             </RowData>
             {renderNftOrTokenImage(output)}

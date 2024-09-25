@@ -15,6 +15,12 @@ import { sleep } from '../../utils/sleep';
 import TxPreview from '../../components/TxPreview';
 import { IndexContext } from 'spv-store';
 import { getTxFromRawTxFormat } from '../../utils/tools';
+import { styled } from 'styled-components';
+
+const Wrapper = styled(ConfirmContent)`
+  max-height: calc(100vh - 8rem);
+  overflow-y: auto;
+`;
 
 export type GetSignaturesResponse = {
   sigResponses?: SignatureResponse[];
@@ -29,7 +35,7 @@ export type GetSignaturesRequestProps = {
 
 export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { theme } = useTheme();
-  const { setSelected } = useBottomMenu();
+  const { setSelected, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const { chromeStorageService, contractService, oneSatSPV } = useServiceContext();
@@ -47,18 +53,23 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       | undefined;
   }>();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
       if (!request.rawtx || !oneSatSPV) return;
+      setIsLoading(true);
       const tx = getTxFromRawTxFormat(request.rawtx, request.format || 'tx');
       const parsedTx = await oneSatSPV.parseTx(tx);
       setTxData(parsedTx);
+      setIsLoading(false);
     })();
   }, [oneSatSPV, request]);
 
   useEffect(() => {
     setSelected('bsv');
+    hideMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setSelected]);
 
   const resetSendState = () => {
@@ -134,11 +145,11 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
 
   return (
     <>
-      <Show when={isProcessing}>
-        <PageLoader theme={theme} message="Signing Transaction..." />
+      <Show when={isProcessing || isLoading}>
+        <PageLoader theme={theme} message={isLoading ? 'Loading transaction...' : 'Signing Transaction...'} />
       </Show>
       <Show when={!isProcessing && !!request && !!txData}>
-        <ConfirmContent>
+        <Wrapper>
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Sign Transaction</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
@@ -164,7 +175,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
               style={{ marginTop: '0' }}
             />
           </FormContainer>
-        </ConfirmContent>
+        </Wrapper>
       </Show>
     </>
   );

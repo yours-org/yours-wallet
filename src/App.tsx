@@ -92,7 +92,8 @@ export const App = () => {
 
   useEffect(() => {
     isReady && getStorageAndSetRequestState(chromeStorageService);
-  }, [chromeStorageService, getStorageAndSetRequestState, isReady]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady]);
 
   const handleUnlock = async () => {
     window.location.reload();
@@ -246,7 +247,7 @@ export const App = () => {
                           </Show>
                         }
                       />
-                      <Route path="/apps" element={<AppsAndTools />} />
+                      <Route path="/tools" element={<AppsAndTools />} />
                       <Route path="/settings" element={<Settings />} />
                     </Routes>
                   </Router>

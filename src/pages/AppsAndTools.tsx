@@ -118,17 +118,36 @@ const LockDetailsHeaderText = styled(LockDetailsText)`
   font-weight: 600;
 `;
 
-const Dropdown = styled.select`
+const Dropdown = styled.select<WhiteLabelTheme>`
   width: 80%;
   padding: 0.5rem;
   margin-bottom: 1rem;
+  border-radius: 0.5rem;
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  background-color: ${({ theme }) => theme.color.global.row};
+  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
 `;
 
-const TextArea = styled.textarea`
+const TextArea = styled.textarea<WhiteLabelTheme>`
+  background-color: ${({ theme }) => theme.color.global.row};
+  border-radius: 0.5rem;
+  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
   width: 80%;
-  height: 150px;
-  padding: 0.5rem;
-  margin-bottom: 1rem;
+  height: 4rem;
+  font-size: 0.85rem;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+  padding: 1rem;
+  margin: 0.5rem;
+  outline: none;
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral + '80'};
+  resize: none;
+
+  &::placeholder {
+    color: ${({ theme }) =>
+      theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral + '80'};
+  }
 `;
 
 type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unlock' | 'decode-broadcast' | 'decode';
@@ -166,7 +185,7 @@ export const AppsAndTools = () => {
   }, [identityAddress, page]);
 
   useEffect(() => {
-    setSelected('apps');
+    setSelected('tools');
   }, [setSelected]);
 
   useEffect(() => {
@@ -445,6 +464,7 @@ export const AppsAndTools = () => {
       <Text theme={theme}>Decode or broadcast a raw transaction in various formats</Text>
 
       <Dropdown
+        theme={theme}
         onChange={(e) =>
           setTransactionFormat(e.target.value === 'hex' ? 'tx' : e.target.value === 'beef' ? 'beef' : 'ef')
         }
@@ -454,7 +474,7 @@ export const AppsAndTools = () => {
         <option value="extended">Extended Format</option>
       </Dropdown>
 
-      <TextArea placeholder="Paste your raw transaction" onChange={(e) => setRawTx(e.target.value)} />
+      <TextArea theme={theme} placeholder="Paste your raw transaction" onChange={(e) => setRawTx(e.target.value)} />
 
       <ButtonsWrapper>
         <Button theme={theme} type="secondary-outline" label="Decode" onClick={handleDecode} />

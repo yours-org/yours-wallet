@@ -143,6 +143,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
 
       setSuccessTxId(sendRes.txid);
       addSnackbar('Transaction Successful!', 'success');
+      onResponse();
 
       if (!requestWithinApp) {
         sendMessage({
@@ -151,7 +152,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           rawtx: sendRes.rawtx,
         });
       }
-      onResponse();
     } catch (error) {
       console.log(error);
     } finally {
