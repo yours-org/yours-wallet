@@ -51,6 +51,7 @@ export interface ServiceContextProps {
   contractService: ContractService;
   isLocked: boolean;
   isReady: boolean;
+  setIsLocked: (isLocked: boolean) => void;
   lockWallet: () => Promise<void>;
   oneSatSPV: SPVStore;
 }
@@ -137,6 +138,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
         {
           ...services,
           isLocked,
+          setIsLocked,
           isReady,
           lockWallet,
         } as ServiceContextProps

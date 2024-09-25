@@ -62,7 +62,7 @@ const Container = styled.div<WhiteLabelTheme>`
 export const App = () => {
   const { isMobile } = useViewport();
   const { theme } = useTheme();
-  const { isLocked, isReady, chromeStorageService } = useServiceContext();
+  const { isLocked, isReady, chromeStorageService, setIsLocked } = useServiceContext();
   const menuContext = useContext(BottomMenuContext);
   const {
     connectRequest,
@@ -96,7 +96,8 @@ export const App = () => {
   }, [isReady]);
 
   const handleUnlock = async () => {
-    window.location.reload();
+    setIsLocked(false);
+    menuContext?.handleSelect('bsv');
   };
 
   useEffect(() => {

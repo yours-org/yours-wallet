@@ -477,7 +477,7 @@ export const AppsAndTools = () => {
         </ButtonsWrapper>
       </Show>
       <Text theme={theme} style={{ width: '95%', margin: '2rem 0 1rem 0' }}>
-        Give Monthly through Yours Wallet's transparent Open Collective.
+        Give Monthly through Yours Wallet's transparent Open Collective (formerly Panda Wallet).
       </Text>
       <Button
         theme={theme}
