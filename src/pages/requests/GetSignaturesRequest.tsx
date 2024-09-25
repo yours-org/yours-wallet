@@ -64,8 +64,6 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       console.log(bsvAddress, ordAddress, identityAddress);
       // how much did the user put in to the tx
       let userSatsOut = txData.spends.reduce((acc, spend) => {
-        console.log(`Spend owner: ${spend.owner}`);
-        console.log(`Spend satoshis: ${spend.satoshis}`);
         if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
           return acc + spend.satoshis;
         }
@@ -74,15 +72,12 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
 
       // how much did the user get back from the tx
       userSatsOut = txData.txos.reduce((acc, txo) => {
-        console.log(`Txo owner: ${txo.owner}`);
-        console.log(`Txo satoshis: ${txo.satoshis}`);
         if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
           return acc - txo.satoshis;
         }
         return acc;
       }, userSatsOut);
 
-      console.log(`User sats: ${userSatsOut}`);
       setSatsOut(Number(userSatsOut));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,7 +196,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
             <Button
               theme={theme}
               type="primary"
-              label={`Sign Tx - ${satsOut / BSV_DECIMAL_CONVERSION} BSV`}
+              label={`Sign Tx - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
               isSubmit
               disabled={isProcessing}
             />

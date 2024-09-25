@@ -158,7 +158,7 @@ export const AppsAndTools = () => {
   const { addSnackbar } = useSnackbar();
   const { setSelected, query } = useBottomMenu();
   const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
-  const identityAddress = keysService.identityAddress;
+  const { bsvAddress, ordAddress, identityAddress } = keysService;
   const exchangeRate = chromeStorageService.getCurrentAccountObject().exchangeRateCache?.rate ?? 0;
   const [isProcessing, setIsProcessing] = useState(false);
   const [page, setPage] = useState<AppsPage>(query === 'pending-locks' ? 'unlock' : 'main');
@@ -171,6 +171,8 @@ export const AppsAndTools = () => {
   const [txData, setTxData] = useState<IndexContext>();
   const [rawTx, setRawTx] = useState<string | number[]>('');
   const [transactionFormat, setTransactionFormat] = useState<TransactionFormat>('tx');
+  const [satsOut, setSatsOut] = useState(0);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
 
   const getLockData = async () => {
     setIsProcessing(true);
@@ -207,7 +209,22 @@ export const AppsAndTools = () => {
     const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
     const data = await oneSatSPV.parseTx(tx);
     setTxData(data);
-    console.log(data);
+    let userSatsOut = data.spends.reduce((acc, spend) => {
+      if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
+        return acc + spend.satoshis;
+      }
+      return acc;
+    }, 0n);
+
+    // how much did the user get back from the tx
+    userSatsOut = data.txos.reduce((acc, txo) => {
+      if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
+        return acc - txo.satoshis;
+      }
+      return acc;
+    }, userSatsOut);
+
+    setSatsOut(Number(userSatsOut));
     setIsProcessing(false);
     setPage('decode');
   };
@@ -215,18 +232,21 @@ export const AppsAndTools = () => {
   const handleBroadcast = async () => {
     if (!rawTx || !transactionFormat) return;
     try {
+      setIsBroadcasting(true);
       setIsProcessing(true);
       const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
       const res = await oneSatSPV.broadcast(tx);
       if (!res.txid) {
         addSnackbar('An error occurred while broadcasting the transaction', 'error');
+        setPage('decode-broadcast');
         return;
       }
       addSnackbar('Transaction broadcasted successfully', 'success');
-      setPage('main');
+      setPage('decode-broadcast');
     } catch (error) {
       console.log(error);
     } finally {
+      setIsBroadcasting(false);
       setIsProcessing(false);
     }
   };
@@ -501,16 +521,26 @@ export const AppsAndTools = () => {
         <Button theme={theme} type="secondary-outline" label="Decode" onClick={handleDecode} />
         <Button theme={theme} type="primary" label="Broadcast" onClick={handleBroadcast} />
       </ButtonsWrapper>
+      <Button
+        style={{ margin: '1rem' }}
+        theme={theme}
+        type="secondary"
+        label={'Go back'}
+        onClick={() => setPage('main')}
+      />
     </PageWrapper>
   );
 
   const decode = !!txData && (
     <>
       <TxPreview txData={txData} />
-      <ButtonsWrapper>
-        <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setPage('main')} />
-        <Button theme={theme} type="primary" label="Broadcast" onClick={handleBroadcast} />
-      </ButtonsWrapper>
+      <Button
+        theme={theme}
+        type="primary"
+        label={`Broadcast - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
+        onClick={handleBroadcast}
+      />
+      <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setPage('decode-broadcast')} />
     </>
   );
 
@@ -520,11 +550,14 @@ export const AppsAndTools = () => {
       <Show when={isProcessing && page === 'unlock'}>
         <PageLoader theme={theme} message={'Gathering info...'} />
       </Show>
-      <Show when={isProcessing && page === 'decode-broadcast'}>
-        <PageLoader theme={theme} message={'Decoding transaction...'} />
+      <Show when={(isProcessing && page === 'decode-broadcast') || (isProcessing && page === 'decode')}>
+        <PageLoader
+          theme={theme}
+          message={isBroadcasting ? 'Broadcasting transaction...' : 'Decoding transaction...'}
+        />
       </Show>
       <Show when={!isProcessing && page === 'decode-broadcast'}>{decodeOrBroadcastPage}</Show>
-      <Show when={page === 'decode'}>{decode}</Show>
+      <Show when={!isProcessing && page === 'decode'}>{decode}</Show>
       <Show when={page === 'main'}>{main}</Show>
       <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show>
       <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show>
