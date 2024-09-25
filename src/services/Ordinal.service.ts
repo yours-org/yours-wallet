@@ -35,7 +35,11 @@ export class OrdinalService {
 
   getOrdinals = async (): Promise<Ordinal[]> => {
     const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 0);
-    const mapped = ordinals.txos.map(mapOrdinal);
+    const mapped = ordinals.txos
+      .filter(
+        (o) => o.data.origin.data.insc.file.type !== 'panda/tag' && o.data.origin.data.insc.file.type !== 'yours/tag',
+      )
+      .map(mapOrdinal);
     return mapped;
   };
 

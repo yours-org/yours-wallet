@@ -21,6 +21,7 @@ import { Input } from '../components/Input';
 import TxPreview from '../components/TxPreview';
 import { TransactionFormat } from 'yours-wallet-provider';
 import { getTxFromRawTxFormat } from '../utils/tools';
+import { useSnackbar } from '../hooks/useSnackbar';
 
 const Content = styled.div`
   display: flex;
@@ -154,6 +155,7 @@ type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unloc
 
 export const AppsAndTools = () => {
   const { theme } = useTheme();
+  const { addSnackbar } = useSnackbar();
   const { setSelected, query } = useBottomMenu();
   const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
   const identityAddress = keysService.identityAddress;
@@ -208,6 +210,25 @@ export const AppsAndTools = () => {
     console.log(data);
     setIsProcessing(false);
     setPage('decode');
+  };
+
+  const handleBroadcast = async () => {
+    if (!rawTx || !transactionFormat) return;
+    try {
+      setIsProcessing(true);
+      const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
+      const res = await oneSatSPV.broadcast(tx);
+      if (!res.txid) {
+        addSnackbar('An error occurred while broadcasting the transaction', 'error');
+        return;
+      }
+      addSnackbar('Transaction broadcasted successfully', 'success');
+      setPage('main');
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const main = (
@@ -478,33 +499,17 @@ export const AppsAndTools = () => {
 
       <ButtonsWrapper>
         <Button theme={theme} type="secondary-outline" label="Decode" onClick={handleDecode} />
-        <Button
-          theme={theme}
-          type="primary"
-          label="Broadcast"
-          onClick={() => {
-            /* TODO: Implement broadcast logic */
-          }}
-        />
+        <Button theme={theme} type="primary" label="Broadcast" onClick={handleBroadcast} />
       </ButtonsWrapper>
     </PageWrapper>
   );
-
-  console.log('txData', txData);
 
   const decode = !!txData && (
     <>
       <TxPreview txData={txData} />
       <ButtonsWrapper>
         <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setPage('main')} />
-        <Button
-          theme={theme}
-          type="primary"
-          label="Broadcast"
-          onClick={() => {
-            /* TODO: Implement broadcast */
-          }}
-        />
+        <Button theme={theme} type="primary" label="Broadcast" onClick={handleBroadcast} />
       </ButtonsWrapper>
     </>
   );
