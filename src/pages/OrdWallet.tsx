@@ -21,7 +21,7 @@ import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, ONE_SAT_MARKET_URL } from '../utils/constants';
 import { isBSV20v2, normalize, showAmount } from '../utils/ordi';
 import { sleep } from '../utils/sleep';
 import { BSV20Id } from '../components/BSV20Id';
@@ -30,6 +30,7 @@ import { AssetRow } from '../components/AssetRow';
 import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { ListOrdinal, OrdOperationResponse } from '../services/types/ordinal.types';
 import { Bsv20, Ordinal as OrdinalType } from 'yours-wallet-provider';
+import { TokenType } from 'js-1sat-ord';
 // import { isValidEmail } from '../utils/tools';
 
 const OrdinalsList = styled.div`
@@ -156,6 +157,7 @@ export const OrdWallet = () => {
   const [priceData, setPriceData] = useState<{ id: string; satPrice: number }[]>([]);
   const [ordinals, setOrdinals] = useState<OrdType[]>([]);
   const [bsv20s, setBsv20s] = useState<Bsv20[]>([]);
+  const tokenType = token && (token.info.id || token.info.tick || '').length > 64 ? TokenType.BSV21 : TokenType.BSV20;
 
   useEffect(() => {
     if (!bsv20s.length) return;
@@ -755,6 +757,17 @@ export const OrdWallet = () => {
             </Show>
             <Button theme={theme} type="primary" label="Send" disabled={isProcessing} isSubmit />
           </FormContainer>
+          <Button
+            theme={theme}
+            type="secondary-outline"
+            label="Trade"
+            onClick={() =>
+              window.open(
+                `${ONE_SAT_MARKET_URL}/${tokenType === TokenType.BSV20 ? 'bsv20' : 'bsv21'}/${tokenType === TokenType.BSV20 ? token.info.tick : token.info.id}`,
+                '_blank',
+              )
+            }
+          />
           <Button
             theme={theme}
             type="secondary"

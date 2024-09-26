@@ -26,6 +26,7 @@ export const SNACKBAR_TIMEOUT = 3 * 1000; // 2.5 seconds
 export const HOSTED_YOURS_IMAGE = 'https://i.ibb.co/zGcthBv/yours-org-light.png';
 export const YOURS_DEV_WALLET = '1MtzWXQEYGp89bQ9U2nfrnuChFv37j6pV6';
 export const PROVIDER_DOCS_URL = 'https://panda-wallet.gitbook.io/provider-api/intro/introduction';
+export const ONE_SAT_MARKET_URL = 'https://1sat.market/market';
 
 export const DEFAULT_WALLET_PATH = "m/44'/236'/0'/1/0";
 export const DEFAULT_ORD_PATH = "m/44'/236'/1'/0/0";

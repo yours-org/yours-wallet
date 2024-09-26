@@ -189,12 +189,10 @@ export class OrdinalService {
 
       const tokenUtxos: TokenUtxo[] = [];
       let tokensIn = 0n;
-      let token: Bsv20Type | Bsv21Type | undefined;
       for (const tokenUtxo of bsv20Utxos) {
         if (tokensIn >= amount) break;
-        // token = tokenUtxo.data.bsv21.data as Bsv20Type | Bsv21Type;
         const t: TokenUtxo = {
-          id: tokenType === TokenType.BSV21 ? (token as Bsv21Type).id : (token as Bsv20Type).tick,
+          id: tokenUtxo.id || tokenUtxo.tick || idOrTick,
           txid: tokenUtxo.txid,
           vout: tokenUtxo.vout,
           satoshis: 1,

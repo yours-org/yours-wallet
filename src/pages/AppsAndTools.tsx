@@ -429,7 +429,7 @@ export const AppsAndTools = () => {
         <Button
           key={`${amt}_${idx}`}
           theme={theme}
-          type="primary"
+          type="secondary-outline"
           label={amt === 'Other' ? amt : `$${amt}`}
           onClick={() => {
             if (amt === 'Other') {
@@ -481,7 +481,7 @@ export const AppsAndTools = () => {
       </Text>
       <Button
         theme={theme}
-        type="secondary-outline"
+        type="primary"
         label="View Open Collective"
         onClick={() => window.open('https://opencollective.com/panda-wallet', '_blank')}
       />

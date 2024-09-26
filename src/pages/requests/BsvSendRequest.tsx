@@ -236,7 +236,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!request && !hasSent}>
         <ConfirmContent>
-          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Text
             theme={theme}
@@ -263,6 +262,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
               disabled={isProcessing}
               isSubmit
             />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </ConfirmContent>
       </Show>
