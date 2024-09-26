@@ -117,7 +117,7 @@ type DecisionType = 'sign-out' | 'export-master-backup' | 'export-keys' | 'expor
 
 export const Settings = () => {
   const { theme } = useTheme();
-  const { setSelected, query } = useBottomMenu();
+  const { setSelected, query, handleSelect } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { chromeStorageService, keysService, lockWallet, oneSatSPV } = useServiceContext();
   const [page, setPage] = useState<SettingsPage>(query === 'manage-accounts' ? 'manage-accounts' : 'main');
@@ -362,6 +362,11 @@ export const Settings = () => {
     setMasterBackupEventText('');
   };
 
+  const handleLockWallet = async () => {
+    lockWallet();
+    handleSelect('bsv');
+  };
+
   const main = (
     <>
       <SettingsRow
@@ -412,7 +417,7 @@ export const Settings = () => {
           />
         }
       />
-      <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={lockWallet} />
+      <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={handleLockWallet} />
       <Text
         style={{
           margin: '1rem 0',

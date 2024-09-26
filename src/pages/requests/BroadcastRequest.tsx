@@ -13,7 +13,15 @@ import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { useServiceContext } from '../../hooks/useServiceContext';
-import { Transaction, Utils } from '@bsv/sdk';
+import { getTxFromRawTxFormat } from '../../utils/tools';
+import { IndexContext } from 'spv-store';
+import TxPreview from '../../components/TxPreview';
+import { styled } from 'styled-components';
+
+const Wrapper = styled(ConfirmContent)`
+  max-height: calc(100vh - 8rem);
+  overflow-y: auto;
+`;
 
 export type BroadcastResponse = {
   txid: string;
@@ -28,20 +36,35 @@ export type BroadcastRequestProps = {
 export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const { request, onBroadcast, popupId } = props;
   const { theme } = useTheme();
-  const { setSelected } = useBottomMenu();
+  const { setSelected, hideMenu } = useBottomMenu();
   const [txid, setTxid] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [satsOut, setSatsOut] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [txData, setTxData] = useState<IndexContext>();
   const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
   const { updateBsvBalance } = bsvService;
-  const { bsvAddress } = keysService;
-  // const { isProcessing, setIsProcessing, updateBsvBalance, fundRawTx, bsvAddress } = useBsv();
+  const { bsvAddress, ordAddress, identityAddress } = keysService;
+
+  useEffect(() => {
+    (async () => {
+      if (!request.rawtx || !oneSatSPV || !!txData) return;
+      setIsLoading(true);
+      const tx = getTxFromRawTxFormat(request.rawtx, request.format || 'tx');
+      const parsedTx = await oneSatSPV.parseTx(tx);
+      setTxData(parsedTx);
+      setIsLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setSelected('bsv');
-  }, [setSelected]);
+    hideMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const resetSendState = () => {
     setTxid('');
@@ -57,90 +80,89 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   }, [message, txid]);
 
   useEffect(() => {
-    if (!bsvAddress || !oneSatSPV) return;
+    if (!bsvAddress || !ordAddress || !identityAddress || !oneSatSPV || !txData) return;
     (async () => {
-      const tx = Transaction.fromHex(request.rawtx);
-      for (const input of tx.inputs) {
-        input.sourceTransaction = await oneSatSPV.getTx(input.sourceTXID ?? '', true);
-      }
-      let outSats = tx.getFee();
-      const changePkh = Utils.fromBase58Check(bsvAddress, 'hex').data as string;
-      for (let index = 0; index < tx.outputs.length; index++) {
-        const outputPkh = Utils.toHex(tx.outputs[index]?.lockingScript?.chunks[2]?.data ?? []);
-        if (outputPkh !== changePkh) {
-          const output = tx.outputs[index];
-          if (!output) continue;
-          outSats += output.satoshis || 0;
+      console.log(bsvAddress, ordAddress, identityAddress);
+      // how much did the user put in to the tx
+      let userSatsOut = txData.spends.reduce((acc, spend) => {
+        if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
+          return acc + spend.satoshis;
         }
-      }
-      setSatsOut(outSats);
+        return acc;
+      }, 0n);
+
+      // how much did the user get back from the tx
+      userSatsOut = txData.txos.reduce((acc, txo) => {
+        if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
+          return acc - txo.satoshis;
+        }
+        return acc;
+      }, userSatsOut);
+
+      setSatsOut(Number(userSatsOut));
     })();
-  }, [bsvAddress, request.fund, request.rawtx, oneSatSPV]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txData]);
 
   const handleBroadcast = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsProcessing(true);
-    await sleep(25);
+    try {
+      setIsProcessing(true);
+      await sleep(25);
 
-    let rawtx = request.rawtx;
-    if (request.fund) {
-      if (!passwordConfirm) {
-        addSnackbar('Must enter a password!', 'error');
+      let rawtx = request.rawtx;
+      if (request.fund) {
+        if (!passwordConfirm) {
+          addSnackbar('Must enter a password!', 'error');
+          setIsProcessing(false);
+          return;
+        }
+
+        const res = await bsvService.fundRawTx(rawtx, passwordConfirm);
+        if (!res.rawtx || res.error) {
+          const message =
+            res.error === 'invalid-password'
+              ? 'Invalid Password!'
+              : 'An unknown error has occurred! Try again.' + res.error;
+
+          addSnackbar(message, 'error');
+          setIsProcessing(false);
+          return;
+        }
+        rawtx = res.rawtx;
+      }
+      const tx = getTxFromRawTxFormat(rawtx, request.format || 'tx');
+
+      const resp = await oneSatSPV.broadcast(tx);
+      if (resp.status === 'error') {
+        addSnackbar('Error broadcasting the raw tx!', 'error');
         setIsProcessing(false);
+        sendMessage({
+          action: 'broadcastResponse',
+          error: resp.description ?? 'Unknown error',
+        });
+        onBroadcast();
         return;
       }
-
-      const res = await bsvService.fundRawTx(rawtx, passwordConfirm);
-      if (!res.rawtx || res.error) {
-        const message =
-          res.error === 'invalid-password'
-            ? 'Invalid Password!'
-            : 'An unknown error has occurred! Try again.' + res.error;
-
-        addSnackbar(message, 'error');
-        setIsProcessing(false);
-        return;
-      }
-      rawtx = res.rawtx;
-    }
-    let tx: Transaction;
-    switch (request.format) {
-      case 'beef':
-        tx = Transaction.fromHexBEEF(rawtx);
-        break;
-      case 'ef':
-        tx = Transaction.fromHexEF(rawtx);
-        break;
-      default:
-        tx = Transaction.fromHex(rawtx);
-        break;
-    }
-
-    const resp = await oneSatSPV.broadcast(tx);
-    if (resp.status === 'error') {
-      addSnackbar('Error broadcasting the raw tx!', 'error');
-      setIsProcessing(false);
+      setTxid(resp.txid);
       sendMessage({
         action: 'broadcastResponse',
-        error: resp.description ?? 'Unknown error',
+        txid: resp.txid,
       });
-      onBroadcast();
-      return;
-    }
-    setTxid(resp.txid);
-    sendMessage({
-      action: 'broadcastResponse',
-      txid: resp.txid,
-    });
 
-    setIsProcessing(false);
-    addSnackbar('Successfully broadcasted the tx!', 'success');
-    onBroadcast();
-    setTimeout(async () => {
-      await updateBsvBalance().catch((e: unknown) => {
-        console.log(e);
-      });
-    }, 3000);
+      setIsProcessing(false);
+      addSnackbar('Successfully broadcasted the tx!', 'success');
+      onBroadcast();
+      setTimeout(async () => {
+        await updateBsvBalance().catch((e: unknown) => {
+          console.log(e);
+        });
+      }, 3000);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const clearRequest = async () => {
@@ -151,17 +173,17 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
 
   return (
     <>
-      <Show when={isProcessing}>
-        <PageLoader theme={theme} message="Broadcasting transaction..." />
+      <Show when={isProcessing || isLoading}>
+        <PageLoader theme={theme} message={isLoading ? 'Loading request...' : 'Broadcasting transaction...'} />
       </Show>
-      <Show when={!isProcessing && !!request}>
-        <ConfirmContent>
+      <Show when={!isProcessing && !isLoading && !!request && !!txData}>
+        <Wrapper>
           <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Broadcast Raw Tx</HeaderText>
-          <Text theme={theme} style={{ margin: '0.75rem 0' }}>
+          <Text theme={theme} style={{ margin: '0.75rem 0', textAlign: 'center' }}>
             The app is requesting to broadcast a transaction.
           </Text>
-          <FormContainer noValidate onSubmit={(e) => handleBroadcast(e)}>
+          <FormContainer noValidate onSubmit={handleBroadcast}>
             <Show when={!!request.fund && satsOut > 0}>
               <Input
                 theme={theme}
@@ -171,18 +193,16 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
                 onChange={(e) => setPasswordConfirm(e.target.value)}
               />
             </Show>
-            <Text theme={theme} style={{ margin: '1rem' }}>
-              Double check details before sending.
-            </Text>
+            {txData && <TxPreview txData={txData} />}
             <Button
               theme={theme}
               type="primary"
-              label={`Broadcast - ${satsOut / BSV_DECIMAL_CONVERSION} BSV`}
+              label={`Broadcast - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
               disabled={isProcessing}
               isSubmit
             />
           </FormContainer>
-        </ConfirmContent>
+        </Wrapper>
       </Show>
     </>
   );

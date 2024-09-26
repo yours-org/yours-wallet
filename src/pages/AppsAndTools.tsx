@@ -15,9 +15,13 @@ import { truncate } from '../utils/format';
 import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { Txo } from 'spv-store';
+import { IndexContext, Txo } from 'spv-store';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 import { Input } from '../components/Input';
+import TxPreview from '../components/TxPreview';
+import { TransactionFormat } from 'yours-wallet-provider';
+import { getTxFromRawTxFormat } from '../utils/tools';
+import { useSnackbar } from '../hooks/useSnackbar';
 
 const Content = styled.div`
   display: flex;
@@ -115,13 +119,46 @@ const LockDetailsHeaderText = styled(LockDetailsText)`
   font-weight: 600;
 `;
 
-type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unlock';
+const Dropdown = styled.select<WhiteLabelTheme>`
+  width: 80%;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  background-color: ${({ theme }) => theme.color.global.row};
+  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
+`;
+
+const TextArea = styled.textarea<WhiteLabelTheme>`
+  background-color: ${({ theme }) => theme.color.global.row};
+  border-radius: 0.5rem;
+  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
+  width: 80%;
+  height: 4rem;
+  font-size: 0.85rem;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+  padding: 1rem;
+  margin: 0.5rem;
+  outline: none;
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral + '80'};
+  resize: none;
+
+  &::placeholder {
+    color: ${({ theme }) =>
+      theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral + '80'};
+  }
+`;
+
+type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unlock' | 'decode-broadcast' | 'decode';
 
 export const AppsAndTools = () => {
   const { theme } = useTheme();
+  const { addSnackbar } = useSnackbar();
   const { setSelected, query } = useBottomMenu();
-  const { keysService, bsvService, chromeStorageService } = useServiceContext();
-  const identityAddress = keysService.identityAddress;
+  const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
+  const { bsvAddress, ordAddress, identityAddress } = keysService;
   const exchangeRate = chromeStorageService.getCurrentAccountObject().exchangeRateCache?.rate ?? 0;
   const [isProcessing, setIsProcessing] = useState(false);
   const [page, setPage] = useState<AppsPage>(query === 'pending-locks' ? 'unlock' : 'main');
@@ -131,6 +168,11 @@ export const AppsAndTools = () => {
   const [didSubmit, setDidSubmit] = useState(false);
   const [lockedUtxos, setLockedUtxos] = useState<Txo[]>([]);
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
+  const [txData, setTxData] = useState<IndexContext>();
+  const [rawTx, setRawTx] = useState<string | number[]>('');
+  const [transactionFormat, setTransactionFormat] = useState<TransactionFormat>('tx');
+  const [satsOut, setSatsOut] = useState(0);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
 
   const getLockData = async () => {
     setIsProcessing(true);
@@ -147,7 +189,7 @@ export const AppsAndTools = () => {
   }, [identityAddress, page]);
 
   useEffect(() => {
-    setSelected('apps');
+    setSelected('tools');
   }, [setSelected]);
 
   useEffect(() => {
@@ -160,6 +202,53 @@ export const AppsAndTools = () => {
 
     const satAmount = Math.round((amount / exchangeRate) * BSV_DECIMAL_CONVERSION);
     setSatAmount(satAmount);
+  };
+
+  const handleDecode = async () => {
+    setIsProcessing(true);
+    const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
+    const data = await oneSatSPV.parseTx(tx);
+    setTxData(data);
+    let userSatsOut = data.spends.reduce((acc, spend) => {
+      if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
+        return acc + spend.satoshis;
+      }
+      return acc;
+    }, 0n);
+
+    // how much did the user get back from the tx
+    userSatsOut = data.txos.reduce((acc, txo) => {
+      if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
+        return acc - txo.satoshis;
+      }
+      return acc;
+    }, userSatsOut);
+
+    setSatsOut(Number(userSatsOut));
+    setIsProcessing(false);
+    setPage('decode');
+  };
+
+  const handleBroadcast = async () => {
+    if (!rawTx || !transactionFormat) return;
+    try {
+      setIsBroadcasting(true);
+      setIsProcessing(true);
+      const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
+      const res = await oneSatSPV.broadcast(tx);
+      if (!res.txid) {
+        addSnackbar('An error occurred while broadcasting the transaction', 'error');
+        setPage('decode-broadcast');
+        return;
+      }
+      addSnackbar('Transaction broadcasted successfully', 'success');
+      setPage('decode-broadcast');
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setIsBroadcasting(false);
+      setIsProcessing(false);
+    }
   };
 
   const main = (
@@ -178,6 +267,18 @@ export const AppsAndTools = () => {
           }
         />
       </Show>
+      <AppsRow
+        name="Decode/Broadcast"
+        description="Decode and broadcast raw transactions"
+        onClick={() => setPage('decode-broadcast')}
+        jsxElement={
+          <RightChevron
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
+          />
+        }
+      />
       <Show when={theme.settings.services.locks}>
         <AppsRow
           name="Pending Locks"
@@ -328,7 +429,7 @@ export const AppsAndTools = () => {
         <Button
           key={`${amt}_${idx}`}
           theme={theme}
-          type="primary"
+          type="secondary-outline"
           label={amt === 'Other' ? amt : `$${amt}`}
           onClick={() => {
             if (amt === 'Other') {
@@ -376,11 +477,11 @@ export const AppsAndTools = () => {
         </ButtonsWrapper>
       </Show>
       <Text theme={theme} style={{ width: '95%', margin: '2rem 0 1rem 0' }}>
-        Give Monthly through Yours Wallet's transparent Open Collective.
+        Give Monthly through Yours Wallet's transparent Open Collective (formerly Panda Wallet).
       </Text>
       <Button
         theme={theme}
-        type="secondary-outline"
+        type="primary"
         label="View Open Collective"
         onClick={() => window.open('https://opencollective.com/panda-wallet', '_blank')}
       />
@@ -398,12 +499,65 @@ export const AppsAndTools = () => {
     </PageWrapper>
   );
 
+  const decodeOrBroadcastPage = (
+    <PageWrapper $marginTop={'0'}>
+      <HeaderText theme={theme}>Decode/Broadcast</HeaderText>
+      <Text theme={theme}>Decode or broadcast a raw transaction in various formats</Text>
+
+      <Dropdown
+        theme={theme}
+        onChange={(e) =>
+          setTransactionFormat(e.target.value === 'hex' ? 'tx' : e.target.value === 'beef' ? 'beef' : 'ef')
+        }
+      >
+        <option value="hex">Raw Hex</option>
+        <option value="beef">BEEF</option>
+        <option value="extended">Extended Format</option>
+      </Dropdown>
+
+      <TextArea theme={theme} placeholder="Paste your raw transaction" onChange={(e) => setRawTx(e.target.value)} />
+
+      <ButtonsWrapper>
+        <Button theme={theme} type="secondary-outline" label="Decode" onClick={handleDecode} />
+        <Button theme={theme} type="primary" label="Broadcast" onClick={handleBroadcast} />
+      </ButtonsWrapper>
+      <Button
+        style={{ margin: '1rem' }}
+        theme={theme}
+        type="secondary"
+        label={'Go back'}
+        onClick={() => setPage('main')}
+      />
+    </PageWrapper>
+  );
+
+  const decode = !!txData && (
+    <>
+      <TxPreview txData={txData} />
+      <Button
+        theme={theme}
+        type="primary"
+        label={`Broadcast - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
+        onClick={handleBroadcast}
+      />
+      <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setPage('decode-broadcast')} />
+    </>
+  );
+
   return (
     <Content>
       <TopNav />
       <Show when={isProcessing && page === 'unlock'}>
         <PageLoader theme={theme} message={'Gathering info...'} />
       </Show>
+      <Show when={(isProcessing && page === 'decode-broadcast') || (isProcessing && page === 'decode')}>
+        <PageLoader
+          theme={theme}
+          message={isBroadcasting ? 'Broadcasting transaction...' : 'Decoding transaction...'}
+        />
+      </Show>
+      <Show when={!isProcessing && page === 'decode-broadcast'}>{decodeOrBroadcastPage}</Show>
+      <Show when={!isProcessing && page === 'decode'}>{decode}</Show>
       <Show when={page === 'main'}>{main}</Show>
       <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show>
       <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show>

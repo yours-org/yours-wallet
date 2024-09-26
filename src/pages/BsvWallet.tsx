@@ -428,7 +428,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
               icon={lockIcon}
               isLock
               nextUnlock={lockData?.nextUnlock}
-              onClick={() => handleSelect('apps', 'pending-locks')}
+              onClick={() => handleSelect('tools', 'pending-locks')}
             />
           </Show>
         )}

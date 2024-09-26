@@ -3,7 +3,7 @@ import { NetWork } from 'yours-wallet-provider';
 import { BottomMenu } from '../components/BottomMenu';
 import { useTheme } from '../hooks/useTheme';
 
-export type MenuItems = 'bsv' | 'ords' | 'apps' | 'settings';
+export type MenuItems = 'bsv' | 'ords' | 'tools' | 'settings';
 
 type BottomMenuContextType = {
   selected: MenuItems | null;

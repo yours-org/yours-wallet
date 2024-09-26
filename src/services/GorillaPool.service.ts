@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Bsv20, BSV20Txo, Bsv21, NetWork, Ordinal } from 'yours-wallet-provider';
+import { Bsv20, BSV20Txo, NetWork, Ordinal } from 'yours-wallet-provider';
 import { GP_BASE_URL, GP_TESTNET_BASE_URL } from '../utils/constants';
 import { MarketResponse, Token } from './types/gorillaPool.types';
 import { ChromeStorageService } from './ChromeStorage.service';
@@ -45,7 +45,7 @@ export class GorillaPoolService {
     const url = `${this.getBaseUrl(network)}/api/bsv20/balance?addresses=${addresses.join('&addresses=')}`;
     const res = await axios.get(url);
 
-    const bsv20List: Array<Bsv20 | Bsv21> = res.data.map(
+    const bsv20List: Array<Bsv20> = res.data.map(
       (b: {
         all: {
           confirmed: string;

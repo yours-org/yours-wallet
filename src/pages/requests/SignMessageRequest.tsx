@@ -134,9 +134,10 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
             <TagText theme={theme}>{`Id: ${request.tag?.id}`}</TagText>
           </Show>
           <FormContainer noValidate onSubmit={(e) => handleSigning(e)}>
-            <RequestDetailsContainer>
+            <RequestDetailsContainer theme={theme}>
               {
                 <Text
+                  theme={theme}
                   style={{
                     color:
                       theme.color.global.primaryTheme === 'dark'

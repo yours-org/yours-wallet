@@ -141,13 +141,13 @@ export const Ordinal = (props: OrdinalProps) => {
             onClick={onClick}
           />
         );
-      case contentType === 'text/plain':
+      case contentType?.startsWith('text/'):
         return (
           <TextWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
             <OrdText theme={theme}>{inscription.origin?.data?.insc?.file?.text}</OrdText>
           </TextWrapper>
         );
-      case contentType === 'application/json':
+      case contentType?.startsWith('application/json'):
         return (
           <JsonWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
             <Json theme={theme}>{JSON.stringify(inscription.origin?.data?.insc?.file?.json, null, 2)}</Json>

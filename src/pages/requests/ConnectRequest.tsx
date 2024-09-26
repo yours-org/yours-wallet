@@ -145,6 +145,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
           <Permission>
             <CheckMark style={{ marginRight: '1rem' }} src={greenCheck} />
             <Text
+              theme={theme}
               style={{
                 color:
                   theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
@@ -158,6 +159,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
           <Permission>
             <CheckMark style={{ marginRight: '1rem' }} src={greenCheck} />
             <Text
+              theme={theme}
               style={{
                 color:
                   theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,

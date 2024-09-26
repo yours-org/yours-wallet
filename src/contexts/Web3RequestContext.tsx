@@ -13,6 +13,7 @@ import {
 import { RequestParams } from '../inject';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { sleep } from '../utils/sleep';
 
 export type Web3RequestContextProps = {
   connectRequest: RequestParams | undefined;
@@ -47,17 +48,49 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [decryptRequest, setDecryptRequest] = useState<DecryptRequest | undefined>(undefined);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
 
-  const clearRequest = () => {
-    setConnectRequest(undefined);
-    setSendBsvRequest(undefined);
-    setTransferOrdinalRequest(undefined);
-    setPurchaseOrdinalRequest(undefined);
-    setSignMessageRequest(undefined);
-    setBroadcastRequest(undefined);
-    setGetSignaturesRequest(undefined);
-    setGenerateTaggedKeysRequest(undefined);
-    setEncryptRequest(undefined);
-    setDecryptRequest(undefined);
+  const clearRequest = async (type: keyof Omit<Web3RequestContextProps, 'clearRequest'>) => {
+    await sleep(1000);
+    switch (type) {
+      case 'connectRequest':
+        setConnectRequest(undefined);
+        break;
+      case 'sendBsvRequest':
+        setSendBsvRequest(undefined);
+        break;
+      case 'transferOrdinalRequest':
+        setTransferOrdinalRequest(undefined);
+        break;
+      case 'purchaseOrdinalRequest':
+        setPurchaseOrdinalRequest(undefined);
+        break;
+      case 'signMessageRequest':
+        setSignMessageRequest(undefined);
+        break;
+      case 'broadcastRequest':
+        setBroadcastRequest(undefined);
+        break;
+      case 'getSignaturesRequest':
+        setGetSignaturesRequest(undefined);
+        break;
+      case 'generateTaggedKeysRequest':
+        setGenerateTaggedKeysRequest(undefined);
+        break;
+      case 'encryptRequest':
+        setEncryptRequest(undefined);
+        break;
+      case 'decryptRequest':
+        setDecryptRequest(undefined);
+        break;
+      default:
+        break;
+    }
+    await chrome.storage.local.remove(type);
+    chrome.storage.local.get(async ({ popupWindowId }) => {
+      if (popupWindowId) {
+        await chrome.windows.remove(popupWindowId);
+        await chrome.storage.local.remove('popupWindowId');
+      }
+    });
   };
 
   const handleRequestStates = async (result: Partial<ChromeStorageObject>) => {

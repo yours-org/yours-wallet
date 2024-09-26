@@ -51,6 +51,7 @@ const GradientBorderWrapper = styled.div<WhiteLabelTheme>`
   );
   border-radius: 0.25rem;
   width: 87%;
+  margin: 0.25rem;
 `;
 
 const SecondaryOutline = styled(Primary)<{ $isOutline?: boolean }>`
