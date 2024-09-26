@@ -143,6 +143,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
 
       setSuccessTxId(sendRes.txid);
       addSnackbar('Transaction Successful!', 'success');
+      onResponse();
 
       if (!requestWithinApp) {
         sendMessage({
@@ -151,7 +152,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           rawtx: sendRes.rawtx,
         });
       }
-      onResponse();
     } catch (error) {
       console.log(error);
     } finally {
@@ -236,14 +236,13 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!request && !hasSent}>
         <ConfirmContent>
-          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Text
             theme={theme}
             style={{ cursor: 'pointer', margin: '0.75rem 0' }}
           >{`Available Balance: ${getBsvBalance()}`}</Text>
           <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
-            <RequestDetailsContainer>{web3Details()}</RequestDetailsContainer>
+            <RequestDetailsContainer theme={theme}>{web3Details()}</RequestDetailsContainer>
             <Show when={isPasswordRequired}>
               <Input
                 theme={theme}
@@ -263,6 +262,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
               disabled={isProcessing}
               isSubmit
             />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </ConfirmContent>
       </Show>

@@ -62,7 +62,7 @@ const Container = styled.div<WhiteLabelTheme>`
 export const App = () => {
   const { isMobile } = useViewport();
   const { theme } = useTheme();
-  const { isLocked, isReady, chromeStorageService } = useServiceContext();
+  const { isLocked, isReady, chromeStorageService, setIsLocked } = useServiceContext();
   const menuContext = useContext(BottomMenuContext);
   const {
     connectRequest,
@@ -92,10 +92,12 @@ export const App = () => {
 
   useEffect(() => {
     isReady && getStorageAndSetRequestState(chromeStorageService);
-  }, [chromeStorageService, getStorageAndSetRequestState, isReady]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady]);
 
   const handleUnlock = async () => {
-    window.location.reload();
+    setIsLocked(false);
+    menuContext?.handleSelect('bsv');
   };
 
   useEffect(() => {
@@ -246,7 +248,7 @@ export const App = () => {
                           </Show>
                         }
                       />
-                      <Route path="/apps" element={<AppsAndTools />} />
+                      <Route path="/tools" element={<AppsAndTools />} />
                       <Route path="/settings" element={<Settings />} />
                     </Routes>
                   </Router>

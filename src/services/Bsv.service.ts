@@ -28,7 +28,7 @@ import {
   Utils,
 } from '@bsv/sdk';
 import { SPVStore, Lock, TxoLookup } from 'spv-store';
-import theme from '../theme.json';
+import { theme } from '../theme';
 //@ts-ignore
 import { PaymailClient } from '@bsv/paymail/client';
 

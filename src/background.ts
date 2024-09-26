@@ -106,7 +106,7 @@ if (isInServiceWorker) {
       {
         url: chrome.runtime.getURL('index.html'),
         type: 'popup',
-        width: 360,
+        width: 392,
         height: 567,
       },
       (window) => {
@@ -187,10 +187,8 @@ if (isInServiceWorker) {
         case YoursEventName.SYNC_UTXOS:
           return processSyncUtxos();
         case YoursEventName.SWITCH_ACCOUNT:
-          console.log('Received SWITCH_ACCOUNT event');
           return switchAccount();
         case YoursEventName.SIGNED_OUT:
-          console.log('Received Sign Out event');
           return signOut();
         default:
           break;
@@ -444,7 +442,6 @@ if (isInServiceWorker) {
         const oneSatSPV = await oneSatSPVPromise;
         if (!oneSatSPV) throw Error('SPV not initialized!');
         const results = await oneSatSPV.search(new TxoLookup('origin'));
-        console.log('results', results);
 
         sendResponse({
           type: YoursEventName.GET_ORDINALS,
@@ -882,13 +879,10 @@ if (isInServiceWorker) {
 
   const cleanup = (types: YoursEventName[]) => {
     chromeStorageService.getAndSetStorage().then((res) => {
-      // Here we allow 1 second for the wallet ui to display success message before killing the window
-      setTimeout(() => {
-        if (res?.popupWindowId) {
-          removeWindow(res.popupWindowId);
-          chromeStorageService.remove([...types, 'popupWindowId']);
-        }
-      }, 1000);
+      if (res?.popupWindowId) {
+        removeWindow(res.popupWindowId);
+        chromeStorageService.remove([...types, 'popupWindowId']);
+      }
     });
   };
 

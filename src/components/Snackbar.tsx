@@ -60,6 +60,7 @@ export const Snackbar = (props: SnackbarProps) => {
   const { message, type, theme, duration = 2.5 } = props;
   return (
     <SnackBarContainer
+      theme={theme}
       duration={duration}
       color={
         type === 'error'

@@ -9,8 +9,8 @@ import {
   TokenUtxo,
   transferOrdTokens,
 } from 'js-1sat-ord';
-import { Bsv20, Bsv21, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
-import { P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction } from '@bsv/sdk';
+import { Bsv20, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
+import { P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction, Utils } from '@bsv/sdk';
 import { BsvService } from './Bsv.service';
 //TODO: look into why BSV20_INDEX_FEE is not being used
 import { BSV20_INDEX_FEE, FEE_PER_KB } from '../utils/constants';
@@ -21,7 +21,7 @@ import { isValidEmail } from '../utils/tools';
 import { PaymailClient } from '@bsv/paymail/client';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { truncate } from '../utils/format';
-import theme from '../theme.json';
+import { theme } from '../theme';
 import { GorillaPoolService } from './GorillaPool.service';
 
 const client = new PaymailClient();
@@ -37,7 +37,11 @@ export class OrdinalService {
 
   getOrdinals = async (): Promise<Ordinal[]> => {
     const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 0);
-    const mapped = ordinals.txos.map(mapOrdinal);
+    const mapped = ordinals.txos
+      .filter(
+        (o) => o.data.origin.data.insc.file.type !== 'panda/tag' && o.data.origin.data.insc.file.type !== 'yours/tag',
+      )
+      .map(mapOrdinal);
     return mapped;
   };
 
@@ -47,7 +51,7 @@ export class OrdinalService {
     return mapOrdinal(txo);
   };
 
-  getBsv20s = async (): Promise<(Bsv20 | Bsv21)[]> => {
+  getBsv20s = async (): Promise<Bsv20[]> => {
     return this.gorillaPoolService.getBsv20Balances([this.keysService.bsvAddress, this.keysService.ordAddress]);
   };
 
@@ -172,9 +176,14 @@ export class OrdinalService {
       if (!keys?.ordAddress || !keys.ordWif || !keys.walletAddress || !keys.walletWif) {
         return { error: 'no-keys' };
       }
-      const paymentPk = PrivateKey.fromWif(keys.walletWif);
-      const ordPk = PrivateKey.fromWif(keys.ordWif);
-      const fundingUtxos = await this.bsvService.fundingTxos();
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
+      const fundingUtxos = (await this.bsvService.fundingTxos()).map((t) => ({
+        txid: t.outpoint.txid,
+        vout: t.outpoint.vout,
+        satoshis: Number(t.satoshis),
+        script: Utils.toBase64(t.script),
+        pk: pkMap.get(t.owner || ''),
+      }));
 
       const tokenType = idOrTick.length > 64 ? TokenType.BSV21 : TokenType.BSV20;
 
@@ -185,17 +194,19 @@ export class OrdinalService {
 
       const tokenUtxos: TokenUtxo[] = [];
       let tokensIn = 0n;
-      let token: Bsv20Type | Bsv21Type | undefined;
       for (const tokenUtxo of bsv20Utxos) {
         if (tokensIn >= amount) break;
-        // token = tokenUtxo.data.bsv21.data as Bsv20Type | Bsv21Type;
+        if (!pkMap.has(tokenUtxo.owner || '')) {
+          continue;
+        }
         const t: TokenUtxo = {
-          id: tokenType === TokenType.BSV21 ? (token as Bsv21Type).id : (token as Bsv20Type).tick,
+          id: tokenUtxo.id || tokenUtxo.tick || idOrTick,
           txid: tokenUtxo.txid,
           vout: tokenUtxo.vout,
           satoshis: 1,
-          script: Buffer.from(tokenUtxo.script!).toString('base64'),
+          script: tokenUtxo.script!,
           amt: tokenUtxo.amt,
+          pk: pkMap.get(tokenUtxo.owner || ''),
         };
         tokenUtxos.push(t);
         tokensIn += BigInt(tokenUtxo.amt);
@@ -216,14 +227,9 @@ export class OrdinalService {
             amount: BSV20_INDEX_FEE * 2,
           },
         ],
-        utxos: fundingUtxos.map((t) => ({
-          txid: t.outpoint.txid,
-          vout: t.outpoint.vout,
-          satoshis: Number(t.satoshis),
-          script: Buffer.from(t.script).toString('base64'),
-        })),
-        ordPk,
-        paymentPk,
+        utxos: fundingUtxos,
+        changeAddress: keys.walletAddress,
+        tokenChangeAddress: keys.ordAddress,
       });
 
       const response = await this.oneSatSPV.broadcast(tx);
@@ -410,7 +416,7 @@ export class OrdinalService {
     }
   };
 
-  getTokenName(b: Bsv20 | Bsv21): string {
-    return (b as Bsv21).sym || (b as Bsv20).tick || 'Null';
+  getTokenName(b: Bsv20): string {
+    return b.sym || b.tick || 'Null';
   }
 }

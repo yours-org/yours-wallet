@@ -30,7 +30,9 @@ export const WalletRow = (props: WalletRowTypes) => {
       color={containerColor}
       onMouseEnter={() =>
         setContainerColor(
-          theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral + '10',
+          theme.color.global.primaryTheme === 'dark'
+            ? theme.color.global.contrast + '10'
+            : theme.color.global.neutral + '10',
         )
       }
       onMouseLeave={() => setContainerColor(theme.color.global.row)}

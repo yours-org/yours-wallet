@@ -17,7 +17,7 @@ import { QueueTrackerMessage } from './hooks/useQueueTracker';
 import { YoursEventName } from './inject';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { sendMessage } from './utils/chromeHelpers';
-import walletTheme from '../src/theme.json';
+import { theme } from './theme';
 
 export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, startSync = false) => {
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
@@ -44,9 +44,9 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
     new OriginIndexer(owners, IndexMode.TrustAndVerify, network),
   ];
 
-  if (walletTheme.settings.services.locks) indexers.push(lockIndexer);
-  if (walletTheme.settings.services.ordinals) indexers.push(...ordIndexers);
-  if (walletTheme.settings.services.bsv20) indexers.push(...bsv20Indexers);
+  if (theme.settings.services.locks) indexers.push(lockIndexer);
+  if (theme.settings.services.ordinals) indexers.push(...ordIndexers);
+  if (theme.settings.services.bsv20) indexers.push(...bsv20Indexers);
 
   const oneSatSPV = await OneSatWebSPV.init(
     selectedAccount || '',

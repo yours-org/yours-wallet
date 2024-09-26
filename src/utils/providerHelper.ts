@@ -16,14 +16,32 @@ export function mapOrdinal(t: Txo): Ordinal {
       nonce: Number(t.data.origin.data.nonce),
       num: t.block.height < 50000000 ? `${t.block.height}:${t.block.idx}:${t.outpoint.vout}` : undefined,
       data: {
-        insc: t.data.origin.data?.insc,
+        insc: {
+          file: t.data?.origin?.data?.insc?.file && {
+            ...t.data.origin.data.insc.file,
+            text:
+              t.data.origin?.data?.insc?.file?.type.startsWith('text') &&
+              Utils.toUTF8(t.data.origin.data.insc.file.content),
+            json:
+              t.data.origin?.data?.insc?.file?.type.startsWith('application/json') &&
+              JSON.parse(Utils.toUTF8(t.data.origin.data.insc.file.content)),
+          },
+        },
         map: t.data.origin.data?.map,
       },
     },
     height: t.block?.height,
     idx: Number(t.block?.idx),
     data: {
-      insc: t.data.insc?.data,
+      insc: {
+        file: t.data?.insc?.data?.file && {
+          ...t.data.insc.data.file,
+          text: t.data.insc?.data?.file?.type.startsWith('text') && Utils.toUTF8(t.data.insc.data.file.content),
+          json:
+            t.data.insc?.data?.file?.type.startsWith('application/json') &&
+            JSON.parse(Utils.toUTF8(t.data.insc.data.file.content)),
+        },
+      },
       list: t.data.list && {
         payout: Utils.toBase58(t.data.list.data.payout),
         price: Number(t.data.list.data.price),

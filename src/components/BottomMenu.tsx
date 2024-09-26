@@ -4,7 +4,7 @@ import { MenuItems } from '../contexts/BottomMenuContext';
 import { Badge, Text } from './Reusable';
 import { Show } from './Show';
 import { NetWork } from 'yours-wallet-provider';
-import { FaCog, FaCoins, FaList, FaSmileBeam } from 'react-icons/fa';
+import { FaCog, FaCoins, FaList, FaTools } from 'react-icons/fa';
 import { ComponentType } from 'react';
 
 const Container = styled.div<WhiteLabelTheme>`
@@ -107,11 +107,11 @@ export const BottomMenu = (props: BottomMenuProps) => {
         />
       </Show>
       <Menu
-        label="Resources"
+        label="Tools"
         theme={theme}
-        icon={FaSmileBeam}
-        onClick={() => handleSelect('apps')}
-        opacity={selected === 'apps' ? 1 : 0.6}
+        icon={FaTools}
+        onClick={() => handleSelect('tools')}
+        opacity={selected === 'tools' ? 1 : 0.6}
       />
       <Menu
         label="Settings"
