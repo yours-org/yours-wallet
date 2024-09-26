@@ -4,7 +4,7 @@ import { Ordinal } from 'yours-wallet-provider';
 import { useTheme } from '../hooks/useTheme';
 import { WhiteLabelTheme } from '../theme.types';
 import { GP_BASE_URL } from '../utils/constants';
-import { convertToTokenValue, formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
+import { convertAtomicValueToReadableTokenValue, formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { mapOrdinal } from '../utils/providerHelper';
 import { Show } from './Show';
 import lockImage from '../assets/lock.svg';
@@ -148,10 +148,7 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
                 }
               >
                 <Label theme={theme}>
-                  {formatNumberWithCommasAndDecimals(
-                    convertToTokenValue(Number(input.data.bsv20?.amt), Number(input.data.bsv20?.dec)),
-                    Number(input.data.bsv20?.dec),
-                  )}{' '}
+                  {convertAtomicValueToReadableTokenValue(Number(input.data.bsv20?.amt), Number(input.data.bsv20?.dec))}{' '}
                   {truncate(input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT', labelMaxLength, 0)}
                 </Label>
               </Show>
@@ -189,8 +186,8 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
                 }
               >
                 <Label theme={theme}>
-                  {formatNumberWithCommasAndDecimals(
-                    convertToTokenValue(Number(output.data.bsv20?.amt), Number(output.data.bsv20?.dec)),
+                  {convertAtomicValueToReadableTokenValue(
+                    Number(output.data.bsv20?.amt),
                     Number(output.data.bsv20?.dec),
                   )}{' '}
                   {truncate(output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT', labelMaxLength, 0)}

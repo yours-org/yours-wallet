@@ -79,3 +79,16 @@ export const formatLargeNumber = (number: number, decimalPlaces = 3): string => 
 export const convertToTokenValue = (balance: number, decimals: number): number => {
   return balance / Math.pow(10, decimals);
 };
+
+const removeTrailingZeros = (numStr: string): string => {
+  if (numStr.includes('.')) {
+    return numStr.replace(/(\.\d*?[1-9])0+$|\.0*$/, '$1');
+  }
+
+  return numStr;
+};
+
+export const convertAtomicValueToReadableTokenValue = (value: number, decimals: number): string => {
+  const tokenValue = convertToTokenValue(value, decimals);
+  return removeTrailingZeros(formatNumberWithCommasAndDecimals(tokenValue, decimals));
+};
