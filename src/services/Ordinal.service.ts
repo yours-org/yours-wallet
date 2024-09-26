@@ -10,7 +10,7 @@ import {
   transferOrdTokens,
 } from 'js-1sat-ord';
 import { Bsv20, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
-import { P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction } from '@bsv/sdk';
+import { P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction, Utils } from '@bsv/sdk';
 import { BsvService } from './Bsv.service';
 //TODO: look into why BSV20_INDEX_FEE is not being used
 import { BSV20_INDEX_FEE, FEE_PER_KB } from '../utils/constants';
@@ -176,9 +176,14 @@ export class OrdinalService {
       if (!keys?.ordAddress || !keys.ordWif || !keys.walletAddress || !keys.walletWif) {
         return { error: 'no-keys' };
       }
-      const paymentPk = PrivateKey.fromWif(keys.walletWif);
-      const ordPk = PrivateKey.fromWif(keys.ordWif);
-      const fundingUtxos = await this.bsvService.fundingTxos();
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
+      const fundingUtxos = (await this.bsvService.fundingTxos()).map((t) => ({
+        txid: t.outpoint.txid,
+        vout: t.outpoint.vout,
+        satoshis: Number(t.satoshis),
+        script: Utils.toBase64(t.script),
+        pk: pkMap.get(t.owner || ''),
+      }));
 
       const tokenType = idOrTick.length > 64 ? TokenType.BSV21 : TokenType.BSV20;
 
@@ -191,13 +196,17 @@ export class OrdinalService {
       let tokensIn = 0n;
       for (const tokenUtxo of bsv20Utxos) {
         if (tokensIn >= amount) break;
+        if (!pkMap.has(tokenUtxo.owner || '')) {
+          continue;
+        }
         const t: TokenUtxo = {
           id: tokenUtxo.id || tokenUtxo.tick || idOrTick,
           txid: tokenUtxo.txid,
           vout: tokenUtxo.vout,
           satoshis: 1,
-          script: Buffer.from(tokenUtxo.script!).toString('base64'),
+          script: tokenUtxo.script!,
           amt: tokenUtxo.amt,
+          pk: pkMap.get(tokenUtxo.owner || ''),
         };
         tokenUtxos.push(t);
         tokensIn += BigInt(tokenUtxo.amt);
@@ -218,14 +227,9 @@ export class OrdinalService {
             amount: BSV20_INDEX_FEE * 2,
           },
         ],
-        utxos: fundingUtxos.map((t) => ({
-          txid: t.outpoint.txid,
-          vout: t.outpoint.vout,
-          satoshis: Number(t.satoshis),
-          script: Buffer.from(t.script).toString('base64'),
-        })),
-        ordPk,
-        paymentPk,
+        utxos: fundingUtxos,
+        changeAddress: keys.walletAddress,
+        tokenChangeAddress: keys.ordAddress,
       });
 
       const response = await this.oneSatSPV.broadcast(tx);
