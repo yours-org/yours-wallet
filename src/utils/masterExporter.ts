@@ -13,7 +13,7 @@ export type MasterBackupProgressEvent = {
 
 type MasterBackupProgress = (event: MasterBackupProgressEvent) => void;
 
-// TODO: should probably handle errors?
+// TODO: handle UI errors if it ever becomes a problem
 export const streamDataToZip = async (
   oneSatSpv: SPVStore,
   chromeStorageService: ChromeStorageService,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { styled } from 'styled-components';
-import { SignMessage } from 'yours-wallet-provider';
+import { SignedMessage, SignMessage } from 'yours-wallet-provider';
 import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -76,9 +76,8 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       return;
     }
 
-    //TODO: This should not be any type. The signMessage method should be refactored to return provider type. Error handling should be done differently.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const signRes: any = await bsvService.signMessage(request, passwordConfirm);
+    const signRes = (await bsvService.signMessage(request, passwordConfirm)) as SignedMessage & { error?: string };
     if (!signRes?.sig) {
       const message =
         signRes?.error === 'invalid-password'

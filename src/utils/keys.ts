@@ -123,7 +123,6 @@ export const getKeysFromWifs = (wifs: WifKeys) => {
   return keys;
 };
 
-// TODO: We should rework this
 const getTaggedDerivation = (tag: DerivationTag): string => {
   const labelHex = Utils.toHex(Hash.sha256(tag.label, 'utf8'));
   const idHex = Utils.toHex(Hash.sha256(tag.id, 'utf8'));
