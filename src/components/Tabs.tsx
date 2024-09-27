@@ -20,6 +20,7 @@ const TabContent = styled.div`
   justify-content: space-between;
   width: 100%;
   height: calc(98%);
+  word-break: break-word;
 `;
 
 const TabsWrapper = styled.div`
