@@ -157,8 +157,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
 
     const keys = (await keysService.retrieveKeys(passwordConfirm)) as Keys;
     const res = await createTaggedKeys(passwordConfirm, request as DerivationTag, keys);
-    //TODO: look into this... doesn't seem optimal
-    setIsProcessing(true); // sendBsv call in createTaggedKeys sets to false but it's still processing at this point
+    setIsProcessing(true); // sendBsv processing in createTaggedKeys sets to false but it's still processing at this point
 
     if (!res.address || !res.pubKey) {
       const message =

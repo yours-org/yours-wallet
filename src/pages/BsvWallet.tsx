@@ -39,6 +39,7 @@ import { YoursEventName } from '../inject';
 import { InWalletBsvResponse } from '../services/types/bsv.types';
 import { useQueueTracker } from '../hooks/useQueueTracker';
 import { isValidEmail } from '../utils/tools';
+import { UpgradeNotification } from '../components/UpgradeNotification';
 
 const MiddleContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -132,6 +133,16 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [exchangeRate, setExchangeRate] = useState<number>(getExchangeRate());
   const [lockData, setLockData] = useState<LockData>();
   const [isSendAllBsv, setIsSendAllBsv] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+
+  useEffect(() => {
+    setTimeout(async () => {
+      const obj = await chromeStorageService.getAndSetStorage();
+      obj && !obj.hasUpgradedToSPV ? setShowUpgrade(true) : setShowUpgrade(false);
+    }, 500);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const bsvBalanceInSats = bsvBalance * BSV_DECIMAL_CONVERSION;
@@ -348,6 +359,12 @@ export const BsvWallet = (props: BsvWalletProps) => {
         : 'Enter Send Details';
   };
 
+  const handleSync = async () => {
+    await refreshUtxos();
+    chromeStorageService.update({ hasUpgradedToSPV: true });
+    window.location.reload();
+  };
+
   const receive = (
     <ReceiveContent>
       <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
@@ -523,6 +540,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
       </ConfirmContent>
     </>
   );
+
+  if (showUpgrade) {
+    return <UpgradeNotification onSync={handleSync} />;
+  }
 
   return (
     <>

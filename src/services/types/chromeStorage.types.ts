@@ -64,6 +64,7 @@ export interface ChromeStorageObject {
   isLocked: boolean;
   colorTheme: Theme;
   version?: number;
+  hasUpgradedToSPV?: boolean;
   connectRequest?: ConnectRequest;
   sendBsvRequest?: SendBsv[];
   transferOrdinalRequest?: TransferOrdinal;

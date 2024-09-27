@@ -69,6 +69,7 @@ if (isInServiceWorker) {
     try {
       const oneSatSPV = await oneSatSPVPromise;
       if (!oneSatSPV) throw Error('SPV not initialized!');
+      await chromeStorageService.update({ hasUpgradedToSPV: true });
       await oneSatSPV.sync();
       console.log('done importing');
     } catch (error) {

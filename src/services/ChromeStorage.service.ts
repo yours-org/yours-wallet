@@ -121,6 +121,7 @@ export class ChromeStorageService {
       passKey,
       salt,
       version: 1, // Version 1 is the first version of the new storage object and should be updated if it ever changes
+      hasUpgradedToSPV: false,
     };
 
     await this.set(newInterface);

@@ -83,7 +83,6 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
         setIsReady(true);
       } catch (error) {
         console.error('Error initializing services:', error);
-        //TODO: show error to user?
       }
     };
     initServices();
