@@ -7,6 +7,16 @@ export type QueueTrackerMessage = {
   data: { length: number };
 };
 
+export type ImportTrackerMessage = {
+  action: YoursEventName.IMPORT_STATUS_UPDATE;
+  data: { tag: string; name: string };
+};
+
+export type FetchingMessage = {
+  action: YoursEventName.FETCHING_TX_STATUS_UPDATE;
+  data: { txid: string };
+};
+
 export const useQueueTracker = () => {
   const { theme } = useTheme();
   const [queueLength, setQueueLength] = useState(0);
@@ -16,11 +26,30 @@ export const useQueueTracker = () => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const twoSecondsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [importName, setImportName] = useState<string | undefined>();
+  const [fetchingTxid, setFetchingTxid] = useState<string | undefined>();
 
   useEffect(() => {
-    const handleQueueStatusUpdate = (message: QueueTrackerMessage) => {
-      if (message.action === YoursEventName.QUEUE_STATUS_UPDATE) {
-        setQueueLength(message.data.length);
+    const handleQueueStatusUpdate = (message: QueueTrackerMessage | ImportTrackerMessage | FetchingMessage) => {
+      if (
+        message.action === YoursEventName.QUEUE_STATUS_UPDATE ||
+        message.action === YoursEventName.IMPORT_STATUS_UPDATE ||
+        message.action === YoursEventName.FETCHING_TX_STATUS_UPDATE
+      ) {
+        const importName = (message as ImportTrackerMessage).data.name;
+        if (importName) {
+          setImportName(importName);
+        } else {
+          setImportName(undefined);
+        }
+
+        const fetchingTxid = (message as FetchingMessage).data.txid;
+        if (fetchingTxid) {
+          setFetchingTxid(fetchingTxid);
+        }
+
+        const queueLength = (message as QueueTrackerMessage).data.length;
+        queueLength && setQueueLength(queueLength);
         setShowQueueBanner(true);
         setIsSyncing(true);
 
@@ -37,10 +66,11 @@ export const useQueueTracker = () => {
           twoSecondsTimeoutRef.current = null;
         }
 
-        if (message.data.length === 0) {
+        if (queueLength === 0) {
           // Set a timeout to delay setting isSyncing to false
           twoSecondsTimeoutRef.current = setTimeout(() => {
             setIsSyncing(false);
+            setFetchingTxid(undefined);
           }, 5000);
         }
 
@@ -82,5 +112,5 @@ export const useQueueTracker = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { queueLength, showQueueBanner, updateBalance, theme, isSyncing };
+  return { queueLength, showQueueBanner, updateBalance, theme, isSyncing, importName, fetchingTxid };
 };

@@ -1,13 +1,18 @@
 import styled from 'styled-components';
 import { useQueueTracker } from '../hooks/useQueueTracker';
 import { WhiteLabelTheme } from '../theme.types';
-import { formatNumberWithCommasAndDecimals } from '../utils/format';
+import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { Show } from './Show';
 
 const Banner = styled.div<WhiteLabelTheme & { $isSyncing: boolean }>`
   position: fixed;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   top: 0;
   width: 100%;
+  min-height: 3.25rem;
   font-size: 0.9rem;
   font-weight: 700;
   background-color: ${({ theme, $isSyncing }) =>
@@ -21,18 +26,25 @@ const Banner = styled.div<WhiteLabelTheme & { $isSyncing: boolean }>`
 `;
 
 export const QueueBanner = () => {
-  const { isSyncing, showQueueBanner, theme, queueLength } = useQueueTracker();
+  const { isSyncing, showQueueBanner, theme, queueLength, importName, fetchingTxid } = useQueueTracker();
 
   return (
     <Show when={showQueueBanner}>
       {theme && (
         <Banner theme={theme} $isSyncing={isSyncing}>
           <Show when={isSyncing} whenFalseContent={<>Your wallet is fully synced!</>}>
-            SPV Wallet is syncing {formatNumberWithCommasAndDecimals(queueLength, 0)} transactions...
+            {importName
+              ? `Importing ${importName}...`
+              : `SPV Wallet is syncing ${formatNumberWithCommasAndDecimals(queueLength, 0)} transactions...`}
             <br />
             <span style={{ fontSize: '0.75rem', fontWeight: 400 }}>
               (You may safely close the wallet during this process)
             </span>
+            <Show when={!!fetchingTxid}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, marginTop: '0.5rem' }}>
+                {fetchingTxid ? truncate(fetchingTxid, 6, 6) : ''}
+              </span>
+            </Show>
           </Show>
         </Banner>
       )}

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { validate } from 'bitcoin-address-validation';
 import bsvCoin from '../../assets/bsv-coin.svg';
-import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -216,7 +215,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           <Icon src={bsvCoin} />
           <Text style={{ margin: 0 }} theme={theme}>{`${r.satoshis / BSV_DECIMAL_CONVERSION}`}</Text>
           <Text style={{ margin: 0 }} theme={theme}>
-            {r.address ? truncate(r.address, 5, 5) : ''}
+            {r.address ? truncate(r.address, 5, 5) : r.paymail ? truncate(r.paymail, 12, 0) : ''}
           </Text>
         </LineItem>
       );

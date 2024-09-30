@@ -34,7 +34,7 @@ import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { mapOrdinal } from './utils/providerHelper';
-import { TxoLookup } from 'spv-store';
+import { TxoLookup, TxoSort } from 'spv-store';
 import { initOneSatSPV } from './initSPVStore';
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
@@ -133,7 +133,13 @@ if (isInServiceWorker) {
     action: YoursEventName;
     params: { domain: string };
   }): Promise<boolean> => {
-    if (message.action === YoursEventName.QUEUE_STATUS_UPDATE) return true;
+    if (
+      message.action === YoursEventName.QUEUE_STATUS_UPDATE ||
+      message.action === YoursEventName.IMPORT_STATUS_UPDATE ||
+      message.action === YoursEventName.FETCHING_TX_STATUS_UPDATE
+    ) {
+      return true;
+    }
     const { params } = message;
     return await verifyAccess(params.domain);
   };
@@ -442,12 +448,13 @@ if (isInServiceWorker) {
       chromeStorageService.getAndSetStorage().then(async () => {
         const oneSatSPV = await oneSatSPVPromise;
         if (!oneSatSPV) throw Error('SPV not initialized!');
-        const results = await oneSatSPV.search(new TxoLookup('origin'));
+        const results = await oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 0);
+        const mapped = results.txos.map(mapOrdinal);
 
         sendResponse({
           type: YoursEventName.GET_ORDINALS,
           success: true,
-          data: results.txos.map(mapOrdinal),
+          data: mapped,
         });
       });
     } catch (error) {

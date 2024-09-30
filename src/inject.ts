@@ -62,6 +62,8 @@ export enum YoursEventName {
   DECRYPT_RESPONSE = 'decryptResponse',
   SYNC_UTXOS = 'syncUtxos', // This is not exposed on the provider
   QUEUE_STATUS_UPDATE = 'queueStatusUpdate', // This is not exposed on the provider
+  IMPORT_STATUS_UPDATE = 'importStatusUpdate', // This is not exposed on the provider
+  FETCHING_TX_STATUS_UPDATE = 'fetchingTx', // This is not exposed on the provider
   BLOCK_HEIGHT_UPDATE = 'blockHeightUpdate', // This is not exposed on the provider
   SWITCH_ACCOUNT = 'switchAccount', // This is not exposed on the provider
 }

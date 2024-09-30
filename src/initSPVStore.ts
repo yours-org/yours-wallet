@@ -13,7 +13,7 @@ import {
 } from 'spv-store';
 import { NetWork } from 'yours-wallet-provider';
 import { BlockHeightTrackerMessage } from './hooks/useBlockHeightTracker';
-import { QueueTrackerMessage } from './hooks/useQueueTracker';
+import { FetchingMessage, ImportTrackerMessage, QueueTrackerMessage } from './hooks/useQueueTracker';
 import { YoursEventName } from './inject';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { sendMessage } from './utils/chromeHelpers';
@@ -58,8 +58,30 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
 
   if (!oneSatSPV) throw Error('SPV not initialized!');
 
-  oneSatSPV.events.on('queueStats', (queueStats: { length: number }) => {
-    const message: QueueTrackerMessage = { action: YoursEventName.QUEUE_STATUS_UPDATE, data: queueStats };
+  await registerEventListeners(oneSatSPV, selectedAccount || '', startSync);
+
+  return oneSatSPV;
+};
+
+const registerEventListeners = async (oneSatSPV: OneSatWebSPV, selectedAccount: string, startSync: boolean) => {
+  oneSatSPV.events.on('queueStats', (data: { length: number }) => {
+    const message: QueueTrackerMessage = { action: YoursEventName.QUEUE_STATUS_UPDATE, data };
+    try {
+      sendMessage(message);
+      // eslint-disable-next-line no-empty
+    } catch (e) {}
+  });
+
+  oneSatSPV.events.on('importing', (data: { tag: string; name: string }) => {
+    const message: ImportTrackerMessage = { action: YoursEventName.IMPORT_STATUS_UPDATE, data };
+    try {
+      sendMessage(message);
+      // eslint-disable-next-line no-empty
+    } catch (e) {}
+  });
+
+  oneSatSPV.events.on('fetchingTx', (data: { txid: string }) => {
+    const message: FetchingMessage = { action: YoursEventName.FETCHING_TX_STATUS_UPDATE, data };
     try {
       sendMessage(message);
       // eslint-disable-next-line no-empty
@@ -79,6 +101,4 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
       } catch (error) {}
     });
   }
-
-  return oneSatSPV;
 };

@@ -142,6 +142,8 @@ export class ChromeStorageService {
     this.storage = await this.get(null); // fetches all chrome storage by passing null
     if ((this.storage as DeprecatedStorage)?.appState?.addresses?.identityAddress && !this.storage.version) {
       this.storage = await this.mapDeprecatedStorageToNewInterface(this.storage as DeprecatedStorage);
+    } else {
+      this.storage = { ...this.storage, hasUpgradedToSPV: true };
     }
     return this.storage;
   };
