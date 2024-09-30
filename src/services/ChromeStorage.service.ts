@@ -90,7 +90,7 @@ export class ChromeStorageService {
             whitelist: whitelist ?? [],
             isPasswordRequired: appState.isPasswordRequired,
             socialProfile: {
-              displayName: socialProfile?.displayName ?? 'Anon Panda',
+              displayName: socialProfile?.displayName ?? 'Anonymous',
               avatar: socialProfile?.avatar ?? HOSTED_YOURS_IMAGE,
             },
           },

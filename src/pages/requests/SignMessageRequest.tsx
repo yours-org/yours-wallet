@@ -124,7 +124,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
             when={!!request.tag?.label}
             whenFalseContent={
               <>
-                <TagText theme={theme}>{`Label: panda`}</TagText>
+                <TagText theme={theme}>{`Label: yours`}</TagText>
                 <TagText theme={theme}>{`Id: identity`}</TagText>
               </>
             }

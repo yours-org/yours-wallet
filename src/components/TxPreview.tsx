@@ -141,7 +141,7 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
                       </Label>
                     }
                   >
-                    <Label>
+                    <Label theme={theme}>
                       {input.origin?.data?.map?.name && truncate(input.origin.data.map.name, labelMaxLength, 0)}
                     </Label>
                   </Show>
@@ -179,7 +179,7 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
                       </Label>
                     }
                   >
-                    <Label>
+                    <Label theme={theme}>
                       {output.origin?.data?.map?.name && truncate(output.origin.data.map.name, labelMaxLength, 0)}
                     </Label>
                   </Show>

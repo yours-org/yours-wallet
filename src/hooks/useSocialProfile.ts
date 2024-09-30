@@ -6,7 +6,7 @@ import { HOSTED_YOURS_IMAGE } from '../utils/constants';
 
 export const useSocialProfile = (chromeStorageService: ChromeStorageService) => {
   const [socialProfile, setSocialProfile] = useState<SocialProfile>({
-    displayName: 'Anon Panda',
+    displayName: 'Anonymous',
     avatar: HOSTED_YOURS_IMAGE,
   });
 

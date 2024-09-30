@@ -83,7 +83,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
 
       const taggedKeys = getTaggedDerivationKeys(derivationTag, keys.mnemonic);
       const message = JSON.stringify(derivationTag);
-      const encryptPrivKey = getPrivateKeyFromTag({ label: 'panda', id: 'identity', domain: '' }, keys);
+      const encryptPrivKey = getPrivateKeyFromTag({ label: 'yours', id: 'identity', domain: '' }, keys);
 
       const encryptedMessages = encryptUsingPrivKey(
         message,
@@ -94,7 +94,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
 
       const insScript = new OrdP2PKH().lock(keys.identityAddress, {
         dataB64: encryptedMessages[0],
-        contentType: 'panda/tag',
+        contentType: 'yours/tag',
       });
       const txid = await bsvService.sendBsv([{ satoshis: 1, script: insScript.toHex() }], password);
 

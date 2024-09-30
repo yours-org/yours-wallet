@@ -75,7 +75,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
 
     const keys = (await keysService.retrieveKeys(passwordConfirm)) as Keys;
 
-    const PrivKey = getPrivateKeyFromTag(request.tag ?? { label: 'panda', id: 'identity', domain: '' }, keys);
+    const PrivKey = getPrivateKeyFromTag(request.tag ?? { label: 'yours', id: 'identity', domain: '' }, keys);
 
     const encrypted = encryptUsingPrivKey(
       request.message,

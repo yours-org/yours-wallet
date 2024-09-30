@@ -25,7 +25,7 @@ export const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 export const SNACKBAR_TIMEOUT = 3 * 1000; // 2.5 seconds
 export const HOSTED_YOURS_IMAGE = 'https://i.ibb.co/zGcthBv/yours-org-light.png';
 export const YOURS_DEV_WALLET = '1MtzWXQEYGp89bQ9U2nfrnuChFv37j6pV6';
-export const PROVIDER_DOCS_URL = 'https://panda-wallet.gitbook.io/provider-api/intro/introduction';
+export const PROVIDER_DOCS_URL = 'https://yours-wallet.gitbook.io/provider-api/intro/introduction';
 export const ONE_SAT_MARKET_URL = 'https://1sat.market/market';
 
 export const DEFAULT_WALLET_PATH = "m/44'/236'/0'/1/0";
@@ -87,7 +87,7 @@ export const DEFAULT_ACCOUNT = {
     noApprovalLimit: 0,
     whitelist: [],
     isPasswordRequired: true,
-    socialProfile: { avatar: HOSTED_YOURS_IMAGE, displayName: 'Anon Panda' },
+    socialProfile: { avatar: HOSTED_YOURS_IMAGE, displayName: 'Anonymous' },
   },
   balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
   encryptedKeys: '',

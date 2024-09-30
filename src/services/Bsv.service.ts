@@ -320,7 +320,7 @@ export class BsvService {
     }
     try {
       const keys = (await this.keysService.retrieveKeys(password)) as Keys;
-      const derivationTag = messageToSign.tag ?? { label: 'panda', id: 'identity', domain: '', meta: {} };
+      const derivationTag = messageToSign.tag ?? { label: 'yours', id: 'identity', domain: '', meta: {} };
       const privateKey = getPrivateKeyFromTag(derivationTag, keys);
 
       if (!privateKey.toWif()) {

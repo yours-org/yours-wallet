@@ -48,7 +48,7 @@ export function mapOrdinal(t: Txo): Ordinal {
       },
       lock: t.data.lock?.data,
       map: t.data.map?.data,
-      bsv20: {
+      bsv20: (t.data.bsv20?.data || t.data.bsv21?.data) && {
         ...(t.data.bsv20?.data || t.data.bsv21?.data),
         amt: Number(t.data.bsv20?.data?.amt || t.data.bsv21?.data?.amt),
       },

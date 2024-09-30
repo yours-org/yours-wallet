@@ -27,12 +27,19 @@ export const setDerivationTags = async (
   oneSatSPV: SPVStore,
   chromeStorageService: ChromeStorageService,
 ) => {
-  const ordinals = await oneSatSPV.search(
+  const ordsWithPandaTag = await oneSatSPV.search(
     new TxoLookup('origin', 'type', 'panda/tag', keys.identityAddress),
     TxoSort.DESC,
     0,
   );
-  const taggedOrds = ordinals.txos;
+
+  const ordsWithYoursTag = await oneSatSPV.search(
+    new TxoLookup('origin', 'type', 'yours/tag', keys.identityAddress),
+    TxoSort.DESC,
+    0,
+  );
+
+  const taggedOrds = ordsWithPandaTag.txos.concat(ordsWithYoursTag.txos);
   const tags: TaggedDerivationResponse[] = [];
   const network = chromeStorageService.getNetwork();
   for (const ord of taggedOrds) {

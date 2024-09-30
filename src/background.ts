@@ -724,7 +724,7 @@ if (isInServiceWorker) {
       chromeStorageService.getAndSetStorage().then(() => {
         const { account } = chromeStorageService.getCurrentAccountObject();
         if (!account) throw Error('No account found!');
-        const displayName = account.settings?.socialProfile?.displayName ?? 'Anon Panda';
+        const displayName = account.settings?.socialProfile?.displayName ?? 'Anonymous';
         const avatar = account.settings?.socialProfile?.avatar ?? HOSTED_YOURS_IMAGE;
         sendResponse({
           type: YoursEventName.GET_SOCIAL_PROFILE,

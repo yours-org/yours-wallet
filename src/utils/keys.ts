@@ -137,7 +137,7 @@ export const getTaggedDerivationKeys = (tag: DerivationTag, mnemonic: string) =>
 };
 
 export const getPrivateKeyFromTag = (tag: DerivationTag, keys: Keys) => {
-  if (tag.label === 'panda') {
+  if (tag.label === 'panda' || tag.label === 'yours') {
     switch (tag.id) {
       case 'bsv':
         return PrivateKey.fromWif(keys.walletWif);
