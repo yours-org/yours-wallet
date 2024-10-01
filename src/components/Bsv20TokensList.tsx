@@ -8,7 +8,7 @@ import { AssetRow } from './AssetRow';
 import { showAmount } from '../utils/ordi';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { truncate } from '../utils/format';
-import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, GENERIC_TOKEN_ICON } from '../utils/constants';
 import { useEffect, useState } from 'react';
 
 const NoInscriptionWrapper = styled.div`
@@ -108,7 +108,9 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
                         animate
                         balance={Number(showAmount(b.all.confirmed, b.dec))}
                         showPointer={true}
-                        icon={b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : ''}
+                        icon={
+                          b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : GENERIC_TOKEN_ICON
+                        }
                         ticker={truncate(ordinalService.getTokenName(b), 10, 0)}
                         usdBalance={
                           (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
@@ -142,7 +144,9 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
                           animate
                           balance={Number(showAmount(b.all.pending, b.dec))}
                           showPointer={true}
-                          icon={b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : ''}
+                          icon={
+                            b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : GENERIC_TOKEN_ICON
+                          }
                           ticker={ordinalService.getTokenName(b)}
                           usdBalance={
                             (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *

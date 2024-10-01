@@ -9,6 +9,7 @@ import { HeaderText, Text } from './Reusable';
 import { Show } from './Show';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { BackButton } from './BackButton';
+import { GENERIC_TOKEN_ICON } from '../utils/constants';
 
 const slideIn = keyframes`
   from {
@@ -149,7 +150,7 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
                   src={
                     b.icon
                       ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${b.icon}`
-                      : ''
+                      : GENERIC_TOKEN_ICON
                   }
                 />
               </Show>
