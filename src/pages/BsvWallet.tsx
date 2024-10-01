@@ -483,7 +483,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         <ManageTokenListWrapper onClick={() => setManageFavorites(!manageFavorites)}>
           <FaListAlt size="1rem" color={theme.color.global.gray} />
           <Text theme={theme} style={{ margin: '0 0 0 0.5rem', fontWeight: 700, color: theme.color.global.gray }}>
-            Manage Tokens
+            Manage Tokens List
           </Text>
         </ManageTokenListWrapper>
       </MiddleContainer>
