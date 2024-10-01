@@ -45,6 +45,7 @@ import { Bsv20TokensList } from '../components/Bsv20TokensList';
 import { FaListAlt } from 'react-icons/fa';
 import { ManageTokens } from '../components/ManageTokens';
 import { Account } from '../services/types/chromeStorage.types';
+import { SendBsv20View } from '../components/SendBsv20View';
 
 const MiddleContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -52,13 +53,13 @@ const MiddleContainer = styled.div<WhiteLabelTheme>`
   justify-content: center;
   flex-direction: column;
   width: 100%;
-  padding: 2.75rem 1rem;
+  padding: 2.5rem 1rem 2.75rem 1rem;
 `;
 
 const ProfileImage = styled.img`
-  width: 4rem;
-  height: 4rem;
-  margin: 0.25rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0;
   border-radius: 100%;
   cursor: pointer;
   transition: transform 0.3s ease;
@@ -149,6 +150,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [bsv20s, setBsv20s] = useState<Bsv20[]>([]);
   const [manageFavorites, setManageFavorites] = useState(false);
   const [account, setAccount] = useState<Account>();
+  const [token, setToken] = useState<{ isConfirmed: boolean; info: Bsv20 } | null>(null);
 
   const getAndSetAccountAndBsv20s = async () => {
     const bsv20s = await ordinalService.getBsv20s();
@@ -388,6 +390,17 @@ export const BsvWallet = (props: BsvWalletProps) => {
     window.location.reload();
   };
 
+  const handleBsv20TokenClick = (token: Bsv20) => {
+    if (token.all.pending > 0n) {
+      addSnackbar('Pending tokens cannot be sent!', 'error', 2000);
+      return;
+    }
+    setToken({
+      isConfirmed: true,
+      info: token,
+    });
+  };
+
   const receive = (
     <ReceiveContent>
       <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
@@ -472,20 +485,22 @@ export const BsvWallet = (props: BsvWalletProps) => {
             />
           </Show>
         )}
-        {bsv20s.length > 0 && (
-          <Bsv20TokensList
-            hideStatusLabels
-            bsv20s={bsv20s.filter((t) => t.id && account?.settings?.favoriteTokens?.includes(t.id))}
-            theme={theme}
-            onTokenClick={() => null}
-          />
-        )}
-        <ManageTokenListWrapper onClick={() => setManageFavorites(!manageFavorites)}>
-          <FaListAlt size="1rem" color={theme.color.global.gray} />
-          <Text theme={theme} style={{ margin: '0 0 0 0.5rem', fontWeight: 700, color: theme.color.global.gray }}>
-            Manage Tokens List
-          </Text>
-        </ManageTokenListWrapper>
+        <Show when={theme.settings.services.bsv20}>
+          {bsv20s.length > 0 && (
+            <Bsv20TokensList
+              hideStatusLabels
+              bsv20s={bsv20s.filter((t) => t.id && account?.settings?.favoriteTokens?.includes(t.id))}
+              theme={theme}
+              onTokenClick={(t: Bsv20) => handleBsv20TokenClick(t)}
+            />
+          )}
+          <ManageTokenListWrapper onClick={() => setManageFavorites(!manageFavorites)}>
+            <FaListAlt size="1rem" color={theme.color.global.gray} />
+            <Text theme={theme} style={{ margin: '0 0 0 0.5rem', fontWeight: 700, color: theme.color.global.gray }}>
+              Manage Tokens List
+            </Text>
+          </ManageTokenListWrapper>
+        </Show>
       </MiddleContainer>
     </MainContent>
   );
@@ -577,6 +592,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
       </ConfirmContent>
     </>
   );
+
+  if (token) {
+    return <SendBsv20View token={token} onBack={() => setToken(null)} />;
+  }
 
   if (showUpgrade) {
     return <UpgradeNotification onSync={handleSync} />;

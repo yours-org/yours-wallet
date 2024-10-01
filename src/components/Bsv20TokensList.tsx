@@ -10,6 +10,8 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { truncate } from '../utils/format';
 import { BSV_DECIMAL_CONVERSION, GENERIC_TOKEN_ICON } from '../utils/constants';
 import { useEffect, useState } from 'react';
+import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 
 const NoInscriptionWrapper = styled.div`
   display: flex;
@@ -54,6 +56,24 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
   const { gorillaPoolService, ordinalService, bsvService, chromeStorageService } = useServiceContext();
   const network = chromeStorageService.getNetwork();
   const [priceData, setPriceData] = useState<PriceData[]>([]);
+  const [tokens, setTokens] = useState<Bsv20[]>([]);
+
+  useEffect(() => {
+    const loadSavedTokens = async () => {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) return;
+      const favoriteTokenIds = account?.settings?.favoriteTokens || [];
+
+      const orderedTokens = favoriteTokenIds
+        .map((id) => bsv20s.find((token) => token.id === id))
+        .filter(Boolean) as Bsv20[];
+
+      setTokens(orderedTokens.length ? orderedTokens : bsv20s);
+    };
+
+    loadSavedTokens();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bsv20s]);
 
   useEffect(() => {
     if (!bsv20s.length) return;
@@ -61,13 +81,42 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
       const data = await gorillaPoolService.getTokenPriceInSats(bsv20s.map((d) => d?.id || ''));
       setPriceData(data);
     })();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsv20s]);
+
+  // Handle drag end event
+  const handleOnDragEnd = async (result: DropResult) => {
+    if (!result.destination) return; // dropped outside the list
+
+    const reorderedTokens = Array.from(tokens);
+    const [removed] = reorderedTokens.splice(result.source.index, 1);
+    reorderedTokens.splice(result.destination.index, 0, removed);
+
+    setTokens(reorderedTokens);
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) return;
+    const key: keyof ChromeStorageObject = 'accounts';
+
+    const favoriteTokens = reorderedTokens.map((t) => t.id).filter((t) => t) as string[];
+
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [account.addresses.identityAddress]: {
+        ...account,
+        settings: {
+          ...account.settings,
+          favoriteTokens,
+        },
+      },
+    };
+
+    await chromeStorageService.updateNested(key, update); // Save the new order
+  };
 
   return (
     <>
       <Show
-        when={bsv20s.length > 0 || hideStatusLabels}
+        when={tokens.length > 0 || hideStatusLabels}
         whenFalseContent={
           <NoInscriptionWrapper>
             <Text
@@ -85,82 +134,69 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
           </NoInscriptionWrapper>
         }
       >
-        <BSV20List>
-          <>
-            <Show when={!hideStatusLabels}>
-              <BSV20Header>
-                <SubHeaderText style={{ margin: '0.5rem 0 0 1rem', color: theme.color.global.gray }} theme={theme}>
-                  Confirmed
-                </SubHeaderText>
-              </BSV20Header>
-            </Show>
-            <div style={{ width: '100%' }}>
-              {bsv20s
-                .filter((d) => d.all.confirmed > 0n)
-                .map((b) => {
-                  return (
-                    <div
-                      key={b.id}
-                      style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
-                      onClick={() => onTokenClick(b)}
-                    >
-                      <AssetRow
-                        animate
-                        balance={Number(showAmount(b.all.confirmed, b.dec))}
-                        showPointer={true}
-                        icon={
-                          b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : GENERIC_TOKEN_ICON
-                        }
-                        ticker={truncate(ordinalService.getTokenName(b), 10, 0)}
-                        usdBalance={
-                          (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
-                          (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
-                          Number(showAmount(b.all.confirmed, b.dec))
-                        }
-                      />
-                    </div>
-                  );
-                })}
-            </div>
-
-            <Show when={bsv20s.filter((d) => d.all.pending > 0n).length > 0}>
-              <Show when={!hideStatusLabels}>
-                <BSV20Header style={{ marginTop: '2rem' }}>
-                  <SubHeaderText style={{ marginLeft: '1rem', color: theme.color.global.gray }} theme={theme}>
-                    Pending
-                  </SubHeaderText>
-                </BSV20Header>
-              </Show>
-              <div style={{ width: '100%' }}>
-                {bsv20s
-                  .filter((d) => d.all.pending > 0n)
-                  .map((b) => {
-                    return (
-                      <div
-                        style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
-                        onClick={() => onTokenClick(b)}
+        <DragDropContext onDragEnd={handleOnDragEnd}>
+          <Droppable droppableId="bsv20-list">
+            {(provided) => (
+              <BSV20List ref={provided.innerRef} {...provided.droppableProps}>
+                <>
+                  <Show when={!hideStatusLabels}>
+                    <BSV20Header>
+                      <SubHeaderText
+                        style={{ margin: '0.5rem 0 0 1rem', color: theme.color.global.gray }}
+                        theme={theme}
                       >
-                        <AssetRow
-                          animate
-                          balance={Number(showAmount(b.all.pending, b.dec))}
-                          showPointer={true}
-                          icon={
-                            b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : GENERIC_TOKEN_ICON
-                          }
-                          ticker={ordinalService.getTokenName(b)}
-                          usdBalance={
-                            (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
-                            (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
-                            Number(showAmount(b.all.confirmed, b.dec))
-                          }
-                        />
-                      </div>
-                    );
-                  })}
-              </div>
-            </Show>
-          </>
-        </BSV20List>
+                        Confirmed
+                      </SubHeaderText>
+                    </BSV20Header>
+                  </Show>
+                  <div style={{ width: '100%' }}>
+                    {tokens
+                      .filter((t) => t.all.confirmed > 0n)
+                      .map(
+                        (t, index) =>
+                          t?.id && (
+                            <Draggable key={t.id} draggableId={t.id} index={index}>
+                              {(provided) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    width: '100%',
+                                  }}
+                                  onClick={() => onTokenClick(t)}
+                                >
+                                  <AssetRow
+                                    animate
+                                    balance={Number(showAmount(t.all.confirmed, t.dec))}
+                                    showPointer={true}
+                                    icon={
+                                      t.icon
+                                        ? `${gorillaPoolService.getBaseUrl(network)}/content/${t.icon}`
+                                        : GENERIC_TOKEN_ICON
+                                    }
+                                    ticker={truncate(ordinalService.getTokenName(t), 10, 0)}
+                                    usdBalance={
+                                      (priceData.find((p) => p.id === t.id)?.satPrice ?? 0) *
+                                      (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
+                                      Number(showAmount(t.all.confirmed, t.dec))
+                                    }
+                                  />
+                                </div>
+                              )}
+                            </Draggable>
+                          ),
+                      )}
+                  </div>
+                  {provided.placeholder}
+                </>
+              </BSV20List>
+            )}
+          </Droppable>
+        </DragDropContext>
       </Show>
     </>
   );

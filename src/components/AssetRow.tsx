@@ -80,7 +80,7 @@ export const AssetRow = (props: AssetRowProps) => {
           <HeaderText style={{ fontSize: '1rem' }} theme={theme}>
             {ticker}
           </HeaderText>
-          <Text style={{ margin: '0', textAlign: 'left' }} theme={theme}>
+          <Text style={{ margin: '0', textAlign: 'left', color: theme.color.global.gray }} theme={theme}>
             {isLock ? 'Next unlock' : 'Balance'}
           </Text>
         </TickerTextWrapper>
@@ -92,7 +92,7 @@ export const AssetRow = (props: AssetRowProps) => {
             isDisplaySat ? 0 : 3,
           )}${isLock ? (isDisplaySat ? `${balance === 0.00000001 ? ' SAT' : ' SATS'}` : ' BSV') : ''}`}
         </HeaderText>
-        <Text style={{ textAlign: 'right', margin: '0' }} theme={theme}>
+        <Text style={{ textAlign: 'right', margin: '0', color: theme.color.global.gray }} theme={theme}>
           {isLock ? `Block ${nextUnlock}` : formatUSD(usdBalance)}
         </Text>
       </BalanceWrapper>

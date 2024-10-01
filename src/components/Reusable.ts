@@ -77,7 +77,7 @@ export const ButtonContainer = styled.div`
   align-items: center;
   justify-content: space-around;
   width: 90%;
-  margin: 1rem;
+  margin: 0.5rem;
 `;
 
 export const MainContent = styled.div`

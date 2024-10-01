@@ -86,20 +86,19 @@ export default Menu;
 
 export const BottomMenu = (props: BottomMenuProps) => {
   const { selected, handleSelect, theme } = props;
-  const services = theme.settings.services;
 
   return (
     <Container theme={theme}>
       <Menu
-        label="BSV"
+        label="Coins"
         theme={theme}
         icon={FaCoins}
         onClick={() => handleSelect('bsv')}
         opacity={selected === 'bsv' ? 1 : 0.6}
       />
-      <Show when={theme.settings.services.ordinals || theme.settings.services.bsv20}>
+      <Show when={theme.settings.services.ordinals}>
         <Menu
-          label={services.ordinals && services.bsv20 ? 'Ordinals' : services.ordinals ? 'NFTs' : 'Tokens'}
+          label={'Ordinals'}
           theme={theme}
           icon={FaList}
           onClick={() => handleSelect('ords')}

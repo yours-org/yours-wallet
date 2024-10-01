@@ -38,7 +38,7 @@ const FavoriteRow = styled.div<WhiteLabelTheme>`
   justify-content: space-between;
   align-items: center;
   width: 95%;
-  padding: 1rem;
+  padding: 0.25rem 1.25rem 0.25rem 0.25rem;
   border-bottom: 1px solid ${({ theme }) => theme.color.global.gray};
 `;
 
@@ -103,8 +103,6 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (!account) return;
     const key: keyof ChromeStorageObject = 'accounts';
-
-    // Update the chrome storage with the new favorite tokens
     const update: Partial<ChromeStorageObject['accounts']> = {
       [keysService.identityAddress]: {
         ...account,
@@ -142,31 +140,34 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
         onChange={(e) => setSearchQuery(e.target.value)}
       />
       {filteredTokens.length > 0 ? (
-        filteredTokens.map((b) => (
-          <FavoriteRow theme={theme} key={b.id}>
+        filteredTokens.map((t) => (
+          <FavoriteRow theme={theme} key={t.id}>
             <TickerWrapper>
-              <Show when={!!b.icon && b.icon.length > 0}>
+              <Show when={!!t.icon && t.icon.length > 0}>
                 <Icon
                   src={
-                    b.icon
-                      ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${b.icon}`
+                    t.icon
+                      ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${t.icon}`
                       : GENERIC_TOKEN_ICON
                   }
                 />
               </Show>
               <TickerTextWrapper>
                 <HeaderText style={{ fontSize: '1rem' }} theme={theme}>
-                  {ordinalService.getTokenName(b)}
+                  {ordinalService.getTokenName(t)}
                 </HeaderText>
-                <Text theme={theme} style={{ color: theme.color.global.gray, fontSize: '0.85rem' }}>
-                  {b?.id && truncate(b.id, 5, 5)}
+                <Text
+                  theme={theme}
+                  style={{ color: theme.color.global.gray, fontSize: '0.85rem', margin: 0, textAlign: 'left' }}
+                >
+                  {t?.id && truncate(t.id, 5, 5)}
                 </Text>
               </TickerTextWrapper>
             </TickerWrapper>
             <ToggleSwitch
-              on={(b?.id && favoriteTokens.includes(b.id)) || false}
+              on={(t?.id && favoriteTokens.includes(t.id)) || false}
               theme={theme}
-              onChange={() => b?.id && handleToggleFavorite(b.id)}
+              onChange={() => t?.id && handleToggleFavorite(t.id)}
             />
           </FavoriteRow>
         ))
