@@ -23,7 +23,7 @@ const Container = styled.div<WhiteLabelTheme>`
   background-color: ${({ theme }) => theme.color.global.walletBackground};
   z-index: 1000;
   position: absolute;
-  animation: ${slideIn} 1s;
+  animation: ${slideIn} 0.5s;
 `;
 
 const Title = styled.h1<WhiteLabelTheme>`

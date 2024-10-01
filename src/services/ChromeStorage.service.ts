@@ -3,7 +3,7 @@ declare const chrome: any;
 import { NetWork } from 'yours-wallet-provider';
 import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
-import { HOSTED_YOURS_IMAGE } from '../utils/constants';
+import { CHROME_STORAGE_OBJECT_VERSION, HOSTED_YOURS_IMAGE } from '../utils/constants';
 import { deepMerge } from './serviceHelpers';
 import { Account, ChromeStorageObject, CurrentAccountObject, DeprecatedStorage } from './types/chromeStorage.types';
 
@@ -120,7 +120,7 @@ export class ChromeStorageService {
       lastActiveTime,
       passKey,
       salt,
-      version: 1, // Version 1 is the first version of the new storage object and should be updated if it ever changes
+      version: CHROME_STORAGE_OBJECT_VERSION, // Version 1 is the first version of the new storage object and should be updated if it ever changes
       hasUpgradedToSPV: false,
     };
 
@@ -142,8 +142,6 @@ export class ChromeStorageService {
     this.storage = await this.get(null); // fetches all chrome storage by passing null
     if ((this.storage as DeprecatedStorage)?.appState?.addresses?.identityAddress && !this.storage.version) {
       this.storage = await this.mapDeprecatedStorageToNewInterface(this.storage as DeprecatedStorage);
-    } else {
-      this.storage = { ...this.storage, hasUpgradedToSPV: true };
     }
     return this.storage;
   };

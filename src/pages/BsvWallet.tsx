@@ -361,7 +361,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const handleSync = async () => {
     await refreshUtxos();
-    chromeStorageService.update({ hasUpgradedToSPV: true });
+    await chromeStorageService.update({ hasUpgradedToSPV: true });
     window.location.reload();
   };
 

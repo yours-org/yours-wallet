@@ -285,7 +285,7 @@ export const Settings = () => {
     sendMessage({
       action: YoursEventName.SIGNED_OUT,
     });
-    window.location.reload();
+    setTimeout(() => window.location.reload(), 100);
   };
 
   const handleCancel = () => {

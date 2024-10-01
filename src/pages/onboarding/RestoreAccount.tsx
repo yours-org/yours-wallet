@@ -167,7 +167,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
       if (!chromeObject?.accounts) throw new Error('No accounts found!');
       const objKeys = Object.keys(chromeObject.accounts);
       if (!objKeys) throw new Error('Object identity address not found');
-      await chromeStorageService.switchAccount(objKeys[0]);
+      await chromeStorageService.switchAccount(keys.identityAddress);
 
       if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
       setStep(4);

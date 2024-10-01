@@ -8,6 +8,7 @@ import {
   SWEEP_PATH,
   FEE_PER_KB,
   WOC_BASE_URL,
+  CHROME_STORAGE_OBJECT_VERSION,
 } from '../utils/constants';
 import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto';
 import { generateKeysFromTag, getKeys, getKeysFromWifs, Keys } from '../utils/keys';
@@ -45,7 +46,13 @@ export class KeysService {
     encryptedKeys: string,
     network: NetWork,
   ) => {
-    await this.chromeStorageService.update({ selectedAccount: keys.identityAddress, passKey, salt });
+    await this.chromeStorageService.update({
+      selectedAccount: keys.identityAddress,
+      passKey,
+      salt,
+      version: CHROME_STORAGE_OBJECT_VERSION,
+      hasUpgradedToSPV: true,
+    });
     const { account } = this.chromeStorageService.getCurrentAccountObject();
     const newAccount: Account = account ? account : DEFAULT_ACCOUNT;
     const totalAccounts = this.chromeStorageService.getAllAccounts().length;
