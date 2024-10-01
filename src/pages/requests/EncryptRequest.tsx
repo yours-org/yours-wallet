@@ -115,7 +115,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!request && !hasEncrypted}>
         <ConfirmContent>
-          <BackButton onClick={clearRequest} />
+          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Encrypt Message</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             {'The app is requesting to encrypt a message using your private key:'}

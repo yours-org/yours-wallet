@@ -115,7 +115,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!request}>
         <ConfirmContent>
-          <BackButton onClick={clearRequest} />
+          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Sign Message</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             {'The app is requesting a signature using derivation tag:'}

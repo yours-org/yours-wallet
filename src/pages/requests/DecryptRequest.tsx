@@ -108,7 +108,7 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!request && !hasDecrypted}>
         <ConfirmContent>
-          <BackButton onClick={clearRequest} />
+          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Decrypt Messages</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             {'The app is requesting to decrypt messages using your private key:'}

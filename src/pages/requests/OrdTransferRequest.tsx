@@ -104,7 +104,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
 
       <Show when={!isProcessing && !!request}>
         <ConfirmContent>
-          <BackButton onClick={clearRequest} />
+          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           {ordinal && (
             <Ordinal

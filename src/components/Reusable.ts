@@ -84,9 +84,9 @@ export const MainContent = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   width: 100%;
   height: calc(100% - 3.75rem);
+  overflow-y: auto;
 `;
 
 export const ReceiveContent = styled(MainContent)`

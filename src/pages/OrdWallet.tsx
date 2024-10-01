@@ -7,14 +7,7 @@ import { Input } from '../components/Input';
 import { Ordinal } from '../components/Ordinal';
 import { Ordinal as OrdType } from 'yours-wallet-provider';
 import { PageLoader } from '../components/PageLoader';
-import {
-  ButtonContainer,
-  ConfirmContent,
-  FormContainer,
-  HeaderText,
-  SubHeaderText,
-  Text,
-} from '../components/Reusable';
+import { ButtonContainer, ConfirmContent, FormContainer, HeaderText, Text } from '../components/Reusable';
 import { Show } from '../components/Show';
 import Tabs, { TabContent, TabsWrapper } from '../components/Tabs';
 import { useBottomMenu } from '../hooks/useBottomMenu';
@@ -26,11 +19,11 @@ import { isBSV20v2, normalize, showAmount } from '../utils/ordi';
 import { sleep } from '../utils/sleep';
 import { BSV20Id } from '../components/BSV20Id';
 import { TopNav } from '../components/TopNav';
-import { AssetRow } from '../components/AssetRow';
-import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
+import { formatNumberWithCommasAndDecimals } from '../utils/format';
 import { ListOrdinal, OrdOperationResponse } from '../services/types/ordinal.types';
 import { Bsv20, Ordinal as OrdinalType } from 'yours-wallet-provider';
 import { TokenType } from 'js-1sat-ord';
+import { Bsv20TokensList } from '../components/Bsv20TokensList';
 // import { isValidEmail } from '../utils/tools';
 
 const OrdinalsList = styled.div`
@@ -42,17 +35,6 @@ const OrdinalsList = styled.div`
   margin-top: 0.5rem;
   height: 25rem;
   padding-bottom: 8rem;
-`;
-
-const BSV20List = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  overflow-y: auto;
-  overflow-x: hidden;
-  width: 100%;
-  margin-top: 0.5rem;
-  height: calc(100% - 4rem);
 `;
 
 const NoInscriptionWrapper = styled.div`
@@ -131,7 +113,7 @@ export const OrdWallet = () => {
   const { theme } = useTheme();
   const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>('main');
-  const { chromeStorageService, ordinalService, gorillaPoolService, bsvService } = useServiceContext();
+  const { chromeStorageService, ordinalService, gorillaPoolService } = useServiceContext();
   const [isProcessing, setIsProcessing] = useState(false);
   const {
     transferOrdinal,
@@ -154,19 +136,9 @@ export const OrdWallet = () => {
   const { addSnackbar, message } = useSnackbar();
   const [token, setToken] = useState<Token | null>(null);
   const [tokenSendAmount, setTokenSendAmount] = useState<bigint | null>(null);
-  const [priceData, setPriceData] = useState<{ id: string; satPrice: number }[]>([]);
   const [ordinals, setOrdinals] = useState<OrdType[]>([]);
   const [bsv20s, setBsv20s] = useState<Bsv20[]>([]);
   const tokenType = token && (token.info.id || token.info.tick || '').length > 64 ? TokenType.BSV21 : TokenType.BSV20;
-
-  useEffect(() => {
-    if (!bsv20s.length) return;
-    (async () => {
-      const data = await gorillaPoolService.getTokenPriceInSats(bsv20s.map((d) => d?.id || ''));
-      setPriceData(data);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bsv20s]);
 
   useEffect(() => {
     setSelected('ords');
@@ -184,7 +156,6 @@ export const OrdWallet = () => {
   const loadBsv20s = async () => {
     if (!ordinalService) return;
     const bsv20s = await getBsv20s();
-    console.log({ bsv20s });
     setBsv20s(bsv20s);
   };
 
@@ -387,6 +358,18 @@ export const OrdWallet = () => {
     }
   };
 
+  const handleBsv20TokenClick = (token: Bsv20) => {
+    if (token.all.pending > 0n) {
+      addSnackbar('Pending tokens cannot be sent!', 'error', 2000);
+      return;
+    }
+    setToken({
+      isConfirmed: true,
+      info: token,
+    });
+    setPageState('sendBSV20');
+  };
+
   const transferAndListButtons = (
     <>
       <Button
@@ -418,104 +401,104 @@ export const OrdWallet = () => {
     </>
   );
 
-  const ft = (
-    <>
-      <Show
-        when={bsv20s.length > 0}
-        whenFalseContent={
-          <NoInscriptionWrapper>
-            <Text
-              theme={theme}
-              style={{
-                color: theme.color.global.gray,
-                fontSize: '1rem',
-                marginTop: '4rem',
-              }}
-            >
-              {theme.settings.services.bsv20
-                ? "You don't have any tokens"
-                : 'Wallet configuration does not support tokens!'}
-            </Text>
-          </NoInscriptionWrapper>
-        }
-      >
-        <BSV20List>
-          <BSV20Header>
-            <SubHeaderText style={{ marginLeft: '1rem', color: theme.color.global.gray }} theme={theme}>
-              Confirmed
-            </SubHeaderText>
-          </BSV20Header>
-          <div style={{ width: '100%' }}>
-            {bsv20s
-              .filter((d) => d.all.confirmed > 0n)
-              .map((b) => {
-                return (
-                  <div
-                    key={b.id}
-                    style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
-                    onClick={async () => {
-                      setToken({
-                        isConfirmed: true,
-                        info: b,
-                      });
-                      setPageState('sendBSV20');
-                    }}
-                  >
-                    <AssetRow
-                      animate
-                      balance={Number(showAmount(b.all.confirmed, b.dec))}
-                      showPointer={true}
-                      icon={b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : ''}
-                      ticker={truncate(getTokenName(b), 10, 0)}
-                      usdBalance={
-                        (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
-                        (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
-                        Number(showAmount(b.all.confirmed, b.dec))
-                      }
-                    />
-                  </div>
-                );
-              })}
-          </div>
+  // const ft = (
+  //   <>
+  //     <Show
+  //       when={bsv20s.length > 0}
+  //       whenFalseContent={
+  //         <NoInscriptionWrapper>
+  //           <Text
+  //             theme={theme}
+  //             style={{
+  //               color: theme.color.global.gray,
+  //               fontSize: '1rem',
+  //               marginTop: '4rem',
+  //             }}
+  //           >
+  //             {theme.settings.services.bsv20
+  //               ? "You don't have any tokens"
+  //               : 'Wallet configuration does not support tokens!'}
+  //           </Text>
+  //         </NoInscriptionWrapper>
+  //       }
+  //     >
+  //       <BSV20List>
+  //         <BSV20Header>
+  //           <SubHeaderText style={{ marginLeft: '1rem', color: theme.color.global.gray }} theme={theme}>
+  //             Confirmed
+  //           </SubHeaderText>
+  //         </BSV20Header>
+  //         <div style={{ width: '100%' }}>
+  //           {bsv20s
+  //             .filter((d) => d.all.confirmed > 0n)
+  //             .map((b) => {
+  //               return (
+  //                 <div
+  //                   key={b.id}
+  //                   style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
+  //                   onClick={async () => {
+  //                     setToken({
+  //                       isConfirmed: true,
+  //                       info: b,
+  //                     });
+  //                     setPageState('sendBSV20');
+  //                   }}
+  //                 >
+  //                   <AssetRow
+  //                     animate
+  //                     balance={Number(showAmount(b.all.confirmed, b.dec))}
+  //                     showPointer={true}
+  //                     icon={b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : ''}
+  //                     ticker={truncate(getTokenName(b), 10, 0)}
+  //                     usdBalance={
+  //                       (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
+  //                       (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
+  //                       Number(showAmount(b.all.confirmed, b.dec))
+  //                     }
+  //                   />
+  //                 </div>
+  //               );
+  //             })}
+  //         </div>
 
-          <Show when={bsv20s.filter((d) => d.all.pending > 0n).length > 0}>
-            <BSV20Header style={{ marginTop: '2rem' }}>
-              <SubHeaderText style={{ marginLeft: '1rem', color: theme.color.global.gray }} theme={theme}>
-                Pending
-              </SubHeaderText>
-            </BSV20Header>
-            <div style={{ width: '100%' }}>
-              {bsv20s
-                .filter((d) => d.all.pending > 0n)
-                .map((b) => {
-                  return (
-                    <div
-                      style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
-                      onClick={async () => {
-                        addSnackbar('Pending tokens cannot be sent!', 'error', 1000);
-                      }}
-                    >
-                      <AssetRow
-                        animate
-                        balance={Number(showAmount(b.all.pending, b.dec))}
-                        showPointer={true}
-                        icon={b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : ''}
-                        ticker={getTokenName(b)}
-                        usdBalance={
-                          (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
-                          (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
-                          Number(showAmount(b.all.confirmed, b.dec))
-                        }
-                      />
-                    </div>
-                  );
-                })}
-            </div>
-          </Show>
-        </BSV20List>
-      </Show>
-    </>
-  );
+  //         <Show when={bsv20s.filter((d) => d.all.pending > 0n).length > 0}>
+  //           <BSV20Header style={{ marginTop: '2rem' }}>
+  //             <SubHeaderText style={{ marginLeft: '1rem', color: theme.color.global.gray }} theme={theme}>
+  //               Pending
+  //             </SubHeaderText>
+  //           </BSV20Header>
+  //           <div style={{ width: '100%' }}>
+  //             {bsv20s
+  //               .filter((d) => d.all.pending > 0n)
+  //               .map((b) => {
+  //                 return (
+  //                   <div
+  //                     style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
+  //                     onClick={async () => {
+  //                       addSnackbar('Pending tokens cannot be sent!', 'error', 1000);
+  //                     }}
+  //                   >
+  //                     <AssetRow
+  //                       animate
+  //                       balance={Number(showAmount(b.all.pending, b.dec))}
+  //                       showPointer={true}
+  //                       icon={b.icon ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}` : ''}
+  //                       ticker={getTokenName(b)}
+  //                       usdBalance={
+  //                         (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
+  //                         (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
+  //                         Number(showAmount(b.all.confirmed, b.dec))
+  //                       }
+  //                     />
+  //                   </div>
+  //                 );
+  //               })}
+  //           </div>
+  //         </Show>
+  //       </BSV20List>
+  //     </Show>
+  //   </>
+  // );
 
   const transfer = (
     <ContentWrapper>
@@ -568,6 +551,7 @@ export const OrdWallet = () => {
   const cancel = (
     <ContentWrapper>
       <BackButton
+        theme={theme}
         onClick={() => {
           setPageState('main');
           resetSendState();
@@ -673,7 +657,9 @@ export const OrdWallet = () => {
         <TabsWrapper>
           <TabContent $addTopMargin>
             <Show when={theme.settings.services.ordinals}>{nft}</Show>
-            <Show when={theme.settings.services.bsv20}>{ft}</Show>
+            <Show when={theme.settings.services.bsv20}>
+              <Bsv20TokensList bsv20s={bsv20s} theme={theme} onTokenClick={handleBsv20TokenClick} />
+            </Show>
           </TabContent>
         </TabsWrapper>
       }
@@ -683,7 +669,7 @@ export const OrdWallet = () => {
           {nft}
         </Tabs.Panel>
         <Tabs.Panel theme={theme} label="Tokens">
-          {ft}
+          <Bsv20TokensList bsv20s={bsv20s} theme={theme} onTokenClick={handleBsv20TokenClick} />
         </Tabs.Panel>
       </Tabs>
     </Show>
@@ -790,6 +776,7 @@ export const OrdWallet = () => {
   const list = (
     <ContentWrapper>
       <BackButton
+        theme={theme}
         onClick={() => {
           setPageState('main');
           resetSendState();

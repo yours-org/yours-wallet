@@ -93,6 +93,7 @@ export class ChromeStorageService {
               displayName: socialProfile?.displayName ?? 'Anonymous',
               avatar: socialProfile?.avatar ?? HOSTED_YOURS_IMAGE,
             },
+            favoriteTokens: [],
           },
           addresses: {
             bsvAddress: appState.addresses.bsvAddress,

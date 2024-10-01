@@ -204,7 +204,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
 
       <Show when={!isProcessing && !!request}>
         <ConfirmContent>
-          <BackButton onClick={clearRequest} />
+          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <FormContainer noValidate onSubmit={(e) => handleCreateTaggedKeys(e)}>
             <Text theme={theme} style={{ margin: '1rem 0' }}>

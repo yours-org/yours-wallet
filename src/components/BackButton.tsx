@@ -1,20 +1,14 @@
-import styled from 'styled-components';
-import arrow from '../assets/left-arrow.svg';
-
-export const Image = styled.img`
-  width: 1.25rem;
-  height: 1.25rem;
-  position: absolute;
-  top: 1.5rem;
-  left: 1.5rem;
-  cursor: pointer;
-`;
+import { FaArrowLeft } from 'react-icons/fa';
+import { Theme } from '../theme.types';
 
 export type BackButtonProps = {
+  theme: Theme;
   onClick: () => void;
 };
 
 export const BackButton = (props: BackButtonProps) => {
-  const { onClick } = props;
-  return <Image src={arrow} onClick={onClick} />;
+  const { onClick, theme } = props;
+  return (
+    <FaArrowLeft size={'1rem'} style={{ cursor: 'pointer' }} color={theme.color.global.contrast} onClick={onClick} />
+  );
 };

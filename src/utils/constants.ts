@@ -89,6 +89,7 @@ export const DEFAULT_ACCOUNT = {
     whitelist: [],
     isPasswordRequired: true,
     socialProfile: { avatar: HOSTED_YOURS_IMAGE, displayName: 'Anonymous' },
+    favoriteTokens: [],
   },
   balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
   encryptedKeys: '',

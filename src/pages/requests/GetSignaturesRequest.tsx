@@ -178,7 +178,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!request && !!txData}>
         <Wrapper>
-          <BackButton onClick={clearRequest} />
+          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Sign Transaction</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             The app is requesting signatures for a transaction.

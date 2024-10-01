@@ -40,6 +40,11 @@ import { InWalletBsvResponse } from '../services/types/bsv.types';
 import { useQueueTracker } from '../hooks/useQueueTracker';
 import { isValidEmail } from '../utils/tools';
 import { UpgradeNotification } from '../components/UpgradeNotification';
+import { Bsv20 } from 'yours-wallet-provider';
+import { Bsv20TokensList } from '../components/Bsv20TokensList';
+import { FaListAlt } from 'react-icons/fa';
+import { ManageTokens } from '../components/ManageTokens';
+import { Account } from '../services/types/chromeStorage.types';
 
 const MiddleContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -95,6 +100,13 @@ const StyledCopy = styled.img`
   margin-right: 0.25rem;
 `;
 
+const ManageTokenListWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  margin-top: 1rem;
+  cursor: pointer;
+`;
+
 type PageState = 'main' | 'receive' | 'send';
 type AmountType = 'bsv' | 'usd';
 
@@ -120,7 +132,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [amountType, setAmountType] = useState<AmountType>('bsv');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService } = useServiceContext();
+  const { chromeStorageService, keysService, bsvService, ordinalService } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
@@ -134,12 +146,23 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [lockData, setLockData] = useState<LockData>();
   const [isSendAllBsv, setIsSendAllBsv] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [bsv20s, setBsv20s] = useState<Bsv20[]>([]);
+  const [manageFavorites, setManageFavorites] = useState(false);
+  const [account, setAccount] = useState<Account>();
+
+  const getAndSetAccountAndBsv20s = async () => {
+    const bsv20s = await ordinalService.getBsv20s();
+    setBsv20s(bsv20s);
+    setAccount(chromeStorageService.getCurrentAccountObject().account);
+  };
 
   useEffect(() => {
-    setTimeout(async () => {
+    (async () => {
       const obj = await chromeStorageService.getAndSetStorage();
       obj && !obj.hasUpgradedToSPV ? setShowUpgrade(true) : setShowUpgrade(false);
-    }, 500);
+      if (!ordinalService) return;
+      await getAndSetAccountAndBsv20s();
+    })();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -449,6 +472,20 @@ export const BsvWallet = (props: BsvWalletProps) => {
             />
           </Show>
         )}
+        {bsv20s.length > 0 && (
+          <Bsv20TokensList
+            hideStatusLabels
+            bsv20s={bsv20s.filter((t) => t.id && account?.settings?.favoriteTokens?.includes(t.id))}
+            theme={theme}
+            onTokenClick={() => null}
+          />
+        )}
+        <ManageTokenListWrapper onClick={() => setManageFavorites(!manageFavorites)}>
+          <FaListAlt size="1rem" color={theme.color.global.gray} />
+          <Text theme={theme} style={{ margin: '0 0 0 0.5rem', fontWeight: 700, color: theme.color.global.gray }}>
+            Manage Tokens
+          </Text>
+        </ManageTokenListWrapper>
       </MiddleContainer>
     </MainContent>
   );
@@ -546,7 +583,19 @@ export const BsvWallet = (props: BsvWalletProps) => {
   }
 
   return (
-    <>
+    <Show
+      when={!manageFavorites}
+      whenFalseContent={
+        <ManageTokens
+          onBack={() => {
+            setManageFavorites(false);
+            getAndSetAccountAndBsv20s();
+          }}
+          bsv20s={bsv20s}
+          theme={theme}
+        />
+      }
+    >
       <TopNav />
       <Show when={isProcessing && pageState === 'main'}>
         <PageLoader theme={theme} message="Loading wallet..." />
@@ -557,6 +606,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
       <Show when={!isProcessing && pageState === 'main'}>{main}</Show>
       <Show when={!isProcessing && pageState === 'receive'}>{receive}</Show>
       <Show when={!isProcessing && pageState === 'send'}>{send}</Show>
-    </>
+    </Show>
   );
 };

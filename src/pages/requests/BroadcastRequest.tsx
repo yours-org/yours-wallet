@@ -178,7 +178,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       </Show>
       <Show when={!isProcessing && !isLoading && !!request && !!txData}>
         <Wrapper>
-          <BackButton onClick={clearRequest} />
+          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Broadcast Raw Tx</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0', textAlign: 'center' }}>
             The app is requesting to broadcast a transaction.

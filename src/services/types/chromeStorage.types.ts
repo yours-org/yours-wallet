@@ -27,6 +27,7 @@ export type Settings = {
   whitelist: WhitelistedApp[];
   isPasswordRequired: boolean;
   socialProfile: SocialProfile;
+  favoriteTokens: string[];
 };
 
 export interface Account {

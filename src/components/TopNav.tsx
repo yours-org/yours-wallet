@@ -14,7 +14,7 @@ import { WhiteLabelTheme } from '../theme.types';
 import { useNavigate } from 'react-router-dom';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 
-const Container = styled.div`
+const Container = styled.div<WhiteLabelTheme>`
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -22,6 +22,7 @@ const Container = styled.div`
   width: 100%;
   top: 0;
   z-index: 10;
+  background-color: ${({ theme }) => theme.color.global.walletBackground};
 `;
 
 const LogoWrapper = styled.div`
@@ -167,7 +168,7 @@ export const TopNav = () => {
   }, [dropdownVisible]);
 
   return (
-    <Container>
+    <Container theme={theme}>
       <LogoWrapper>
         <Logo src={logo} />
         <Text style={{ margin: '0', marginLeft: '-0.25rem' }} theme={theme}>

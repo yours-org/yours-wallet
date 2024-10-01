@@ -131,7 +131,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
 
       <Show when={!isProcessing && !!request && !!inscription}>
         <ConfirmContent>
-          <BackButton onClick={clearRequest} />
+          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Purchase Request</HeaderText>
           <Ordinal
             inscription={inscription as OrdinalType}
