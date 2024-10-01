@@ -602,9 +602,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
   }
 
   return (
-    <Show
-      when={!manageFavorites}
-      whenFalseContent={
+    <>
+      <Show when={manageFavorites}>
         <ManageTokens
           onBack={() => {
             setManageFavorites(false);
@@ -613,8 +612,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           bsv20s={bsv20s}
           theme={theme}
         />
-      }
-    >
+      </Show>
       <TopNav />
       <Show when={isProcessing && pageState === 'main'}>
         <PageLoader theme={theme} message="Loading wallet..." />
@@ -625,6 +623,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
       <Show when={!isProcessing && pageState === 'main'}>{main}</Show>
       <Show when={!isProcessing && pageState === 'receive'}>{receive}</Show>
       <Show when={!isProcessing && pageState === 'send'}>{send}</Show>
-    </Show>
+    </>
   );
 };

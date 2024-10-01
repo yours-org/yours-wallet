@@ -6,10 +6,9 @@ import { truncate } from '../utils/format';
 import { useEffect, useState } from 'react';
 import { ToggleSwitch } from './ToggleSwitch';
 import { HeaderText, Text } from './Reusable';
-import { Show } from './Show';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
-import { BackButton } from './BackButton';
 import { GENERIC_TOKEN_ICON } from '../utils/constants';
+import { FaTimes } from 'react-icons/fa';
 
 const slideIn = keyframes`
   from {
@@ -20,7 +19,16 @@ const slideIn = keyframes`
   }
 `;
 
-const Container = styled.div<WhiteLabelTheme>`
+const slideOut = keyframes`
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+`;
+
+const Container = styled.div<{ isSlidingOut: boolean } & WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -30,7 +38,7 @@ const Container = styled.div<WhiteLabelTheme>`
   background-color: ${({ theme }) => theme.color.global.walletBackground};
   z-index: 1000;
   position: absolute;
-  animation: ${slideIn} 1s;
+  animation: ${({ isSlidingOut }) => (isSlidingOut ? slideOut : slideIn)} 1s forwards;
 `;
 
 const FavoriteRow = styled.div<WhiteLabelTheme>`
@@ -38,8 +46,8 @@ const FavoriteRow = styled.div<WhiteLabelTheme>`
   justify-content: space-between;
   align-items: center;
   width: 95%;
-  padding: 0.25rem 1.25rem 0.25rem 0.25rem;
-  border-bottom: 1px solid ${({ theme }) => theme.color.global.gray};
+  padding: 0.35rem 1.25rem 0.35rem 0.25rem;
+  border-bottom: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
 `;
 
 const Icon = styled.img`
@@ -73,7 +81,7 @@ const SearchInput = styled.input<WhiteLabelTheme>`
   margin: 1rem 0;
   border: 1px solid ${({ theme }) => theme.color.global.gray};
   border-radius: 0.5rem;
-  font-size: 1rem;
+  font-size: 0.85rem;
   color: ${({ theme }) => theme.color.global.contrast};
   background-color: ${({ theme }) => theme.color.global.neutral};
 `;
@@ -87,8 +95,9 @@ export type Bsv20TokensListProps = {
 export const ManageTokens = (props: Bsv20TokensListProps) => {
   const { bsv20s, theme, onBack } = props;
   const { ordinalService, chromeStorageService, keysService, gorillaPoolService } = useServiceContext();
-  const [favoriteTokens, setFavoriteTokens] = useState<string[]>([]); // Manage favorite states
-  const [searchQuery, setSearchQuery] = useState(''); // State to store the search query
+  const [favoriteTokens, setFavoriteTokens] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSlidingOut, setIsSlidingOut] = useState(false);
 
   useEffect(() => {
     const { account } = chromeStorageService.getCurrentAccountObject();
@@ -117,7 +126,11 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
     await chromeStorageService.updateNested(key, update);
   };
 
-  // Filter the tokens based on the search query (either by token name or ID)
+  const handleBackClick = () => {
+    setIsSlidingOut(true);
+    setTimeout(onBack, 1000);
+  };
+
   const filteredTokens = bsv20s.filter(
     (b) =>
       ordinalService.getTokenName(b).toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -125,9 +138,9 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
   );
 
   return (
-    <Container theme={theme}>
+    <Container theme={theme} isSlidingOut={isSlidingOut}>
       <BackWrapper>
-        <BackButton theme={theme} onClick={onBack} />
+        <FaTimes size={'1.5rem'} color={theme.color.global.contrast} cursor="pointer" onClick={handleBackClick} />
       </BackWrapper>
       <Text style={{ marginTop: '3rem', fontSize: '1.25rem', fontWeight: 700 }} theme={theme}>
         Manage Token List
@@ -143,22 +156,20 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
         filteredTokens.map((t) => (
           <FavoriteRow theme={theme} key={t.id}>
             <TickerWrapper>
-              <Show when={!!t.icon && t.icon.length > 0}>
-                <Icon
-                  src={
-                    t.icon
-                      ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${t.icon}`
-                      : GENERIC_TOKEN_ICON
-                  }
-                />
-              </Show>
+              <Icon
+                src={
+                  t.icon
+                    ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${t.icon}`
+                    : GENERIC_TOKEN_ICON
+                }
+              />
               <TickerTextWrapper>
-                <HeaderText style={{ fontSize: '1rem' }} theme={theme}>
+                <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
                   {ordinalService.getTokenName(t)}
                 </HeaderText>
                 <Text
                   theme={theme}
-                  style={{ color: theme.color.global.gray, fontSize: '0.85rem', margin: 0, textAlign: 'left' }}
+                  style={{ color: theme.color.global.gray, fontSize: '0.75rem', margin: 0, textAlign: 'left' }}
                 >
                   {t?.id && truncate(t.id, 5, 5)}
                 </Text>
