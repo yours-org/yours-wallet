@@ -115,7 +115,9 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
 
   return (
     <Container>
-      <SectionHeader theme={theme}>Inputs</SectionHeader>
+      <SectionHeader theme={theme} style={{ marginTop: '0.5rem' }}>
+        Inputs
+      </SectionHeader>
       {mappedInputs.map((input: Ordinal, index: number) => (
         <Row $toSign={!!inputsToSign?.includes(index)} key={index} theme={theme}>
           <IndexOwnerWrapper>
