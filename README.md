@@ -6,9 +6,9 @@ Version: v3.3.0
 
 <a href="https://chromewebstore.google.com/detail/yours-wallet/mlbnicldlpdimbjdcncnklfempedeipj" target="_blank">🌱 Download Chrome Extension 🌱</a>
 
-# Yours Wallet | Non-Custodial Web3 Wallet For BSV
+# Yours Wallet | Non-Custodial Web3 SPV Wallet For BSV
 
-Yours Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV) and [1Sat Ordinals](https://docs.1satordinals.com/). This wallet allows users to have full control over their funds, providing security and independence in managing their assets.
+Yours Wallet is an open-source and non-custodial web3 SPV wallet for Bitcoin SV (BSV) and [1Sat Ordinals](https://docs.1satordinals.com/). This wallet allows users to have full control over their funds, providing security and independence in managing their assets.
 
 ## Features
 
