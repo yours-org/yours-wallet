@@ -53,7 +53,7 @@ const MiddleContainer = styled.div<WhiteLabelTheme>`
   justify-content: center;
   flex-direction: column;
   width: 100%;
-  padding: 2.5rem 1rem 2.75rem 1rem;
+  padding: 3.5rem 1rem 2.75rem 1rem;
 `;
 
 const ProfileImage = styled.img`
