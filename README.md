@@ -4,17 +4,16 @@
 
 Version: v3.3.0
 
-<a href="https://chrome.google.com/webstore/detail/panda-wallet/mlbnicldlpdimbjdcncnklfempedeipj" target="_blank">🌱 Download Chrome Extension 🌱</a>
+<a href="https://chromewebstore.google.com/detail/yours-wallet/mlbnicldlpdimbjdcncnklfempedeipj" target="_blank">🌱 Download Chrome Extension 🌱</a>
 
 # Yours Wallet | Non-Custodial Web3 Wallet For BSV
-
-## IMPORTANT NOTICE: Panda is in the process of rebranding to Yours Wallet. The wallet will automatically be updated but namespace changes to the repo will take some time!
 
 Yours Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV) and [1Sat Ordinals](https://docs.1satordinals.com/). This wallet allows users to have full control over their funds, providing security and independence in managing their assets.
 
 ## Features
 
 - 🔑 **Non-Custodial:** Your private keys are encrypted and stored locally on your device, ensuring complete control over your funds.
+- 🙌 **Multi-Account:** Use one wallet to manage all of your different accounts/keys.
 - 😎 **User-Friendly:** A user-friendly interface makes asset management a breeze.
 - ✅ **BSV Support:** Receive and Send BSV payments.
 - 🟡 **1Sat Ordinals:** Full support for sending and transferring 1Sat Ordinals.
@@ -26,7 +25,7 @@ Yours Wallet is an open-source and non-custodial web3 wallet for Bitcoin SV (BSV
 
 Documentation on integrating Yours Wallet into your decentralized web3 application can be [found here](https://panda-wallet.gitbook.io/provider-api/).
 
-You can also check out the live sample app: https://panda-wallet-sample-app.vercel.app/
+You can also check out the live sample app: [View Sample App](https://panda-wallet-sample-app.vercel.app/)
 
 #### Contributing 🙌
 
