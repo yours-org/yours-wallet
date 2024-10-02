@@ -191,7 +191,44 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
                           ),
                       )}
                   </div>
-                  {provided.placeholder}
+                  <Show when={bsv20s.filter((d) => d.all.pending > 0n).length > 0}>
+                    <Show when={!hideStatusLabels}>
+                      <BSV20Header style={{ marginTop: '2rem' }}>
+                        <SubHeaderText style={{ marginLeft: '1rem', color: theme.color.global.gray }} theme={theme}>
+                          Pending
+                        </SubHeaderText>
+                      </BSV20Header>
+                    </Show>
+                    <div style={{ width: '100%' }}>
+                      {bsv20s
+                        .filter((d) => d.all.pending > 0n)
+                        .map((b) => {
+                          return (
+                            <div
+                              style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
+                              onClick={() => onTokenClick(b)}
+                            >
+                              <AssetRow
+                                animate
+                                balance={Number(showAmount(b.all.pending, b.dec))}
+                                showPointer={true}
+                                icon={
+                                  b.icon
+                                    ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}`
+                                    : GENERIC_TOKEN_ICON
+                                }
+                                ticker={ordinalService.getTokenName(b)}
+                                usdBalance={
+                                  (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
+                                  (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
+                                  Number(showAmount(b.all.confirmed, b.dec))
+                                }
+                              />
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </Show>
                 </>
               </BSV20List>
             )}

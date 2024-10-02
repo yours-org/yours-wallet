@@ -28,7 +28,7 @@ const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
   width: 85%;
   height: 2rem;
   padding-left: 0.5rem;
-  margin: 0.5rem;
+  margin: 0.25rem;
   outline: none;
   text-indent: 0.5rem;
   color: ${({ theme }) =>

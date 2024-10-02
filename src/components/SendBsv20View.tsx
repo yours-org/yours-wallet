@@ -35,7 +35,7 @@ const TokenIcon = styled.img`
 const Balance = styled(Text)`
   font-size: 0.85rem;
   white-space: pre-wrap;
-  margin: 0;
+  margin: 0.5rem 0 0 0;
   width: fit-content;
   cursor: pointer;
   text-align: center;
