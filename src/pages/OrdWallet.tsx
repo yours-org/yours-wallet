@@ -64,6 +64,16 @@ export const BSV20Header = styled.div`
   margin-left: 1rem;
 `;
 
+const SectionHeader = styled.h2<WhiteLabelTheme>`
+  width: 100%;
+  text-align: left;
+  padding-left: 1rem;
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: ${({ theme }) => theme.color.global.gray};
+`;
+
 type PageState = 'main' | 'transfer' | 'list' | 'cancel';
 
 export const OrdWallet = () => {
@@ -83,6 +93,9 @@ export const OrdWallet = () => {
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const [ordinals, setOrdinals] = useState<OrdType[]>([]);
+
+  const listedOrdinals = ordinals.filter((o) => o?.data?.list);
+  const myOrdinals = ordinals.filter((o) => !o?.data?.list);
 
   useEffect(() => {
     setSelected('ords');
@@ -313,13 +326,6 @@ export const OrdWallet = () => {
 
   const cancel = (
     <ContentWrapper>
-      <BackButton
-        theme={theme}
-        onClick={() => {
-          setPageState('main');
-          resetSendState();
-        }}
-      />
       <ConfirmContent>
         <HeaderText style={{ fontSize: '1.35rem' }} theme={theme}>
           {'Cancel Listing'}
@@ -343,10 +349,38 @@ export const OrdWallet = () => {
             />
           </Show>
           <Button theme={theme} type="primary" label="Cancel Now" disabled={isProcessing} isSubmit />
+          <Button
+            theme={theme}
+            type="secondary"
+            label="Go Back"
+            onClick={() => {
+              setPageState('main');
+              resetSendState();
+            }}
+            disabled={isProcessing}
+          />
         </FormContainer>
       </ConfirmContent>
     </ContentWrapper>
   );
+
+  const renderOrdinals = (list: OrdType[]) => {
+    return list
+      .filter((l) => l.origin?.data?.insc?.file?.type !== 'application/bsv-20')
+      .map((ord) => (
+        <Ordinal
+          theme={theme}
+          inscription={ord}
+          key={ord.origin?.outpoint}
+          url={`${gorillaPoolService.getBaseUrl(network)}/content/${ord.origin?.outpoint}`}
+          selected={selectedOrdinal?.origin?.outpoint === ord.origin?.outpoint}
+          onClick={() => {
+            setSelectedOrdinal(ord);
+            setOrdinalOutpoint(ord.outpoint);
+          }}
+        />
+      ));
+  };
 
   const nft = (
     <>
@@ -369,23 +403,10 @@ export const OrdWallet = () => {
         }
       >
         <OrdinalsList>
-          {ordinals
-            .filter((o) => o.origin?.data?.insc?.file.type !== 'application/bsv-20')
-            .map((ord) => {
-              return (
-                <Ordinal
-                  theme={theme}
-                  inscription={ord}
-                  key={ord.origin?.outpoint}
-                  url={`${gorillaPoolService.getBaseUrl(network)}/content/${ord.origin?.outpoint}`}
-                  selected={selectedOrdinal?.origin?.outpoint === ord.origin?.outpoint}
-                  onClick={() => {
-                    setSelectedOrdinal(ord);
-                    setOrdinalOutpoint(ord.outpoint);
-                  }}
-                />
-              );
-            })}
+          <SectionHeader theme={theme}>Listings</SectionHeader>
+          {renderOrdinals(listedOrdinals)}
+          <SectionHeader theme={theme}>My Ordinals</SectionHeader>
+          {renderOrdinals(myOrdinals)}
         </OrdinalsList>
       </Show>
       <OrdButtonContainer theme={theme} $blur={!!selectedOrdinal}>
@@ -416,13 +437,6 @@ export const OrdWallet = () => {
 
   const list = (
     <ContentWrapper>
-      <BackButton
-        theme={theme}
-        onClick={() => {
-          setPageState('main');
-          resetSendState();
-        }}
-      />
       <ConfirmContent>
         <HeaderText style={{ fontSize: '1.35rem' }} theme={theme}>{`List ${
           selectedOrdinal?.origin?.data?.map?.name ??
@@ -475,7 +489,7 @@ export const OrdWallet = () => {
             onClick={() => {
               setPageState('main');
               setBsvListAmount(null);
-              setBsvListAmount(null);
+              resetSendState();
             }}
           />
         </FormContainer>

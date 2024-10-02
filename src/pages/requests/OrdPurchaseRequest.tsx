@@ -1,7 +1,6 @@
 import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
 import { Ordinal as OrdinalType, PurchaseOrdinal } from 'yours-wallet-provider';
-import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
@@ -14,6 +13,7 @@ import { useServiceContext } from '../../hooks/useServiceContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { BSV_DECIMAL_CONVERSION, GLOBAL_ORDERBOOK_MARKET_RATE, YOURS_DEV_WALLET } from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
 
 export type OrdPurchaseRequestProps = {
   request: PurchaseOrdinal & { password?: string };
@@ -24,6 +24,7 @@ export type OrdPurchaseRequestProps = {
 export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
+  const { hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
   const { gorillaPoolService, ordinalService, chromeStorageService } = useServiceContext();
@@ -34,6 +35,11 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   const outpoint = request.outpoint;
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const network = chromeStorageService.getNetwork();
+
+  useEffect(() => {
+    hideMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!request.outpoint) return;
@@ -110,7 +116,6 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
 
       <Show when={!isProcessing && !!request && !!inscription}>
         <ConfirmContent>
-          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Purchase Request</HeaderText>
           <Ordinal
             inscription={inscription as OrdinalType}
@@ -141,6 +146,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
               disabled={isProcessing}
               isSubmit
             />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </ConfirmContent>
       </Show>

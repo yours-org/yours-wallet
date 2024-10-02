@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Broadcast } from 'yours-wallet-provider';
-import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -172,7 +171,6 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       </Show>
       <Show when={!isProcessing && !isLoading && !!request && !!txData}>
         <Wrapper>
-          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Broadcast Raw Tx</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0', textAlign: 'center' }}>
             The app is requesting to broadcast a transaction.
@@ -195,6 +193,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
               disabled={isProcessing}
               isSubmit
             />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </Wrapper>
       </Show>

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { EncryptRequest as EncryptRequestType } from 'yours-wallet-provider';
-import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -30,7 +29,7 @@ export type EncryptRequestProps = {
 export const EncryptRequest = (props: EncryptRequestProps) => {
   const { request, onEncrypt, popupId } = props;
   const { theme } = useTheme();
-  const { setSelected } = useBottomMenu();
+  const { setSelected, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [encryptedMessages, setEncryptedMessages] = useState<string[] | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
@@ -47,6 +46,8 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
 
   useEffect(() => {
     setSelected('bsv');
+    hideMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setSelected]);
 
   useEffect(() => {
@@ -116,7 +117,6 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!request && !hasEncrypted}>
         <ConfirmContent>
-          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Encrypt Message</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             {'The app is requesting to encrypt a message using your private key:'}
@@ -138,6 +138,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
               />
             </Show>
             <Button theme={theme} type="primary" label="Encrypt Message" disabled={isProcessing} isSubmit />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </ConfirmContent>
       </Show>

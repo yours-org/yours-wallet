@@ -24,6 +24,7 @@ import { RestoreAccount } from './onboarding/RestoreAccount';
 import { ImportAccount } from './onboarding/ImportAccount';
 import { AccountRow } from '../components/AccountRow';
 import { MasterBackupProgressEvent, streamDataToZip } from '../utils/masterExporter';
+import { useSnackbar } from '../hooks/useSnackbar';
 
 const Content = styled.div`
   display: flex;
@@ -113,10 +114,11 @@ export type SettingsPage =
   | 'export-keys-options'
   | 'export-keys-qr'
   | 'preferences';
-type DecisionType = 'sign-out' | 'export-master-backup' | 'export-keys' | 'export-keys-qr-code';
+type DecisionType = 'sign-out' | 'export-master-backup' | 'export-keys' | 'export-keys-qr-code' | 'delete-account';
 
 export const Settings = () => {
   const { theme } = useTheme();
+  const { addSnackbar } = useSnackbar();
   const { setSelected, query, handleSelect } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { chromeStorageService, keysService, lockWallet, oneSatSPV } = useServiceContext();
@@ -174,6 +176,12 @@ export const Settings = () => {
     setConnectedApps(newList);
   };
 
+  const handleDeleteAccountIntent = () => {
+    setDecisionType('delete-account');
+    setSpeedBumpMessage('Are you sure you want to delete this account? All keys and data will be lost.');
+    setShowSpeedBump(true);
+  };
+
   const handleSignOutIntent = () => {
     setDecisionType('sign-out');
     setSpeedBumpMessage('Make sure you have your seed phrase backed up!');
@@ -224,6 +232,21 @@ export const Settings = () => {
       },
     };
     await chromeStorageService.updateNested(key, update);
+    setPage('main');
+  };
+
+  const handleDeleteAccount = async () => {
+    let accounts = chromeStorageService.getAllAccounts();
+    if (accounts.length === 1) {
+      addSnackbar('You cannot delete your only account', 'error');
+      return;
+    }
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) return;
+    const key: keyof ChromeStorageObject = 'accounts';
+    await chromeStorageService.removeNested(key, account.addresses.identityAddress);
+    accounts = chromeStorageService.getAllAccounts();
+    await chromeStorageService.switchAccount(accounts[0].addresses.identityAddress);
     setPage('main');
   };
 
@@ -299,6 +322,12 @@ export const Settings = () => {
   const handleSpeedBumpConfirm = async (password?: string) => {
     if (decisionType === 'sign-out') {
       signOut();
+    }
+
+    if (decisionType === 'delete-account') {
+      await handleDeleteAccount();
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
     }
 
     if (decisionType === 'export-master-backup') {
@@ -675,6 +704,7 @@ export const Settings = () => {
           style={{ marginTop: '1rem' }}
           onClick={handleAccountEditSave}
         />
+        <Button theme={theme} type="warn" label="Delete" onClick={handleDeleteAccountIntent} />
         <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('account-list')} />
       </PageWrapper>
     </>

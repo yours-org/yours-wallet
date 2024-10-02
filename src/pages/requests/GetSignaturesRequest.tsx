@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
-import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -178,7 +177,6 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!request && !!txData}>
         <Wrapper>
-          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Sign Transaction</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             The app is requesting signatures for a transaction.
@@ -208,6 +206,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
               onClick={rejectSigning}
               style={{ marginTop: '0' }}
             />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </Wrapper>
       </Show>

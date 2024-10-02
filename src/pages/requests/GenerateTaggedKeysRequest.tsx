@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { DerivationTag, NetWork, TaggedDerivationRequest } from 'yours-wallet-provider';
-import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -19,6 +18,7 @@ import { OrdP2PKH } from 'js-1sat-ord';
 import { convertAddressToMainnet, convertAddressToTestnet } from '../../utils/tools';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 import { setDerivationTags } from '../../services/serviceHelpers';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
 
 export type GenerateTaggedKeysRequestProps = {
   request: TaggedDerivationRequest & { domain?: string };
@@ -35,6 +35,7 @@ export type InternalTaggedDerivationResponse = {
 
 export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps) => {
   const { request, popupId, onResponse } = props;
+  const { hideMenu } = useBottomMenu();
   const { theme } = useTheme();
   const [isProcessing, setIsProcessing] = useState(false);
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -42,6 +43,11 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
   const { addSnackbar, message } = useSnackbar();
   const { chromeStorageService, keysService, bsvService, oneSatSPV } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
+
+  useEffect(() => {
+    hideMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!successTxId) return;
@@ -205,7 +211,6 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
 
       <Show when={!isProcessing && !!request}>
         <ConfirmContent>
-          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <FormContainer noValidate onSubmit={(e) => handleCreateTaggedKeys(e)}>
             <Text theme={theme} style={{ margin: '1rem 0' }}>
@@ -224,6 +229,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
               />
             </Show>
             <Button theme={theme} type="primary" label="Approve" disabled={isProcessing} isSubmit />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </ConfirmContent>
       </Show>

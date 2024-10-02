@@ -107,7 +107,7 @@ export class BsvService {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid),
+          sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid, true),
           sourceOutputIndex: u.outpoint.vout,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(pk),
@@ -247,7 +247,7 @@ export class BsvService {
       for await (const u of fundResults.txos || []) {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
-        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
+        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid, true);
         if (!sourceTransaction) {
           console.log(`Could not find source transaction ${u.outpoint.txid}`);
           return { error: 'source-tx-not-found' };
@@ -419,7 +419,7 @@ export class BsvService {
       const pk = pkMap.get(u.owner || '');
       if (!pk) continue;
       tx.addInput({
-        sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid),
+        sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid, true),
         sourceOutputIndex: u.outpoint.vout,
         sequence: 0xffffffff,
         unlockingScriptTemplate: new P2PKH().unlock(pk),

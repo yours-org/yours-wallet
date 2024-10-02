@@ -38,7 +38,9 @@ export class OrdinalService {
     const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 0);
     const mapped = ordinals.txos
       .filter(
-        (o) => o.data.origin.data.insc.file.type !== 'panda/tag' && o.data.origin.data.insc.file.type !== 'yours/tag',
+        (o) =>
+          o.data?.origin?.data?.insc?.file?.type !== 'panda/tag' &&
+          o.data?.origin?.data?.insc?.file?.type !== 'yours/tag',
       )
       .map(mapOrdinal);
     return mapped;
@@ -85,7 +87,7 @@ export class OrdinalService {
       if (!u) return { error: 'no-ordinal' };
       const pk = pkMap.get(u.owner || '');
       if (!pk) return { error: 'no-keys' };
-      const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
+      const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid, true);
       if (!sourceTransaction) {
         console.log(`Could not find source transaction ${u.outpoint.txid}`);
         return { error: 'source-tx-not-found' };
@@ -123,7 +125,7 @@ export class OrdinalService {
       for await (const u of fundResults.txos || []) {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
-        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
+        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid, true);
         if (!sourceTransaction) {
           console.log(`Could not find source transaction ${u.outpoint.txid}`);
           return { error: 'source-tx-not-found' };

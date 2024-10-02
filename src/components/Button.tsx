@@ -32,7 +32,7 @@ const Primary = styled.button<WhiteLabelTheme>`
   &:disabled {
     cursor: not-allowed;
     opacity: 0.6;
-    background-color: ${({ theme }) => theme.color.component.primaryButtonRightGradient + '40'};
+    background: ${({ theme }) => theme.color.component.primaryButtonRightGradient + '40'};
   }
 
   &:hover {
@@ -71,7 +71,7 @@ const SecondaryOutline = styled(Primary)<{ $isOutline?: boolean }>`
 
   &:disabled {
     opacity: 1;
-    background-color: ${({ theme }) => theme.color.global.walletBackground};
+    background: ${({ theme }) => theme.color.global.walletBackground};
   }
 
   &:hover {
@@ -83,12 +83,12 @@ const Secondary = styled(SecondaryOutline)`
   margin: 0.5rem 0 0 0;
 `;
 
-const Warn = styled(Primary)`
-  background-color: ${({ theme }) => theme.color.component.warningButton};
+const Warn = styled(Primary)<WhiteLabelTheme>`
+  background: ${({ theme }) => theme.color.component.warningButton};
   color: ${({ theme }) => theme.color.component.warningButtonText};
 
   &:disabled {
-    background-color: ${({ theme }) => theme.color.component.warningButton + '40'};
+    background: ${({ theme }) => theme.color.component.warningButton + '40'};
   }
 `;
 

@@ -1,7 +1,6 @@
 import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
 import { TransferOrdinal } from 'yours-wallet-provider';
-import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
@@ -15,6 +14,7 @@ import { useServiceContext } from '../../hooks/useServiceContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
 
 export type OrdTransferRequestProps = {
   request: TransferOrdinal;
@@ -25,6 +25,7 @@ export type OrdTransferRequestProps = {
 export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
+  const { hideMenu } = useBottomMenu();
   const [isProcessing, setIsProcessing] = useState(false);
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
@@ -32,6 +33,11 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const network = chromeStorageService.getNetwork();
   const [ordinal, setOrdinal] = useState<OrdType | undefined>();
+
+  useEffect(() => {
+    hideMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!ordinalService || !request?.outpoint) return;
@@ -98,7 +104,6 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
 
       <Show when={!isProcessing && !!request}>
         <ConfirmContent>
-          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           {ordinal && (
             <Ordinal
@@ -126,6 +131,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
               Double check details before sending.
             </Text>
             <Button theme={theme} type="primary" label="Approve" disabled={isProcessing} isSubmit />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </ConfirmContent>
       </Show>

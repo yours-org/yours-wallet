@@ -138,7 +138,7 @@ export class KeysService {
       const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
       for await (const u of utxos || []) {
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash),
+          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash, true),
           sourceOutputIndex: u.tx_pos,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(sweepWallet.privKey),

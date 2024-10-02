@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { SignedMessage, SignMessage } from 'yours-wallet-provider';
-import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -40,7 +39,7 @@ export type SignMessageRequestProps = {
 export const SignMessageRequest = (props: SignMessageRequestProps) => {
   const { request, onSignature, popupId } = props;
   const { theme } = useTheme();
-  const { setSelected } = useBottomMenu();
+  const { setSelected, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [signature, setSignature] = useState<string | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
@@ -50,6 +49,8 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
 
   useEffect(() => {
     setSelected('bsv');
+    hideMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setSelected]);
 
   const resetSendState = () => {
@@ -115,7 +116,6 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!request}>
         <ConfirmContent>
-          <BackButton theme={theme} onClick={clearRequest} />
           <HeaderText theme={theme}>Sign Message</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             {'The app is requesting a signature using derivation tag:'}
@@ -156,6 +156,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
               />
             </Show>
             <Button theme={theme} type="primary" label="Sign Message" disabled={isProcessing} isSubmit />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </ConfirmContent>
       </Show>

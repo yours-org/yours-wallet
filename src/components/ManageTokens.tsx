@@ -135,11 +135,18 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
     setTimeout(onBack, 1000);
   };
 
-  const filteredTokens = bsv20s.filter(
-    (b) =>
-      ordinalService.getTokenName(b).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (b?.id && b.id.toLowerCase().includes(searchQuery.toLowerCase())),
-  );
+  const filteredTokens = bsv20s
+    .filter(
+      (b) =>
+        ordinalService.getTokenName(b).toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (b?.id && b.id.toLowerCase().includes(searchQuery.toLowerCase())),
+    )
+    // Sort by favorite status
+    .sort((a, b) => {
+      if (a?.id && favoriteTokens.includes(a.id) && b?.id && !favoriteTokens.includes(b.id)) return -1;
+      if (b?.id && favoriteTokens.includes(b?.id) && a?.id && !favoriteTokens.includes(a.id)) return 1;
+      return 0;
+    });
 
   return (
     <Container theme={theme} isSlidingOut={isSlidingOut}>

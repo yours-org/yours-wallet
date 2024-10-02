@@ -163,6 +163,19 @@ export class ChromeStorageService {
     }
   };
 
+  removeNested = async <K extends keyof ChromeStorageObject>(key: K, nestedKey: string): Promise<void> => {
+    try {
+      const result = await this.get([key]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const existingObject = (result[key] ?? {}) as Record<string, any>;
+      delete existingObject[nestedKey];
+      const data: Partial<ChromeStorageObject> = { [key]: existingObject as ChromeStorageObject[K] };
+      await this.set(data);
+    } catch (error) {
+      throw new Error(`Failed to remove nested object value: ${error}`);
+    }
+  };
+
   update = async (obj: Partial<ChromeStorageObject>): Promise<void> => {
     try {
       const result = await this.get(null); // Get all storage
