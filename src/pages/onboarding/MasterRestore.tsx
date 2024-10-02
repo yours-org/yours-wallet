@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import styled from 'styled-components';
 import { Button } from '../../components/Button';
 import { PageLoader } from '../../components/PageLoader';
-import { HeaderText, Text, StyledImage } from '../../components/Reusable';
+import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
@@ -10,7 +10,6 @@ import { useServiceContext } from '../../hooks/useServiceContext';
 import { restoreMasterFromZip } from '../../utils/masterImporter';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useNavigate } from 'react-router-dom';
-import yoursIcon from '../../assets/logos/icon.png';
 import { YoursIcon } from '../../components/YoursIcon';
 
 const Content = styled.div`

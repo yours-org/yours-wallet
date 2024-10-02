@@ -21,9 +21,11 @@ export function mapOrdinal(t: Txo): Ordinal {
             ...t.data.origin.data.insc.file,
             text:
               t.data.origin?.data?.insc?.file?.type.startsWith('text') &&
+              t.data.origin.data.insc?.file?.content &&
               Utils.toUTF8(t.data.origin.data.insc.file.content),
             json:
               t.data.origin?.data?.insc?.file?.type.startsWith('application/json') &&
+              t.data.origin?.data?.insc?.file?.content &&
               JSON.parse(Utils.toUTF8(t.data.origin.data.insc.file.content)),
           },
         },
@@ -36,9 +38,13 @@ export function mapOrdinal(t: Txo): Ordinal {
       insc: {
         file: t.data?.insc?.data?.file && {
           ...t.data.insc.data.file,
-          text: t.data.insc?.data?.file?.type.startsWith('text') && Utils.toUTF8(t.data.insc.data.file.content),
+          text:
+            t.data.insc?.data?.file?.type.startsWith('text') &&
+            t.data.insc.data.file.content &&
+            Utils.toUTF8(t.data.insc.data.file.content),
           json:
             t.data.insc?.data?.file?.type.startsWith('application/json') &&
+            t.data.insc.data.file.content &&
             JSON.parse(Utils.toUTF8(t.data.insc.data.file.content)),
         },
       },

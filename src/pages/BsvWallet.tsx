@@ -61,11 +61,10 @@ const ProfileImage = styled.img`
   height: 3.5rem;
   margin: 0;
   border-radius: 100%;
-  cursor: pointer;
   transition: transform 0.3s ease;
 
   &:hover {
-    transform: scale(1.2);
+    transform: scale(1.05);
   }
 `;
 
@@ -443,14 +442,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
     <MainContent>
       <MiddleContainer theme={theme}>
         <Show when={socialProfile.avatar !== HOSTED_YOURS_IMAGE}>
-          <ProfileImage title="Refresh Wallet Balance" src={socialProfile.avatar} onClick={() => refreshUtxos(true)} />
+          <ProfileImage src={socialProfile.avatar} />
         </Show>
-        <HeaderText
-          title="Refresh Wallet Balance"
-          style={{ fontSize: '2rem', cursor: 'pointer' }}
-          theme={theme}
-          onClick={() => refreshUtxos(true)}
-        >
+        <HeaderText style={{ fontSize: '2rem' }} theme={theme}>
           {formatUSD(bsvBalance * exchangeRate)}
         </HeaderText>
         <BalanceContainer>

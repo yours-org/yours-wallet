@@ -34,7 +34,7 @@ export const streamDataToZip = async (
   };
   const zipChromeObject = async (zip: JSZip) => {
     progress({ message: 'Gathering data for all accounts...' });
-    await sleep(1000); // This is really just a UX thing to show user what we are doing...
+    await sleep(1000); // UX thing again...
     const chromeObject = await chromeStorageService.getAndSetStorage();
     zip.file('chromeStorage.json', JSON.stringify(chromeObject));
     progress({ message: 'Account data collected successfully!' });
@@ -42,7 +42,7 @@ export const streamDataToZip = async (
   };
 
   const zipBlock = async (zip: JSZip) => {
-    progress({ message: 'Getting blocks data...' }); // UX thing again...
+    progress({ message: 'Getting blocks data...' });
     const blocks = await oneSatSpv.getBlocksBackup();
     const folder = zip.folder('blocks');
     if (!folder) throw new Error('Blocks folder not found');

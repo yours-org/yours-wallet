@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import styled from 'styled-components';
 import { useQueueTracker } from '../hooks/useQueueTracker';
+import { useSnackbar } from '../hooks/useSnackbar';
 import { WhiteLabelTheme } from '../theme.types';
 import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { Show } from './Show';
@@ -27,12 +29,20 @@ const Banner = styled.div<WhiteLabelTheme & { $isSyncing: boolean }>`
 
 export const QueueBanner = () => {
   const { isSyncing, showQueueBanner, theme, queueLength, importName, fetchingTxid } = useQueueTracker();
+  const { addSnackbar } = useSnackbar();
+
+  useEffect(() => {
+    if (!isSyncing) {
+      addSnackbar('SPV Wallet is now synced!', 'success', 3000);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSyncing, showQueueBanner]);
 
   return (
     <Show when={showQueueBanner}>
       {theme && (
         <Banner theme={theme} $isSyncing={isSyncing}>
-          <Show when={isSyncing} whenFalseContent={<>Your wallet is fully synced!</>}>
+          <Show when={isSyncing}>
             {importName
               ? `Importing ${importName}...`
               : `SPV Wallet is syncing ${formatNumberWithCommasAndDecimals(queueLength, 0)} transactions...`}

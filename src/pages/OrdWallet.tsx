@@ -18,6 +18,7 @@ import { sleep } from '../utils/sleep';
 import { TopNav } from '../components/TopNav';
 import { ListOrdinal, OrdOperationResponse } from '../services/types/ordinal.types';
 import { Ordinal as OrdinalType } from 'yours-wallet-provider';
+import { WhiteLabelTheme } from '../theme.types';
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -27,7 +28,7 @@ const OrdinalsList = styled.div`
   width: 100%;
   margin-top: 4.5rem;
   height: 25rem;
-  padding-bottom: 4.5rem;
+  padding-bottom: 8rem;
 `;
 
 const NoInscriptionWrapper = styled.div`
@@ -35,7 +36,6 @@ const NoInscriptionWrapper = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin-top: 8rem;
   width: 100%;
 `;
 
@@ -47,10 +47,14 @@ const ContentWrapper = styled.div`
   width: 100%;
 `;
 
-export const OrdButtonContainer = styled(ButtonContainer)`
-  margin: 0.5rem 0 0.5rem 0;
+export const OrdButtonContainer = styled(ButtonContainer)<WhiteLabelTheme & { $blur: boolean }>`
+  margin: 0;
   position: absolute;
-  bottom: 4.5rem;
+  bottom: 3.75rem;
+  height: 5rem;
+  width: 100%;
+  background-color: ${({ theme, $blur }) => ($blur ? theme.color.global.walletBackground + '95' : 'transparent')};
+  backdrop-filter: ${({ $blur }) => ($blur ? 'blur(8px)' : 'none')};
 `;
 
 export const BSV20Header = styled.div`
@@ -355,7 +359,6 @@ export const OrdWallet = () => {
               style={{
                 color: theme.color.global.gray,
                 fontSize: '1rem',
-                marginTop: '4rem',
               }}
             >
               {theme.settings.services.ordinals
@@ -385,7 +388,7 @@ export const OrdWallet = () => {
             })}
         </OrdinalsList>
       </Show>
-      <OrdButtonContainer>
+      <OrdButtonContainer theme={theme} $blur={!!selectedOrdinal}>
         <Show
           when={!selectedOrdinal}
           whenFalseContent={

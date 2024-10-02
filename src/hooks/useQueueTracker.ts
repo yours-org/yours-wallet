@@ -69,9 +69,11 @@ export const useQueueTracker = () => {
         if (queueLength === 0) {
           // Set a timeout to delay setting isSyncing to false
           twoSecondsTimeoutRef.current = setTimeout(() => {
+            setUpdateBalance(true);
             setIsSyncing(false);
+            setShowQueueBanner(false);
             setFetchingTxid(undefined);
-          }, 5000);
+          }, 3000);
         }
 
         // Reset the hide banner timeout whenever a new event is received
@@ -79,18 +81,13 @@ export const useQueueTracker = () => {
           clearTimeout(timeoutRef.current);
         }
 
-        // Hide the banner after 5 seconds if no new events and indicate syncing is done
         timeoutRef.current = setTimeout(() => {
-          setShowQueueBanner(false);
-
-          // Clear the interval and stop updating the balance after sync is complete
+          // Clear the interval and stop updating after sync is complete
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
           }
-
-          setUpdateBalance(true);
-        }, 8000);
+        }, 4000);
       }
     };
 

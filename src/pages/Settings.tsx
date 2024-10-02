@@ -525,17 +525,28 @@ export const Settings = () => {
         masterBackupText={masterBackupEventText}
         masterBackupProgress={masterBackupProgress}
       />
-      <SettingsRow
-        name="Download Keys"
-        description="Download your seed, private, and public keys for current account"
-        onClick={handleExportKeysIntent}
+      <Show when={!masterBackupEventText}>
+        <SettingsRow
+          name="Download Keys"
+          description="Download your seed, private, and public keys for current account"
+          onClick={handleExportKeysIntent}
+        />
+        <SettingsRow
+          name="Export Keys as QR code"
+          description="Display private keys for current account as QR code for mobile import"
+          onClick={handleExportKeysAsQrCodeIntent}
+        />
+      </Show>
+      <Button
+        theme={theme}
+        style={{
+          color: masterBackupEventText ? theme.color.component.snackbarError : undefined,
+          width: masterBackupEventText ? '80%' : undefined,
+        }}
+        type="secondary"
+        label={masterBackupEventText ? 'DO NOT CLOSE WALLET OR CHANGE TABS DURING THIS PROCESS!' : 'Go back'}
+        onClick={() => (masterBackupEventText ? null : setPage('main'))}
       />
-      <SettingsRow
-        name="Export Keys as QR code"
-        description="Display private keys for current account as QR code for mobile import"
-        onClick={handleExportKeysAsQrCodeIntent}
-      />
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
     </>
   );
 
