@@ -38,7 +38,7 @@ const Container = styled.div<{ isSlidingOut: boolean } & WhiteLabelTheme>`
   background-color: ${({ theme }) => theme.color.global.walletBackground};
   z-index: 1000;
   position: absolute;
-  animation: ${({ isSlidingOut }) => (isSlidingOut ? slideOut : slideIn)} 1s forwards;
+  animation: ${({ isSlidingOut }) => (isSlidingOut ? slideOut : slideIn)} 0.75s forwards;
 `;
 
 const FavoriteRow = styled.div<WhiteLabelTheme>`
@@ -84,6 +84,10 @@ const SearchInput = styled.input<WhiteLabelTheme>`
   font-size: 0.85rem;
   color: ${({ theme }) => theme.color.global.contrast};
   background-color: ${({ theme }) => theme.color.global.neutral};
+
+  &:focus {
+    outline: none;
+  }
 `;
 
 export type Bsv20TokensListProps = {
