@@ -24,6 +24,9 @@ import {
   YoursEventListeners,
   YoursEvents,
   YoursProviderType,
+  Bsv20,
+  SendBsv20Response,
+  SendBsv20,
 } from 'yours-wallet-provider';
 
 export enum YoursEventName {
@@ -35,7 +38,9 @@ export enum YoursEventName {
   GET_NETWORK = 'getNetwork',
   GET_BALANCE = 'getBalance',
   GET_ORDINALS = 'getOrdinals',
+  GET_BSV20S = 'getBsv20s',
   SEND_BSV = 'sendBsvRequest',
+  SEND_BSV20 = 'sendBsv20Request',
   TRANSFER_ORDINAL = 'transferOrdinalRequest',
   SIGN_MESSAGE = 'signMessageRequest',
   BROADCAST = 'broadcastRequest',
@@ -52,6 +57,7 @@ export enum YoursEventName {
   SIGNED_OUT = 'signedOut',
   USER_CONNECT_RESPONSE = 'userConnectResponse',
   SEND_BSV_RESPONSE = 'sendBsvResponse',
+  SEND_BSV20_RESPONSE = 'sendBsv20Response',
   TRANSFER_ORDINAL_RESPONSE = 'transferOrdinalResponse',
   PURCHASE_ORDINAL_RESPONSE = 'purchaseOrdinalResponse',
   SIGN_MESSAGE_RESPONSE = 'signMessageResponse',
@@ -79,6 +85,7 @@ export type RequestParams = {
   appIcon?: string;
   data?:
     | SendBsv[]
+    | SendBsv20
     | InscribeRequest[]
     | TransferOrdinal
     | PurchaseOrdinal
@@ -102,6 +109,11 @@ export type RequestEvent = {
   detail: RequestEventDetail;
 };
 
+export type SerializedBsv20 = Omit<Bsv20, 'listed' | 'all'> & {
+  listed: { confirmed: string; pending: string };
+  all: { confirmed: string; pending: string };
+};
+
 export type ResponseEventDetail = {
   type: YoursEventName;
   success: boolean;
@@ -113,6 +125,8 @@ export type ResponseEventDetail = {
     | NetWork
     | Balance
     | Ordinal[]
+    | Bsv20[]
+    | SerializedBsv20[]
     | SignatureResponse[]
     | SocialProfile
     | TaggedDerivationResponse
@@ -231,7 +245,9 @@ const provider: YoursProviderType = {
   getNetwork: createYoursMethod<NetWork | undefined, void>(YoursEventName.GET_NETWORK),
   getBalance: createYoursMethod<Balance | undefined, void>(YoursEventName.GET_BALANCE),
   getOrdinals: createYoursMethod<Ordinal[] | undefined, void>(YoursEventName.GET_ORDINALS),
+  getBsv20s: createYoursMethod<Bsv20[] | undefined, void>(YoursEventName.GET_BSV20S),
   sendBsv: createYoursMethod<SendBsvResponse | undefined, SendBsv[]>(YoursEventName.SEND_BSV),
+  sendBsv20: createYoursMethod<SendBsv20Response | undefined, SendBsv20>(YoursEventName.SEND_BSV20),
   transferOrdinal: createYoursMethod<string | undefined, TransferOrdinal>(YoursEventName.TRANSFER_ORDINAL),
   signMessage: createYoursMethod<SignedMessage | undefined, SignMessage>(YoursEventName.SIGN_MESSAGE),
   broadcast: createYoursMethod<string | undefined, Broadcast>(YoursEventName.BROADCAST),

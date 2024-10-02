@@ -37,6 +37,7 @@ import { QueueBanner } from './components/QueueBanner';
 import { BlockHeightProvider } from './contexts/BlockHeightContext';
 import { SyncingBlocks } from './components/SyncingBlocks';
 import { MasterRestore } from './pages/onboarding/MasterRestore';
+import { Bsv20SendRequest } from './pages/requests/Bsv20SendRequest';
 
 const MainContainer = styled.div<WhiteLabelTheme & { $isMobile?: boolean }>`
   display: flex;
@@ -67,6 +68,7 @@ export const App = () => {
   const {
     connectRequest,
     sendBsvRequest,
+    sendBsv20Request,
     transferOrdinalRequest,
     purchaseOrdinalRequest,
     signMessageRequest,
@@ -155,6 +157,7 @@ export const App = () => {
                           <Show
                             when={
                               !sendBsvRequest &&
+                              !sendBsv20Request &&
                               !signMessageRequest &&
                               !broadcastRequest &&
                               !getSignaturesRequest &&
@@ -168,6 +171,13 @@ export const App = () => {
                                   <BsvSendRequest
                                     request={sendBsvRequest!}
                                     onResponse={() => clearRequest('sendBsvRequest')}
+                                    popupId={popupId}
+                                  />
+                                </Show>
+                                <Show when={!!sendBsv20Request}>
+                                  <Bsv20SendRequest
+                                    request={sendBsv20Request!}
+                                    onResponse={() => clearRequest('sendBsv20Request')}
                                     popupId={popupId}
                                   />
                                 </Show>

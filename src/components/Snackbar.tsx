@@ -40,7 +40,7 @@ export const SnackBarContainer = styled.div<SnackBarColorTheme & { duration: num
   background-color: ${({ color }) => color};
   color: ${({ theme }) =>
     theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
-  z-index: 200;
+  z-index: 9999;
   animation:
     ${slideIn} 0.25s ease-out,
     ${fadeOut} 0.25s ease-out ${({ duration }) => `${duration}s`};

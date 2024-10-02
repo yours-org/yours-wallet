@@ -23,6 +23,7 @@ const TokenId = styled(Text)<WhiteLabelTheme>`
   margin: 0 0;
   width: fit-content;
   color: ${({ theme }) => theme.color.global.gray};
+  cursor: pointer;
 `;
 
 export type BSV20IdProps = {

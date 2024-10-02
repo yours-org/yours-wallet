@@ -89,6 +89,7 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
     });
 
     addSnackbar('Successfully Decrypted!', 'success');
+    await sleep(2000);
     setDecryptedMessages(decrypted);
     setHasDecrypted(true);
     setIsProcessing(false);

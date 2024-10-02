@@ -44,7 +44,7 @@
     "url": "^0.11.3",
     "util": "^0.12.5",
     "web-vitals": "^2.1.4",
-    "yours-wallet-provider": "^3.2.4"
+    "yours-wallet-provider": "^3.3.5"
   },
   "scripts": {
     "start": "react-app-rewired start",

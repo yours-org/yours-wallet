@@ -91,13 +91,13 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       return;
     }
 
+    addSnackbar('Successfully Signed!', 'success');
+    await sleep(2000);
+    setSignature(signRes.sig);
     sendMessage({
       action: 'signMessageResponse',
       ...signRes,
     });
-
-    addSnackbar('Successfully Signed!', 'success');
-    setSignature(signRes.sig);
     setIsProcessing(false);
     onSignature();
   };

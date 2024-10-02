@@ -178,8 +178,8 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     await setDerivationTags(keys, oneSatSPV, chromeStorageService);
 
     setSuccessTxId(res.pubKey);
-    setIsProcessing(false);
     addSnackbar('Successfully generated key!', 'success');
+    await sleep(2000);
 
     sendMessage({
       action: 'generateTaggedKeysResponse',
@@ -187,6 +187,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       pubKey: res.pubKey,
       tag: res.tag,
     });
+    setIsProcessing(false);
     onResponse();
   };
 

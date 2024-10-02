@@ -20,7 +20,7 @@ export const LoaderContainer = styled.div<WhiteLabelTheme>`
   width: 100%;
   top: 0;
   left: 0;
-  z-index: 9999;
+  z-index: 9998;
 `;
 
 const ProgressBarContainer = styled.div`

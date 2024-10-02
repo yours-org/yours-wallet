@@ -15,6 +15,7 @@ import {
   EncryptRequest,
   DecryptRequest,
   SocialProfile,
+  SendBsv20,
 } from 'yours-wallet-provider';
 import { WhitelistedApp } from '../../inject';
 import { Theme } from '../../theme.types';
@@ -68,6 +69,7 @@ export interface ChromeStorageObject {
   hasUpgradedToSPV?: boolean;
   connectRequest?: ConnectRequest;
   sendBsvRequest?: SendBsv[];
+  sendBsv20Request?: SendBsv20;
   transferOrdinalRequest?: TransferOrdinal;
   purchaseOrdinalRequest?: PurchaseOrdinal;
   signMessageRequest?: SignMessage;
@@ -84,6 +86,7 @@ export type CurrentAccountObject = Omit<
   | 'popupWindowId'
   | 'connectRequest'
   | 'sendBsvRequest'
+  | 'sendBsv20Request'
   | 'transferOrdinalRequest'
   | 'purchaseOrdinalRequest'
   | 'signMessageRequest'

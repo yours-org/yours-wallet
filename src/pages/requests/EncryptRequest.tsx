@@ -96,6 +96,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
     });
 
     addSnackbar('Successfully Encrypted!', 'success');
+    await sleep(2000);
     setEncryptedMessages(encrypted);
     setHasEncrypted(true);
     setIsProcessing(false);

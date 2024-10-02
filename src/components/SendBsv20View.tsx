@@ -104,6 +104,7 @@ export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
     setTokenSendAmount(null);
   };
 
+  //TODO: This pattern (response.error) is used in a number of other places in the codebase. It should be refactored into a common function.
   const getErrorMessage = (response: OrdOperationResponse) => {
     return response.error === 'invalid-password'
       ? 'Invalid Password!'

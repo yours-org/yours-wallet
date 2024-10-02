@@ -233,7 +233,7 @@ export class OrdinalService {
 
       const response = await this.oneSatSPV.broadcast(tx);
       if (response?.txid) {
-        return { txid: response.txid };
+        return { txid: response.txid, rawTx: tx.toHex() };
       }
 
       return { error: 'broadcast-failed' };

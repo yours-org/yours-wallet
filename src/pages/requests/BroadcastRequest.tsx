@@ -45,7 +45,6 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [txData, setTxData] = useState<IndexContext>();
   const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
-  const { updateBsvBalance } = bsvService;
   const { bsvAddress, ordAddress, identityAddress } = keysService;
 
   useEffect(() => {
@@ -150,14 +149,9 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
         txid: resp.txid,
       });
 
-      setIsProcessing(false);
       addSnackbar('Successfully broadcasted the tx!', 'success');
+      await sleep(2000);
       onBroadcast();
-      setTimeout(async () => {
-        await updateBsvBalance().catch((e: unknown) => {
-          console.log(e);
-        });
-      }, 3000);
     } catch (error) {
       console.error(error);
     } finally {

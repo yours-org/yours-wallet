@@ -17,13 +17,15 @@ import {
   InscribeRequest,
   SignMessage,
   NetWork,
-  // Inscription,
+  SendBsv20Response,
+  SendBsv20,
 } from 'yours-wallet-provider';
 import {
   CustomListenerName,
   Decision,
   RequestParams,
   ResponseEventDetail,
+  SerializedBsv20,
   WhitelistedApp,
   YoursEventName,
 } from './inject';
@@ -33,11 +35,13 @@ import { removeWindow } from './utils/chromeHelpers';
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
+import { GorillaPoolService } from './services/GorillaPool.service';
 import { mapOrdinal } from './utils/providerHelper';
 import { TxoLookup, TxoSort } from 'spv-store';
 import { initOneSatSPV } from './initSPVStore';
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
+const gorillaPoolService = new GorillaPoolService(chromeStorageService);
 
 export let oneSatSPVPromise = chromeStorageService
   .getAndSetStorage()
@@ -51,6 +55,7 @@ type CallbackResponse = (response: ResponseEventDetail) => void;
 
 let responseCallbackForConnectRequest: CallbackResponse | null = null;
 let responseCallbackForSendBsvRequest: CallbackResponse | null = null;
+let responseCallbackForSendBsv20Request: CallbackResponse | null = null;
 let responseCallbackForTransferOrdinalRequest: CallbackResponse | null = null;
 let responseCallbackForPurchaseOrdinalRequest: CallbackResponse | null = null;
 let responseCallbackForSignMessageRequest: CallbackResponse | null = null;
@@ -154,6 +159,7 @@ if (isInServiceWorker) {
       YoursEventName.IS_CONNECTED,
       YoursEventName.USER_CONNECT_RESPONSE,
       YoursEventName.SEND_BSV_RESPONSE,
+      YoursEventName.SEND_BSV20_RESPONSE,
       YoursEventName.TRANSFER_ORDINAL_RESPONSE,
       YoursEventName.PURCHASE_ORDINAL_RESPONSE,
       YoursEventName.SIGN_MESSAGE_RESPONSE,
@@ -175,6 +181,8 @@ if (isInServiceWorker) {
           return processConnectResponse(message as { decision: Decision; pubKeys: PubKeys });
         case YoursEventName.SEND_BSV_RESPONSE:
           return processSendBsvResponse(message as SendBsvResponse);
+        case YoursEventName.SEND_BSV20_RESPONSE:
+          return processSendBsv20Response(message as SendBsv20Response);
         case YoursEventName.TRANSFER_ORDINAL_RESPONSE:
           return processTransferOrdinalResponse(message as { txid: string });
         case YoursEventName.PURCHASE_ORDINAL_RESPONSE:
@@ -231,9 +239,13 @@ if (isInServiceWorker) {
           return processGetNetworkRequest(sendResponse);
         case YoursEventName.GET_ORDINALS:
           return processGetOrdinalsRequest(sendResponse);
+        case YoursEventName.GET_BSV20S:
+          return processGetBsv20sRequest(sendResponse);
         case YoursEventName.SEND_BSV:
         case YoursEventName.INSCRIBE: // We use the sendBsv functionality here
           return processSendBsvRequest(message, sendResponse);
+        case YoursEventName.SEND_BSV20:
+          return processSendBsv20Request(message, sendResponse);
         case YoursEventName.TRANSFER_ORDINAL:
           return processTransferOrdinalRequest(message, sendResponse);
         case YoursEventName.PURCHASE_ORDINAL:
@@ -466,6 +478,41 @@ if (isInServiceWorker) {
     }
   };
 
+  const processGetBsv20sRequest = (sendResponse: CallbackResponse) => {
+    try {
+      chromeStorageService.getAndSetStorage().then(async () => {
+        let data: SerializedBsv20[] = [];
+        const obj = chromeStorageService.getCurrentAccountObject();
+        if (obj.account?.addresses?.bsvAddress && obj.account?.addresses?.ordAddress) {
+          const rawData = await gorillaPoolService.getBsv20Balances([
+            obj.account?.addresses.bsvAddress,
+            obj.account?.addresses.ordAddress,
+          ]);
+
+          data = rawData.map((d) => {
+            return {
+              ...d,
+              listed: { confirmed: d.listed.confirmed.toString(), pending: d.listed.pending.toString() },
+              all: { confirmed: d.all.confirmed.toString(), pending: d.all.pending.toString() },
+            };
+          });
+        }
+
+        sendResponse({
+          type: YoursEventName.GET_BSV20S,
+          success: true,
+          data,
+        });
+      });
+    } catch (error) {
+      sendResponse({
+        type: YoursEventName.GET_BSV20S,
+        success: false,
+        error: JSON.stringify(error),
+      });
+    }
+  };
+
   const processGetExchangeRate = (sendResponse: CallbackResponse) => {
     try {
       chromeStorageService.getAndSetStorage().then(async (res) => {
@@ -572,6 +619,31 @@ if (isInServiceWorker) {
     } catch (error) {
       sendResponse({
         type: YoursEventName.SEND_BSV,
+        success: false,
+        error: JSON.stringify(error),
+      });
+    }
+  };
+
+  const processSendBsv20Request = (message: { params: SendBsv20 }, sendResponse: CallbackResponse) => {
+    console.log('processSendBsv20Request', message);
+    if (!message.params) {
+      sendResponse({
+        type: YoursEventName.SEND_BSV20,
+        success: false,
+        error: 'Must provide valid params!',
+      });
+      return;
+    }
+    try {
+      responseCallbackForSendBsv20Request = sendResponse;
+      const sendBsv20Request = message.params;
+      chromeStorageService.update({ sendBsv20Request }).then(() => {
+        launchPopUp();
+      });
+    } catch (error) {
+      sendResponse({
+        type: YoursEventName.SEND_BSV20,
         success: false,
         error: JSON.stringify(error),
       });
@@ -936,6 +1008,27 @@ if (isInServiceWorker) {
     return true;
   };
 
+  const processSendBsv20Response = (response: SendBsv20Response) => {
+    if (!responseCallbackForSendBsv20Request) throw Error('Missing callback!');
+    try {
+      responseCallbackForSendBsv20Request({
+        type: YoursEventName.SEND_BSV20,
+        success: true,
+        data: { txid: response.txid, rawtx: response.rawtx },
+      });
+    } catch (error) {
+      responseCallbackForSendBsv20Request?.({
+        type: YoursEventName.SEND_BSV20,
+        success: false,
+        error: JSON.stringify(error),
+      });
+    } finally {
+      cleanup([YoursEventName.SEND_BSV20]);
+    }
+
+    return true;
+  };
+
   const processTransferOrdinalResponse = (response: { txid: string }) => {
     if (!responseCallbackForTransferOrdinalRequest) throw Error('Missing callback!');
     try {
@@ -1144,6 +1237,16 @@ if (isInServiceWorker) {
         });
         responseCallbackForSendBsvRequest = null;
         chromeStorageService.remove('sendBsvRequest');
+      }
+
+      if (responseCallbackForSendBsv20Request) {
+        responseCallbackForSendBsv20Request({
+          type: YoursEventName.SEND_BSV20,
+          success: false,
+          error: 'User dismissed the request!',
+        });
+        responseCallbackForSendBsvRequest = null;
+        chromeStorageService.remove('sendBsv20Request');
       }
 
       if (responseCallbackForSignMessageRequest) {

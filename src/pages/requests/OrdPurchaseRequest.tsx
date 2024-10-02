@@ -24,14 +24,9 @@ export type OrdPurchaseRequestProps = {
 export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
-  // const { ordAddress, getOrdinals, isProcessing, purchaseGlobalOrderbookListing, setIsProcessing, getOrdinalsBaseUrl } =
-  //   useOrds();
-  // const { getUtxoByOutpoint } = useGorillaPool();
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [successTxId, setSuccessTxId] = useState('');
-  const { addSnackbar, message } = useSnackbar();
-  const { gorillaPoolService, ordinalService, chromeStorageService, keysService } = useServiceContext();
-  const { ordAddress } = keysService;
+  const { addSnackbar } = useSnackbar();
+  const { gorillaPoolService, ordinalService, chromeStorageService } = useServiceContext();
   const [inscription, setInscription] = useState<OrdinalType | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
   const marketplaceAddress = request.marketplaceAddress ?? YOURS_DEV_WALLET;
@@ -50,22 +45,6 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     getOrigin();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request.outpoint]);
-
-  // useEffect(() => {
-  //   if (!successTxId) return;
-  //   if (!message && ordAddress) {
-  //     resetSendState();
-  //     ordinalService.getAndSetOrdinals(ordAddress);
-  //   }
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [successTxId, message, ordAddress]);
-
-  const resetSendState = () => {
-    setPasswordConfirm('');
-    setSuccessTxId('');
-    setInscription(undefined);
-    setIsProcessing(false);
-  };
 
   const handlePurchaseOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -107,13 +86,13 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
       return;
     }
 
+    addSnackbar('Purchase Successful!', 'success');
+    await sleep(2000);
     sendMessage({
       action: 'purchaseOrdinalResponse',
       txid: purchaseRes.txid,
     });
-
-    setSuccessTxId(purchaseRes.txid);
-    addSnackbar('Purchase Successful!', 'success');
+    setIsProcessing(false);
     onResponse();
   };
 

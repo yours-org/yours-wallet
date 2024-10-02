@@ -27,9 +27,8 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   const { theme } = useTheme();
   const [isProcessing, setIsProcessing] = useState(false);
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [successTxId, setSuccessTxId] = useState('');
-  const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, ordinalService, keysService, gorillaPoolService } = useServiceContext();
+  const { addSnackbar } = useSnackbar();
+  const { chromeStorageService, ordinalService, gorillaPoolService } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const network = chromeStorageService.getNetwork();
   const [ordinal, setOrdinal] = useState<OrdType | undefined>();
@@ -40,12 +39,6 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
       setOrdinal(ord);
     });
   }, [ordinalService, request.outpoint]);
-
-  // const resetSendState = () => {
-  //   setPasswordConfirm('');
-  //   setSuccessTxId('');
-  //   setIsProcessing(false);
-  // };
 
   const handleTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -80,13 +73,14 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
       return;
     }
 
-    setSuccessTxId(transferRes.txid);
     addSnackbar('Transfer Successful!', 'success');
+    await sleep(2000);
 
     sendMessage({
       action: 'transferOrdinalResponse',
       txid: transferRes.txid,
     });
+    setIsProcessing(false);
     onResponse();
   };
 

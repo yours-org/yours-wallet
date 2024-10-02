@@ -80,7 +80,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       validationFail.set('script', false);
       validationFail.set('data', false);
 
-      request.forEach((req) => {
+      request.forEach((req, idx) => {
         if (req.script?.length === 0) {
           validationFail.set('script', true);
           return;
@@ -90,11 +90,19 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
             return;
           }
         }
-        if (req.address && !validate(req.address)) {
-          validationFail.set('address', true);
-          return;
+        if (req.address) {
+          if (req.address.includes('@')) {
+            request[idx].paymail = req.address;
+            request[idx].address = undefined;
+            return;
+          }
+          if (!validate(req.address)) {
+            validationFail.set('address', true);
+            return;
+          }
         }
       });
+
       let validationErrorMessage = '';
       if (validationFail.get('script')) {
         validationErrorMessage = 'Found an invalid script.';
@@ -114,6 +122,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         return;
       }
 
+      console.log(request);
       const sendRes = await sendBsv(request, passwordConfirm, noApprovalLimit);
       if (!sendRes.txid || sendRes.error) {
         const message =
@@ -142,6 +151,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
 
       setSuccessTxId(sendRes.txid);
       addSnackbar('Transaction Successful!', 'success');
+      await sleep(2000);
       onResponse();
 
       if (!requestWithinApp) {

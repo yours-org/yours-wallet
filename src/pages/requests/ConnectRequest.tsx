@@ -12,6 +12,7 @@ import { RequestParams, WhitelistedApp } from '../../inject';
 import { sendMessage } from '../../utils/chromeHelpers';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
+import { sleep } from '../../utils/sleep';
 
 const Container = styled.div`
   display: flex;
@@ -104,13 +105,14 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
       },
     };
     await chromeStorageService.updateNested(key, update);
+    addSnackbar(`Approved`, 'success');
+    await sleep(2000);
     onDecision();
     sendMessage({
       action: 'userConnectResponse',
       decision: 'approved',
       pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
     });
-    addSnackbar(`Approved`, 'success');
   };
 
   const handleDecline = async () => {
