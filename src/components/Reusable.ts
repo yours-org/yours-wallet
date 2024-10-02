@@ -87,6 +87,7 @@ export const MainContent = styled.div`
   width: 100%;
   height: calc(100% - 3.75rem);
   overflow-y: auto;
+  overflow-x: hidden;
 `;
 
 export const ReceiveContent = styled(MainContent)`
