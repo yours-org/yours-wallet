@@ -403,7 +403,7 @@ export const OrdWallet = () => {
         }
       >
         <OrdinalsList>
-          <SectionHeader theme={theme}>Listings</SectionHeader>
+          <SectionHeader theme={theme}>My Listings</SectionHeader>
           {renderOrdinals(listedOrdinals)}
           <SectionHeader theme={theme}>My Ordinals</SectionHeader>
           {renderOrdinals(myOrdinals)}
