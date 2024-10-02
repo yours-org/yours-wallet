@@ -65,11 +65,11 @@ export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
 export const Input = (props: InputProps) => {
   const { shake = 'false', theme, ...allProps } = props;
 
-  const preventScroll = (e: any) => {
-    e.target.blur();
+  const preventScroll = (e: React.WheelEvent<HTMLInputElement>) => {
+    (e.target as HTMLInputElement).blur();
     e.stopPropagation();
     setTimeout(() => {
-      e.target.focus();
+      (e.target as HTMLInputElement).focus();
     }, 0);
   };
 

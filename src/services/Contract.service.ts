@@ -66,7 +66,7 @@ export class ContractService {
             outputs: tx.outputs,
             inputSequence: tx.inputs[sigReq.inputIndex].sequence,
             subscript: sigReq.script
-              ? Script.fromHex(sigReq.script!)
+              ? Script.fromHex(sigReq.script)
               : new P2PKH().lock(privKey.toPublicKey().toAddress()),
             lockTime: tx.lockTime,
             scope: sigReq.sigHashType || DEFAULT_SIGHASH_TYPE,

@@ -39,7 +39,7 @@ function showId(id: string) {
 export const BSV20Id = (props: BSV20IdProps) => {
   const { id, theme, onCopyTokenId } = props;
 
-  const copy = (e: any) => {
+  const copy = (e: React.MouseEvent<HTMLElement, MouseEvent>) => {
     e.stopPropagation();
     navigator.clipboard.writeText(id);
     onCopyTokenId();

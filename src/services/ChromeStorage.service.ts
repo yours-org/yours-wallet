@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const chrome: any;
 
 import { NetWork } from 'yours-wallet-provider';
@@ -25,7 +26,7 @@ export class ChromeStorageService {
 
   private get = async (keyOrKeys: string | string[] | null): Promise<Partial<ChromeStorageObject>> => {
     return new Promise<Partial<ChromeStorageObject>>((resolve, reject) => {
-      chrome.storage.local.get(keyOrKeys, (result: any) => {
+      chrome.storage.local.get(keyOrKeys, (result: Partial<ChromeStorageObject>) => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
         } else {

@@ -185,7 +185,7 @@ export class BsvService {
       let satsOut = 0;
       const paymailRefs: { paymail: string; reference: string }[] = [];
       for (const req of request) {
-        let outScript: Script;
+        let outScript: Script = new Script();
         if (req.address) {
           if (req.inscription) {
             const { base64Data, mimeType, map } = req.inscription;
@@ -219,7 +219,7 @@ export class BsvService {
         if (!req.paymail) {
           tx.addOutput({
             satoshis: req.satoshis,
-            lockingScript: outScript!,
+            lockingScript: outScript,
           });
         } else {
           const p2pDestination = await client.getP2pPaymentDestination(req.paymail, req.satoshis);

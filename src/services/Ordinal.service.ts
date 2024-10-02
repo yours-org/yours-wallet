@@ -205,7 +205,7 @@ export class OrdinalService {
           txid: tokenUtxo.txid,
           vout: tokenUtxo.vout,
           satoshis: 1,
-          script: tokenUtxo.script!,
+          script: tokenUtxo.script || '',
           amt: tokenUtxo.amt,
           pk: pkMap.get(tokenUtxo.owner || ''),
         };
@@ -293,9 +293,11 @@ export class OrdinalService {
       }
 
       return { error: 'broadcast-failed' };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(error);
-      if (error.message?.includes('Not enough funds')) return { error: 'insufficient-funds' };
+      if (error instanceof Error && error.message.includes('Not enough funds')) {
+        return { error: 'insufficient-funds' };
+      }
       return { error: JSON.stringify(error) };
     }
   };
@@ -342,9 +344,11 @@ export class OrdinalService {
       }
 
       return { error: 'broadcast-failed' };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(error);
-      if (error.message?.includes('Not enough funds')) return { error: 'insufficient-funds' };
+      if (error instanceof Error && error.message.includes('Not enough funds')) {
+        return { error: 'insufficient-funds' };
+      }
       return { error: JSON.stringify(error) };
     }
   };
@@ -410,9 +414,11 @@ export class OrdinalService {
       }
 
       return { error: 'broadcast-failed' };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(error);
-      if (error.message?.includes('Not enough funds')) return { error: 'insufficient-funds' };
+      if (error instanceof Error && error.message.includes('Not enough funds')) {
+        return { error: 'insufficient-funds' };
+      }
       return { error: JSON.stringify(error) };
     }
   };
