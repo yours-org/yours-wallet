@@ -279,7 +279,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
             style={{ margin: '0.1rem 0 1rem', width: '85%' }}
           />
         </Show>
-        <Show when={!importWallet}>
+        <Show when={importWallet === 'other'}>
           <ExpertImportWrapper>
             <ToggleSwitch theme={theme} on={isExpertImport} onChange={handleExpertToggle} />
             <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>

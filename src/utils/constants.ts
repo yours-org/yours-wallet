@@ -66,7 +66,7 @@ export const featuredApps = [
     link: 'https://taleofshua.com/profile/',
   },
   {
-    icon: 'https://pbs.twimg.com/profile_images/1222666970203471873/zn3OPLG0_400x400.jpg',
+    icon: 'https://avatars.githubusercontent.com/u/52027588?v=4',
     name: 'sCrypt',
     link: 'https://docs.scrypt.io/tokens/tutorials/ordinal-lock/#use-panda-wallet',
   },
@@ -74,11 +74,6 @@ export const featuredApps = [
     icon: 'https://pbs.twimg.com/profile_images/1555622553799892993/m0C6BWiv_400x400.jpg',
     name: 'Haste Arcade',
     link: 'https://hastearcade.com',
-  },
-  {
-    icon: 'https://pbs.twimg.com/profile_images/1671319128593031170/MZ_B266m_400x400.jpg',
-    name: 'Library of Babel',
-    link: 'https://babel.markets',
   },
 ];
 
