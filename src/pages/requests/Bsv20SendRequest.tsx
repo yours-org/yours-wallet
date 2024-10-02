@@ -41,6 +41,9 @@ export const Bsv20SendRequest = (props: Bsv20SendRequestProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [token, setToken] = useState<Token>();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
+  const tokenIcon =
+    (token?.icon && `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${token.icon}`) ||
+    GENERIC_TOKEN_ICON;
 
   useEffect(() => {
     (async () => {
@@ -151,12 +154,7 @@ export const Bsv20SendRequest = (props: Bsv20SendRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!request}>
         <ConfirmContent>
-          <Icon
-            src={
-              (token && `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${token.icon}`) ||
-              GENERIC_TOKEN_ICON
-            }
-          />
+          <Icon src={tokenIcon} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Text
             theme={theme}
