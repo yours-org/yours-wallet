@@ -150,6 +150,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [manageFavorites, setManageFavorites] = useState(false);
   const [account, setAccount] = useState<Account>();
   const [token, setToken] = useState<{ isConfirmed: boolean; info: Bsv20 } | null>(null);
+  const services = theme.settings.services;
 
   const getAndSetAccountAndBsv20s = async () => {
     const bsv20s = await ordinalService.getBsv20s();
@@ -405,9 +406,19 @@ export const BsvWallet = (props: BsvWalletProps) => {
       <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
         Receive Assets
       </HeaderText>
-      <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
-        You may safely send <Warning theme={theme}>BSV and Ordinals</Warning> to this address.
-      </Text>
+      <Show
+        when={services.ordinals || services.bsv20}
+        whenFalseContent={
+          <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
+            You may safely send <Warning theme={theme}>Bitcoin SV (BSV)</Warning> to this address.
+          </Text>
+        }
+      >
+        <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
+          You may safely send <Warning theme={theme}>BSV and Ordinals</Warning> to this address.
+        </Text>
+      </Show>
+
       <QrCode address={bsvAddress} onClick={handleCopyToClipboard} />
       <Text theme={theme} style={{ margin: '1rem 0 -1.25rem 0', fontWeight: 700 }}>
         Scan or copy the address
@@ -465,7 +476,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           showPointer={false}
         />
         {lockData && (
-          <Show when={theme.settings.services.locks && lockData.totalLocked > 0}>
+          <Show when={services.locks && lockData.totalLocked > 0}>
             <AssetRow
               animate
               ticker="Total Locked"
@@ -479,7 +490,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
             />
           </Show>
         )}
-        <Show when={theme.settings.services.bsv20}>
+        <Show when={services.bsv20}>
           {bsv20s.length > 0 && (
             <Bsv20TokensList
               hideStatusLabels
