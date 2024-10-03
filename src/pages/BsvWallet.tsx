@@ -132,7 +132,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [amountType, setAmountType] = useState<AmountType>('bsv');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService, ordinalService } = useServiceContext();
+  const { chromeStorageService, keysService, bsvService, ordinalService, oneSatSPV } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
@@ -162,6 +162,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
     (async () => {
       const obj = await chromeStorageService.getAndSetStorage();
       obj && !obj.hasUpgradedToSPV ? setShowUpgrade(true) : setShowUpgrade(false);
+      oneSatSPV.stores.txos?.syncTxLogs();
       if (!ordinalService) return;
       await getAndSetAccountAndBsv20s();
     })();
