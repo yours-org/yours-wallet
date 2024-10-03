@@ -6,11 +6,11 @@ import { Bsv20 } from 'yours-wallet-provider';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
-import { OrdOperationResponse } from '../services/types/ordinal.types';
 import { ONE_SAT_MARKET_URL } from '../utils/constants';
 import { formatNumberWithCommasAndDecimals } from '../utils/format';
 import { isBSV20v2, normalize, showAmount } from '../utils/ordi';
 import { sleep } from '../utils/sleep';
+import { getErrorMessage } from '../utils/tools';
 import { BSV20Id } from './BSV20Id';
 import { Button } from './Button';
 import { Input } from './Input';
@@ -104,27 +104,6 @@ export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
     setTokenSendAmount(null);
   };
 
-  //TODO: This pattern (response.error) is used in a number of other places in the codebase. It should be refactored into a common function.
-  const getErrorMessage = (response: OrdOperationResponse) => {
-    return response.error === 'invalid-password'
-      ? 'Invalid Password!'
-      : response.error === 'no-keys'
-        ? 'No keys were found!'
-        : response.error === 'insufficient-funds'
-          ? 'Insufficient Funds!'
-          : response.error === 'fee-too-high'
-            ? 'Miner fee too high!'
-            : response.error === 'no-bsv20-utxo'
-              ? 'No bsv20 token found!'
-              : response.error === 'token-details'
-                ? 'Could not gather token details!'
-                : response.error === 'no-ord-utxo'
-                  ? 'Could not locate the ordinal!'
-                  : response.error === 'broadcast-error'
-                    ? 'There was an error broadcasting the tx!'
-                    : 'An unknown error has occurred! Try again.';
-  };
-
   const handleSendBSV20 = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -161,9 +140,8 @@ export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
     );
 
     if (!sendBSV20Res.txid || sendBSV20Res.error) {
-      const message = getErrorMessage(sendBSV20Res);
       setIsProcessing(false);
-      addSnackbar(message, 'error');
+      addSnackbar(getErrorMessage(sendBSV20Res.error), 'error');
       return;
     }
 

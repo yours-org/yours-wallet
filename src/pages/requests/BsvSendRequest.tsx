@@ -17,6 +17,7 @@ import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendBsv } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
+import { getErrorMessage } from '../../utils/tools';
 
 const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -125,27 +126,8 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       console.log(request);
       const sendRes = await sendBsv(request, passwordConfirm, noApprovalLimit);
       if (!sendRes.txid || sendRes.error) {
-        const message =
-          sendRes.error === 'invalid-password'
-            ? 'Invalid Password!'
-            : sendRes.error === 'insufficient-funds'
-              ? 'Insufficient Funds!'
-              : sendRes.error === 'fee-too-high'
-                ? 'Miner fee too high!'
-                : sendRes.error === 'no-wallet-address'
-                  ? 'No wallet address found!'
-                  : sendRes.error === 'invalid-data'
-                    ? 'Invalid data!'
-                    : sendRes.error === 'invalid-request'
-                      ? 'Invalid request!'
-                      : sendRes.error === 'source-tx-not-found'
-                        ? 'Source transaction not found!'
-                        : sendRes.error === 'no-account'
-                          ? 'No account found!'
-                          : 'An unknown error has occurred! Try again.';
-
+        addSnackbar(getErrorMessage(sendRes.error), 'error');
         setIsProcessing(false);
-        addSnackbar(message, 'error');
         return;
       }
 

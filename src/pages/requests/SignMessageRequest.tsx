@@ -13,6 +13,7 @@ import { useServiceContext } from '../../hooks/useServiceContext';
 import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
+import { getErrorMessage } from '../../utils/tools';
 
 const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -78,15 +79,8 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const signRes = (await bsvService.signMessage(request, passwordConfirm)) as SignedMessage & { error?: string };
-    if (!signRes?.sig) {
-      const message =
-        signRes?.error === 'invalid-password'
-          ? 'Invalid Password!'
-          : signRes?.error === 'key-type'
-            ? 'Key type does not exist!'
-            : 'An unknown error has occurred! Try again.';
-
-      addSnackbar(message, 'error');
+    if (!signRes?.sig || signRes.error) {
+      addSnackbar(getErrorMessage(signRes.error), 'error');
       setIsProcessing(false);
       return;
     }

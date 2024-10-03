@@ -38,7 +38,7 @@ import { sendMessage } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
 import { InWalletBsvResponse } from '../services/types/bsv.types';
 import { useQueueTracker } from '../hooks/useQueueTracker';
-import { isValidEmail } from '../utils/tools';
+import { getErrorMessage, isValidEmail } from '../utils/tools';
 import { UpgradeNotification } from '../components/UpgradeNotification';
 import { Bsv20 } from 'yours-wallet-provider';
 import { Bsv20TokensList } from '../components/Bsv20TokensList';
@@ -326,28 +326,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
     }
 
     if (!sendRes.txid || sendRes.error) {
-      const message =
-        sendRes.error === 'invalid-password'
-          ? 'Invalid Password!'
-          : sendRes.error === 'insufficient-funds'
-            ? 'Insufficient Funds!'
-            : sendRes.error === 'fee-too-high'
-              ? 'Miner fee too high!'
-              : sendRes.error === 'no-wallet-address'
-                ? 'No wallet address found!'
-                : sendRes.error === 'invalid-data'
-                  ? 'Invalid data!'
-                  : sendRes.error === 'invalid-request'
-                    ? 'Invalid request!'
-                    : sendRes.error === 'source-tx-not-found'
-                      ? 'Source transaction not found!'
-                      : sendRes.error === 'no-account'
-                        ? 'No account found!'
-                        : 'An unknown error has occurred! Try again.';
-
-      setIsProcessing(false);
-      addSnackbar(message, 'error');
+      addSnackbar(getErrorMessage(sendRes.error), 'error');
       setPasswordConfirm('');
+      setIsProcessing(false);
       return;
     }
 

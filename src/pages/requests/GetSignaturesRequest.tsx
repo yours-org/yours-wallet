@@ -13,7 +13,7 @@ import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { sleep } from '../../utils/sleep';
 import TxPreview from '../../components/TxPreview';
 import { IndexContext } from 'spv-store';
-import { getTxFromRawTxFormat } from '../../utils/tools';
+import { getErrorMessage, getTxFromRawTxFormat } from '../../utils/tools';
 import { styled } from 'styled-components';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 
@@ -126,22 +126,13 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     const getSigsRes = await contractService.getSignatures(request, passwordConfirm);
 
     if (getSigsRes?.error) {
-      const message =
-        getSigsRes.error.message === 'invalid-password'
-          ? 'Invalid Password!'
-          : getSigsRes.error.message === 'unknown-address'
-            ? 'Unknown Address: ' + (getSigsRes.error.cause ?? '')
-            : 'An unknown error has occurred! Try again.';
-
       sendMessage({
         action: 'getSignaturesResponse',
         ...getSigsRes,
       });
 
+      addSnackbar(getErrorMessage(getSigsRes.error.message), 'error', 3000);
       setIsProcessing(false);
-
-      addSnackbar(message, 'error', 3000);
-
       return;
     }
 

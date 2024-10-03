@@ -22,6 +22,7 @@ import { sleep } from '../../utils/sleep';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { styled } from 'styled-components';
 import { Token } from '../../services/types/gorillaPool.types';
+import { getErrorMessage } from '../../utils/tools';
 
 const TokenIcon = styled.img`
   width: 3.5rem;
@@ -103,16 +104,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     const purchaseRes = await ordinalService.purchaseGlobalOrderbookListing(purchaseListing, inscription, tokenDetails);
 
     if (!purchaseRes.txid || purchaseRes.error) {
-      const message =
-        purchaseRes.error === 'invalid-password'
-          ? 'Invalid Password!'
-          : purchaseRes.error === 'insufficient-funds'
-            ? 'Insufficient Funds!'
-            : purchaseRes.error === 'no-ord-utxo'
-              ? 'Could not locate the ordinal!'
-              : 'An unknown error has occurred! Try again.';
-
-      addSnackbar(message, 'error');
+      addSnackbar(getErrorMessage(purchaseRes.error), 'error');
       setIsProcessing(false);
       return;
     }

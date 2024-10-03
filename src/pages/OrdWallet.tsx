@@ -14,9 +14,10 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { sleep } from '../utils/sleep';
 import { TopNav } from '../components/TopNav';
-import { ListOrdinal, OrdOperationResponse } from '../services/types/ordinal.types';
+import { ListOrdinal } from '../services/types/ordinal.types';
 import { Ordinal as OrdinalType } from 'yours-wallet-provider';
 import { WhiteLabelTheme } from '../theme.types';
+import { getErrorMessage } from '../utils/tools';
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -121,26 +122,6 @@ export const OrdWallet = () => {
     setSelectedOrdinal(undefined);
   };
 
-  const getErrorMessage = (response: OrdOperationResponse) => {
-    return response.error === 'invalid-password'
-      ? 'Invalid Password!'
-      : response.error === 'no-keys'
-        ? 'No keys were found!'
-        : response.error === 'insufficient-funds'
-          ? 'Insufficient Funds!'
-          : response.error === 'fee-too-high'
-            ? 'Miner fee too high!'
-            : response.error === 'no-bsv20-utxo'
-              ? 'No bsv20 token found!'
-              : response.error === 'token-details'
-                ? 'Could not gather token details!'
-                : response.error === 'no-ord-utxo'
-                  ? 'Could not locate the ordinal!'
-                  : response.error === 'broadcast-error'
-                    ? 'There was an error broadcasting the tx!'
-                    : 'An unknown error has occurred! Try again.';
-  };
-
   const handleTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -162,8 +143,8 @@ export const OrdWallet = () => {
     const transferRes = await transferOrdinal(receiveAddress, ordinalOutpoint, passwordConfirm);
 
     if (!transferRes.txid || transferRes.error) {
-      const errorMessage = getErrorMessage(transferRes);
-      addSnackbar(errorMessage, 'error');
+      addSnackbar(getErrorMessage(transferRes.error), 'error');
+      setIsProcessing(false);
       return;
     }
 
@@ -204,8 +185,8 @@ export const OrdWallet = () => {
     const listRes = await listOrdinalOnGlobalOrderbook(listing);
 
     if (!listRes.txid || listRes.error) {
-      const errorMessage = getErrorMessage(listRes);
-      addSnackbar(errorMessage, 'error');
+      addSnackbar(getErrorMessage(listRes.error), 'error');
+      setIsProcessing(false);
       return;
     }
 
@@ -228,8 +209,8 @@ export const OrdWallet = () => {
     const cancelRes = await cancelGlobalOrderbookListing(ordinalOutpoint, passwordConfirm);
 
     if (!cancelRes.txid || cancelRes.error) {
-      const errorMessage = getErrorMessage(cancelRes);
-      addSnackbar(errorMessage, 'error');
+      addSnackbar(getErrorMessage(cancelRes.error), 'error');
+      setIsProcessing(false);
       return;
     }
 

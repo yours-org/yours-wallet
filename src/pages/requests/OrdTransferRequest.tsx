@@ -15,6 +15,7 @@ import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { getErrorMessage } from '../../utils/tools';
 
 export type OrdTransferRequestProps = {
   request: TransferOrdinal;
@@ -66,16 +67,8 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     const transferRes = await ordinalService.transferOrdinal(request.address, request.outpoint, passwordConfirm);
 
     if (!transferRes.txid || transferRes.error) {
-      const message =
-        transferRes.error === 'invalid-password'
-          ? 'Invalid Password!'
-          : transferRes.error === 'insufficient-funds'
-            ? 'Insufficient Funds!'
-            : transferRes.error === 'no-ord-utxo'
-              ? 'Could not locate the ordinal!'
-              : 'An unknown error has occurred! Try again.';
-
-      addSnackbar(message, 'error');
+      addSnackbar(getErrorMessage(transferRes.error), 'error');
+      setIsProcessing(false);
       return;
     }
 

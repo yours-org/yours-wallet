@@ -15,7 +15,7 @@ import { getPrivateKeyFromTag, getTaggedDerivationKeys, Keys } from '../../utils
 import { sleep } from '../../utils/sleep';
 import { PublicKey } from '@bsv/sdk';
 import { OrdP2PKH } from 'js-1sat-ord';
-import { convertAddressToMainnet, convertAddressToTestnet } from '../../utils/tools';
+import { convertAddressToMainnet, convertAddressToTestnet, getErrorMessage } from '../../utils/tools';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 import { setDerivationTags } from '../../services/serviceHelpers';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
@@ -105,7 +105,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       const txid = await bsvService.sendBsv([{ satoshis: 1, script: insScript.toHex() }], password);
 
       if (!txid) {
-        return { error: 'no-txid' };
+        return { error: 'no-tag-inscription-txid' };
       }
 
       const network = chromeStorageService.getNetwork();
@@ -166,17 +166,8 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     setIsProcessing(true); // sendBsv processing in createTaggedKeys sets to false but it's still processing at this point
 
     if (!res.address || !res.pubKey) {
-      const message =
-        res.error === 'invalid-password'
-          ? 'Invalid Password!'
-          : res.error === 'no-keys'
-            ? 'Could not locate the wallet keys!'
-            : res.error === 'no-txid'
-              ? 'Error creating tag inscription'
-              : 'An unknown error has occurred! Try again.';
-
+      addSnackbar(getErrorMessage(res.error), 'error');
       setIsProcessing(false);
-      addSnackbar(message, 'error');
       return;
     }
 
