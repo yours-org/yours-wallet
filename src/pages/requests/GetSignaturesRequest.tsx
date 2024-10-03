@@ -157,12 +157,6 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     onSignature();
   };
 
-  const rejectSigning = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    e.preventDefault();
-    if (popupId) removeWindow(popupId);
-    await chromeStorageService.remove('getSignaturesRequest');
-  };
-
   const clearRequest = async () => {
     await chromeStorageService.remove('getSignaturesRequest');
     if (popupId) removeWindow(popupId);
@@ -196,14 +190,6 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
               label={`Sign Tx - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
               isSubmit
               disabled={isProcessing}
-            />
-            <Button
-              theme={theme}
-              type="secondary"
-              label="Cancel"
-              disabled={isProcessing}
-              onClick={rejectSigning}
-              style={{ marginTop: '0' }}
             />
             <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>

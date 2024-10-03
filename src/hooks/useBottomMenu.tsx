@@ -12,8 +12,6 @@ export const useBottomMenu = () => {
 
   useEffect(() => {
     if (!context || !navigate) return;
-    console.log('context.selected', context.selected);
-
     switch (context.selected) {
       case 'bsv':
         navigate('/bsv-wallet');

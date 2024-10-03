@@ -45,7 +45,7 @@
     "typescript": "^4.9.5",
     "url": "^0.11.3",
     "util": "^0.12.5",
-    "yours-wallet-provider": "^3.3.5"
+    "yours-wallet-provider": "^3.3.6"
   },
   "scripts": {
     "start": "react-app-rewired start",

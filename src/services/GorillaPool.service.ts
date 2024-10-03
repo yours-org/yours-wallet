@@ -17,7 +17,6 @@ export class GorillaPoolService {
       const { data } = await axios.get(`${this.getBaseUrl(network)}/api/txos/${outpoint}?script=true`);
       const ordUtxo: Ordinal = data;
       if (!ordUtxo.script) throw Error('No script when fetching by outpoint');
-      ordUtxo.script = Buffer.from(ordUtxo.script, 'base64').toString('hex');
       return ordUtxo;
     } catch (e) {
       throw new Error(JSON.stringify(e));

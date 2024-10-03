@@ -49,6 +49,7 @@ export enum YoursEventName {
   GET_PAYMENT_UTXOS = 'getPaymentUtxos',
   GET_EXCHANGE_RATE = 'getExchangeRate',
   PURCHASE_ORDINAL = 'purchaseOrdinalRequest',
+  PURCHASE_BSV20 = 'purchaseOrdinalRequest',
   GENERATE_TAGGED_KEYS = 'generateTaggedKeysRequest',
   GET_TAGGED_KEYS = 'getTaggedKeys',
   INSCRIBE = 'sendBsvRequest',
@@ -256,6 +257,7 @@ const provider: YoursProviderType = {
   getPaymentUtxos: createYoursMethod<Utxo[] | undefined, void>(YoursEventName.GET_PAYMENT_UTXOS),
   getExchangeRate: createYoursMethod<number | undefined, void>(YoursEventName.GET_EXCHANGE_RATE),
   purchaseOrdinal: createYoursMethod<string | undefined, PurchaseOrdinal>(YoursEventName.PURCHASE_ORDINAL),
+  purchaseBsv20: createYoursMethod<string | undefined, PurchaseOrdinal>(YoursEventName.PURCHASE_BSV20),
   generateTaggedKeys: createYoursMethod<TaggedDerivationResponse, TaggedDerivationRequest>(
     YoursEventName.GENERATE_TAGGED_KEYS,
   ),

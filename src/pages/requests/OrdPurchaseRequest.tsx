@@ -11,9 +11,23 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
-import { BSV_DECIMAL_CONVERSION, GLOBAL_ORDERBOOK_MARKET_RATE, YOURS_DEV_WALLET } from '../../utils/constants';
+import {
+  BSV20_INDEX_FEE,
+  BSV_DECIMAL_CONVERSION,
+  GENERIC_TOKEN_ICON,
+  GLOBAL_ORDERBOOK_MARKET_RATE,
+  YOURS_DEV_WALLET,
+} from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { styled } from 'styled-components';
+import { Token } from '../../services/types/gorillaPool.types';
+
+const TokenIcon = styled.img`
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+`;
 
 export type OrdPurchaseRequestProps = {
   request: PurchaseOrdinal & { password?: string };
@@ -30,6 +44,8 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   const { gorillaPoolService, ordinalService, chromeStorageService } = useServiceContext();
   const [inscription, setInscription] = useState<OrdinalType | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [tokenDetails, setTokenDetails] = useState<Token>();
+  const [isLoaded, setIsLoaded] = useState(false);
   const marketplaceAddress = request.marketplaceAddress ?? YOURS_DEV_WALLET;
   const marketplaceRate = request.marketplaceRate ?? GLOBAL_ORDERBOOK_MARKET_RATE;
   const outpoint = request.outpoint;
@@ -38,14 +54,19 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
 
   useEffect(() => {
     hideMenu();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
     if (!request.outpoint) return;
     const getOrigin = async () => {
+      setIsProcessing(true);
       const res = await gorillaPoolService.getUtxoByOutpoint(request.outpoint);
       setInscription(res);
+      if (res?.data?.bsv20) {
+        const tokenDetails = await gorillaPoolService.getBsv20Details(
+          res?.data.bsv20?.id || res.data.bsv20?.tick || '',
+        );
+        setTokenDetails(tokenDetails);
+      }
+      setIsProcessing(false);
+      setIsLoaded(true);
     };
 
     getOrigin();
@@ -54,6 +75,10 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
 
   const handlePurchaseOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!inscription) {
+      addSnackbar('Could not locate the ordinal!', 'error');
+      return;
+    }
     setIsProcessing(true);
 
     await sleep(25);
@@ -75,7 +100,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
       outpoint,
       password: passwordConfirm,
     };
-    const purchaseRes = await ordinalService.purchaseGlobalOrderbookListing(purchaseListing);
+    const purchaseRes = await ordinalService.purchaseGlobalOrderbookListing(purchaseListing, inscription, tokenDetails);
 
     if (!purchaseRes.txid || purchaseRes.error) {
       const message =
@@ -111,18 +136,36 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   return (
     <>
       <Show when={isProcessing}>
-        <PageLoader theme={theme} message="Purchasing Ordinal..." />
+        <PageLoader theme={theme} message={isLoaded ? 'Purchasing Ordinal...' : 'Processing...'} />
       </Show>
 
       <Show when={!isProcessing && !!request && !!inscription}>
         <ConfirmContent>
+          <Show
+            when={!tokenDetails}
+            whenFalseContent={
+              <TokenIcon
+                src={
+                  tokenDetails?.icon
+                    ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${tokenDetails.icon}`
+                    : GENERIC_TOKEN_ICON
+                }
+              />
+            }
+          >
+            <Ordinal
+              inscription={inscription as OrdinalType}
+              theme={theme}
+              url={`${gorillaPoolService.getBaseUrl(network)}/content/${inscription?.origin?.outpoint}`}
+              selected={true}
+            />
+          </Show>
           <HeaderText theme={theme}>Purchase Request</HeaderText>
-          <Ordinal
-            inscription={inscription as OrdinalType}
-            theme={theme}
-            url={`${gorillaPoolService.getBaseUrl(network)}/content/${inscription?.origin?.outpoint}`}
-            selected={true}
-          />
+          <Show when={!!tokenDetails}>
+            <Text theme={theme} style={{ color: theme.color.global.gray }}>
+              {tokenDetails?.sym || tokenDetails?.tick || inscription?.origin?.data?.map?.name || 'Unknown Token'}
+            </Text>
+          </Show>
           <FormContainer noValidate onSubmit={(e) => handlePurchaseOrdinal(e)}>
             <Show when={isPasswordRequired}>
               <Input
@@ -140,7 +183,8 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
               theme={theme}
               type="primary"
               label={`Pay ${(
-                (Number(inscription?.data?.list?.price) * (1 + marketplaceRate)) /
+                (Number(inscription?.data?.list?.price) * (1 + marketplaceRate) +
+                  (tokenDetails ? BSV20_INDEX_FEE : 0)) /
                 BSV_DECIMAL_CONVERSION
               ).toFixed(8)} BSV`}
               disabled={isProcessing}

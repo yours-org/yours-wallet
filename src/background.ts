@@ -249,6 +249,7 @@ if (isInServiceWorker) {
         case YoursEventName.TRANSFER_ORDINAL:
           return processTransferOrdinalRequest(message, sendResponse);
         case YoursEventName.PURCHASE_ORDINAL:
+        case YoursEventName.PURCHASE_BSV20:
           return processPurchaseOrdinalRequest(message, sendResponse);
         case YoursEventName.SIGN_MESSAGE:
           return processSignMessageRequest(message, sendResponse);

@@ -5,9 +5,11 @@ import {
   createOrdListings,
   OrdP2PKH,
   purchaseOrdListing,
+  purchaseOrdTokenListing,
   TokenType,
   TokenUtxo,
   transferOrdTokens,
+  Utxo,
 } from 'js-1sat-ord';
 import { Bsv20, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction, Utils } from '@bsv/sdk';
@@ -22,6 +24,7 @@ import { ChromeStorageService } from './ChromeStorage.service';
 import { truncate } from '../utils/format';
 import { theme } from '../theme';
 import { GorillaPoolService } from './GorillaPool.service';
+import { Token } from './types/gorillaPool.types';
 
 const client = new PaymailClient();
 
@@ -353,9 +356,13 @@ export class OrdinalService {
     }
   };
 
-  purchaseGlobalOrderbookListing = async (purchaseOrdinal: PurchaseOrdinal & { password: string }) => {
+  purchaseGlobalOrderbookListing = async (
+    purchaseOrdinal: PurchaseOrdinal & { password: string },
+    listingTxo: Ordinal,
+    tokenDetail?: Token,
+  ) => {
     try {
-      const { marketplaceAddress, marketplaceRate, outpoint, password } = purchaseOrdinal;
+      const { marketplaceAddress, marketplaceRate, password } = purchaseOrdinal;
       const isAuthenticated = await this.keysService.verifyPassword(password);
       if (!isAuthenticated) {
         return { error: 'invalid-password' };
@@ -365,17 +372,17 @@ export class OrdinalService {
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
       const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
 
-      const paymentPk = PrivateKey.fromWif(keys.walletWif);
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
 
-      const listingTxo = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
+      console.log('listingTxo', listingTxo);
       if (!listingTxo) return { error: 'no-ord-utxo' };
 
       if (!listingTxo?.data.list) {
         return { error: 'no-listing-data' };
       }
 
-      const price = Number(listingTxo.data?.list?.data.price);
-      const payout = listingTxo.data?.list?.data.payout;
+      const price = Number(listingTxo.data?.list?.price);
+      const payout = listingTxo.data?.list?.payout;
       if (!payout) return { error: 'bad-listing' };
 
       const additionalPayments: { to: string; amount: number }[] = [];
@@ -387,26 +394,65 @@ export class OrdinalService {
           amount: marketFee,
         });
       }
-      const { tx } = await purchaseOrdListing({
-        ordAddress: this.keysService.ordAddress,
-        paymentPk,
-        utxos: fundResults.txos.map((t) => ({
+      let tx: Transaction = new Transaction();
+      const utxos: Utxo[] = [];
+      fundResults.txos.forEach((t) => {
+        const pk = pkMap.get(t.owner || '');
+        if (!pk) return;
+        utxos.push({
           txid: t.outpoint.txid,
           vout: t.outpoint.vout,
           satoshis: Number(t.satoshis),
           script: Buffer.from(t.script).toString('base64'),
-        })),
-        listing: {
-          payout: payout,
-          listingUtxo: {
-            txid: listingTxo.outpoint.txid,
-            vout: listingTxo.outpoint.vout,
-            satoshis: Number(listingTxo.satoshis),
-            script: Buffer.from(listingTxo.script).toString('base64'),
-          },
-        },
-        additionalPayments,
+          pk,
+        });
       });
+      console.log('utxos:', utxos);
+      if (listingTxo.script && listingTxo?.data?.bsv20) {
+        if (!tokenDetail) return { error: 'no-token-details' };
+
+        additionalPayments.push({
+          to: tokenDetail.fundAddress,
+          amount: BSV20_INDEX_FEE,
+        });
+
+        const res = await purchaseOrdTokenListing({
+          protocol: listingTxo.data.bsv20.id ? TokenType.BSV21 : TokenType.BSV20,
+          ordAddress: this.keysService.ordAddress,
+          utxos,
+          tokenID: listingTxo.data.bsv20.id || listingTxo.data.bsv20.tick || '',
+          changeAddress: keys.walletAddress,
+          listingUtxo: {
+            txid: listingTxo.txid,
+            vout: listingTxo.vout,
+            satoshis: 1,
+            script: listingTxo.script,
+            payout,
+            price,
+            amt: String(listingTxo.data.bsv20.amt),
+            id: listingTxo.data.bsv20.id || listingTxo.data.bsv20.tick || '',
+          },
+          additionalPayments,
+        });
+        tx = res.tx;
+      } else if (listingTxo.script) {
+        const res = await purchaseOrdListing({
+          ordAddress: this.keysService.ordAddress,
+          changeAddress: keys.walletAddress,
+          utxos,
+          listing: {
+            payout,
+            listingUtxo: {
+              txid: listingTxo.txid,
+              vout: listingTxo.vout,
+              satoshis: 1,
+              script: listingTxo.script,
+            },
+          },
+          additionalPayments,
+        });
+        tx = res.tx;
+      }
 
       const response = await this.oneSatSPV.broadcast(tx);
       if (response?.txid) {
