@@ -104,6 +104,21 @@ export const Ordinal = (props: OrdinalProps) => {
   const { url, selected, isTransfer, size, inscription, theme, onClick } = props;
   const contentType = inscription?.origin?.data?.insc?.file?.type;
 
+  // We can use this function to properly render unique use cases that may have different metadata than what is supported by default
+  const getOrdinalName = () => {
+    if (inscription?.origin?.data?.map?.name) {
+      return inscription.origin?.data?.map?.name;
+    } else if (inscription?.origin?.data?.map?.app === 'ssm') {
+      if (inscription?.origin?.data?.map?.chatName) {
+        return `SSM - ${inscription?.origin?.data?.map?.chatName}`;
+      } else {
+        return 'Unknown SSM Channel';
+      }
+    } else {
+      return 'Unknown Name';
+    }
+  };
+
   const renderContent = () => {
     switch (true) {
       case contentType?.startsWith('image/svg'):
@@ -171,7 +186,7 @@ export const Ordinal = (props: OrdinalProps) => {
           style={{ margin: '0.25rem 0', cursor: 'pointer', fontSize: '0.75rem' }}
           onClick={() => window.open(url, '_blank')}
         >
-          {inscription?.origin?.data?.map?.name ?? 'Unknown name'}
+          {getOrdinalName()}
         </Text>
       </Show>
     </FlexWrapper>

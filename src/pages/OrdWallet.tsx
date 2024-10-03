@@ -402,9 +402,11 @@ export const OrdWallet = () => {
         }
       >
         <OrdinalsList>
-          <SectionHeader theme={theme}>My Listings</SectionHeader>
-          {renderOrdinals(listedOrdinals)}
-          <SectionHeader theme={theme}>My Ordinals</SectionHeader>
+          <Show when={listedOrdinals.length > 0}>
+            <SectionHeader theme={theme}>My Listings</SectionHeader>
+            {renderOrdinals(listedOrdinals)}
+            <SectionHeader theme={theme}>My Ordinals</SectionHeader>
+          </Show>
           {renderOrdinals(myOrdinals)}
         </OrdinalsList>
       </Show>

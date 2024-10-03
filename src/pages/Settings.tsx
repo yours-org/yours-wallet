@@ -246,6 +246,7 @@ export const Settings = () => {
     const key: keyof ChromeStorageObject = 'accounts';
     await chromeStorageService.removeNested(key, account.addresses.identityAddress);
     accounts = chromeStorageService.getAllAccounts();
+    indexedDB.deleteDatabase(`txos-${account.addresses.identityAddress}-${chromeStorageService.getNetwork()}`);
     await chromeStorageService.switchAccount(accounts[0].addresses.identityAddress);
     setPage('main');
   };
