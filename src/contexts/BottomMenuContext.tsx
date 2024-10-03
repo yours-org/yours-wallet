@@ -24,7 +24,7 @@ interface BottomMenuProviderProps {
 export const BottomMenuProvider = (props: BottomMenuProviderProps) => {
   const { children, network } = props;
   const { theme } = useTheme();
-  const [selected, setSelected] = useState<MenuItems | null>('bsv');
+  const [selected, setSelected] = useState<MenuItems | null>(null);
   const [query, setQuery] = useState('');
   const [isVisible, setIsVisible] = useState(false);
 

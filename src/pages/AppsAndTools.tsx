@@ -231,7 +231,7 @@ export const AppsAndTools = () => {
       setIsBroadcasting(true);
       setIsProcessing(true);
       const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
-      const res = await oneSatSPV.broadcast(tx);
+      const res = await oneSatSPV.broadcast(tx, 'manual', transactionFormat === 'beef');
       if (!res.txid) {
         addSnackbar('An error occurred while broadcasting the transaction', 'error');
         setPage('decode-broadcast');

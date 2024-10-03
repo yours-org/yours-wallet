@@ -221,11 +221,11 @@ export class ChromeStorageService {
 
   isPasswordRequired = (): boolean => {
     if (this.storage === null || this.storage === undefined) {
-      throw new Error('Storage is not initialized.');
+      return true;
     }
     const { accounts, selectedAccount } = this.storage as ChromeStorageObject;
     if (!accounts || !selectedAccount) {
-      throw new Error('No account found!');
+      return true;
     }
     const account = accounts[selectedAccount];
     if (account.settings.isPasswordRequired === undefined) {

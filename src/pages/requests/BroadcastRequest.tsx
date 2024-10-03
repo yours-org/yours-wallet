@@ -131,7 +131,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       }
       const tx = getTxFromRawTxFormat(rawtx, request.format || 'tx');
 
-      const resp = await oneSatSPV.broadcast(tx);
+      const resp = await oneSatSPV.broadcast(tx, 'provider', request.format === 'beef');
       if (resp.status === 'error') {
         addSnackbar('Error broadcasting the raw tx!', 'error');
         setIsProcessing(false);
