@@ -33,7 +33,7 @@ export type Bsv20SendRequestProps = {
 export const Bsv20SendRequest = (props: Bsv20SendRequestProps) => {
   const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
-  const { setSelected, hideMenu } = useBottomMenu();
+  const { handleSelect, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
   const { ordinalService, chromeStorageService, gorillaPoolService } = useServiceContext();
@@ -124,10 +124,10 @@ export const Bsv20SendRequest = (props: Bsv20SendRequestProps) => {
   };
 
   useEffect(() => {
-    setSelected('bsv');
+    handleSelect('bsv');
     hideMenu();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setSelected]);
+  }, [handleSelect, hideMenu]);
 
   const handleSendBsv20 = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

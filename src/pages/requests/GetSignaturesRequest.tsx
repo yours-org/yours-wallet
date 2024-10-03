@@ -35,7 +35,7 @@ export type GetSignaturesRequestProps = {
 
 export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { theme } = useTheme();
-  const { setSelected, hideMenu } = useBottomMenu();
+  const { handleSelect, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const { chromeStorageService, contractService, oneSatSPV, keysService } = useServiceContext();
@@ -94,10 +94,9 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   }, [oneSatSPV, request]);
 
   useEffect(() => {
-    setSelected('bsv');
+    handleSelect('bsv');
     hideMenu();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setSelected]);
+  }, [handleSelect, hideMenu]);
 
   const resetSendState = () => {
     setPasswordConfirm('');

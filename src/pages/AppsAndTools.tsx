@@ -156,7 +156,7 @@ type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unloc
 export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
-  const { setSelected, query } = useBottomMenu();
+  const { query } = useBottomMenu();
   const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
   const { bsvAddress, ordAddress, identityAddress } = keysService;
   const exchangeRate = chromeStorageService.getCurrentAccountObject().exchangeRateCache?.rate ?? 0;
@@ -187,10 +187,6 @@ export const AppsAndTools = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identityAddress, page]);
-
-  useEffect(() => {
-    setSelected('tools');
-  }, [setSelected]);
 
   useEffect(() => {
     if (!satAmount) return;

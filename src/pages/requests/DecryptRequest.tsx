@@ -28,7 +28,7 @@ export type DecryptRequestProps = {
 export const DecryptRequest = (props: DecryptRequestProps) => {
   const { request, onDecrypt, popupId } = props;
   const { theme } = useTheme();
-  const { setSelected, hideMenu } = useBottomMenu();
+  const { handleSelect, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [decryptedMessages, setDecryptedMessages] = useState<string[] | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
@@ -44,10 +44,9 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
   }, [hasDecrypted, isPasswordRequired, request]);
 
   useEffect(() => {
-    setSelected('bsv');
+    handleSelect('bsv');
     hideMenu();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setSelected]);
+  }, [handleSelect, hideMenu]);
 
   useEffect(() => {
     if (!decryptedMessages) return;

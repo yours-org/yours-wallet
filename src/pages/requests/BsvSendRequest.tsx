@@ -54,7 +54,7 @@ export type BsvSendRequestProps = {
 export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const { request, requestWithinApp, popupId, onResponse } = props;
   const { theme } = useTheme();
-  const { setSelected, hideMenu } = useBottomMenu();
+  const { handleSelect, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
@@ -185,10 +185,9 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
 
   useEffect(() => {
     if (requestWithinApp) return;
-    setSelected('bsv');
+    handleSelect('bsv');
     hideMenu();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestWithinApp, setSelected]);
+  }, [requestWithinApp, handleSelect, hideMenu]);
 
   const resetSendState = () => {
     setPasswordConfirm('');

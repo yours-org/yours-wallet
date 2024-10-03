@@ -123,7 +123,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const urlParams = new URLSearchParams(location.search);
   const isReload = urlParams.get('reload') === 'true';
   urlParams.delete('reload');
-  const { setSelected, handleSelect } = useBottomMenu();
+  const { handleSelect } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>('main');
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const [usdSendAmount, setUsdSendAmount] = useState<number | null>(null);
@@ -244,11 +244,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   useEffect(() => {
     if (isOrdRequest) {
-      setSelected('ords');
-    } else {
-      setSelected('bsv');
+      handleSelect('ords');
     }
-  }, [isOrdRequest, setSelected]);
+  }, [isOrdRequest, handleSelect]);
 
   useEffect(() => {
     if (!successTxId) return;

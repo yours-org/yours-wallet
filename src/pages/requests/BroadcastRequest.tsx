@@ -35,7 +35,7 @@ export type BroadcastRequestProps = {
 export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const { request, onBroadcast, popupId } = props;
   const { theme } = useTheme();
-  const { setSelected, hideMenu } = useBottomMenu();
+  const { handleSelect, hideMenu } = useBottomMenu();
   const [txid, setTxid] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -59,10 +59,10 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   }, []);
 
   useEffect(() => {
-    setSelected('bsv');
+    handleSelect('bsv');
     hideMenu();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [handleSelect, handleSelect]);
 
   const resetSendState = () => {
     setTxid('');

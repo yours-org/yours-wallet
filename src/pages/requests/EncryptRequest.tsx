@@ -29,7 +29,7 @@ export type EncryptRequestProps = {
 export const EncryptRequest = (props: EncryptRequestProps) => {
   const { request, onEncrypt, popupId } = props;
   const { theme } = useTheme();
-  const { setSelected, hideMenu } = useBottomMenu();
+  const { handleSelect, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [encryptedMessages, setEncryptedMessages] = useState<string[] | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
@@ -45,10 +45,9 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
   }, [hasEncrypted, isPasswordRequired, request]);
 
   useEffect(() => {
-    setSelected('bsv');
+    handleSelect('bsv');
     hideMenu();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setSelected]);
+  }, [handleSelect, hideMenu]);
 
   useEffect(() => {
     if (!encryptedMessages) return;

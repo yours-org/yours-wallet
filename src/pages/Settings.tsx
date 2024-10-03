@@ -119,7 +119,7 @@ type DecisionType = 'sign-out' | 'export-master-backup' | 'export-keys' | 'expor
 export const Settings = () => {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
-  const { setSelected, query, handleSelect } = useBottomMenu();
+  const { query, handleSelect } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { chromeStorageService, keysService, lockWallet, oneSatSPV } = useServiceContext();
   const [page, setPage] = useState<SettingsPage>(query === 'manage-accounts' ? 'manage-accounts' : 'main');
@@ -315,10 +315,6 @@ export const Settings = () => {
   const handleCancel = () => {
     setShowSpeedBump(false);
   };
-
-  useEffect(() => {
-    setSelected('settings');
-  }, [setSelected]);
 
   const handleSpeedBumpConfirm = async (password?: string) => {
     if (decisionType === 'sign-out') {

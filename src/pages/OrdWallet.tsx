@@ -8,7 +8,6 @@ import { Ordinal as OrdType } from 'yours-wallet-provider';
 import { PageLoader } from '../components/PageLoader';
 import { ButtonContainer, ConfirmContent, FormContainer, HeaderText, Text } from '../components/Reusable';
 import { Show } from '../components/Show';
-import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
@@ -77,7 +76,6 @@ type PageState = 'main' | 'transfer' | 'list' | 'cancel';
 
 export const OrdWallet = () => {
   const { theme } = useTheme();
-  const { setSelected } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>('main');
   const { chromeStorageService, ordinalService, gorillaPoolService } = useServiceContext();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -95,10 +93,6 @@ export const OrdWallet = () => {
 
   const listedOrdinals = ordinals.filter((o) => o?.data?.list);
   const myOrdinals = ordinals.filter((o) => !o?.data?.list);
-
-  useEffect(() => {
-    setSelected('ords');
-  }, [setSelected]);
 
   useEffect(() => {
     if (!successTxId) return;

@@ -103,11 +103,7 @@ export const App = () => {
   };
 
   useEffect(() => {
-    if (transferOrdinalRequest) {
-      menuContext?.handleSelect('ords');
-    }
-
-    if (purchaseOrdinalRequest) {
+    if (transferOrdinalRequest || purchaseOrdinalRequest) {
       menuContext?.handleSelect('ords');
     }
   }, [transferOrdinalRequest, purchaseOrdinalRequest, menuContext]);
