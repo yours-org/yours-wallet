@@ -127,7 +127,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       const sendRes = await sendBsv(request, passwordConfirm, noApprovalLimit);
       if (!sendRes.txid || sendRes.error) {
         addSnackbar(getErrorMessage(sendRes.error), 'error');
-        setIsProcessing(false);
         return;
       }
 

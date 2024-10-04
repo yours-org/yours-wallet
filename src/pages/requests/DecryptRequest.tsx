@@ -92,7 +92,6 @@ export const DecryptRequest = (props: DecryptRequestProps) => {
     await sleep(2000);
     setDecryptedMessages(decrypted);
     setHasDecrypted(true);
-    setIsProcessing(false);
     onDecrypt();
   };
 

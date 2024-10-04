@@ -115,7 +115,6 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
       action: 'purchaseOrdinalResponse',
       txid: purchaseRes.txid,
     });
-    setIsProcessing(false);
     onResponse();
   };
 

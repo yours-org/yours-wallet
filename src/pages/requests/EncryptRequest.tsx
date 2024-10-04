@@ -99,7 +99,6 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
     await sleep(2000);
     setEncryptedMessages(encrypted);
     setHasEncrypted(true);
-    setIsProcessing(false);
     onEncrypt();
   };
 

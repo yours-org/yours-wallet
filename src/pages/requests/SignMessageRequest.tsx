@@ -92,7 +92,6 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       action: 'signMessageResponse',
       ...signRes,
     });
-    setIsProcessing(false);
     onSignature();
   };
 

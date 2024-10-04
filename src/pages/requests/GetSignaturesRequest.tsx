@@ -144,7 +144,6 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
 
     addSnackbar('Successfully Signed!', 'success');
     await sleep(2000);
-    setIsProcessing(false);
     onSignature();
   };
 

@@ -79,7 +79,6 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
       action: 'transferOrdinalResponse',
       txid: transferRes.txid,
     });
-    setIsProcessing(false);
     onResponse();
   };
 

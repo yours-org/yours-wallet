@@ -184,7 +184,6 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
       pubKey: res.pubKey,
       tag: res.tag,
     });
-    setIsProcessing(false);
     onResponse();
   };
 
