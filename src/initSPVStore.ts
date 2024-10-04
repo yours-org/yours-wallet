@@ -10,6 +10,7 @@ import {
   OneSatWebSPV,
   OrdLockIndexer,
   OriginIndexer,
+  SigmaIndexer,
 } from 'spv-store';
 import { NetWork } from 'yours-wallet-provider';
 import { BlockHeightTrackerMessage } from './hooks/useBlockHeightTracker';
@@ -41,6 +42,7 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
     new OrdLockIndexer(owners, IndexMode.TrustAndVerify, network),
     new InscriptionIndexer(owners, IndexMode.TrustAndVerify, network),
     new MapIndexer(owners, IndexMode.Verify, network),
+    new SigmaIndexer(owners, IndexMode.Verify, network),
     new OriginIndexer(owners, IndexMode.TrustAndVerify, network),
   ];
 

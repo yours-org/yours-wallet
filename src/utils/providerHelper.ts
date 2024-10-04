@@ -18,7 +18,9 @@ export function mapOrdinal(t: Txo): Ordinal {
       data: {
         insc: {
           file: t.data?.origin?.data?.insc?.file && {
-            ...t.data.origin.data.insc.file,
+            type: t.data.origin.data.insc.file.type,
+            size: Number(t.data.origin.data.insc.file.size),
+            hash: t.data.origin.data.insc.file.hash,
             text:
               t.data.origin?.data?.insc?.file?.type.startsWith('text') &&
               t.data.origin.data.insc?.file?.content &&
@@ -30,6 +32,10 @@ export function mapOrdinal(t: Txo): Ordinal {
           },
         },
         map: t.data.origin.data?.map,
+        sigma: (t.data.origin.data?.sigma?.data || []).map((s: any) => ({
+          ...s,
+          signature: Utils.toBase64(s.signature),
+        })),
       },
     },
     height: t.block?.height,
@@ -37,7 +43,9 @@ export function mapOrdinal(t: Txo): Ordinal {
     data: {
       insc: {
         file: t.data?.insc?.data?.file && {
-          ...t.data.insc.data.file,
+          type: t.data.insc.data.file.type,
+          size: t.data.insc.data.file.size,
+          hash: t.data.insc.data.file.hash,
           text:
             t.data.insc?.data?.file?.type.startsWith('text') &&
             t.data.insc.data.file.content &&
