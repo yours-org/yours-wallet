@@ -1,6 +1,6 @@
 {
   "name": "yours-wallet",
-  "version": "3.3.0",
+  "version": "4.0.0",
   "private": true,
   "dependencies": {
     "@bsv/paymail": "^2.0.2",
