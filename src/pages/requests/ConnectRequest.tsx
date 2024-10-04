@@ -1,17 +1,18 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect } from 'react';
 import { styled } from 'styled-components';
-import { ThirdPartyAppRequestData, WhitelistedApp } from '../../App';
 import { Button } from '../../components/Button';
 import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { BottomMenuContext } from '../../contexts/BottomMenuContext';
-import { useBsv } from '../../hooks/useBsv';
-import { useOrds } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { storage } from '../../utils/storage';
 import greenCheck from '../../assets/green-check.svg';
-import { ColorThemeProps } from '../../theme';
+import { WhiteLabelTheme } from '../../theme.types';
+import { RequestParams, WhitelistedApp } from '../../inject';
+import { sendMessage } from '../../utils/chromeHelpers';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
+import { sleep } from '../../utils/sleep';
 
 const Container = styled.div`
   display: flex;
@@ -27,12 +28,12 @@ const Icon = styled.img<{ size: string }>`
   border-radius: 0.5rem;
 `;
 
-const PermissionsContainer = styled.div<ColorThemeProps>`
+const PermissionsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   padding: 1rem;
   width: 75%;
-  background-color: ${({ theme }) => theme.darkAccent};
+  background-color: ${({ theme }) => theme.color.global.row};
   border-radius: 0.75rem;
   margin: 1rem 0 1.5rem 0;
 `;
@@ -49,19 +50,19 @@ const CheckMark = styled.img`
 `;
 
 export type ConnectRequestProps = {
-  thirdPartyAppRequestData: ThirdPartyAppRequestData | undefined;
+  request: RequestParams | undefined;
   whiteListedApps: WhitelistedApp[];
   popupId: number | undefined;
   onDecision: () => void;
 };
+
 export const ConnectRequest = (props: ConnectRequestProps) => {
-  const { thirdPartyAppRequestData, whiteListedApps, popupId, onDecision } = props;
+  const { request, whiteListedApps, onDecision } = props;
   const { theme } = useTheme();
   const context = useContext(BottomMenuContext);
   const { addSnackbar } = useSnackbar();
-  const [isDecided, setIsDecided] = useState(false);
-  const { bsvPubKey, identityPubKey } = useBsv();
-  const { ordPubKey } = useOrds();
+  const { keysService, chromeStorageService } = useServiceContext();
+  const { identityPubKey, bsvPubKey, ordPubKey, identityAddress } = keysService;
 
   useEffect(() => {
     if (!context) return;
@@ -71,97 +72,105 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   }, [context]);
 
   useEffect(() => {
-    if (isDecided) return;
-    if (thirdPartyAppRequestData && !thirdPartyAppRequestData.isAuthorized) return;
-    if (!bsvPubKey || !ordPubKey) return;
+    if (!request?.isAuthorized) return;
+    if (!identityPubKey || !bsvPubKey || !ordPubKey) return;
     if (!window.location.href.includes('localhost')) {
-      chrome.runtime.sendMessage({
+      onDecision();
+      sendMessage({
         action: 'userConnectResponse',
         decision: 'approved',
-        pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
+        pubKeys: { identityPubKey, bsvPubKey, ordPubKey },
       });
-      storage.remove('connectRequest');
-      // We don't want the window to stay open after a successful connection. The 10ms timeout is used because of some weirdness with how chrome.sendMessage() works
-      setTimeout(() => {
-        if (popupId) chrome.windows.remove(popupId);
-      }, 1000);
     }
-  }, [bsvPubKey, ordPubKey, popupId, thirdPartyAppRequestData, isDecided, identityPubKey]);
+  }, [request, identityPubKey, bsvPubKey, ordPubKey, onDecision]);
 
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
-  const handleConnectDecision = async (approved: boolean) => {
-    if (chrome.runtime) {
-      if (approved) {
-        storage.set({
+  const handleAccept = async () => {
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) throw Error('No account found');
+    const { settings } = account;
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [identityAddress]: {
+        ...account,
+        settings: {
+          ...settings,
           whitelist: [
             ...whiteListedApps,
             {
-              domain: thirdPartyAppRequestData?.domain,
-              icon: thirdPartyAppRequestData?.appIcon,
+              domain: request?.domain ?? '',
+              icon: request?.appIcon ?? '',
             },
           ],
-        });
-        chrome.runtime.sendMessage({
-          action: 'userConnectResponse',
-          decision: 'approved',
-          pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
-        });
-        addSnackbar(`Approved`, 'success');
-      } else {
-        chrome.runtime.sendMessage({
-          action: 'userConnectResponse',
-          decision: 'declined',
-        });
+        },
+      },
+    };
+    await chromeStorageService.updateNested(key, update);
+    addSnackbar(`Approved`, 'success');
+    await sleep(2000);
+    onDecision();
+    sendMessage({
+      action: 'userConnectResponse',
+      decision: 'approved',
+      pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
+    });
+  };
 
-        addSnackbar(`Declined`, 'error');
-      }
-    }
-
-    setIsDecided(true);
-
-    storage.remove('connectRequest');
-    setTimeout(() => {
-      if (popupId) chrome.windows.remove(popupId);
-    }, 100);
+  const handleDecline = async () => {
+    onDecision();
+    sendMessage({
+      action: 'userConnectResponse',
+      decision: 'declined',
+    });
+    addSnackbar(`Declined`, 'error');
   };
 
   return (
     <Show
-      when={!thirdPartyAppRequestData?.isAuthorized}
+      when={!request?.isAuthorized}
       whenFalseContent={
         <Container>
           <Text theme={theme} style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-            Reconnecting to {thirdPartyAppRequestData?.appName} ...
+            Reconnecting to {request?.appName} ...
           </Text>
         </Container>
       }
     >
       <Container>
-        <Icon size="5rem" src={thirdPartyAppRequestData?.appIcon} />
+        <Icon size="5rem" src={request?.appIcon} />
         <HeaderText theme={theme} style={{ width: '90%' }}>
-          {thirdPartyAppRequestData?.appName}
+          {request?.appName}
         </HeaderText>
         <Text theme={theme} style={{ marginBottom: '1rem' }}>
-          {thirdPartyAppRequestData?.domain}
+          {request?.domain}
         </Text>
         <PermissionsContainer theme={theme}>
           <Permission>
             <CheckMark style={{ marginRight: '1rem' }} src={greenCheck} />
-            <Text style={{ color: theme.white, margin: 0, textAlign: 'left' }}>View your wallet public keys</Text>
+            <Text
+              theme={theme}
+              style={{
+                color:
+                  theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
+                margin: 0,
+                textAlign: 'left',
+              }}
+            >
+              View your wallet public keys
+            </Text>
           </Permission>
           <Permission>
             <CheckMark style={{ marginRight: '1rem' }} src={greenCheck} />
-            <Text style={{ color: theme.white, margin: 0, textAlign: 'left' }}>Request approval for transactions</Text>
+            <Text
+              theme={theme}
+              style={{
+                color:
+                  theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
+                margin: 0,
+                textAlign: 'left',
+              }}
+            >
+              Request approval for transactions
+            </Text>
           </Permission>
         </PermissionsContainer>
         <Button
@@ -170,8 +179,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
           label="Connect"
           onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
-            handleConnectDecision(true);
-            onDecision();
+            handleAccept();
           }}
         />
         <Button
@@ -180,8 +188,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
           label="Cancel"
           onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
-            handleConnectDecision(false);
-            onDecision();
+            handleDecline();
           }}
         />
       </Container>

@@ -1,21 +1,19 @@
-import { PublicKey } from 'bsv-wasm-web';
 import { useEffect, useState } from 'react';
-import { BackButton } from '../../components/BackButton';
+import { EncryptRequest as EncryptRequestType } from 'yours-wallet-provider';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useBsv, Web3EncryptRequest } from '../../hooks/useBsv';
-import { useKeys } from '../../hooks/useKeys';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { encryptUsingPrivKey } from '../../utils/crypto';
 import { getPrivateKeyFromTag, Keys } from '../../utils/keys';
 import { sleep } from '../../utils/sleep';
-import { storage } from '../../utils/storage';
+import { PublicKey } from '@bsv/sdk';
 
 export type EncryptResponse = {
   encryptedMessages: string[];
@@ -23,33 +21,33 @@ export type EncryptResponse = {
 };
 
 export type EncryptRequestProps = {
-  messageToEncrypt: Web3EncryptRequest;
+  request: EncryptRequestType;
   popupId: number | undefined;
   onEncrypt: () => void;
 };
 
 export const EncryptRequest = (props: EncryptRequestProps) => {
-  const { messageToEncrypt, onEncrypt, popupId } = props;
+  const { request, onEncrypt, popupId } = props;
   const { theme } = useTheme();
-  const { setSelected } = useBottomMenu();
+  const { handleSelect, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [encryptedMessages, setEncryptedMessages] = useState<string[] | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useWeb3Context();
-  const { retrieveKeys } = useKeys();
+  const { chromeStorageService, keysService } = useServiceContext();
   const [hasEncrypted, setHasEncrypted] = useState(false);
-
-  const { isProcessing, setIsProcessing } = useBsv();
+  const isPasswordRequired = chromeStorageService.isPasswordRequired();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    if (hasEncrypted || isPasswordRequired || !messageToEncrypt || !retrieveKeys) return;
+    if (hasEncrypted || isPasswordRequired || !request) return;
     handleEncryption();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasEncrypted, isPasswordRequired, messageToEncrypt, retrieveKeys]);
+  }, [hasEncrypted, isPasswordRequired, request]);
 
   useEffect(() => {
-    setSelected('bsv');
-  }, [setSelected]);
+    handleSelect('bsv');
+    hideMenu();
+  }, [handleSelect, hideMenu]);
 
   useEffect(() => {
     if (!encryptedMessages) return;
@@ -59,17 +57,6 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, encryptedMessages]);
-
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      storage.remove('encryptRequest');
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, []);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -86,14 +73,14 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
       return;
     }
 
-    const keys = (await retrieveKeys(passwordConfirm)) as Keys;
+    const keys = (await keysService.retrieveKeys(passwordConfirm)) as Keys;
 
-    const PrivKey = getPrivateKeyFromTag(messageToEncrypt.tag ?? { label: 'panda', id: 'identity', domain: '' }, keys);
+    const PrivKey = getPrivateKeyFromTag(request.tag ?? { label: 'yours', id: 'identity', domain: '' }, keys);
 
     const encrypted = encryptUsingPrivKey(
-      messageToEncrypt.message,
-      messageToEncrypt.encoding,
-      messageToEncrypt.pubKeys.map((key) => PublicKey.from_hex(key)),
+      request.message,
+      request.encoding,
+      request.pubKeys.map((key) => PublicKey.fromString(key)),
       PrivKey,
     );
 
@@ -103,25 +90,22 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
       return;
     }
 
-    chrome.runtime.sendMessage({
+    sendMessage({
       action: 'encryptResponse',
       encryptedMessages: encrypted,
     });
 
     addSnackbar('Successfully Encrypted!', 'success');
+    await sleep(2000);
     setEncryptedMessages(encrypted);
     setHasEncrypted(true);
     setIsProcessing(false);
-    setTimeout(() => {
-      onEncrypt();
-      storage.remove('encryptRequest');
-      if (popupId) chrome.windows.remove(popupId);
-    }, 2000);
+    onEncrypt();
   };
 
-  const clearRequest = () => {
-    storage.remove('encryptRequest');
-    if (popupId) chrome.windows.remove(popupId);
+  const clearRequest = async () => {
+    await chromeStorageService.remove('encryptRequest');
+    if (popupId) removeWindow(popupId);
     window.location.reload();
   };
 
@@ -130,9 +114,8 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
       <Show when={isProcessing}>
         <PageLoader theme={theme} message="Encrypting Message..." />
       </Show>
-      <Show when={!isProcessing && !!messageToEncrypt && !hasEncrypted}>
+      <Show when={!isProcessing && !!request && !hasEncrypted}>
         <ConfirmContent>
-          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Encrypt Message</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             {'The app is requesting to encrypt a message using your private key:'}
@@ -154,6 +137,7 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
               />
             </Show>
             <Button theme={theme} type="primary" label="Encrypt Message" disabled={isProcessing} isSubmit />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </ConfirmContent>
       </Show>

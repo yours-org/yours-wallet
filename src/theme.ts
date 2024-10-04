@@ -1,27 +1,61 @@
-export interface Theme {
-  darkAccent: string;
-  mainBackground: string;
-  lightAccent: string;
-  primaryButton: string;
-  white: string;
-  black: string;
-  gray: string;
-  errorRed: string;
-  warning: string;
-}
+import { Theme } from './theme.types';
 
-export type ColorThemeProps = {
-  theme: Theme;
-};
-
-export const defaultTheme: Theme = {
-  darkAccent: '#17191E',
-  mainBackground: '#010101',
-  lightAccent: '#A1FF8B',
-  primaryButton: '#34D399',
-  white: '#FFFFFF',
-  black: '#000000',
-  gray: '#98A2B3',
-  errorRed: '#FF4646',
-  warning: '#F79009',
+export const theme: Theme = {
+  color: {
+    component: {
+      bottomMenuBackground: '#010101',
+      bottomMenuText: '#FFFFFF',
+      ordinalSelectedBorder: '#A1FF8B',
+      ordinalTypeJson: '#34D399',
+      ordinalTypePlainText: '#34D399',
+      ordinalTypeUnsupported: '#FFFFFF',
+      pageLoaderSpinner: '#A1FF8B',
+      pageLoaderSpinnerBorder: '#FFFFFF50',
+      pageLoaderText: '#FFFFFF',
+      primaryButtonLeftGradient: '#A1FF8B',
+      primaryButtonRightGradient: '#34D399',
+      primaryButtonText: '#010101',
+      progressBar: '#34D399',
+      progressBarTrack: '#F5F5F5',
+      queueBannerSynced: '#34D399',
+      queueBannerSyncedText: '#000000',
+      queueBannerSyncing: '#F79009',
+      queueBannerSyncingText: '#000000',
+      secondaryOutlineButtonGradientLeft: '#A1FF8B',
+      secondaryOutlineButtonGradientRight: '#34D399',
+      secondaryOutlineButtonText: '#010101',
+      snackbarError: '#FF4646',
+      snackbarErrorText: '#000000',
+      snackbarSuccess: '#34D399',
+      snackbarSuccessText: '#000000',
+      snackbarWarning: '#F79009',
+      snackbarWarningText: '#000000',
+      tabSelectedLeftGradient: '#A1FF8B',
+      tabSelectedRightGradient: '#34D399',
+      tabSelectedText: '#010101',
+      tabUnselected: '#17191E',
+      tabUnselectedText: '#FFFFFF',
+      toggleSwitchOn: '#34D399',
+      warningButton: '#FF4646',
+      warningButtonText: '#FFFFFF',
+    },
+    global: {
+      neutral: '#000000',
+      gray: '#98A2B3',
+      primaryTheme: 'dark',
+      row: '#17191E',
+      walletBackground: '#010101',
+      contrast: '#FFFFFF',
+    },
+  },
+  settings: {
+    repo: 'https://github.com/yours-org/yours-wallet',
+    services: {
+      apps: true,
+      bsv20: true,
+      locks: true,
+      ordinals: true,
+    },
+    walletName: 'Yours',
+  },
 };

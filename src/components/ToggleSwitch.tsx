@@ -1,6 +1,6 @@
 import styled from 'styled-components';
 import { ChangeEvent } from 'react';
-import { ColorThemeProps, Theme } from '../theme';
+import { WhiteLabelTheme, Theme } from '../theme.types';
 
 const Label = styled.label`
   display: flex;
@@ -9,11 +9,14 @@ const Label = styled.label`
   cursor: pointer;
 `;
 
-const Switch = styled.div<ColorThemeProps>`
+const Switch = styled.div<WhiteLabelTheme>`
   position: relative;
   width: 2rem;
   height: 1rem;
-  background: ${({ theme }) => theme.white + '30'};
+  background: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'light'
+      ? theme.color.global.neutral + '30'
+      : theme.color.global.contrast + '30'};
   border-radius: 2rem;
   padding: 0.25rem;
   transition: 300ms all;
@@ -24,23 +27,24 @@ const Switch = styled.div<ColorThemeProps>`
     position: absolute;
     width: 1.25rem;
     height: 1.25rem;
-    border-radius: 2.1875rem;
+    border-radius: 50%;
     top: 50%;
-    left: 0rem;
-    background: ${({ theme }) => theme.white};
+    left: 0.125rem;
+    background: ${({ theme }) =>
+      theme.color.global.primaryTheme === 'light' ? theme.color.global.neutral : theme.color.global.contrast};
     transform: translate(0, -50%);
   }
 `;
 
-const Input = styled.input<ColorThemeProps>`
+const Input = styled.input<WhiteLabelTheme>`
   opacity: 0;
   position: absolute;
 
   &:checked + ${Switch} {
-    background: ${({ theme }) => theme.primaryButton + '95'};
+    background: ${({ theme }) => theme.color.component.toggleSwitchOn};
 
     &:before {
-      transform: translate(1.25rem, -50%);
+      transform: translate(1rem, -50%);
     }
   }
 `;

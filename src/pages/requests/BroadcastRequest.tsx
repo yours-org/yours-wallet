@@ -1,26 +1,33 @@
-import init, { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
-import { BackButton } from '../../components/BackButton';
+import { Broadcast } from 'yours-wallet-provider';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useBsv, Web3BroadcastRequest } from '../../hooks/useBsv';
-import { useGorillaPool } from '../../hooks/useGorillaPool';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
-import { storage } from '../../utils/storage';
+import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { getTxFromRawTxFormat } from '../../utils/tools';
+import { IndexContext } from 'spv-store';
+import TxPreview from '../../components/TxPreview';
+import { styled } from 'styled-components';
+
+const Wrapper = styled(ConfirmContent)`
+  max-height: calc(100vh - 8rem);
+  overflow-y: auto;
+`;
 
 export type BroadcastResponse = {
   txid: string;
 };
 
 export type BroadcastRequestProps = {
-  request: Web3BroadcastRequest;
+  request: Broadcast;
   popupId: number | undefined;
   onBroadcast: () => void;
 };
@@ -28,137 +35,147 @@ export type BroadcastRequestProps = {
 export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const { request, onBroadcast, popupId } = props;
   const { theme } = useTheme();
-  const { setSelected } = useBottomMenu();
+  const { handleSelect, hideMenu } = useBottomMenu();
   const [txid, setTxid] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [satsOut, setSatsOut] = useState(0);
-  const { broadcastWithGorillaPool } = useGorillaPool();
-  const { isProcessing, setIsProcessing, updateBsvBalance, fundRawTx, bsvAddress } = useBsv();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [txData, setTxData] = useState<IndexContext>();
+  const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
+  const { bsvAddress, ordAddress, identityAddress } = keysService;
 
   useEffect(() => {
-    setSelected('bsv');
-  }, [setSelected]);
-
-  useEffect(() => {
-    if (!txid) return;
-    if (!message && txid) {
-      resetSendState();
-    }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [message, txid]);
-
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
-  useEffect(() => {
-    if (!bsvAddress) return;
     (async () => {
-      await init();
-      const tx = Transaction.from_hex(request.rawtx);
-      let satsOut = 0;
-      const changeScript = P2PKHAddress.from_string(bsvAddress).get_locking_script().to_hex();
-      for (let index = 0; index < tx.get_noutputs(); index++) {
-        if (tx.get_output(index)?.get_script_pub_key_hex() !== changeScript) {
-          satsOut += Number(tx.get_output(index)!.get_satoshis());
-        }
-      }
-      setSatsOut(satsOut);
+      if (!request.rawtx || !oneSatSPV || !!txData) return;
+      setIsLoading(true);
+      const tx = getTxFromRawTxFormat(request.rawtx, request.format || 'tx');
+      const parsedTx = await oneSatSPV.parseTx(tx);
+      setTxData(parsedTx);
+      setIsLoading(false);
     })();
-  }, [bsvAddress, request.fund, request.rawtx]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    handleSelect('bsv');
+    hideMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleSelect, handleSelect]);
 
   const resetSendState = () => {
     setTxid('');
     setIsProcessing(false);
   };
 
+  useEffect(() => {
+    if (!txid) return;
+    if (!message && txid) {
+      resetSendState();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [message, txid]);
+
+  useEffect(() => {
+    if (!bsvAddress || !ordAddress || !identityAddress || !oneSatSPV || !txData) return;
+    (async () => {
+      console.log(bsvAddress, ordAddress, identityAddress);
+      // how much did the user put in to the tx
+      let userSatsOut = txData.spends.reduce((acc, spend) => {
+        if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
+          return acc + spend.satoshis;
+        }
+        return acc;
+      }, 0n);
+
+      // how much did the user get back from the tx
+      userSatsOut = txData.txos.reduce((acc, txo) => {
+        if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
+          return acc - txo.satoshis;
+        }
+        return acc;
+      }, userSatsOut);
+
+      setSatsOut(Number(userSatsOut));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txData]);
+
   const handleBroadcast = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsProcessing(true);
-    await sleep(25);
+    try {
+      setIsProcessing(true);
+      await sleep(25);
 
-    let rawtx = request.rawtx;
-    if (request.fund) {
-      if (!passwordConfirm) {
-        addSnackbar('Must enter a password!', 'error');
+      let rawtx = request.rawtx;
+      if (request.fund) {
+        if (!passwordConfirm) {
+          addSnackbar('Must enter a password!', 'error');
+          setIsProcessing(false);
+          return;
+        }
+
+        const res = await bsvService.fundRawTx(rawtx, passwordConfirm);
+        if (!res.rawtx || res.error) {
+          const message =
+            res.error === 'invalid-password'
+              ? 'Invalid Password!'
+              : 'An unknown error has occurred! Try again.' + res.error;
+
+          addSnackbar(message, 'error');
+          setIsProcessing(false);
+          return;
+        }
+        rawtx = res.rawtx;
+      }
+      const tx = getTxFromRawTxFormat(rawtx, request.format || 'tx');
+
+      const resp = await oneSatSPV.broadcast(tx, 'provider', request.format === 'beef');
+      if (resp.status === 'error') {
+        addSnackbar('Error broadcasting the raw tx!', 'error');
         setIsProcessing(false);
+        sendMessage({
+          action: 'broadcastResponse',
+          error: resp.description ?? 'Unknown error',
+        });
+        onBroadcast();
         return;
       }
-
-      const res = await fundRawTx(rawtx, passwordConfirm);
-      if (!res.rawtx || res.error) {
-        const message =
-          res.error === 'invalid-password'
-            ? 'Invalid Password!'
-            : 'An unknown error has occurred! Try again.' + res.error;
-
-        addSnackbar(message, 'error');
-        setIsProcessing(false);
-        return;
-      }
-      rawtx = res.rawtx;
-    }
-    const { txid, message } = await broadcastWithGorillaPool(rawtx);
-    if (!txid) {
-      addSnackbar('Error broadcasting the raw tx!', 'error');
-      setIsProcessing(false);
-
-      chrome.runtime.sendMessage({
+      setTxid(resp.txid);
+      sendMessage({
         action: 'broadcastResponse',
-        error: message ?? 'Unknown error',
+        txid: resp.txid,
       });
 
-      setTimeout(() => {
-        onBroadcast();
-        if (popupId) chrome.windows.remove(popupId);
-      }, 2000);
-      return;
-    }
-    setTxid(txid);
-    chrome.runtime.sendMessage({
-      action: 'broadcastResponse',
-      txid,
-    });
-
-    setIsProcessing(false);
-    addSnackbar('Successfully broadcasted the tx!', 'success');
-
-    storage.remove('broadcastRequest');
-    setTimeout(async () => {
-      await updateBsvBalance(true).catch(() => {});
+      addSnackbar('Successfully broadcasted the tx!', 'success');
+      await sleep(2000);
       onBroadcast();
-      if (popupId) chrome.windows.remove(popupId);
-    }, 2000);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const clearRequest = () => {
-    storage.remove('broadcastRequest');
-    if (popupId) chrome.windows.remove(popupId);
+  const clearRequest = async () => {
+    await chromeStorageService.remove('broadcastRequest');
+    if (popupId) removeWindow(popupId);
     window.location.reload();
   };
 
   return (
     <>
-      <Show when={isProcessing}>
-        <PageLoader theme={theme} message="Broadcasting transaction..." />
+      <Show when={isProcessing || isLoading}>
+        <PageLoader theme={theme} message={isLoading ? 'Loading request...' : 'Broadcasting transaction...'} />
       </Show>
-      <Show when={!isProcessing && !!request}>
-        <ConfirmContent>
-          <BackButton onClick={clearRequest} />
+      <Show when={!isProcessing && !isLoading && !!request && !!txData}>
+        <Wrapper>
           <HeaderText theme={theme}>Broadcast Raw Tx</HeaderText>
-          <Text theme={theme} style={{ margin: '0.75rem 0' }}>
+          <Text theme={theme} style={{ margin: '0.75rem 0', textAlign: 'center' }}>
             The app is requesting to broadcast a transaction.
           </Text>
-          <FormContainer noValidate onSubmit={(e) => handleBroadcast(e)}>
+          <FormContainer noValidate onSubmit={handleBroadcast}>
             <Show when={!!request.fund && satsOut > 0}>
               <Input
                 theme={theme}
@@ -168,18 +185,17 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
                 onChange={(e) => setPasswordConfirm(e.target.value)}
               />
             </Show>
-            <Text theme={theme} style={{ margin: '1rem' }}>
-              Double check details before sending.
-            </Text>
+            {txData && <TxPreview txData={txData} />}
             <Button
               theme={theme}
               type="primary"
-              label={`Broadcast - ${satsOut / BSV_DECIMAL_CONVERSION} BSV`}
+              label={`Broadcast - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
               disabled={isProcessing}
               isSubmit
             />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
-        </ConfirmContent>
+        </Wrapper>
       </Show>
     </>
   );

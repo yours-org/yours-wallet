@@ -1,5 +1,5 @@
+import { FaChevronRight } from 'react-icons/fa';
 import styled from 'styled-components';
-import rightChevron from '../assets/right-chevron.svg';
 
 export const Image = styled.img`
   width: 1.25rem;
@@ -10,10 +10,11 @@ export const Image = styled.img`
 `;
 
 export type ForwardButtonProps = {
+  color: string;
   onClick?: () => void;
 };
 
 export const ForwardButton = (props: ForwardButtonProps) => {
-  const { onClick } = props;
-  return <Image src={rightChevron} onClick={onClick} />;
+  const { color, onClick } = props;
+  return <FaChevronRight color={color} onClick={onClick} />;
 };

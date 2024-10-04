@@ -1,11 +1,10 @@
 import styled from 'styled-components';
-import { OrdinalTxo } from '../hooks/ordTypes';
-import { ColorThemeProps, Theme } from '../theme';
+import { Ordinal as OrdinalType } from 'yours-wallet-provider';
+import { WhiteLabelTheme, Theme } from '../theme.types';
 import { Text } from './Reusable';
 import { Show } from './Show';
-import React from 'react';
 
-export type OrdinalDivProps = ColorThemeProps & {
+export type OrdinalDivProps = WhiteLabelTheme & {
   url: string;
   selected?: boolean;
   size?: string;
@@ -20,7 +19,8 @@ const OrdinalWrapper = styled.div<OrdinalDivProps>`
   background-repeat: no-repeat;
   border-radius: 1.25rem;
   cursor: pointer;
-  border: ${(props) => (props.selected ? `0.1rem solid ${props.theme.lightAccent}` : undefined)};
+  border: ${(props) =>
+    props.selected ? `0.1rem solid ${props.theme.color.component.ordinalSelectedBorder}` : undefined};
 `;
 
 const StyledIFrame = styled.iframe<{ size?: string }>`
@@ -38,11 +38,11 @@ const TextWrapper = styled(OrdinalWrapper)`
   align-items: center;
   justify-content: center;
   overflow-x: auto;
-  background-color: ${(props) => props.theme.darkAccent};
+  background-color: ${(props) => props.theme.color.global.row};
 `;
 
 const OrdText = styled(Text)`
-  color: ${(props) => props.theme.primaryButton};
+  color: ${(props) => props.theme.color.component.ordinalTypePlainText};
   text-align: center;
   width: 100%;
   margin: 0;
@@ -50,7 +50,7 @@ const OrdText = styled(Text)`
 `;
 
 const UnsupportedText = styled(OrdText)`
-  color: ${(props) => props.theme.white};
+  color: ${(props) => props.theme.color.component.ordinalTypeUnsupported};
 `;
 
 const JsonWrapper = styled.div<OrdinalDivProps>`
@@ -61,17 +61,17 @@ const JsonWrapper = styled.div<OrdinalDivProps>`
   width: ${(props) => props.size ?? '6.5rem'};
   border-radius: 0.5rem;
   position: relative;
-  background-color: ${(props) => props.theme.darkAccent};
-  margin: 0.5rem;
+  background-color: ${(props) => props.theme.color.global.row};
   cursor: pointer;
-  border: ${(props) => (props.selected ? `0.1rem solid ${props.theme.lightAccent}` : undefined)};
+  border: ${(props) =>
+    props.selected ? `0.1rem solid ${props.theme.color.component.ordinalSelectedBorder}` : undefined};
   overflow: auto;
 `;
 
-export const Json = styled.pre<ColorThemeProps>`
+export const Json = styled.pre<WhiteLabelTheme>`
   font-family: 'DM Mono', monospace;
   font-size: 0.65rem;
-  color: ${(props) => props.theme.primaryButton};
+  color: ${(props) => props.theme.color.component.ordinalTypeJson};
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
@@ -82,7 +82,12 @@ export const FlexWrapper = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 0.5rem;
+  margin: 0.25rem;
+  transition: 0.3s ease-in-out;
+
+  &:hover {
+    transform: scale(1.02);
+  }
 `;
 
 export type OrdinalProps = {
@@ -91,13 +96,28 @@ export type OrdinalProps = {
   isTransfer?: boolean;
   selected?: boolean;
   size?: string;
-  inscription: OrdinalTxo;
+  inscription: OrdinalType;
   onClick?: () => void;
 };
 
 export const Ordinal = (props: OrdinalProps) => {
   const { url, selected, isTransfer, size, inscription, theme, onClick } = props;
   const contentType = inscription?.origin?.data?.insc?.file?.type;
+
+  // We can use this function to properly render unique use cases that may have different metadata than what is supported by default
+  const getOrdinalName = () => {
+    if (inscription?.origin?.data?.map?.name) {
+      return inscription.origin?.data?.map?.name;
+    } else if (inscription?.origin?.data?.map?.app === 'ssm') {
+      if (inscription?.origin?.data?.map?.chatName) {
+        return `SSM - ${inscription?.origin?.data?.map?.chatName}`;
+      } else {
+        return 'Unknown SSM Channel';
+      }
+    } else {
+      return 'Unknown Name';
+    }
+  };
 
   const renderContent = () => {
     switch (true) {
@@ -136,16 +156,16 @@ export const Ordinal = (props: OrdinalProps) => {
             onClick={onClick}
           />
         );
-      case contentType === 'text/plain':
+      case contentType?.startsWith('text/'):
         return (
           <TextWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <OrdText theme={theme}>{inscription.origin?.data?.insc?.text}</OrdText>
+            <OrdText theme={theme}>{inscription.origin?.data?.insc?.file?.text}</OrdText>
           </TextWrapper>
         );
-      case contentType === 'application/json':
+      case contentType?.startsWith('application/json'):
         return (
           <JsonWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <Json theme={theme}>{JSON.stringify(inscription.origin?.data?.insc?.json, null, 2)}</Json>
+            <Json theme={theme}>{JSON.stringify(inscription.origin?.data?.insc?.file?.json, null, 2)}</Json>
           </JsonWrapper>
         );
       default:
@@ -166,7 +186,7 @@ export const Ordinal = (props: OrdinalProps) => {
           style={{ margin: '0.25rem 0', cursor: 'pointer', fontSize: '0.75rem' }}
           onClick={() => window.open(url, '_blank')}
         >
-          {inscription?.origin?.data?.map?.name ?? 'Unknown name'}
+          {getOrdinalName()}
         </Text>
       </Show>
     </FlexWrapper>

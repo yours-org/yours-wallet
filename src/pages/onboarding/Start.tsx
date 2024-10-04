@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import gihubIcon from '../../assets/github.svg';
 import { Button } from '../../components/Button';
-import { GithubIcon, Text, YoursLogo } from '../../components/Reusable';
+import { GithubIcon, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useTheme } from '../../hooks/useTheme';
-import { ColorThemeProps } from '../../theme';
-import { storage } from '../../utils/storage';
-import yoursLogo from '../../assets/yours-logo.png';
+import { WhiteLabelTheme } from '../../theme.types';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { YoursIcon } from '../../components/YoursIcon';
 
 const Content = styled.div`
   display: flex;
@@ -18,9 +18,10 @@ const Content = styled.div`
   width: 100%;
 `;
 
-const TitleText = styled.h1<ColorThemeProps>`
+const TitleText = styled.h1<WhiteLabelTheme>`
   font-size: 2rem;
-  color: ${({ theme }) => theme.white};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 700;
   margin: 0.25rem 0;
@@ -32,6 +33,9 @@ export const Start = () => {
   const navigate = useNavigate();
   const [showStart, setShowStart] = useState(false);
   const { hideMenu, showMenu } = useBottomMenu();
+  const { chromeStorageService } = useServiceContext();
+  const { account } = chromeStorageService.getCurrentAccountObject();
+  const encryptedKeys = account?.encryptedKeys;
 
   useEffect(() => {
     hideMenu();
@@ -41,29 +45,22 @@ export const Start = () => {
     };
   }, [hideMenu, showMenu]);
 
-  // If the encrypted keys are present, take the user to the wallet page.
   useEffect(() => {
-    storage.get(['encryptedKeys', 'connectRequest'], (result) => {
-      if (result?.connectRequest) {
-        setShowStart(false);
-        navigate('/connect');
-        return;
-      }
+    if (encryptedKeys) {
+      setShowStart(false);
+      navigate('/bsv-wallet');
+      return;
+    }
 
-      if (result?.encryptedKeys) {
-        setShowStart(false);
-        navigate('/bsv-wallet');
-        return;
-      }
-      setShowStart(true);
-    });
-  }, [navigate]);
+    setShowStart(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [encryptedKeys]);
 
   return (
     <Show when={showStart}>
       <Content>
-        <YoursLogo src={yoursLogo} />
-        <TitleText theme={theme}>Yours Wallet</TitleText>
+        <YoursIcon width="4rem" />
+        <TitleText theme={theme}>{`${theme.settings.walletName} Wallet`}</TitleText>
         <Text theme={theme} style={{ margin: '0.25rem 0 1rem 0' }}>
           An open source project.
         </Text>

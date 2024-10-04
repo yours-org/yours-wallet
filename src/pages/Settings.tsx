@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { WhitelistedApp } from '../App';
 import x from '../assets/x.svg';
-import { BackButton } from '../components/BackButton';
 import { Button } from '../components/Button';
 import { ForwardButton } from '../components/ForwardButton';
 import { Input } from '../components/Input';
@@ -14,16 +12,19 @@ import { SpeedBump } from '../components/SpeedBump';
 import { ToggleSwitch } from '../components/ToggleSwitch';
 import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
-import { useKeys } from '../hooks/useKeys';
-import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
-import { useWalletLockState } from '../hooks/useWalletLockState';
-import { useWeb3Context } from '../hooks/useWeb3Context';
-import { ColorThemeProps } from '../theme';
-import { SNACKBAR_TIMEOUT } from '../utils/constants';
-import { NetWork } from '../utils/network';
-import { storage } from '../utils/storage';
+import { useServiceContext } from '../hooks/useServiceContext';
+import { WhitelistedApp, YoursEventName } from '../inject';
+import { WhiteLabelTheme } from '../theme.types';
+import { sendMessage } from '../utils/chromeHelpers';
+import { ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { CreateAccount } from './onboarding/CreateAccount';
+import { RestoreAccount } from './onboarding/RestoreAccount';
+import { ImportAccount } from './onboarding/ImportAccount';
+import { AccountRow } from '../components/AccountRow';
+import { MasterBackupProgressEvent, streamDataToZip } from '../utils/masterExporter';
+import { useSnackbar } from '../hooks/useSnackbar';
 
 const Content = styled.div`
   display: flex;
@@ -35,19 +36,20 @@ const Content = styled.div`
   overflow-x: hidden;
 `;
 
-const ConnectedAppRow = styled.div<ColorThemeProps>`
+const ConnectedAppRow = styled.div<WhiteLabelTheme>`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: ${({ theme }) => theme.darkAccent};
+  background-color: ${({ theme }) => theme.color.global.row};
   border-radius: 0.5rem;
   padding: 0.5rem;
   margin: 0.25rem;
   width: 80%;
 `;
 
-const SettingsText = styled(Text)<ColorThemeProps>`
-  color: ${({ theme }) => theme.white};
+const SettingsText = styled(Text)<WhiteLabelTheme>`
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   margin: 0;
   font-weight: 600;
   text-align: left;
@@ -99,68 +101,98 @@ const PageWrapper = styled.div<{ $marginTop: string }>`
   width: 100%;
 `;
 
-type SettingsPage =
+export type SettingsPage =
   | 'main'
+  | 'manage-accounts'
+  | 'create-account'
+  | 'restore-account'
+  | 'import-wif'
+  | 'account-list'
+  | 'edit-account'
   | 'connected-apps'
   | 'social-profile'
   | 'export-keys-options'
   | 'export-keys-qr'
   | 'preferences';
-type DecisionType = 'sign-out' | 'export-keys' | 'export-keys-qr-code';
+type DecisionType = 'sign-out' | 'export-master-backup' | 'export-keys' | 'export-keys-qr-code' | 'delete-account';
 
 export const Settings = () => {
   const { theme } = useTheme();
-  const { setSelected } = useBottomMenu();
-  const { lockWallet } = useWalletLockState();
-  const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { addSnackbar } = useSnackbar();
-  const {
-    network,
-    updateNetwork,
-    isPasswordRequired,
-    updatePasswordRequirement,
-    updateNoApprovalLimit,
-    noApprovalLimit,
-  } = useWeb3Context();
-  const [page, setPage] = useState<SettingsPage>('main');
+  const { query, handleSelect } = useBottomMenu();
+  const [showSpeedBump, setShowSpeedBump] = useState(false);
+  const { chromeStorageService, keysService, lockWallet, oneSatSPV } = useServiceContext();
+  const [page, setPage] = useState<SettingsPage>(query === 'manage-accounts' ? 'manage-accounts' : 'main');
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
-  const { retrieveKeys } = useKeys();
-  const { socialProfile, storeSocialProfile } = useSocialProfile();
+  const { socialProfile, storeSocialProfile } = useSocialProfile(chromeStorageService);
   const [exportKeysQrData, setExportKeysAsQrData] = useState('');
   const [shouldVisibleExportedKeys, setShouldVisibleExportedKeys] = useState(false);
-
   const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState(socialProfile.displayName);
+  const [enteredAccountName, setEnteredAccountName] = useState('');
+  const [enteredAccountIcon, setEnteredAccountIcon] = useState('');
   const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(socialProfile?.avatar);
+  const [isPasswordRequired, setIsPasswordRequired] = useState(chromeStorageService.isPasswordRequired());
+  const [masterBackupProgress, setMasterBackupProgress] = useState(0);
+  const [masterBackupEventText, setMasterBackupEventText] = useState('');
+  const [noApprovalLimit, setNoApprovalLimit] = useState(
+    chromeStorageService.getCurrentAccountObject().account?.settings.noApprovalLimit ?? 0,
+  );
 
   useEffect(() => {
-    const getWhitelist = (): Promise<string[]> => {
-      return new Promise((resolve, reject) => {
-        storage.get(['whitelist'], async (result) => {
-          try {
-            const { whitelist } = result;
-            setConnectedApps(whitelist ?? []);
-            resolve(whitelist ?? []);
-          } catch (error) {
-            reject(error);
-          }
-        });
-      });
+    const getWhitelist = async (): Promise<WhitelistedApp[]> => {
+      try {
+        const { account } = chromeStorageService.getCurrentAccountObject();
+        if (!account) return [];
+        const { whitelist } = account.settings;
+        setConnectedApps(whitelist ?? []);
+        return whitelist ?? [];
+      } catch (error) {
+        console.error(error);
+        return [];
+      }
     };
 
     getWhitelist();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRemoveDomain = (domain: string) => {
+  const handleRemoveDomain = async (domain: string) => {
     const newList = connectedApps.filter((app) => app.domain !== domain);
-    storage.set({ whitelist: newList });
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) return [];
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [keysService.identityAddress]: {
+        ...account,
+        settings: {
+          ...account.settings,
+          whitelist: newList,
+        },
+      },
+    };
+    await chromeStorageService.updateNested(key, update);
     setConnectedApps(newList);
+  };
+
+  const handleDeleteAccountIntent = () => {
+    setDecisionType('delete-account');
+    setSpeedBumpMessage('Are you sure you want to delete this account? All keys and data will be lost.');
+    setShowSpeedBump(true);
   };
 
   const handleSignOutIntent = () => {
     setDecisionType('sign-out');
     setSpeedBumpMessage('Make sure you have your seed phrase backed up!');
+    setShowSpeedBump(true);
+  };
+
+  const handleMasterBackupIntent = () => {
+    setDecisionType('export-master-backup');
+    setSpeedBumpMessage(
+      'You are about to download wallet data for all your accounts. Make sure you are in a safe place.',
+    );
     setShowSpeedBump(true);
   };
 
@@ -188,6 +220,37 @@ export const Settings = () => {
     setPage('main');
   };
 
+  const handleAccountEditSave = async () => {
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) return;
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [account?.addresses.identityAddress]: {
+        ...account,
+        name: enteredAccountName,
+        icon: enteredAccountIcon,
+      },
+    };
+    await chromeStorageService.updateNested(key, update);
+    setPage('main');
+  };
+
+  const handleDeleteAccount = async () => {
+    let accounts = chromeStorageService.getAllAccounts();
+    if (accounts.length === 1) {
+      addSnackbar('You cannot delete your only account', 'error');
+      return;
+    }
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) return;
+    const key: keyof ChromeStorageObject = 'accounts';
+    await chromeStorageService.removeNested(key, account.addresses.identityAddress);
+    accounts = chromeStorageService.getAllAccounts();
+    indexedDB.deleteDatabase(`txos-${account.addresses.identityAddress}-${chromeStorageService.getNetwork()}`);
+    await chromeStorageService.switchAccount(accounts[0].addresses.identityAddress);
+    setPage('main');
+  };
+
   useEffect(() => {
     if (!socialProfile) return;
     setEnteredSocialDisplayName(socialProfile.displayName);
@@ -195,7 +258,7 @@ export const Settings = () => {
   }, [socialProfile]);
 
   const exportKeys = async (password: string) => {
-    const keys = await retrieveKeys(password);
+    const keys = await keysService.retrieveKeys(password);
 
     const keysToExport = {
       mnemonic: keys.mnemonic,
@@ -220,7 +283,7 @@ export const Settings = () => {
   };
 
   const exportKeysAsQrCode = async (password: string) => {
-    const keys = await retrieveKeys(password);
+    const keys = await keysService.retrieveKeys(password);
 
     const keysToExport = {
       mnemonic: keys.mnemonic,
@@ -241,46 +304,34 @@ export const Settings = () => {
   };
 
   const signOut = async () => {
-    await storage.clear();
+    await chromeStorageService.clear();
     setDecisionType(undefined);
-    window.location.reload();
-
-    chrome.runtime.sendMessage({
-      action: 'signedOut',
+    sendMessage({
+      action: YoursEventName.SIGNED_OUT,
     });
+    setTimeout(() => window.location.reload(), 100);
   };
 
   const handleCancel = () => {
     setShowSpeedBump(false);
   };
 
-  useEffect(() => {
-    setSelected('settings');
-  }, [setSelected]);
-
-  const handleNetworkChange = (e: any) => {
-    const network = e.target.checked ? NetWork.Testnet : NetWork.Mainnet;
-    updateNetwork(network);
-
-    // The provider relies on appState in local storage to accurately return addresses. This is an easy way to handle making sure the state is always up to date.
-    addSnackbar(`Switching to ${network}`, 'info');
-    setTimeout(() => {
-      window.location.reload();
-    }, SNACKBAR_TIMEOUT - 500);
-
-    chrome.runtime.sendMessage({
-      action: 'networkChanged',
-      params: {
-        network,
-      },
-    });
-  };
-
-  const handleSpeedBumpConfirm = (password?: string) => {
+  const handleSpeedBumpConfirm = async (password?: string) => {
     if (decisionType === 'sign-out') {
       signOut();
     }
 
+    if (decisionType === 'delete-account') {
+      await handleDeleteAccount();
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+    }
+
+    if (decisionType === 'export-master-backup') {
+      handleMasterBackup();
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+    }
     if (decisionType === 'export-keys' && password) {
       exportKeys(password);
       setDecisionType(undefined);
@@ -293,34 +344,169 @@ export const Settings = () => {
     }
   };
 
+  const handleUpdatePasswordRequirement = async (isRequired: boolean) => {
+    setIsPasswordRequired(isRequired);
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) throw new Error('No account found');
+    const accountSettings = account.settings;
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [keysService.identityAddress]: {
+        ...account,
+        settings: {
+          ...accountSettings,
+          isPasswordRequired: isRequired,
+        },
+      },
+    };
+    await chromeStorageService.updateNested(key, update);
+  };
+
+  const handleUpdateApprovalLimit = async (amount: number) => {
+    setNoApprovalLimit(amount);
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) throw new Error('No account found');
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [keysService.identityAddress]: {
+        ...account,
+        settings: {
+          ...account.settings,
+          noApprovalLimit: amount,
+        },
+      },
+    };
+    await chromeStorageService.updateNested(key, update);
+  };
+
+  const handleMasterBackup = async () => {
+    await streamDataToZip(oneSatSPV, chromeStorageService, (e: MasterBackupProgressEvent) => {
+      setMasterBackupEventText(e.message);
+      const progress = e.endValue && e.value ? Math.ceil((e.value / e.endValue) * 100) : 0;
+      setMasterBackupProgress(progress);
+    });
+    setMasterBackupEventText('');
+  };
+
+  const handleLockWallet = async () => {
+    lockWallet();
+    handleSelect('bsv');
+  };
+
   const main = (
     <>
+      <SettingsRow
+        name="Manage Accounts"
+        description="Manage your accounts"
+        onClick={() => setPage('manage-accounts')}
+        jsxElement={
+          <ForwardButton
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
+          />
+        }
+      />
       <SettingsRow
         name="Connected Apps"
         description="Manage the apps you are connected to"
         onClick={() => setPage('connected-apps')}
-        jsxElement={<ForwardButton />}
+        jsxElement={
+          <ForwardButton
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
+          />
+        }
       />
       <SettingsRow
         name="Preferences"
         description="Manage your wallet preferences"
         onClick={() => setPage('preferences')}
-        jsxElement={<ForwardButton />}
-      />
-      <SettingsRow
-        name="Testnet Mode"
-        description="Applies to balances and app connections"
-        jsxElement={<ToggleSwitch theme={theme} on={network === NetWork.Testnet} onChange={handleNetworkChange} />}
+        jsxElement={
+          <ForwardButton
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
+          />
+        }
       />
       <SettingsRow
         name="Export Keys"
         description="Download keys or export as QR code"
         onClick={() => setPage('export-keys-options')}
-        jsxElement={<ForwardButton />}
+        jsxElement={
+          <ForwardButton
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
+          />
+        }
       />
+      <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={handleLockWallet} />
+      <Text
+        style={{
+          margin: '1rem 0',
+          textAlign: 'left',
+          color: theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
+          fontSize: '1rem',
+          fontWeight: 700,
+        }}
+        theme={theme}
+      >
+        Danger Zone
+      </Text>
+      <SettingsRow
+        style={{
+          backgroundColor: theme.color.component.warningButton + '40',
+          border: '1px solid ' + theme.color.component.warningButton,
+        }}
+        name="Sign Out"
+        description={`Sign out of ${theme.settings.walletName} Wallet completely`}
+        onClick={handleSignOutIntent}
+      />
+    </>
+  );
 
-      <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={lockWallet} />
-      <SettingsRow name="Sign Out" description="Sign out of Yours Wallet completely" onClick={handleSignOutIntent} />
+  const manageAccountsPage = (
+    <>
+      <SettingsRow
+        name="Create Account"
+        description="Create a new account"
+        jsxElement={
+          <ForwardButton
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
+          />
+        }
+        onClick={() => setPage('create-account')}
+      />
+      <SettingsRow
+        name="Restore/Import"
+        description="Import or restore an existing account"
+        jsxElement={
+          <ForwardButton
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
+          />
+        }
+        onClick={() => setPage('restore-account')}
+      />
+      <SettingsRow
+        name="Edit Account"
+        description="Edit an existing account"
+        jsxElement={
+          <ForwardButton
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
+          />
+        }
+        onClick={() => setPage('account-list')}
+      />
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
     </>
   );
 
@@ -359,16 +545,34 @@ export const Settings = () => {
   const exportKeyOptionsPage = (
     <>
       <SettingsRow
-        name="Download Keys"
-        description="Download your seed, private, and public keys"
-        onClick={handleExportKeysIntent}
+        name="Master Backup"
+        description="Download all wallet data for all accounts. Use this to restore your wallet on another device."
+        onClick={masterBackupEventText ? () => null : handleMasterBackupIntent}
+        masterBackupText={masterBackupEventText}
+        masterBackupProgress={masterBackupProgress}
       />
-      <SettingsRow
-        name="Export Keys as QR code"
-        description="Display private keys as QR code for mobile import"
-        onClick={handleExportKeysAsQrCodeIntent}
+      <Show when={!masterBackupEventText}>
+        <SettingsRow
+          name="Download Keys"
+          description="Download your seed, private, and public keys for current account"
+          onClick={handleExportKeysIntent}
+        />
+        <SettingsRow
+          name="Export Keys as QR code"
+          description="Display private keys for current account as QR code for mobile import"
+          onClick={handleExportKeysAsQrCodeIntent}
+        />
+      </Show>
+      <Button
+        theme={theme}
+        style={{
+          color: masterBackupEventText ? theme.color.component.snackbarError : undefined,
+          width: masterBackupEventText ? '80%' : undefined,
+        }}
+        type="secondary"
+        label={masterBackupEventText ? 'DO NOT CLOSE WALLET OR CHANGE TABS DURING THIS PROCESS!' : 'Go back'}
+        onClick={() => (masterBackupEventText ? null : setPage('main'))}
       />
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
     </>
   );
 
@@ -378,7 +582,13 @@ export const Settings = () => {
         name="Social Profile"
         description="Set your display name and avatar"
         onClick={() => setPage('social-profile')}
-        jsxElement={<ForwardButton />}
+        jsxElement={
+          <ForwardButton
+            color={
+              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+            }
+          />
+        }
       />
       <SettingsRow
         name="Require Password"
@@ -387,7 +597,7 @@ export const Settings = () => {
           <ToggleSwitch
             theme={theme}
             on={isPasswordRequired}
-            onChange={() => updatePasswordRequirement(!isPasswordRequired)}
+            onChange={() => handleUpdatePasswordRequirement(!isPasswordRequired)}
           />
         }
       />
@@ -399,7 +609,7 @@ export const Settings = () => {
             theme={theme}
             placeholder={String(noApprovalLimit)}
             type="number"
-            onChange={(e) => updateNoApprovalLimit(Number(e.target.value))}
+            onChange={(e) => handleUpdateApprovalLimit(Number(e.target.value))}
             value={noApprovalLimit}
             style={{ width: '5rem', margin: 0 }}
           />
@@ -411,7 +621,6 @@ export const Settings = () => {
 
   const socialProfilePage = (
     <PageWrapper $marginTop="5rem">
-      <BackButton onClick={() => setPage('preferences')} />
       <SettingsText theme={theme}>Display Name</SettingsText>
       <Input
         theme={theme}
@@ -435,7 +644,67 @@ export const Settings = () => {
         style={{ marginTop: '1rem' }}
         onClick={handleSocialProfileSave}
       />
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('preferences')} />
     </PageWrapper>
+  );
+
+  const accountList = (
+    <>
+      {chromeStorageService.getAllAccounts().map((account) => {
+        return (
+          <AccountRow
+            key={account.addresses.identityAddress}
+            name={account.name}
+            icon={account.icon}
+            jsxElement={
+              <ForwardButton
+                color={
+                  theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
+                }
+              />
+            }
+            onClick={() => {
+              setEnteredAccountName(account.name);
+              setEnteredAccountIcon(account.icon);
+              setPage('edit-account');
+            }}
+          />
+        );
+      })}
+      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('manage-accounts')} />
+    </>
+  );
+
+  const editAccount = (
+    <>
+      <PageWrapper $marginTop="5rem">
+        <SettingsText theme={theme}>Label</SettingsText>
+        <Input
+          theme={theme}
+          placeholder="Account Label"
+          type="text"
+          onChange={(e) => setEnteredAccountName(e.target.value)}
+          value={enteredAccountName}
+        />
+        <SettingsText theme={theme}>Icon</SettingsText>
+        <Input
+          theme={theme}
+          placeholder="Account Icon"
+          type="text"
+          onChange={(e) => setEnteredAccountIcon(e.target.value)}
+          value={enteredAccountIcon}
+        />
+        <Button
+          theme={theme}
+          type="primary"
+          label="Save"
+          style={{ marginTop: '1rem' }}
+          onClick={handleAccountEditSave}
+        />
+        <Button theme={theme} type="warn" label="Delete" onClick={handleDeleteAccountIntent} />
+        <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('account-list')} />
+      </PageWrapper>
+    </>
   );
 
   return (
@@ -448,13 +717,35 @@ export const Settings = () => {
           onCancel={handleCancel}
           onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
           showSpeedBump={showSpeedBump}
-          withPassword={decisionType === 'export-keys' || decisionType === 'export-keys-qr-code'}
+          withPassword={
+            decisionType === 'export-keys' ||
+            decisionType === 'export-keys-qr-code' ||
+            decisionType === 'export-master-backup'
+          }
         />
       }
     >
       <Content>
         <TopNav />
         <Show when={page === 'main'}>{main}</Show>
+        <Show when={page === 'manage-accounts'}>{manageAccountsPage}</Show>
+        <Show when={page === 'create-account'}>
+          <PageWrapper $marginTop="3rem">
+            <CreateAccount onNavigateBack={() => setPage('manage-accounts')} />
+          </PageWrapper>
+        </Show>
+        <Show when={page === 'restore-account'}>
+          <PageWrapper $marginTop="1rem">
+            <RestoreAccount onNavigateBack={(page: SettingsPage) => setPage(page)} />
+          </PageWrapper>
+        </Show>
+        <Show when={page === 'import-wif'}>
+          <PageWrapper $marginTop="1rem">
+            <ImportAccount onNavigateBack={() => setPage('restore-account')} />
+          </PageWrapper>
+        </Show>
+        <Show when={page === 'account-list'}>{accountList}</Show>
+        <Show when={page === 'edit-account'}>{editAccount}</Show>
         <Show when={page === 'connected-apps'}>{connectedAppsPage}</Show>
         <Show when={page === 'preferences'}>{preferencesPage}</Show>
         <Show when={page === 'social-profile'}>{socialProfilePage}</Show>

@@ -1,13 +1,12 @@
 import { ReactNode, createContext, useState } from 'react';
+import { NetWork } from 'yours-wallet-provider';
 import { BottomMenu } from '../components/BottomMenu';
 import { useTheme } from '../hooks/useTheme';
-import { useWeb3Context } from '../hooks/useWeb3Context';
 
-export type MenuItems = 'bsv' | 'ords' | 'apps' | 'settings';
+export type MenuItems = 'bsv' | 'ords' | 'tools' | 'settings';
 
 type BottomMenuContextType = {
   selected: MenuItems | null;
-  setSelected: React.Dispatch<React.SetStateAction<MenuItems | null>>;
   query: string;
   handleSelect: (item: MenuItems, query?: string) => void;
   showMenu: () => void;
@@ -18,16 +17,16 @@ type BottomMenuContextType = {
 export const BottomMenuContext = createContext<BottomMenuContextType | null>(null);
 
 interface BottomMenuProviderProps {
+  network: NetWork;
   children: ReactNode;
 }
 
 export const BottomMenuProvider = (props: BottomMenuProviderProps) => {
-  const { children } = props;
+  const { children, network } = props;
   const { theme } = useTheme();
   const [selected, setSelected] = useState<MenuItems | null>(null);
   const [query, setQuery] = useState('');
   const [isVisible, setIsVisible] = useState(false);
-  const { network } = useWeb3Context();
 
   const handleSelect = (item: MenuItems, pageQuery?: string) => {
     setSelected(item);
@@ -50,7 +49,6 @@ export const BottomMenuProvider = (props: BottomMenuProviderProps) => {
         isVisible,
         showMenu,
         hideMenu,
-        setSelected,
         query,
       }}
     >

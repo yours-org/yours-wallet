@@ -1,18 +1,20 @@
 import styled, { css } from 'styled-components';
-import { ColorThemeProps } from '../theme';
+import { WhiteLabelTheme } from '../theme.types';
 
-export const HeaderText = styled.h1<ColorThemeProps>`
+export const HeaderText = styled.h1<WhiteLabelTheme>`
   font-size: 1.35rem;
-  color: ${({ theme }) => theme.white};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 600;
   margin: 0.25rem 0;
   text-align: center;
 `;
 
-export const SubHeaderText = styled.h1<ColorThemeProps>`
+export const SubHeaderText = styled.h1<WhiteLabelTheme>`
   font-size: 1rem;
-  color: ${({ theme }) => theme.white};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 400;
   margin: 0.1rem 0;
@@ -25,9 +27,10 @@ export const Divider = styled.hr`
   margin: 1rem;
 `;
 
-export const Text = styled.p<ColorThemeProps>`
+export const Text = styled.p<WhiteLabelTheme>`
   font-size: 0.85rem;
-  color: ${({ theme }) => theme.gray ?? theme.white};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 400;
   margin: 0.25rem 0 1rem 0;
@@ -39,10 +42,13 @@ export const Badge = styled.button<{ $primary?: boolean }>`
   background: transparent;
   border-radius: 0.5rem;
   border: none;
-  color: ${({ theme }) => theme.white + '90'};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark'
+      ? theme.color.global.contrast + '90'
+      : theme.color.global.neutral + '90'};
   margin: 0.5em 1em;
   padding: 0.25em 1em;
-  ${(props) => css`
+  ${() => css`
     background: #bf4f74;
     color: white;
   `}
@@ -71,16 +77,17 @@ export const ButtonContainer = styled.div`
   align-items: center;
   justify-content: space-around;
   width: 90%;
-  margin: 1rem;
+  margin: 0.5rem;
 `;
 
 export const MainContent = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   width: 100%;
   height: calc(100% - 3.75rem);
+  overflow-y: auto;
+  overflow-x: hidden;
 `;
 
 export const ReceiveContent = styled(MainContent)`
@@ -89,9 +96,9 @@ export const ReceiveContent = styled(MainContent)`
   height: calc(100% - 3.75rem);
 `;
 
-export const YoursLogo = styled.img`
-  width: 5rem;
-  height: 5rem;
+export const StyledImage = styled.img<{ $size?: string }>`
+  width: ${({ $size }) => $size ?? '5rem'};
+  height: ${({ $size }) => $size ?? '5rem'};
 `;
 
 export const GithubIcon = styled.img`
@@ -100,6 +107,7 @@ export const GithubIcon = styled.img`
   cursor: pointer;
 `;
 
-export const Warning = styled.span<ColorThemeProps>`
-  color: ${({ theme }) => theme.warning};
+export const Warning = styled.span<WhiteLabelTheme>`
+  color: ${({ theme }) => theme.color.component.snackbarWarning};
+  font-weight: 700;
 `;

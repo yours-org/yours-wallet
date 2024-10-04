@@ -1,196 +1,26 @@
-import init, { P2PKHAddress, Transaction } from 'bsv-wasm-web';
 import React, { useEffect, useState } from 'react';
-import { DefaultTheme, styled } from 'styled-components';
-import { BackButton } from '../../components/BackButton';
+import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { SignatureResponse, useContracts, Web3GetSignaturesRequest } from '../../hooks/useContracts';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { sleep } from '../../utils/sleep';
-import { storage } from '../../utils/storage';
+import TxPreview from '../../components/TxPreview';
+import { IndexContext } from 'spv-store';
+import { getErrorMessage, getTxFromRawTxFormat } from '../../utils/tools';
+import { styled } from 'styled-components';
+import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 
-const TxInput = styled.div`
-  border: 1px solid yellow;
-  margin: 0.5rem 0;
-  padding: 0.5rem;
-  width: 85%;
-`;
-
-const TxOutput = styled.div`
-  border: 1px solid green;
-  margin: 0.5rem 0;
-  padding: 0.5rem;
-  width: 85%;
-`;
-
-const TxContainer = styled.div`
-  max-height: 10rem;
+const Wrapper = styled(ConfirmContent)`
+  max-height: calc(100vh - 8rem);
   overflow-y: auto;
-  overflow-x: hidden;
 `;
-
-const TxInputsContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-`;
-
-const TxOutputsContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-`;
-
-const InputContent = (props: {
-  idx: number;
-  tag: string;
-  addr: string | string[];
-  sats: number;
-  theme?: DefaultTheme | undefined;
-}) => {
-  return (
-    <div style={{ color: props.theme?.color || 'white' }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          paddingTop: '0.2rem',
-        }}
-      >
-        <span>#{props.idx}</span>
-        <span>{props.tag}</span>
-        <span>{props.sats} sats</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <div>Signer:</div>
-        <div style={{ overflowX: 'scroll', padding: '0.5rem 0 0.5rem 0.5rem' }}>{props.addr}</div>
-      </div>
-    </div>
-  );
-};
-
-const OutputContent = (props: {
-  idx: number;
-  tag: string;
-  addr: string | string[];
-  sats: number;
-  theme?: DefaultTheme | undefined;
-}) => {
-  return (
-    <div style={{ color: props.theme?.color || 'white' }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          paddingTop: '0.2rem',
-        }}
-      >
-        <span>#{props.idx}</span>
-        <span>{props.tag}</span>
-        <span>{props.sats} sats</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <div>Payee:</div>
-        <div style={{ overflowX: 'scroll', padding: '0.5rem 0 0.5rem 0.5rem' }}>{props.addr}</div>
-      </div>
-    </div>
-  );
-};
-
-const TxViewer = (props: { request: Web3GetSignaturesRequest }) => {
-  const { theme } = useTheme();
-  const [showDetail, setShowDetail] = useState(false);
-  const { request } = props;
-  const [txOutputs, setTxOutputs] = useState<{ asm: string; satoshis: number }[]>([]);
-
-  useEffect(() => {
-    const setTheTx = async () => {
-      await init();
-      const tx = Transaction.from_hex(request.rawtx);
-      const numOuts = tx.get_noutputs();
-      const outputs: { asm: string; satoshis: number }[] = [];
-      for (let i = 0; i < numOuts; i++) {
-        const output = tx.get_output(i);
-        const asm = output!.get_script_pub_key().to_asm_string();
-        const satoshis = output!.get_satoshis();
-        outputs.push({ asm, satoshis: Number(satoshis) });
-      }
-      setTxOutputs(outputs);
-    };
-    setTheTx();
-  }, [request.rawtx]);
-
-  return (
-    <TxContainer>
-      <Show when={!showDetail}>
-        <Button
-          theme={theme}
-          type="secondary"
-          label="Details"
-          // disabled={isProcessing}
-          onClick={() => setShowDetail(!showDetail)}
-          style={{ marginTop: '0' }}
-        />
-      </Show>
-
-      <Show when={showDetail}>
-        <TxInputsContainer>
-          <Text theme={theme} style={{ margin: '0.5rem 0' }}>
-            Inputs To Sign
-          </Text>
-          {request.sigRequests.map((sigReq) => {
-            return (
-              <TxInput>
-                <InputContent
-                  idx={sigReq.inputIndex}
-                  tag={sigReq.script ? 'nonStandard' : 'P2PKH'}
-                  addr={[sigReq.address].flat().join(', ')}
-                  sats={sigReq.satoshis}
-                  theme={theme}
-                />
-              </TxInput>
-            );
-          })}
-        </TxInputsContainer>
-        <TxOutputsContainer>
-          <Text theme={theme} style={{ margin: '0.5rem 0' }}>
-            Outputs
-          </Text>
-          {txOutputs ? (
-            txOutputs.map(({ asm, satoshis }, idx: number) => {
-              const pubkeyHash = (/^OP_DUP OP_HASH160 ([0-9a-fA-F]{40}) OP_EQUALVERIFY OP_CHECKSIG$/.exec(asm) ||
-                [])[1];
-              const isP2PKH = !!pubkeyHash;
-              const toAddr = pubkeyHash
-                ? P2PKHAddress.from_pubkey_hash(Uint8Array.from(Buffer.from(pubkeyHash, 'hex'))).to_string()
-                : 'Unknown Address';
-
-              return (
-                <TxOutput>
-                  <OutputContent
-                    idx={idx}
-                    tag={isP2PKH ? 'P2PKH' : 'nonStandard'}
-                    addr={toAddr}
-                    sats={satoshis}
-                    theme={theme}
-                  />
-                </TxOutput>
-              );
-            })
-          ) : (
-            <>Parsing Tx ...</>
-          )}
-        </TxOutputsContainer>
-      </Show>
-    </TxContainer>
-  );
-};
 
 export type GetSignaturesResponse = {
   sigResponses?: SignatureResponse[];
@@ -198,25 +28,81 @@ export type GetSignaturesResponse = {
 };
 
 export type GetSignaturesRequestProps = {
-  getSigsRequest: Web3GetSignaturesRequest;
+  request: GetSignatures;
   popupId: number | undefined;
   onSignature: () => void;
 };
 
 export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { theme } = useTheme();
-  const { setSelected } = useBottomMenu();
+  const { handleSelect, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useWeb3Context();
-
-  const { getSigsRequest, onSignature, popupId } = props;
-  const [getSigsResponse, setGetSigsResponse] = useState<any>(undefined);
-  const { isProcessing, setIsProcessing, getSignatures } = useContracts();
+  const { chromeStorageService, contractService, oneSatSPV, keysService } = useServiceContext();
+  const isPasswordRequired = chromeStorageService.isPasswordRequired();
+  const [txData, setTxData] = useState<IndexContext>();
+  const { bsvAddress, ordAddress, identityAddress } = keysService;
+  const [satsOut, setSatsOut] = useState(0);
+  const { request, onSignature, popupId } = props;
+  const [getSigsResponse, setGetSigsResponse] = useState<{
+    sigResponses?: SignatureResponse[] | undefined;
+    error?:
+      | {
+          message: string;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          cause?: any;
+        }
+      | undefined;
+  }>();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    setSelected('bsv');
-  }, [setSelected]);
+    if (!bsvAddress || !ordAddress || !identityAddress || !oneSatSPV || !txData) return;
+    (async () => {
+      console.log(bsvAddress, ordAddress, identityAddress);
+      // how much did the user put in to the tx
+      let userSatsOut = txData.spends.reduce((acc, spend) => {
+        if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
+          return acc + spend.satoshis;
+        }
+        return acc;
+      }, 0n);
+
+      // how much did the user get back from the tx
+      userSatsOut = txData.txos.reduce((acc, txo) => {
+        if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
+          return acc - txo.satoshis;
+        }
+        return acc;
+      }, userSatsOut);
+
+      setSatsOut(Number(userSatsOut));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txData]);
+
+  useEffect(() => {
+    (async () => {
+      if (!request.rawtx || !oneSatSPV) return;
+      setIsLoading(true);
+      const tx = getTxFromRawTxFormat(request.rawtx, request.format || 'tx');
+      const parsedTx = await oneSatSPV.parseTx(tx);
+      setTxData(parsedTx);
+      setIsLoading(false);
+    })();
+  }, [oneSatSPV, request]);
+
+  useEffect(() => {
+    handleSelect('bsv');
+    hideMenu();
+  }, [handleSelect, hideMenu]);
+
+  const resetSendState = () => {
+    setPasswordConfirm('');
+    setGetSigsResponse(undefined);
+    setIsProcessing(false);
+  };
 
   useEffect(() => {
     if (!getSigsResponse) return;
@@ -225,23 +111,6 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message, getSigsResponse]);
-
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
-  const resetSendState = () => {
-    setPasswordConfirm('');
-    setGetSigsResponse(undefined);
-    setIsProcessing(false);
-  };
 
   const handleSigning = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -254,71 +123,50 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       return;
     }
 
-    const getSigsRes = await getSignatures(getSigsRequest, passwordConfirm);
+    const getSigsRes = await contractService.getSignatures(request, passwordConfirm);
 
     if (getSigsRes?.error) {
-      const message =
-        getSigsRes.error.message === 'invalid-password'
-          ? 'Invalid Password!'
-          : getSigsRes.error.message === 'unknown-address'
-            ? 'Unknown Address: ' + (getSigsRes.error.cause ?? '')
-            : 'An unknown error has occurred! Try again.';
-
-      chrome.runtime.sendMessage({
+      sendMessage({
         action: 'getSignaturesResponse',
         ...getSigsRes,
       });
 
+      addSnackbar(getErrorMessage(getSigsRes.error.message), 'error', 3000);
       setIsProcessing(false);
-
-      addSnackbar(message, 'error', 3000);
-
       return;
     }
 
-    setGetSigsResponse(getSigsRes.sigResponses);
-    chrome.runtime.sendMessage({
+    setGetSigsResponse(getSigsRes);
+    sendMessage({
       action: 'getSignaturesResponse',
       ...getSigsRes,
     });
 
-    setIsProcessing(false);
-
     addSnackbar('Successfully Signed!', 'success');
-
-    setTimeout(() => {
-      onSignature();
-      storage.remove('getSignaturesRequest');
-      if (popupId) chrome.windows.remove(popupId);
-    }, 2000);
+    await sleep(2000);
+    setIsProcessing(false);
+    onSignature();
   };
 
-  const rejectSigning = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    e.preventDefault();
-    if (popupId) chrome.windows.remove(popupId);
-    storage.remove('getSignaturesRequest');
-  };
-
-  const clearRequest = () => {
-    storage.remove('getSignaturesRequest');
-    if (popupId) chrome.windows.remove(popupId);
+  const clearRequest = async () => {
+    await chromeStorageService.remove('getSignaturesRequest');
+    if (popupId) removeWindow(popupId);
     window.location.reload();
   };
 
   return (
     <>
-      <Show when={isProcessing}>
-        <PageLoader theme={theme} message="Signing Transaction..." />
+      <Show when={isProcessing || isLoading}>
+        <PageLoader theme={theme} message={isLoading ? 'Loading transaction...' : 'Signing Transaction...'} />
       </Show>
-      <Show when={!isProcessing && !!getSigsRequest}>
-        <ConfirmContent>
-          <BackButton onClick={clearRequest} />
+      <Show when={!isProcessing && !!request && !!txData}>
+        <Wrapper>
           <HeaderText theme={theme}>Sign Transaction</HeaderText>
           <Text theme={theme} style={{ margin: '0.75rem 0' }}>
             The app is requesting signatures for a transaction.
           </Text>
           <FormContainer noValidate onSubmit={(e) => handleSigning(e)}>
-            <TxViewer request={getSigsRequest} />
+            {txData && <TxPreview txData={txData} inputsToSign={request.sigRequests.map((r) => r.inputIndex)} />}
             <Show when={isPasswordRequired}>
               <Input
                 theme={theme}
@@ -327,17 +175,16 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
                 onChange={(e) => setPasswordConfirm(e.target.value)}
               />
             </Show>
-            <Button theme={theme} type="primary" label="Sign the transaction" isSubmit disabled={isProcessing} />
             <Button
               theme={theme}
-              type="secondary"
-              label="Cancel"
+              type="primary"
+              label={`Sign Tx - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
+              isSubmit
               disabled={isProcessing}
-              onClick={rejectSigning}
-              style={{ marginTop: '0' }}
             />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
-        </ConfirmContent>
+        </Wrapper>
       </Show>
     </>
   );

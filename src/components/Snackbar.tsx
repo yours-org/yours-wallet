@@ -1,12 +1,11 @@
 import styled, { keyframes } from 'styled-components';
 import { Text } from './Reusable';
 import { SnackbarType } from '../contexts/SnackbarContext';
-import { ColorThemeProps, Theme } from '../theme';
-import errorIcon from '../assets/error.svg';
-import infoIcon from '../assets/info-dark.svg';
-import successIcon from '../assets/success.svg';
+import { WhiteLabelTheme, Theme } from '../theme.types';
+import { FaCheckCircle, FaExclamation, FaInfoCircle } from 'react-icons/fa';
+import { Show } from './Show';
 
-type SnackBarColorTheme = ColorThemeProps & { color: string };
+type SnackBarColorTheme = WhiteLabelTheme & { color: string };
 
 const slideIn = keyframes`
   from {
@@ -29,7 +28,7 @@ const fadeOut = keyframes`
   }
 `;
 
-export const SnackBarContainer = styled.div<SnackBarColorTheme>`
+export const SnackBarContainer = styled.div<SnackBarColorTheme & { duration: number }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -39,18 +38,13 @@ export const SnackBarContainer = styled.div<SnackBarColorTheme>`
   margin: 1rem;
   border-radius: 0.5rem;
   background-color: ${({ color }) => color};
-  color: ${({ theme }) => theme.white};
-  z-index: 200;
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  z-index: 9999;
   animation:
     ${slideIn} 0.25s ease-out,
-    ${fadeOut} 0.25s ease-out 2.5s;
+    ${fadeOut} 0.25s ease-out ${({ duration }) => `${duration}s`};
   animation-fill-mode: forwards;
-`;
-
-const Image = styled.img`
-  width: 1rem;
-  height: 1rem;
-  margin: 1rem;
 `;
 
 export type SnackbarProps = {
@@ -59,18 +53,46 @@ export type SnackbarProps = {
   /** The type of snackbar. success | error | info */
   type: SnackbarType | null;
   theme: Theme;
+  duration?: number;
 };
 
 export const Snackbar = (props: SnackbarProps) => {
-  const { message, type, theme } = props;
+  const { message, type, theme, duration = 2.5 } = props;
   return (
-    <SnackBarContainer color={type === 'error' ? theme.errorRed : type === 'info' ? theme.white : theme.lightAccent}>
-      <Image src={type === 'error' ? errorIcon : type === 'info' ? infoIcon : successIcon} />
+    <SnackBarContainer
+      theme={theme}
+      duration={duration}
+      color={
+        type === 'error'
+          ? theme.color.component.snackbarError
+          : type === 'info'
+            ? theme.color.component.snackbarWarning
+            : theme.color.component.snackbarSuccess
+      }
+    >
+      <Show when={type === 'error'}>
+        <FaExclamation color={theme.color.component.snackbarErrorText} size={'1.25rem'} style={{ margin: '0.5rem' }} />
+      </Show>
+      <Show when={type === 'info'}>
+        <FaInfoCircle color={theme.color.component.snackbarWarningText} size={'1.25rem'} style={{ margin: '0.5rem' }} />
+      </Show>
+      <Show when={type === 'success'}>
+        <FaCheckCircle
+          color={theme.color.component.snackbarSuccessText}
+          size={'1.25rem'}
+          style={{ margin: '0.5rem' }}
+        />
+      </Show>
       <Text
         theme={theme}
         style={{
           margin: '1rem 0 1rem .25rem',
-          color: type === 'error' ? theme.white : theme.darkAccent,
+          color:
+            type === 'error'
+              ? theme.color.component.snackbarErrorText
+              : type === 'info'
+                ? theme.color.component.snackbarWarningText
+                : theme.color.component.snackbarSuccessText,
           wordWrap: 'break-word',
           textAlign: 'left',
         }}

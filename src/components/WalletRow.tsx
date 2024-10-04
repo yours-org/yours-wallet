@@ -23,13 +23,19 @@ export type WalletRowTypes = {
 export const WalletRow = (props: WalletRowTypes) => {
   const { element, onClick } = props;
   const { theme } = useTheme();
-  const [containerColor, setContainerColor] = useState(theme.darkAccent);
+  const [containerColor, setContainerColor] = useState(theme.color.global.row);
   return (
     <Container
       key={window.crypto.randomUUID()}
       color={containerColor}
-      onMouseEnter={() => setContainerColor(theme.white + '10')}
-      onMouseLeave={() => setContainerColor(theme.darkAccent)}
+      onMouseEnter={() =>
+        setContainerColor(
+          theme.color.global.primaryTheme === 'dark'
+            ? theme.color.global.contrast + '10'
+            : theme.color.global.neutral + '10',
+        )
+      }
+      onMouseLeave={() => setContainerColor(theme.color.global.row)}
       theme={theme}
       onClick={onClick}
     >

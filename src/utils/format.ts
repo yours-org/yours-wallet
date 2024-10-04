@@ -26,7 +26,7 @@ export const truncate = (str: string, startLength: number, endLength: number) =>
   return `${startStr}...${endStr}`;
 };
 
-export const formatNumberWithCommasAndDecimals = (number: number, decimalPlaces: number = 2): string => {
+export const formatNumberWithCommasAndDecimals = (number: number, decimalPlaces = 2): string => {
   if (isNaN(number)) {
     return 'Invalid Number';
   }
@@ -59,4 +59,36 @@ export const removeBase64Prefix = (base64Data: string): string => {
   }
 
   return base64Data;
+};
+
+export const formatLargeNumber = (number: number, decimalPlaces = 3): string => {
+  if (isNaN(number)) {
+    return 'Invalid Number';
+  }
+
+  if (number >= 1e9) {
+    return `${(number / 1e9).toFixed(decimalPlaces)} B`; // Billion
+  } else if (number >= 1e6) {
+    return `${(number / 1e6).toFixed(decimalPlaces)} M`; // Million
+  }
+
+  // For numbers below 1 million, use the existing formatting function
+  return formatNumberWithCommasAndDecimals(number, decimalPlaces);
+};
+
+export const convertToTokenValue = (balance: number, decimals: number): number => {
+  return balance / Math.pow(10, decimals);
+};
+
+const removeTrailingZeros = (numStr: string): string => {
+  if (numStr.includes('.')) {
+    return numStr.replace(/(\.\d*?[1-9])0+$|\.0*$/, '$1');
+  }
+
+  return numStr;
+};
+
+export const convertAtomicValueToReadableTokenValue = (value: number, decimals: number): string => {
+  const tokenValue = convertToTokenValue(value, decimals);
+  return removeTrailingZeros(formatNumberWithCommasAndDecimals(tokenValue, decimals));
 };

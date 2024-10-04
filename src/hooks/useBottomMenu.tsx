@@ -12,16 +12,24 @@ export const useBottomMenu = () => {
 
   useEffect(() => {
     if (!context || !navigate) return;
-    return context.selected === 'bsv'
-      ? navigate('/bsv-wallet')
-      : context.selected === 'ords'
-        ? navigate('/ord-wallet')
-        : context.selected === 'settings'
-          ? navigate('/settings')
-          : context.selected === 'apps'
-            ? navigate('/apps')
-            : undefined;
-  }, [context, context.selected, navigate]);
+    switch (context.selected) {
+      case 'bsv':
+        navigate('/bsv-wallet');
+        break;
+      case 'ords':
+        navigate('/ord-wallet');
+        break;
+      case 'settings':
+        navigate('/settings');
+        break;
+      case 'tools':
+        navigate('/tools');
+        break;
+      default:
+        console.warn('No matching route for selected menu item');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context.selected]);
 
   return context;
 };

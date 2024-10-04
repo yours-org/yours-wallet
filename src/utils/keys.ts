@@ -1,8 +1,9 @@
-import { Bn, Point } from '@ts-bitcoin/core';
 import * as bip39 from 'bip39';
-import { ExtendedPrivateKey, Hash, PrivateKey } from 'bsv-wasm-web';
-import { WifKeys } from '../hooks/useKeys';
+import { DerivationTag, NetWork } from 'yours-wallet-provider';
+import { WifKeys } from '../services/types/keys.types';
 import { DEFAULT_IDENTITY_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';
+import { convertAddressToTestnet } from './tools';
+import { BigNumber, Hash, HD, Mnemonic, PrivateKey, Utils } from '@bsv/sdk';
 
 export type Keys = {
   mnemonic: string;
@@ -20,35 +21,21 @@ export type Keys = {
   identityDerivationPath: string;
 };
 
-export type InternalYoursTags =
-  | { label: 'panda'; id: 'bsv'; domain: ''; meta: {} }
-  | { label: 'panda'; id: 'ord'; domain: ''; meta: {} }
-  | { label: 'panda'; id: 'identity'; domain: ''; meta: {} };
-
-export type DerivationTag =
-  | InternalYoursTags
-  | {
-      label: string;
-      id: string;
-      domain: string;
-      meta?: Record<string, any>;
-    };
-
 const getWifAndDerivation = (seedPhrase: string, derivationPath: string) => {
-  const seed = bip39.mnemonicToSeedSync(seedPhrase);
-  const masterNode = ExtendedPrivateKey.from_seed(seed);
-  const childNode = derivationPath === 'm' ? masterNode : masterNode.derive_from_path(derivationPath);
-  const privateKey = childNode.get_private_key();
-  const wif = privateKey.to_wif();
+  const seed = Mnemonic.fromString(seedPhrase).toSeed();
+  const masterNode = HD.fromSeed(seed);
+  const childNode = derivationPath === 'm' ? masterNode : masterNode.derive(derivationPath);
+  const privateKey = childNode.privKey;
+  const wif = privateKey.toWif();
 
   return { wif, derivationPath };
 };
 
 export const generateKeysFromTag = (mnemonic: string, derivation: string) => {
   const wifAndDp = getWifAndDerivation(mnemonic, derivation);
-  const privKey = PrivateKey.from_wif(wifAndDp.wif);
-  const pubKey = privKey.to_public_key();
-  const address = pubKey.to_address().to_string();
+  const privKey = PrivateKey.fromWif(wifAndDp.wif);
+  const pubKey = privKey.toPublicKey();
+  const address = pubKey.toAddress();
   return {
     wif: wifAndDp.wif,
     derivationPath: wifAndDp.derivationPath,
@@ -59,6 +46,7 @@ export const generateKeysFromTag = (mnemonic: string, derivation: string) => {
 };
 
 export const getKeys = (
+  network: NetWork,
   validMnemonic?: string,
   walletDerivation: string | null = null,
   ordDerivation: string | null = null,
@@ -72,20 +60,23 @@ export const getKeys = (
   const wallet = generateKeysFromTag(mnemonic, walletDerivation || DEFAULT_WALLET_PATH);
   const ord = generateKeysFromTag(mnemonic, ordDerivation || DEFAULT_ORD_PATH);
   const identity = generateKeysFromTag(mnemonic, identityDerivation || DEFAULT_IDENTITY_PATH);
+  const walletAddress = network === NetWork.Testnet ? convertAddressToTestnet(wallet.address) : wallet.address;
+  const ordAddress = network === NetWork.Testnet ? convertAddressToTestnet(ord.address) : ord.address;
+  const identityAddress = network === NetWork.Testnet ? convertAddressToTestnet(identity.address) : identity.address;
 
   const keys: Keys = {
     mnemonic,
     walletWif: wallet.wif,
-    walletAddress: wallet.address,
-    walletPubKey: wallet.pubKey.to_hex(),
+    walletAddress,
+    walletPubKey: wallet.pubKey.toString(),
     walletDerivationPath: wallet.derivationPath,
     ordWif: ord.wif,
-    ordAddress: ord.address,
-    ordPubKey: ord.pubKey.to_hex(),
+    ordAddress,
+    ordPubKey: ord.pubKey.toString(),
     ordDerivationPath: ord.derivationPath,
     identityWif: identity.wif,
-    identityAddress: identity.address,
-    identityPubKey: identity.pubKey.to_hex(),
+    identityAddress,
+    identityPubKey: identity.pubKey.toString(),
     identityDerivationPath: identity.derivationPath,
   };
 
@@ -93,49 +84,48 @@ export const getKeys = (
 };
 
 export const getKeysFromWifs = (wifs: WifKeys) => {
-  const walletPrivKey = PrivateKey.from_wif(wifs.payPk);
-  const walletPubKey = walletPrivKey.to_public_key();
-  const walletAddress = walletPubKey.to_address().to_string();
+  const walletPrivKey = PrivateKey.fromWif(wifs.payPk);
+  const walletPubKey = walletPrivKey.toPublicKey();
+  const walletAddress = walletPubKey.toAddress();
 
-  const ordPrivKey = PrivateKey.from_wif(wifs.ordPk);
-  const ordPubKey = ordPrivKey.to_public_key();
-  const ordAddress = ordPubKey.to_address().to_string();
+  const ordPrivKey = PrivateKey.fromWif(wifs.ordPk);
+  const ordPubKey = ordPrivKey.toPublicKey();
+  const ordAddress = ordPubKey.toAddress();
 
   let identityPrivKey: PrivateKey | undefined;
   if (wifs.identityPk) {
-    identityPrivKey = PrivateKey.from_wif(wifs.identityPk);
+    identityPrivKey = PrivateKey.fromWif(wifs.identityPk);
   } else {
-    let privBuf = Buffer.concat([Buffer.from(walletPrivKey.to_bytes()), Buffer.from(ordPrivKey.to_bytes())]);
+    const privBuf = walletPrivKey.toArray().concat(ordPrivKey.toArray());
     while (!identityPrivKey) {
-      privBuf = Buffer.from(Hash.sha_256(privBuf).to_bytes());
-      const bn = new Bn().fromBuffer(privBuf);
-      if (bn.lt(Point.getN())) {
-        identityPrivKey = PrivateKey.from_bytes(bn.toBuffer());
+      const bn = new BigNumber(Hash.sha256(privBuf));
+      if (bn.lt(new BigNumber('ffffffff ffffffff ffffffff fffffffe baaedce6 af48a03b bfd25e8c d0364141', 16))) {
+        identityPrivKey = PrivateKey.fromString(bn.toHex(), 'hex');
       }
     }
   }
 
-  const identityPubKey = identityPrivKey.to_public_key();
-  const identityAddress = identityPubKey.to_address().to_string();
+  const identityPubKey = identityPrivKey.toPublicKey();
+  const identityAddress = identityPubKey.toAddress();
 
   const keys: Partial<Keys> = {
     walletWif: wifs.payPk,
     walletAddress,
     ordWif: wifs.ordPk,
     ordAddress,
-    walletPubKey: walletPubKey.to_hex(),
-    ordPubKey: ordPubKey.to_hex(),
-    identityWif: identityPrivKey.to_wif(),
+    walletPubKey: walletPubKey.toString(),
+    ordPubKey: ordPubKey.toString(),
+    identityWif: identityPrivKey.toWif(),
     identityAddress,
-    identityPubKey: identityPubKey.to_hex(),
+    identityPubKey: identityPubKey.toString(),
   };
 
   return keys;
 };
 
 const getTaggedDerivation = (tag: DerivationTag): string => {
-  const labelHex = Hash.sha_256(Buffer.from(tag.label, 'utf-8')).to_hex();
-  const idHex = Hash.sha_256(Buffer.from(tag.id, 'utf-8')).to_hex();
+  const labelHex = Utils.toHex(Hash.sha256(tag.label, 'utf8'));
+  const idHex = Utils.toHex(Hash.sha256(tag.id, 'utf8'));
   const labelNumber = parseInt(labelHex.slice(-8), 16) % 2 ** 31;
   const idNumber = parseInt(idHex.slice(-8), 16) % 2 ** 31;
   return `m/44'/236'/218'/${labelNumber}/${idNumber}`;
@@ -147,16 +137,16 @@ export const getTaggedDerivationKeys = (tag: DerivationTag, mnemonic: string) =>
 };
 
 export const getPrivateKeyFromTag = (tag: DerivationTag, keys: Keys) => {
-  if (tag.label === 'panda') {
+  if (tag.label === 'panda' || tag.label === 'yours') {
     switch (tag.id) {
       case 'bsv':
-        return PrivateKey.from_wif(keys.walletWif);
+        return PrivateKey.fromWif(keys.walletWif);
       case 'ord':
-        return PrivateKey.from_wif(keys.ordWif);
+        return PrivateKey.fromWif(keys.ordWif);
       case 'identity':
-        return PrivateKey.from_wif(keys.identityWif);
+        return PrivateKey.fromWif(keys.identityWif);
       default:
-        return PrivateKey.from_wif(keys.identityWif);
+        return PrivateKey.fromWif(keys.identityWif);
     }
   } else {
     const taggedKeys = getTaggedDerivationKeys(tag, keys.mnemonic);

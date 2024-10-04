@@ -3,7 +3,7 @@
   "manifest_version": 3,
   "name": "Yours Wallet",
   "description": "A non-custodial and open-source wallet for BSV and 1Sat Ordinals",
-  "permissions": ["storage", "unlimitedStorage"],
+  "permissions": ["storage", "unlimitedStorage", "tabs"],
   "action": {
     "default_popup": "index.html",
     "default_title": "Yours Wallet"

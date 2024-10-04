@@ -1,68 +1,58 @@
 import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
-import { BackButton } from '../../components/BackButton';
+import { TransferOrdinal } from 'yours-wallet-provider';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
+import { Ordinal as OrdType } from 'yours-wallet-provider';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
-import { useOrds, Web3TransferOrdinalRequest } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useWeb3Context } from '../../hooks/useWeb3Context';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
-import { storage } from '../../utils/storage';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { getErrorMessage } from '../../utils/tools';
 
 export type OrdTransferRequestProps = {
-  web3Request: Web3TransferOrdinalRequest;
+  request: TransferOrdinal;
   popupId: number | undefined;
   onResponse: () => void;
 };
 
 export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
-  const { web3Request, popupId, onResponse } = props;
+  const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
-  const { ordAddress, getOrdinals, isProcessing, transferOrdinal, setIsProcessing, getOrdinalsBaseUrl, ordinals } =
-    useOrds();
+  const { hideMenu } = useBottomMenu();
+  const [isProcessing, setIsProcessing] = useState(false);
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [successTxId, setSuccessTxId] = useState('');
-  const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useWeb3Context();
+  const { addSnackbar } = useSnackbar();
+  const { chromeStorageService, ordinalService, gorillaPoolService } = useServiceContext();
+  const isPasswordRequired = chromeStorageService.isPasswordRequired();
+  const network = chromeStorageService.getNetwork();
+  const [ordinal, setOrdinal] = useState<OrdType | undefined>();
 
   useEffect(() => {
-    if (!successTxId) return;
-    if (!message && ordAddress) {
-      resetSendState();
-      getOrdinals();
-    }
+    hideMenu();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successTxId, message, getOrdinals, ordAddress]);
+  }, []);
 
   useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
-  const resetSendState = () => {
-    setPasswordConfirm('');
-    setSuccessTxId('');
-    setIsProcessing(false);
-  };
+    if (!ordinalService || !request?.outpoint) return;
+    ordinalService.getOrdinal(request.outpoint).then((ord) => {
+      setOrdinal(ord);
+    });
+  }, [ordinalService, request.outpoint]);
 
   const handleTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
 
     await sleep(25);
-    if (!validate(web3Request.address)) {
+    if (!validate(request.address)) {
       addSnackbar('Invalid address detected!', 'info');
       setIsProcessing(false);
       return;
@@ -74,40 +64,28 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
       return;
     }
 
-    const transferRes = await transferOrdinal(web3Request.address, web3Request.outpoint, passwordConfirm);
+    const transferRes = await ordinalService.transferOrdinal(request.address, request.outpoint, passwordConfirm);
 
     if (!transferRes.txid || transferRes.error) {
-      const message =
-        transferRes.error === 'invalid-password'
-          ? 'Invalid Password!'
-          : transferRes.error === 'insufficient-funds'
-            ? 'Insufficient Funds!'
-            : transferRes.error === 'no-ord-utxo'
-              ? 'Could not locate the ordinal!'
-              : 'An unknown error has occurred! Try again.';
-
-      addSnackbar(message, 'error');
+      addSnackbar(getErrorMessage(transferRes.error), 'error');
+      setIsProcessing(false);
       return;
     }
 
-    setSuccessTxId(transferRes.txid);
     addSnackbar('Transfer Successful!', 'success');
+    await sleep(2000);
 
-    chrome.runtime.sendMessage({
+    sendMessage({
       action: 'transferOrdinalResponse',
       txid: transferRes.txid,
     });
-
-    setTimeout(async () => {
-      onResponse();
-      storage.remove('transferOrdinalRequest');
-      if (popupId) chrome.windows.remove(popupId);
-    }, 2000);
+    setIsProcessing(false);
+    onResponse();
   };
 
-  const clearRequest = () => {
-    storage.remove('transferOrdinalRequest');
-    if (popupId) chrome.windows.remove(popupId);
+  const clearRequest = async () => {
+    await chromeStorageService.remove('transferOrdinalRequest');
+    if (popupId) removeWindow(popupId);
     window.location.reload();
   };
 
@@ -117,19 +95,20 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
         <PageLoader theme={theme} message="Processing request..." />
       </Show>
 
-      <Show when={!isProcessing && !!web3Request}>
+      <Show when={!isProcessing && !!request}>
         <ConfirmContent>
-          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
-          <Ordinal
-            inscription={ordinals.data.filter((ord) => ord.outpoint.toString() === web3Request.outpoint)[0]}
-            theme={theme}
-            url={`${getOrdinalsBaseUrl()}/content/${web3Request.origin}`}
-            selected={true}
-          />
+          {ordinal && (
+            <Ordinal
+              inscription={ordinal}
+              theme={theme}
+              url={`${gorillaPoolService.getBaseUrl(network)}/content/${request.origin}`}
+              selected={true}
+            />
+          )}
           <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>
             <Text theme={theme} style={{ margin: '1rem 0' }}>
-              {`Transfer to: ${truncate(web3Request.address, 5, 5)}`}
+              {`Transfer to: ${truncate(request.address, 5, 5)}`}
             </Text>
             <Show when={isPasswordRequired}>
               <Input
@@ -145,6 +124,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
               Double check details before sending.
             </Text>
             <Button theme={theme} type="primary" label="Approve" disabled={isProcessing} isSubmit />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </ConfirmContent>
       </Show>

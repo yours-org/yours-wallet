@@ -1,4 +1,4 @@
-import { ECIESCiphertext, PrivateKey, PublicKey } from 'bsv-wasm-web';
+import { ECIES, PrivateKey, PublicKey, Utils } from '@bsv/sdk';
 import CryptoJS from 'crypto-js';
 
 export const deriveKey = (password: string, salt: string) => {
@@ -56,18 +56,10 @@ export const encryptUsingPrivKey = (
   pubKeys: PublicKey[],
   privateKey: PrivateKey,
 ) => {
-  const msgBuf = Buffer.from(message, encoding);
-  const encryptedMessages = pubKeys.map((keys) => keys.encrypt_message(msgBuf, privateKey));
-  return encryptedMessages.map((m) => Buffer.from(m.to_bytes()).toString('base64'));
+  const msgBuf = Utils.toArray(message, encoding);
+  return pubKeys.map((pubKey) => Utils.toBase64(ECIES.electrumEncrypt(msgBuf, pubKey, privateKey)));
 };
 
 export const decryptUsingPrivKey = (messages: string[], privateKey: PrivateKey) => {
-  let decryptedMessages: string[] = [];
-  for (const message of messages) {
-    const ciphertext = ECIESCiphertext.from_bytes(Buffer.from(message, 'base64'), true);
-    const pubKey = ciphertext.extract_public_key();
-    const decrypted = privateKey.decrypt_message(ciphertext, pubKey);
-    decryptedMessages.push(Buffer.from(decrypted).toString('base64'));
-  }
-  return decryptedMessages;
+  return messages.map((m) => Utils.toBase64(ECIES.electrumDecrypt(Utils.toArray(m, 'base64'), privateKey)));
 };

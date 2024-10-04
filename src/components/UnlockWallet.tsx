@@ -1,17 +1,18 @@
 import { useState } from 'react';
-import { styled } from 'styled-components';
-import { useKeys } from '../hooks/useKeys';
+import styled from 'styled-components';
 import { useTheme } from '../hooks/useTheme';
 import { useViewport } from '../hooks/useViewport';
-import { ColorThemeProps } from '../theme';
+import { WhiteLabelTheme } from '../theme.types';
 import { sleep } from '../utils/sleep';
-import { storage } from '../utils/storage';
 import { Button } from './Button';
 import { Input } from './Input';
-import yoursLogo from '../assets/yours-logo.png';
-import { FormContainer, HeaderText, Text, YoursLogo } from './Reusable';
+import { FormContainer, HeaderText, Text } from './Reusable';
+import { useServiceContext } from '../hooks/useServiceContext';
+import { YoursIcon } from './YoursIcon';
+import { setDerivationTags } from '../services/serviceHelpers';
+import { Keys } from '../utils/keys';
 
-const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
+const Container = styled.div<WhiteLabelTheme & { $isMobile: boolean }>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -20,8 +21,9 @@ const Container = styled.div<ColorThemeProps & { $isMobile: boolean }>`
   width: ${(props) => (props.$isMobile ? '100vw' : '22.5rem')};
   height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
   margin: 0;
-  background-color: ${({ theme }) => theme.mainBackground};
-  color: ${({ theme }) => theme.white};
+  background-color: ${({ theme }) => theme.color.global.walletBackground};
+  color: ${({ theme }) =>
+    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
   z-index: 100;
 `;
 
@@ -36,22 +38,24 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
   const { isMobile } = useViewport();
-
-  const { verifyPassword } = useKeys();
+  const { keysService, chromeStorageService, oneSatSPV } = useServiceContext();
 
   const handleUnlock = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isProcessing) return;
     setIsProcessing(true);
     await sleep(25);
-    const isVerified = await verifyPassword(password);
+
+    const isVerified = await keysService.verifyPassword(password);
     if (isVerified) {
       setVerificationFailed(false);
       const timestamp = Date.now();
-      storage.set({ lastActiveTime: timestamp });
+      await chromeStorageService.update({ lastActiveTime: timestamp });
+      const keys = (await keysService.retrieveKeys(password)) as Keys;
+      await setDerivationTags(keys, oneSatSPV, chromeStorageService);
       onUnlock();
     } else {
       setVerificationFailed(true);
-      setPassword('');
       setTimeout(() => {
         setVerificationFailed(false);
         setIsProcessing(false);
@@ -61,7 +65,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
 
   return (
     <Container $isMobile={isMobile} theme={theme}>
-      <YoursLogo src={yoursLogo} />
+      <YoursIcon width="4rem" />
       <HeaderText style={{ fontSize: '1.75rem' }} theme={theme}>
         Unlock Wallet
       </HeaderText>
@@ -75,12 +79,13 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           onChange={(e) => setPassword(e.target.value)}
           shake={verificationFailed ? 'true' : 'false'}
           autoFocus
+          onKeyDown={(e) => e.stopPropagation()}
         />
         <Button
           theme={theme}
           type="secondary-outline"
           label={isProcessing ? 'Unlocking...' : 'Unlock'}
-          disabled={isProcessing}
+          disabled={isProcessing || password === ''}
           isSubmit
         />
       </FormContainer>

@@ -1,25 +1,25 @@
+import { useState, useEffect } from 'react';
+import styled from 'styled-components';
 import { validate } from 'bitcoin-address-validation';
-import React, { useEffect, useState } from 'react';
-import { styled } from 'styled-components';
 import bsvCoin from '../../assets/bsv-coin.svg';
-import { BackButton } from '../../components/BackButton';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
-import { useBsv, Web3SendBsvRequest } from '../../hooks/useBsv';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useWeb3Context } from '../../hooks/useWeb3Context';
-import { ColorThemeProps } from '../../theme';
+import { WhiteLabelTheme } from '../../theme.types';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
-import { storage } from '../../utils/storage';
+import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
+import { SendBsv } from 'yours-wallet-provider';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { getErrorMessage } from '../../utils/tools';
 
-const RequestDetailsContainer = styled.div<ColorThemeProps>`
+const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -27,7 +27,7 @@ const RequestDetailsContainer = styled.div<ColorThemeProps>`
   max-height: 10rem;
   overflow-y: auto;
   overflow-x: hidden;
-  background: ${({ theme }) => theme.darkAccent + '80'};
+  background: ${({ theme }) => theme.color.global.row + '80'};
   margin: 0.5rem;
 `;
 
@@ -46,92 +46,64 @@ const Icon = styled.img`
 `;
 
 export type BsvSendRequestProps = {
-  web3Request: Web3SendBsvRequest;
+  request: SendBsv[];
   requestWithinApp?: boolean;
   popupId: number | undefined;
   onResponse: () => void;
 };
 
 export const BsvSendRequest = (props: BsvSendRequestProps) => {
-  const { web3Request, requestWithinApp, popupId, onResponse } = props;
+  const { request, requestWithinApp, popupId, onResponse } = props;
   const { theme } = useTheme();
-  const { setSelected } = useBottomMenu();
+  const { handleSelect, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired, noApprovalLimit } = useWeb3Context();
-  const { bsvAddress, bsvBalance, isProcessing, setIsProcessing, sendBsv, updateBsvBalance } = useBsv();
+  const { bsvService, chromeStorageService, keysService } = useServiceContext();
+  const { sendBsv, updateBsvBalance, getBsvBalance } = bsvService;
+  const { bsvAddress } = keysService;
   const [hasSent, setHasSent] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const requestSats = web3Request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
+  const { account } = chromeStorageService.getCurrentAccountObject();
+  if (!account) throw Error('No account found');
+  const { settings } = account;
+  const noApprovalLimit = settings.noApprovalLimit ?? 0;
+  const isPasswordRequired = chromeStorageService.isPasswordRequired();
+
+  const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
   const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
-
-  // This useEffect handle the instance where the request is below the no approval setting and will immediately process the request.
-  useEffect(() => {
-    if (hasSent || noApprovalLimit === undefined) return;
-    if (web3Request.length > 0 && bsvSendAmount <= noApprovalLimit) {
-      setHasSent(true);
-
-      // Using timeout here so that the state that sendBsv relies on is ready. Not ideal but can refactor later.
-      // TODO: Should consider a broader refactor of how state is being handled across hooks and context when the time is right.
-      setTimeout(() => {
-        processBsvSend();
-      }, 100);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bsvSendAmount, noApprovalLimit, web3Request, hasSent]);
-
-  useEffect(() => {
-    if (requestWithinApp) return;
-    setSelected('bsv');
-  }, [requestWithinApp, setSelected]);
-
-  useEffect(() => {
-    if (!successTxId) return;
-    if (!message && bsvAddress) {
-      resetSendState();
-      updateBsvBalance(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successTxId, message, updateBsvBalance, bsvAddress]);
-
-  useEffect(() => {
-    if (requestWithinApp) return;
-
-    const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [requestWithinApp, popupId]);
 
   const processBsvSend = async () => {
     try {
-      let validationFail = new Map<string, boolean>();
+      const validationFail = new Map<string, boolean>();
       validationFail.set('address', false);
       validationFail.set('script', false);
       validationFail.set('data', false);
 
-      web3Request.forEach((request) => {
-        // validate script or data if they are set
-        if (request.script?.length === 0) {
+      request.forEach((req, idx) => {
+        if (req.script?.length === 0) {
           validationFail.set('script', true);
           return;
-        } else if (request.data) {
-          if (request.data.length === 0) {
+        } else if (req.data) {
+          if (req.data.length === 0) {
             validationFail.set('data', true);
             return;
           }
         }
-        // otherwise sending to address
-        if (request.address && !validate(request.address)) {
-          validationFail.set('address', true);
-          return;
+        if (req.address) {
+          if (req.address.includes('@')) {
+            request[idx].paymail = req.address;
+            request[idx].address = undefined;
+            return;
+          }
+          if (!validate(req.address)) {
+            validationFail.set('address', true);
+            return;
+          }
         }
       });
+
       let validationErrorMessage = '';
       if (validationFail.get('script')) {
         validationErrorMessage = 'Found an invalid script.';
@@ -146,48 +118,31 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         return;
       }
 
-      if (web3Request[0].address && !web3Request[0].satoshis) {
+      if (request[0].address && !request[0].satoshis) {
         addSnackbar('No sats supplied', 'info');
         return;
       }
 
-      const sendRes = await sendBsv(web3Request, passwordConfirm, noApprovalLimit);
+      console.log(request);
+      const sendRes = await sendBsv(request, passwordConfirm, noApprovalLimit);
       if (!sendRes.txid || sendRes.error) {
-        const message =
-          sendRes.error === 'invalid-password'
-            ? 'Invalid Password!'
-            : sendRes.error === 'insufficient-funds'
-              ? 'Insufficient Funds!'
-              : sendRes.error === 'fee-too-high'
-                ? 'Miner fee too high!'
-                : sendRes.error === 'tx-size-too-large'
-                  ? 'Tx too big. 50MB max'
-                  : 'An unknown error has occurred! Try again.' + sendRes.error;
-
-        addSnackbar(message, 'error');
+        addSnackbar(getErrorMessage(sendRes.error), 'error');
+        setIsProcessing(false);
         return;
       }
 
       setSuccessTxId(sendRes.txid);
       addSnackbar('Transaction Successful!', 'success');
+      await sleep(2000);
+      onResponse();
 
-      // This should only get called if it's from the provider.
       if (!requestWithinApp) {
-        chrome.runtime.sendMessage({
+        sendMessage({
           action: 'sendBsvResponse',
           txid: sendRes.txid,
           rawtx: sendRes.rawtx,
         });
       }
-
-      setTimeout(async () => {
-        onResponse();
-        if (!requestWithinApp) {
-          storage.remove('sendBsvRequest');
-        }
-
-        if (popupId) chrome.windows.remove(popupId);
-      }, 2000);
     } catch (error) {
       console.log(error);
     } finally {
@@ -195,11 +150,41 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     }
   };
 
+  useEffect(() => {
+    if (hasSent || noApprovalLimit === undefined) return;
+    if (request.length > 0 && bsvSendAmount <= noApprovalLimit) {
+      setHasSent(true);
+
+      setTimeout(async () => {
+        setIsProcessing(true);
+        await processBsvSend();
+        setIsProcessing(false);
+        await updateBsvBalance();
+      }, 100);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bsvSendAmount, hasSent, noApprovalLimit]);
+
+  useEffect(() => {
+    if (requestWithinApp) return;
+    handleSelect('bsv');
+    hideMenu();
+  }, [requestWithinApp, handleSelect, hideMenu]);
+
   const resetSendState = () => {
     setPasswordConfirm('');
     setSuccessTxId('');
     setIsProcessing(false);
   };
+
+  useEffect(() => {
+    if (!successTxId) return;
+    if (!message && bsvAddress) {
+      resetSendState();
+      updateBsvBalance();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bsvAddress, message, successTxId]);
 
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -217,22 +202,22 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   };
 
   const web3Details = () => {
-    return web3Request.map((r, i) => {
+    return request.map((r, i) => {
       return (
         <LineItem key={i}>
           <Icon src={bsvCoin} />
           <Text style={{ margin: 0 }} theme={theme}>{`${r.satoshis / BSV_DECIMAL_CONVERSION}`}</Text>
           <Text style={{ margin: 0 }} theme={theme}>
-            {r.address ? truncate(r.address, 5, 5) : ''}
+            {r.address ? truncate(r.address, 5, 5) : r.paymail ? truncate(r.paymail, 12, 0) : ''}
           </Text>
         </LineItem>
       );
     });
   };
 
-  const clearRequest = () => {
-    storage.remove('sendBsvRequest');
-    if (popupId) chrome.windows.remove(popupId);
+  const clearRequest = async () => {
+    await chromeStorageService.remove('sendBsvRequest');
+    if (popupId) removeWindow(popupId);
     window.location.reload();
   };
 
@@ -241,16 +226,15 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       <Show when={isProcessing}>
         <PageLoader theme={theme} message="Sending BSV..." />
       </Show>
-      <Show when={!isProcessing && !!web3Request && !hasSent}>
+      <Show when={!isProcessing && !!request && !hasSent}>
         <ConfirmContent>
-          <BackButton onClick={clearRequest} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Text
             theme={theme}
             style={{ cursor: 'pointer', margin: '0.75rem 0' }}
-          >{`Available Balance: ${bsvBalance}`}</Text>
+          >{`Available Balance: ${getBsvBalance()}`}</Text>
           <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
-            <RequestDetailsContainer>{web3Details()}</RequestDetailsContainer>
+            <RequestDetailsContainer theme={theme}>{web3Details()}</RequestDetailsContainer>
             <Show when={isPasswordRequired}>
               <Input
                 theme={theme}
@@ -266,10 +250,11 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
             <Button
               theme={theme}
               type="primary"
-              label={`Approve ${web3Request.reduce((a, item) => a + item.satoshis, 0) / BSV_DECIMAL_CONVERSION} BSV`}
+              label={`Approve ${request.reduce((a, item) => a + item.satoshis, 0) / BSV_DECIMAL_CONVERSION} BSV`}
               disabled={isProcessing}
               isSubmit
             />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </ConfirmContent>
       </Show>

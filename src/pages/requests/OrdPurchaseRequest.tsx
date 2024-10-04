@@ -1,89 +1,85 @@
 import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
-import { BackButton } from '../../components/BackButton';
+import { Ordinal as OrdinalType, PurchaseOrdinal } from 'yours-wallet-provider';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
-import { OrdinalTxo } from '../../hooks/ordTypes';
-import { useGorillaPool } from '../../hooks/useGorillaPool';
-import { PurchaseOrdinal, useOrds } from '../../hooks/useOrds';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { useWeb3Context } from '../../hooks/useWeb3Context';
-import { BSV_DECIMAL_CONVERSION, GLOBAL_ORDERBOOK_MARKET_RATE, YOURS_DEV_WALLET } from '../../utils/constants';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
+import {
+  BSV20_INDEX_FEE,
+  BSV_DECIMAL_CONVERSION,
+  GENERIC_TOKEN_ICON,
+  GLOBAL_ORDERBOOK_MARKET_RATE,
+  YOURS_DEV_WALLET,
+} from '../../utils/constants';
 import { sleep } from '../../utils/sleep';
-import { storage } from '../../utils/storage';
+import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { styled } from 'styled-components';
+import { Token } from '../../services/types/gorillaPool.types';
+import { getErrorMessage } from '../../utils/tools';
 
-export type Web3PurchaseOrdinalRequest = {
-  outpoint: string;
-  marketplaceRate?: number;
-  marketplaceAddress?: string;
-};
+const TokenIcon = styled.img`
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+`;
 
 export type OrdPurchaseRequestProps = {
-  web3Request: Web3PurchaseOrdinalRequest;
+  request: PurchaseOrdinal & { password?: string };
   popupId: number | undefined;
   onResponse: () => void;
 };
 
 export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
-  const { web3Request, popupId, onResponse } = props;
+  const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
-  const { ordAddress, getOrdinals, isProcessing, purchaseGlobalOrderbookListing, setIsProcessing, getOrdinalsBaseUrl } =
-    useOrds();
-  const { getUtxoByOutpoint } = useGorillaPool();
+  const { hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [successTxId, setSuccessTxId] = useState('');
-  const { addSnackbar, message } = useSnackbar();
-  const { isPasswordRequired } = useWeb3Context();
-  const [inscription, setInscription] = useState<OrdinalTxo | undefined>();
-  const marketplaceAddress = web3Request.marketplaceAddress ?? YOURS_DEV_WALLET;
-  const marketplaceRate = web3Request.marketplaceRate ?? GLOBAL_ORDERBOOK_MARKET_RATE;
-  const outpoint = web3Request.outpoint;
+  const { addSnackbar } = useSnackbar();
+  const { gorillaPoolService, ordinalService, chromeStorageService } = useServiceContext();
+  const [inscription, setInscription] = useState<OrdinalType | undefined>();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [tokenDetails, setTokenDetails] = useState<Token>();
+  const [isLoaded, setIsLoaded] = useState(false);
+  const marketplaceAddress = request.marketplaceAddress ?? YOURS_DEV_WALLET;
+  const marketplaceRate = request.marketplaceRate ?? GLOBAL_ORDERBOOK_MARKET_RATE;
+  const outpoint = request.outpoint;
+  const isPasswordRequired = chromeStorageService.isPasswordRequired();
+  const network = chromeStorageService.getNetwork();
 
   useEffect(() => {
-    if (!web3Request.outpoint) return;
+    hideMenu();
+    if (!request.outpoint) return;
     const getOrigin = async () => {
-      const res = await getUtxoByOutpoint(web3Request.outpoint);
+      setIsProcessing(true);
+      const res = await gorillaPoolService.getUtxoByOutpoint(request.outpoint);
       setInscription(res);
+      if (res?.data?.bsv20) {
+        const tokenDetails = await gorillaPoolService.getBsv20Details(
+          res?.data.bsv20?.id || res.data.bsv20?.tick || '',
+        );
+        setTokenDetails(tokenDetails);
+      }
+      setIsProcessing(false);
+      setIsLoaded(true);
     };
 
     getOrigin();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [web3Request.outpoint]);
-
-  useEffect(() => {
-    if (!successTxId) return;
-    if (!message && ordAddress) {
-      resetSendState();
-      getOrdinals();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successTxId, message, getOrdinals, ordAddress]);
-
-  useEffect(() => {
-    const onbeforeunloadFn = () => {
-      if (popupId) chrome.windows.remove(popupId);
-    };
-
-    window.addEventListener('beforeunload', onbeforeunloadFn);
-    return () => {
-      window.removeEventListener('beforeunload', onbeforeunloadFn);
-    };
-  }, [popupId]);
-
-  const resetSendState = () => {
-    setPasswordConfirm('');
-    setSuccessTxId('');
-    setInscription(undefined);
-    setIsProcessing(false);
-  };
+  }, [request.outpoint]);
 
   const handlePurchaseOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!inscription) {
+      addSnackbar('Could not locate the ordinal!', 'error');
+      return;
+    }
     setIsProcessing(true);
 
     await sleep(25);
@@ -99,65 +95,69 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
       return;
     }
 
-    const purchaseListing: PurchaseOrdinal = {
+    const purchaseListing: PurchaseOrdinal & { password: string } = {
       marketplaceAddress,
       marketplaceRate,
       outpoint,
       password: passwordConfirm,
     };
-    const purchaseRes = await purchaseGlobalOrderbookListing(purchaseListing);
+    const purchaseRes = await ordinalService.purchaseGlobalOrderbookListing(purchaseListing, inscription, tokenDetails);
 
     if (!purchaseRes.txid || purchaseRes.error) {
-      const message =
-        purchaseRes.error === 'invalid-password'
-          ? 'Invalid Password!'
-          : purchaseRes.error === 'insufficient-funds'
-            ? 'Insufficient Funds!'
-            : purchaseRes.error === 'no-ord-utxo'
-              ? 'Could not locate the ordinal!'
-              : 'An unknown error has occurred! Try again.';
-
-      addSnackbar(message, 'error');
+      addSnackbar(getErrorMessage(purchaseRes.error), 'error');
       setIsProcessing(false);
       return;
     }
 
-    chrome.runtime.sendMessage({
+    addSnackbar('Purchase Successful!', 'success');
+    await sleep(2000);
+    sendMessage({
       action: 'purchaseOrdinalResponse',
       txid: purchaseRes.txid,
     });
-
-    setSuccessTxId(purchaseRes.txid);
-    addSnackbar('Purchase Successful!', 'success');
-    setTimeout(async () => {
-      onResponse();
-      storage.remove('purchaseOrdinalRequest');
-      if (popupId) chrome.windows.remove(popupId);
-    }, 2000);
+    setIsProcessing(false);
+    onResponse();
   };
 
-  const clearRequest = () => {
-    storage.remove('purchaseOrdinalRequest');
-    if (popupId) chrome.windows.remove(popupId);
+  const clearRequest = async () => {
+    await chromeStorageService.remove('purchaseOrdinalRequest');
+    if (popupId) removeWindow(popupId);
     window.location.reload();
   };
 
   return (
     <>
       <Show when={isProcessing}>
-        <PageLoader theme={theme} message="Purchasing Ordinal..." />
+        <PageLoader theme={theme} message={isLoaded ? 'Purchasing Ordinal...' : 'Processing...'} />
       </Show>
 
-      <Show when={!isProcessing && !!web3Request && !!inscription}>
+      <Show when={!isProcessing && !!request && !!inscription}>
         <ConfirmContent>
-          <BackButton onClick={clearRequest} />
+          <Show
+            when={!tokenDetails}
+            whenFalseContent={
+              <TokenIcon
+                src={
+                  tokenDetails?.icon
+                    ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${tokenDetails.icon}`
+                    : GENERIC_TOKEN_ICON
+                }
+              />
+            }
+          >
+            <Ordinal
+              inscription={inscription as OrdinalType}
+              theme={theme}
+              url={`${gorillaPoolService.getBaseUrl(network)}/content/${inscription?.origin?.outpoint}`}
+              selected={true}
+            />
+          </Show>
           <HeaderText theme={theme}>Purchase Request</HeaderText>
-          <Ordinal
-            inscription={inscription as OrdinalTxo}
-            theme={theme}
-            url={`${getOrdinalsBaseUrl()}/content/${inscription?.origin?.outpoint.toString()}`}
-            selected={true}
-          />
+          <Show when={!!tokenDetails}>
+            <Text theme={theme} style={{ color: theme.color.global.gray }}>
+              {tokenDetails?.sym || tokenDetails?.tick || inscription?.origin?.data?.map?.name || 'Unknown Token'}
+            </Text>
+          </Show>
           <FormContainer noValidate onSubmit={(e) => handlePurchaseOrdinal(e)}>
             <Show when={isPasswordRequired}>
               <Input
@@ -175,12 +175,14 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
               theme={theme}
               type="primary"
               label={`Pay ${(
-                (Number(inscription?.data?.list?.price) * (1 + marketplaceRate)) /
+                (Number(inscription?.data?.list?.price) * (1 + marketplaceRate) +
+                  (tokenDetails ? BSV20_INDEX_FEE : 0)) /
                 BSV_DECIMAL_CONVERSION
               ).toFixed(8)} BSV`}
               disabled={isProcessing}
               isSubmit
             />
+            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
         </ConfirmContent>
       </Show>

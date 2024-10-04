@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { ColorThemeProps, Theme } from '../theme';
+import { WhiteLabelTheme, Theme } from '../theme.types';
 import { Text } from './Reusable';
 import { IconButton } from './IconButton';
 import copyIcon from '../assets/copy.svg';
@@ -14,7 +14,7 @@ const Container = styled.div`
   padding: 0 0;
 `;
 
-const TokenId = styled(Text)<ColorThemeProps>`
+const TokenId = styled(Text)<WhiteLabelTheme>`
   font-size: 0.85rem;
   max-width: 16rem;
   white-space: nowrap;
@@ -22,7 +22,8 @@ const TokenId = styled(Text)<ColorThemeProps>`
   text-overflow: ellipsis;
   margin: 0 0;
   width: fit-content;
-  color: ${({ theme }) => theme.gray};
+  color: ${({ theme }) => theme.color.global.gray};
+  cursor: pointer;
 `;
 
 export type BSV20IdProps = {
@@ -38,7 +39,7 @@ function showId(id: string) {
 export const BSV20Id = (props: BSV20IdProps) => {
   const { id, theme, onCopyTokenId } = props;
 
-  const copy = (e: any) => {
+  const copy = (e: React.MouseEvent<HTMLElement, MouseEvent>) => {
     e.stopPropagation();
     navigator.clipboard.writeText(id);
     onCopyTokenId();
