@@ -60,6 +60,7 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
 
   useEffect(() => {
     const loadSavedTokens = async () => {
+      if (!bsv20s.length) return;
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) return;
       const favoriteTokenIds = account?.settings?.favoriteTokens || [];
@@ -68,22 +69,14 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
         .map((id) => bsv20s.find((token) => token.id === id))
         .filter(Boolean) as Bsv20[];
 
+      const data = await gorillaPoolService.getTokenPriceInSats(bsv20s.map((d) => d?.id || ''));
       setTokens(orderedTokens.length ? orderedTokens : bsv20s);
+      setPriceData(data);
     };
 
     loadSavedTokens();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bsv20s]);
-
-  useEffect(() => {
-    if (!bsv20s.length) return;
-    (async () => {
-      const data = await gorillaPoolService.getTokenPriceInSats(bsv20s.map((d) => d?.id || ''));
-      setPriceData(data);
-    })();
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bsv20s]);
+  }, []);
 
   // Handle drag end event
   const handleOnDragEnd = async (result: DropResult) => {
