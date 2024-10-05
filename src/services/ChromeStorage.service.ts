@@ -95,6 +95,7 @@ export class ChromeStorageService {
               avatar: socialProfile?.avatar ?? HOSTED_YOURS_IMAGE,
             },
             favoriteTokens: [],
+            customFeeRate: 10,
           },
           addresses: {
             bsvAddress: appState.addresses.bsvAddress,
@@ -217,6 +218,13 @@ export class ChromeStorageService {
     const account = accounts[selectedAccount];
     const { network } = account;
     return network ?? NetWork.Mainnet;
+  };
+
+  getCustomFeeRate = (): number => {
+    if (!this.storage) return 10;
+    const { accounts, selectedAccount } = this.storage as ChromeStorageObject;
+    if (!accounts || !selectedAccount) return 10;
+    return accounts[selectedAccount]?.settings?.customFeeRate ?? 10;
   };
 
   isPasswordRequired = (): boolean => {

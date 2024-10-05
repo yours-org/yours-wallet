@@ -14,7 +14,7 @@ export const MAINNET_ADDRESS_PREFIX = 0x00;
 export const TESTNET_ADDRESS_PREFIX = 0x6f;
 export const BSV_DECIMAL_CONVERSION = 100000000;
 export const BSV20_INDEX_FEE = 1000;
-export const FEE_PER_KB = 50;
+export const FEE_PER_KB = 10;
 export const MAX_BYTES_PER_TX = 50000000; // 50MB;
 export const GLOBAL_ORDERBOOK_MARKET_RATE = 0.05;
 export const FEE_SATS = 125;
@@ -87,6 +87,7 @@ export const DEFAULT_ACCOUNT = {
     isPasswordRequired: true,
     socialProfile: { avatar: HOSTED_YOURS_IMAGE, displayName: 'Anonymous' },
     favoriteTokens: [],
+    customFeeRate: 10,
   },
   balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
   encryptedKeys: '',

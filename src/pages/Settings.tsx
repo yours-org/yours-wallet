@@ -136,9 +136,9 @@ export const Settings = () => {
   const [isPasswordRequired, setIsPasswordRequired] = useState(chromeStorageService.isPasswordRequired());
   const [masterBackupProgress, setMasterBackupProgress] = useState(0);
   const [masterBackupEventText, setMasterBackupEventText] = useState('');
-  const [noApprovalLimit, setNoApprovalLimit] = useState(
-    chromeStorageService.getCurrentAccountObject().account?.settings.noApprovalLimit ?? 0,
-  );
+  const currentAccount = chromeStorageService.getCurrentAccountObject();
+  const [noApprovalLimit, setNoApprovalLimit] = useState(currentAccount.account?.settings.noApprovalLimit ?? 0);
+  const [customFeeRate, setCustomFeeRate] = useState(currentAccount.account?.settings.customFeeRate ?? 10);
 
   useEffect(() => {
     const getWhitelist = async (): Promise<WhitelistedApp[]> => {
@@ -379,6 +379,27 @@ export const Settings = () => {
     await chromeStorageService.updateNested(key, update);
   };
 
+  const handleUpdateCustomFeeRate = async (rate: number) => {
+    if (rate < 1) {
+      addSnackbar('Fee rate must be at least 1 sat/byte', 'error');
+      return;
+    }
+    setCustomFeeRate(rate);
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) throw new Error('No account found');
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [keysService.identityAddress]: {
+        ...account,
+        settings: {
+          ...account.settings,
+          customFeeRate: rate,
+        },
+      },
+    };
+    await chromeStorageService.updateNested(key, update);
+  };
+
   const handleMasterBackup = async () => {
     await streamDataToZip(oneSatSPV, chromeStorageService, (e: MasterBackupProgressEvent) => {
       setMasterBackupEventText(e.message);
@@ -611,6 +632,20 @@ export const Settings = () => {
             type="number"
             onChange={(e) => handleUpdateApprovalLimit(Number(e.target.value))}
             value={noApprovalLimit}
+            style={{ width: '5rem', margin: 0 }}
+          />
+        }
+      />
+      <SettingsRow
+        name="Custom Fee Rate"
+        description="Set a custom fee rate for transactions (default is 10 sat/kb)"
+        jsxElement={
+          <Input
+            theme={theme}
+            placeholder={String(customFeeRate)}
+            type="number"
+            onChange={(e) => handleUpdateCustomFeeRate(Number(e.target.value))}
+            value={customFeeRate}
             style={{ width: '5rem', margin: 0 }}
           />
         }

@@ -2,7 +2,6 @@ import { OrdP2PKH } from 'js-1sat-ord';
 import { NetWork, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
 import {
   BSV_DECIMAL_CONVERSION,
-  FEE_PER_KB,
   MAINNET_ADDRESS_PREFIX,
   MAX_BYTES_PER_TX,
   TESTNET_ADDRESS_PREFIX,
@@ -101,7 +100,7 @@ export class BsvService {
     try {
       const tx = new Transaction();
       const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
-      const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+      const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       const pkMap = await this.keysService.retrievePrivateKeyMap(password);
       for await (const u of fundResults.txos || []) {
         const pk = pkMap.get(u.owner || '');
@@ -243,7 +242,7 @@ export class BsvService {
 
       let satsIn = 0;
       let fee = 0;
-      const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+      const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       for await (const u of fundResults.txos || []) {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
@@ -414,7 +413,7 @@ export class BsvService {
 
     const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
 
-    const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+    const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
     for await (const u of fundResults.txos || []) {
       const pk = pkMap.get(u.owner || '');
       if (!pk) continue;

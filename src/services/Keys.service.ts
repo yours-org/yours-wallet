@@ -6,14 +6,13 @@ import {
   MAINNET_ADDRESS_PREFIX,
   TESTNET_ADDRESS_PREFIX,
   SWEEP_PATH,
-  FEE_PER_KB,
   WOC_BASE_URL,
   CHROME_STORAGE_OBJECT_VERSION,
 } from '../utils/constants';
 import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto';
 import { generateKeysFromTag, getKeys, getKeysFromWifs, Keys } from '../utils/keys';
 import { ChromeStorageService } from './ChromeStorage.service';
-import { Account, ChromeStorageObject } from './types/chromeStorage.types';
+import { ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction, Utils } from '@bsv/sdk';
 import { SPVStore } from 'spv-store';
@@ -53,13 +52,11 @@ export class KeysService {
       version: CHROME_STORAGE_OBJECT_VERSION,
       hasUpgradedToSPV: true,
     });
-    const { account } = this.chromeStorageService.getCurrentAccountObject();
-    const newAccount: Account = account ? account : DEFAULT_ACCOUNT;
     const totalAccounts = this.chromeStorageService.getAllAccounts().length;
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
       [keys.identityAddress]: {
-        ...newAccount,
+        ...DEFAULT_ACCOUNT,
         network,
         name: `Account ${totalAccounts + 1}`,
         addresses: {
@@ -135,7 +132,7 @@ export class KeysService {
       const { data } = await axios.get<WocUtxo[]>(`${WOC_BASE_URL}/address/${sweepWallet.address}/unspent`);
       const utxos = data;
       if (utxos.length === 0) return;
-      const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+      const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       for await (const u of utxos || []) {
         tx.addInput({
           sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash, true),

@@ -14,7 +14,7 @@ import {
 import { Bsv20, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction, Utils } from '@bsv/sdk';
 import { BsvService } from './Bsv.service';
-import { BSV20_INDEX_FEE, FEE_PER_KB } from '../utils/constants';
+import { BSV20_INDEX_FEE } from '../utils/constants';
 import { mapOrdinal } from '../utils/providerHelper';
 import { SPVStore, Outpoint, TxoLookup, TxoSort } from 'spv-store';
 import { isValidEmail } from '../utils/tools';
@@ -124,7 +124,7 @@ export class OrdinalService {
 
       let satsIn = 0;
       let fee = 0;
-      const feeModel = new SatoshisPerKilobyte(FEE_PER_KB);
+      const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       for await (const u of fundResults.txos || []) {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;

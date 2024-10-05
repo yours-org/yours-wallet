@@ -29,6 +29,7 @@ export type Settings = {
   isPasswordRequired: boolean;
   socialProfile: SocialProfile;
   favoriteTokens: string[];
+  customFeeRate: number;
 };
 
 export interface Account {
