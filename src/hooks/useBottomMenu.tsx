@@ -26,7 +26,6 @@ export const useBottomMenu = () => {
         navigate('/tools');
         break;
       default:
-        console.warn('No matching route for selected menu item');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [context.selected]);
