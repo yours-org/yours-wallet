@@ -45,7 +45,7 @@ export const QueueBanner = () => {
           <Show when={isSyncing}>
             {importName
               ? `Importing ${importName}...`
-              : `SPV Wallet is syncing ${formatNumberWithCommasAndDecimals(queueLength, 0)} transactions...`}
+              : `SPV Wallet is syncing ${!queueLength ? '' : formatNumberWithCommasAndDecimals(queueLength, 0)} transactions...`}
             <br />
             <span style={{ fontSize: '0.75rem', fontWeight: 400 }}>
               (You may safely close the wallet during this process)
