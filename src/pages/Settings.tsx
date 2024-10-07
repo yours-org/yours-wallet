@@ -139,6 +139,7 @@ export const Settings = () => {
   const currentAccount = chromeStorageService.getCurrentAccountObject();
   const [noApprovalLimit, setNoApprovalLimit] = useState(currentAccount.account?.settings.noApprovalLimit ?? 0);
   const [customFeeRate, setCustomFeeRate] = useState(currentAccount.account?.settings.customFeeRate ?? 10);
+  const [selectedAccountIdentityAddress, setSelectedAccountIdentityAddress] = useState<string | undefined>();
 
   useEffect(() => {
     const getWhitelist = async (): Promise<WhitelistedApp[]> => {
@@ -232,22 +233,32 @@ export const Settings = () => {
       },
     };
     await chromeStorageService.updateNested(key, update);
+    setSelectedAccountIdentityAddress(undefined);
     setPage('main');
   };
 
   const handleDeleteAccount = async () => {
+    if (!selectedAccountIdentityAddress) {
+      addSnackbar('No account selected', 'error');
+      return;
+    }
+    const res = await chromeStorageService.getAndSetStorage();
     let accounts = chromeStorageService.getAllAccounts();
     if (accounts.length === 1) {
       addSnackbar('You cannot delete your only account', 'error');
       return;
     }
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) return;
+    if (res?.selectedAccount === selectedAccountIdentityAddress) {
+      addSnackbar('You cannot delete the currently selected account. Switch to another account first.', 'error');
+      return;
+    }
     const key: keyof ChromeStorageObject = 'accounts';
-    await chromeStorageService.removeNested(key, account.addresses.identityAddress);
+    indexedDB.deleteDatabase(`txos-${selectedAccountIdentityAddress}-${chromeStorageService.getNetwork()}`);
+    await chromeStorageService.removeNested(key, selectedAccountIdentityAddress);
+    await chromeStorageService.getAndSetStorage();
     accounts = chromeStorageService.getAllAccounts();
-    indexedDB.deleteDatabase(`txos-${account.addresses.identityAddress}-${chromeStorageService.getNetwork()}`);
     await chromeStorageService.switchAccount(accounts[0].addresses.identityAddress);
+    setSelectedAccountIdentityAddress(undefined);
     setPage('main');
   };
 
@@ -699,6 +710,7 @@ export const Settings = () => {
               />
             }
             onClick={() => {
+              setSelectedAccountIdentityAddress(account.addresses.identityAddress);
               setEnteredAccountName(account.name);
               setEnteredAccountIcon(account.icon);
               setPage('edit-account');
@@ -737,7 +749,15 @@ export const Settings = () => {
           onClick={handleAccountEditSave}
         />
         <Button theme={theme} type="warn" label="Delete" onClick={handleDeleteAccountIntent} />
-        <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('account-list')} />
+        <Button
+          theme={theme}
+          type="secondary"
+          label={'Go back'}
+          onClick={() => {
+            setSelectedAccountIdentityAddress(undefined);
+            setPage('account-list');
+          }}
+        />
       </PageWrapper>
     </>
   );
@@ -753,6 +773,7 @@ export const Settings = () => {
           onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
           showSpeedBump={showSpeedBump}
           withPassword={
+            decisionType === 'delete-account' ||
             decisionType === 'export-keys' ||
             decisionType === 'export-keys-qr-code' ||
             decisionType === 'export-master-backup'
