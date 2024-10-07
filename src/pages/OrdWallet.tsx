@@ -1,5 +1,5 @@
 import validate from 'bitcoin-address-validation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -18,6 +18,7 @@ import { ListOrdinal } from '../services/types/ordinal.types';
 import { Ordinal as OrdinalType } from 'yours-wallet-provider';
 import { WhiteLabelTheme } from '../theme.types';
 import { getErrorMessage } from '../utils/tools';
+import { useIntersectionObserver } from '../hooks/useIntersectObserver';
 
 const OrdinalsList = styled.div`
   display: flex;
@@ -91,6 +92,28 @@ export const OrdWallet = () => {
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const [ordinals, setOrdinals] = useState<OrdType[]>([]);
+  const [from, setFrom] = useState<string>();
+
+  const { isIntersecting, elementRef } = useIntersectionObserver({
+    root: null,
+    threshold: 1.0,
+  });
+
+  const loadOrdinals = useCallback(async () => {
+    if (!ordinalService) return;
+    if (ordinals.length === 0) setIsProcessing(true);
+    const data = await getOrdinals(from);
+    setFrom(data.from);
+    setOrdinals((prev) => [...prev, ...data.ordinals]);
+    setIsProcessing(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordinalService, getOrdinals, from]);
+
+  useEffect(() => {
+    if (isIntersecting && from) {
+      loadOrdinals();
+    }
+  }, [isIntersecting, from, loadOrdinals]);
 
   const listedOrdinals = ordinals.filter((o) => o?.data?.list);
   const myOrdinals = ordinals.filter((o) => !o?.data?.list);
@@ -101,12 +124,6 @@ export const OrdWallet = () => {
     setPageState('main');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message]);
-
-  const loadOrdinals = async () => {
-    if (!ordinalService) return;
-    const ordinals = await getOrdinals();
-    setOrdinals(ordinals);
-  };
 
   useEffect(() => {
     loadOrdinals();
@@ -383,6 +400,7 @@ export const OrdWallet = () => {
             <SectionHeader theme={theme}>My Ordinals</SectionHeader>
           </Show>
           {renderOrdinals(myOrdinals)}
+          <div ref={elementRef} style={{ height: '1px' }} />
         </OrdinalsList>
       </Show>
       <OrdButtonContainer theme={theme} $blur={!!selectedOrdinal}>

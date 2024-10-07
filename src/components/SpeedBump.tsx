@@ -97,7 +97,7 @@ export const SpeedBump = (props: SpeedBumpProps) => {
     <Show when={showSpeedBump}>
       <Container $isMobile={isMobile} theme={theme}>
         <Show when={isProcessing} whenFalseContent={mainContent}>
-          <PageLoader theme={theme} message="Exporting Keys..." />
+          <PageLoader theme={theme} message="Processing..." />
         </Show>
       </Container>
     </Show>

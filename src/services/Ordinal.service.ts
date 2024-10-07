@@ -1,5 +1,5 @@
 import { KeysService } from './Keys.service';
-import { ListOrdinal, OrdOperationResponse } from './types/ordinal.types';
+import { GetOrdinalsResponse, ListOrdinal, OrdOperationResponse } from './types/ordinal.types';
 import {
   cancelOrdListings,
   createOrdListings,
@@ -37,8 +37,8 @@ export class OrdinalService {
     private readonly gorillaPoolService: GorillaPoolService,
   ) {}
 
-  getOrdinals = async (): Promise<Ordinal[]> => {
-    const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 0);
+  getOrdinals = async (from = ''): Promise<GetOrdinalsResponse> => {
+    const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 50, from);
     const mapped = ordinals.txos
       .filter(
         (o) =>
@@ -46,7 +46,10 @@ export class OrdinalService {
           o.data?.origin?.data?.insc?.file?.type !== 'yours/tag',
       )
       .map(mapOrdinal);
-    return mapped;
+    return {
+      ordinals: mapped,
+      from: ordinals.nextPage,
+    };
   };
 
   getOrdinal = async (outpoint: string): Promise<Ordinal | undefined> => {
