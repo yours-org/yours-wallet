@@ -1,5 +1,5 @@
 import { KeysService } from './Keys.service';
-import { GetOrdinalsResponse, ListOrdinal, OrdOperationResponse } from './types/ordinal.types';
+import { ListOrdinal, OrdOperationResponse } from './types/ordinal.types';
 import {
   cancelOrdListings,
   createOrdListings,
@@ -11,7 +11,7 @@ import {
   transferOrdTokens,
   Utxo,
 } from 'js-1sat-ord';
-import { Bsv20, Ordinal, PurchaseOrdinal } from 'yours-wallet-provider';
+import { Bsv20, Ordinal, PaginatedOrdinalsResponse, PurchaseOrdinal } from 'yours-wallet-provider';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction, Utils } from '@bsv/sdk';
 import { BsvService } from './Bsv.service';
 import { BSV20_INDEX_FEE } from '../utils/constants';
@@ -37,7 +37,7 @@ export class OrdinalService {
     private readonly gorillaPoolService: GorillaPoolService,
   ) {}
 
-  getOrdinals = async (from = ''): Promise<GetOrdinalsResponse> => {
+  getOrdinals = async (from = ''): Promise<PaginatedOrdinalsResponse> => {
     const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 50, from);
     const mapped = ordinals.txos
       .filter(

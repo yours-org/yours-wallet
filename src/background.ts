@@ -19,6 +19,7 @@ import {
   NetWork,
   SendBsv20Response,
   SendBsv20,
+  GetPaginatedOrdinals,
 } from 'yours-wallet-provider';
 import {
   CustomListenerName,
@@ -238,7 +239,7 @@ if (isInServiceWorker) {
         case YoursEventName.GET_NETWORK:
           return processGetNetworkRequest(sendResponse);
         case YoursEventName.GET_ORDINALS:
-          return processGetOrdinalsRequest(sendResponse);
+          return processGetOrdinalsRequest(message, sendResponse);
         case YoursEventName.GET_BSV20S:
           return processGetBsv20sRequest(sendResponse);
         case YoursEventName.SEND_BSV:
@@ -456,19 +457,33 @@ if (isInServiceWorker) {
     }
   };
 
-  const processGetOrdinalsRequest = (sendResponse: CallbackResponse) => {
+  const processGetOrdinalsRequest = (message: { params: GetPaginatedOrdinals }, sendResponse: CallbackResponse) => {
     try {
       chromeStorageService.getAndSetStorage().then(async () => {
         const oneSatSPV = await oneSatSPVPromise;
         if (!oneSatSPV) throw Error('SPV not initialized!');
-        const results = await oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 0);
-        const mapped = results.txos.map(mapOrdinal);
-
-        sendResponse({
-          type: YoursEventName.GET_ORDINALS,
-          success: true,
-          data: mapped,
-        });
+        if (message.params.from === undefined || message.params.from === null) {
+          const result = await oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 0);
+          const mapped = result.txos.map(mapOrdinal);
+          sendResponse({
+            type: YoursEventName.GET_ORDINALS,
+            success: true,
+            data: mapped,
+          });
+        } else {
+          const results = await oneSatSPV.search(
+            new TxoLookup('origin'),
+            TxoSort.DESC,
+            message.params.limit || 50,
+            message.params.from || '',
+          );
+          const mapped = results.txos.map(mapOrdinal);
+          sendResponse({
+            type: YoursEventName.GET_ORDINALS,
+            success: true,
+            data: { ordinals: mapped, from: results.nextPage },
+          });
+        }
       });
     } catch (error) {
       sendResponse({

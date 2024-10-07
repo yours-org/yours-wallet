@@ -33,11 +33,6 @@ export type ListOrdinal = {
   password: string;
 };
 
-export type GetOrdinalsResponse = {
-  ordinals: Ordinal[];
-  from?: string;
-};
-
 // export interface BSV20Data {
 //   initialized: boolean;
 //   data: Bsv20[];

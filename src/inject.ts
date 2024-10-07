@@ -27,6 +27,8 @@ import {
   Bsv20,
   SendBsv20Response,
   SendBsv20,
+  PaginatedOrdinalsResponse,
+  GetPaginatedOrdinals,
 } from 'yours-wallet-provider';
 
 export enum YoursEventName {
@@ -87,6 +89,7 @@ export type RequestParams = {
   data?:
     | SendBsv[]
     | SendBsv20
+    | GetPaginatedOrdinals
     | InscribeRequest[]
     | TransferOrdinal
     | PurchaseOrdinal
@@ -126,6 +129,7 @@ export type ResponseEventDetail = {
     | NetWork
     | Balance
     | Ordinal[]
+    | PaginatedOrdinalsResponse
     | Bsv20[]
     | SerializedBsv20[]
     | SignatureResponse[]
@@ -245,7 +249,9 @@ const provider: YoursProviderType = {
   getAddresses: createYoursMethod<Addresses | undefined, void>(YoursEventName.GET_ADDRESSES),
   getNetwork: createYoursMethod<NetWork | undefined, void>(YoursEventName.GET_NETWORK),
   getBalance: createYoursMethod<Balance | undefined, void>(YoursEventName.GET_BALANCE),
-  getOrdinals: createYoursMethod<Ordinal[] | undefined, void>(YoursEventName.GET_ORDINALS),
+  getOrdinals: createYoursMethod<Ordinal[] | PaginatedOrdinalsResponse, GetPaginatedOrdinals>(
+    YoursEventName.GET_ORDINALS,
+  ),
   getBsv20s: createYoursMethod<Bsv20[] | undefined, void>(YoursEventName.GET_BSV20S),
   sendBsv: createYoursMethod<SendBsvResponse | undefined, SendBsv[]>(YoursEventName.SEND_BSV),
   sendBsv20: createYoursMethod<SendBsv20Response | undefined, SendBsv20>(YoursEventName.SEND_BSV20),
