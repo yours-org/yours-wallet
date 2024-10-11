@@ -32,6 +32,7 @@ export function mapOrdinal(t: Txo): Ordinal {
           },
         },
         map: t.data.origin.data?.map,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         sigma: (t.data.origin.data?.sigma?.data || []).map((s: any) => ({
           ...s,
           signature: Utils.toBase64(s.signature),

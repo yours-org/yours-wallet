@@ -3,12 +3,13 @@ import styled from 'styled-components';
 import { Ordinal } from 'yours-wallet-provider';
 import { useTheme } from '../hooks/useTheme';
 import { WhiteLabelTheme } from '../theme.types';
-import { GP_BASE_URL } from '../utils/constants';
+import { GP_BASE_URL, KNOWN_BURN_ADDRESSES } from '../utils/constants';
 import { convertAtomicValueToReadableTokenValue, formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { mapOrdinal } from '../utils/providerHelper';
 import { Show } from './Show';
 import lockImage from '../assets/lock.svg';
 import { useMemo } from 'react';
+import { FaFire } from 'react-icons/fa';
 
 const Container = styled.div`
   display: flex;
@@ -165,7 +166,10 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
         <Row $toSign={false} key={index} theme={theme}>
           <IndexOwnerWrapper>
             <Index theme={theme}>#{index}</Index>
-            {<RowData theme={theme}>{output.owner ? truncate(output.owner, 6, 6) : 'Script/Contract'}</RowData>}
+            <RowData theme={theme}>{output.owner ? truncate(output.owner, 6, 6) : 'Script/Contract'}</RowData>
+            <Show when={!!output.owner && KNOWN_BURN_ADDRESSES.includes(output.owner)}>
+              <FaFire color={theme.color.component.snackbarError} size={'1rem'} style={{ marginLeft: '0.5rem' }} />
+            </Show>
           </IndexOwnerWrapper>
 
           <AmountImageWrapper>

@@ -176,7 +176,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
             The app is requesting to broadcast a transaction.
           </Text>
           <FormContainer noValidate onSubmit={handleBroadcast}>
-            <Show when={!!request.fund && satsOut > 0}>
+            <Show when={chromeStorageService.isPasswordRequired()}>
               <Input
                 theme={theme}
                 placeholder="Enter Wallet Password"
