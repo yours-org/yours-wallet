@@ -159,12 +159,17 @@ export class BsvService {
     }
   };
 
-  sendBsv = async (request: SendBsv[], password: string, noApprovalLimit?: number): Promise<InWalletBsvResponse> => {
+  sendBsv = async (
+    request: SendBsv[],
+    password: string,
+    noApprovalLimit?: number,
+    showPreview = false,
+  ): Promise<InWalletBsvResponse> => {
     try {
       const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
       const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
 
-      if (bsvSendAmount > Number(noApprovalLimit)) {
+      if (!showPreview && bsvSendAmount > Number(noApprovalLimit)) {
         const isAuthenticated = await this.keysService.verifyPassword(password);
         if (!isAuthenticated) {
           return { error: 'invalid-password' };
@@ -176,7 +181,7 @@ export class BsvService {
       const keys = await this.keysService.retrieveKeys(password, isBelowNoApprovalLimit);
       if (!keys?.walletAddress) return { error: 'no-wallet-address' };
       const changeAddress = keys.walletAddress;
-      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password, showPreview || isBelowNoApprovalLimit);
       const amount = request.reduce((a, r) => a + r.satoshis, 0);
 
       // Build tx
@@ -269,6 +274,8 @@ export class BsvService {
       // Size checker
       const bytes = tx.toBinary().length;
       if (bytes > MAX_BYTES_PER_TX) return { error: 'tx-size-too-large' };
+
+      if (showPreview) return { rawtx: tx.toHex() };
 
       const response = await this.oneSatSPV.broadcast(tx);
 
