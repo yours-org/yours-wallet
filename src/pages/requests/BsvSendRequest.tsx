@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
-import styled from 'styled-components';
 import { validate } from 'bitcoin-address-validation';
-import bsvCoin from '../../assets/bsv-coin.svg';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
@@ -10,39 +8,19 @@ import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { WhiteLabelTheme } from '../../theme.types';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
-import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendBsv } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
-import { getErrorMessage } from '../../utils/tools';
+import { getErrorMessage, getTxFromRawTxFormat } from '../../utils/tools';
+import { IndexContext } from 'spv-store';
+import TxPreview from '../../components/TxPreview';
+import { styled } from 'styled-components';
 
-const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  max-height: 10rem;
+const Wrapper = styled(ConfirmContent)`
+  max-height: calc(100vh - 8rem);
   overflow-y: auto;
-  overflow-x: hidden;
-  background: ${({ theme }) => theme.color.global.row + '80'};
-  margin: 0.5rem;
-`;
-
-const LineItem = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0.25rem;
-  width: 60%;
-  z-index: 100;
-`;
-
-const Icon = styled.img`
-  width: 1rem;
-  height: 1rem;
 `;
 
 export type BsvSendRequestProps = {
@@ -59,11 +37,12 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { bsvService, chromeStorageService, keysService } = useServiceContext();
+  const { bsvService, chromeStorageService, keysService, oneSatSPV } = useServiceContext();
   const { sendBsv, updateBsvBalance, getBsvBalance } = bsvService;
   const { bsvAddress } = keysService;
   const [hasSent, setHasSent] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [txData, setTxData] = useState<IndexContext>();
 
   const { account } = chromeStorageService.getCurrentAccountObject();
   if (!account) throw Error('No account found');
@@ -74,7 +53,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
   const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
 
-  const processBsvSend = async () => {
+  const processBsvSend = async (showPreview = false) => {
     try {
       const validationFail = new Map<string, boolean>();
       validationFail.set('address', false);
@@ -123,8 +102,14 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         return;
       }
 
-      console.log(request);
-      const sendRes = await sendBsv(request, passwordConfirm, noApprovalLimit);
+      const sendRes = await sendBsv(request, passwordConfirm, noApprovalLimit, showPreview);
+      if (!sendRes.txid && sendRes.rawtx) {
+        const tx = getTxFromRawTxFormat(sendRes.rawtx, 'tx');
+        const parsedTx = await oneSatSPV.parseTx(tx);
+        setTxData(parsedTx);
+        return;
+      }
+
       if (!sendRes.txid || sendRes.error) {
         addSnackbar(getErrorMessage(sendRes.error), 'error');
         return;
@@ -150,6 +135,13 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   };
 
   useEffect(() => {
+    if (!request) return;
+    processBsvSend(true); // Show preview
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request]);
+
+  // This useEffect used to auto process requests when an approval limit is set
+  useEffect(() => {
     if (hasSent || noApprovalLimit === undefined) return;
     if (request.length > 0 && bsvSendAmount <= noApprovalLimit) {
       setHasSent(true);
@@ -164,6 +156,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvSendAmount, hasSent, noApprovalLimit]);
 
+  // This useEffect used to process yours wallet donations within the app
   useEffect(() => {
     if (requestWithinApp) return;
     handleSelect('bsv');
@@ -200,20 +193,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     processBsvSend();
   };
 
-  const web3Details = () => {
-    return request.map((r, i) => {
-      return (
-        <LineItem key={i}>
-          <Icon src={bsvCoin} />
-          <Text style={{ margin: 0 }} theme={theme}>{`${r.satoshis / BSV_DECIMAL_CONVERSION}`}</Text>
-          <Text style={{ margin: 0 }} theme={theme}>
-            {r.address ? truncate(r.address, 5, 5) : r.paymail ? truncate(r.paymail, 12, 0) : ''}
-          </Text>
-        </LineItem>
-      );
-    });
-  };
-
   const clearRequest = async () => {
     await chromeStorageService.remove('sendBsvRequest');
     if (popupId) removeWindow(popupId);
@@ -226,14 +205,13 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         <PageLoader theme={theme} message="Sending BSV..." />
       </Show>
       <Show when={!isProcessing && !!request && !hasSent}>
-        <ConfirmContent>
+        <Wrapper>
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Text
             theme={theme}
             style={{ cursor: 'pointer', margin: '0.75rem 0' }}
           >{`Available Balance: ${getBsvBalance()}`}</Text>
           <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
-            <RequestDetailsContainer theme={theme}>{web3Details()}</RequestDetailsContainer>
             <Show when={isPasswordRequired}>
               <Input
                 theme={theme}
@@ -243,9 +221,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
                 onChange={(e) => setPasswordConfirm(e.target.value)}
               />
             </Show>
-            <Text theme={theme} style={{ margin: '1rem' }}>
-              Double check details before sending.
-            </Text>
+            {txData && <TxPreview txData={txData} />}
             <Button
               theme={theme}
               type="primary"
@@ -255,7 +231,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
             />
             <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>
-        </ConfirmContent>
+        </Wrapper>
       </Show>
     </>
   );
