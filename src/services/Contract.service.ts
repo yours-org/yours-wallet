@@ -107,7 +107,7 @@ export class ContractService {
       const tx = new Transaction();
       tx.lockTime = currentBlockHeight;
       tx.addOutput({
-        lockingScript: new P2PKH().lock(Utils.fromBase58(bsvAddress)),
+        lockingScript: new P2PKH().lock(bsvAddress),
         change: true,
       });
       for (const lock of locks) {

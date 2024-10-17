@@ -197,7 +197,7 @@ export class OrdinalService {
       const tokenDetails = await this.gorillaPoolService.getBsv20Details(idOrTick);
 
       const bsv20Utxos = await this.gorillaPoolService.getBSV20Utxos(idOrTick, [keys.ordAddress, keys.walletAddress]);
-      if (!bsv20Utxos || bsv20Utxos.length === 0) throw Error('no-bsv20-utxo');
+      if (!bsv20Utxos || bsv20Utxos.length === 0) return { error: 'no-bsv20-utxo' };
 
       const tokenUtxos: TokenUtxo[] = [];
       let tokensIn = 0n;

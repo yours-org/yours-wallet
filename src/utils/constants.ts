@@ -29,6 +29,7 @@ export const PROVIDER_DOCS_URL = 'https://yours-wallet.gitbook.io/provider-api/i
 export const ONE_SAT_MARKET_URL = 'https://1sat.market/market';
 export const GENERIC_TOKEN_ICON =
   'https://static-00.iconduck.com/assets.00/generic-cryptocurrency-icon-2048x2029-vzaeox5w.png';
+export const KNOWN_BURN_ADDRESSES = ['1111111111111111111114oLvT2', '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'];
 
 export const DEFAULT_WALLET_PATH = "m/44'/236'/0'/1/0";
 export const DEFAULT_ORD_PATH = "m/44'/236'/1'/0/0";
