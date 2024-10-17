@@ -38,7 +38,7 @@
     "react-router-dom": "^6.16.0",
     "react-scripts": "^5.0.1",
     "replace-module-webpack-plugin": "^1.0.0",
-    "spv-store": "file:../spv-store/spv-store-0.0.9.tgz",
+    "spv-store": "^0.1.0",
     "stream-browserify": "^3.0.0",
     "styled-components": "^6.0.8",
     "ts-loader": "^9.5.1",
