@@ -119,7 +119,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const { updateBalance } = useQueueTracker();
+  const { updateBalance, isSyncing } = useQueueTracker();
   const urlParams = new URLSearchParams(location.search);
   const isReload = urlParams.get('reload') === 'true';
   urlParams.delete('reload');
@@ -222,7 +222,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   });
 
   useEffect(() => {
-    if (!identityAddress) return;
+    if (!identityAddress || isSyncing) return;
     if (!unlockAttempted) {
       (async () => {
         const res = await unlockLockedCoins();
@@ -240,7 +240,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identityAddress]);
+  }, [identityAddress, isSyncing]);
 
   useEffect(() => {
     if (isOrdRequest) {
