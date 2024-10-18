@@ -93,8 +93,7 @@ const AppIcon = styled.img`
 `;
 
 const DiscoverAppsText = styled(Text)<WhiteLabelTheme>`
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
   margin: 0;
   font-weight: 600;
   text-align: left;
@@ -110,8 +109,7 @@ const LockDetailsContainer = styled.div`
 
 const LockDetailsText = styled(Text)<WhiteLabelTheme>`
   margin: 0;
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
 `;
 
 const LockDetailsHeaderText = styled(LockDetailsText)`
@@ -124,8 +122,7 @@ const Dropdown = styled.select<WhiteLabelTheme>`
   padding: 0.5rem;
   margin-bottom: 1rem;
   border-radius: 0.5rem;
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
   background-color: ${({ theme }) => theme.color.global.row};
   border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
 `;
@@ -141,13 +138,11 @@ const TextArea = styled.textarea<WhiteLabelTheme>`
   padding: 1rem;
   margin: 0.5rem;
   outline: none;
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral + '80'};
+  color: ${({ theme }) => theme.color.global.contrast + '80'};
   resize: none;
 
   &::placeholder {
-    color: ${({ theme }) =>
-      theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral + '80'};
+    color: ${({ theme }) => theme.color.global.contrast + '80'};
   }
 `;
 
@@ -254,39 +249,21 @@ export const AppsAndTools = () => {
           name="Support Yours"
           description="Fund Yours Wallet's open source developers"
           onClick={() => setPage('sponsor')}
-          jsxElement={
-            <RightChevron
-              color={
-                theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-              }
-            />
-          }
+          jsxElement={<RightChevron color={theme.color.global.contrast} />}
         />
       </Show>
       <AppsRow
         name="Decode/Broadcast"
         description="Decode and broadcast raw transactions"
         onClick={() => setPage('decode-broadcast')}
-        jsxElement={
-          <RightChevron
-            color={
-              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-            }
-          />
-        }
+        jsxElement={<RightChevron color={theme.color.global.contrast} />}
       />
       <Show when={theme.settings.services.locks}>
         <AppsRow
           name="Pending Locks"
           description="View the pending coins you've locked"
           onClick={() => setPage('unlock')}
-          jsxElement={
-            <RightChevron
-              color={
-                theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-              }
-            />
-          }
+          jsxElement={<RightChevron color={theme.color.global.contrast} />}
         />
       </Show>
       <Show when={theme.settings.services.apps}>
@@ -294,13 +271,7 @@ export const AppsAndTools = () => {
           name="Discover Apps"
           description={`Meet the apps using ${theme.settings.walletName} Wallet`}
           onClick={() => setPage('discover-apps')}
-          jsxElement={
-            <RightChevron
-              color={
-                theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-              }
-            />
-          }
+          jsxElement={<RightChevron color={theme.color.global.contrast} />}
         />
       </Show>
       <AppsRow
@@ -308,13 +279,7 @@ export const AppsAndTools = () => {
         description="All the tools you need to get involved"
         onClick={() => window.open(theme.settings.repo, '_blank')}
         jsxElement={
-          <FaExternalLinkAlt
-            color={
-              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-            }
-            size={'1rem'}
-            style={{ margin: '0.5rem' }}
-          />
+          <FaExternalLinkAlt color={theme.color.global.contrast} size={'1rem'} style={{ margin: '0.5rem' }} />
         }
       />
     </>
@@ -380,8 +345,7 @@ export const AppsAndTools = () => {
             rel="noreferrer"
             target="_blank"
             style={{
-              color:
-                theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
+              color: theme.color.global.contrast,
             }}
           >
             let us know!

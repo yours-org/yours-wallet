@@ -48,8 +48,7 @@ const ConnectedAppRow = styled.div<WhiteLabelTheme>`
 `;
 
 const SettingsText = styled(Text)<WhiteLabelTheme>`
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
   margin: 0;
   font-weight: 600;
   text-align: left;
@@ -431,56 +430,32 @@ export const Settings = () => {
         name="Manage Accounts"
         description="Manage your accounts"
         onClick={() => setPage('manage-accounts')}
-        jsxElement={
-          <ForwardButton
-            color={
-              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-            }
-          />
-        }
+        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
       />
       <SettingsRow
         name="Connected Apps"
         description="Manage the apps you are connected to"
         onClick={() => setPage('connected-apps')}
-        jsxElement={
-          <ForwardButton
-            color={
-              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-            }
-          />
-        }
+        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
       />
       <SettingsRow
         name="Preferences"
         description="Manage your wallet preferences"
         onClick={() => setPage('preferences')}
-        jsxElement={
-          <ForwardButton
-            color={
-              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-            }
-          />
-        }
+        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
       />
       <SettingsRow
         name="Export Keys"
         description="Download keys or export as QR code"
         onClick={() => setPage('export-keys-options')}
-        jsxElement={
-          <ForwardButton
-            color={
-              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-            }
-          />
-        }
+        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
       />
       <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={handleLockWallet} />
       <Text
         style={{
           margin: '1rem 0',
           textAlign: 'left',
-          color: theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
+          color: theme.color.global.contrast,
           fontSize: '1rem',
           fontWeight: 700,
         }}
@@ -505,37 +480,19 @@ export const Settings = () => {
       <SettingsRow
         name="Create Account"
         description="Create a new account"
-        jsxElement={
-          <ForwardButton
-            color={
-              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-            }
-          />
-        }
+        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
         onClick={() => setPage('create-account')}
       />
       <SettingsRow
         name="Restore/Import"
         description="Import or restore an existing account"
-        jsxElement={
-          <ForwardButton
-            color={
-              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-            }
-          />
-        }
+        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
         onClick={() => setPage('restore-account')}
       />
       <SettingsRow
         name="Edit Account"
         description="Edit an existing account"
-        jsxElement={
-          <ForwardButton
-            color={
-              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-            }
-          />
-        }
+        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
         onClick={() => setPage('account-list')}
       />
       <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
@@ -614,13 +571,7 @@ export const Settings = () => {
         name="Social Profile"
         description="Set your display name and avatar"
         onClick={() => setPage('social-profile')}
-        jsxElement={
-          <ForwardButton
-            color={
-              theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-            }
-          />
-        }
+        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
       />
       <SettingsRow
         name="Require Password"
@@ -702,13 +653,7 @@ export const Settings = () => {
             key={account.addresses.identityAddress}
             name={account.name}
             icon={account.icon}
-            jsxElement={
-              <ForwardButton
-                color={
-                  theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral
-                }
-              />
-            }
+            jsxElement={<ForwardButton color={theme.color.global.contrast} />}
             onClick={() => {
               setSelectedAccountIdentityAddress(account.addresses.identityAddress);
               setEnteredAccountName(account.name);

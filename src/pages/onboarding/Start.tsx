@@ -20,8 +20,7 @@ const Content = styled.div`
 
 const TitleText = styled.h1<WhiteLabelTheme>`
   font-size: 2rem;
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   font-weight: 700;
   margin: 0.25rem 0;

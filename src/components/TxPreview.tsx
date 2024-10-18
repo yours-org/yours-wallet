@@ -18,8 +18,7 @@ const Container = styled.div`
 `;
 
 const SectionHeader = styled.h3<WhiteLabelTheme>`
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
   font-weight: 900;
   margin-bottom: 0.5rem;
   font-size: 1.25rem;
@@ -43,8 +42,7 @@ const Index = styled.div<WhiteLabelTheme>`
 `;
 
 const RowData = styled.div<WhiteLabelTheme>`
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
 `;
 
 const NftImage = styled.img<{ $isCircle: boolean }>`
@@ -65,8 +63,7 @@ const IndexOwnerWrapper = styled.div`
 `;
 
 const Label = styled.div<WhiteLabelTheme>`
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
   text-align: right;
 `;
 

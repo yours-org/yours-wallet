@@ -21,8 +21,7 @@ const Container = styled.div<WhiteLabelTheme>`
 const Title = styled.h1<WhiteLabelTheme>`
   text-align: center;
   width: 100%;
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
   margin: 0 0 1rem 0;
 `;
 

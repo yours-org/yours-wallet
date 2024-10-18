@@ -48,8 +48,7 @@ const Dropdown = styled.div<WhiteLabelTheme>`
   position: absolute;
   top: 3.5rem;
   left: 5rem;
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
   background: ${({ theme }) => theme.color.global.row + '90'};
   backdrop-filter: blur(10px);
   border: 1px solid ${({ theme }) => theme.color.global.gray};
@@ -98,8 +97,7 @@ const DropDownIcon = styled.img`
 `;
 
 const DropDownAccountName = styled.p<WhiteLabelTheme>`
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
   font-size: 0.85rem;
   font-weight: 600;
   margin: 0;
@@ -180,8 +178,7 @@ export const TopNav = () => {
             style={{
               margin: '0 0.25rem 0 0.25rem',
               textAlign: 'left',
-              color:
-                theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
+              color: theme.color.global.contrast,
               fontSize: '0.75rem',
               cursor: 'pointer',
               minWidth: 'fit-content',

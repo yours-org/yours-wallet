@@ -38,8 +38,7 @@ export const SnackBarContainer = styled.div<SnackBarColorTheme & { duration: num
   margin: 1rem;
   border-radius: 0.5rem;
   background-color: ${({ color }) => color};
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
   z-index: 9999;
   animation:
     ${slideIn} 0.25s ease-out,
