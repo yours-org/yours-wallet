@@ -30,11 +30,7 @@ const ProgressBarContainer = styled.div`
 `;
 
 export const Loader = styled.div<WhiteLabelTheme>`
-  border: 0.5rem solid
-    ${({ theme }) =>
-      theme.color.global.primaryTheme === 'dark'
-        ? theme.color.global.contrast + '50'
-        : theme.color.global.neutral + '50'};
+  border: 0.5rem solid ${({ theme }) => theme.color.global.contrast + '50'};
   border-top: 0.5rem solid ${({ theme }) => theme.color.component.pageLoaderSpinner};
   border-radius: 50%;
   width: 2rem;

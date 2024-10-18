@@ -54,13 +54,11 @@ const SeedInput = styled.textarea<WhiteLabelTheme & { $isExpert: boolean }>`
   padding: 1rem;
   margin: 0.5rem;
   outline: none;
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral + '80'};
+  color: ${({ theme }) => theme.color.global.contrast + '80'};
   resize: none;
 
   &::placeholder {
-    color: ${({ theme }) =>
-      theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral + '80'};
+    color: ${({ theme }) => theme.color.global.contrast + '80'};
   }
 `;
 
@@ -95,8 +93,7 @@ const WalletLogo = styled.img`
 const WalletText = styled(Text)`
   margin: 0 0 0 1rem;
   text-align: left;
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
   font-weight: 600;
 `;
 

@@ -21,8 +21,7 @@ const Container = styled.div<WhiteLabelTheme & { $isMobile: boolean }>`
   height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
   margin: 0;
   background-color: ${({ theme }) => theme.color.global.walletBackground};
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral};
+  color: ${({ theme }) => theme.color.global.contrast};
   z-index: 100;
 `;
 

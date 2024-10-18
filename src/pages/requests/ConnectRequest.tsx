@@ -149,8 +149,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
             <Text
               theme={theme}
               style={{
-                color:
-                  theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
+                color: theme.color.global.contrast,
                 margin: 0,
                 textAlign: 'left',
               }}
@@ -163,8 +162,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
             <Text
               theme={theme}
               style={{
-                color:
-                  theme.color.global.primaryTheme === 'dark' ? theme.color.global.contrast : theme.color.global.neutral,
+                color: theme.color.global.contrast,
                 margin: 0,
                 textAlign: 'left',
               }}

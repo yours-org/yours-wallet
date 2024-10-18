@@ -132,7 +132,7 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
 
   const handleBackClick = () => {
     setIsSlidingOut(true);
-    setTimeout(onBack, 1000);
+    setTimeout(onBack, 1000); // Give time for animation to finish
   };
 
   const filteredTokens = bsv20s
