@@ -39,10 +39,7 @@ export const Badge = styled.button<{ $primary?: boolean }>`
   background: transparent;
   border-radius: 0.5rem;
   border: none;
-  color: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'dark'
-      ? theme.color.global.contrast + '90'
-      : theme.color.global.neutral + '90'};
+  color: ${({ theme }) => theme.color.global.contrast + '90'};
   margin: 0.5em 1em;
   padding: 0.25em 1em;
   ${() => css`

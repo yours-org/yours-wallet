@@ -359,15 +359,7 @@ export const AppsAndTools = () => {
                   <AppIcon src={app.icon} />
                   <DiscoverAppsText theme={theme}>{app.name}</DiscoverAppsText>
                 </ImageAndDomain>
-                <FaExternalLinkAlt
-                  color={
-                    theme.color.global.primaryTheme === 'dark'
-                      ? theme.color.global.contrast
-                      : theme.color.global.neutral
-                  }
-                  size={'1rem'}
-                  style={{ margin: '0.5rem' }}
-                />
+                <FaExternalLinkAlt color={theme.color.global.contrast} size={'1rem'} style={{ margin: '0.5rem' }} />
               </DiscoverAppsRow>
             );
           })}

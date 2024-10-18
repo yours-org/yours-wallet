@@ -28,13 +28,7 @@ export const WalletRow = (props: WalletRowTypes) => {
     <Container
       key={window.crypto.randomUUID()}
       color={containerColor}
-      onMouseEnter={() =>
-        setContainerColor(
-          theme.color.global.primaryTheme === 'dark'
-            ? theme.color.global.contrast + '10'
-            : theme.color.global.neutral + '10',
-        )
-      }
+      onMouseEnter={() => setContainerColor(theme.color.global.contrast + '10')}
       onMouseLeave={() => setContainerColor(theme.color.global.row)}
       theme={theme}
       onClick={onClick}

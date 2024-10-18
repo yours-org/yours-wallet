@@ -59,12 +59,7 @@ const SecondaryOutline = styled(Primary)<{ $isOutline?: boolean }>`
   height: 2.25rem;
   background: ${({ theme }) => theme.color.global.walletBackground};
   border: none;
-  color: ${(props) =>
-    props.$isOutline
-      ? props.theme.color.global.primaryTheme === 'dark'
-        ? props.theme.color.global.contrast
-        : props.theme.color.global.neutral
-      : props.theme.color.global.gray};
+  color: ${(props) => (props.$isOutline ? props.theme.color.global.contrast : props.theme.color.global.gray)};
   transition: none;
   transform: none;
   margin: 0;

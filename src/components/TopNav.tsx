@@ -70,10 +70,7 @@ const DropdownItem = styled.div`
   cursor: pointer;
 
   &:hover {
-    background: ${({ theme }) =>
-      theme.color.global.primaryTheme === 'dark'
-        ? theme.color.global.contrast + '10'
-        : theme.color.global.neutral + '10'};
+    background: ${({ theme }) => theme.color.global.contrast + '10'};
   }
 `;
 
