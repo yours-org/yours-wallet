@@ -1,12 +1,12 @@
 {
   "version": "4.0.0",
   "manifest_version": 3,
-  "name": "Yours Wallet",
+  "name": "SPV Wallet",
   "description": "A non-custodial and open-source wallet for BSV and 1Sat Ordinals",
   "permissions": ["storage", "unlimitedStorage", "tabs"],
   "action": {
     "default_popup": "index.html",
-    "default_title": "Yours Wallet"
+    "default_title": "SPV Wallet"
   },
   "background": {
     "service_worker": "background.js",
