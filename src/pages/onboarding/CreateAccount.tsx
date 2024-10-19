@@ -200,8 +200,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
             textAlign: 'left',
             width: '100%',
             margin: '0',
-            color:
-              theme.color.global.primaryTheme === 'light' ? theme.color.global.neutral : theme.color.global.contrast,
+            color: theme.color.global.contrast,
           }}
           theme={theme}
         >
