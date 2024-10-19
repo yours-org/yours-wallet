@@ -27,7 +27,7 @@ const Switch = styled.div<WhiteLabelTheme>`
     border-radius: 50%;
     top: 50%;
     left: 0.125rem;
-    background: ${({ theme }) => theme.color.global.contrast};
+    background: #ffffff;
     transform: translate(0, -50%);
   }
 `;
