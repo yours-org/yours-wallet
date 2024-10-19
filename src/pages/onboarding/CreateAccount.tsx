@@ -10,12 +10,12 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
-import copyIcon from '../../assets/copy-green.svg';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import { NetWork } from 'yours-wallet-provider';
 import { useNavigate } from 'react-router-dom';
 import { YoursIcon } from '../../components/YoursIcon';
+import { FaCopy } from 'react-icons/fa';
 
 const Content = styled.div`
   display: flex;
@@ -52,11 +52,8 @@ const CopyToClipboardContainer = styled.div<WhiteLabelTheme>`
   margin-top: 1.5rem;
   border: none;
   background: none;
-`;
-
-const CopyIcon = styled.img`
-  width: 0.85rem;
-  height: 0.85rem;
+  width: fit-content;
+  cursor: pointer;
 `;
 
 const NetworkSelectWrapper = styled.div`
@@ -207,7 +204,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
           {seedWords.join(' ').trim()}
         </Text>
         <CopyToClipboardContainer onClick={() => handleCopyToClipboard(seedWords.join(' ').trim())}>
-          <CopyIcon src={copyIcon} />
+          <FaCopy size={'0.85rem'} color={theme.color.component.primaryButtonRightGradient} />
           <Text
             style={{
               color: theme.color.component.primaryButtonRightGradient,
