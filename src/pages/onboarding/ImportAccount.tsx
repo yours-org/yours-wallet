@@ -105,7 +105,6 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
       }
 
       await chromeStorageService.switchAccount(keys.identityAddress || identityPk);
-      if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
       setStep(3);
     } catch (error) {
       console.log(error);

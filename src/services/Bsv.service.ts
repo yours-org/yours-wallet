@@ -68,6 +68,10 @@ export class BsvService {
         lockData.nextUnlock = lock.until;
       }
     }
+    // IF the fees required to unlock are greater than the unlockable amount, then the unlockable amount is 0
+    if (lockData.unlockable < 1500 * lockTxos.length) {
+      lockData.unlockable = 0;
+    }
     return lockData;
   };
 
@@ -78,7 +82,7 @@ export class BsvService {
 
   getLockedTxos = async () => {
     const lockTxos = await this.oneSatSPV.search(new TxoLookup('lock'));
-    return lockTxos.txos.filter((txo) => txo.satoshis > 1n && !txo.data.insc);
+    return lockTxos.txos.filter((txo) => !txo.data.insc);
   };
 
   rate = async () => {

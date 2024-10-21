@@ -27,7 +27,7 @@ const OrdinalsList = styled.div`
   overflow-y: auto;
   width: 100%;
   margin-top: 4.5rem;
-  height: 25rem;
+  height: 20rem;
   padding-bottom: 8rem;
 `;
 

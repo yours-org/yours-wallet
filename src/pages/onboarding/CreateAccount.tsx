@@ -226,11 +226,10 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
       <Button
         theme={theme}
         type="primary"
-        label={newWallet ? 'Next' : 'Finish'}
+        label="Next"
         onClick={async () => {
           setSeedWords([]);
           await chromeStorageService.switchAccount(identityAddress);
-          if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
           setStep(3);
         }}
       />

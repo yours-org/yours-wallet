@@ -183,6 +183,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   useEffect(() => {
     if (updateBalance) {
       getAndSetBsvBalance();
+      loadLocks();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateBalance]);
@@ -223,7 +224,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   useEffect(() => {
     if (!identityAddress || isSyncing) return;
-    if (!unlockAttempted) {
+    if (!unlockAttempted && lockData?.unlockable) {
       (async () => {
         const res = await unlockLockedCoins();
         setUnlockAttempted(true);

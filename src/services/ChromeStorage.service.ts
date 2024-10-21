@@ -116,6 +116,7 @@ export class ChromeStorageService {
         },
       },
       selectedAccount: appState.addresses.identityAddress,
+      accountNumber: 1,
       colorTheme,
       isLocked: appState?.isLocked,
       popupWindowId,
