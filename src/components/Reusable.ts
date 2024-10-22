@@ -40,7 +40,7 @@ export const Badge = styled.button<WhiteLabelTheme>`
   border-radius: 0.5rem;
   border: none;
   color: ${({ theme }) => theme.color.global.contrast + '90'};
-  margin: 0.5rem 1rem 4rem 1rem;
+  margin: 0.5rem 1rem 4.5rem 1rem;
   padding: 0.25rem 1rem;
   ${() => css`
     background: #bf4f74;
