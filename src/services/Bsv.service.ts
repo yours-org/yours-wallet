@@ -180,7 +180,6 @@ export class BsvService {
         }
       }
 
-      // let feeSats = 20;
       const isBelowNoApprovalLimit = Number(bsvSendAmount) <= Number(noApprovalLimit);
       const keys = await this.keysService.retrieveKeys(password, isBelowNoApprovalLimit);
       if (!keys?.walletAddress) return { error: 'no-wallet-address' };
