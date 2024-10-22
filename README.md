@@ -1,4 +1,4 @@
-![Example Image](/public/banner.png)
+![Example Image](/public/banner-bsv.png)
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
