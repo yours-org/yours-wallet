@@ -151,12 +151,19 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [account, setAccount] = useState<Account>();
   const [token, setToken] = useState<{ isConfirmed: boolean; info: Bsv20 } | null>(null);
   const services = theme.settings.services;
+  const [filteredTokens, setFilteredTokens] = useState<Bsv20[]>([]);
+  const [randomKey, setRandomKey] = useState(Math.random());
 
   const getAndSetAccountAndBsv20s = async () => {
-    const bsv20s = await ordinalService.getBsv20s();
-    setBsv20s(bsv20s);
+    const res = await ordinalService.getBsv20s();
+    setBsv20s(res);
     setAccount(chromeStorageService.getCurrentAccountObject().account);
   };
+
+  useEffect(() => {
+    if (!bsv20s || !account) return;
+    setFilteredTokens(bsv20s.filter((t) => t.id && account?.settings?.favoriteTokens?.includes(t.id)));
+  }, [bsv20s, account]);
 
   useEffect(() => {
     (async () => {
@@ -472,10 +479,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
           </Show>
         )}
         <Show when={services.bsv20}>
-          {bsv20s.length > 0 && (
+          {filteredTokens.length > 0 && (
             <Bsv20TokensList
+              key={randomKey}
               hideStatusLabels
-              bsv20s={bsv20s.filter((t) => t.id && account?.settings?.favoriteTokens?.includes(t.id))}
+              bsv20s={filteredTokens}
               theme={theme}
               onTokenClick={(t: Bsv20) => handleBsv20TokenClick(t)}
             />
@@ -594,6 +602,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           onBack={() => {
             setManageFavorites(false);
             getAndSetAccountAndBsv20s();
+            setRandomKey(Math.random());
           }}
           bsv20s={bsv20s}
           theme={theme}

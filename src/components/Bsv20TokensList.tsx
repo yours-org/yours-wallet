@@ -222,6 +222,7 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
                         })}
                     </div>
                   </Show>
+                  {provided.placeholder}
                 </>
               </BSV20List>
             )}

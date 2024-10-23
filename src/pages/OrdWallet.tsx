@@ -93,6 +93,8 @@ export const OrdWallet = () => {
   const { addSnackbar, message } = useSnackbar();
   const [ordinals, setOrdinals] = useState<OrdType[]>([]);
   const [from, setFrom] = useState<string>();
+  const listedOrdinals = ordinals && ordinals.filter((o) => o?.data?.list);
+  const myOrdinals = ordinals && ordinals.filter((o) => !o?.data?.list);
 
   const { isIntersecting, elementRef } = useIntersectionObserver({
     root: null,
@@ -114,9 +116,6 @@ export const OrdWallet = () => {
       loadOrdinals();
     }
   }, [isIntersecting, from, loadOrdinals]);
-
-  const listedOrdinals = ordinals.filter((o) => o?.data?.list);
-  const myOrdinals = ordinals.filter((o) => !o?.data?.list);
 
   useEffect(() => {
     if (!successTxId) return;
