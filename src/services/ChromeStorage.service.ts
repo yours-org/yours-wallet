@@ -1,10 +1,18 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const chrome: any;
 
+import { Utils } from '@bsv/sdk';
 import { NetWork } from 'yours-wallet-provider';
 import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
-import { CHROME_STORAGE_OBJECT_VERSION, HOSTED_YOURS_IMAGE } from '../utils/constants';
+import {
+  CHROME_STORAGE_OBJECT_VERSION,
+  HOSTED_YOURS_IMAGE,
+  MAINNET_ADDRESS_PREFIX,
+  TESTNET_ADDRESS_PREFIX,
+} from '../utils/constants';
+import { decrypt } from '../utils/crypto';
+import { Keys } from '../utils/keys';
 import { deepMerge } from './serviceHelpers';
 import { Account, ChromeStorageObject, CurrentAccountObject, DeprecatedStorage } from './types/chromeStorage.types';
 
@@ -142,9 +150,78 @@ export class ChromeStorageService {
     return newInterface;
   };
 
+  private retrieveKeysFromOldStorage(storage: Partial<DeprecatedStorage>): Partial<Keys> | undefined {
+    const { encryptedKeys, passKey, network } = storage;
+    try {
+      if (!encryptedKeys || !passKey) return;
+      const d = decrypt(encryptedKeys, passKey);
+      const keys: Keys = JSON.parse(d);
+
+      const walletAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.walletAddress).data as number[], [
+        network === NetWork.Mainnet || !network ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+      ]);
+
+      const ordAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.ordAddress).data as number[], [
+        network === NetWork.Mainnet || !network ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+      ]);
+
+      let identityAddr = '';
+      let identityPubKey = '';
+      if (keys.identityAddress) {
+        identityAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.identityAddress).data as number[], [
+          network === NetWork.Mainnet || !network ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+        ]);
+
+        identityPubKey = keys.identityPubKey;
+      }
+
+      return {
+        ordAddress: ordAddr,
+        walletAddress: walletAddr,
+        walletPubKey: keys.walletPubKey,
+        ordPubKey: keys.ordPubKey,
+        identityAddress: identityAddr,
+        identityPubKey,
+      };
+    } catch (error) {
+      console.log('Error in retrieveKeys:', error);
+    }
+  }
+
+  private setOldAppStateIfMissing = async (
+    storage: Partial<DeprecatedStorage>,
+  ): Promise<Partial<ChromeStorageObject>> => {
+    console.log(storage);
+    if (!(storage as DeprecatedStorage)?.appState) {
+      const keys = this.retrieveKeysFromOldStorage(storage);
+      console.log(keys);
+      (storage as DeprecatedStorage).appState = {
+        isLocked: true,
+        ordinals: [],
+        balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
+        network: NetWork.Mainnet,
+        isPasswordRequired: true,
+        addresses: {
+          bsvAddress: keys?.walletAddress || '',
+          ordAddress: keys?.ordAddress || '',
+          identityAddress: keys?.identityAddress || '',
+        },
+        pubKeys: {
+          bsvPubKey: keys?.walletPubKey || '',
+          ordPubKey: keys?.ordPubKey || '',
+          identityPubKey: keys?.identityPubKey || '',
+        },
+      };
+      await this.set(storage);
+      return storage;
+    }
+    return storage;
+  };
+
   getAndSetStorage = async (): Promise<Partial<ChromeStorageObject> | undefined> => {
     this.storage = await this.get(null); // fetches all chrome storage by passing null
-    if ((this.storage as DeprecatedStorage)?.appState?.addresses?.identityAddress && !this.storage.version) {
+    if (!this.storage.version && !this.storage.hasUpgradedToSPV) {
+      this.storage = await this.setOldAppStateIfMissing(this.storage);
       this.storage = await this.mapDeprecatedStorageToNewInterface(this.storage as DeprecatedStorage);
     }
     return this.storage;
