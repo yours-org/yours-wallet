@@ -418,8 +418,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           theme={theme}
           style={{
             margin: '0',
-            color:
-              theme.color.global.primaryTheme === 'light' ? theme.color.global.neutral : theme.color.global.contrast,
+            color: theme.color.global.contrast,
             fontSize: '0.75rem',
           }}
         >

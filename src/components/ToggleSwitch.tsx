@@ -13,10 +13,7 @@ const Switch = styled.div<WhiteLabelTheme>`
   position: relative;
   width: 2rem;
   height: 1rem;
-  background: ${({ theme }) =>
-    theme.color.global.primaryTheme === 'light'
-      ? theme.color.global.neutral + '30'
-      : theme.color.global.contrast + '30'};
+  background: ${({ theme }) => theme.color.global.contrast + '30'};
   border-radius: 2rem;
   padding: 0.25rem;
   transition: 300ms all;
@@ -30,8 +27,7 @@ const Switch = styled.div<WhiteLabelTheme>`
     border-radius: 50%;
     top: 50%;
     left: 0.125rem;
-    background: ${({ theme }) =>
-      theme.color.global.primaryTheme === 'light' ? theme.color.global.neutral : theme.color.global.contrast};
+    background: #ffffff;
     transform: translate(0, -50%);
   }
 `;

@@ -73,7 +73,7 @@ export const Start = () => {
         <GithubIcon
           style={{ marginTop: '1rem' }}
           src={gihubIcon}
-          onClick={() => window.open('https://github.com/yours-org', '_blank')}
+          onClick={() => window.open(theme.settings.repo, '_blank')}
         />
       </Content>
     </Show>

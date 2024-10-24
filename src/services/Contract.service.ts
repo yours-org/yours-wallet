@@ -55,7 +55,7 @@ export class ContractService {
         const privkeys = getPrivKeys(sigReq.address) as PrivateKey[];
         if (!privkeys.length) throw new Error('no-private-key', { cause: sigReq.address });
         return privkeys.map((privKey: PrivateKey) => {
-          // TODO: support multiple OP_CODESEPARATORs and get subScript according to `csIdx`.
+          // TODO: support multiple OP_CODESEPARATORs and get subScript according to `csIdx`. See SignatureRequest.csIdx in the GetSignatures type.
           const preimage = TransactionSignature.format({
             sourceTXID: sigReq.prevTxid,
             sourceOutputIndex: sigReq.outputIndex,

@@ -11,10 +11,7 @@ export type ThemeSettings = {
   services: ThemeServices;
 };
 
-export type PrimaryTheme = 'light' | 'dark';
-
 type GlobalColors = {
-  primaryTheme: PrimaryTheme;
   row: string;
   walletBackground: string;
   contrast: string;

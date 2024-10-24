@@ -228,7 +228,7 @@ export const TopNav = () => {
       <GithubIcon
         style={{ marginRight: '1.5rem' }}
         src={gitHubIcon}
-        onClick={() => window.open('https://github.com/yours-org', '_blank')}
+        onClick={() => window.open(theme.settings.repo, '_blank')}
       />
     </Container>
   );

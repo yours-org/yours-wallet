@@ -42,7 +42,6 @@ export const theme: Theme = {
     global: {
       neutral: '#000000',
       gray: '#98A2B3',
-      primaryTheme: 'dark',
       row: '#17191E',
       walletBackground: '#010101',
       contrast: '#FFFFFF',
