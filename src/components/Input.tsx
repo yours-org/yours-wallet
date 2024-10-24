@@ -31,7 +31,7 @@ const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
   margin: 0.25rem;
   outline: none;
   text-indent: 0.5rem;
-  color: ${({ theme }) => theme.color.global.contrast + '80'};
+  color: ${({ theme }) => theme.color.global.contrast};
   animation: ${(props) =>
     props.$shake === 'true'
       ? css`

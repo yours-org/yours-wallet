@@ -59,6 +59,7 @@ export type ConnectRequest = {
 export interface ChromeStorageObject {
   accounts: { [identityAddress: string]: Account };
   selectedAccount: string;
+  accountNumber: number;
   exchangeRateCache: ExchangeRateCache;
   lastActiveTime: number;
   popupWindowId: number;

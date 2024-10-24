@@ -27,7 +27,7 @@ const OrdinalsList = styled.div`
   overflow-y: auto;
   width: 100%;
   margin-top: 4.5rem;
-  height: 25rem;
+  height: 20rem;
   padding-bottom: 8rem;
 `;
 
@@ -93,6 +93,8 @@ export const OrdWallet = () => {
   const { addSnackbar, message } = useSnackbar();
   const [ordinals, setOrdinals] = useState<OrdType[]>([]);
   const [from, setFrom] = useState<string>();
+  const listedOrdinals = ordinals && ordinals.filter((o) => o?.data?.list);
+  const myOrdinals = ordinals && ordinals.filter((o) => !o?.data?.list);
 
   const { isIntersecting, elementRef } = useIntersectionObserver({
     root: null,
@@ -114,9 +116,6 @@ export const OrdWallet = () => {
       loadOrdinals();
     }
   }, [isIntersecting, from, loadOrdinals]);
-
-  const listedOrdinals = ordinals.filter((o) => o?.data?.list);
-  const myOrdinals = ordinals.filter((o) => !o?.data?.list);
 
   useEffect(() => {
     if (!successTxId) return;
@@ -376,7 +375,7 @@ export const OrdWallet = () => {
   const nft = (
     <>
       <Show
-        when={ordinals.length > 0}
+        when={ordinals.filter((o) => o.origin?.data?.insc?.file?.type !== 'application/bsv-20').length > 0}
         whenFalseContent={
           <NoInscriptionWrapper>
             <Text

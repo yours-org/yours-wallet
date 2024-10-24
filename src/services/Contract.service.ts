@@ -55,7 +55,7 @@ export class ContractService {
         const privkeys = getPrivKeys(sigReq.address) as PrivateKey[];
         if (!privkeys.length) throw new Error('no-private-key', { cause: sigReq.address });
         return privkeys.map((privKey: PrivateKey) => {
-          // TODO: support multiple OP_CODESEPARATORs and get subScript according to `csIdx`.
+          // TODO: support multiple OP_CODESEPARATORs and get subScript according to `csIdx`. See SignatureRequest.csIdx in the GetSignatures type.
           const preimage = TransactionSignature.format({
             sourceTXID: sigReq.prevTxid,
             sourceOutputIndex: sigReq.outputIndex,
@@ -64,7 +64,7 @@ export class ContractService {
             otherInputs: tx.inputs.filter((_, index) => index !== sigReq.inputIndex),
             inputIndex: sigReq.inputIndex,
             outputs: tx.outputs,
-            inputSequence: tx.inputs[sigReq.inputIndex].sequence,
+            inputSequence: tx.inputs[sigReq.inputIndex].sequence || 0,
             subscript: sigReq.script
               ? Script.fromHex(sigReq.script)
               : new P2PKH().lock(privKey.toPublicKey().toAddress()),

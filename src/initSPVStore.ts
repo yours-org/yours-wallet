@@ -7,6 +7,7 @@ import {
   InscriptionIndexer,
   LockIndexer,
   MapIndexer,
+  OneSatIndexer,
   OneSatWebSPV,
   OrdLockIndexer,
   OriginIndexer,
@@ -39,6 +40,7 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
   ];
 
   const ordIndexers = [
+    new OneSatIndexer(owners, IndexMode.TrustAndVerify, network),
     new OrdLockIndexer(owners, IndexMode.TrustAndVerify, network),
     new InscriptionIndexer(owners, IndexMode.TrustAndVerify, network),
     new MapIndexer(owners, IndexMode.Verify, network),

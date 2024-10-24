@@ -35,13 +35,13 @@ export const Text = styled.p<WhiteLabelTheme>`
   width: 90%;
 `;
 
-export const Badge = styled.button<{ $primary?: boolean }>`
+export const Badge = styled.button<WhiteLabelTheme>`
   background: transparent;
   border-radius: 0.5rem;
   border: none;
   color: ${({ theme }) => theme.color.global.contrast + '90'};
-  margin: 0.5em 1em;
-  padding: 0.25em 1em;
+  margin: 0.5rem 1rem 4.5rem 1rem;
+  padding: 0.25rem 1rem;
   ${() => css`
     background: #bf4f74;
     color: white;

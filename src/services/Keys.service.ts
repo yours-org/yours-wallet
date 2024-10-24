@@ -45,20 +45,23 @@ export class KeysService {
     encryptedKeys: string,
     network: NetWork,
   ) => {
+    const currentChromeObj = await this.chromeStorageService.getAndSetStorage();
+    const totalAccounts = this.chromeStorageService.getAllAccounts().length;
+    const accountNumber = currentChromeObj?.accountNumber ? currentChromeObj.accountNumber + 1 : totalAccounts + 1;
     await this.chromeStorageService.update({
       selectedAccount: keys.identityAddress,
       passKey,
       salt,
       version: CHROME_STORAGE_OBJECT_VERSION,
       hasUpgradedToSPV: true,
+      accountNumber,
     });
-    const totalAccounts = this.chromeStorageService.getAllAccounts().length;
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
       [keys.identityAddress]: {
         ...DEFAULT_ACCOUNT,
         network,
-        name: `Account ${totalAccounts + 1}`,
+        name: `Account ${accountNumber}`,
         addresses: {
           bsvAddress: keys.walletAddress,
           identityAddress: keys.identityAddress,

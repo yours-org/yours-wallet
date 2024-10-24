@@ -166,7 +166,6 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
       if (!objKeys) throw new Error('Object identity address not found');
       await chromeStorageService.switchAccount(keys.identityAddress);
 
-      if (!newWallet) return window.location.reload(); // no need to show success screen for existing wallets
       setStep(4);
     } catch (error) {
       console.log(error);

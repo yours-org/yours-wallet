@@ -1,5 +1,4 @@
 import { NetWork } from 'yours-wallet-provider';
-import circle from '../assets/active-circle.png';
 
 export const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv/main';
 
@@ -93,7 +92,7 @@ export const DEFAULT_ACCOUNT = {
   balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
   encryptedKeys: '',
   derivationTags: [],
-  icon: circle,
+  icon: HOSTED_YOURS_IMAGE,
   name: 'Account 1',
   ordinals: [],
   paymentUtxos: [],
