@@ -207,6 +207,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   useEffect(() => {
     loadLocks && loadLocks();
+    getAndSetBsvBalance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

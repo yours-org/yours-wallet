@@ -375,7 +375,7 @@ export const OrdWallet = () => {
   const nft = (
     <>
       <Show
-        when={ordinals.length > 0}
+        when={ordinals.filter((o) => o.origin?.data?.insc?.file?.type !== 'application/bsv-20').length > 0}
         whenFalseContent={
           <NoInscriptionWrapper>
             <Text
