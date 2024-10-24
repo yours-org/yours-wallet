@@ -106,7 +106,6 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
   useEffect(() => {
     const { account } = chromeStorageService.getCurrentAccountObject();
     setFavoriteTokens(account?.settings?.favoriteTokens || []);
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -141,11 +140,12 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
         ordinalService.getTokenName(b).toLowerCase().includes(searchQuery.toLowerCase()) ||
         (b?.id && b.id.toLowerCase().includes(searchQuery.toLowerCase())),
     )
-    // Sort by favorite status
+    // Sort by sym or tick alphabetically
     .sort((a, b) => {
-      if (a?.id && favoriteTokens.includes(a.id) && b?.id && !favoriteTokens.includes(b.id)) return -1;
-      if (b?.id && favoriteTokens.includes(b?.id) && a?.id && !favoriteTokens.includes(a.id)) return 1;
-      return 0;
+      const aLabel = a.sym ?? a.tick ?? '';
+      const bLabel = b.sym ?? b.tick ?? '';
+
+      return aLabel.toLowerCase().localeCompare(bLabel.toLowerCase());
     });
 
   return (

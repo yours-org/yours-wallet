@@ -64,7 +64,7 @@ export class ContractService {
             otherInputs: tx.inputs.filter((_, index) => index !== sigReq.inputIndex),
             inputIndex: sigReq.inputIndex,
             outputs: tx.outputs,
-            inputSequence: tx.inputs[sigReq.inputIndex].sequence,
+            inputSequence: tx.inputs[sigReq.inputIndex].sequence || 0,
             subscript: sigReq.script
               ? Script.fromHex(sigReq.script)
               : new P2PKH().lock(privKey.toPublicKey().toAddress()),

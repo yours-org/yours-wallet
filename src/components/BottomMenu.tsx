@@ -75,7 +75,9 @@ const Menu = (props: MenuProps) => {
           {label}
         </StyledText>
         <Show when={!!badge}>
-          <Badge style={{ position: 'absolute' }}>{badge}</Badge>
+          <Badge theme={theme} style={{ position: 'absolute' }}>
+            {badge}
+          </Badge>
         </Show>
       </ContentWrapper>
     </MenuContainer>

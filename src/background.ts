@@ -40,6 +40,7 @@ import { GorillaPoolService } from './services/GorillaPool.service';
 import { mapOrdinal } from './utils/providerHelper';
 import { TxoLookup, TxoSort } from 'spv-store';
 import { initOneSatSPV } from './initSPVStore';
+import { HOSTED_YOURS_IMAGE } from './utils/constants';
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
 const gorillaPoolService = new GorillaPoolService(chromeStorageService);
@@ -807,7 +808,6 @@ if (isInServiceWorker) {
   };
 
   const processGetSocialProfileRequest = (sendResponse: CallbackResponse) => {
-    const HOSTED_YOURS_IMAGE = 'https://i.ibb.co/zGcthBv/yours-org-light.png';
     try {
       chromeStorageService.getAndSetStorage().then(() => {
         const { account } = chromeStorageService.getCurrentAccountObject();
