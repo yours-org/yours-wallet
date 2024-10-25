@@ -92,7 +92,7 @@ const AppIcon = styled.img`
   border-radius: 0.5rem;
 `;
 
-const DiscoverAppsText = styled(Text)<WhiteLabelTheme>`
+const DiscoverAppsText = styled(Text) <WhiteLabelTheme>`
   color: ${({ theme }) => theme.color.global.contrast};
   margin: 0;
   font-weight: 600;
@@ -107,7 +107,7 @@ const LockDetailsContainer = styled.div`
   width: 80%;
 `;
 
-const LockDetailsText = styled(Text)<WhiteLabelTheme>`
+const LockDetailsText = styled(Text) <WhiteLabelTheme>`
   margin: 0;
   color: ${({ theme }) => theme.color.global.contrast};
 `;
@@ -146,7 +146,7 @@ const TextArea = styled.textarea<WhiteLabelTheme>`
   }
 `;
 
-type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unlock' | 'decode-broadcast' | 'decode';
+type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unlock' | 'decode-broadcast' | 'decode' | 'sweep-wif';
 
 export const AppsAndTools = () => {
   const { theme } = useTheme();
@@ -281,6 +281,12 @@ export const AppsAndTools = () => {
         jsxElement={
           <FaExternalLinkAlt color={theme.color.global.contrast} size={'1rem'} style={{ margin: '0.5rem' }} />
         }
+      />
+      <AppsRow
+        name="Sweep Private Key"
+        description="Import funds from WIF private key"
+        onClick={() => setPage('sweep-wif')}
+        jsxElement={<RightChevron color={theme.color.global.contrast} />}
       />
     </>
   );
