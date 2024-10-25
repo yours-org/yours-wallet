@@ -625,6 +625,7 @@ export const AppsAndTools = () => {
       <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show>
       <Show when={!isProcessing && page === 'unlock'}>{unlockPage}</Show>
       <Show when={page === 'discover-apps'}>{discoverAppsPage}</Show>
+      <Show when={page === 'sweep-wif'}>{wifSweepPage}</Show>
       <Show when={page === 'sponsor' && didSubmit}>
         <BsvSendRequest
           request={[{ address: YOURS_DEV_WALLET, satoshis: satAmount }]}
