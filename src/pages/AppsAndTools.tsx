@@ -169,6 +169,49 @@ export const AppsAndTools = () => {
   const [satsOut, setSatsOut] = useState(0);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
 
+  //? Sweep-WIF states
+  const [wifKey, setWifKey] = useState('');
+  const [sweepBalance, setSweepBalance] = useState<{ regular: number; ordinals: number }>({ regular: 0, ordinals: 0 });
+  const [isSweeping, setIsSweeping] = useState(false);
+  const [sweepError, setSweepError] = useState('');
+
+  //? sweep-wif functions
+  const checkWIFBalance = async (wif: string) => {
+    try {
+      setIsProcessing(true);
+      setSweepError('');
+
+      //TODO: logic to check balance
+
+      setSweepBalance({
+        regular: 0,
+        ordinals: 0
+      });
+    } catch (error) {
+      setSweepError('Error checking balance. Please ensure the WIF key is valid.');
+      console.error('WIF balance check error:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const sweepFunds = async () => {
+    try {
+      setIsSweeping(true);
+      setSweepError('');
+
+      //TODO: logic to sweep funds
+
+      addSnackbar('Successfully swept funds to your wallet', 'success');
+      setPage('main');
+    } catch (error) {
+      setSweepError('Error sweeping funds. Please try again.');
+      console.error('Sweep error:', error);
+    } finally {
+      setIsSweeping(false);
+    }
+  };
+
   const getLockData = async () => {
     setIsProcessing(true);
     setCurrentBlockHeight(await bsvService.getCurrentHeight());
