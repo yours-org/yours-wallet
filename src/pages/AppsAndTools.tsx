@@ -146,6 +146,20 @@ const TextArea = styled.textarea<WhiteLabelTheme>`
   }
 `;
 
+//? Sweep-WIF styled components
+const WIFInput = styled(Input)`
+  width: 80%;
+  margin-bottom: 1rem;
+`;
+
+const SweepInfo = styled.div`
+  width: 80%;
+  padding: 1rem;
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+  background-color: ${({ theme }) => theme.color.global.row};
+`;
+
 type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unlock' | 'decode-broadcast' | 'decode' | 'sweep-wif';
 
 export const AppsAndTools = () => {
@@ -173,13 +187,12 @@ export const AppsAndTools = () => {
   const [wifKey, setWifKey] = useState('');
   const [sweepBalance, setSweepBalance] = useState<{ regular: number; ordinals: number }>({ regular: 0, ordinals: 0 });
   const [isSweeping, setIsSweeping] = useState(false);
-  const [sweepError, setSweepError] = useState('');
+
 
   //? sweep-wif functions
   const checkWIFBalance = async (wif: string) => {
     try {
       setIsProcessing(true);
-      setSweepError('');
 
       //TODO: logic to check balance
 
@@ -188,7 +201,7 @@ export const AppsAndTools = () => {
         ordinals: 0
       });
     } catch (error) {
-      setSweepError('Error checking balance. Please ensure the WIF key is valid.');
+      addSnackbar('Error checking balance. Please ensure the WIF key is valid.', 'error');
       console.error('WIF balance check error:', error);
     } finally {
       setIsProcessing(false);
@@ -198,17 +211,25 @@ export const AppsAndTools = () => {
   const sweepFunds = async () => {
     try {
       setIsSweeping(true);
-      setSweepError('');
 
       //TODO: logic to sweep funds
 
       addSnackbar('Successfully swept funds to your wallet', 'success');
       setPage('main');
     } catch (error) {
-      setSweepError('Error sweeping funds. Please try again.');
+      addSnackbar('Error sweeping funds. Please try again.', 'error');
       console.error('Sweep error:', error);
     } finally {
       setIsSweeping(false);
+    }
+  };
+
+  const validateWIF = (wif: string): boolean => {
+    try {
+      //TODO: logic to validate WIF
+      return true;
+    } catch (error) {
+      return false;
     }
   };
 
@@ -529,6 +550,46 @@ export const AppsAndTools = () => {
         label={'Go back'}
         onClick={() => setPage('main')}
       />
+    </PageWrapper>
+  );
+
+  //? Sweep-WIF page
+  const wifSweepPage = (
+    <PageWrapper $marginTop={'0'}>
+      <HeaderText theme={theme}>Sweep Private Key</HeaderText>
+      <Text theme={theme}>Enter a private key in WIF format to sweep all funds to your wallet</Text>
+
+      <WIFInput
+        theme={theme}
+        placeholder="Enter WIF private key"
+        value={wifKey}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWifKey(e.target.value)}
+        onBlur={() => validateWIF(wifKey) && checkWIFBalance(wifKey)}
+      />
+
+      {(sweepBalance.regular > 0 || sweepBalance.ordinals > 0) && (
+        <SweepInfo theme={theme}>
+          <Text theme={theme}>Available to sweep:</Text>
+          <Text theme={theme}>Regular BSV: {sweepBalance.regular} BSV</Text>
+          <Text theme={theme}>Ordinals: {sweepBalance.ordinals} BSV</Text>
+        </SweepInfo>
+      )}
+
+      <ButtonsWrapper>
+        <Button
+          theme={theme}
+          type="secondary-outline"
+          label="Cancel"
+          onClick={() => setPage('main')}
+        />
+        <Button
+          theme={theme}
+          type="primary"
+          label="Sweep Funds"
+          onClick={sweepFunds}
+          disabled={!validateWIF(wifKey) || (sweepBalance.regular === 0 && sweepBalance.ordinals === 0)}
+        />
+      </ButtonsWrapper>
     </PageWrapper>
   );
 
