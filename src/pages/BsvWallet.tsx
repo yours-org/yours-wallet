@@ -229,6 +229,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const resetRecipients = () => {
     setRecipients([{ id: Math.random().toString(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' }]);
+    setIsProcessing(false);
   };
 
   const computeTotalAmount = () => {
@@ -348,7 +349,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   useEffect(() => {
     if (!successTxId) return;
-    resetSendState();
+    resetRecipients();
     setPageState('main');
     setTimeout(() => refreshUtxos(), 1000); // slight delay to allow for transaction to be processed
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -387,7 +388,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
     await sleep(25);
 
     //? multi-send validate all recipients
-
     for (const recipient of recipients) {
       if (!isValidEmail(recipient.address) && !validate(recipient.address)) {
         updateRecipient(recipient.id, 'error', 'Provide a valid BSV or Paymail address.');
@@ -433,7 +433,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
     setSuccessTxId(sendRes.txid);
     addSnackbar('Transaction Successful!', 'success');
-    resetRecipients();
   };
 
   const fillInputWithAllBsv = () => {
@@ -691,7 +690,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           type="secondary"
           onClick={() => {
             setPageState('main');
-            resetSendState();
+            resetRecipients();
           }}
         />
       </ConfirmContent>
