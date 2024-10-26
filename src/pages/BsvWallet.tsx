@@ -388,7 +388,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
     //? multi-send validate all recipients
 
-    // ///TODO: consider a way to remove old errors
     for (const recipient of recipients) {
       if (!isValidEmail(recipient.address) && !validate(recipient.address)) {
         updateRecipient(recipient.id, 'error', 'Provide a valid BSV or Paymail address.');
