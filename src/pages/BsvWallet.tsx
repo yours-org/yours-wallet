@@ -46,6 +46,7 @@ import { FaListAlt } from 'react-icons/fa';
 import { ManageTokens } from '../components/ManageTokens';
 import { Account } from '../services/types/chromeStorage.types';
 import { SendBsv20View } from '../components/SendBsv20View';
+import { FaucetButton } from '../components/FaucetButton';
 
 const MiddleContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -153,6 +154,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const services = theme.settings.services;
   const [filteredTokens, setFilteredTokens] = useState<Bsv20[]>([]);
   const [randomKey, setRandomKey] = useState(Math.random());
+  const isTestnet = chromeStorageService.getNetwork() === 'testnet' ? true : false;
 
   const getAndSetAccountAndBsv20s = async () => {
     const res = await ordinalService.getBsv20s();
@@ -495,6 +497,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
             </Text>
           </ManageTokenListWrapper>
         </Show>
+        <ButtonContainer>
+          <FaucetButton address={''} isTestnet={isTestnet} />
+        </ButtonContainer>
       </MiddleContainer>
     </MainContent>
   );
