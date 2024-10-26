@@ -237,6 +237,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
     const totalUsd = recipients.reduce((acc, r) => acc + (r.usdSendAmount ?? 0), 0);
     return { totalBsv, totalUsd };
   };
+
+  const resetRecipientErrors = () => {
+    setRecipients([...recipients.map(r => ({ ...r, error: undefined }))]);
+  };
   //?multi-send functions ends
 
   const getAndSetAccountAndBsv20s = async () => {
@@ -378,12 +382,13 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    resetRecipientErrors();
     setIsProcessing(true);
     await sleep(25);
 
     //? multi-send validate all recipients
 
-    //TODO: consider a way to remove old errors
+    // ///TODO: consider a way to remove old errors
     for (const recipient of recipients) {
       if (!isValidEmail(recipient.address) && !validate(recipient.address)) {
         updateRecipient(recipient.id, 'error', 'Provide a valid BSV or Paymail address.');
