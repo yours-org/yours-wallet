@@ -1,15 +1,16 @@
 import { keyframes, styled } from 'styled-components';
-import { Bsv20 } from 'yours-wallet-provider';
 import { Theme, WhiteLabelTheme } from '../theme.types';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { truncate } from '../utils/format';
 import { useEffect, useMemo, useState } from 'react';
-import { ToggleSwitch } from './ToggleSwitch';
 import { HeaderText, Text } from './Reusable';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { GENERIC_TOKEN_ICON } from '../utils/constants';
 import { FaTimes } from 'react-icons/fa';
 import { TxLog } from 'spv-store';
+import transactions from './const';
+import { FaExternalLinkAlt } from 'react-icons/fa';
+import { Button } from './Button';
 
 const slideIn = keyframes`
   from {
@@ -61,6 +62,14 @@ const Icon = styled.img`
 const TickerWrapper = styled.div`
   display: flex;
   align-items: center;
+  justify-content: between;
+`;
+
+const ButtonsWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: between;
+  width: 40%;
 `;
 
 const TickerTextWrapper = styled.div`
@@ -76,31 +85,21 @@ const BackWrapper = styled.div`
   left: 2rem;
 `;
 
-const SearchInput = styled.input<WhiteLabelTheme>`
-  width: 90%;
-  padding: 0.5rem;
-  margin: 1rem 0;
-  border: 1px solid ${({ theme }) => theme.color.global.gray};
-  border-radius: 0.5rem;
-  font-size: 0.85rem;
-  color: ${({ theme }) => theme.color.global.contrast};
-  background-color: ${({ theme }) => theme.color.global.neutral};
-
-  &:focus {
-    outline: none;
-  }
-`;
-
-export type Bsv20TokensListProps = {
+export type TxHistoryProps = {
   theme: Theme;
   onBack: () => void;
 };
 
-export const TxHistory = (props: Bsv20TokensListProps) => {
+const URL_WHATSINCHAIN = 'https://whatsonchain.com/tx/';
+
+export const TxHistory = (props: TxHistoryProps) => {
   const { theme, onBack } = props;
-  const [data, setData] = useState<TxLog[]>();
+  const [data, setData] = useState<TxLog[]>(); // ! api response
   const [isSlidingOut, setIsSlidingOut] = useState(false);
   const { oneSatSPV } = useServiceContext();
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 2;
+  const dataTest = transactions;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -117,10 +116,30 @@ export const TxHistory = (props: Bsv20TokensListProps) => {
 
   const handleBackClick = () => {
     setIsSlidingOut(true);
-    setTimeout(onBack, 1000); // Give time for animation to finish
+    setTimeout(onBack, 1000);
   };
 
-  const txsHistory = useMemo(() => data, [data]);
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return dataTest?.slice(startIndex, endIndex);
+  }, [currentPage, dataTest]);
+
+  const handleNextPage = () => {
+    if (currentPage * itemsPerPage < (dataTest?.length ?? 0)) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleOpenLink = (txid: string) => {
+    window.open(`${URL_WHATSINCHAIN}${txid}`, '_blank');
+  };
 
   return (
     <Container theme={theme} isSlidingOut={isSlidingOut}>
@@ -130,37 +149,66 @@ export const TxHistory = (props: Bsv20TokensListProps) => {
       <Text style={{ marginTop: '3rem', fontSize: '1.25rem', fontWeight: 700 }} theme={theme}>
         See Last Activity
       </Text>
-      {(txsHistory || []).length > 0 ? (
-        txsHistory?.map((t) => (
+      {(paginatedData || []).length > 0 ? (
+        paginatedData?.map((t) => (
           <FavoriteRow theme={theme} key={t.idx}>
-            <TickerWrapper>
-              {/* <Icon
+            <TickerWrapper style={{ width: '100%', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {/* <Icon
                 src={
                   t.icon
                     ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${t.icon}`
                     : GENERIC_TOKEN_ICON
                 }
               /> */}
-              <p>ICON</p>
+                <p>Icon</p>
+                <TickerTextWrapper>
+                  <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
+                    {t?.idx}
+                  </HeaderText>
+                  <Text
+                    theme={theme}
+                    style={{ color: theme.color.global.gray, fontSize: '0.75rem', margin: 0, textAlign: 'left' }}
+                  >
+                    {t?.txid && truncate(t.txid!, 5, 5)}
+                  </Text>
+                </TickerTextWrapper>
+              </div>
               <TickerTextWrapper>
                 <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
-                  {t?.source}
+                  Amount
                 </HeaderText>
-                <Text
-                  theme={theme}
-                  style={{ color: theme.color.global.gray, fontSize: '0.75rem', margin: 0, textAlign: 'left' }}
-                >
-                  {t?.idx && truncate(t.source!, 5, 5)}
-                </Text>
+                <FaExternalLinkAlt
+                  onClick={() => handleOpenLink(t.txid!)}
+                  style={{ cursor: 'pointer', color: theme.color.global.gray }}
+                  title="See transaction in Whatsonchain"
+                />
               </TickerTextWrapper>
             </TickerWrapper>
           </FavoriteRow>
         ))
       ) : (
         <Text theme={theme} style={{ marginTop: '1rem', color: theme.color.global.gray }}>
-          No tokens found
+          No History found
         </Text>
       )}
+      <ButtonsWrapper>
+        <Button
+          theme={theme}
+          type="secondary"
+          label="Previous"
+          style={{ marginTop: '0.5rem' }}
+          disabled={currentPage === 1}
+          onClick={handlePreviousPage}
+        />
+        <Button
+          theme={theme}
+          type="primary"
+          label="Next"
+          onClick={handleNextPage}
+          disabled={currentPage * itemsPerPage >= (dataTest?.length ?? 0)}
+        />
+      </ButtonsWrapper>
     </Container>
   );
 };
