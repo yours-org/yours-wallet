@@ -1,10 +1,8 @@
 import { keyframes, styled } from 'styled-components';
 import { Theme, WhiteLabelTheme } from '../theme.types';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { truncate } from '../utils/format';
 import { useEffect, useMemo, useState } from 'react';
 import { HeaderText, Text } from './Reusable';
-import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { GENERIC_TOKEN_ICON } from '../utils/constants';
 import { FaTimes } from 'react-icons/fa';
 import { TxLog } from 'spv-store';
@@ -48,7 +46,7 @@ const FavoriteRow = styled.div<WhiteLabelTheme>`
   justify-content: space-between;
   align-items: center;
   width: 95%;
-  padding: 0.35rem 1.25rem 0.35rem 0.25rem;
+  padding: 0.35rem;
   border-bottom: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
 `;
 
@@ -79,6 +77,12 @@ const TickerTextWrapper = styled.div`
   margin-left: 1rem;
 `;
 
+const ContentWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
 const BackWrapper = styled.div`
   position: absolute;
   top: 3rem;
@@ -98,8 +102,9 @@ export const TxHistory = (props: TxHistoryProps) => {
   const [isSlidingOut, setIsSlidingOut] = useState(false);
   const { oneSatSPV } = useServiceContext();
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 2;
+  const itemsPerPage = 15;
   const dataTest = transactions;
+  const { gorillaPoolService, chromeStorageService } = useServiceContext();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -150,43 +155,137 @@ export const TxHistory = (props: TxHistoryProps) => {
         See Last Activity
       </Text>
       {(paginatedData || []).length > 0 ? (
-        paginatedData?.map((t) => (
-          <FavoriteRow theme={theme} key={t.idx}>
-            <TickerWrapper style={{ width: '100%', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {/* <Icon
-                src={
-                  t.icon
-                    ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${t.icon}`
-                    : GENERIC_TOKEN_ICON
-                }
-              /> */}
-                <p>Icon</p>
-                <TickerTextWrapper>
-                  <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
-                    {t?.idx}
-                  </HeaderText>
-                  <Text
-                    theme={theme}
-                    style={{ color: theme.color.global.gray, fontSize: '0.75rem', margin: 0, textAlign: 'left' }}
-                  >
-                    {t?.txid && truncate(t.txid!, 5, 5)}
-                  </Text>
-                </TickerTextWrapper>
-              </div>
-              <TickerTextWrapper>
-                <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
-                  Amount
-                </HeaderText>
-                <FaExternalLinkAlt
-                  onClick={() => handleOpenLink(t.txid!)}
-                  style={{ cursor: 'pointer', color: theme.color.global.gray }}
-                  title="See transaction in Whatsonchain"
-                />
-              </TickerTextWrapper>
-            </TickerWrapper>
-          </FavoriteRow>
-        ))
+        paginatedData?.map((t) => {
+          const summaryEntries = Object.entries(t.summary);
+
+          return (
+            <FavoriteRow theme={theme} key={t.idx}>
+              <TickerWrapper
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}
+              >
+                {summaryEntries.length === 1 ? (
+                  <div style={{ display: 'flex', gap: '0.5rem', width: '100%', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <Icon
+                        src={
+                          summaryEntries[0][1].icon
+                            ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${summaryEntries[0][1].icon}`
+                            : GENERIC_TOKEN_ICON
+                        }
+                      />
+                      <TickerTextWrapper>
+                        <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
+                          {summaryEntries[0][0]}
+                        </HeaderText>
+                        <Text
+                          theme={theme}
+                          style={{ color: theme.color.global.gray, fontSize: '0.75rem', margin: 0, textAlign: 'left' }}
+                        >
+                          {summaryEntries[0][1].amount < 0
+                            ? summaryEntries[0][1].amount === -1
+                              ? 'Listar'
+                              : 'Sent'
+                            : summaryEntries[0][1].amount === 0
+                              ? 'Cancelled'
+                              : 'Received'}
+                        </Text>
+                      </TickerTextWrapper>
+                    </div>
+                    <ContentWrapper>
+                      <HeaderText
+                        style={{
+                          fontSize: '0.85rem',
+                          marginTop: 0,
+                          color:
+                            summaryEntries[0][1].amount < 0
+                              ? summaryEntries[0][1].amount === -1
+                                ? '#E5BE01'
+                                : 'red'
+                              : summaryEntries[0][1].amount === 0
+                                ? theme.color.global.gray
+                                : 'green',
+                        }}
+                        theme={theme}
+                      >
+                        {summaryEntries[0][1].amount}
+                      </HeaderText>
+                      <FaExternalLinkAlt
+                        onClick={() => handleOpenLink(t.txid)}
+                        style={{ cursor: 'pointer', color: theme.color.global.gray }}
+                        title="See transaction in Whatsonchain"
+                      />
+                    </ContentWrapper>
+                  </div>
+                ) : (
+                  summaryEntries.map(([key, value]) => (
+                    <div style={{ display: 'flex', gap: '0.5rem', width: '100%', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <Icon
+                          src={
+                            value.icon
+                              ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${value.icon}`
+                              : GENERIC_TOKEN_ICON
+                          }
+                        />
+                        <TickerTextWrapper>
+                          <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
+                            {key}
+                          </HeaderText>
+                          <Text
+                            theme={theme}
+                            style={{
+                              color: theme.color.global.gray,
+                              fontSize: '0.75rem',
+                              margin: 0,
+                              textAlign: 'left',
+                            }}
+                          >
+                            {value.amount < 0
+                              ? value.amount === -1
+                                ? 'Listar'
+                                : 'Sent'
+                              : value.amount === 0
+                                ? 'Cancelled'
+                                : 'Received'}
+                          </Text>
+                        </TickerTextWrapper>
+                      </div>
+                      <ContentWrapper>
+                        <HeaderText
+                          style={{
+                            fontSize: '0.85rem',
+                            marginTop: 0,
+                            color:
+                              value.amount < 0
+                                ? value.amount === -1
+                                  ? 'yellow'
+                                  : 'red'
+                                : value.amount === 0
+                                  ? theme.color.global.gray
+                                  : 'green',
+                          }}
+                          theme={theme}
+                        >
+                          {value.amount}
+                        </HeaderText>
+                        <FaExternalLinkAlt
+                          onClick={() => handleOpenLink(t.txid)}
+                          style={{ cursor: 'pointer', color: theme.color.global.gray }}
+                          title="See transaction in Whatsonchain"
+                        />
+                      </ContentWrapper>
+                    </div>
+                  ))
+                )}
+              </TickerWrapper>
+            </FavoriteRow>
+          );
+        })
       ) : (
         <Text theme={theme} style={{ marginTop: '1rem', color: theme.color.global.gray }}>
           No History found
