@@ -13,6 +13,7 @@ import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { WifKeys } from '../../services/types/keys.types';
 import { useNavigate } from 'react-router-dom';
+import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
 
 const Content = styled.div`
   display: flex;
@@ -52,6 +53,8 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
   const [loading, setLoading] = useState(false);
   const [explicitlyDisableButton, setExplicitlyDisableButton] = useState(false);
   const hiddenFileInput = useRef<HTMLInputElement>(null);
+  const [accountName, setAccountName] = useState('');
+  const [iconURL, setIconURL] = useState('');
 
   useEffect(() => {
     newWallet && hideMenu();
@@ -105,6 +108,8 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
       }
 
       await chromeStorageService.switchAccount(keys.identityAddress || identityPk);
+      // New: Save account name and icon URL to local storage
+      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL); // Call the imported function
       setStep(3);
     } catch (error) {
       console.log(error);
@@ -162,6 +167,22 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
       </Text>
       <FormContainer onSubmit={handleImport}>
+        {/* New Input for Account Name */}
+        <Input
+          theme={theme}
+          placeholder="Account Name"
+          type="text"
+          value={accountName}
+          onChange={(e) => setAccountName(e.target.value)}
+        />
+        {/* New Input for Icon URL */}
+        <Input
+          theme={theme}
+          placeholder="Icon URL"
+          type="text"
+          value={iconURL}
+          onChange={(e) => setIconURL(e.target.value)}
+        />
         <Input
           theme={theme}
           placeholder="Password"
