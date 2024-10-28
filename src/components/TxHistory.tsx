@@ -56,7 +56,6 @@ const FavoriteRow = styled.div<WhiteLabelTheme>`
 const Icon = styled.img`
   width: 2.25rem;
   height: 2.25rem;
-  margin-left: 1rem;
   border-radius: 50%;
 `;
 
@@ -92,6 +91,14 @@ const BackWrapper = styled.div`
   left: 2rem;
 `;
 
+const RowWrapper = styled.div`
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0.5rem 0;
+`;
+
 export type TxHistoryProps = {
   theme: Theme;
   onBack: () => void;
@@ -106,8 +113,9 @@ export const TxHistory = (props: TxHistoryProps) => {
   const { oneSatSPV } = useServiceContext();
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
-  const dataTest = transactions;
+  const dataTest = transactions; // ! delete
   const { gorillaPoolService, chromeStorageService } = useServiceContext();
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const fetchData = async () => {
@@ -120,7 +128,7 @@ export const TxHistory = (props: TxHistoryProps) => {
     };
 
     fetchData();
-  }, []); // ! add dependency
+  }, []); // ! add dependency of the fetch data
 
   const handleBackClick = () => {
     setIsSlidingOut(true);
@@ -130,11 +138,12 @@ export const TxHistory = (props: TxHistoryProps) => {
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return dataTest?.slice(startIndex, endIndex);
-  }, [currentPage, dataTest]);
+    return dataTest?.slice(startIndex, endIndex); // ! change dataTest to data
+  }, [currentPage, dataTest]); // ! change dataTest to data
 
   const handleNextPage = () => {
     if (currentPage * itemsPerPage < (dataTest?.length ?? 0)) {
+      // ! change dataTest to data
       setCurrentPage(currentPage + 1);
     }
   };
@@ -184,6 +193,7 @@ export const TxHistory = (props: TxHistoryProps) => {
       {(paginatedData || []).length > 0 ? (
         paginatedData?.map((t) => {
           const summaryEntries = Object.entries(t.summary);
+          const isExpanded = expandedRows.has(t.idx);
 
           return (
             <RowWrapper>
@@ -228,7 +238,7 @@ export const TxHistory = (props: TxHistoryProps) => {
                                 src={getIconForSummary(key, value.icon)}
                                 style={{
                                   position: 'absolute',
-                          <HeaderText style={{ fontSize: '0.85rem', marginTop: 0, marginLeft: '0.2rem' }} theme={theme}>
+                                  left: `${iconIdx * 0.75}rem`,
                                   zIndex: 3 - iconIdx,
                                 }}
                               />
@@ -236,7 +246,7 @@ export const TxHistory = (props: TxHistoryProps) => {
                           {isExpanded && <Icon src={getIconForSummary(key, value.icon)} />}
                         </div>
                         <TickerTextWrapper>
-                          <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
+                          <HeaderText style={{ fontSize: '0.85rem', marginTop: 0, marginLeft: '0.2rem' }} theme={theme}>
                             {key}
                           </HeaderText>
                           <Text
@@ -266,11 +276,13 @@ export const TxHistory = (props: TxHistoryProps) => {
                             color:
                               value.amount < 0
                                 ? value.amount === -1
-                                  ? 'yellow'
+                                  ? '#E5BE01'
                                   : 'red'
                                 : value.amount === 0
                                   ? theme.color.global.gray
                                   : 'green',
+                            width: '60px',
+                            textAlign: 'right',
                           }}
                           theme={theme}
                         >
@@ -295,16 +307,14 @@ export const TxHistory = (props: TxHistoryProps) => {
                         </div>
                       </ContentWrapper>
                     </div>
-                  ))
-                )}
-              </TickerWrapper>
-            </FavoriteRow>
+                  ))}
+                </TickerWrapper>
+              </FavoriteRow>
+            </RowWrapper>
           );
         })
       ) : (
-        <Text theme={theme} style={{ marginTop: '1rem', color: theme.color.global.gray }}>
-          No History found
-        </Text>
+        <Text>No transaction records found.</Text>
       )}
       <ButtonsWrapper>
         <Button
@@ -320,7 +330,7 @@ export const TxHistory = (props: TxHistoryProps) => {
           type="primary"
           label="Next"
           onClick={handleNextPage}
-          disabled={currentPage * itemsPerPage >= (dataTest?.length ?? 0)}
+          disabled={currentPage * itemsPerPage >= (dataTest?.length ?? 0)} // ! change dataTest to data
         />
       </ButtonsWrapper>
     </Container>
