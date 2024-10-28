@@ -99,6 +99,25 @@ const RowWrapper = styled.div`
   margin: 0.5rem 0;
 `;
 
+const BoundedContent = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+  width: 100%;
+`;
+
+const IconNameWrapper = styled.div`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const IconContent = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  position: relative;
+  width: 2.5rem;
+`;
+
 export type TxHistoryProps = {
   theme: Theme;
   onBack: () => void;
@@ -110,7 +129,7 @@ export const TxHistory = (props: TxHistoryProps) => {
   const [isSlidingOut, setIsSlidingOut] = useState(false);
   const { oneSatSPV } = useServiceContext();
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
+  const itemsPerPage = 15; // ! you can change the number of items per page
   const dataTest = transactions; // ! delete
   const { gorillaPoolService, chromeStorageService } = useServiceContext();
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
@@ -223,12 +242,9 @@ export const TxHistory = (props: TxHistoryProps) => {
                   }}
                 >
                   {summaryEntries.slice(0, isExpanded ? summaryEntries.length : 1).map(([key, value], idx) => (
-                    <div
-                      key={idx}
-                      style={{ display: 'flex', gap: '0.5rem', width: '100%', justifyContent: 'space-between' }}
-                    >
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', position: 'relative', width: '2.5rem' }}>
+                    <BoundedContent key={idx}>
+                      <IconNameWrapper>
+                        <IconContent>
                           {!isExpanded &&
                             summaryEntries.slice(0, 3).map(([key, value], iconIdx) => (
                               <Icon
@@ -242,7 +258,7 @@ export const TxHistory = (props: TxHistoryProps) => {
                               />
                             ))}
                           {isExpanded && <Icon src={getIconForSummary(key, value.icon)} />}
-                        </div>
+                        </IconContent>
                         <TickerTextWrapper>
                           <HeaderText style={{ fontSize: '0.85rem', marginTop: 0, marginLeft: '0.2rem' }} theme={theme}>
                             {key}
@@ -265,7 +281,7 @@ export const TxHistory = (props: TxHistoryProps) => {
                                 : 'Received'}
                           </Text>
                         </TickerTextWrapper>
-                      </div>
+                      </IconNameWrapper>
                       <ContentWrapper>
                         <HeaderText
                           style={{
@@ -292,19 +308,17 @@ export const TxHistory = (props: TxHistoryProps) => {
                           title="See transaction in Whatsonchain"
                         />
 
-                        <div>
-                          {idx === 0 && summaryEntries.length > 1 ? (
-                            isExpanded ? (
-                              <FaChevronUp />
-                            ) : (
-                              <FaChevronDown />
-                            )
+                        {idx === 0 && summaryEntries.length > 1 ? (
+                          isExpanded ? (
+                            <FaChevronUp />
                           ) : (
-                            <span style={{ display: 'inline-block', width: '12px', height: '16px' }} /> // empty space to keep the icons order
-                          )}
-                        </div>
+                            <FaChevronDown />
+                          )
+                        ) : (
+                          <span style={{ display: 'inline-block', width: '12px', height: '16px' }} /> // empty space to keep the icons order
+                        )}
                       </ContentWrapper>
-                    </div>
+                    </BoundedContent>
                   ))}
                 </TickerWrapper>
               </HistoryRow>
