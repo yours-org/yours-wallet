@@ -186,71 +186,39 @@ export const TxHistory = (props: TxHistoryProps) => {
           const summaryEntries = Object.entries(t.summary);
 
           return (
-            <FavoriteRow theme={theme} key={t.idx}>
-              <TickerWrapper
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                }}
+            <RowWrapper>
+              <FavoriteRow
+                theme={theme}
+                key={t.idx}
+                onClick={summaryEntries.length > 1 ? () => toggleRowExpansion(t.idx) : undefined}
+                style={
+                  summaryEntries.length > 1
+                    ? {
+                        display: 'flex',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                        color: theme.color.global.gray,
+                      }
+                    : {
+                        display: 'flex',
+                        alignItems: 'center',
+                        color: theme.color.global.gray,
+                      }
+                }
               >
-                {summaryEntries.length === 1 ? (
-                  <div style={{ display: 'flex', gap: '0.5rem', width: '100%', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <Icon
-                        src={
-                          summaryEntries[0][1].icon
-                            ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${summaryEntries[0][1].icon}`
-                            : GENERIC_TOKEN_ICON
-                        }
-                      />
-                      <TickerTextWrapper>
-                        <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
-                          {summaryEntries[0][0]}
-                        </HeaderText>
-                        <Text
-                          theme={theme}
-                          style={{ color: theme.color.global.gray, fontSize: '0.75rem', margin: 0, textAlign: 'left' }}
-                        >
-                          {summaryEntries[0][1].amount < 0
-                            ? summaryEntries[0][1].amount === -1
-                              ? 'Listar'
-                              : 'Sent'
-                            : summaryEntries[0][1].amount === 0
-                              ? 'Cancelled'
-                              : 'Received'}
-                        </Text>
-                      </TickerTextWrapper>
-                    </div>
-                    <ContentWrapper>
-                      <HeaderText
-                        style={{
-                          fontSize: '0.85rem',
-                          marginTop: 0,
-                          color:
-                            summaryEntries[0][1].amount < 0
-                              ? summaryEntries[0][1].amount === -1
-                                ? '#E5BE01'
-                                : 'red'
-                              : summaryEntries[0][1].amount === 0
-                                ? theme.color.global.gray
-                                : 'green',
-                        }}
-                        theme={theme}
-                      >
-                        {summaryEntries[0][1].amount}
-                      </HeaderText>
-                      <FaExternalLinkAlt
-                        onClick={() => handleOpenLink(t.txid)}
-                        style={{ cursor: 'pointer', color: theme.color.global.gray }}
-                        title="See transaction in Whatsonchain"
-                      />
-                    </ContentWrapper>
-                  </div>
-                ) : (
-                  summaryEntries.map(([key, value]) => (
-                    <div style={{ display: 'flex', gap: '0.5rem', width: '100%', justifyContent: 'space-between' }}>
+                <TickerWrapper
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem',
+                  }}
+                >
+                  {summaryEntries.slice(0, isExpanded ? summaryEntries.length : 1).map(([key, value], idx) => (
+                    <div
+                      key={idx}
+                      style={{ display: 'flex', gap: '0.5rem', width: '100%', justifyContent: 'space-between' }}
+                    >
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <Icon
                           src={
