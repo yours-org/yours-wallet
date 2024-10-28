@@ -108,7 +108,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
       }
 
       await chromeStorageService.switchAccount(keys.identityAddress || identityPk);
-      // New: Save account name and icon URL to local storage
+      // Save account name and icon URL to local storage
       await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL); // Call the imported function
       setStep(3);
     } catch (error) {
@@ -167,7 +167,6 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
       </Text>
       <FormContainer onSubmit={handleImport}>
-        {/* New Input for Account Name */}
         <Input
           theme={theme}
           placeholder="Account Name"
@@ -175,7 +174,6 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
         />
-        {/* New Input for Icon URL */}
         <Input
           theme={theme}
           placeholder="Icon URL"

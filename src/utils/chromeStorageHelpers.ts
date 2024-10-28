@@ -1,28 +1,23 @@
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { ChromeStorageService } from '../services/ChromeStorage.service';
+import { HOSTED_YOURS_IMAGE } from '../utils/constants';
 
 export const saveAccountDataToChromeStorage = async (
-  chromeStorageService: any, // Accept as an argument
+  chromeStorageService: ChromeStorageService,
   enteredAccountName: string,
   enteredAccountIcon: string,
 ) => {
-  // Retrieve the current account from Chrome storage
   const { account } = chromeStorageService.getCurrentAccountObject();
 
-  // Ensure the account exists
   if (!account) return;
 
-  // Define the key for storage
   const key: keyof ChromeStorageObject = 'accounts';
-
-  // Prepare the update for the account's name and icon
   const update: Partial<ChromeStorageObject['accounts']> = {
     [account?.addresses.identityAddress]: {
       ...account,
-      name: enteredAccountName,
-      icon: enteredAccountIcon,
+      name: enteredAccountName || account.name,
+      icon: enteredAccountIcon || HOSTED_YOURS_IMAGE,
     },
   };
-
-  // Update the nested storage
   await chromeStorageService.updateNested(key, update);
 };

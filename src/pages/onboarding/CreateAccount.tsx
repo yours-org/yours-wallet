@@ -124,7 +124,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
       }
       setIdentityAddress(keys.identityAddress);
       // Save account name and icon URL to local storage
-      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL); // Call the imported function
+      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL);
       setStep(2);
     } catch (error) {
       console.log(error);
@@ -147,7 +147,6 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
       </Text>
       <FormContainer onSubmit={handleKeyGeneration}>
-        {/* New Input for Account Name */}
         <Input
           theme={theme}
           placeholder="Account Name"
@@ -155,7 +154,6 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
         />
-        {/* New Input for Icon URL */}
         <Input
           theme={theme}
           placeholder="Icon URL"

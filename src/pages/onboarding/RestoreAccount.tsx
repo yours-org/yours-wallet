@@ -218,7 +218,6 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
       </Text>
       <FormContainer onSubmit={handleRestore}>
-        {/* New Input for Account Name */}
         <Input
           theme={theme}
           placeholder="Account Name"
@@ -226,7 +225,6 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
         />
-        {/* New Input for Icon URL */}
         <Input
           theme={theme}
           placeholder="Icon URL"
