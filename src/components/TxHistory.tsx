@@ -149,6 +149,30 @@ export const TxHistory = (props: TxHistoryProps) => {
     window.open(`${URL_WHATSINCHAIN}${txid}`, '_blank');
   };
 
+  const getIconForSummary = (tag: string, icon: string) => {
+    switch (tag) {
+      case 'fund':
+        return bsvCoin;
+      case 'lock':
+        return lock;
+      case 'list':
+        return priceTag;
+      default:
+        return icon
+          ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${icon}`
+          : GENERIC_TOKEN_ICON;
+    }
+  };
+
+  const toggleRowExpansion = (idx: number) => {
+    setExpandedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(idx)) newSet.delete(idx);
+      else newSet.add(idx);
+      return newSet;
+    });
+  };
+
   return (
     <Container theme={theme} isSlidingOut={isSlidingOut}>
       <BackWrapper>
