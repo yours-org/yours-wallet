@@ -4,7 +4,7 @@ import { Button } from '../components/Button';
 import { ForwardButton as RightChevron } from '../components/ForwardButton';
 import { PageLoader } from '../components/PageLoader';
 import yoursLogo from '../assets/logos/icon.png';
-import { HeaderText, Text } from '../components/Reusable';
+import { HeaderText, Text, Warning } from '../components/Reusable';
 import { SettingsRow as AppsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
 import { useBottomMenu } from '../hooks/useBottomMenu';
@@ -92,7 +92,7 @@ const AppIcon = styled.img`
   border-radius: 0.5rem;
 `;
 
-const DiscoverAppsText = styled(Text) <WhiteLabelTheme>`
+const DiscoverAppsText = styled(Text)<WhiteLabelTheme>`
   color: ${({ theme }) => theme.color.global.contrast};
   margin: 0;
   font-weight: 600;
@@ -107,7 +107,7 @@ const LockDetailsContainer = styled.div`
   width: 80%;
 `;
 
-const LockDetailsText = styled(Text) <WhiteLabelTheme>`
+const LockDetailsText = styled(Text)<WhiteLabelTheme>`
   margin: 0;
   color: ${({ theme }) => theme.color.global.contrast};
 `;
@@ -146,12 +146,6 @@ const TextArea = styled.textarea<WhiteLabelTheme>`
   }
 `;
 
-//? Sweep-WIF styled components
-const WIFInput = styled(Input)`
-  width: 80%;
-  margin-bottom: 1rem;
-`;
-
 const SweepInfo = styled.div`
   width: 80%;
   padding: 1rem;
@@ -160,7 +154,15 @@ const SweepInfo = styled.div`
   background-color: ${({ theme }) => theme.color.global.row};
 `;
 
-type AppsPage = 'main' | 'sponsor' | 'sponsor-thanks' | 'discover-apps' | 'unlock' | 'decode-broadcast' | 'decode' | 'sweep-wif';
+type AppsPage =
+  | 'main'
+  | 'sponsor'
+  | 'sponsor-thanks'
+  | 'discover-apps'
+  | 'unlock'
+  | 'decode-broadcast'
+  | 'decode'
+  | 'sweep-wif';
 
 export const AppsAndTools = () => {
   const { theme } = useTheme();
@@ -183,13 +185,10 @@ export const AppsAndTools = () => {
   const [satsOut, setSatsOut] = useState(0);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
 
-  //? Sweep-WIF states
   const [wifKey, setWifKey] = useState('');
   const [sweepBalance, setSweepBalance] = useState<{ regular: number; ordinals: number }>({ regular: 0, ordinals: 0 });
   const [isSweeping, setIsSweeping] = useState(false);
 
-
-  //? sweep-wif functions
   const checkWIFBalance = async (wif: string) => {
     try {
       setIsProcessing(true);
@@ -198,7 +197,7 @@ export const AppsAndTools = () => {
 
       setSweepBalance({
         regular: 0,
-        ordinals: 0
+        ordinals: 0,
       });
     } catch (error) {
       addSnackbar('Error checking balance. Please ensure the WIF key is valid.', 'error');
@@ -553,13 +552,12 @@ export const AppsAndTools = () => {
     </PageWrapper>
   );
 
-  //? Sweep-WIF page
   const wifSweepPage = (
     <PageWrapper $marginTop={'0'}>
       <HeaderText theme={theme}>Sweep Private Key</HeaderText>
-      <Text theme={theme}>Enter a private key in WIF format to sweep all funds to your wallet</Text>
+      <Text theme={theme}>Enter a private key in WIF format to sweep all funds to your wallet.</Text>
 
-      <WIFInput
+      <Input
         theme={theme}
         placeholder="Enter WIF private key"
         value={wifKey}
@@ -576,12 +574,7 @@ export const AppsAndTools = () => {
       )}
 
       <ButtonsWrapper>
-        <Button
-          theme={theme}
-          type="secondary-outline"
-          label="Cancel"
-          onClick={() => setPage('main')}
-        />
+        <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setPage('main')} />
         <Button
           theme={theme}
           type="primary"
