@@ -43,9 +43,11 @@ import { UpgradeNotification } from '../components/UpgradeNotification';
 import { Bsv20 } from 'yours-wallet-provider';
 import { Bsv20TokensList } from '../components/Bsv20TokensList';
 import { FaListAlt } from 'react-icons/fa';
+import { FaHistory } from 'react-icons/fa';
 import { ManageTokens } from '../components/ManageTokens';
 import { Account } from '../services/types/chromeStorage.types';
 import { SendBsv20View } from '../components/SendBsv20View';
+import { TxHistory } from '../components/TxHistory';
 
 const MiddleContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -148,6 +150,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [bsv20s, setBsv20s] = useState<Bsv20[]>([]);
   const [manageFavorites, setManageFavorites] = useState(false);
+  const [historyTx, setHistoryTx] = useState(false);
   const [account, setAccount] = useState<Account>();
   const [token, setToken] = useState<{ isConfirmed: boolean; info: Bsv20 } | null>(null);
   const services = theme.settings.services;
@@ -494,6 +497,12 @@ export const BsvWallet = (props: BsvWalletProps) => {
               Manage Tokens List
             </Text>
           </ManageTokenListWrapper>
+          <ManageTokenListWrapper onClick={() => setHistoryTx(!historyTx)}>
+            <FaHistory size="1rem" color={theme.color.global.gray} />
+            <Text theme={theme} style={{ margin: '0 0 0 0.5rem', fontWeight: 700, color: theme.color.global.gray }}>
+              See Last Activity
+            </Text>
+          </ManageTokenListWrapper>
         </Show>
       </MiddleContainer>
     </MainContent>
@@ -605,6 +614,16 @@ export const BsvWallet = (props: BsvWalletProps) => {
             setRandomKey(Math.random());
           }}
           bsv20s={bsv20s}
+          theme={theme}
+        />
+      </Show>
+      <Show when={historyTx}>
+        <TxHistory
+          onBack={() => {
+            setHistoryTx(false);
+            getAndSetAccountAndBsv20s();
+            setRandomKey(Math.random());
+          }}
           theme={theme}
         />
       </Show>
