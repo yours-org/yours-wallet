@@ -281,6 +281,18 @@ export const TxHistory = (props: TxHistoryProps) => {
                           style={{ cursor: 'pointer', color: theme.color.global.gray }}
                           title="See transaction in Whatsonchain"
                         />
+
+                        <div>
+                          {idx === 0 && summaryEntries.length > 1 ? (
+                            isExpanded ? (
+                              <FaChevronUp />
+                            ) : (
+                              <FaChevronDown />
+                            )
+                          ) : (
+                            <span style={{ display: 'inline-block', width: '12px', height: '16px' }} /> // empty space to keep the icons order
+                          )}
+                        </div>
                       </ContentWrapper>
                     </div>
                   ))
