@@ -4,11 +4,14 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { useEffect, useMemo, useState } from 'react';
 import { HeaderText, Text } from './Reusable';
 import { GENERIC_TOKEN_ICON } from '../utils/constants';
-import { FaTimes } from 'react-icons/fa';
+import { FaTimes, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { TxLog } from 'spv-store';
 import transactions from './const';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 import { Button } from './Button';
+import bsvCoin from '../assets/bsv-coin.svg';
+import lock from '../assets/lock.svg';
+import priceTag from '../assets/price-tag.svg';
 
 const slideIn = keyframes`
   from {
