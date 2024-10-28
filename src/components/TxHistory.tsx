@@ -220,13 +220,21 @@ export const TxHistory = (props: TxHistoryProps) => {
                       style={{ display: 'flex', gap: '0.5rem', width: '100%', justifyContent: 'space-between' }}
                     >
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <Icon
-                          src={
-                            value.icon
-                              ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${value.icon}`
-                              : GENERIC_TOKEN_ICON
-                          }
-                        />
+                        <div style={{ display: 'flex', gap: '0.5rem', position: 'relative', width: '2.5rem' }}>
+                          {!isExpanded &&
+                            summaryEntries.slice(0, 3).map(([key, value], iconIdx) => (
+                              <Icon
+                                key={iconIdx}
+                                src={getIconForSummary(key, value.icon)}
+                                style={{
+                                  position: 'absolute',
+                          <HeaderText style={{ fontSize: '0.85rem', marginTop: 0, marginLeft: '0.2rem' }} theme={theme}>
+                                  zIndex: 3 - iconIdx,
+                                }}
+                              />
+                            ))}
+                          {isExpanded && <Icon src={getIconForSummary(key, value.icon)} />}
+                        </div>
                         <TickerTextWrapper>
                           <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
                             {key}
