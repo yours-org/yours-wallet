@@ -3,7 +3,7 @@ import { Theme, WhiteLabelTheme } from '../theme.types';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useEffect, useMemo, useState } from 'react';
 import { HeaderText, Text } from './Reusable';
-import { GENERIC_TOKEN_ICON } from '../utils/constants';
+import { GENERIC_TOKEN_ICON, URL_WHATSINCHAIN } from '../utils/constants';
 import { FaTimes, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { TxLog } from 'spv-store';
 import transactions from './const';
@@ -103,8 +103,6 @@ export type TxHistoryProps = {
   theme: Theme;
   onBack: () => void;
 };
-
-const URL_WHATSINCHAIN = 'https://whatsonchain.com/tx/';
 
 export const TxHistory = (props: TxHistoryProps) => {
   const { theme, onBack } = props;
