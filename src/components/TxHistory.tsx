@@ -44,7 +44,7 @@ const Container = styled.div<{ isSlidingOut: boolean } & WhiteLabelTheme>`
   animation: ${({ isSlidingOut }) => (isSlidingOut ? slideOut : slideIn)} 0.75s forwards;
 `;
 
-const FavoriteRow = styled.div<WhiteLabelTheme>`
+const HistoryRow = styled.div<WhiteLabelTheme>`
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -195,7 +195,7 @@ export const TxHistory = (props: TxHistoryProps) => {
 
           return (
             <RowWrapper>
-              <FavoriteRow
+              <HistoryRow
                 theme={theme}
                 key={t.idx}
                 onClick={summaryEntries.length > 1 ? () => toggleRowExpansion(t.idx) : undefined}
@@ -307,7 +307,7 @@ export const TxHistory = (props: TxHistoryProps) => {
                     </div>
                   ))}
                 </TickerWrapper>
-              </FavoriteRow>
+              </HistoryRow>
             </RowWrapper>
           );
         })
