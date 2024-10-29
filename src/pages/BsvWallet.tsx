@@ -145,6 +145,21 @@ const AddRecipientButton = styled.div`
   }
 `;
 
+const ScrollableConfirmContent = styled(ConfirmContent)`
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+`;
+
+const FixedHeader = styled.div`
+  position: sticky;
+  top: 0;
+  background: ${props => props.theme.color.global.background};
+  padding: 1rem 0;
+  z-index: 1;
+`;
 //? multi-send styles end
 
 type PageState = 'main' | 'receive' | 'send';
@@ -599,7 +614,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const send = (
     <>
-      <ConfirmContent>
+      {/* <ConfirmContent>0 */}
+
+    <ScrollableConfirmContent>
         <HeaderText theme={theme}>Send BSV</HeaderText>
         <Text
           theme={theme}
@@ -708,7 +725,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
             resetRecipients();
           }}
         />
-      </ConfirmContent>
+      {/* </ConfirmContent> */}
+      </ScrollableConfirmContent>
     </>
   );
 
