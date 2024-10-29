@@ -392,6 +392,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
     });
   };
 
+  const handleTestNetFaucetConfirmation = () => {
+    addSnackbar('Testnet coins sent! It may take one block confirmation for them to appear in your wallet.', 'success');
+    refreshUtxos();
+  };
+
   const receive = (
     <ReceiveContent>
       <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
@@ -458,6 +463,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           <Button theme={theme} type="primary" label="Receive" onClick={() => setPageState('receive')} />
           <Button theme={theme} type="primary" label="Send" onClick={() => setPageState('send')} />
         </ButtonContainer>
+        <FaucetButton onConfirmation={handleTestNetFaucetConfirmation} address={bsvAddress} isTestnet={isTestnet} />
         <AssetRow
           balance={bsvBalance}
           icon={bsvCoin}
@@ -497,9 +503,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
             </Text>
           </ManageTokenListWrapper>
         </Show>
-        <ButtonContainer>
-          <FaucetButton address={bsvAddress} isTestnet={isTestnet} />
-        </ButtonContainer>
       </MiddleContainer>
     </MainContent>
   );

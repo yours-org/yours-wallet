@@ -10,30 +10,15 @@ interface FaucetResponse {
   txid: string;
 }
 
-interface BalanceResponse {
-  confirmed: number;
-  unconfirmed: number;
-}
-
 export async function requestTestnetCoins(address: string): Promise<FaucetResponse> {
   try {
     const response = await axios.post<FaucetResponse>(`${WITNESSONCHAIN_API_URL}/faucet/tbsv`, {
       address,
-      channel: 'yours-wallet'
+      channel: 'yours-wallet',
     });
     return response.data;
   } catch (error) {
     console.error('Error requesting testnet coins:', error);
-    throw error;
-  }
-}
-
-export async function getAddressBalance(address: string): Promise<number> {
-  try {
-    const response = await axios.get<BalanceResponse>(`${WHATSONCHAIN_API_URL}/address/${address}/balance`);
-    return response.data.confirmed + response.data.unconfirmed;
-  } catch (error) {
-    console.error('Error fetching address balance:', error);
     throw error;
   }
 }
@@ -50,7 +35,7 @@ export async function waitForTransaction(txid: string, maxAttempts = 10, interva
         console.error('Error checking transaction:', error);
       }
     }
-    await new Promise(resolve => setTimeout(resolve, interval));
+    await new Promise((resolve) => setTimeout(resolve, interval));
   }
   return false;
 }
