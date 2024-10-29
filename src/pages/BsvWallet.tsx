@@ -498,7 +498,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           </ManageTokenListWrapper>
         </Show>
         <ButtonContainer>
-          <FaucetButton address={''} isTestnet={isTestnet} />
+          <FaucetButton address={bsvAddress} isTestnet={isTestnet} />
         </ButtonContainer>
       </MiddleContainer>
     </MainContent>
