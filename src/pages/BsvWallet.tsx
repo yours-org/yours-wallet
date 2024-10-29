@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import bsvCoin from '../assets/bsv-coin.svg';
 import switchAsset from '../assets/switch-asset.svg';
+import deleteIcon from '../assets/logos/delete.svg';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { PageLoader } from '../components/PageLoader';
@@ -79,12 +80,6 @@ const Icon = styled.img<{ size?: string }>`
   margin: 0 0.5rem 0 0;
 `;
 
-const InputAmountWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-`;
 
 const CopyAddressWrapper = styled.div`
   display: flex;
@@ -110,16 +105,28 @@ const ManageTokenListWrapper = styled.div`
 //? multi-send styles start
 const RecipientRow = styled.div`
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
   width: 100%;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid ${props => props.theme.color.global.border || 'gray'};
+  border-radius: 0.5rem;
 `;
 
 const RecipientInputs = styled.div`
-  flex: 1;
+  width: 100%;
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
+`;
+
+const InputWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  position: relative;
+  width: 100%;
 `;
 
 const AddRecipientButton = styled.div`
@@ -129,14 +136,15 @@ const AddRecipientButton = styled.div`
   width: 100%;
   padding: 0.5rem;
   margin-bottom: 1rem;
-  border: 1px dashed ${props => props.theme.color.global.border};
+  border: 1px dashed ${props => props.theme.color.global.border || 'gray'};
   border-radius: 0.5rem;
   cursor: pointer;
 
   &:hover {
-    background: ${props => props.theme.color.global.background};
+    background: ${props => props.theme.color.global.background || 'white'};
   }
 `;
+
 //? multi-send styles end
 
 type PageState = 'main' | 'receive' | 'send';
@@ -600,16 +608,32 @@ export const BsvWallet = (props: BsvWalletProps) => {
         >{`Balance: ${bsvBalance}`}</Text>
         <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
           {recipients.map((recipient, index) => (
-            <RecipientRow key={recipient.id}>
+            <RecipientRow key={recipient.id} theme={theme} >
               <RecipientInputs>
-                <Input
-                  theme={theme}
-                  placeholder="Enter Address or Paymail"
-                  type="text"
-                  onChange={(e) => updateRecipient(recipient.id, 'address', e.target.value)}
-                  value={recipient.address}
-                />
-                <InputAmountWrapper>
+                <InputWrapper>
+                  <Input
+                    theme={theme}
+                    placeholder="Enter Address or Paymail"
+                    type="text"
+                    onChange={(e) => updateRecipient(recipient.id, 'address', e.target.value)}
+                    value={recipient.address}
+                  />
+                  {recipients.length > 1 && (
+                    <Icon
+                      src={deleteIcon}
+                      size="1rem"
+                      style={{
+                        position: 'absolute',
+                        right: '2.25rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => removeRecipient(recipient.id)}
+                    />
+                  )}
+                </InputWrapper>
+                <InputWrapper>
                   <Input
                     theme={theme}
                     placeholder={recipient.amountType === 'bsv' ? 'Enter BSV Amount' : 'Enter USD Amount'}
@@ -624,13 +648,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
                     }
                     onChange={(e) => {
                       const inputValue = e.target.value;
-
-                      // Check if the input is empty and if so, set the state to null
                       if (inputValue === '') {
                         updateRecipient(recipient.id, 'satSendAmount', null);
                         updateRecipient(recipient.id, 'usdSendAmount', null);
                       } else {
-                        // Existing logic for setting state
                         if (recipient.amountType === 'bsv') {
                           updateRecipient(recipient.id, 'satSendAmount', Math.round(Number(inputValue) * BSV_DECIMAL_CONVERSION));
                         } else {
@@ -645,27 +666,21 @@ export const BsvWallet = (props: BsvWalletProps) => {
                     style={{
                       position: 'absolute',
                       right: '2.25rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
                       cursor: 'pointer',
                     }}
                     onClick={() => toggleRecipientAmountType(recipient.id)}
                   />
-                </InputAmountWrapper>
+                </InputWrapper>
               </RecipientInputs>
-
-              {recipients.length > 1 && (
-                <Button
-                  theme={theme}
-                  type="secondary-outline"
-                  label="x"
-                  onClick={() => removeRecipient(recipient.id)}
-                />
-              )}
             </RecipientRow>
           ))}
-          <AddRecipientButton onClick={addRecipient}>
+
+          <AddRecipientButton onClick={addRecipient} theme={theme}>
             + Add Recipient
           </AddRecipientButton>
-          
+
           <Show when={isPasswordRequired}>
             <Input
               theme={theme}
