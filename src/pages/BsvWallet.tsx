@@ -220,7 +220,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   //? multi-send state starts
   const [recipients, setRecipients] = useState<Recipient[]>([
-    { id: Math.random().toString(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' }
+    { id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' }
   ]);
   //? multi-send state ends
 
@@ -228,7 +228,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const addRecipient = () => {
     setRecipients([
       ...recipients,
-      { id: Math.random().toString(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' }
+      { id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' }
     ]);
   };
 
@@ -239,19 +239,31 @@ export const BsvWallet = (props: BsvWalletProps) => {
   };
 
   const updateRecipient = (id: string, field: 'address' | 'satSendAmount' | 'usdSendAmount' | 'amountType' | 'error', value: string | number | null) => {
-    setRecipients([...recipients.map(r =>
-      r.id === id ? { ...r, [field]: value } : r
-    )]);
+    const newRecipients = [...recipients.map(r => {
+      if (r.id === id) {
+        // If we're updating amountType, reset both amounts
+        if (field === 'amountType') {
+          return {
+            ...r,
+            [field]: value as AmountType,
+            satSendAmount: null,
+            usdSendAmount: null
+          };
+        }
+        // Otherwise just update the specified field
+        return { ...r, [field]: value };
+      }
+      return r;
+    })];
+    setRecipients(newRecipients);
   };
 
   const toggleRecipientAmountType = (id: string) => {
     updateRecipient(id, 'amountType', recipients.find(r => r.id === id)?.amountType === 'bsv' ? 'usd' : 'bsv');
-    updateRecipient(id, 'satSendAmount', null);
-    updateRecipient(id, 'usdSendAmount', null);
   };
 
   const resetRecipients = () => {
-    setRecipients([{ id: Math.random().toString(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' }]);
+    setRecipients([{ id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' }]);
     setIsProcessing(false);
   };
 
@@ -616,7 +628,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
     <>
       {/* <ConfirmContent>0 */}
 
-    <ScrollableConfirmContent>
+      <ScrollableConfirmContent>
         <HeaderText theme={theme}>Send BSV</HeaderText>
         <Text
           theme={theme}
@@ -725,7 +737,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
             resetRecipients();
           }}
         />
-      {/* </ConfirmContent> */}
+        {/* </ConfirmContent> */}
       </ScrollableConfirmContent>
     </>
   );
