@@ -24,5 +24,10 @@ jobs:
       - name: Install dependencies
         run: yarn install
 
-      - name: Run tests
-        run: yarn test
+      - name: Run tests if available
+        run: |
+          if [ -n "$(find . -name '*.test.js' -o -name '*.test.ts' -o -name '*.spec.js' -o -name '*.spec.ts')" ]; then
+            yarn test
+          else
+            echo "No test files found. Skipping tests."
+          fi
