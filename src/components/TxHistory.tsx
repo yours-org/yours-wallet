@@ -151,7 +151,7 @@ export const TxHistory = (props: TxHistoryProps) => {
   const { gorillaPoolService, chromeStorageService } = useServiceContext();
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
-  const tagPriorityOrder: Tag[] = ['list', 'bsv21', 'origin', 'lock', 'fund']; // The order of these tags will determine the order of the icons and which is prioritized
+  const tagPriorityOrder: Tag[] = ['list', 'bsv21', 'bsv20', 'origin', 'lock', 'fund']; // The order of these tags will determine the order of the icons and which is prioritized
 
   useEffect(() => {
     const fetchData = async () => {
