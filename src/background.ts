@@ -151,6 +151,37 @@ if (isInServiceWorker) {
     return await verifyAccess(params.domain);
   };
 
+  // Function to create a notification with simulated transaction data every 5 seconds
+  const sendTransactionNotification = () => {
+    setInterval(() => {
+      const newTransaction = {
+        amount: '0.1',
+        currency: 'BTC',
+        time: new Date().toLocaleTimeString(),
+      };
+
+      // Create the Chrome notification
+      chrome.notifications.create(
+        {
+          type: 'basic',
+          iconUrl:
+            'https://images.pexels.com/photos/674010/pexels-photo-674010.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
+          title: 'New Transaction',
+          message: `Transaction of ${newTransaction.amount} ${newTransaction.currency} confirmed at ${newTransaction.time}`,
+          priority: 2,
+        },
+        (notificationId: any) => {
+          if (chrome.runtime.lastError) {
+            console.error('Notification error:', chrome.runtime.lastError.message || chrome.runtime.lastError);
+          } else {
+            console.log('Notification sent:', notificationId);
+          }
+        },
+      );
+    }, 8000);
+  };
+  sendTransactionNotification();
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
     if ([YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT].includes(message.action)) {
