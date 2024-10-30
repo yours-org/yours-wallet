@@ -134,7 +134,7 @@ const ListIconWrapper = styled.div<WhiteLabelTheme>`
   height: 2.25rem;
 `;
 
-type Tag = 'bsv21' | 'origin' | 'list' | 'lock' | 'fund';
+type Tag = 'bsv21' | 'bsv20' | 'origin' | 'list' | 'lock' | 'fund';
 
 export type TxHistoryProps = {
   theme: Theme;
