@@ -46,6 +46,7 @@ import { FaListAlt } from 'react-icons/fa';
 import { ManageTokens } from '../components/ManageTokens';
 import { Account } from '../services/types/chromeStorage.types';
 import { SendBsv20View } from '../components/SendBsv20View';
+import { FaucetButton } from '../components/FaucetButton';
 
 const MiddleContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -153,6 +154,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const services = theme.settings.services;
   const [filteredTokens, setFilteredTokens] = useState<Bsv20[]>([]);
   const [randomKey, setRandomKey] = useState(Math.random());
+  const isTestnet = chromeStorageService.getNetwork() === 'testnet' ? true : false;
 
   const getAndSetAccountAndBsv20s = async () => {
     const res = await ordinalService.getBsv20s();
@@ -390,6 +392,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
     });
   };
 
+  const handleTestNetFaucetConfirmation = () => {
+    addSnackbar('Testnet coins sent! It may take one block confirmation for them to appear in your wallet.', 'success');
+    refreshUtxos();
+  };
+
   const receive = (
     <ReceiveContent>
       <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
@@ -456,6 +463,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           <Button theme={theme} type="primary" label="Receive" onClick={() => setPageState('receive')} />
           <Button theme={theme} type="primary" label="Send" onClick={() => setPageState('send')} />
         </ButtonContainer>
+        <FaucetButton onConfirmation={handleTestNetFaucetConfirmation} address={bsvAddress} isTestnet={isTestnet} />
         <AssetRow
           balance={bsvBalance}
           icon={bsvCoin}
