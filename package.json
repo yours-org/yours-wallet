@@ -5,6 +5,7 @@
   "dependencies": {
     "@bsv/paymail": "^2.0.2",
     "@bsv/sdk": "^1.1.24",
+    "@fortawesome/react-fontawesome": "^0.2.2",
     "@ramonak/react-progress-bar": "^5.2.0",
     "@tempfix/idb": "^8.0.3",
     "@testing-library/jest-dom": "^6.5.0",
