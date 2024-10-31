@@ -250,7 +250,7 @@ export const TxHistory = (props: TxHistoryProps) => {
       case 'fund':
         return 'BSV';
       default:
-        return '';
+        return 'Unknown';
     }
   };
 
