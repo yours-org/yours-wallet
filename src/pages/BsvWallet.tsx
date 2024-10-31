@@ -2,8 +2,6 @@ import { validate } from 'bitcoin-address-validation';
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import bsvCoin from '../assets/bsv-coin.svg';
-import switchAsset from '../assets/switch-asset.svg';
-import deleteIcon from '../assets/logos/delete.svg';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { PageLoader } from '../components/PageLoader';
@@ -43,7 +41,8 @@ import { getErrorMessage, isValidEmail } from '../utils/tools';
 import { UpgradeNotification } from '../components/UpgradeNotification';
 import { Bsv20 } from 'yours-wallet-provider';
 import { Bsv20TokensList } from '../components/Bsv20TokensList';
-import { FaListAlt } from 'react-icons/fa';
+import { FaListAlt, FaTrash } from 'react-icons/fa';
+import { FaArrowRightArrowLeft } from 'react-icons/fa6';
 import { ManageTokens } from '../components/ManageTokens';
 import { Account } from '../services/types/chromeStorage.types';
 import { SendBsv20View } from '../components/SendBsv20View';
@@ -81,7 +80,6 @@ const Icon = styled.img<{ size?: string }>`
   margin: 0 0.5rem 0 0;
 `;
 
-
 const CopyAddressWrapper = styled.div`
   display: flex;
   align-items: center;
@@ -103,14 +101,12 @@ const ManageTokenListWrapper = styled.div`
   cursor: pointer;
 `;
 
-//? multi-send styles start
-const RecipientRow = styled.div`
+const RecipientRow = styled.div<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   width: 100%;
-  margin-bottom: 0.5rem;
   padding: 1rem;
-  border-top: 1px solid ${props => props.theme.color.global.border || 'gray'};
+  border-top: 1px solid ${({ theme }) => theme.color.global.gray + 80};
   border-radius: 0.5rem;
 `;
 
@@ -130,22 +126,6 @@ const InputWrapper = styled.div`
   width: 100%;
 `;
 
-const AddRecipientButton = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 0.5rem;
-  margin-bottom: 1rem;
-  border: 1px dashed ${props => props.theme.color.global.border || 'gray'};
-  border-radius: 0.5rem;
-  cursor: pointer;
-
-  &:hover {
-    background: ${props => props.theme.color.global.background || 'white'};
-  }
-`;
-
 const ScrollableConfirmContent = styled(ConfirmContent)`
   max-height: calc(100vh - 150px);
   overflow-y: auto;
@@ -154,14 +134,15 @@ const ScrollableConfirmContent = styled(ConfirmContent)`
   flex-direction: column;
 `;
 
-const FixedHeader = styled.div`
-  position: sticky;
-  top: 0;
-  background: ${props => props.theme.color.global.background};
-  padding: 1rem 0;
-  z-index: 1;
+const UnitSwitcher = styled.div`
+  position: absolute;
+  display: flex;
+  align-items: center;
+  right: 2.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
 `;
-//? multi-send styles end
 
 type PageState = 'main' | 'receive' | 'send';
 type AmountType = 'bsv' | 'usd';
@@ -191,10 +172,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { handleSelect } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>('main');
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
-  const [usdSendAmount, setUsdSendAmount] = useState<number | null>(null);
-  const [receiveAddress, setReceiveAddress] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [amountType, setAmountType] = useState<AmountType>('bsv');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar } = useSnackbar();
   const { chromeStorageService, keysService, bsvService, ordinalService, oneSatSPV } = useServiceContext();
@@ -220,66 +198,68 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [randomKey, setRandomKey] = useState(Math.random());
   const isTestnet = chromeStorageService.getNetwork() === 'testnet' ? true : false;
 
-  //? multi-send state starts
   const [recipients, setRecipients] = useState<Recipient[]>([
-    { id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' }
+    { id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' },
   ]);
-  //? multi-send state ends
 
-  //?multi-send functions starts
   const addRecipient = () => {
-    setRecipients([
-      ...recipients,
-      { id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' }
+    setRecipients((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' },
     ]);
   };
 
   const removeRecipient = (id: string) => {
     if (recipients.length > 1) {
-      setRecipients([...recipients.filter(r => r.id !== id)]);
+      setRecipients((prev) => [...prev.filter((r) => r.id !== id)]);
     }
   };
 
-  const updateRecipient = (id: string, field: 'address' | 'satSendAmount' | 'usdSendAmount' | 'amountType' | 'error', value: string | number | null) => {
-    const newRecipients = [...recipients.map(r => {
-      if (r.id === id) {
-        // If we're updating amountType, reset both amounts
-        if (field === 'amountType') {
-          return {
-            ...r,
-            [field]: value as AmountType,
-            satSendAmount: null,
-            usdSendAmount: null
-          };
+  const updateRecipient = (
+    id: string,
+    field: 'address' | 'satSendAmount' | 'usdSendAmount' | 'amountType' | 'error',
+    value: string | number | null,
+  ) => {
+    setRecipients((prev) => [
+      ...prev.map((r) => {
+        if (r.id === id) {
+          // If we're updating amountType, reset both amounts
+          if (field === 'amountType') {
+            return {
+              ...r,
+              [field]: value as AmountType,
+              satSendAmount: null,
+              usdSendAmount: null,
+            };
+          }
+          // Otherwise just update the specified field
+          return { ...r, [field]: value };
         }
-        // Otherwise just update the specified field
-        return { ...r, [field]: value };
-      }
-      return r;
-    })];
-    setRecipients(newRecipients);
+        return r;
+      }),
+    ]);
   };
 
   const toggleRecipientAmountType = (id: string) => {
-    updateRecipient(id, 'amountType', recipients.find(r => r.id === id)?.amountType === 'bsv' ? 'usd' : 'bsv');
+    updateRecipient(id, 'amountType', recipients.find((r) => r.id === id)?.amountType === 'bsv' ? 'usd' : 'bsv');
   };
 
   const resetRecipients = () => {
-    setRecipients([{ id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' }]);
+    setRecipients([
+      { id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' },
+    ]);
     setIsProcessing(false);
   };
 
   const computeTotalAmount = () => {
-    //return total bsv and total usd
     const totalBsv = recipients.reduce((acc, r) => acc + (r.satSendAmount ?? 0), 0);
     const totalUsd = recipients.reduce((acc, r) => acc + (r.usdSendAmount ?? 0), 0);
     return { totalBsv, totalUsd };
   };
 
   const resetRecipientErrors = () => {
-    setRecipients([...recipients.map(r => ({ ...r, error: undefined }))]);
+    setRecipients((prev) => [...prev.map((r) => ({ ...r, error: undefined }))]);
   };
-  //?multi-send functions ends
 
   const getAndSetAccountAndBsv20s = async () => {
     const res = await ordinalService.getBsv20s();
@@ -386,36 +366,25 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   useEffect(() => {
     if (!successTxId) return;
-    resetRecipients();
+    resetSendState();
     setPageState('main');
     setTimeout(() => refreshUtxos(), 1000); // slight delay to allow for transaction to be processed
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId]);
 
   const resetSendState = () => {
-    setSatSendAmount(null);
-    setUsdSendAmount(null);
-    setAmountType('bsv');
-    setReceiveAddress('');
     setPasswordConfirm('');
     setSuccessTxId('');
     setIsProcessing(false);
+    resetRecipients();
+    setIsSendAllBsv(false);
+    setSatSendAmount(null);
   };
 
   const handleCopyToClipboard = () => {
     navigator.clipboard.writeText(bsvAddress).then(() => {
       addSnackbar('Copied!', 'success');
     });
-  };
-
-  const toggleAmountType = () => {
-    if (amountType === 'bsv') {
-      setAmountType('usd');
-    } else {
-      setAmountType('bsv');
-    }
-    setUsdSendAmount(null);
-    setSatSendAmount(null);
   };
 
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -453,13 +422,16 @@ export const BsvWallet = (props: BsvWalletProps) => {
       if (r.amountType === 'usd' && r.usdSendAmount) {
         satoshis = Math.ceil((r.usdSendAmount / exchangeRate) * BSV_DECIMAL_CONVERSION);
       }
-      // return { address: r.address, satoshis };
-      return isValidEmail(r.address)
-        ? { paymail: r.address, satoshis }
-        : { address: r.address, satoshis };
+      return isValidEmail(r.address) ? { paymail: r.address, satoshis } : { address: r.address, satoshis };
     });
 
-    const sendRes = await sendBsv(sendRecipients, passwordConfirm);
+    let sendRes: InWalletBsvResponse;
+    if (isSendAllBsv) {
+      const r = sendRecipients[0];
+      sendRes = await sendAllBsv(r.address ?? r.paymail, r.address ? 'address' : 'paymail', passwordConfirm);
+    } else {
+      sendRes = await sendBsv(sendRecipients, passwordConfirm);
+    }
 
     if (!sendRes.txid || sendRes.error) {
       addSnackbar(getErrorMessage(sendRes.error), 'error');
@@ -474,30 +446,32 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const fillInputWithAllBsv = () => {
     setSatSendAmount(Math.round(bsvBalance * BSV_DECIMAL_CONVERSION));
+    setRecipients([
+      {
+        id: crypto.randomUUID(),
+        address: '',
+        satSendAmount: Math.round(bsvBalance * BSV_DECIMAL_CONVERSION),
+        usdSendAmount: null,
+        amountType: 'bsv',
+      },
+    ]);
   };
 
-  useEffect(() => {
-    const calcValue = () => {
-      return amountType === 'bsv'
-        ? satSendAmount
-          ? satSendAmount / BSV_DECIMAL_CONVERSION
-          : undefined
-        : amountType === 'usd'
-          ? usdSendAmount
-            ? usdSendAmount
-            : undefined
-          : undefined;
-    };
-
-    calcValue();
-  }, [satSendAmount, usdSendAmount, amountType]);
-
   const getLabel = () => {
-    return amountType === 'bsv' && satSendAmount
-      ? `Send ${(satSendAmount / BSV_DECIMAL_CONVERSION).toFixed(8)}`
-      : amountType === 'usd' && usdSendAmount
-        ? `Send ${formatUSD(usdSendAmount)}`
-        : 'Enter Send Details';
+    let satAmount = 0;
+    recipients.forEach((r) => {
+      const usdAmountInSats = r.usdSendAmount
+        ? Math.ceil((r.usdSendAmount / exchangeRate) * BSV_DECIMAL_CONVERSION)
+        : 0;
+      satAmount += r.satSendAmount ?? usdAmountInSats;
+    });
+    const sendAmount = satAmount ? satAmount / BSV_DECIMAL_CONVERSION : 0;
+    const overBalance = sendAmount > bsvBalance;
+    return sendAmount
+      ? overBalance
+        ? 'Insufficient Balance'
+        : `Send ${satAmount / BSV_DECIMAL_CONVERSION}`
+      : 'Enter Send Details';
   };
 
   const handleSync = async () => {
@@ -634,8 +608,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const send = (
     <>
-      {/* <ConfirmContent>0 */}
-
       <ScrollableConfirmContent>
         <HeaderText theme={theme}>Send BSV</HeaderText>
         <Text
@@ -644,8 +616,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
           onClick={fillInputWithAllBsv}
         >{`Balance: ${bsvBalance}`}</Text>
         <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
-          {recipients.map((recipient, index) => (
-            <RecipientRow key={recipient.id} theme={theme} >
+          {recipients.map((recipient) => (
+            <RecipientRow key={recipient.id} theme={theme}>
               <RecipientInputs>
                 <InputWrapper>
                   <Input
@@ -656,9 +628,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
                     value={recipient.address}
                   />
                   {recipients.length > 1 && (
-                    <Icon
-                      src={deleteIcon}
+                    <FaTrash
                       size="1rem"
+                      color={theme.color.global.gray}
                       style={{
                         position: 'absolute',
                         right: '2.25rem',
@@ -690,34 +662,33 @@ export const BsvWallet = (props: BsvWalletProps) => {
                         updateRecipient(recipient.id, 'usdSendAmount', null);
                       } else {
                         if (recipient.amountType === 'bsv') {
-                          updateRecipient(recipient.id, 'satSendAmount', Math.round(Number(inputValue) * BSV_DECIMAL_CONVERSION));
+                          updateRecipient(
+                            recipient.id,
+                            'satSendAmount',
+                            Math.round(Number(inputValue) * BSV_DECIMAL_CONVERSION),
+                          );
                         } else {
                           updateRecipient(recipient.id, 'usdSendAmount', Number(inputValue));
                         }
                       }
                     }}
                   />
-                  <Icon
-                    src={switchAsset}
-                    size="1rem"
-                    style={{
-                      position: 'absolute',
-                      right: '2.25rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      cursor: 'pointer',
-                    }}
-                    onClick={() => toggleRecipientAmountType(recipient.id)}
-                  />
+                  <UnitSwitcher>
+                    {recipient.amountType === 'bsv' ? 'BSV' : 'USD'}
+                    <FaArrowRightArrowLeft
+                      size="1rem"
+                      style={{ marginLeft: '0.5rem' }}
+                      color={theme.color.global.gray}
+                      onClick={() => toggleRecipientAmountType(recipient.id)}
+                    />
+                  </UnitSwitcher>
                 </InputWrapper>
               </RecipientInputs>
             </RecipientRow>
           ))}
-
-          <AddRecipientButton onClick={addRecipient} theme={theme}>
-            + Add Recipient
-          </AddRecipientButton>
-
+          <Show when={!isSendAllBsv}>
+            <Button type="secondary-outline" label="+ Add Recipient" onClick={addRecipient} theme={theme} />
+          </Show>
           <Show when={isPasswordRequired}>
             <Input
               theme={theme}
@@ -731,7 +702,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
             theme={theme}
             type="primary"
             label={getLabel()}
-            disabled={isProcessing || (!computeTotalAmount().totalBsv && !computeTotalAmount().totalUsd)}
+            disabled={
+              isProcessing ||
+              getLabel() === 'Insufficient Balance' ||
+              (!computeTotalAmount().totalBsv && !computeTotalAmount().totalUsd)
+            }
             isSubmit
           />
         </FormContainer>
@@ -743,9 +718,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
           onClick={() => {
             setPageState('main');
             resetRecipients();
+            resetSendState();
           }}
         />
-        {/* </ConfirmContent> */}
       </ScrollableConfirmContent>
     </>
   );
