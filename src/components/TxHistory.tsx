@@ -3,7 +3,7 @@ import { Theme, WhiteLabelTheme } from '../theme.types';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useEffect, useMemo, useState } from 'react';
 import { HeaderText, Text } from './Reusable';
-import { GENERIC_TOKEN_ICON, URL_WHATSINCHAIN } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, GENERIC_TOKEN_ICON, URL_WHATSINCHAIN } from '../utils/constants';
 import { FaTimes, FaChevronDown, FaChevronUp, FaLink, FaTag } from 'react-icons/fa'; // Import FaTag
 import { TxLog } from 'spv-store';
 import { Button } from './Button';
@@ -219,7 +219,7 @@ export const TxHistory = (props: TxHistoryProps) => {
     }
   };
 
-  const sortEntriesByPriority = (entries: [Tag, { icon?: string; amount?: number }][]) => {
+  const sortEntriesByPriority = (entries: [Tag, { id?: string; icon?: string; amount?: number }][]) => {
     return entries.sort((a, b) => {
       const aPriority = tagPriorityOrder.indexOf(a[0]);
       const bPriority = tagPriorityOrder.indexOf(b[0]);
@@ -236,6 +236,47 @@ export const TxHistory = (props: TxHistoryProps) => {
     });
   };
 
+  const getHeaderText = (tag: Tag) => {
+    switch (tag) {
+      case 'bsv21':
+      case 'bsv20':
+        return 'Token';
+      case 'origin':
+        return 'NFT';
+      case 'list':
+        return 'Listing';
+      case 'lock':
+        return 'Lock';
+      case 'fund':
+        return 'BSV';
+      default:
+        return '';
+    }
+  };
+
+  const getDescriptionText = (tag: Tag, amount: number) => {
+    switch (tag) {
+      case 'list':
+        return amount === -1 ? 'Listed for sale' : amount === 0 ? 'Cancelled listing' : 'Purchased listing';
+      case 'lock':
+        return 'Lock contract';
+      default:
+        return amount === 0 ? 'Self transfer' : amount > 0 ? 'Received' : 'Sent';
+    }
+  };
+
+  const getAmountText = (tag: Tag, amount: number, id: string) => {
+    switch (tag) {
+      case 'fund':
+        return amount / BSV_DECIMAL_CONVERSION + ' BSV';
+      case 'bsv21':
+      case 'bsv20':
+        return amount + ` ${id}`;
+      default:
+        return amount;
+    }
+  };
+
   return (
     <Container theme={theme} isSlidingOut={isSlidingOut}>
       <BackWrapper>
@@ -249,7 +290,7 @@ export const TxHistory = (props: TxHistoryProps) => {
           const summaryEntries = sortEntriesByPriority(
             Object.entries(t.summary || {}).filter(([key]) => tagPriorityOrder.includes(key as Tag)) as [
               Tag,
-              { icon?: string; amount?: number },
+              { id?: string; icon?: string; amount?: number },
             ][],
           );
           const isExpanded = expandedRows.has(t.idx);
@@ -286,8 +327,8 @@ export const TxHistory = (props: TxHistoryProps) => {
                               ))}
                         </IconContent>
                         <TickerTextWrapper>
-                          <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
-                            {key}
+                          <HeaderText style={{ fontSize: '0.85rem', marginTop: 0, fontWeight: 700 }} theme={theme}>
+                            {getHeaderText(key)}
                           </HeaderText>
                           <Text
                             theme={theme}
@@ -296,35 +337,32 @@ export const TxHistory = (props: TxHistoryProps) => {
                               fontSize: '0.75rem',
                               margin: 0,
                               textAlign: 'left',
+                              width: '100%',
                             }}
                           >
-                            {value?.amount && value.amount < 0
-                              ? value.amount === -1
-                                ? 'Listing'
-                                : 'Sent'
-                              : value.amount === 0
-                                ? 'Cancelled'
-                                : 'Received'}
+                            {getDescriptionText(key, value.amount ?? 0)}
                           </Text>
                         </TickerTextWrapper>
                       </IconNameWrapper>
                       <ContentWrapper>
                         <HeaderText
                           style={{
-                            fontSize: '0.85rem',
-                            marginTop: 0,
+                            fontSize: '0.75rem',
+                            fontWeight: 900,
+                            margin: 0,
                             color: value?.amount
                               ? value.amount > 1
                                 ? '#52C41A'
                                 : value.amount < -1
-                                  ? '#FF4D4F'
+                                  ? theme.color.global.contrast
                                   : 'transparent'
                               : 'transparent',
                             textAlign: 'right',
                           }}
                           theme={theme}
                         >
-                          {value.amount}
+                          {value.amount && value.amount > 0 ? '+' : ''}
+                          {getAmountText(key, value.amount ?? 0, value.id ?? '')}
                         </HeaderText>
                         <Show when={idx === 0}>
                           <FaLink
