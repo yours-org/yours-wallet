@@ -446,7 +446,14 @@ export const BsvWallet = (props: BsvWalletProps) => {
         <Show when={socialProfile.avatar !== HOSTED_YOURS_IMAGE}>
           <ProfileImage src={socialProfile.avatar} />
         </Show>
-        <HeaderText style={{ fontSize: '2rem' }} theme={theme}>
+        <HeaderText
+          title={'Sync Transactions'}
+          style={{ fontSize: '2rem', cursor: 'pointer' }}
+          theme={theme}
+          onClick={() => {
+            oneSatSPV.stores.txos?.syncTxLogs();
+          }}
+        >
           {formatUSD(bsvBalance * exchangeRate)}
         </HeaderText>
         <BalanceContainer>
