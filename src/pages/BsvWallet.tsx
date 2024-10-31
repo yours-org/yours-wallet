@@ -500,7 +500,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           <ManageTokenListWrapper onClick={() => setHistoryTx(!historyTx)}>
             <FaHistory size="1rem" color={theme.color.global.gray} />
             <Text theme={theme} style={{ margin: '0 0 0 0.5rem', fontWeight: 700, color: theme.color.global.gray }}>
-              See Last Activity
+              Recent Activity
             </Text>
           </ManageTokenListWrapper>
         </Show>
