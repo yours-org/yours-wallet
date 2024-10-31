@@ -43,10 +43,12 @@ import { Bsv20 } from 'yours-wallet-provider';
 import { Bsv20TokensList } from '../components/Bsv20TokensList';
 import { FaListAlt, FaTrash } from 'react-icons/fa';
 import { FaArrowRightArrowLeft } from 'react-icons/fa6';
+import { FaHistory } from 'react-icons/fa';
 import { ManageTokens } from '../components/ManageTokens';
 import { Account } from '../services/types/chromeStorage.types';
 import { SendBsv20View } from '../components/SendBsv20View';
 import { FaucetButton } from '../components/FaucetButton';
+import { TxHistory } from '../components/TxHistory';
 
 const MiddleContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -191,6 +193,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [bsv20s, setBsv20s] = useState<Bsv20[]>([]);
   const [manageFavorites, setManageFavorites] = useState(false);
+  const [historyTx, setHistoryTx] = useState(false);
   const [account, setAccount] = useState<Account>();
   const [token, setToken] = useState<{ isConfirmed: boolean; info: Bsv20 } | null>(null);
   const services = theme.settings.services;
@@ -549,7 +552,14 @@ export const BsvWallet = (props: BsvWalletProps) => {
         <Show when={socialProfile.avatar !== HOSTED_YOURS_IMAGE}>
           <ProfileImage src={socialProfile.avatar} />
         </Show>
-        <HeaderText style={{ fontSize: '2rem' }} theme={theme}>
+        <HeaderText
+          title={'Sync Transactions'}
+          style={{ fontSize: '2rem', cursor: 'pointer' }}
+          theme={theme}
+          onClick={() => {
+            oneSatSPV.stores.txos?.syncTxLogs();
+          }}
+        >
           {formatUSD(bsvBalance * exchangeRate)}
         </HeaderText>
         <BalanceContainer>
@@ -599,6 +609,12 @@ export const BsvWallet = (props: BsvWalletProps) => {
             <FaListAlt size="1rem" color={theme.color.global.gray} />
             <Text theme={theme} style={{ margin: '0 0 0 0.5rem', fontWeight: 700, color: theme.color.global.gray }}>
               Manage Tokens List
+            </Text>
+          </ManageTokenListWrapper>
+          <ManageTokenListWrapper onClick={() => setHistoryTx(!historyTx)}>
+            <FaHistory size="1rem" color={theme.color.global.gray} />
+            <Text theme={theme} style={{ margin: '0 0 0 0.5rem', fontWeight: 700, color: theme.color.global.gray }}>
+              Recent Activity
             </Text>
           </ManageTokenListWrapper>
         </Show>
@@ -743,6 +759,16 @@ export const BsvWallet = (props: BsvWalletProps) => {
             setRandomKey(Math.random());
           }}
           bsv20s={bsv20s}
+          theme={theme}
+        />
+      </Show>
+      <Show when={historyTx}>
+        <TxHistory
+          onBack={() => {
+            setHistoryTx(false);
+            getAndSetAccountAndBsv20s();
+            setRandomKey(Math.random());
+          }}
           theme={theme}
         />
       </Show>
