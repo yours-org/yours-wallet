@@ -283,7 +283,7 @@ export const TxHistory = (props: TxHistoryProps) => {
         <FaTimes size={'1.5rem'} color={theme.color.global.contrast} cursor="pointer" onClick={handleBackClick} />
       </BackWrapper>
       <Text style={{ marginTop: '3rem', fontSize: '1.25rem', fontWeight: 700 }} theme={theme}>
-        See Last Activity
+        Recent Activity
       </Text>
       {(paginatedData || []).length > 0 ? (
         paginatedData?.map((t) => {
