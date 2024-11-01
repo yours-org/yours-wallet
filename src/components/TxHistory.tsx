@@ -149,7 +149,7 @@ export const TxHistory = (props: TxHistoryProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
   const { gorillaPoolService, chromeStorageService } = useServiceContext();
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const tagPriorityOrder: Tag[] = ['list', 'bsv21', 'bsv20', 'origin', 'lock', 'fund']; // The order of these tags will determine the order of the icons and which is prioritized
 
@@ -227,11 +227,11 @@ export const TxHistory = (props: TxHistoryProps) => {
     });
   };
 
-  const toggleRowExpansion = (idx: number) => {
+  const toggleRowExpansion = (uniqueId: string) => {
     setExpandedRows((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(idx)) newSet.delete(idx);
-      else newSet.add(idx);
+      if (newSet.has(uniqueId)) newSet.delete(uniqueId);
+      else newSet.add(uniqueId);
       return newSet;
     });
   };
@@ -293,12 +293,13 @@ export const TxHistory = (props: TxHistoryProps) => {
               { id?: string; icon?: string; amount?: number },
             ][],
           );
-          const isExpanded = expandedRows.has(t.idx);
+          const uniqueId = `${t.txid}-${t.idx}`;
+          const isExpanded = expandedRows.has(uniqueId);
           return (
-            <RowWrapper key={t.idx}>
+            <RowWrapper key={uniqueId}>
               <HistoryRow
                 theme={theme}
-                onClick={summaryEntries.length > 1 ? () => toggleRowExpansion(t.idx) : undefined}
+                onClick={summaryEntries.length > 1 ? () => toggleRowExpansion(uniqueId) : undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
