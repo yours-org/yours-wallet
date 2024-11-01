@@ -261,7 +261,7 @@ export const TxHistory = (props: TxHistoryProps) => {
       case 'lock':
         return 'Lock contract';
       default:
-        return amount === 0 ? 'Self transfer' : amount > 0 ? 'Received' : 'Sent';
+        return amount === 0 ? 'Transfer' : amount > 0 ? 'Received' : 'Sent';
     }
   };
 
