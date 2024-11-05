@@ -138,6 +138,12 @@ export const OrdWallet = () => {
     setSelectedOrdinal(undefined);
   };
 
+  const refreshOrdinals = async () => {
+    const data = await getOrdinals();
+    setOrdinals(data.ordinals);
+    setFrom(data.from);
+  };
+
   const handleTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -166,7 +172,7 @@ export const OrdWallet = () => {
 
     setSuccessTxId(transferRes.txid);
     addSnackbar('Transfer Successful!', 'success');
-    loadOrdinals();
+    refreshOrdinals();
   };
 
   const handleListOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -208,7 +214,7 @@ export const OrdWallet = () => {
 
     setSuccessTxId(listRes.txid);
     addSnackbar('Listing Successful!', 'success');
-    loadOrdinals();
+    refreshOrdinals();
   };
 
   const handleCancelListing = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -232,7 +238,7 @@ export const OrdWallet = () => {
 
     setSuccessTxId(cancelRes.txid);
     addSnackbar('Successfully canceled the listing!', 'success');
-    loadOrdinals();
+    refreshOrdinals();
   };
 
   const transferAndListButtons = (
@@ -320,7 +326,6 @@ export const OrdWallet = () => {
         <HeaderText style={{ fontSize: '1.35rem' }} theme={theme}>
           {'Cancel Listing'}
         </HeaderText>
-        <Text style={{ margin: 0 }} theme={theme}>{`#${selectedOrdinal?.origin?.num}`}</Text>
         <Ordinal
           theme={theme}
           inscription={selectedOrdinal as OrdinalType}
@@ -436,7 +441,6 @@ export const OrdWallet = () => {
           selectedOrdinal?.origin?.data?.map?.subTypeData?.name ??
           'List Ordinal'
         }`}</HeaderText>
-        <Text style={{ margin: 0 }} theme={theme}>{`#${selectedOrdinal?.origin?.num}`}</Text>
         <Ordinal
           theme={theme}
           inscription={selectedOrdinal as OrdinalType}
