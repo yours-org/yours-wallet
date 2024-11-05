@@ -32,7 +32,7 @@ import {
 } from './inject';
 import { EncryptResponse } from './pages/requests/EncryptRequest';
 import { DecryptResponse } from './pages/requests/DecryptRequest';
-import { removeWindow } from './utils/chromeHelpers';
+import { removeWindow, sendTransactionNotification } from './utils/chromeHelpers';
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
@@ -72,6 +72,14 @@ const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 // only run in background worker
 if (isInServiceWorker) {
+  const initNewTxsListener = async () => {
+    const oneSatSPV = await oneSatSPVPromise;
+    oneSatSPV.events.on('newTxs', (data: number) => {
+      sendTransactionNotification(data);
+    });
+  };
+  initNewTxsListener();
+
   const processSyncUtxos = async () => {
     try {
       const oneSatSPV = await oneSatSPVPromise;
@@ -107,6 +115,7 @@ if (isInServiceWorker) {
     chromeStorageService = new ChromeStorageService();
     await chromeStorageService.getAndSetStorage();
     oneSatSPVPromise = initOneSatSPV(chromeStorageService, isInServiceWorker);
+    initNewTxsListener();
   };
 
   const launchPopUp = () => {
@@ -150,37 +159,6 @@ if (isInServiceWorker) {
     const { params } = message;
     return await verifyAccess(params.domain);
   };
-
-  // Function to create a notification with simulated transaction data every 5 seconds
-  const sendTransactionNotification = () => {
-    setInterval(() => {
-      const newTransaction = {
-        amount: '0.1',
-        currency: 'BTC',
-        time: new Date().toLocaleTimeString(),
-      };
-
-      // Create the Chrome notification
-      chrome.notifications.create(
-        {
-          type: 'basic',
-          iconUrl:
-            'https://images.pexels.com/photos/674010/pexels-photo-674010.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2',
-          title: 'New Transaction',
-          message: `Transaction of ${newTransaction.amount} ${newTransaction.currency} confirmed at ${newTransaction.time}`,
-          priority: 2,
-        },
-        (notificationId: any) => {
-          if (chrome.runtime.lastError) {
-            console.error('Notification error:', chrome.runtime.lastError.message || chrome.runtime.lastError);
-          } else {
-            console.log('Notification sent:', notificationId);
-          }
-        },
-      );
-    }, 8000);
-  };
-  sendTransactionNotification();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
