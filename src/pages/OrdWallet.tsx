@@ -371,19 +371,21 @@ export const OrdWallet = () => {
           setPageState('transfer');
         }}
       />
-      <Button
-        theme={theme}
-        type="primary"
-        label="List"
-        disabled={ordinals.length === 0 || !selectedOrdinals.length}
-        onClick={async () => {
-          if (!selectedOrdinals.length) {
-            addSnackbar('You must select an ordinal to list!', 'info');
-            return;
-          }
-          setPageState('list');
-        }}
-      />
+      <Show when={selectedOrdinals.length === 1}>
+        <Button
+          theme={theme}
+          type="primary"
+          label="List"
+          disabled={ordinals.length === 0 || !selectedOrdinals.length}
+          onClick={async () => {
+            if (!selectedOrdinals.length) {
+              addSnackbar('You must select an ordinal to list!', 'info');
+              return;
+            }
+            setPageState('list');
+          }}
+        />
+      </Show>
     </>
   );
 
