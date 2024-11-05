@@ -19,6 +19,7 @@ import { Ordinal as OrdinalType } from 'yours-wallet-provider';
 import { WhiteLabelTheme } from '../theme.types';
 import { getErrorMessage } from '../utils/tools';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
+import { truncate } from '../utils/format';
 
 type Addresses = Record<string, string>;
 
@@ -82,12 +83,11 @@ const Label = styled.div<WhiteLabelTheme>`
 `;
 
 const OrdinalWrapper = styled.div<WhiteLabelTheme>`
-  display: grid;
-  width: 100%;
-  max-width: 320px;
+  display: flex;
+  width: 87%;
   gap: 5px;
-  grid-template-columns: repeat(2, 1fr);
   justify-items: center;
+  flex-wrap: wrap;
 `;
 
 const OrdinalItem = styled.div<WhiteLabelTheme>`
@@ -95,10 +95,10 @@ const OrdinalItem = styled.div<WhiteLabelTheme>`
   align-items: center;
   justify-content: center;
   padding: 5px;
+  min-width: 10.5rem;
   border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  border-radius: 0.5rem;
   background-color: #f9f9f9;
-  width: 150px;
   flex-direction: column;
   box-sizing: border-box;
   margin-bottom: 5px;
@@ -122,7 +122,7 @@ const OrdinalTitle = styled.div<WhiteLabelTheme>`
 const ReceiverInput = styled.input<WhiteLabelTheme>`
   width: 100%;
   max-width: 100%;
-  padding: 8px;
+  padding: 0.5rem;
   border: 1px solid #ccc;
   border-radius: 6px;
   font-size: 0.8rem;
@@ -399,7 +399,11 @@ export const OrdWallet = () => {
         />
         <OrdinalDetails>
           <OrdinalTitle>
-            {`${ordinal?.origin?.data?.map?.name ?? ordinal?.origin?.data?.map?.subTypeData?.name ?? 'ID'}`}
+            {truncate(
+              `${ordinal?.origin?.data?.map?.name ?? ordinal?.origin?.data?.map?.subTypeData?.name ?? 'ID'}`,
+              15,
+              0,
+            )}
           </OrdinalTitle>
           <Show when={!useSameAddress}>
             <ReceiverInput
@@ -439,7 +443,7 @@ export const OrdWallet = () => {
                 checked={useSameAddress}
                 onChange={toggleUseSameAddress}
                 size={5}
-                style={{ transform: 'scale(0.8)', width: '20px', height: '20px' }}
+                style={{ transform: 'scale(0.8)', width: '1.25rem', height: '1.25rem' }}
               />
             </div>
           </Show>
