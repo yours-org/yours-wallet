@@ -169,7 +169,7 @@ export const AppsAndTools = () => {
   const { addSnackbar } = useSnackbar();
   const { query } = useBottomMenu();
   const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
-  const { bsvAddress, ordAddress, identityAddress } = keysService;
+  const { bsvAddress, ordAddress, identityAddress, getWifBalance, sweepWif } = keysService;
   const exchangeRate = chromeStorageService.getCurrentAccountObject().exchangeRateCache?.rate ?? 0;
   const [isProcessing, setIsProcessing] = useState(false);
   const [page, setPage] = useState<AppsPage>(query === 'pending-locks' ? 'unlock' : 'main');
@@ -186,35 +186,37 @@ export const AppsAndTools = () => {
   const [isBroadcasting, setIsBroadcasting] = useState(false);
 
   const [wifKey, setWifKey] = useState('');
-  const [sweepBalance, setSweepBalance] = useState<{ regular: number; ordinals: number }>({ regular: 0, ordinals: 0 });
+  const [sweepBalance, setSweepBalance] = useState(0);
   const [isSweeping, setIsSweeping] = useState(false);
 
   const checkWIFBalance = async (wif: string) => {
-    try {
-      setIsProcessing(true);
-
-      //TODO: logic to check balance
-
-      setSweepBalance({
-        regular: 0,
-        ordinals: 0,
-      });
-    } catch (error) {
+    const balance = await getWifBalance(wif);
+    if (balance === undefined) {
       addSnackbar('Error checking balance. Please ensure the WIF key is valid.', 'error');
-      console.error('WIF balance check error:', error);
-    } finally {
-      setIsProcessing(false);
+      return;
     }
+    if (balance === 0) {
+      addSnackbar('No balance found for this WIF key', 'info');
+      setSweepBalance(balance);
+      return;
+    }
+
+    addSnackbar(`Balance found: ${balance / BSV_DECIMAL_CONVERSION} BSV`, 'success');
+    setSweepBalance(balance);
   };
 
   const sweepFunds = async () => {
     try {
+      if (!wifKey) return;
       setIsSweeping(true);
-
-      //TODO: logic to sweep funds
-
-      addSnackbar('Successfully swept funds to your wallet', 'success');
-      setPage('main');
+      const res = await sweepWif(wifKey);
+      if (res?.txid) {
+        addSnackbar('Successfully swept funds to your wallet', 'success');
+        handleResetSweep();
+        return;
+      } else {
+        addSnackbar('Error sweeping funds. Please try again.', 'error');
+      }
     } catch (error) {
       addSnackbar('Error sweeping funds. Please try again.', 'error');
       console.error('Sweep error:', error);
@@ -223,13 +225,18 @@ export const AppsAndTools = () => {
     }
   };
 
-  const validateWIF = (wif: string): boolean => {
-    try {
-      //TODO: logic to validate WIF
-      return true;
-    } catch (error) {
-      return false;
-    }
+  const handleWifChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const wif = e.target.value;
+    if (!wif) return;
+    checkWIFBalance(wif);
+    setWifKey(e.target.value);
+  };
+
+  const handleResetSweep = () => {
+    setWifKey('');
+    setSweepBalance(0);
+    setIsSweeping(false);
+    setPage('main');
   };
 
   const getLockData = async () => {
@@ -556,33 +563,34 @@ export const AppsAndTools = () => {
     <PageWrapper $marginTop={'0'}>
       <HeaderText theme={theme}>Sweep Private Key</HeaderText>
       <Text theme={theme}>Enter a private key in WIF format to sweep all funds to your wallet.</Text>
+      <Input theme={theme} placeholder="Enter WIF private key" value={wifKey} onChange={handleWifChange} />
 
-      <Input
-        theme={theme}
-        placeholder="Enter WIF private key"
-        value={wifKey}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWifKey(e.target.value)}
-        onBlur={() => validateWIF(wifKey) && checkWIFBalance(wifKey)}
-      />
-
-      {(sweepBalance.regular > 0 || sweepBalance.ordinals > 0) && (
+      {sweepBalance > 0 && (
         <SweepInfo theme={theme}>
           <Text theme={theme}>Available to sweep:</Text>
-          <Text theme={theme}>Regular BSV: {sweepBalance.regular} BSV</Text>
-          <Text theme={theme}>Ordinals: {sweepBalance.ordinals} BSV</Text>
+          <Text style={{ fontWeight: 700 }} theme={theme}>
+            {sweepBalance / BSV_DECIMAL_CONVERSION} BSV
+          </Text>
         </SweepInfo>
       )}
 
       <ButtonsWrapper>
-        <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setPage('main')} />
+        <Button
+          theme={theme}
+          type="secondary-outline"
+          label="Cancel"
+          onClick={handleResetSweep}
+          disabled={isSweeping}
+        />
         <Button
           theme={theme}
           type="primary"
-          label="Sweep Funds"
+          label={isSweeping ? 'Sweeping...' : 'Sweep Funds'}
           onClick={sweepFunds}
-          disabled={!validateWIF(wifKey) || (sweepBalance.regular === 0 && sweepBalance.ordinals === 0)}
+          disabled={isSweeping || sweepBalance === 0}
         />
       </ButtonsWrapper>
+      <Warning theme={theme}>This will only sweep funds. 1Sat Ordinals could be lost!</Warning>
     </PageWrapper>
   );
 
