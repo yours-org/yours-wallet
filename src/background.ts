@@ -32,7 +32,7 @@ import {
 } from './inject';
 import { EncryptResponse } from './pages/requests/EncryptRequest';
 import { DecryptResponse } from './pages/requests/DecryptRequest';
-import { removeWindow } from './utils/chromeHelpers';
+import { removeWindow, sendTransactionNotification } from './utils/chromeHelpers';
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
@@ -72,6 +72,14 @@ const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 // only run in background worker
 if (isInServiceWorker) {
+  const initNewTxsListener = async () => {
+    const oneSatSPV = await oneSatSPVPromise;
+    oneSatSPV.events.on('newTxs', (data: number) => {
+      sendTransactionNotification(data);
+    });
+  };
+  initNewTxsListener();
+
   const processSyncUtxos = async () => {
     try {
       const oneSatSPV = await oneSatSPVPromise;
@@ -107,6 +115,7 @@ if (isInServiceWorker) {
     chromeStorageService = new ChromeStorageService();
     await chromeStorageService.getAndSetStorage();
     oneSatSPVPromise = initOneSatSPV(chromeStorageService, isInServiceWorker);
+    initNewTxsListener();
   };
 
   const launchPopUp = () => {

@@ -1,5 +1,5 @@
 import { KeysService } from './Keys.service';
-import { ListOrdinal, OrdOperationResponse } from './types/ordinal.types';
+import { ListOrdinal, MultiSendOrdinals, OrdOperationResponse } from './types/ordinal.types';
 import {
   cancelOrdListings,
   createOrdListings,
@@ -9,7 +9,10 @@ import {
   TokenType,
   TokenUtxo,
   transferOrdTokens,
+  sendOrdinals,
   Utxo,
+  Destination,
+  NftUtxo,
 } from 'js-1sat-ord';
 import { Bsv20, Ordinal, PaginatedOrdinalsResponse, PurchaseOrdinal } from 'yours-wallet-provider';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction, Utils } from '@bsv/sdk';
@@ -169,6 +172,75 @@ export class OrdinalService {
       return { error: 'broadcast-failed' };
     } catch (error) {
       console.error('transferOrdinal failed:', error);
+      return { error: JSON.stringify(error) };
+    }
+  };
+
+  transferOrdinalsMulti = async (multiSend: MultiSendOrdinals): Promise<OrdOperationResponse> => {
+    try {
+      const { outpoints, destinationAddresses, password } = multiSend;
+      const isAuthenticated = await this.keysService.verifyPassword(password);
+      if (!isAuthenticated) {
+        return { error: 'invalid-password' };
+      }
+      const keys = await this.keysService.retrieveKeys(password);
+      if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
+
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
+
+      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+      const outpointObjects = outpoints.map((outpoint) => new Outpoint(outpoint));
+      const ordUtxos = await this.oneSatSPV.getTxos(outpointObjects);
+
+      const { activeUtxos, destinations }: { activeUtxos: Utxo[]; destinations: Destination[] } = ordUtxos.reduce(
+        (acc: { activeUtxos: Utxo[]; destinations: Destination[] }, txo, index) => {
+          if (txo) {
+            const pk = pkMap.get(txo.owner || '');
+            if (!pk) return acc;
+            // Only process active UTXOs
+            acc.activeUtxos.push({
+              txid: txo.outpoint.txid,
+              vout: txo.outpoint.vout,
+              satoshis: 1,
+              script: Buffer.from(txo.script).toString('base64'),
+              pk,
+            });
+            acc.destinations.push({
+              address: destinationAddresses[index],
+            });
+          }
+          return acc;
+        },
+        { activeUtxos: [], destinations: [] },
+      );
+
+      const paymentUtxos: Utxo[] = [];
+      fundResults.txos.forEach((t) => {
+        const pk = pkMap.get(t.owner || '');
+        if (!pk) return;
+        paymentUtxos.push({
+          txid: t.outpoint.txid,
+          vout: t.outpoint.vout,
+          satoshis: Number(t.satoshis),
+          script: Buffer.from(t.script).toString('base64'),
+          pk,
+        });
+      });
+
+      const { tx } = await sendOrdinals({
+        paymentUtxos,
+        ordinals: activeUtxos,
+        destinations: destinations,
+        changeAddress: keys.walletAddress,
+      });
+
+      const response = await this.oneSatSPV.broadcast(tx);
+      if (response?.txid) {
+        return { txid: response.txid };
+      }
+      return { error: 'broadcast-failed' };
+    } catch (error: unknown) {
+      console.log(error);
       return { error: JSON.stringify(error) };
     }
   };

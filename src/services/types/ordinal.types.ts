@@ -33,6 +33,12 @@ export type ListOrdinal = {
   password: string;
 };
 
+export type MultiSendOrdinals = {
+  outpoints: string[];
+  destinationAddresses: string[];
+  password: string;
+};
+
 // export interface BSV20Data {
 //   initialized: boolean;
 //   data: Bsv20[];
