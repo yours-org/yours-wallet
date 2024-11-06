@@ -24,6 +24,7 @@ import { SupportedWalletImports } from '../../services/types/keys.types';
 import { NetWork } from 'yours-wallet-provider';
 import { SettingsPage } from '../Settings';
 import { YoursIcon } from '../../components/YoursIcon';
+import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
 
 const Content = styled.div`
   display: flex;
@@ -118,6 +119,8 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   const [ordDerivation, setOrdDerivation] = useState<string | null>(null);
   const [identityDerivation, setIdentityDerivation] = useState<string | null>(null);
   const { keysService, chromeStorageService } = useServiceContext();
+  const [accountName, setAccountName] = useState('');
+  const [iconURL, setIconURL] = useState('');
 
   useEffect(() => {
     newWallet && hideMenu();
@@ -165,6 +168,8 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
       const objKeys = Object.keys(chromeObject.accounts);
       if (!objKeys) throw new Error('Object identity address not found');
       await chromeStorageService.switchAccount(keys.identityAddress);
+      // Save account name and icon URL to local storage
+      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL); // Call the imported function
 
       setStep(4);
     } catch (error) {
@@ -213,6 +218,20 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
       </Text>
       <FormContainer onSubmit={handleRestore}>
+        <Input
+          theme={theme}
+          placeholder="Account Name"
+          type="text"
+          value={accountName}
+          onChange={(e) => setAccountName(e.target.value)}
+        />
+        <Input
+          theme={theme}
+          placeholder="Icon URL"
+          type="text"
+          value={iconURL}
+          onChange={(e) => setIconURL(e.target.value)}
+        />
         <Input
           theme={theme}
           placeholder="Password"
