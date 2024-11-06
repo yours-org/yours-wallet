@@ -83,7 +83,7 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
 
   const renderNftOrTokenImage = (ordinal: Ordinal) => {
     const inscriptionWithOutpoint =
-      ordinal?.origin?.data?.insc?.file.type.startsWith('image') && !!ordinal.origin.outpoint;
+      ordinal?.origin?.data?.insc?.file?.type.startsWith('image') && !!ordinal.origin.outpoint;
     const bsv20WithIcon = !!ordinal?.data?.bsv20 && !!ordinal.data.bsv20.icon;
     const isLock = !!ordinal?.data?.lock;
 
