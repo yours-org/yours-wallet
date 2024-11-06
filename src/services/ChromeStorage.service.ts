@@ -191,10 +191,9 @@ export class ChromeStorageService {
   private setOldAppStateIfMissing = async (
     storage: Partial<DeprecatedStorage>,
   ): Promise<Partial<ChromeStorageObject>> => {
-    console.log(storage);
     if (!(storage as DeprecatedStorage)?.appState) {
       const keys = this.retrieveKeysFromOldStorage(storage);
-      console.log(keys);
+      if (!keys) return storage;
       (storage as DeprecatedStorage).appState = {
         isLocked: true,
         ordinals: [],
@@ -202,13 +201,13 @@ export class ChromeStorageService {
         network: NetWork.Mainnet,
         isPasswordRequired: true,
         addresses: {
-          bsvAddress: keys?.walletAddress || '',
-          ordAddress: keys?.ordAddress || '',
-          identityAddress: keys?.identityAddress || '',
+          bsvAddress: keys.walletAddress || '',
+          ordAddress: keys.ordAddress || '',
+          identityAddress: keys.identityAddress || '',
         },
         pubKeys: {
-          bsvPubKey: keys?.walletPubKey || '',
-          ordPubKey: keys?.ordPubKey || '',
+          bsvPubKey: keys.walletPubKey || '',
+          ordPubKey: keys.ordPubKey || '',
           identityPubKey: keys?.identityPubKey || '',
         },
       };
@@ -222,6 +221,7 @@ export class ChromeStorageService {
     this.storage = await this.get(null); // fetches all chrome storage by passing null
     if (!this.storage.version && !this.storage.hasUpgradedToSPV) {
       this.storage = await this.setOldAppStateIfMissing(this.storage);
+      if (!(this.storage as DeprecatedStorage).appState) return;
       this.storage = await this.mapDeprecatedStorageToNewInterface(this.storage as DeprecatedStorage);
     }
     return this.storage;

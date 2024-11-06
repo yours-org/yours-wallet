@@ -155,6 +155,53 @@ export class KeysService {
     }
   };
 
+  getWifBalance = async (wif: string) => {
+    try {
+      const privKey = PrivateKey.fromWif(wif);
+      const { data } = await axios.get<WocUtxo[]>(`${WOC_BASE_URL}/address/${privKey.toAddress()}/unspent`);
+      const utxos = data;
+      if (utxos.length === 0) return 0;
+      const balance = utxos.reduce((acc, u) => acc + u.value, 0);
+      return balance;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.log(error);
+      return;
+    }
+  };
+
+  sweepWif = async (wif: string) => {
+    try {
+      const privKey = PrivateKey.fromWif(wif);
+      const tx = new Transaction();
+      const outScript = new P2PKH().lock(this.bsvAddress);
+      tx.addOutput({ lockingScript: outScript, change: true });
+
+      const { data } = await axios.get<WocUtxo[]>(`${WOC_BASE_URL}/address/${privKey.toAddress()}/unspent`);
+      const utxos = data;
+      if (utxos.length === 0) return;
+      const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
+      for await (const u of utxos || []) {
+        tx.addInput({
+          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash, true),
+          sourceOutputIndex: u.tx_pos,
+          sequence: 0xffffffff,
+          unlockingScriptTemplate: new P2PKH().unlock(privKey),
+        });
+      }
+      await tx.fee(feeModel);
+      await tx.sign();
+      const response = await this.oneSatSPV.broadcast(tx);
+      if (response.status == 'error') return { error: response.description };
+      const txid = tx.id('hex');
+      console.log('Change sweep:', txid);
+      return { txid, rawtx: Utils.toHex(tx.toBinary()) };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.log(error);
+    }
+  };
+
   generateKeysFromWifAndStoreEncrypted = async (password: string, wifs: WifKeys, isNewWallet: boolean) => {
     const { passKey, salt } = await this.getPassKeyAndSalt(password, isNewWallet);
     const keys = getKeysFromWifs(wifs);

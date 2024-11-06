@@ -17,7 +17,7 @@ const OrdinalWrapper = styled.div<OrdinalDivProps>`
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  border-radius: 1.25rem;
+  border-radius: 12%;
   cursor: pointer;
   border: ${(props) =>
     props.selected ? `0.1rem solid ${props.theme.color.component.ordinalSelectedBorder}` : undefined};
@@ -26,7 +26,7 @@ const OrdinalWrapper = styled.div<OrdinalDivProps>`
 const StyledIFrame = styled.iframe<{ size?: string }>`
   height: ${(props) => props.size ?? '6.5rem'};
   width: ${(props) => props.size ?? '6.5rem'};
-  border-radius: 1.25rem;
+  border-radius: 12%;
   border: none;
   cursor: pointer;
   pointer-events: none;

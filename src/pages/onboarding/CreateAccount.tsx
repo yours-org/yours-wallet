@@ -16,6 +16,7 @@ import { NetWork } from 'yours-wallet-provider';
 import { useNavigate } from 'react-router-dom';
 import { YoursIcon } from '../../components/YoursIcon';
 import { FaCopy } from 'react-icons/fa';
+import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
 
 const Content = styled.div`
   display: flex;
@@ -81,6 +82,8 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
   const { hideMenu, showMenu } = useBottomMenu();
   const [loading, setLoading] = useState(false);
   const { keysService, chromeStorageService } = useServiceContext();
+  const [accountName, setAccountName] = useState('');
+  const [iconURL, setIconURL] = useState('');
 
   useEffect(() => {
     newWallet && hideMenu();
@@ -120,6 +123,8 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
         return;
       }
       setIdentityAddress(keys.identityAddress);
+      // Save account name and icon URL to local storage
+      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL);
       setStep(2);
     } catch (error) {
       console.log(error);
@@ -142,6 +147,20 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
       </Text>
       <FormContainer onSubmit={handleKeyGeneration}>
+        <Input
+          theme={theme}
+          placeholder="Account Name"
+          type="text"
+          value={accountName}
+          onChange={(e) => setAccountName(e.target.value)}
+        />
+        <Input
+          theme={theme}
+          placeholder="Icon URL"
+          type="text"
+          value={iconURL}
+          onChange={(e) => setIconURL(e.target.value)}
+        />
         <Input
           theme={theme}
           placeholder="Password"
