@@ -269,6 +269,8 @@ export const TxHistory = (props: TxHistoryProps) => {
     switch (tag) {
       case 'fund':
         return amount / BSV_DECIMAL_CONVERSION + ' BSV';
+      case 'lock':
+        return amount + ' sats';
       case 'bsv21':
       case 'bsv20':
         return amount + ` ${id}`;
