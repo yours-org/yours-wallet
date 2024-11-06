@@ -345,6 +345,12 @@ export const AppsAndTools = () => {
         />
       </Show>
       <AppsRow
+        name="Sweep Private Key"
+        description="Import funds from WIF private key"
+        onClick={() => setPage('sweep-wif')}
+        jsxElement={<RightChevron color={theme.color.global.contrast} />}
+      />
+      <AppsRow
         name="Contribute or integrate"
         description="All the tools you need to get involved"
         onClick={() => window.open(theme.settings.repo, '_blank')}

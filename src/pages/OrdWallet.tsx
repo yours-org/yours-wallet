@@ -96,9 +96,9 @@ const OrdinalItem = styled.div<WhiteLabelTheme>`
   justify-content: center;
   padding: 5px;
   min-width: 10.5rem;
-  border: 1px solid #e0e0e0;
+  border: ${({ theme }) => `1px solid ${theme.color.global.gray}`};
   border-radius: 0.5rem;
-  background-color: #f9f9f9;
+  background-color: ${({ theme }) => theme.color.global.row};
   flex-direction: column;
   box-sizing: border-box;
   margin-bottom: 5px;
@@ -116,7 +116,7 @@ const OrdinalDetails = styled.div<WhiteLabelTheme>`
 const OrdinalTitle = styled.div<WhiteLabelTheme>`
   font-size: 0.8rem;
   font-weight: 600;
-  color: #333;
+  color: ${({ theme }) => theme.color.global.contrast};
 `;
 
 const ReceiverInput = styled.input<WhiteLabelTheme>`
@@ -156,7 +156,7 @@ export const OrdWallet = () => {
   const [from, setFrom] = useState<string>();
   const listedOrdinals = ordinals && ordinals.filter((o) => o?.data?.list);
   const myOrdinals = ordinals && ordinals.filter((o) => !o?.data?.list);
-  const [useSameAddress, setUseSameAddress] = useState(false);
+  const [useSameAddress, setUseSameAddress] = useState(true);
   const [addresses, setAddresses] = useState<Addresses>({});
   const [addressErrors, setAddressErrors] = useState<Addresses>({});
   const [commonAddress, setCommonAddress] = useState('');
@@ -391,7 +391,7 @@ export const OrdWallet = () => {
 
   const renderTransfers = (selectedOrdinals: OrdType[]) => {
     return selectedOrdinals.map((ordinal) => (
-      <OrdinalItem key={ordinal.origin?.outpoint}>
+      <OrdinalItem theme={theme} key={ordinal.origin?.outpoint}>
         <Ordinal
           theme={theme}
           inscription={ordinal as OrdinalType}
@@ -400,9 +400,9 @@ export const OrdWallet = () => {
           size="3rem"
         />
         <OrdinalDetails>
-          <OrdinalTitle>
+          <OrdinalTitle theme={theme}>
             {truncate(
-              `${ordinal?.origin?.data?.map?.name ?? ordinal?.origin?.data?.map?.subTypeData?.name ?? 'ID'}`,
+              `${ordinal?.origin?.data?.map?.name ?? ordinal?.origin?.data?.map?.subTypeData?.name ?? 'Unknown'}`,
               15,
               0,
             )}
