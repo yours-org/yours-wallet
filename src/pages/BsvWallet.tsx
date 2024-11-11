@@ -272,7 +272,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   useEffect(() => {
     if (!bsv20s || !account) return;
-    setFilteredTokens(bsv20s.filter((t) => t.id && account?.settings?.favoriteTokens?.includes(t.id)));
+    const filtered = bsv20s.filter((t) => t.id && account?.settings?.favoriteTokens?.includes(t.id));
+    setFilteredTokens(filtered);
   }, [bsv20s, account]);
 
   useEffect(() => {

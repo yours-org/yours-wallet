@@ -1,6 +1,5 @@
 import axios from 'axios';
 
-const WHATSONCHAIN_API_URL = 'https://api.whatsonchain.com/v1/bsv/test';
 const WITNESSONCHAIN_API_URL = 'https://witnessonchain.com/v1';
 
 interface FaucetResponse {

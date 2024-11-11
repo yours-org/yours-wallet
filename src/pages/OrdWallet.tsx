@@ -163,12 +163,38 @@ export const OrdWallet = () => {
 
   const toggleOrdinalSelection = (ord: OrdinalType) => {
     const isSelected = selectedOrdinals.some((selected) => selected.outpoint === ord.outpoint);
+    const isListing = ord.data?.list;
+
     if (isSelected) {
       // Deselect if already selected
       setSelectedOrdinals(selectedOrdinals.filter((selected) => selected !== ord));
     } else {
-      // Add to selection
-      setSelectedOrdinals([...selectedOrdinals, ord]);
+      // Check if any selected ordinal is a listing or non-listing
+      const hasListings = selectedOrdinals.some((selected) => selected.data?.list);
+      const hasNonListings = selectedOrdinals.some((selected) => !selected.data?.list);
+
+      if (isListing) {
+        if (selectedOrdinals.length === 0) {
+          // If nothing is selected, allow selecting a listing
+          setSelectedOrdinals([ord]);
+        } else if (hasNonListings) {
+          // If non-listings are already selected, prevent selecting a listing
+          addSnackbar('Multiselect listings not supported!', 'info');
+        } else if (selectedOrdinals.length === 1) {
+          // Allow only one listing to be selected
+          addSnackbar('You can only select one listing at a time!', 'info');
+        } else {
+          setSelectedOrdinals([ord]);
+        }
+      } else {
+        if (hasListings) {
+          // Prevent selecting non-listings if listings are selected
+          addSnackbar('Multiselect listings not supported!', 'info');
+        } else {
+          // Add to selection if all selected ordinals are non-listings
+          setSelectedOrdinals([...selectedOrdinals, ord]);
+        }
+      }
     }
   };
 
@@ -575,25 +601,25 @@ export const OrdWallet = () => {
         </OrdinalsList>
       </Show>
       <OrdButtonContainer theme={theme} $blur={selectedOrdinals.length > 0}>
-        <Show
-          when={!selectedOrdinals.length}
-          whenFalseContent={
-            <Show when={pageState === 'list'} whenFalseContent={transferAndListButtons}>
-              <Button
-                theme={theme}
-                type="warn"
-                label="Cancel Listing"
-                onClick={async () => {
-                  if (!selectedOrdinals.length) {
-                    addSnackbar('You must select an ordinal to transfer!', 'info');
-                    return;
-                  }
-                  setPageState('cancel');
-                }}
-              />
-            </Show>
-          }
-        ></Show>
+        <Show when={!!selectedOrdinals.length}>
+          <Show
+            when={selectedOrdinals.length === 1 && !!selectedOrdinals[0].data?.list}
+            whenFalseContent={transferAndListButtons}
+          >
+            <Button
+              theme={theme}
+              type="warn"
+              label="Cancel Listing"
+              onClick={async () => {
+                if (!selectedOrdinals.length) {
+                  addSnackbar('You must select an ordinal!', 'info');
+                  return;
+                }
+                setPageState('cancel');
+              }}
+            />
+          </Show>
+        </Show>
       </OrdButtonContainer>
     </>
   );
@@ -606,9 +632,8 @@ export const OrdWallet = () => {
         <HeaderText style={{ fontSize: '1.35rem' }} theme={theme}>{`List ${
           selectedOrdinals[0]?.origin?.data?.map?.name ??
           selectedOrdinals[0]?.origin?.data?.map?.subTypeData?.name ??
-          'List Ordinal'
+          'Ordinal'
         }`}</HeaderText>
-        <Text style={{ margin: 0 }} theme={theme}>{`#${selectedOrdinals[0]?.origin?.num}`}</Text>
         <Ordinal
           theme={theme}
           inscription={selectedOrdinals[0] as OrdinalType}

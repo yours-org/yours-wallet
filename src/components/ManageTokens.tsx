@@ -1,4 +1,4 @@
-import { keyframes, styled } from 'styled-components';
+import { styled } from 'styled-components';
 import { Bsv20 } from 'yours-wallet-provider';
 import { Theme, WhiteLabelTheme } from '../theme.types';
 import { useServiceContext } from '../hooks/useServiceContext';
@@ -9,26 +9,9 @@ import { HeaderText, Text } from './Reusable';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { GENERIC_TOKEN_ICON } from '../utils/constants';
 import { FaTimes } from 'react-icons/fa';
+import { motion } from 'framer-motion';
 
-const slideIn = keyframes`
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-`;
-
-const slideOut = keyframes`
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(100%);
-  }
-`;
-
-const Container = styled.div<{ isSlidingOut: boolean } & WhiteLabelTheme>`
+const Container = styled(motion.div)<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -38,7 +21,6 @@ const Container = styled.div<{ isSlidingOut: boolean } & WhiteLabelTheme>`
   background-color: ${({ theme }) => theme.color.global.walletBackground};
   z-index: 1000;
   position: absolute;
-  animation: ${({ isSlidingOut }) => (isSlidingOut ? slideOut : slideIn)} 0.75s forwards;
 `;
 
 const FavoriteRow = styled.div<WhiteLabelTheme>`
@@ -149,7 +131,16 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
     });
 
   return (
-    <Container theme={theme} isSlidingOut={isSlidingOut}>
+    <Container
+      theme={theme}
+      initial="hidden"
+      animate={isSlidingOut ? 'hidden' : 'visible'}
+      variants={{
+        hidden: { y: '100%' },
+        visible: { y: 0 },
+      }}
+      transition={{ duration: 0.75 }}
+    >
       <BackWrapper>
         <FaTimes size={'1.5rem'} color={theme.color.global.contrast} cursor="pointer" onClick={handleBackClick} />
       </BackWrapper>

@@ -1,4 +1,4 @@
-import { keyframes, styled } from 'styled-components';
+import { styled } from 'styled-components';
 import { Theme, WhiteLabelTheme } from '../theme.types';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useEffect, useMemo, useState } from 'react';
@@ -10,26 +10,9 @@ import { Button } from './Button';
 import bsvCoin from '../assets/bsv-coin.svg';
 import lock from '../assets/lock.svg';
 import { Show } from './Show';
+import { motion } from 'framer-motion';
 
-const slideIn = keyframes`
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-`;
-
-const slideOut = keyframes`
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(100%);
-  }
-`;
-
-const Container = styled.div<{ isSlidingOut: boolean } & WhiteLabelTheme>`
+const Container = styled(motion.div)<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -39,7 +22,6 @@ const Container = styled.div<{ isSlidingOut: boolean } & WhiteLabelTheme>`
   background-color: ${({ theme }) => theme.color.global.walletBackground};
   z-index: 1000;
   position: absolute;
-  animation: ${({ isSlidingOut }) => (isSlidingOut ? slideOut : slideIn)} 0.75s forwards;
 `;
 
 const HistoryRow = styled.div<WhiteLabelTheme>`
@@ -236,11 +218,11 @@ export const TxHistory = (props: TxHistoryProps) => {
     });
   };
 
-  const getHeaderText = (tag: Tag) => {
+  const getHeaderText = (tag: Tag, tokenName?: string) => {
     switch (tag) {
       case 'bsv21':
       case 'bsv20':
-        return 'Token';
+        return tokenName || 'Token';
       case 'origin':
         return 'NFT';
       case 'list':
@@ -265,22 +247,29 @@ export const TxHistory = (props: TxHistoryProps) => {
     }
   };
 
-  const getAmountText = (tag: Tag, amount: number, id: string) => {
+  const getAmountText = (tag: Tag, amount: number) => {
     switch (tag) {
       case 'fund':
-        return amount / BSV_DECIMAL_CONVERSION + ' BSV';
-      case 'lock':
-        return amount + ' sats';
+        return amount / BSV_DECIMAL_CONVERSION;
       case 'bsv21':
       case 'bsv20':
-        return amount + ` ${id}`;
-      default:
         return amount;
+      default:
+        return amount + ' sats';
     }
   };
 
   return (
-    <Container theme={theme} isSlidingOut={isSlidingOut}>
+    <Container
+      theme={theme}
+      initial="hidden"
+      animate={isSlidingOut ? 'hidden' : 'visible'}
+      variants={{
+        hidden: { y: '100%' },
+        visible: { y: 0 },
+      }}
+      transition={{ duration: 0.75 }}
+    >
       <BackWrapper>
         <FaTimes size={'1.5rem'} color={theme.color.global.contrast} cursor="pointer" onClick={handleBackClick} />
       </BackWrapper>
@@ -331,7 +320,7 @@ export const TxHistory = (props: TxHistoryProps) => {
                         </IconContent>
                         <TickerTextWrapper>
                           <HeaderText style={{ fontSize: '0.85rem', marginTop: 0, fontWeight: 700 }} theme={theme}>
-                            {getHeaderText(key)}
+                            {getHeaderText(key, value.id)}
                           </HeaderText>
                           <Text
                             theme={theme}
@@ -365,7 +354,7 @@ export const TxHistory = (props: TxHistoryProps) => {
                           theme={theme}
                         >
                           {value.amount && value.amount > 0 ? '+' : ''}
-                          {getAmountText(key, value.amount ?? 0, value.id ?? '')}
+                          {getAmountText(key, value.amount ?? 0)}
                         </HeaderText>
                         <Show when={idx === 0}>
                           <FaLink

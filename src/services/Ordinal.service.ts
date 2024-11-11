@@ -12,7 +12,6 @@ import {
   sendOrdinals,
   Utxo,
   Destination,
-  NftUtxo,
 } from 'js-1sat-ord';
 import { Bsv20, Ordinal, PaginatedOrdinalsResponse, PurchaseOrdinal } from 'yours-wallet-provider';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction, Utils } from '@bsv/sdk';
@@ -335,21 +334,28 @@ export class OrdinalService {
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
 
       const paymentPk = PrivateKey.fromWif(keys.walletWif);
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
       const ordPk = PrivateKey.fromWif(keys.ordWif);
 
-      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+      const fundingUtxos = (await this.bsvService.fundingTxos()).map((t) => ({
+        txid: t.outpoint.txid,
+        vout: t.outpoint.vout,
+        satoshis: Number(t.satoshis),
+        script: Utils.toBase64(t.script),
+        pk: pkMap.get(t.owner || ''),
+      }));
+
       const ordUtxo = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
       if (!ordUtxo) return { error: 'no-ord-utxo' };
+
+      if (!pkMap.has(ordUtxo.owner || '')) {
+        return { error: '' }; // default error
+      }
 
       const { tx } = await createOrdListings({
         ordPk,
         paymentPk,
-        utxos: fundResults.txos.map((t) => ({
-          txid: t.outpoint.txid,
-          vout: t.outpoint.vout,
-          satoshis: Number(t.satoshis),
-          script: Buffer.from(t.script).toString('base64'),
-        })),
+        utxos: fundingUtxos,
         listings: [
           {
             listingUtxo: {
@@ -357,6 +363,7 @@ export class OrdinalService {
               vout: ordUtxo.outpoint.vout,
               satoshis: Number(ordUtxo.satoshis),
               script: Buffer.from(ordUtxo.script).toString('base64'),
+              pk: pkMap.get(ordUtxo.owner || ''),
             },
             price: Number(price),
             payAddress: this.keysService.bsvAddress,
@@ -389,29 +396,37 @@ export class OrdinalService {
       const keys = await this.keysService.retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
-      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+      const pkMap = await this.keysService.retrievePrivateKeyMap(password);
 
       const paymentPk = PrivateKey.fromWif(keys.walletWif);
       const ordPk = PrivateKey.fromWif(keys.ordWif);
 
+      const fundingUtxos = (await this.bsvService.fundingTxos()).map((t) => ({
+        txid: t.outpoint.txid,
+        vout: t.outpoint.vout,
+        satoshis: Number(t.satoshis),
+        script: Utils.toBase64(t.script),
+        pk: pkMap.get(t.owner || ''),
+      }));
+
       const listingUtxo = await this.oneSatSPV.getTxo(new Outpoint(outpoint));
       if (!listingUtxo) return { error: 'no-ord-utxo' };
+
+      if (!pkMap.has(listingUtxo.owner || '')) {
+        return { error: '' }; // default error
+      }
 
       const { tx } = await cancelOrdListings({
         ordPk,
         paymentPk,
-        utxos: fundResults.txos.map((t) => ({
-          txid: t.outpoint.txid,
-          vout: t.outpoint.vout,
-          satoshis: Number(t.satoshis),
-          script: Buffer.from(t.script).toString('base64'),
-        })),
+        utxos: fundingUtxos,
         listingUtxos: [
           {
             txid: listingUtxo.outpoint.txid,
             vout: listingUtxo.outpoint.vout,
             satoshis: Number(listingUtxo.satoshis),
             script: Buffer.from(listingUtxo.script).toString('base64'),
+            pk: pkMap.get(listingUtxo.owner || ''),
           },
         ],
       });

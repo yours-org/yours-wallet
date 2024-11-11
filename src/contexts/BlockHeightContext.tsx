@@ -6,7 +6,7 @@ type QueueContextType = {
   showSyncPage: boolean;
 };
 
-export const BlockHeightContext = createContext<QueueContextType | null>(null);
+const BlockHeightContext = createContext<QueueContextType | null>(null);
 
 export const BlockHeightProvider = ({ children }: { children: ReactNode }) => {
   const { percentCompleted, showSyncPage } = useBlockHeightTracker();
