@@ -90,8 +90,8 @@ export class GorillaPoolService {
       await Promise.all(
         addresses.map(async (address) => {
           const url = isBSV20v2(tick)
-            ? `${this.getBaseUrl(network)}/api/bsv20/${address}/id/${tick}`
-            : `${this.getBaseUrl(network)}/api/bsv20/${address}/tick/${tick}`;
+            ? `${this.getBaseUrl(network)}/api/bsv20/${address}/id/${tick}?limit=10000`
+            : `${this.getBaseUrl(network)}/api/bsv20/${address}/tick/${tick}?limit=10000`;
 
           const r = await axios.get(url);
           (r.data as BSV20Txo[]).forEach((utxo) => {

@@ -5,7 +5,7 @@ import { Text } from './Reusable';
 import { Show } from './Show';
 
 export type OrdinalDivProps = WhiteLabelTheme & {
-  url: string;
+  url?: string;
   selected?: boolean;
   size?: string;
 };
@@ -23,12 +23,20 @@ const OrdinalWrapper = styled.div<OrdinalDivProps>`
     props.selected ? `0.1rem solid ${props.theme.color.component.ordinalSelectedBorder}` : undefined};
 `;
 
-const StyledIFrame = styled.iframe<{ size?: string }>`
+const IFrameWrapper = styled.div<OrdinalDivProps>`
+  height: ${(props) => props.size ?? '6.5rem'};
+  width: ${(props) => props.size ?? '6.5rem'};
+  border-radius: 12%;
+  cursor: pointer;
+  border: ${(props) =>
+    props.selected ? `0.1rem solid ${props.theme.color.component.ordinalSelectedBorder}` : undefined};
+`;
+
+const StyledIFrame = styled.iframe<OrdinalDivProps>`
   height: ${(props) => props.size ?? '6.5rem'};
   width: ${(props) => props.size ?? '6.5rem'};
   border-radius: 12%;
   border: none;
-  cursor: pointer;
   pointer-events: none;
 `;
 
@@ -122,40 +130,14 @@ export const Ordinal = (props: OrdinalProps) => {
   const renderContent = () => {
     switch (true) {
       case contentType?.startsWith('image/svg'):
-        return (
-          <OrdinalWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <StyledIFrame src={url} sandbox="true" size={size} />
-          </OrdinalWrapper>
-        );
       case contentType?.startsWith('text/html'):
-        if (inscription.origin?.data?.map?.previewUrl) {
-          return (
-            <OrdinalWrapper
-              size={size}
-              selected={selected}
-              url={inscription.origin?.data?.map?.previewUrl}
-              theme={theme}
-              style={{ backgroundImage: `url(${url})` }}
-              onClick={onClick}
-            />
-          );
-        }
         return (
-          <OrdinalWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
+          <IFrameWrapper size={size} selected={selected} theme={theme} onClick={onClick}>
             <StyledIFrame src={url} sandbox="true" size={size} />
-          </OrdinalWrapper>
+          </IFrameWrapper>
         );
       case contentType?.startsWith('image/'):
-        return (
-          <OrdinalWrapper
-            size={size}
-            selected={selected}
-            url={url}
-            theme={theme}
-            style={{ backgroundImage: `url(${url})` }}
-            onClick={onClick}
-          />
-        );
+        return <OrdinalWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick} />;
       case contentType?.startsWith('text/'):
         return (
           <TextWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
@@ -170,8 +152,8 @@ export const Ordinal = (props: OrdinalProps) => {
         );
       default:
         return (
-          <TextWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <UnsupportedText theme={theme}>😩 Unsupported File Type</UnsupportedText>
+          <TextWrapper size={size} selected={selected} theme={theme} onClick={onClick}>
+            <UnsupportedText theme={theme}>😩 Syncing or Unsupported File Type</UnsupportedText>
           </TextWrapper>
         );
     }
