@@ -1,7 +1,7 @@
 import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
 import { DEFAULT_SIGHASH_TYPE } from '../utils/constants';
 import { KeysService } from './Keys.service';
-import { fromUtxo, Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
+import { fromUtxo, Hash, OP, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
 import { SPVStore, Txo } from 'spv-store';
 import { LockTemplate } from 'spv-store';
 
@@ -55,7 +55,26 @@ export class ContractService {
         const privkeys = getPrivKeys(sigReq.address) as PrivateKey[];
         if (!privkeys.length) throw new Error('no-private-key', { cause: sigReq.address });
         return privkeys.map((privKey: PrivateKey) => {
-          // TODO: support multiple OP_CODESEPARATORs and get subScript according to `csIdx`. See SignatureRequest.csIdx in the GetSignatures type.
+          let subscript: Script;
+          if (sigReq.script) {
+            subscript = Script.fromHex(sigReq.script);
+            // TODO: support multiple OP_CODESEPARATORs and get subScript according to `csIdx`. See SignatureRequest.csIdx in the GetSignatures type;
+            if (sigReq.csIdx !== undefined) {
+              let found = 0;
+              for (const [i, chunk] of subscript.chunks.entries()) {
+                if (chunk.op === OP.OP_CODESEPARATOR) {
+                  if (found === sigReq.csIdx) {
+                    subscript = new Script(subscript.chunks.slice(i + 1));
+                    break;
+                  }
+                  found++;
+                }
+              }
+            }
+          } else {
+            subscript = new P2PKH().lock(privKey.toPublicKey().toAddress());
+          }
+
           const preimage = TransactionSignature.format({
             sourceTXID: sigReq.prevTxid,
             sourceOutputIndex: sigReq.outputIndex,
@@ -65,9 +84,7 @@ export class ContractService {
             inputIndex: sigReq.inputIndex,
             outputs: tx.outputs,
             inputSequence: tx.inputs[sigReq.inputIndex].sequence || 0,
-            subscript: sigReq.script
-              ? Script.fromHex(sigReq.script)
-              : new P2PKH().lock(privKey.toPublicKey().toAddress()),
+            subscript,
             lockTime: tx.lockTime,
             scope: sigReq.sigHashType || DEFAULT_SIGHASH_TYPE,
           });
