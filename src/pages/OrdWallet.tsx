@@ -156,7 +156,7 @@ export const OrdWallet = () => {
   const [from, setFrom] = useState<string>();
   const listedOrdinals = ordinals && ordinals.filter((o) => o?.data?.list);
   const myOrdinals = ordinals && ordinals.filter((o) => !o?.data?.list);
-  const [useSameAddress, setUseSameAddress] = useState(true);
+  const [useSameAddress, setUseSameAddress] = useState(false);
   const [addresses, setAddresses] = useState<Addresses>({});
   const [addressErrors, setAddressErrors] = useState<Addresses>({});
   const [commonAddress, setCommonAddress] = useState('');
