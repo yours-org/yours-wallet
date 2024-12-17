@@ -421,7 +421,7 @@ export const OrdWallet = () => {
         <Ordinal
           theme={theme}
           inscription={ordinal as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${ordinal.origin?.outpoint}`}
+          url={`${gorillaPoolService.getBaseUrl(network)}/content/${ordinal.origin?.outpoint}?outpoint=${ordinal?.outpoint}`}
           isTransfer
           size="3rem"
         />
@@ -525,7 +525,7 @@ export const OrdWallet = () => {
         <Ordinal
           theme={theme}
           inscription={selectedOrdinals[0] as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinals[0]?.origin?.outpoint}`}
+          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinals[0]?.origin?.outpoint}?outpoint=${selectedOrdinals[0]?.outpoint}`}
           selected
           isTransfer
         />
@@ -563,7 +563,7 @@ export const OrdWallet = () => {
           theme={theme}
           inscription={ord}
           key={ord.origin?.outpoint}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${ord.origin?.outpoint}`}
+          url={`${gorillaPoolService.getBaseUrl(network)}/content/${ord.origin?.outpoint}?outpoint=${ord?.outpoint}`}
           selected={selectedOrdinals.some((selected) => selected.outpoint === ord.outpoint)}
           onClick={() => toggleOrdinalSelection(ord)}
         />
@@ -637,7 +637,7 @@ export const OrdWallet = () => {
         <Ordinal
           theme={theme}
           inscription={selectedOrdinals[0] as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinals[0]?.origin?.outpoint}`}
+          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinals[0]?.origin?.outpoint}?outpoint=${selectedOrdinals[0]?.outpoint}`}
           selected
           isTransfer
         />
