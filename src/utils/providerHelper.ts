@@ -22,7 +22,8 @@ export function mapOrdinal(t: Txo): Ordinal {
             size: Number(t.data.origin.data.insc.file.size),
             hash: t.data.origin.data.insc.file.hash,
             text:
-              t.data.origin?.data?.insc?.file?.type.startsWith('text') &&
+              (t.data.origin?.data?.insc?.file?.type.startsWith('text') ||
+                t.data.origin?.data?.insc?.file?.type.startsWith('application/op-ns')) &&
               t.data.origin.data.insc?.file?.content &&
               Utils.toUTF8(t.data.origin.data.insc.file.content),
             json:

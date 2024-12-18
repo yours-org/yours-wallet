@@ -113,17 +113,28 @@ export class ContractService {
       for (const lock of locks) {
         const pk = pkMap.get(lock.owner || '');
         if (!pk) continue;
-        const input = fromUtxo(
-          {
-            txid: lock.outpoint.txid,
-            vout: lock.outpoint.vout,
-            satoshis: Number(lock.satoshis),
-            script: Utils.toHex([...lock.script]),
-          },
-          new LockTemplate().unlock(pk, 'all', false, Number(lock.satoshis), Script.fromBinary(lock.script)),
-        );
-        input.sequence = 0;
-        tx.addInput(input);
+        // const input = fromUtxo(
+        //   {
+        //     txid: lock.outpoint.txid,
+        //     vout: lock.outpoint.vout,
+        //     satoshis: Number(lock.satoshis),
+        //     script: Utils.toHex([...lock.script]),
+        //   },
+        //   new LockTemplate().unlock(pk, 'all', false, Number(lock.satoshis), Script.fromBinary(lock.script)),
+        // );
+        // input.sequence = 0;
+        tx.addInput({
+          sourceTransaction: await this.oneSatSPV.getTx(lock.outpoint.txid),
+          sourceOutputIndex: lock.outpoint.vout,
+          sequence: 0,
+          unlockingScriptTemplate: new LockTemplate().unlock(
+            pk,
+            'all',
+            false,
+            Number(lock.satoshis),
+            Script.fromBinary(lock.script),
+          ),
+        });
       }
 
       await tx.fee();

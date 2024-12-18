@@ -3,7 +3,7 @@ import { Theme, WhiteLabelTheme } from '../theme.types';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useEffect, useMemo, useState } from 'react';
 import { HeaderText, Text } from './Reusable';
-import { BSV_DECIMAL_CONVERSION, GENERIC_TOKEN_ICON, URL_WHATSINCHAIN } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, GENERIC_NFT_ICON, GENERIC_TOKEN_ICON, URL_WHATSINCHAIN } from '../utils/constants';
 import { FaTimes, FaChevronDown, FaChevronUp, FaLink, FaTag } from 'react-icons/fa'; // Import FaTag
 import { TxLog } from 'spv-store';
 import { Button } from './Button';
@@ -40,10 +40,10 @@ const HistoryRow = styled.div<WhiteLabelTheme>`
   }
 `;
 
-const Icon = styled.img`
+const Icon = styled.img<{ $isNFT?: boolean }>`
   width: 2.25rem;
   height: 2.25rem;
-  border-radius: 50%;
+  border-radius: ${({ $isNFT }) => ($isNFT ? '0.25rem' : '50%')};
 `;
 
 const TickerWrapper = styled.div`
@@ -194,7 +194,10 @@ export const TxHistory = (props: TxHistoryProps) => {
           <Icon
             src={`${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${icon}`}
             alt="Summary Icon"
+            $isNFT={tag === 'origin'}
           />
+        ) : tag === ('origin' as Tag) ? (
+          <Icon src={GENERIC_NFT_ICON} alt="Generic NFT Icon" />
         ) : (
           <Icon src={GENERIC_TOKEN_ICON} alt="Generic Token Icon" />
         );
@@ -254,8 +257,10 @@ export const TxHistory = (props: TxHistoryProps) => {
       case 'bsv21':
       case 'bsv20':
         return amount;
+      case 'lock':
+        return amount / BSV_DECIMAL_CONVERSION + ' BSV';
       default:
-        return amount + ' sats';
+        return amount.toLocaleString() + ' sats';
     }
   };
 
@@ -344,7 +349,7 @@ export const TxHistory = (props: TxHistoryProps) => {
                             margin: 0,
                             color: value?.amount
                               ? value.amount > 1
-                                ? '#52C41A'
+                                ? theme.color.component.primaryButtonLeftGradient
                                 : value.amount < -1
                                   ? theme.color.global.contrast
                                   : 'transparent'

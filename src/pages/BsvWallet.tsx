@@ -360,7 +360,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identityAddress, isSyncing]);
+  }, [identityAddress, isSyncing, lockData]);
 
   useEffect(() => {
     if (isOrdRequest) {

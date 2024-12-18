@@ -139,6 +139,7 @@ export const Ordinal = (props: OrdinalProps) => {
       case contentType?.startsWith('image/'):
         return <OrdinalWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick} />;
       case contentType?.startsWith('text/'):
+      case contentType?.startsWith('application/op-ns'):
         return (
           <TextWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
             <OrdText theme={theme}>{inscription.origin?.data?.insc?.file?.text}</OrdText>
