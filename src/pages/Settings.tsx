@@ -221,11 +221,12 @@ export const Settings = () => {
   };
 
   const handleAccountEditSave = async () => {
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) return;
+    const accounts = chromeStorageService.getAllAccounts();
+    const account = accounts.find((acc) => acc.addresses.identityAddress === selectedAccountIdentityAddress);
+    if (!account || !selectedAccountIdentityAddress) return;
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
-      [account?.addresses.identityAddress]: {
+      [selectedAccountIdentityAddress]: {
         ...account,
         name: enteredAccountName,
         icon: enteredAccountIcon,
