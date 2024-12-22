@@ -358,12 +358,6 @@ export const AppsAndTools = () => {
           <FaExternalLinkAlt color={theme.color.global.contrast} size={'1rem'} style={{ margin: '0.5rem' }} />
         }
       />
-      <AppsRow
-        name="Sweep Private Key"
-        description="Import funds from WIF private key"
-        onClick={() => setPage('sweep-wif')}
-        jsxElement={<RightChevron color={theme.color.global.contrast} />}
-      />
     </>
   );
 
