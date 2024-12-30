@@ -3,7 +3,7 @@ import { Theme, WhiteLabelTheme } from '../theme.types';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useEffect, useMemo, useState } from 'react';
 import { HeaderText, Text } from './Reusable';
-import { BSV_DECIMAL_CONVERSION, GENERIC_NFT_ICON, GENERIC_TOKEN_ICON, URL_WHATSINCHAIN } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, GENERIC_NFT_ICON, GENERIC_TOKEN_ICON, URL_WHATSONCHAIN, URL_WHATSONCHAIN_TESTNET } from '../utils/constants';
 import { FaTimes, FaChevronDown, FaChevronUp, FaLink, FaTag } from 'react-icons/fa'; // Import FaTag
 import { TxLog } from 'spv-store';
 import { Button } from './Button';
@@ -132,6 +132,7 @@ export const TxHistory = (props: TxHistoryProps) => {
   const itemsPerPage = 25;
   const { gorillaPoolService, chromeStorageService } = useServiceContext();
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const isTestnet = chromeStorageService.getNetwork() === 'testnet';
 
   const tagPriorityOrder: Tag[] = ['list', 'bsv21', 'bsv20', 'origin', 'lock', 'fund']; // The order of these tags will determine the order of the icons and which is prioritized
 
@@ -174,7 +175,8 @@ export const TxHistory = (props: TxHistoryProps) => {
   };
 
   const handleOpenLink = (txid: string) => {
-    window.open(`${URL_WHATSINCHAIN}${txid}`, '_blank');
+    const url = isTestnet ? `${URL_WHATSONCHAIN_TESTNET}${txid}` : `${URL_WHATSONCHAIN}${txid}`;
+    window.open(url, '_blank');
   };
 
   const getIconForSummary = (tag: Tag, icon?: string) => {
