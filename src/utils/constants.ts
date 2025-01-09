@@ -4,7 +4,8 @@ export const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv/main';
 
 export const WOC_TESTNET_BASE_URL = 'https://api.whatsonchain.com/v1/bsv/test';
 
-export const URL_WHATSINCHAIN = 'https://whatsonchain.com/tx/';
+export const URL_WHATSONCHAIN = 'https://whatsonchain.com/tx/';
+export const URL_WHATSONCHAIN_TESTNET = 'https://test.whatsonchain.com/tx/';
 
 export const GP_BASE_URL = 'https://ordinals.gorillapool.io';
 export const JUNGLE_BUS_URL = 'https://junglebus.gorillapool.io';
