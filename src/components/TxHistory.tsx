@@ -3,7 +3,13 @@ import { Theme, WhiteLabelTheme } from '../theme.types';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useEffect, useMemo, useState } from 'react';
 import { HeaderText, Text } from './Reusable';
-import { BSV_DECIMAL_CONVERSION, GENERIC_NFT_ICON, GENERIC_TOKEN_ICON, URL_WHATSONCHAIN, URL_WHATSONCHAIN_TESTNET } from '../utils/constants';
+import {
+  BSV_DECIMAL_CONVERSION,
+  GENERIC_NFT_ICON,
+  GENERIC_TOKEN_ICON,
+  URL_WHATSONCHAIN,
+  URL_WHATSONCHAIN_TESTNET,
+} from '../utils/constants';
 import { FaTimes, FaChevronDown, FaChevronUp, FaLink, FaTag } from 'react-icons/fa'; // Import FaTag
 import { TxLog } from 'spv-store';
 import { Button } from './Button';
@@ -11,6 +17,7 @@ import bsvCoin from '../assets/bsv-coin.svg';
 import lock from '../assets/lock.svg';
 import { Show } from './Show';
 import { motion } from 'framer-motion';
+import { NetWork } from 'yours-wallet-provider';
 
 const Container = styled(motion.div)<WhiteLabelTheme>`
   display: flex;
@@ -132,7 +139,7 @@ export const TxHistory = (props: TxHistoryProps) => {
   const itemsPerPage = 25;
   const { gorillaPoolService, chromeStorageService } = useServiceContext();
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const isTestnet = chromeStorageService.getNetwork() === 'testnet';
+  const isTestnet = chromeStorageService.getNetwork() === NetWork.Testnet;
 
   const tagPriorityOrder: Tag[] = ['list', 'bsv21', 'bsv20', 'origin', 'lock', 'fund']; // The order of these tags will determine the order of the icons and which is prioritized
 
