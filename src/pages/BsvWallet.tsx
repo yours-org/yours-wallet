@@ -557,9 +557,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           title={'Sync Transactions'}
           style={{ fontSize: '2rem', cursor: 'pointer' }}
           theme={theme}
-          onClick={() => {
-            oneSatSPV.stores.txos?.syncTxLogs();
-          }}
+          onClick={() => oneSatSPV.stores.txos?.syncTxLogs()}
         >
           {formatUSD(bsvBalance * exchangeRate)}
         </HeaderText>
