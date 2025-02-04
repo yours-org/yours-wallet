@@ -1,20 +1,8 @@
-import { ReactNode, createContext, useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { NetWork } from 'yours-wallet-provider';
-import { BottomMenu } from '../components/BottomMenu';
-import { useTheme } from '../hooks/useTheme';
-
-export type MenuItems = 'bsv' | 'ords' | 'tools' | 'settings';
-
-type BottomMenuContextType = {
-  selected: MenuItems | null;
-  query: string;
-  handleSelect: (item: MenuItems, query?: string) => void;
-  showMenu: () => void;
-  hideMenu: () => void;
-  isVisible: boolean;
-};
-
-export const BottomMenuContext = createContext<BottomMenuContextType | null>(null);
+import { BottomMenu } from '../../components/BottomMenu';
+import { useTheme } from '../../hooks/useTheme';
+import { BottomMenuContext, MenuItems } from '../BottomMenuContext';
 
 interface BottomMenuProviderProps {
   network: NetWork;

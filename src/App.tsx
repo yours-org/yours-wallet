@@ -4,8 +4,7 @@ import { MemoryRouter as Router, Route, Routes } from 'react-router-dom';
 import styled from 'styled-components';
 import { Show } from './components/Show';
 import { UnlockWallet } from './components/UnlockWallet';
-import { BottomMenuContext, BottomMenuProvider } from './contexts/BottomMenuContext';
-import { SnackbarProvider } from './contexts/SnackbarContext';
+import { BottomMenuContext } from './contexts/BottomMenuContext';
 import { useActivityDetector } from './hooks/useActivityDetector';
 import { useTheme } from './hooks/useTheme';
 import { useViewport } from './hooks/useViewport';
@@ -32,12 +31,14 @@ import { WhitelistedApp } from './inject';
 import { PageLoader } from './components/PageLoader';
 import { useServiceContext } from './hooks/useServiceContext';
 import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
-import { QueueProvider } from './contexts/QueueContext';
 import { QueueBanner } from './components/QueueBanner';
-import { BlockHeightProvider } from './contexts/BlockHeightContext';
 import { SyncingBlocks } from './components/SyncingBlocks';
 import { MasterRestore } from './pages/onboarding/MasterRestore';
 import { Bsv20SendRequest } from './pages/requests/Bsv20SendRequest';
+import { BlockHeightProvider } from './contexts/providers/BlockHeightProvider';
+import { QueueProvider } from './contexts/providers/QueueProvider';
+import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
+import { SnackbarProvider } from './contexts/providers/SnackbarProvider';
 
 const MainContainer = styled.div<WhiteLabelTheme & { $isMobile?: boolean }>`
   display: flex;

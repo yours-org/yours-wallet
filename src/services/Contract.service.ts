@@ -1,7 +1,7 @@
 import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
 import { DEFAULT_SIGHASH_TYPE } from '../utils/constants';
 import { KeysService } from './Keys.service';
-import { fromUtxo, Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
+import { Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
 import { SPVStore, Txo } from 'spv-store';
 import { LockTemplate } from 'spv-store';
 

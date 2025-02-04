@@ -1,17 +1,8 @@
-import { ReactNode, createContext, useState } from 'react';
-import { Snackbar } from '../components/Snackbar';
-import { useTheme } from '../hooks/useTheme';
-import { SNACKBAR_TIMEOUT } from '../utils/constants';
-
-export type SnackbarType = 'error' | 'info' | 'success';
-
-type SnackbarContextType = {
-  message: string | null;
-  snackBarType: SnackbarType | null;
-  addSnackbar: (message: string, type: SnackbarType, duration?: number) => void;
-};
-
-export const SnackbarContext = createContext<SnackbarContextType | null>(null);
+import { ReactNode, useState } from 'react';
+import { Snackbar } from '../../components/Snackbar';
+import { useTheme } from '../../hooks/useTheme';
+import { SNACKBAR_TIMEOUT } from '../../utils/constants';
+import { SnackbarContext, SnackbarType } from '../SnackbarContext';
 
 interface SnackbarProviderProps {
   children: ReactNode;
