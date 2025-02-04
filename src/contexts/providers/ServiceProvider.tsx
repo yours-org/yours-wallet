@@ -47,6 +47,14 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [isReady, setIsReady] = useState<boolean>(false);
 
   useEffect(() => {
+    if (services?.chromeStorageService) {
+      const timestamp = Date.now();
+      const twentyMinutesAgo = timestamp - 20 * 60 * 1000;
+      services.chromeStorageService.update({ lastActiveTime: isLocked ? twentyMinutesAgo : timestamp, isLocked });
+    }
+  }, [isLocked, services?.chromeStorageService]);
+
+  useEffect(() => {
     const initServices = async () => {
       try {
         const initializedServices = await initializeServices();
@@ -75,10 +83,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const lockWallet = useCallback(async () => {
     if (!isReady) return;
     setIsLocked(true);
-    const timestamp = Date.now();
-    const twentyMinutesAgo = timestamp - 20 * 60 * 1000;
-    services?.chromeStorageService?.update({ lastActiveTime: twentyMinutesAgo });
-  }, [isReady, services]);
+  }, [isReady]);
 
   useEffect(() => {
     const checkLockState = async () => {
