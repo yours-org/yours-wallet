@@ -1,0 +1,218 @@
+import { PublicKey, Script, Transaction, TransactionSignature, UnlockingScript } from '@bsv/sdk';
+import axios from 'axios';
+import { Inscription, applyInscription } from 'js-1sat-ord';
+import { SPVStore } from 'spv-store';
+import { SignatureRequest } from 'yours-wallet-provider';
+import { MNEE_API } from '../utils/constants';
+import { ChromeStorageService } from './ChromeStorage.service';
+import { ContractService } from './Contract.service';
+import CosignTemplate from '../utils/mneeCosignTemplate';
+import { MNEEBalance, MNEEConfig, MNEEOperation, MNEEUtxo } from './types/mnee.types';
+import { Utils } from '@bsv/sdk';
+
+export class MNEEService {
+  constructor(
+    private readonly chromeStorageService: ChromeStorageService,
+    private readonly oneSatSPV: SPVStore,
+    private readonly contractService: ContractService,
+  ) {}
+
+  getConfig = async (): Promise<MNEEConfig | undefined> => {
+    try {
+      const { data } = await axios.get<MNEEConfig>(`${MNEE_API}/config`);
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch config:', error);
+    }
+  };
+
+  getAddresses = () => {
+    const addresses = this.chromeStorageService.getCurrentAccountObject().account?.addresses;
+    if (!addresses) throw new Error('Could not fetch addresses from chrome storage');
+    return addresses;
+  };
+
+  getBalance = async (): Promise<MNEEBalance> => {
+    try {
+      const config = await this.getConfig();
+      if (!config) throw new Error('Config not fetched');
+      const res = await this.getUtxos();
+      const balance = res.reduce((acc, utxo) => {
+        if (utxo.data.bsv21.op === 'transfer') {
+          acc += utxo.data.bsv21.amt;
+        }
+        return acc;
+      }, 0);
+      return {
+        atomicAmount: balance,
+        decimalAmount: parseFloat((balance / 10 ** (config.decimals || 0)).toFixed(config.decimals)),
+      };
+    } catch (error) {
+      console.error('Failed to fetch balance:', error);
+      return { atomicAmount: 0, decimalAmount: 0 };
+    }
+  };
+
+  private toTokenSat(amount: number, decimals: number): number {
+    return Math.round(amount * 10 ** decimals);
+  }
+
+  private createInscription = (recipient: string, amount: number, config: MNEEConfig) => {
+    const inscriptionData = {
+      p: 'bsv-20',
+      op: 'transfer',
+      id: config.tokenId,
+      amt: amount.toString(),
+    };
+    return {
+      lockingScript: applyInscription(new CosignTemplate().lock(recipient, PublicKey.fromString(config.approver)), {
+        dataB64: Buffer.from(JSON.stringify(inscriptionData)).toString('base64'),
+        contentType: 'application/bsv-20',
+      } as Inscription),
+      satoshis: 1,
+    };
+  };
+
+  getUtxos = async (ops: MNEEOperation[] = ['transfer', 'deploy+mint']): Promise<MNEEUtxo[]> => {
+    try {
+      const addresses = this.getAddresses();
+      const { data } = await axios.post<MNEEUtxo[]>(`${MNEE_API}/utxos`, [
+        addresses.bsvAddress,
+        addresses.ordAddress,
+        addresses.identityAddress,
+      ]);
+      if (ops.length) {
+        return data.filter((utxo) =>
+          ops.includes(utxo.data.bsv21.op.toLowerCase() as 'transfer' | 'burn' | 'deploy+mint'),
+        );
+      }
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch UTXOs:', error);
+      return [];
+    }
+  };
+
+  transfer = async (
+    recipient: string,
+    amount: number,
+    password: string,
+  ): Promise<{ txid?: string; error?: string }> => {
+    try {
+      const config = await this.getConfig();
+      if (!config) throw new Error('Config not fetched');
+
+      const tokenSatAmt = this.toTokenSat(amount, config.decimals);
+
+      // Fetch UTXOs
+      const utxos = await this.getUtxos();
+      const totalUtxoAmount = utxos.reduce((sum, utxo) => sum + (utxo.data.bsv21.amt || 0), 0);
+
+      if (totalUtxoAmount < tokenSatAmt) {
+        return { error: 'Insufficient MNEE balance' };
+      }
+
+      // Determine fee
+      let fee = 0;
+      if (recipient !== config.burnAddress) {
+        const foundFee = config.fees.find((fee) => tokenSatAmt >= fee.min && tokenSatAmt <= fee.max)?.fee;
+        if (foundFee === undefined) return { error: 'Fee ranges inadequate' };
+        fee = foundFee;
+      }
+
+      // Build transaction
+      const tx = new Transaction(1, [], [], 0);
+      let tokensIn = 0;
+      const signingAddresses: string[] = [];
+
+      while (tokensIn < tokenSatAmt + fee) {
+        const utxo = utxos.shift();
+        if (!utxo) return { error: 'Insufficient MNEE balance' };
+
+        const sourceTransaction = await this.oneSatSPV.getTx(utxo.txid, true);
+        if (!sourceTransaction) return { error: 'Failed to fetch source transaction' };
+
+        signingAddresses.push(utxo.owners[0]);
+
+        tx.addInput({
+          sourceTXID: utxo.txid,
+          sourceOutputIndex: utxo.vout,
+          sourceTransaction,
+          unlockingScript: new UnlockingScript(),
+        });
+
+        tokensIn += utxo.data.bsv21.amt;
+      }
+
+      // Add outputs
+      const addresses = this.getAddresses();
+      tx.addOutput(this.createInscription(recipient, tokenSatAmt, config));
+      if (fee > 0) tx.addOutput(this.createInscription(config.feeAddress, fee, config));
+      tx.addOutput(this.createInscription(addresses.ordAddress, tokensIn - tokenSatAmt - fee, config));
+
+      // Signing transaction
+      const sigRequests: SignatureRequest[] = tx.inputs.map((input, index) => {
+        if (!input.sourceTXID) throw new Error('Source TXID is undefined');
+        return {
+          prevTxid: input.sourceTXID,
+          outputIndex: input.sourceOutputIndex,
+          inputIndex: index,
+          address: signingAddresses[index],
+          script: input.sourceTransaction?.outputs[input.sourceOutputIndex].lockingScript.toHex(),
+          satoshis: input.sourceTransaction?.outputs[input.sourceOutputIndex].satoshis || 1,
+          sigHashType:
+            TransactionSignature.SIGHASH_ALL |
+            TransactionSignature.SIGHASH_ANYONECANPAY |
+            TransactionSignature.SIGHASH_FORKID,
+        };
+      });
+
+      const rawtx = tx.toHex();
+      const res = await this.contractService.getSignatures({ rawtx, sigRequests }, password);
+
+      if (!res?.sigResponses) return { error: 'Failed to get signatures' };
+
+      // Apply signatures
+      for (const sigResponse of res.sigResponses) {
+        tx.inputs[sigResponse.inputIndex].unlockingScript = new Script()
+          .writeBin(Utils.toArray(sigResponse.sig, 'hex'))
+          .writeBin(Utils.toArray(sigResponse.pubKey, 'hex'));
+      }
+
+      // Submit transaction using Axios
+      const response = await axios.post<{ rawtx: string }>(`${MNEE_API}/transfer`, {
+        rawtx: Utils.toBase64(tx.toBinary()),
+      });
+
+      return { txid: response.data.rawtx }; // Return transaction ID
+    } catch (error) {
+      let errorMessage = 'Transaction submission failed';
+
+      if (axios.isAxiosError(error) && error.response) {
+        const { status, data } = error.response;
+        if (data?.message) {
+          if (status === 423) {
+            if (data.message.includes('frozen')) {
+              errorMessage = 'Your address is currently frozen and cannot send tokens';
+            } else if (data.message.includes('blacklisted')) {
+              errorMessage = 'The recipient address is blacklisted and cannot receive tokens';
+            } else {
+              errorMessage = 'Transaction blocked: Address is either frozen or blacklisted';
+            }
+          } else if (status === 503) {
+            if (data.message.includes('cosigner is paused')) {
+              errorMessage = 'Token transfers are currently paused by the administrator';
+            } else errorMessage = 'Service temporarily unavailable';
+          } else {
+            errorMessage = data.message;
+          }
+        }
+      } else {
+        errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      }
+
+      console.error('Failed to transfer tokens:', errorMessage);
+      return { error: errorMessage };
+    }
+  };
+}

@@ -9,6 +9,7 @@ import { INACTIVITY_LIMIT } from '../utils/constants';
 import { SPVStore } from 'spv-store';
 import { oneSatSPVPromise } from '../background';
 import { GorillaPoolService } from '../services/GorillaPool.service';
+import { MNEEService } from '../services/Mnee.service';
 
 const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();
@@ -21,6 +22,7 @@ const initializeServices = async () => {
   const contractService = new ContractService(keysService, oneSatSPV);
 
   const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, oneSatSPV);
+  const mneeService = new MNEEService(chromeStorageService, oneSatSPV, contractService);
   const ordinalService = new OrdinalService(
     keysService,
     bsvService,
@@ -33,6 +35,7 @@ const initializeServices = async () => {
     chromeStorageService,
     keysService,
     bsvService,
+    mneeService,
     ordinalService,
     wocService,
     gorillaPoolService,
@@ -45,6 +48,7 @@ export interface ServiceContextProps {
   chromeStorageService: ChromeStorageService;
   keysService: KeysService;
   bsvService: BsvService;
+  mneeService: MNEEService;
   ordinalService: OrdinalService;
   wocService: WhatsOnChainService;
   gorillaPoolService: GorillaPoolService;

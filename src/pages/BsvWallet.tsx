@@ -49,6 +49,7 @@ import { Account } from '../services/types/chromeStorage.types';
 import { SendBsv20View } from '../components/SendBsv20View';
 import { FaucetButton } from '../components/FaucetButton';
 import { TxHistory } from '../components/TxHistory';
+import mneeIcon from '../assets/mnee-icon.png';
 
 const MiddleContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -177,7 +178,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService, ordinalService, oneSatSPV } = useServiceContext();
+  const { chromeStorageService, keysService, bsvService, ordinalService, oneSatSPV, mneeService } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
@@ -200,6 +201,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [filteredTokens, setFilteredTokens] = useState<Bsv20[]>([]);
   const [randomKey, setRandomKey] = useState(Math.random());
   const isTestnet = chromeStorageService.getNetwork() === 'testnet' ? true : false;
+  const [mneeBalance, setMneeBalance] = useState(0);
 
   const [recipients, setRecipients] = useState<Recipient[]>([
     { id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' },
@@ -375,6 +377,14 @@ export const BsvWallet = (props: BsvWalletProps) => {
     setTimeout(() => refreshUtxos(), 1000); // slight delay to allow for transaction to be processed
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId]);
+
+  useEffect(() => {
+    mneeService.getBalance().then((res) => {
+      if (res) {
+        setMneeBalance(res.decimalAmount);
+      }
+    });
+  }, [mneeService]);
 
   const resetSendState = () => {
     setPasswordConfirm('');
@@ -580,6 +590,14 @@ export const BsvWallet = (props: BsvWalletProps) => {
           ticker="BSV"
           usdBalance={bsvBalance * exchangeRate}
           showPointer={false}
+        />
+        <AssetRow
+          balance={mneeBalance}
+          icon={mneeIcon}
+          ticker="MNEE"
+          usdBalance={mneeBalance}
+          showPointer
+          onClick={mneeService.getBalance}
         />
         {lockData && (
           <Show when={services.locks && lockData.totalLocked > 0}>
