@@ -106,7 +106,6 @@ export class MNEEService {
 
       // Fetch UTXOs
       const utxos = await this.getUtxos();
-      console.log('UTXOs:', utxos);
       const totalUtxoAmount = utxos.reduce((sum, utxo) => sum + (utxo.data.bsv21.amt || 0), 0);
 
       if (totalUtxoAmount < tokenSatAmt) {
@@ -168,8 +167,6 @@ export class MNEEService {
         };
       });
 
-      console.log('Sig REQUESTS:', sigRequests);
-
       const rawtx = tx.toHex();
       const res = await this.contractService.getSignatures({ rawtx, sigRequests }, password);
 
@@ -187,9 +184,9 @@ export class MNEEService {
         rawtx: Utils.toBase64(tx.toBinary()),
       });
 
-      console.log('Transfer response:', response.data);
+      const decodedBase64 = Buffer.from(response.data.rawtx, 'base64').toString('hex');
 
-      return { rawtx: response.data.rawtx };
+      return { rawtx: decodedBase64 };
     } catch (error) {
       let errorMessage = 'Transaction submission failed';
 

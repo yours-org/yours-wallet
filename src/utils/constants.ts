@@ -33,7 +33,8 @@ export const GENERIC_TOKEN_ICON =
   'https://static-00.iconduck.com/assets.00/generic-cryptocurrency-icon-2048x2029-vzaeox5w.png';
 export const GENERIC_NFT_ICON = 'https://cdn-icons-png.flaticon.com/512/6228/6228867.png';
 export const KNOWN_BURN_ADDRESSES = ['1111111111111111111114oLvT2', '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'];
-export const MNEE_API = 'https://mnee-cosigner-production.up.railway.app/v1';
+export const MNEE_API = 'https://mnee-cosigner-production.up.railway.app/v1'; // TODO: update to production
+export const MNEE_DECIMALS = 5;
 
 export const DEFAULT_WALLET_PATH = "m/44'/236'/0'/1/0";
 export const DEFAULT_ORD_PATH = "m/44'/236'/1'/0/0";

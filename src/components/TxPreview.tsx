@@ -3,13 +3,16 @@ import styled from 'styled-components';
 import { Ordinal } from 'yours-wallet-provider';
 import { useTheme } from '../hooks/useTheme';
 import { WhiteLabelTheme } from '../theme.types';
-import { GP_BASE_URL, KNOWN_BURN_ADDRESSES } from '../utils/constants';
+import { GP_BASE_URL, KNOWN_BURN_ADDRESSES, MNEE_DECIMALS } from '../utils/constants';
 import { convertAtomicValueToReadableTokenValue, formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { mapOrdinal } from '../utils/providerHelper';
 import { Show } from './Show';
 import lockImage from '../assets/lock.svg';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FaFire } from 'react-icons/fa';
+import { useServiceContext } from '../hooks/useServiceContext';
+import { MNEEConfig } from '../services/types/mnee.types';
+import mneeIcon from '../assets/mnee-icon.png';
 
 const Container = styled.div`
   display: flex;
@@ -74,17 +77,27 @@ type TxPreviewProps = {
 
 const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
   const { theme } = useTheme();
+  const { mneeService } = useServiceContext();
   const labelMaxLength = 20;
   const mappedInputs = useMemo(() => txData?.spends.map((txo: Txo) => mapOrdinal(txo)), [txData]);
   const mappedOutputs = useMemo(() => txData?.txos.map((txo: Txo) => mapOrdinal(txo)), [txData]);
+  const [mneeConfig, setMneeConfig] = useState<MNEEConfig>();
 
   console.log('mappedInputs', mappedInputs);
   console.log('mappedOutputs', mappedOutputs);
 
-  const renderNftOrTokenImage = (ordinal: Ordinal) => {
+  useEffect(() => {
+    if (!mneeService) return;
+    (async () => {
+      const config = await mneeService.getConfig();
+      setMneeConfig(config);
+    })();
+  }, [mneeService]);
+
+  const renderNftOrTokenImage = (ordinal: Ordinal, isMNEE: boolean) => {
     const inscriptionWithOutpoint =
       ordinal?.origin?.data?.insc?.file?.type.startsWith('image') && !!ordinal.origin.outpoint;
-    const bsv20WithIcon = !!ordinal?.data?.bsv20 && !!ordinal.data.bsv20.icon;
+    const bsv20WithIcon = (!!ordinal?.data?.bsv20 && !!ordinal.data.bsv20.icon) || isMNEE;
     const isLock = !!ordinal?.data?.lock;
 
     if (inscriptionWithOutpoint) {
@@ -96,9 +109,11 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
         <NftImage
           $isCircle
           src={
-            ordinal.data.bsv20?.icon?.startsWith('https://')
-              ? ordinal.data.bsv20.icon
-              : `${GP_BASE_URL}/content/${ordinal.data.bsv20?.icon}`
+            isMNEE
+              ? mneeIcon
+              : ordinal.data.bsv20?.icon?.startsWith('https://')
+                ? ordinal.data.bsv20.icon
+                : `${GP_BASE_URL}/content/${ordinal.data.bsv20?.icon}`
           }
           alt="Token"
         />
@@ -111,96 +126,117 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
     return null;
   };
 
+  if (!mappedInputs || !mappedOutputs || !mneeConfig) return null;
+
   return (
     <Container>
       <SectionHeader theme={theme} style={{ marginTop: '0.5rem' }}>
         Inputs
       </SectionHeader>
-      {mappedInputs.map((input: Ordinal, index: number) => (
-        <Row $toSign={!!inputsToSign?.includes(index)} key={index} theme={theme}>
-          <IndexOwnerWrapper>
-            <Index theme={theme}>#{index}</Index>
-            {<RowData theme={theme}>{input.owner ? truncate(input.owner, 6, 6) : 'Script/Contract'}</RowData>}
-            {!!inputsToSign?.includes(index) && (
-              <RowData style={{ marginLeft: '0.5rem' }} theme={theme}>
-                ✍️
-              </RowData>
-            )}
-          </IndexOwnerWrapper>
+      {mappedInputs.map((input: Ordinal, index: number) => {
+        const isMNEE = input.data.bsv20?.id === mneeConfig?.tokenId;
+        return (
+          <Row $toSign={!!inputsToSign?.includes(index)} key={index} theme={theme}>
+            <IndexOwnerWrapper>
+              <Index theme={theme}>#{index}</Index>
+              {<RowData theme={theme}>{input.owner ? truncate(input.owner, 6, 6) : 'Script/Contract'}</RowData>}
+              {!!inputsToSign?.includes(index) && (
+                <RowData style={{ marginLeft: '0.5rem' }} theme={theme}>
+                  ✍️
+                </RowData>
+              )}
+            </IndexOwnerWrapper>
 
-          <AmountImageWrapper>
-            <RowData theme={theme}>
-              <Show
-                when={!!input.data.bsv20}
-                whenFalseContent={
-                  <Show
-                    when={!!input.origin?.data?.map?.name}
-                    whenFalseContent={
+            <AmountImageWrapper>
+              <RowData theme={theme}>
+                <Show
+                  when={!!input.data.bsv20}
+                  whenFalseContent={
+                    <Show
+                      when={!!input.origin?.data?.map?.name}
+                      whenFalseContent={
+                        <Label theme={theme}>
+                          {formatNumberWithCommasAndDecimals(input.satoshis, 0)} {input.satoshis > 1 ? 'sats' : 'sat'}
+                        </Label>
+                      }
+                    >
                       <Label theme={theme}>
-                        {formatNumberWithCommasAndDecimals(input.satoshis, 0)} {input.satoshis > 1 ? 'sats' : 'sat'}
+                        {input.origin?.data?.map?.name && truncate(input.origin.data.map.name, labelMaxLength, 0)}
                       </Label>
-                    }
-                  >
-                    <Label theme={theme}>
-                      {input.origin?.data?.map?.name && truncate(input.origin.data.map.name, labelMaxLength, 0)}
-                    </Label>
-                  </Show>
-                }
-              >
-                <Label theme={theme}>
-                  {convertAtomicValueToReadableTokenValue(Number(input.data.bsv20?.amt), Number(input.data.bsv20?.dec))}{' '}
-                  {truncate(input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT', labelMaxLength, 0)}
-                </Label>
-              </Show>
-            </RowData>
-            {renderNftOrTokenImage(input)}
-          </AmountImageWrapper>
-        </Row>
-      ))}
+                    </Show>
+                  }
+                >
+                  <Label theme={theme}>
+                    {(isMNEE ? '$' : '') +
+                      convertAtomicValueToReadableTokenValue(
+                        Number(input.data.bsv20?.amt),
+                        isMNEE ? MNEE_DECIMALS : Number(input.data.bsv20?.dec),
+                      )}{' '}
+                    {truncate(
+                      isMNEE ? 'MNEE' : (input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT'),
+                      labelMaxLength,
+                      0,
+                    )}
+                  </Label>
+                </Show>
+              </RowData>
+              {renderNftOrTokenImage(input, isMNEE)}
+            </AmountImageWrapper>
+          </Row>
+        );
+      })}
 
       <SectionHeader theme={theme}>Outputs</SectionHeader>
-      {mappedOutputs.map((output: Ordinal, index: number) => (
-        <Row $toSign={false} key={index} theme={theme}>
-          <IndexOwnerWrapper>
-            <Index theme={theme}>#{index}</Index>
-            <RowData theme={theme}>{output.owner ? truncate(output.owner, 6, 6) : 'Script/Contract'}</RowData>
-            <Show when={!!output.owner && KNOWN_BURN_ADDRESSES.includes(output.owner)}>
-              <FaFire color={theme.color.component.snackbarError} size={'1rem'} style={{ marginLeft: '0.5rem' }} />
-            </Show>
-          </IndexOwnerWrapper>
-
-          <AmountImageWrapper>
-            <RowData theme={theme}>
-              <Show
-                when={!!output.data.bsv20}
-                whenFalseContent={
-                  <Show
-                    when={!!output.origin?.data?.map?.name}
-                    whenFalseContent={
-                      <Label theme={theme}>
-                        {formatNumberWithCommasAndDecimals(output.satoshis, 0)} {output.satoshis > 1 ? 'sats' : 'sat'}
-                      </Label>
-                    }
-                  >
-                    <Label theme={theme}>
-                      {output.origin?.data?.map?.name && truncate(output.origin.data.map.name, labelMaxLength, 0)}
-                    </Label>
-                  </Show>
-                }
-              >
-                <Label theme={theme}>
-                  {convertAtomicValueToReadableTokenValue(
-                    Number(output.data.bsv20?.amt),
-                    Number(output.data.bsv20?.dec),
-                  )}{' '}
-                  {truncate(output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT', labelMaxLength, 0)}
-                </Label>
+      {mappedOutputs.map((output: Ordinal, index: number) => {
+        const isMNEE = output.data.bsv20?.id === mneeConfig?.tokenId;
+        return (
+          <Row $toSign={false} key={index} theme={theme}>
+            <IndexOwnerWrapper>
+              <Index theme={theme}>#{index}</Index>
+              <RowData theme={theme}>{output.owner ? truncate(output.owner, 6, 6) : 'Script/Contract'}</RowData>
+              <Show when={!!output.owner && KNOWN_BURN_ADDRESSES.includes(output.owner)}>
+                <FaFire color={theme.color.component.snackbarError} size={'1rem'} style={{ marginLeft: '0.5rem' }} />
               </Show>
-            </RowData>
-            {renderNftOrTokenImage(output)}
-          </AmountImageWrapper>
-        </Row>
-      ))}
+            </IndexOwnerWrapper>
+
+            <AmountImageWrapper>
+              <RowData theme={theme}>
+                <Show
+                  when={!!output.data.bsv20}
+                  whenFalseContent={
+                    <Show
+                      when={!!output.origin?.data?.map?.name}
+                      whenFalseContent={
+                        <Label theme={theme}>
+                          {formatNumberWithCommasAndDecimals(output.satoshis, 0)} {output.satoshis > 1 ? 'sats' : 'sat'}
+                        </Label>
+                      }
+                    >
+                      <Label theme={theme}>
+                        {output.origin?.data?.map?.name && truncate(output.origin.data.map.name, labelMaxLength, 0)}
+                      </Label>
+                    </Show>
+                  }
+                >
+                  <Label theme={theme}>
+                    {(isMNEE ? '$' : '') +
+                      convertAtomicValueToReadableTokenValue(
+                        Number(output.data.bsv20?.amt),
+                        isMNEE ? 5 : Number(output.data.bsv20?.dec),
+                      )}{' '}
+                    {truncate(
+                      isMNEE ? 'MNEE' : output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT',
+                      labelMaxLength,
+                      0,
+                    )}
+                  </Label>
+                </Show>
+              </RowData>
+              {renderNftOrTokenImage(output, isMNEE)}
+            </AmountImageWrapper>
+          </Row>
+        );
+      })}
     </Container>
   );
 };
