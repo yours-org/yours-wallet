@@ -115,6 +115,10 @@ export class ChromeStorageService {
             satoshis: appState.balance?.satoshis ?? 0,
             usdInCents: appState.balance?.usdInCents ?? 0,
           },
+          mneeBalance: {
+            amount: 0,
+            decimalAmount: 0,
+          },
           pubKeys: {
             bsvPubKey: appState.pubKeys.bsvPubKey,
             ordPubKey: appState.pubKeys.ordPubKey,

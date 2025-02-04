@@ -96,6 +96,7 @@ export const DEFAULT_ACCOUNT = {
     customFeeRate: 10,
   },
   balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
+  mneeBalance: { amount: 0, decimalAmount: 0 },
   encryptedKeys: '',
   derivationTags: [],
   icon: HOSTED_YOURS_IMAGE,

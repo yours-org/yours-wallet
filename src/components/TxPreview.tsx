@@ -167,11 +167,10 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
                   }
                 >
                   <Label theme={theme}>
-                    {(isMNEE ? '$' : '') +
-                      convertAtomicValueToReadableTokenValue(
-                        Number(input.data.bsv20?.amt),
-                        isMNEE ? MNEE_DECIMALS : Number(input.data.bsv20?.dec),
-                      )}{' '}
+                    {convertAtomicValueToReadableTokenValue(
+                      Number(input.data.bsv20?.amt),
+                      isMNEE ? MNEE_DECIMALS : Number(input.data.bsv20?.dec),
+                    )}{' '}
                     {truncate(
                       isMNEE ? 'MNEE' : (input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT'),
                       labelMaxLength,
@@ -219,11 +218,10 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
                   }
                 >
                   <Label theme={theme}>
-                    {(isMNEE ? '$' : '') +
-                      convertAtomicValueToReadableTokenValue(
-                        Number(output.data.bsv20?.amt),
-                        isMNEE ? 5 : Number(output.data.bsv20?.dec),
-                      )}{' '}
+                    {convertAtomicValueToReadableTokenValue(
+                      Number(output.data.bsv20?.amt),
+                      isMNEE ? MNEE_DECIMALS : Number(output.data.bsv20?.dec),
+                    )}{' '}
                     {truncate(
                       isMNEE ? 'MNEE' : output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT',
                       labelMaxLength,

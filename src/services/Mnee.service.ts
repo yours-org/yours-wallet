@@ -2,13 +2,14 @@ import { PublicKey, Script, Transaction, TransactionSignature, UnlockingScript }
 import axios from 'axios';
 import { Inscription, applyInscription } from 'js-1sat-ord';
 import { SPVStore } from 'spv-store';
-import { SignatureRequest } from 'yours-wallet-provider';
+import { MNEEBalance, SignatureRequest } from 'yours-wallet-provider';
 import { MNEE_API } from '../utils/constants';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { ContractService } from './Contract.service';
 import CosignTemplate from '../utils/mneeCosignTemplate';
-import { MNEEBalance, MNEEConfig, MNEEOperation, MNEEUtxo } from './types/mnee.types';
+import { MNEEConfig, MNEEOperation, MNEEUtxo } from './types/mnee.types';
 import { Utils } from '@bsv/sdk';
+import { ChromeStorageObject } from './types/chromeStorage.types';
 
 export class MNEEService {
   constructor(
@@ -43,13 +44,25 @@ export class MNEEService {
         }
         return acc;
       }, 0);
-      return {
-        atomicAmount: balance,
-        decimalAmount: parseFloat((balance / 10 ** (config.decimals || 0)).toFixed(config.decimals)),
+
+      const decimalAmount = parseFloat((balance / 10 ** (config.decimals || 0)).toFixed(config.decimals));
+      const mneeBalance = { amount: balance, decimalAmount };
+
+      const { account } = this.chromeStorageService.getCurrentAccountObject();
+      if (!account) throw Error('No account found!');
+      const key: keyof ChromeStorageObject = 'accounts';
+      const update: Partial<ChromeStorageObject['accounts']> = {
+        [account.addresses.identityAddress]: {
+          ...account,
+          mneeBalance,
+        },
       };
+      await this.chromeStorageService.updateNested(key, update);
+
+      return mneeBalance;
     } catch (error) {
       console.error('Failed to fetch balance:', error);
-      return { atomicAmount: 0, decimalAmount: 0 };
+      return { amount: 0, decimalAmount: 0 };
     }
   };
 
@@ -97,7 +110,7 @@ export class MNEEService {
     recipient: string,
     amount: number,
     password: string,
-  ): Promise<{ rawtx?: string; error?: string }> => {
+  ): Promise<{ txid?: string; rawtx?: string; error?: string }> => {
     try {
       const config = await this.getConfig();
       if (!config) throw new Error('Config not fetched');
@@ -180,13 +193,18 @@ export class MNEEService {
       }
 
       // Submit transaction using Axios
+      const base64Tx = Utils.toBase64(tx.toBinary());
       const response = await axios.post<{ rawtx: string }>(`${MNEE_API}/transfer`, {
-        rawtx: Utils.toBase64(tx.toBinary()),
+        rawtx: base64Tx,
       });
 
-      const decodedBase64 = Buffer.from(response.data.rawtx, 'base64').toString('hex');
+      const decodedBase64AsBinary = Utils.toArray(response.data.rawtx, 'base64');
+      const tx2 = Transaction.fromBinary(decodedBase64AsBinary);
+      const rep = await this.oneSatSPV.broadcast(tx2);
 
-      return { rawtx: decodedBase64 };
+      if (!rep?.txid) return { error: 'Failed to broadcast transaction' };
+
+      return { txid: rep.txid, rawtx: Utils.toHex(decodedBase64AsBinary) };
     } catch (error) {
       let errorMessage = 'Transaction submission failed';
 

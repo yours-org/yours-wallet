@@ -403,14 +403,14 @@ export const BsvWallet = (props: BsvWalletProps) => {
       return;
     }
 
-    if (!passwordConfirm && isPasswordRequired) {
+    if (!passwordConfirm) {
       addSnackbar('You must enter a password!', 'error');
       setIsProcessing(false);
       return;
     }
 
     const res = await mneeService.transfer(mneeRecipient, mneeReciepientAmount, passwordConfirm);
-    if (!res.rawtx || res.error) {
+    if (!res.txid || res.error) {
       addSnackbar(res.error ?? 'An unknown error occurred.', 'error');
       setPasswordConfirm('');
       setIsProcessing(false);

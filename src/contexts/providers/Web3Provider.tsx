@@ -7,6 +7,7 @@ import {
   PurchaseOrdinal,
   SendBsv,
   SendBsv20,
+  SendMNEE,
   SignMessage,
   TaggedDerivationRequest,
   TransferOrdinal,
@@ -21,6 +22,7 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [connectRequest, setConnectRequest] = useState<RequestParams | undefined>(undefined);
   const [sendBsvRequest, setSendBsvRequest] = useState<SendBsv[] | undefined>(undefined);
   const [sendBsv20Request, setSendBsv20Request] = useState<SendBsv20 | undefined>(undefined);
+  const [sendMNEERequest, setSendMNEERequest] = useState<SendMNEE | undefined>(undefined);
   const [transferOrdinalRequest, setTransferOrdinalRequest] = useState<TransferOrdinal | undefined>(undefined);
   const [purchaseOrdinalRequest, setPurchaseOrdinalRequest] = useState<PurchaseOrdinal | undefined>(undefined);
   const [signMessageRequest, setSignMessageRequest] = useState<SignMessage | undefined>(undefined);
@@ -44,6 +46,9 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
         break;
       case 'sendBsv20Request':
         setSendBsv20Request(undefined);
+        break;
+      case 'sendMNEERequest':
+        setSendMNEERequest(undefined);
         break;
       case 'transferOrdinalRequest':
         setTransferOrdinalRequest(undefined);
@@ -86,6 +91,7 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       connectRequest,
       sendBsvRequest,
       sendBsv20Request,
+      sendMNEERequest,
       transferOrdinalRequest,
       purchaseOrdinalRequest,
       signMessageRequest,
@@ -100,6 +106,7 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (connectRequest) setConnectRequest(connectRequest);
     if (sendBsvRequest) setSendBsvRequest(sendBsvRequest);
     if (sendBsv20Request) setSendBsv20Request(sendBsv20Request);
+    if (sendMNEERequest) setSendMNEERequest(sendMNEERequest);
     if (transferOrdinalRequest) setTransferOrdinalRequest(transferOrdinalRequest);
     if (purchaseOrdinalRequest) setPurchaseOrdinalRequest(purchaseOrdinalRequest);
     if (signMessageRequest) setSignMessageRequest(signMessageRequest);
@@ -122,6 +129,7 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
         connectRequest,
         sendBsvRequest,
         sendBsv20Request,
+        sendMNEERequest,
         transferOrdinalRequest,
         purchaseOrdinalRequest,
         signMessageRequest,

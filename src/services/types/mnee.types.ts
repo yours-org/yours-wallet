@@ -4,11 +4,6 @@ type MNEEFee = {
   fee: number;
 };
 
-export type MNEEBalance = {
-  atomicAmount: number;
-  decimalAmount: number;
-};
-
 export type MNEEConfig = {
   approver: string;
   feeAddress: string;
