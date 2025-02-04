@@ -3,6 +3,26 @@ import { Txo } from 'spv-store';
 import { Ordinal } from 'yours-wallet-provider';
 
 export function mapOrdinal(t: Txo): Ordinal {
+  let originJson: string | undefined;
+  let inscriptionJson: string | undefined;
+  try {
+    originJson =
+      t.data.origin?.data?.insc?.file?.type.startsWith('application/json') &&
+      t.data.origin?.data?.insc?.file?.content &&
+      JSON.parse(Utils.toUTF8(t.data.origin.data.insc.file.content));
+  } catch (e) {
+    console.warn('Error parsing origin json', e);
+  }
+
+  try {
+    inscriptionJson =
+      t.data.insc?.data?.file?.type.startsWith('application/json') &&
+      t.data.insc?.data?.file?.content &&
+      JSON.parse(Utils.toUTF8(t.data.insc.data.file.content));
+  } catch (error) {
+    console.warn('Error parsing inscription json', error);
+  }
+
   return {
     txid: t.outpoint.txid,
     vout: t.outpoint.vout,
@@ -26,10 +46,7 @@ export function mapOrdinal(t: Txo): Ordinal {
                 t.data.origin?.data?.insc?.file?.type.startsWith('application/op-ns')) &&
               t.data.origin.data.insc?.file?.content &&
               Utils.toUTF8(t.data.origin.data.insc.file.content),
-            json:
-              t.data.origin?.data?.insc?.file?.type.startsWith('application/json') &&
-              t.data.origin?.data?.insc?.file?.content &&
-              JSON.parse(Utils.toUTF8(t.data.origin.data.insc.file.content)),
+            json: originJson,
           },
         },
         map: t.data.origin.data?.map,
@@ -52,10 +69,7 @@ export function mapOrdinal(t: Txo): Ordinal {
             t.data.insc?.data?.file?.type.startsWith('text') &&
             t.data.insc.data.file.content &&
             Utils.toUTF8(t.data.insc.data.file.content),
-          json:
-            t.data.insc?.data?.file?.type.startsWith('application/json') &&
-            t.data.insc.data.file.content &&
-            JSON.parse(Utils.toUTF8(t.data.insc.data.file.content)),
+          json: inscriptionJson,
         },
       },
       list: t.data.list && {

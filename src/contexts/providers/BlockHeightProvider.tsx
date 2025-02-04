@@ -1,12 +1,6 @@
-import { createContext, ReactNode } from 'react';
-import { useBlockHeightTracker } from '../hooks/useBlockHeightTracker';
-
-type QueueContextType = {
-  percentCompleted: number;
-  showSyncPage: boolean;
-};
-
-const BlockHeightContext = createContext<QueueContextType | null>(null);
+import { ReactNode } from 'react';
+import { useBlockHeightTracker } from '../../hooks/useBlockHeightTracker';
+import { BlockHeightContext } from '../BlockHeightContext';
 
 export const BlockHeightProvider = ({ children }: { children: ReactNode }) => {
   const { percentCompleted, showSyncPage } = useBlockHeightTracker();
