@@ -35,7 +35,7 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
   const lockIndexer = new LockIndexer(owners, IndexMode.TrustAndVerify, network);
 
   const bsv20Indexers = [
-    new Bsv21Indexer(owners, IndexMode.Trust, network),
+    new Bsv21Indexer(owners, IndexMode.Trust, [], network),
     new Bsv20Indexer(owners, IndexMode.Trust, network),
   ];
 
