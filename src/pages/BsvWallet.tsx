@@ -23,7 +23,7 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { WhiteLabelTheme } from '../theme.types';
-import { BSV_DECIMAL_CONVERSION, HOSTED_YOURS_IMAGE } from '../utils/constants';
+import { BSV_DECIMAL_CONVERSION, HOSTED_YOURS_IMAGE, MNEE_ICON_URL } from '../utils/constants';
 import { formatNumberWithCommasAndDecimals, formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import copyIcon from '../assets/copy.svg';
@@ -49,7 +49,6 @@ import { Account } from '../services/types/chromeStorage.types';
 import { SendBsv20View } from '../components/SendBsv20View';
 import { FaucetButton } from '../components/FaucetButton';
 import { TxHistory } from '../components/TxHistory';
-import mneeIcon from '../assets/mnee-icon.png';
 
 const MiddleContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -409,6 +408,18 @@ export const BsvWallet = (props: BsvWalletProps) => {
       return;
     }
 
+    if (mneeReciepientAmount > mneeBalance) {
+      addSnackbar('Insufficient MNEE balance!', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    if (mneeReciepientAmount <= 0.00001) {
+      addSnackbar('Minimum send amount is 0.00001 MNEE!', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
     const res = await mneeService.transfer(mneeRecipient, mneeReciepientAmount, passwordConfirm);
     if (!res.txid || res.error) {
       addSnackbar(res.error ?? 'An unknown error occurred.', 'error');
@@ -622,8 +633,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
         />
         <AssetRow
           balance={mneeBalance}
-          icon={mneeIcon}
-          ticker="MNEE"
+          icon={MNEE_ICON_URL}
+          ticker="MNEE USD"
           usdBalance={mneeBalance}
           showPointer
           onClick={() => setPageState('sendMNEE')}
@@ -673,7 +684,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const sendMNEE = (
     <>
       <ScrollableConfirmContent>
-        <Icon src={mneeIcon} size="3rem" style={{ margin: 0, borderRadius: '50%' }} />
+        <Icon src={MNEE_ICON_URL} size="3rem" style={{ margin: 0, borderRadius: '50%' }} />
         <HeaderText theme={theme}>Send MNEE</HeaderText>
         <Text
           theme={theme}

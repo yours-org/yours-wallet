@@ -12,6 +12,7 @@ import {
   OrdLockIndexer,
   OriginIndexer,
   SigmaIndexer,
+  CosignIndexer,
 } from 'spv-store';
 import { NetWork } from 'yours-wallet-provider';
 import { BlockHeightTrackerMessage } from './hooks/useBlockHeightTracker';
@@ -20,6 +21,7 @@ import { YoursEventName } from './inject';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { sendMessage } from './utils/chromeHelpers';
 import { theme } from './theme';
+import { MNEE_DECIMALS, MNEE_ICON_ID, MNEE_SYM, MNEE_TOKEN_ID } from './utils/constants';
 
 export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, startSync = false) => {
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
@@ -30,12 +32,31 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
   if (!identityAddress) identityAddress = '';
   if (!ordAddress) ordAddress = '';
   const owners = new Set<string>([bsvAddress, identityAddress, ordAddress]);
-  const indexers: Indexer[] = [new FundIndexer(owners, IndexMode.TrustAndVerify, network)];
+  const indexers: Indexer[] = [
+    new FundIndexer(owners, IndexMode.Verify, network),
+    new CosignIndexer(owners, IndexMode.Verify, network),
+  ];
 
   const lockIndexer = new LockIndexer(owners, IndexMode.TrustAndVerify, network);
 
   const bsv20Indexers = [
-    new Bsv21Indexer(owners, IndexMode.Trust, network),
+    new Bsv21Indexer(
+      owners,
+      IndexMode.Trust,
+      [
+        {
+          id: MNEE_TOKEN_ID,
+          icon: MNEE_ICON_ID,
+          sym: MNEE_SYM,
+          dec: MNEE_DECIMALS,
+          op: 'deploy+mint',
+          amt: 0n,
+          fundAddress: '',
+          status: 1,
+        },
+      ],
+      network,
+    ),
     new Bsv20Indexer(owners, IndexMode.Trust, network),
   ];
 

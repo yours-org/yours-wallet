@@ -9,9 +9,8 @@ import { HeaderText, Text } from './Reusable';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { GENERIC_TOKEN_ICON } from '../utils/constants';
 import { FaTimes } from 'react-icons/fa';
-import { motion } from 'framer-motion';
 
-const Container = styled(motion.div)<WhiteLabelTheme>`
+const Container = styled.div<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -83,7 +82,6 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
   const { ordinalService, chromeStorageService, keysService, gorillaPoolService } = useServiceContext();
   const [favoriteTokens, setFavoriteTokens] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSlidingOut, setIsSlidingOut] = useState(false);
 
   useEffect(() => {
     const { account } = chromeStorageService.getCurrentAccountObject();
@@ -111,11 +109,6 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
     await chromeStorageService.updateNested(key, update);
   };
 
-  const handleBackClick = () => {
-    setIsSlidingOut(true);
-    setTimeout(onBack, 1000); // Give time for animation to finish
-  };
-
   const filteredTokens = bsv20s
     .filter(
       (b) =>
@@ -131,18 +124,9 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
     });
 
   return (
-    <Container
-      theme={theme}
-      initial="hidden"
-      animate={isSlidingOut ? 'hidden' : 'visible'}
-      variants={{
-        hidden: { y: '100%' },
-        visible: { y: 0 },
-      }}
-      transition={{ duration: 0.75 }}
-    >
+    <Container theme={theme}>
       <BackWrapper>
-        <FaTimes size={'1.5rem'} color={theme.color.global.contrast} cursor="pointer" onClick={handleBackClick} />
+        <FaTimes size={'1.5rem'} color={theme.color.global.contrast} cursor="pointer" onClick={onBack} />
       </BackWrapper>
       <Text style={{ marginTop: '3rem', fontSize: '1.25rem', fontWeight: 700 }} theme={theme}>
         Manage Token List

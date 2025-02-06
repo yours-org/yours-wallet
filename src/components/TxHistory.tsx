@@ -7,6 +7,8 @@ import {
   BSV_DECIMAL_CONVERSION,
   GENERIC_NFT_ICON,
   GENERIC_TOKEN_ICON,
+  MNEE_DECIMALS,
+  MNEE_SYM,
   URL_WHATSONCHAIN,
   URL_WHATSONCHAIN_TESTNET,
 } from '../utils/constants';
@@ -16,10 +18,10 @@ import { Button } from './Button';
 import bsvCoin from '../assets/bsv-coin.svg';
 import lock from '../assets/lock.svg';
 import { Show } from './Show';
-import { motion } from 'framer-motion';
 import { NetWork } from 'yours-wallet-provider';
+import { formatNumberWithCommasAndDecimals } from '../utils/format';
 
-const Container = styled(motion.div)<WhiteLabelTheme>`
+const Container = styled.div<WhiteLabelTheme>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -133,7 +135,6 @@ export type TxHistoryProps = {
 export const TxHistory = (props: TxHistoryProps) => {
   const { theme, onBack } = props;
   const [data, setData] = useState<TxLog[]>();
-  const [isSlidingOut, setIsSlidingOut] = useState(false);
   const { oneSatSPV } = useServiceContext();
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
@@ -157,11 +158,6 @@ export const TxHistory = (props: TxHistoryProps) => {
 
     fetchData();
   }, [oneSatSPV]);
-
-  const handleBackClick = () => {
-    setIsSlidingOut(true);
-    setTimeout(onBack, 1000);
-  };
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -273,19 +269,17 @@ export const TxHistory = (props: TxHistoryProps) => {
     }
   };
 
+  const formatMNEEAmount = (amount: number) => {
+    return formatNumberWithCommasAndDecimals(
+      getAmountText('bsv21', amount) as number,
+      Math.abs(amount) >= 0.01 ? 2 : MNEE_DECIMALS,
+    );
+  };
+
   return (
-    <Container
-      theme={theme}
-      initial="hidden"
-      animate={isSlidingOut ? 'hidden' : 'visible'}
-      variants={{
-        hidden: { y: '100%' },
-        visible: { y: 0 },
-      }}
-      transition={{ duration: 0.75 }}
-    >
+    <Container theme={theme}>
       <BackWrapper>
-        <FaTimes size={'1.5rem'} color={theme.color.global.contrast} cursor="pointer" onClick={handleBackClick} />
+        <FaTimes size={'1.5rem'} color={theme.color.global.contrast} cursor="pointer" onClick={onBack} />
       </BackWrapper>
       <Text style={{ marginTop: '3rem', fontSize: '1.25rem', fontWeight: 700 }} theme={theme}>
         Recent Activity
@@ -357,18 +351,20 @@ export const TxHistory = (props: TxHistoryProps) => {
                             fontWeight: 900,
                             margin: 0,
                             color: value?.amount
-                              ? value.amount > 1
+                              ? value.amount >= 1
                                 ? theme.color.component.primaryButtonLeftGradient
-                                : value.amount < -1
-                                  ? theme.color.global.contrast
-                                  : 'transparent'
+                                : key === 'origin' && value.amount === -1 // If an NFT is sent
+                                  ? 'transparent'
+                                  : theme.color.global.contrast
                               : 'transparent',
                             textAlign: 'right',
                           }}
                           theme={theme}
                         >
                           {value.amount && value.amount > 0 ? '+' : ''}
-                          {getAmountText(key, value.amount ?? 0)}
+                          {value.id === MNEE_SYM
+                            ? formatMNEEAmount(value.amount ?? 0)
+                            : getAmountText(key, value.amount ?? 0)}
                         </HeaderText>
                         <Show when={idx === 0}>
                           <FaLink

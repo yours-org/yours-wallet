@@ -15,8 +15,7 @@ import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendMNEE } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { getErrorMessage } from '../../utils/tools';
-import mneeIcon from '../../assets/mnee-icon.png';
-import { MNEE_DECIMALS } from '../../utils/constants';
+import { MNEE_DECIMALS, MNEE_ICON_URL } from '../../utils/constants';
 
 const Icon = styled.img`
   width: 3.5rem;
@@ -72,6 +71,7 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
 
       addSnackbar('Transaction Successful!', 'success');
       await sleep(2000);
+      await mneeService.getBalance();
       onResponse();
 
       sendMessage({
@@ -119,7 +119,7 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
       </Show>
       <Show when={!isProcessing && !!request}>
         <ConfirmContent>
-          <Icon src={mneeIcon} />
+          <Icon src={MNEE_ICON_URL} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
           <Text
             theme={theme}

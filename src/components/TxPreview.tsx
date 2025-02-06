@@ -3,16 +3,13 @@ import styled from 'styled-components';
 import { Ordinal } from 'yours-wallet-provider';
 import { useTheme } from '../hooks/useTheme';
 import { WhiteLabelTheme } from '../theme.types';
-import { GP_BASE_URL, KNOWN_BURN_ADDRESSES, MNEE_DECIMALS } from '../utils/constants';
+import { GP_BASE_URL, KNOWN_BURN_ADDRESSES } from '../utils/constants';
 import { convertAtomicValueToReadableTokenValue, formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { mapOrdinal } from '../utils/providerHelper';
 import { Show } from './Show';
 import lockImage from '../assets/lock.svg';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { FaFire } from 'react-icons/fa';
-import { useServiceContext } from '../hooks/useServiceContext';
-import { MNEEConfig } from '../services/types/mnee.types';
-import mneeIcon from '../assets/mnee-icon.png';
 
 const Container = styled.div`
   display: flex;
@@ -76,28 +73,19 @@ type TxPreviewProps = {
 };
 
 const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
+  console.log('txData', txData);
   const { theme } = useTheme();
-  const { mneeService } = useServiceContext();
   const labelMaxLength = 20;
   const mappedInputs = useMemo(() => txData?.spends.map((txo: Txo) => mapOrdinal(txo)), [txData]);
   const mappedOutputs = useMemo(() => txData?.txos.map((txo: Txo) => mapOrdinal(txo)), [txData]);
-  const [mneeConfig, setMneeConfig] = useState<MNEEConfig>();
 
   console.log('mappedInputs', mappedInputs);
   console.log('mappedOutputs', mappedOutputs);
 
-  useEffect(() => {
-    if (!mneeService) return;
-    (async () => {
-      const config = await mneeService.getConfig();
-      setMneeConfig(config);
-    })();
-  }, [mneeService]);
-
-  const renderNftOrTokenImage = (ordinal: Ordinal, isMNEE: boolean) => {
+  const renderNftOrTokenImage = (ordinal: Ordinal) => {
     const inscriptionWithOutpoint =
       ordinal?.origin?.data?.insc?.file?.type.startsWith('image') && !!ordinal.origin.outpoint;
-    const bsv20WithIcon = (!!ordinal?.data?.bsv20 && !!ordinal.data.bsv20.icon) || isMNEE;
+    const bsv20WithIcon = !!ordinal?.data?.bsv20 && !!ordinal.data.bsv20.icon;
     const isLock = !!ordinal?.data?.lock;
 
     if (inscriptionWithOutpoint) {
@@ -109,11 +97,9 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
         <NftImage
           $isCircle
           src={
-            isMNEE
-              ? mneeIcon
-              : ordinal.data.bsv20?.icon?.startsWith('https://')
-                ? ordinal.data.bsv20.icon
-                : `${GP_BASE_URL}/content/${ordinal.data.bsv20?.icon}`
+            ordinal.data.bsv20?.icon?.startsWith('https://')
+              ? ordinal.data.bsv20.icon
+              : `${GP_BASE_URL}/content/${ordinal.data.bsv20?.icon}`
           }
           alt="Token"
         />
@@ -126,7 +112,7 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
     return null;
   };
 
-  if (!mappedInputs || !mappedOutputs || !mneeConfig) return null;
+  if (!mappedInputs || !mappedOutputs) return null;
 
   return (
     <Container>
@@ -134,7 +120,6 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
         Inputs
       </SectionHeader>
       {mappedInputs.map((input: Ordinal, index: number) => {
-        const isMNEE = input.data.bsv20?.id === mneeConfig?.tokenId;
         return (
           <Row $toSign={!!inputsToSign?.includes(index)} key={index} theme={theme}>
             <IndexOwnerWrapper>
@@ -169,17 +154,13 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
                   <Label theme={theme}>
                     {convertAtomicValueToReadableTokenValue(
                       Number(input.data.bsv20?.amt),
-                      isMNEE ? MNEE_DECIMALS : Number(input.data.bsv20?.dec),
+                      Number(input.data.bsv20?.dec),
                     )}{' '}
-                    {truncate(
-                      isMNEE ? 'MNEE' : (input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT'),
-                      labelMaxLength,
-                      0,
-                    )}
+                    {truncate(input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT', labelMaxLength, 0)}
                   </Label>
                 </Show>
               </RowData>
-              {renderNftOrTokenImage(input, isMNEE)}
+              {renderNftOrTokenImage(input)}
             </AmountImageWrapper>
           </Row>
         );
@@ -187,7 +168,6 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
 
       <SectionHeader theme={theme}>Outputs</SectionHeader>
       {mappedOutputs.map((output: Ordinal, index: number) => {
-        const isMNEE = output.data.bsv20?.id === mneeConfig?.tokenId;
         return (
           <Row $toSign={false} key={index} theme={theme}>
             <IndexOwnerWrapper>
@@ -220,17 +200,13 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
                   <Label theme={theme}>
                     {convertAtomicValueToReadableTokenValue(
                       Number(output.data.bsv20?.amt),
-                      isMNEE ? MNEE_DECIMALS : Number(output.data.bsv20?.dec),
+                      Number(output.data.bsv20?.dec),
                     )}{' '}
-                    {truncate(
-                      isMNEE ? 'MNEE' : output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT',
-                      labelMaxLength,
-                      0,
-                    )}
+                    {truncate(output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT', labelMaxLength, 0)}
                   </Label>
                 </Show>
               </RowData>
-              {renderNftOrTokenImage(output, isMNEE)}
+              {renderNftOrTokenImage(output)}
             </AmountImageWrapper>
           </Row>
         );

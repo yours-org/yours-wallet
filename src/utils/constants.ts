@@ -33,9 +33,16 @@ export const GENERIC_TOKEN_ICON =
   'https://static-00.iconduck.com/assets.00/generic-cryptocurrency-icon-2048x2029-vzaeox5w.png';
 export const GENERIC_NFT_ICON = 'https://cdn-icons-png.flaticon.com/512/6228/6228867.png';
 export const KNOWN_BURN_ADDRESSES = ['1111111111111111111114oLvT2', '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'];
-export const MNEE_API = 'https://mnee-cosigner-production.up.railway.app/v1'; // TODO: update to production
-export const MNEE_DECIMALS = 5;
 
+// MNEE
+export const MNEE_API = 'https://mnee-cosigner-production.up.railway.app/v1'; // TODO: update to production
+export const MNEE_SYM = 'MNEE';
+export const MNEE_TOKEN_ID = 'c16a7b22240885c40d9b00ca65d97ed032561d748e85b46dcdf6ace4c84ab988_0'; // TODO: update to production
+export const MNEE_ICON_ID = '9c7f7f1788c6382d5ac737a4052334cf150b52d1e46c484ecfb1d6e00184f263_0'; // TODO: update to production
+export const MNEE_ICON_URL = `${GP_BASE_URL}/content/${MNEE_ICON_ID}`;
+export const MNEE_DECIMALS = 5; // TODO: update to production
+
+// DERIVATION PATHS
 export const DEFAULT_WALLET_PATH = "m/44'/236'/0'/1/0";
 export const DEFAULT_ORD_PATH = "m/44'/236'/1'/0/0";
 export const DEFAULT_RELAYX_ORD_PATH = "m/44'/236'/0'/2/0";
