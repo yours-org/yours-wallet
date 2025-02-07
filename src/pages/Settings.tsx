@@ -425,6 +425,16 @@ export const Settings = () => {
     handleSelect('bsv');
   };
 
+  const resyncUTXOs = () => {
+    oneSatSPV.sync(true);
+    addSnackbar('Resyncing UTXOs in the background...', 'info');
+  };
+
+  const updateSpends = () => {
+    oneSatSPV.stores.txos?.refreshSpends();
+    addSnackbar('Updating spends in the background...', 'info');
+  };
+
   const main = (
     <>
       <SettingsRow
@@ -451,6 +461,8 @@ export const Settings = () => {
         onClick={() => setPage('export-keys-options')}
         jsxElement={<ForwardButton color={theme.color.global.contrast} />}
       />
+      <SettingsRow name="Re-Sync UTXOs" description="Re-sync your wallets spendable coins" onClick={resyncUTXOs} />
+      <SettingsRow name="Update Spends" description="Update your wallet's spent coins" onClick={updateSpends} />
       <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={handleLockWallet} />
       <Text
         style={{

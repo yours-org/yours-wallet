@@ -1,14 +1,14 @@
-import React, { createContext, ReactNode, useCallback, useEffect, useState } from 'react';
-import { ChromeStorageService } from '../services/ChromeStorage.service';
-import { WhatsOnChainService } from '../services/WhatsOnChain.service';
-import { KeysService } from '../services/Keys.service';
-import { ContractService } from '../services/Contract.service';
-import { BsvService } from '../services/Bsv.service';
-import { OrdinalService } from '../services/Ordinal.service';
-import { INACTIVITY_LIMIT } from '../utils/constants';
-import { SPVStore } from 'spv-store';
-import { oneSatSPVPromise } from '../background';
-import { GorillaPoolService } from '../services/GorillaPool.service';
+import { ReactNode, useCallback, useEffect, useState } from 'react';
+import { oneSatSPVPromise } from '../../background';
+import { BsvService } from '../../services/Bsv.service';
+import { ChromeStorageService } from '../../services/ChromeStorage.service';
+import { ContractService } from '../../services/Contract.service';
+import { GorillaPoolService } from '../../services/GorillaPool.service';
+import { KeysService } from '../../services/Keys.service';
+import { OrdinalService } from '../../services/Ordinal.service';
+import { WhatsOnChainService } from '../../services/WhatsOnChain.service';
+import { INACTIVITY_LIMIT } from '../../utils/constants';
+import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 
 const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();
@@ -41,27 +41,18 @@ const initializeServices = async () => {
   };
 };
 
-export interface ServiceContextProps {
-  chromeStorageService: ChromeStorageService;
-  keysService: KeysService;
-  bsvService: BsvService;
-  ordinalService: OrdinalService;
-  wocService: WhatsOnChainService;
-  gorillaPoolService: GorillaPoolService;
-  contractService: ContractService;
-  isLocked: boolean;
-  isReady: boolean;
-  setIsLocked: (isLocked: boolean) => void;
-  lockWallet: () => Promise<void>;
-  oneSatSPV: SPVStore;
-}
-
-export const ServiceContext = createContext<ServiceContextProps | undefined>(undefined);
-
 export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [services, setServices] = useState<Partial<ServiceContextProps>>({});
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [isReady, setIsReady] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (services?.chromeStorageService) {
+      const timestamp = Date.now();
+      const twentyMinutesAgo = timestamp - 20 * 60 * 1000;
+      services.chromeStorageService.update({ lastActiveTime: isLocked ? twentyMinutesAgo : timestamp, isLocked });
+    }
+  }, [isLocked, services?.chromeStorageService]);
 
   useEffect(() => {
     const initServices = async () => {
@@ -92,10 +83,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const lockWallet = useCallback(async () => {
     if (!isReady) return;
     setIsLocked(true);
-    const timestamp = Date.now();
-    const twentyMinutesAgo = timestamp - 20 * 60 * 1000;
-    services?.chromeStorageService?.update({ lastActiveTime: twentyMinutesAgo });
-  }, [isReady, services]);
+  }, [isReady]);
 
   useEffect(() => {
     const checkLockState = async () => {
