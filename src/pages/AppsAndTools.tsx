@@ -4,14 +4,14 @@ import { Button } from '../components/Button';
 import { ForwardButton as RightChevron } from '../components/ForwardButton';
 import { PageLoader } from '../components/PageLoader';
 import yoursLogo from '../assets/logos/icon.png';
-import { HeaderText, Text, Warning } from '../components/Reusable';
+import { DateTimePicker, HeaderText, Text, Warning } from '../components/Reusable';
 import { SettingsRow as AppsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useTheme } from '../hooks/useTheme';
 import { WhiteLabelTheme } from '../theme.types';
 import { BSV_DECIMAL_CONVERSION, YOURS_DEV_WALLET, featuredApps } from '../utils/constants';
-import { truncate } from '../utils/format';
+import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
@@ -22,6 +22,7 @@ import TxPreview from '../components/TxPreview';
 import { TransactionFormat } from 'yours-wallet-provider';
 import { getTxFromRawTxFormat } from '../utils/tools';
 import { useSnackbar } from '../hooks/useSnackbar';
+import { LockData } from '../services/types/bsv.types';
 
 const Content = styled.div`
   display: flex;
@@ -160,6 +161,7 @@ type AppsPage =
   | 'sponsor-thanks'
   | 'discover-apps'
   | 'unlock'
+  | 'lock-page'
   | 'decode-broadcast'
   | 'decode'
   | 'sweep-wif';
@@ -184,6 +186,10 @@ export const AppsAndTools = () => {
   const [transactionFormat, setTransactionFormat] = useState<TransactionFormat>('tx');
   const [satsOut, setSatsOut] = useState(0);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [lockBlockHeight, setLockBlockHeight] = useState(0);
+  const [lockBsvAmount, setLockBsvAmount] = useState<number | null>(null);
+  const [lockData, setLockData] = useState<LockData>({ nextUnlock: 0, totalLocked: 0, unlockable: 0 });
+  const [lockPassword, setLockPassword] = useState('');
 
   const [wifKey, setWifKey] = useState('');
   const [sweepBalance, setSweepBalance] = useState(0);
@@ -243,6 +249,7 @@ export const AppsAndTools = () => {
     setIsProcessing(true);
     setCurrentBlockHeight(await bsvService.getCurrentHeight());
     setLockedUtxos(await bsvService.getLockedTxos());
+    setLockData(await bsvService.getLockData());
     setIsProcessing(false);
   };
 
@@ -312,6 +319,62 @@ export const AppsAndTools = () => {
     }
   };
 
+  const handleUnlock = async () => {
+    try {
+      setIsProcessing(true);
+      const res = await bsvService.unlockLockedCoins();
+      if (!res?.txid) {
+        addSnackbar(`Error unlocking funds. ${res?.error ?? 'Please try again.'}`, 'error');
+        return;
+      }
+
+      addSnackbar('Funds unlocked successfully', 'success');
+    } catch (error) {
+      console.error('Unlock error:', error);
+    } finally {
+      setIsProcessing(false);
+      getLockData();
+    }
+  };
+
+  const handleBlockHeightChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const dateChoice = new Date(e.target.value).getTime();
+    const blockCount = Math.ceil((dateChoice - Date.now()) / 1000 / 60 / 10);
+    const chainTip = await oneSatSPV.getChaintip();
+    if (!chainTip) return;
+    const blockHeight = chainTip.height + blockCount;
+    setLockBlockHeight(blockHeight);
+  };
+
+  const handleLockBsv = async () => {
+    try {
+      if (!identityAddress) return;
+      if (!lockBsvAmount || !lockBlockHeight) throw new Error('Invalid lock amount or block height');
+      if (!lockPassword) throw new Error('Please enter a password');
+      setIsProcessing(true);
+      const chainTip = await oneSatSPV.getChaintip();
+      if (chainTip?.height && chainTip.height >= lockBlockHeight) {
+        throw new Error('Invalid block height. Please choose a future block height.');
+      }
+      const sats = Math.round(lockBsvAmount * BSV_DECIMAL_CONVERSION);
+      const res = await bsvService.lockBsv(
+        [{ address: identityAddress, blockHeight: lockBlockHeight, sats }],
+        lockPassword,
+      );
+
+      if (!res?.txid) throw new Error(`${res?.error ?? 'An error occurred. Please try again.'}`);
+
+      addSnackbar('Funds locked successfully', 'success');
+      setLockBlockHeight(0);
+      setLockBsvAmount(null);
+    } catch (error) {
+      console.error('Lock error:', error);
+      addSnackbar(`${error ?? 'An error has occurred!'}`, 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const main = (
     <>
       <Show when={theme.settings.walletName === 'Yours'}>
@@ -328,6 +391,14 @@ export const AppsAndTools = () => {
         onClick={() => setPage('decode-broadcast')}
         jsxElement={<RightChevron color={theme.color.global.contrast} />}
       />
+      <Show when={theme.settings.services.locks}>
+        <AppsRow
+          name="Lock BSV"
+          description="Lock your coins for a set period of time"
+          onClick={() => setPage('lock-page')}
+          jsxElement={<RightChevron color={theme.color.global.contrast} />}
+        />
+      </Show>
       <Show when={theme.settings.services.locks}>
         <AppsRow
           name="Pending Locks"
@@ -375,6 +446,59 @@ export const AppsAndTools = () => {
     </LockDetailsContainer>
   );
 
+  const lockPage = (
+    <PageWrapper $marginTop={'0'}>
+      <HeaderText style={{ marginBottom: '1rem' }} theme={theme}>
+        Lock BSV
+      </HeaderText>
+      <Text theme={theme} style={{ marginBottom: '1rem' }}>
+        Lock your BSV for a set period of time. This will prevent you from spending them until the lock expires.
+      </Text>
+      <Input
+        theme={theme}
+        placeholder={'Enter BSV Amount'}
+        type="number"
+        min="0.00000001"
+        value={lockBsvAmount !== null && lockBsvAmount !== undefined ? lockBsvAmount : ''}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          const inputValue = e.target.value;
+          if (inputValue === '') {
+            setLockBsvAmount(null);
+          } else {
+            setLockBsvAmount(parseFloat(inputValue));
+          }
+        }}
+      />
+      <DateTimePicker theme={theme} onChange={handleBlockHeightChange} />
+      <Input
+        theme={theme}
+        placeholder={'Password'}
+        type="password"
+        value={lockPassword}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLockPassword(e.target.value)}
+      />
+      <Button
+        style={{ margin: '1rem' }}
+        theme={theme}
+        type="primary"
+        label={
+          isProcessing
+            ? 'Locking...'
+            : `${lockBlockHeight ? `Lock until block ${formatNumberWithCommasAndDecimals(lockBlockHeight, 0)}` : 'Lock'}`
+        }
+        onClick={handleLockBsv}
+        disabled={isProcessing}
+      />
+      <Button
+        style={{ margin: '1rem' }}
+        theme={theme}
+        type="secondary"
+        label={'Go back'}
+        onClick={() => setPage('main')}
+      />
+    </PageWrapper>
+  );
+
   const unlockPage = (
     <PageWrapper $marginTop={'0'}>
       <HeaderText style={{ marginBottom: '1rem' }} theme={theme}>
@@ -401,6 +525,9 @@ export const AppsAndTools = () => {
             </LockDetailsContainer>
           );
         })}
+      <Show when={lockData.unlockable > 0}>
+        <Button style={{ margin: '1rem' }} theme={theme} type="primary" label={'Unlock Funds'} onClick={handleUnlock} />
+      </Show>
       <Button
         style={{ margin: '1rem' }}
         theme={theme}
@@ -613,6 +740,9 @@ export const AppsAndTools = () => {
       <Show when={isProcessing && page === 'unlock'}>
         <PageLoader theme={theme} message={'Gathering info...'} />
       </Show>
+      <Show when={isProcessing && page === 'lock-page'}>
+        <PageLoader theme={theme} message={'Locking...'} />
+      </Show>
       <Show when={(isProcessing && page === 'decode-broadcast') || (isProcessing && page === 'decode')}>
         <PageLoader
           theme={theme}
@@ -625,6 +755,7 @@ export const AppsAndTools = () => {
       <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show>
       <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show>
       <Show when={!isProcessing && page === 'unlock'}>{unlockPage}</Show>
+      <Show when={!isProcessing && page === 'lock-page'}>{lockPage}</Show>
       <Show when={page === 'discover-apps'}>{discoverAppsPage}</Show>
       <Show when={page === 'sweep-wif'}>{wifSweepPage}</Show>
       <Show when={page === 'sponsor' && didSubmit}>

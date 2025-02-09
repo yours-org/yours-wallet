@@ -93,3 +93,24 @@ export const getErrorMessage = (error: string | undefined) => {
       return 'An unknown error has occurred! Try again.';
   }
 };
+
+export const decimalToHex = (d: number) => {
+  // helper function to convert integer to hex
+  const h = d.toString(16);
+  return h.length % 2 ? '0' + h : h;
+};
+
+export const changeEndianness = (string: string) => {
+  // change endianess of hex value before placing into ASM script
+  const result = [];
+  let len = string.length - 2;
+  while (len >= 0) {
+    result.push(string.substr(len, 2));
+    len -= 2;
+  }
+  return result.join('');
+};
+export const int2Hex = (int: number) => {
+  const unreversedHex = decimalToHex(int);
+  return changeEndianness(unreversedHex);
+};

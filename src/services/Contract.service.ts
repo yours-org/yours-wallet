@@ -4,7 +4,6 @@ import { KeysService } from './Keys.service';
 import { Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
 import { SPVStore, Txo } from 'spv-store';
 import { LockTemplate } from 'spv-store';
-
 export class ContractService {
   constructor(
     private readonly keysService: KeysService,
@@ -150,4 +149,28 @@ export class ContractService {
       return { error: JSON.stringify(error) };
     }
   };
+
+  // createLockOutputs = (lockData) => {
+  //   const tx = new Transaction(1, 0);
+
+  //   for (let index = 0; index < lockData.length; index++) {
+  //     const data = lockData[index];
+  //     const destinationAddress = P2PKHAddress.from_string(data.address);
+  //     const addressHex = destinationAddress.get_locking_script().to_asm_string().split(' ')[2];
+  //     const nLockTimeHexHeight = int2Hex(data.blockHeight);
+  //     const scriptTemplate = `${LOCKUP_PREFIX} ${addressHex} ${nLockTimeHexHeight} ${LOCKUP_SUFFIX}`;
+  //     const lockingScript = Script.from_asm_string(scriptTemplate);
+  //     const out = new TxOut(BigInt(data.sats), lockingScript);
+  //     tx.add_output(out);
+  //   }
+  //   return tx.to_hex();
+  // };
+
+  // rawHex = createLockOutputs([
+  //   {
+  //     address: '16vkCfMLXMfRn32S4qr9x3qeEkRFv5WqRo',
+  //     blockHeight: 816300,
+  //     sats: 500,
+  //   },
+  // ]);
 }
