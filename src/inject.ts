@@ -29,6 +29,7 @@ import {
   SendBsv20,
   PaginatedOrdinalsResponse,
   GetPaginatedOrdinals,
+  LockRequest,
 } from 'yours-wallet-provider';
 
 export enum YoursEventName {
@@ -55,6 +56,7 @@ export enum YoursEventName {
   GENERATE_TAGGED_KEYS = 'generateTaggedKeysRequest',
   GET_TAGGED_KEYS = 'getTaggedKeys',
   INSCRIBE = 'sendBsvRequest',
+  LOCK_BSV = 'sendBsvRequest',
   ENCRYPT = 'encryptRequest',
   DECRYPT = 'decryptRequest',
   SIGNED_OUT = 'signedOut',
@@ -91,6 +93,7 @@ export type RequestParams = {
     | SendBsv20
     | GetPaginatedOrdinals
     | InscribeRequest[]
+    | LockRequest[]
     | TransferOrdinal
     | PurchaseOrdinal
     | SignMessage
@@ -238,6 +241,7 @@ const createYoursEventEmitter = () => {
 
 const { on, removeListener, emit } = createYoursEventEmitter();
 
+//@ts-ignore TODO: remove this once MNEE is released.
 const provider: YoursProviderType = {
   isReady: true,
   on,
@@ -271,6 +275,7 @@ const provider: YoursProviderType = {
     YoursEventName.GET_TAGGED_KEYS,
   ),
   inscribe: createYoursMethod<SendBsvResponse | undefined, InscribeRequest[]>(YoursEventName.INSCRIBE),
+  lockBsv: createYoursMethod<SendBsvResponse | undefined, LockRequest[]>(YoursEventName.LOCK_BSV),
   encrypt: createYoursMethod<string[] | undefined, EncryptRequest>(YoursEventName.ENCRYPT),
   decrypt: createYoursMethod<string[] | undefined, DecryptRequest>(YoursEventName.DECRYPT),
 };

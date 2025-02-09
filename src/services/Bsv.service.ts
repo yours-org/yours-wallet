@@ -1,9 +1,7 @@
 import { OrdP2PKH } from 'js-1sat-ord';
-import { NetWork, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
+import { LockRequest, NetWork, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
 import {
   BSV_DECIMAL_CONVERSION,
-  LOCKUP_PREFIX,
-  LOCKUP_SUFFIX,
   MAINNET_ADDRESS_PREFIX,
   MAX_BYTES_PER_TX,
   TESTNET_ADDRESS_PREFIX,
@@ -32,15 +30,9 @@ import { SPVStore, Lock, TxoLookup } from 'spv-store';
 import { theme } from '../theme';
 //@ts-ignore
 import { PaymailClient } from '@bsv/paymail/client';
-import { int2Hex } from '../utils/tools';
+import { convertLockReqToSendBsvReq } from '../utils/tools';
 
 const client = new PaymailClient();
-
-export type LockRequest = {
-  address: string;
-  blockHeight: number;
-  sats: number;
-};
 
 export class BsvService {
   private bsvBalance: number;
@@ -110,17 +102,7 @@ export class BsvService {
   };
 
   lockBsv = async (lockData: LockRequest[], password: string) => {
-    const request = lockData.map((d) => {
-      const addressHex = Utils.fromBase58Check(d.address, 'hex').data as string;
-      const nLockTimeHexHeight = int2Hex(d.blockHeight);
-      const scriptTemplate = `${LOCKUP_PREFIX} ${addressHex} ${nLockTimeHexHeight} ${LOCKUP_SUFFIX}`;
-      const lockingScript = Script.fromASM(scriptTemplate);
-      return {
-        satoshis: d.sats,
-        script: lockingScript.toHex(),
-      } as SendBsv;
-    });
-
+    const request = convertLockReqToSendBsvReq(lockData);
     return await this.sendBsv(request, password);
   };
 

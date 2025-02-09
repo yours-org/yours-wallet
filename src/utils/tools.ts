@@ -1,6 +1,6 @@
-import { NetWork, TransactionFormat } from 'yours-wallet-provider';
-import { Transaction, Utils } from '@bsv/sdk';
-import { MAINNET_ADDRESS_PREFIX, TESTNET_ADDRESS_PREFIX } from './constants';
+import { LockRequest, NetWork, SendBsv, TransactionFormat } from 'yours-wallet-provider';
+import { Script, Transaction, Utils } from '@bsv/sdk';
+import { LOCKUP_PREFIX, LOCKUP_SUFFIX, MAINNET_ADDRESS_PREFIX, TESTNET_ADDRESS_PREFIX } from './constants';
 
 export const getCurrentUtcTimestamp = (): number => {
   const currentDate = new Date();
@@ -110,7 +110,21 @@ export const changeEndianness = (string: string) => {
   }
   return result.join('');
 };
+
 export const int2Hex = (int: number) => {
   const unreversedHex = decimalToHex(int);
   return changeEndianness(unreversedHex);
+};
+
+export const convertLockReqToSendBsvReq = (lockData: LockRequest[]) => {
+  return lockData.map((d) => {
+    const addressHex = Utils.fromBase58Check(d.address, 'hex').data as string;
+    const nLockTimeHexHeight = int2Hex(d.blockHeight);
+    const scriptTemplate = `${LOCKUP_PREFIX} ${addressHex} ${nLockTimeHexHeight} ${LOCKUP_SUFFIX}`;
+    const lockingScript = Script.fromASM(scriptTemplate);
+    return {
+      satoshis: d.sats,
+      script: lockingScript.toHex(),
+    } as SendBsv;
+  });
 };
