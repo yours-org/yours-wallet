@@ -21,7 +21,7 @@ const $shakeAnimation = keyframes`
 `;
 
 const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
-  background-color: ${({ theme }) => theme.color.global.gray + '10'};
+  background-color: ${({ theme }) => theme.color.global.row};
   border-radius: 0.25rem;
   border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
   font-size: 0.85rem;

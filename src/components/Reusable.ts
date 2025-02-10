@@ -105,3 +105,31 @@ export const Warning = styled.span<WhiteLabelTheme>`
   color: ${({ theme }) => theme.color.component.snackbarWarning};
   font-weight: 700;
 `;
+
+export const DateTimePicker = styled.input.attrs({
+  type: 'datetime-local',
+})<WhiteLabelTheme>`
+  background-color: ${({ theme }) => theme.color.global.row};
+  border-radius: 0.25rem;
+  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
+  width: 80%;
+  height: auto;
+  font-size: 0.85rem;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+  padding: 0.5rem 1rem;
+  margin: 0.5rem;
+  outline: none;
+  color: ${({ theme }) => theme.color.global.contrast};
+
+  &::placeholder {
+    color: ${({ theme }) => theme.color.global.gray};
+  }
+
+  &:focus {
+    border: 1px solid ${({ theme }) => theme.color.component.primaryButtonLeftGradient};
+  }
+
+  &::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+`;

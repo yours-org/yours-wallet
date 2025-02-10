@@ -4,7 +4,6 @@ import { KeysService } from './Keys.service';
 import { Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
 import { SPVStore, Txo } from 'spv-store';
 import { LockTemplate } from 'spv-store';
-
 export class ContractService {
   constructor(
     private readonly keysService: KeysService,

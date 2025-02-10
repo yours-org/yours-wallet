@@ -20,6 +20,7 @@ import {
   SendBsv20Response,
   SendBsv20,
   GetPaginatedOrdinals,
+  LockRequest,
 } from 'yours-wallet-provider';
 import {
   CustomListenerName,
@@ -41,6 +42,7 @@ import { mapOrdinal } from './utils/providerHelper';
 import { TxoLookup, TxoSort } from 'spv-store';
 import { initOneSatSPV } from './initSPVStore';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
+import { convertLockReqToSendBsvReq } from './utils/tools';
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
 const gorillaPoolService = new GorillaPoolService(chromeStorageService);
@@ -254,6 +256,7 @@ if (isInServiceWorker) {
           return processGetBsv20sRequest(sendResponse);
         case YoursEventName.SEND_BSV:
         case YoursEventName.INSCRIBE: // We use the sendBsv functionality here
+        case YoursEventName.LOCK_BSV: // We use the sendBsv functionality here
           return processSendBsvRequest(message, sendResponse);
         case YoursEventName.SEND_BSV20:
           return processSendBsv20Request(message, sendResponse);
@@ -608,7 +611,7 @@ if (isInServiceWorker) {
 
   // Important note: We process the InscribeRequest as a SendBsv request.
   const processSendBsvRequest = (
-    message: { params: { data: SendBsv[] | InscribeRequest[] } },
+    message: { params: { data: SendBsv[] | InscribeRequest[] | LockRequest[] } },
     sendResponse: CallbackResponse,
   ) => {
     if (!message.params.data) {
@@ -637,6 +640,12 @@ if (isInServiceWorker) {
             satoshis: d.satoshis ?? 1,
           } as SendBsv;
         });
+      }
+
+      // If in this if block, it's a lock() request.
+      const lockRequest = message.params.data as LockRequest[];
+      if (lockRequest[0].blockHeight) {
+        sendBsvRequest = convertLockReqToSendBsvReq(lockRequest);
       }
 
       chromeStorageService.update({ sendBsvRequest }).then(() => {
