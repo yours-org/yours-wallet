@@ -22,7 +22,6 @@ import TxPreview from '../components/TxPreview';
 import { TransactionFormat } from 'yours-wallet-provider';
 import { getTxFromRawTxFormat } from '../utils/tools';
 import { useSnackbar } from '../hooks/useSnackbar';
-import { LockData } from '../services/types/bsv.types';
 
 const Content = styled.div`
   display: flex;
@@ -188,7 +187,6 @@ export const AppsAndTools = () => {
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [lockBlockHeight, setLockBlockHeight] = useState(0);
   const [lockBsvAmount, setLockBsvAmount] = useState<number | null>(null);
-  const [lockData, setLockData] = useState<LockData>({ nextUnlock: 0, totalLocked: 0, unlockable: 0 });
   const [lockPassword, setLockPassword] = useState('');
 
   const [wifKey, setWifKey] = useState('');
@@ -249,7 +247,6 @@ export const AppsAndTools = () => {
     setIsProcessing(true);
     setCurrentBlockHeight(await bsvService.getCurrentHeight());
     setLockedUtxos(await bsvService.getLockedTxos());
-    setLockData(await bsvService.getLockData());
     setIsProcessing(false);
   };
 
@@ -525,9 +522,8 @@ export const AppsAndTools = () => {
             </LockDetailsContainer>
           );
         })}
-      <Show when={lockData.unlockable > 0}>
-        <Button style={{ margin: '1rem' }} theme={theme} type="primary" label={'Unlock Funds'} onClick={handleUnlock} />
-      </Show>
+
+      <Button style={{ margin: '1rem' }} theme={theme} type="primary" label={'Unlock Funds'} onClick={handleUnlock} />
       <Button
         style={{ margin: '1rem' }}
         theme={theme}
