@@ -57,6 +57,7 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
     indexers,
     owners,
     startSync && !!account,
+    new Set<string>(['fund', 'lock']),
     network == NetWork.Mainnet ? NetWork.Mainnet : NetWork.Testnet,
   );
 
