@@ -109,10 +109,10 @@ export class BsvService {
   sendAllBsv = async (destinationAddress: string, type: 'address' | 'paymail', password: string) => {
     try {
       const tx = new Transaction();
-      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+      const fundResults = await this.fundingTxos();
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       const pkMap = await this.keysService.retrievePrivateKeyMap(password);
-      for await (const u of fundResults.txos || []) {
+      for await (const u of fundResults || []) {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
         tx.addInput({
@@ -252,12 +252,12 @@ export class BsvService {
         change: true,
       });
 
-      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+      const fundResults = await this.fundingTxos();
 
       let satsIn = 0;
       let fee = 0;
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
-      for await (const u of fundResults.txos || []) {
+      for await (const u of fundResults || []) {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
         const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid, true);
@@ -427,10 +427,10 @@ export class BsvService {
     let fee = 0;
     tx.addOutput({ change: true, lockingScript: new P2PKH().lock(this.keysService.bsvAddress) });
 
-    const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+    const fundResults = await this.fundingTxos();
 
     const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
-    for await (const u of fundResults.txos || []) {
+    for await (const u of fundResults || []) {
       const pk = pkMap.get(u.owner || '');
       if (!pk) continue;
       tx.addInput({

@@ -125,12 +125,12 @@ export class OrdinalService {
         change: true,
       });
 
-      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+      const fundResults = await this.bsvService.fundingTxos();
 
       let satsIn = 0;
       let fee = 0;
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
-      for await (const u of fundResults.txos || []) {
+      for await (const u of fundResults || []) {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
         const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid, true);
@@ -187,7 +187,7 @@ export class OrdinalService {
 
       const pkMap = await this.keysService.retrievePrivateKeyMap(password);
 
-      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+      const fundResults = await this.bsvService.fundingTxos();
       const outpointObjects = outpoints.map((outpoint) => new Outpoint(outpoint));
       const ordUtxos = await this.oneSatSPV.getTxos(outpointObjects);
 
@@ -214,7 +214,7 @@ export class OrdinalService {
       );
 
       const paymentUtxos: Utxo[] = [];
-      fundResults.txos.forEach((t) => {
+      fundResults.forEach((t) => {
         const pk = pkMap.get(t.owner || '');
         if (!pk) return;
         paymentUtxos.push({
@@ -460,7 +460,7 @@ export class OrdinalService {
       const keys = await this.keysService.retrieveKeys(password);
 
       if (!keys.walletWif || !keys.ordWif) return { error: 'no-keys' };
-      const fundResults = await this.oneSatSPV.search(new TxoLookup('fund'));
+      const fundResults = await this.bsvService.fundingTxos();
 
       const pkMap = await this.keysService.retrievePrivateKeyMap(password);
 
@@ -486,7 +486,7 @@ export class OrdinalService {
       }
       let tx: Transaction = new Transaction();
       const utxos: Utxo[] = [];
-      fundResults.txos.forEach((t) => {
+      fundResults.forEach((t) => {
         const pk = pkMap.get(t.owner || '');
         if (!pk) return;
         utxos.push({
