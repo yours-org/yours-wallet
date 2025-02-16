@@ -41,6 +41,7 @@ export const MNEE_TOKEN_ID = 'c16a7b22240885c40d9b00ca65d97ed032561d748e85b46dcd
 export const MNEE_ICON_ID = '9c7f7f1788c6382d5ac737a4052334cf150b52d1e46c484ecfb1d6e00184f263_0'; // TODO: update to production
 export const MNEE_ICON_URL = `${GP_BASE_URL}/content/${MNEE_ICON_ID}`;
 export const MNEE_DECIMALS = 5; // TODO: update to production
+export const MNEE_MOBILE_REFERRAL_LINK = 'https://rockwalletllc.pxf.io/6ygyKG';
 
 // DERIVATION PATHS
 export const DEFAULT_WALLET_PATH = "m/44'/236'/0'/1/0";

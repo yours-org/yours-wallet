@@ -10,16 +10,17 @@ const QrImage = styled.img`
 `;
 
 export type QrCodeProps = {
-  address: string;
+  address?: string;
+  link?: string;
   onClick?: () => void;
 };
 
 export const QrCode = (props: QrCodeProps) => {
-  const { address, onClick } = props;
+  const { address, link, onClick } = props;
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const uri = `bitcoin:${address}`;
+    const uri = link ?? `bitcoin:${address}`;
     qr.toDataURL(uri, function (err, url) {
       if (err) {
         console.error(err);
@@ -27,7 +28,7 @@ export const QrCode = (props: QrCodeProps) => {
       }
       setQrUrl(url);
     });
-  }, [address]);
+  }, [address, link]);
 
   return <>{qrUrl && <QrImage src={qrUrl} alt="Bitcoin QR Code" onClick={onClick} />}</>;
 };

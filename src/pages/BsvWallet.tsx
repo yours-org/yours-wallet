@@ -23,7 +23,12 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { WhiteLabelTheme } from '../theme.types';
-import { BSV_DECIMAL_CONVERSION, HOSTED_YOURS_IMAGE, MNEE_ICON_URL } from '../utils/constants';
+import {
+  BSV_DECIMAL_CONVERSION,
+  HOSTED_YOURS_IMAGE,
+  MNEE_ICON_URL,
+  MNEE_MOBILE_REFERRAL_LINK,
+} from '../utils/constants';
 import { formatNumberWithCommasAndDecimals, formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import copyIcon from '../assets/copy.svg';
@@ -146,7 +151,13 @@ const UnitSwitcher = styled.div`
   cursor: pointer;
 `;
 
-type PageState = 'main' | 'receive' | 'send' | 'sendMNEE';
+const GetMneeContainer = styled(ReceiveContent)<WhiteLabelTheme>`
+  height: 100%;
+  background-color: ${({ theme }) => theme.color.global.walletBackground};
+  z-index: 9999;
+`;
+
+type PageState = 'main' | 'receive' | 'send' | 'sendMNEE' | 'getMNEE';
 type AmountType = 'bsv' | 'usd';
 
 export type BsvWalletProps = {
@@ -631,14 +642,18 @@ export const BsvWallet = (props: BsvWalletProps) => {
           usdBalance={bsvBalance * exchangeRate}
           showPointer={false}
         />
-        <AssetRow
-          balance={mneeBalance}
-          icon={MNEE_ICON_URL}
-          ticker="MNEE USD"
-          usdBalance={mneeBalance}
-          showPointer
-          onClick={() => setPageState('sendMNEE')}
-        />
+        <Show when={services.mnee}>
+          <AssetRow
+            balance={mneeBalance}
+            icon={MNEE_ICON_URL}
+            ticker="MNEE USD"
+            usdBalance={mneeBalance}
+            showPointer={mneeBalance > 0}
+            isMNEE
+            onGetMneeClick={() => setPageState('getMNEE')}
+            onClick={() => (mneeBalance > 0 ? setPageState('sendMNEE') : null)}
+          />
+        </Show>
         {lockData && (
           <Show when={services.locks && lockData.totalLocked > 0}>
             <AssetRow
@@ -754,6 +769,32 @@ export const BsvWallet = (props: BsvWalletProps) => {
         />
       </ScrollableConfirmContent>
     </>
+  );
+
+  const getMnee = (
+    <GetMneeContainer theme={theme}>
+      <Icon src={MNEE_ICON_URL} size="3rem" style={{ margin: 0, borderRadius: '50%' }} />
+      <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
+        Get Started with MNEE
+      </HeaderText>
+      <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
+        MNEE is the <Warning theme={theme}>first USD backed stablecoin</Warning> to leverage the BSV blockchain. Each
+        token is equal to $1.00 USD and is fully collateralized with US T-bills and cash equivalents.
+      </Text>
+
+      <QrCode link={MNEE_MOBILE_REFERRAL_LINK} onClick={handleCopyToClipboard} />
+      <Text theme={theme} style={{ margin: '1rem 0', fontWeight: 700 }}>
+        Scan with your mobile device
+      </Text>
+      <Button
+        label="Go back"
+        theme={theme}
+        type="secondary"
+        onClick={() => {
+          setPageState('main');
+        }}
+      />
+    </GetMneeContainer>
   );
 
   const send = (
@@ -920,6 +961,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
       <Show when={!isProcessing && pageState === 'receive'}>{receive}</Show>
       <Show when={!isProcessing && pageState === 'send'}>{send}</Show>
       <Show when={!isProcessing && pageState === 'sendMNEE'}>{sendMNEE}</Show>
+      <Show when={!isProcessing && pageState === 'getMNEE'}>{getMnee}</Show>
     </>
   );
 };
