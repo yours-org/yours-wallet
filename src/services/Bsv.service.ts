@@ -1,5 +1,5 @@
 import { OrdP2PKH } from 'js-1sat-ord';
-import { NetWork, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
+import { LockRequest, NetWork, SendBsv, SignedMessage, SignMessage } from 'yours-wallet-provider';
 import {
   BSV_DECIMAL_CONVERSION,
   MAINNET_ADDRESS_PREFIX,
@@ -30,6 +30,7 @@ import { SPVStore, Lock, TxoLookup } from 'spv-store';
 import { theme } from '../theme';
 //@ts-ignore
 import { PaymailClient } from '@bsv/paymail/client';
+import { convertLockReqToSendBsvReq } from '../utils/tools';
 
 const client = new PaymailClient();
 
@@ -98,6 +99,11 @@ export class BsvService {
     if (txos.length > 0) {
       return await this.contractService.unlock(txos, blockHeight);
     }
+  };
+
+  lockBsv = async (lockData: LockRequest[], password: string) => {
+    const request = convertLockReqToSendBsvReq(lockData);
+    return await this.sendBsv(request, password);
   };
 
   sendAllBsv = async (destinationAddress: string, type: 'address' | 'paymail', password: string) => {
