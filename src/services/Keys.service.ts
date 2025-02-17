@@ -136,7 +136,7 @@ export class KeysService {
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       for await (const u of utxos || []) {
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash, true),
+          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash),
           sourceOutputIndex: u.tx_pos,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(sweepWallet.privKey),
@@ -183,7 +183,7 @@ export class KeysService {
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       for await (const u of utxos || []) {
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash, true),
+          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash),
           sourceOutputIndex: u.tx_pos,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(privKey),

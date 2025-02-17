@@ -30,9 +30,9 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
   if (!identityAddress) identityAddress = '';
   if (!ordAddress) ordAddress = '';
   const owners = new Set<string>([bsvAddress, identityAddress, ordAddress]);
-  const indexers: Indexer[] = [new FundIndexer(owners, IndexMode.TrustAndVerify, network)];
+  const indexers: Indexer[] = [new FundIndexer(owners, network)];
 
-  const lockIndexer = new LockIndexer(owners, IndexMode.TrustAndVerify, network);
+  const lockIndexer = new LockIndexer(owners, network);
 
   const bsv20Indexers = [
     new Bsv21Indexer(owners, IndexMode.Trust, [], network),
@@ -40,12 +40,12 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
   ];
 
   const ordIndexers = [
-    new OneSatIndexer(owners, IndexMode.TrustAndVerify, network),
-    new OrdLockIndexer(owners, IndexMode.TrustAndVerify, network),
-    new InscriptionIndexer(owners, IndexMode.TrustAndVerify, network),
-    new MapIndexer(owners, IndexMode.Verify, network),
-    new SigmaIndexer(owners, IndexMode.Verify, network),
-    new OriginIndexer(owners, IndexMode.TrustAndVerify, network),
+    // new OneSatIndexer(owners, network),
+    new OrdLockIndexer(owners, network),
+    new InscriptionIndexer(owners, network),
+    new MapIndexer(owners, network),
+    new SigmaIndexer(owners, network),
+    new OriginIndexer(owners, network),
   ];
 
   if (theme.settings.services.locks) indexers.push(lockIndexer);
@@ -57,7 +57,7 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
     indexers,
     owners,
     startSync && !!account,
-    new Set<string>(['fund', 'lock']),
+    new Set<string>(['lock', 'fund', 'origin']),
     network == NetWork.Mainnet ? NetWork.Mainnet : NetWork.Testnet,
   );
 
