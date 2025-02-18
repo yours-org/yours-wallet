@@ -7,10 +7,11 @@ import {
   InscriptionIndexer,
   LockIndexer,
   MapIndexer,
-  OneSatIndexer,
+  // OneSatIndexer,
   OneSatWebSPV,
   OrdLockIndexer,
   OriginIndexer,
+  ParseMode,
   SigmaIndexer,
 } from 'spv-store';
 import { NetWork } from 'yours-wallet-provider';
@@ -25,14 +26,17 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
   const network = chromeStorageService.getNetwork();
 
+  // Set true to sync full history of transactions.
+  const SYNC_HISTORY = false;
+
   let { bsvAddress, identityAddress, ordAddress } = account?.addresses || {};
   if (!bsvAddress) bsvAddress = '';
   if (!identityAddress) identityAddress = '';
   if (!ordAddress) ordAddress = '';
   const owners = new Set<string>([bsvAddress, identityAddress, ordAddress]);
-  const indexers: Indexer[] = [new FundIndexer(owners, network)];
+  const indexers: Indexer[] = [new FundIndexer(owners, network, SYNC_HISTORY)];
 
-  const lockIndexer = new LockIndexer(owners, network);
+  const lockIndexer = new LockIndexer(owners, network, SYNC_HISTORY);
 
   const bsv20Indexers = [
     new Bsv21Indexer(owners, IndexMode.Trust, [], network),
@@ -40,12 +44,12 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
   ];
 
   const ordIndexers = [
-    // new OneSatIndexer(owners, network),
+    // new OneSatIndexer(owners, network, SYNC_HISTORY),
     new OrdLockIndexer(owners, network),
     new InscriptionIndexer(owners, network),
     new MapIndexer(owners, network),
     new SigmaIndexer(owners, network),
-    new OriginIndexer(owners, network),
+    new OriginIndexer(owners, network, SYNC_HISTORY),
   ];
 
   if (theme.settings.services.locks) indexers.push(lockIndexer);
@@ -56,9 +60,10 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
     selectedAccount || '',
     indexers,
     owners,
-    startSync && !!account,
-    new Set<string>(['lock', 'fund', 'origin']),
     network == NetWork.Mainnet ? NetWork.Mainnet : NetWork.Testnet,
+    startSync && !!account,
+    new Set<string>(['fund', 'lock', 'origin']),
+    ParseMode.Persist,
   );
 
   if (!oneSatSPV) throw Error('SPV not initialized!');
