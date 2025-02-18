@@ -40,7 +40,7 @@ export class OrdinalService {
   ) {}
 
   getOrdinals = async (from = ''): Promise<PaginatedOrdinalsResponse> => {
-    const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 50, from);
+    const ordinals = await this.oneSatSPV.search(new TxoLookup('origin', 'type'), TxoSort.DESC, 50, from);
     const mapped = ordinals.txos
       .filter(
         (o) =>
