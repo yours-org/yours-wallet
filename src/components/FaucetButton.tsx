@@ -29,7 +29,7 @@ export function FaucetButton({ address, isTestnet, onConfirmation }: FaucetButto
 
       if (response.code === 0) {
         const tx = Transaction.fromHex(response.raw);
-        const res = await oneSatSPV.stores.txos?.ingest(tx, 'faucet', ParseMode.Persist, false);
+        const res = await oneSatSPV.stores.txos?.ingest(tx, 'faucet', ParseMode.Persist);
         if (res?.txid) {
           onConfirmation();
         } else {
