@@ -34,7 +34,7 @@ export const getTxFromRawTxFormat = (rawTx: string | number[], format: Transacti
     format === 'tx'
       ? Transaction.fromHex(rawTx as string)
       : format === 'beef'
-        ? Transaction.fromBEEF(rawTx as number[])
+        ? Transaction.fromAtomicBEEF(rawTx as number[])
         : Transaction.fromEF(rawTx as number[]);
   return tx;
 };

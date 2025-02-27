@@ -40,7 +40,7 @@ export class OrdinalService {
   ) {}
 
   getOrdinals = async (from = ''): Promise<PaginatedOrdinalsResponse> => {
-    const ordinals = await this.oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 50, from);
+    const ordinals = await this.oneSatSPV.search(new TxoLookup('origin', 'type'), TxoSort.DESC, 50, from);
     const mapped = ordinals.txos
       .filter(
         (o) =>
@@ -95,7 +95,7 @@ export class OrdinalService {
       if (!u) return { error: 'no-ordinal' };
       const pk = pkMap.get(u.owner || '');
       if (!pk) return { error: 'no-keys' };
-      const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid, true);
+      const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
       if (!sourceTransaction) {
         console.log(`Could not find source transaction ${u.outpoint.txid}`);
         return { error: 'source-tx-not-found' };
@@ -133,7 +133,7 @@ export class OrdinalService {
       for await (const u of fundResults || []) {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
-        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid, true);
+        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
         if (!sourceTransaction) {
           console.log(`Could not find source transaction ${u.outpoint.txid}`);
           return { error: 'source-tx-not-found' };
