@@ -585,7 +585,7 @@ if (isInServiceWorker) {
       chromeStorageService.getAndSetStorage().then(async () => {
         const oneSatSPV = await oneSatSPVPromise;
         if (!oneSatSPV) throw Error('SPV not initialized!');
-        const results = await oneSatSPV.search(new TxoLookup('fund'));
+        const results = await oneSatSPV.search(new TxoLookup('fund'), undefined, 0);
         const utxos = results.txos.map((txo) => {
           return {
             txid: txo.outpoint.txid,
