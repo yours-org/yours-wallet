@@ -164,7 +164,7 @@ export class MNEEService {
       }
 
       if (fee > 0) tx.addOutput(this.createInscription(config.feeAddress, fee, config));
-      tx.addOutput(this.createInscription(addresses.ordAddress, tokensIn - totalAtomicTokenAmount - fee, config));
+      tx.addOutput(this.createInscription(addresses.bsvAddress, tokensIn - totalAtomicTokenAmount - fee, config));
 
       // Signing transaction
       const sigRequests: SignatureRequest[] = tx.inputs.map((input, index) => {
@@ -196,6 +196,7 @@ export class MNEEService {
       }
 
       // Submit transaction using Axios
+      console.log('pre-signed', tx.toHex());
       const base64Tx = Utils.toBase64(tx.toBinary());
       const response = await axios.post<{ rawtx: string }>(`${MNEE_API}/v1/transfer`, {
         rawtx: base64Tx,
