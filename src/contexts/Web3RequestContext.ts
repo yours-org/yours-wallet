@@ -19,7 +19,7 @@ export type Web3RequestContextProps = {
   connectRequest: RequestParams | undefined;
   sendBsvRequest: SendBsv[] | undefined;
   sendBsv20Request: SendBsv20 | undefined;
-  sendMNEERequest: SendMNEE | undefined;
+  sendMNEERequest: SendMNEE[] | undefined;
   transferOrdinalRequest: TransferOrdinal | undefined;
   purchaseOrdinalRequest: PurchaseOrdinal | undefined;
   signMessageRequest: SignMessage | undefined;

@@ -97,7 +97,7 @@ export type RequestParams = {
   data?:
     | SendBsv[]
     | SendBsv20
-    | SendMNEE
+    | SendMNEE[]
     | GetPaginatedOrdinals
     | InscribeRequest[]
     | LockRequest[]
@@ -270,7 +270,7 @@ const provider: YoursProviderType = {
   getBsv20s: createYoursMethod<Bsv20[] | undefined, void>(YoursEventName.GET_BSV20S),
   sendBsv: createYoursMethod<SendBsvResponse | undefined, SendBsv[]>(YoursEventName.SEND_BSV),
   sendBsv20: createYoursMethod<SendBsv20Response | undefined, SendBsv20>(YoursEventName.SEND_BSV20),
-  sendMNEE: createYoursMethod<SendMNEEResponse | undefined, SendMNEE>(YoursEventName.SEND_MNEE),
+  sendMNEE: createYoursMethod<SendMNEEResponse | undefined, SendMNEE[]>(YoursEventName.SEND_MNEE),
   transferOrdinal: createYoursMethod<string | undefined, TransferOrdinal>(YoursEventName.TRANSFER_ORDINAL),
   signMessage: createYoursMethod<SignedMessage | undefined, SignMessage>(YoursEventName.SIGN_MESSAGE),
   broadcast: createYoursMethod<string | undefined, Broadcast>(YoursEventName.BROADCAST),

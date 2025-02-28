@@ -24,7 +24,7 @@ const Icon = styled.img`
 `;
 
 export type MNEESendRequestProps = {
-  request: SendMNEE;
+  request: SendMNEE[];
   popupId: number | undefined;
   onResponse: () => void;
 };
@@ -43,13 +43,24 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
       const validationFail = new Map<string, boolean>();
       validationFail.set('address', false);
 
-      if (request.address && !validate(request.address)) {
-        validationFail.set('address', true);
-        return;
+      for (const req of request) {
+        if (req.address && !validate(req.address)) {
+          validationFail.set('address', true);
+          break;
+        }
+        if (req.amount && !req.amount) {
+          validationFail.set('amount', true);
+          break;
+        }
       }
+
       let validationErrorMessage = '';
       if (validationFail.get('address')) {
         validationErrorMessage = 'Found an invalid receive address.';
+      }
+
+      if (validationFail.get('amount')) {
+        validationErrorMessage = 'Found an invalid amount.';
       }
 
       if (validationErrorMessage) {
@@ -57,12 +68,7 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
         return;
       }
 
-      if (request.address && !request.amount) {
-        addSnackbar('No amount supplied', 'info');
-        return;
-      }
-
-      const sendRes = await mneeService.transfer(request.address, request.amount, password);
+      const sendRes = await mneeService.transfer(request, password);
       if (!sendRes.txid || !sendRes.rawtx || sendRes.error) {
         addSnackbar(getErrorMessage(sendRes.error), 'error');
         setIsProcessing(false);
@@ -112,6 +118,8 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
     window.location.reload();
   };
 
+  const totalAmount = request.reduce((acc, req) => acc + req.amount, 0);
+
   return (
     <>
       <Show when={isProcessing}>
@@ -121,10 +129,9 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
         <ConfirmContent>
           <Icon src={MNEE_ICON_URL} />
           <HeaderText theme={theme}>Approve Request</HeaderText>
-          <Text
-            theme={theme}
-            style={{ cursor: 'pointer', margin: '0.75rem 0', color: theme.color.global.gray }}
-          >{`Send to: ${truncate(request.address, 5, 5)}`}</Text>
+          <Text theme={theme} style={{ cursor: 'pointer', margin: '0.75rem 0', color: theme.color.global.gray }}>
+            {request.length === 1 ? `Send to: ${truncate(request[0].address, 5, 5)}` : 'Send to multiple recipients.'}
+          </Text>
           <FormContainer noValidate onSubmit={(e) => handleSendMNEE(e)}>
             <Input
               theme={theme}
@@ -139,7 +146,7 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
             <Button
               theme={theme}
               type="primary"
-              label={`Approve ${formatNumberWithCommasAndDecimals(request.amount, MNEE_DECIMALS)} MNEE`}
+              label={`Approve ${formatNumberWithCommasAndDecimals(totalAmount, MNEE_DECIMALS)} MNEE`}
               disabled={isProcessing}
               isSubmit
             />

@@ -2,7 +2,7 @@ import { PublicKey, Script, Transaction, TransactionSignature, UnlockingScript }
 import axios from 'axios';
 import { Inscription, applyInscription } from 'js-1sat-ord';
 import { SPVStore } from 'spv-store';
-import { MNEEBalance, SignatureRequest } from 'yours-wallet-provider';
+import { MNEEBalance, SendMNEE, SignatureRequest } from 'yours-wallet-provider';
 import { MNEE_API } from '../utils/constants';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { ContractService } from './Contract.service';
@@ -66,7 +66,7 @@ export class MNEEService {
     }
   };
 
-  private toTokenSat(amount: number, decimals: number): number {
+  private toAtomicAmount(amount: number, decimals: number): number {
     return Math.round(amount * 10 ** decimals);
   }
 
@@ -107,38 +107,38 @@ export class MNEEService {
   };
 
   transfer = async (
-    recipient: string,
-    amount: number,
+    request: SendMNEE[],
     password: string,
   ): Promise<{ txid?: string; rawtx?: string; error?: string }> => {
     try {
       const config = await this.getConfig();
       if (!config) throw new Error('Config not fetched');
 
-      const tokenSatAmt = this.toTokenSat(amount, config.decimals);
+      const totalAmount = request.reduce((sum, req) => sum + req.amount, 0);
+      if (totalAmount <= 0) return { error: 'Invalid amount' };
+      const totalAtomicTokenAmount = this.toAtomicAmount(totalAmount, config.decimals);
 
       // Fetch UTXOs
       const utxos = await this.getUtxos();
       const totalUtxoAmount = utxos.reduce((sum, utxo) => sum + (utxo.data.bsv21.amt || 0), 0);
 
-      if (totalUtxoAmount < tokenSatAmt) {
+      if (totalUtxoAmount < totalAtomicTokenAmount) {
         return { error: 'Insufficient MNEE balance' };
       }
 
       // Determine fee
-      let fee = 0;
-      if (recipient !== config.burnAddress) {
-        const foundFee = config.fees.find((fee) => tokenSatAmt >= fee.min && tokenSatAmt <= fee.max)?.fee;
-        if (foundFee === undefined) return { error: 'Fee ranges inadequate' };
-        fee = foundFee;
-      }
+      const fee =
+        request.find((req) => req.address === config.burnAddress) !== undefined
+          ? 0
+          : config.fees.find((fee) => totalAtomicTokenAmount >= fee.min && totalAtomicTokenAmount <= fee.max)?.fee;
+      if (fee === undefined) return { error: 'Fee ranges inadequate' };
 
       // Build transaction
       const tx = new Transaction(1, [], [], 0);
       let tokensIn = 0;
       const signingAddresses: string[] = [];
 
-      while (tokensIn < tokenSatAmt + fee) {
+      while (tokensIn < totalAtomicTokenAmount + fee) {
         const utxo = utxos.shift();
         if (!utxo) return { error: 'Insufficient MNEE balance' };
 
@@ -159,9 +159,12 @@ export class MNEEService {
 
       // Add outputs
       const addresses = this.getAddresses();
-      tx.addOutput(this.createInscription(recipient, tokenSatAmt, config));
+      for (const req of request) {
+        tx.addOutput(this.createInscription(req.address, this.toAtomicAmount(req.amount, config.decimals), config));
+      }
+
       if (fee > 0) tx.addOutput(this.createInscription(config.feeAddress, fee, config));
-      tx.addOutput(this.createInscription(addresses.ordAddress, tokensIn - tokenSatAmt - fee, config));
+      tx.addOutput(this.createInscription(addresses.ordAddress, tokensIn - totalAtomicTokenAmount - fee, config));
 
       // Signing transaction
       const sigRequests: SignatureRequest[] = tx.inputs.map((input, index) => {
@@ -198,15 +201,14 @@ export class MNEEService {
         rawtx: base64Tx,
       });
 
+      if (!response.data.rawtx) return { error: 'Failed to broadcast transaction' };
+
       const decodedBase64AsBinary = Utils.toArray(response.data.rawtx, 'base64');
       const tx2 = Transaction.fromBinary(decodedBase64AsBinary);
 
-      console.log(Utils.toHex(decodedBase64AsBinary));
-      const rep = await this.oneSatSPV.broadcast(tx2);
+      this.oneSatSPV.broadcast(tx2);
 
-      if (!rep?.txid) return { error: 'Failed to broadcast transaction' };
-
-      return { txid: rep.txid, rawtx: Utils.toHex(decodedBase64AsBinary) };
+      return { txid: tx2.id('hex'), rawtx: Utils.toHex(decodedBase64AsBinary) };
     } catch (error) {
       let errorMessage = 'Transaction submission failed';
 

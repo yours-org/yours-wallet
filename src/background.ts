@@ -714,8 +714,8 @@ if (isInServiceWorker) {
     }
   };
 
-  const processSendMNEERequest = (message: { params: SendMNEE }, sendResponse: CallbackResponse) => {
-    if (!message.params) {
+  const processSendMNEERequest = (message: { params: { data: SendMNEE[] } }, sendResponse: CallbackResponse) => {
+    if (!message.params.data) {
       sendResponse({
         type: YoursEventName.SEND_MNEE,
         success: false,
@@ -725,7 +725,7 @@ if (isInServiceWorker) {
     }
     try {
       responseCallbackForSendMNEERequest = sendResponse;
-      const sendMNEERequest = message.params;
+      const sendMNEERequest = message.params.data;
       chromeStorageService.update({ sendMNEERequest }).then(() => {
         launchPopUp();
       });

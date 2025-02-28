@@ -75,7 +75,7 @@ export interface ChromeStorageObject {
   connectRequest?: ConnectRequest;
   sendBsvRequest?: SendBsv[];
   sendBsv20Request?: SendBsv20;
-  sendMNEERequest?: SendMNEE;
+  sendMNEERequest?: SendMNEE[];
   transferOrdinalRequest?: TransferOrdinal;
   purchaseOrdinalRequest?: PurchaseOrdinal;
   signMessageRequest?: SignMessage;

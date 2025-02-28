@@ -40,14 +40,14 @@
     "react-router-dom": "^6.16.0",
     "react-scripts": "^5.0.1",
     "replace-module-webpack-plugin": "^1.0.0",
-    "spv-store": "^0.1.72",
+    "spv-store": "file:spv-store-0.1.73.tgz",
     "stream-browserify": "^3.0.0",
     "styled-components": "^6.0.8",
     "ts-loader": "^9.5.1",
     "typescript": "^4.9.5",
     "url": "^0.11.3",
     "util": "^0.12.5",
-    "yours-wallet-provider": "^3.6.0"
+    "yours-wallet-provider": "^3.6.1"
   },
   "scripts": {
     "start": "react-app-rewired start",

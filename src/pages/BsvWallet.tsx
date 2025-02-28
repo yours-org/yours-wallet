@@ -431,7 +431,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
       return;
     }
 
-    const res = await mneeService.transfer(mneeRecipient, mneeReciepientAmount, passwordConfirm);
+    const res = await mneeService.transfer([{ address: mneeRecipient, amount: mneeReciepientAmount }], passwordConfirm);
     if (!res.txid || res.error) {
       addSnackbar(res.error ?? 'An unknown error occurred.', 'error');
       setPasswordConfirm('');
@@ -442,6 +442,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
     setMneeRecipient('');
     setMneeRecipientAmount(null);
     setTimeout(updateMneeBalance, 1000);
+    setPasswordConfirm('');
     setPageState('main');
     addSnackbar('Transaction Successful!', 'success');
     setIsProcessing(false);

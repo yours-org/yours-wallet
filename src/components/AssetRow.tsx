@@ -57,7 +57,7 @@ const GradientButton = styled.button<WhiteLabelTheme>`
   padding: 0.5rem 1rem;
   font-size: 0.85rem;
   font-weight: bold;
-  border-radius: 0.5rem;
+  border-radius: 0.25rem;
   width: 10rem;
   margin-right: 1rem;
   cursor: pointer;
