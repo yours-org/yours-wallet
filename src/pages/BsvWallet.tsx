@@ -577,7 +577,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         }
       >
         <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
-          You may safely send <Warning theme={theme}>BSV and Ordinals</Warning> to this address.
+          You may safely send <Warning theme={theme}>BSV, MNEE, and Ordinals</Warning> to this address.
         </Text>
       </Show>
 

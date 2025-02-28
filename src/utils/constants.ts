@@ -35,7 +35,7 @@ export const GENERIC_NFT_ICON = 'https://cdn-icons-png.flaticon.com/512/6228/622
 export const KNOWN_BURN_ADDRESSES = ['1111111111111111111114oLvT2', '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'];
 
 // MNEE
-export const MNEE_API = 'https://mnee-cosigner-production.up.railway.app/v1'; // TODO: update to production
+export const MNEE_API = 'https://stg-api-cosigner.mnee.net'; // TODO: update to production
 export const MNEE_SYM = 'MNEE';
 export const MNEE_TOKEN_ID = 'c16a7b22240885c40d9b00ca65d97ed032561d748e85b46dcdf6ace4c84ab988_0'; // TODO: update to production
 export const MNEE_ICON_ID = '9c7f7f1788c6382d5ac737a4052334cf150b52d1e46c484ecfb1d6e00184f263_0'; // TODO: update to production

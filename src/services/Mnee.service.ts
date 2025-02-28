@@ -20,7 +20,7 @@ export class MNEEService {
 
   getConfig = async (): Promise<MNEEConfig | undefined> => {
     try {
-      const { data } = await axios.get<MNEEConfig>(`${MNEE_API}/config`);
+      const { data } = await axios.get<MNEEConfig>(`${MNEE_API}/v1/config`);
       return data;
     } catch (error) {
       console.error('Failed to fetch config:', error);
@@ -89,7 +89,7 @@ export class MNEEService {
   getUtxos = async (ops: MNEEOperation[] = ['transfer', 'deploy+mint']): Promise<MNEEUtxo[]> => {
     try {
       const addresses = this.getAddresses();
-      const { data } = await axios.post<MNEEUtxo[]>(`${MNEE_API}/utxos`, [
+      const { data } = await axios.post<MNEEUtxo[]>(`${MNEE_API}/v1/utxos`, [
         addresses.bsvAddress,
         addresses.ordAddress,
         addresses.identityAddress,
@@ -142,7 +142,7 @@ export class MNEEService {
         const utxo = utxos.shift();
         if (!utxo) return { error: 'Insufficient MNEE balance' };
 
-        const sourceTransaction = await this.oneSatSPV.getTx(utxo.txid, true);
+        const sourceTransaction = await this.oneSatSPV.getTx(utxo.txid);
         if (!sourceTransaction) return { error: 'Failed to fetch source transaction' };
 
         signingAddresses.push(utxo.owners[0]);
@@ -194,12 +194,14 @@ export class MNEEService {
 
       // Submit transaction using Axios
       const base64Tx = Utils.toBase64(tx.toBinary());
-      const response = await axios.post<{ rawtx: string }>(`${MNEE_API}/transfer`, {
+      const response = await axios.post<{ rawtx: string }>(`${MNEE_API}/v1/transfer`, {
         rawtx: base64Tx,
       });
 
       const decodedBase64AsBinary = Utils.toArray(response.data.rawtx, 'base64');
       const tx2 = Transaction.fromBinary(decodedBase64AsBinary);
+
+      console.log(Utils.toHex(decodedBase64AsBinary));
       const rep = await this.oneSatSPV.broadcast(tx2);
 
       if (!rep?.txid) return { error: 'Failed to broadcast transaction' };

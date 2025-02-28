@@ -271,27 +271,33 @@ export const AppsAndTools = () => {
 
   const handleDecode = async () => {
     setIsProcessing(true);
-    const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
-    const data = await oneSatSPV.parseTx(tx);
-    setTxData(data);
-    let userSatsOut = data.spends.reduce((acc, spend) => {
-      if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
-        return acc + spend.satoshis;
-      }
-      return acc;
-    }, 0n);
+    try {
+      const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
+      const data = await oneSatSPV.parseTx(tx);
+      setTxData(data);
+      let userSatsOut = data.spends.reduce((acc, spend) => {
+        if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
+          return acc + spend.satoshis;
+        }
+        return acc;
+      }, 0n);
 
-    // how much did the user get back from the tx
-    userSatsOut = data.txos.reduce((acc, txo) => {
-      if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
-        return acc - txo.satoshis;
-      }
-      return acc;
-    }, userSatsOut);
+      // how much did the user get back from the tx
+      userSatsOut = data.txos.reduce((acc, txo) => {
+        if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
+          return acc - txo.satoshis;
+        }
+        return acc;
+      }, userSatsOut);
 
-    setSatsOut(Number(userSatsOut));
-    setIsProcessing(false);
-    setPage('decode');
+      setSatsOut(Number(userSatsOut));
+      setIsProcessing(false);
+      setPage('decode');
+    } catch (error) {
+      console.error('Decode error:', error);
+      addSnackbar('An error occurred while decoding the transaction', 'error');
+      setIsProcessing(false);
+    }
   };
 
   const handleBroadcast = async () => {
