@@ -36,7 +36,7 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
   if (!identityAddress) identityAddress = '';
   if (!ordAddress) ordAddress = '';
   const owners = new Set<string>([bsvAddress, identityAddress, ordAddress]);
-  const indexers: Indexer[] = [new FundIndexer(owners, network, SYNC_HISTORY)];
+  const indexers: Indexer[] = [new FundIndexer(owners, network, SYNC_HISTORY), new CosignIndexer(owners, network)];
 
   const lockIndexer = new LockIndexer(owners, network, SYNC_HISTORY);
 
