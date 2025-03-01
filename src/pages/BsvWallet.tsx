@@ -643,7 +643,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           usdBalance={bsvBalance * exchangeRate}
           showPointer={false}
         />
-        <Show when={services.mnee}>
+        <Show when={services.mnee && !isTestnet}>
           <AssetRow
             balance={mneeBalance}
             icon={MNEE_ICON_URL}

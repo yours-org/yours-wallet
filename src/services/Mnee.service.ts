@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Inscription, applyInscription } from 'js-1sat-ord';
 import { SPVStore } from 'spv-store';
 import { MNEEBalance, SendMNEE, SignatureRequest } from 'yours-wallet-provider';
-import { MNEE_API } from '../utils/constants';
+import { MNEE_API, MNEE_API_TOKEN } from '../utils/constants';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { ContractService } from './Contract.service';
 import CosignTemplate from '../utils/mneeCosignTemplate';
@@ -20,7 +20,7 @@ export class MNEEService {
 
   getConfig = async (): Promise<MNEEConfig | undefined> => {
     try {
-      const { data } = await axios.get<MNEEConfig>(`${MNEE_API}/v1/config`);
+      const { data } = await axios.get<MNEEConfig>(`${MNEE_API}/v1/config?auth_token=${MNEE_API_TOKEN}`);
       return data;
     } catch (error) {
       console.error('Failed to fetch config:', error);
@@ -89,7 +89,7 @@ export class MNEEService {
   getUtxos = async (ops: MNEEOperation[] = ['transfer', 'deploy+mint']): Promise<MNEEUtxo[]> => {
     try {
       const addresses = this.getAddresses();
-      const { data } = await axios.post<MNEEUtxo[]>(`${MNEE_API}/v1/utxos`, [
+      const { data } = await axios.post<MNEEUtxo[]>(`${MNEE_API}/v1/utxos?auth_token=${MNEE_API_TOKEN}`, [
         addresses.bsvAddress,
         addresses.ordAddress,
         addresses.identityAddress,
@@ -198,7 +198,7 @@ export class MNEEService {
       // Submit transaction using Axios
       console.log('pre-signed', tx.toHex());
       const base64Tx = Utils.toBase64(tx.toBinary());
-      const response = await axios.post<{ rawtx: string }>(`${MNEE_API}/v1/transfer`, {
+      const response = await axios.post<{ rawtx: string }>(`${MNEE_API}/v1/transfer?auth_token=${MNEE_API_TOKEN}`, {
         rawtx: base64Tx,
       });
 

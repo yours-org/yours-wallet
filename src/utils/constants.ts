@@ -1,17 +1,15 @@
 import { NetWork } from 'yours-wallet-provider';
 
 export const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv/main';
-
 export const WOC_TESTNET_BASE_URL = 'https://api.whatsonchain.com/v1/bsv/test';
-
 export const URL_WHATSONCHAIN = 'https://whatsonchain.com/tx/';
 export const URL_WHATSONCHAIN_TESTNET = 'https://test.whatsonchain.com/tx/';
 
 export const GP_BASE_URL = 'https://ordinals.gorillapool.io';
 export const JUNGLE_BUS_URL = 'https://junglebus.gorillapool.io';
-
 export const GP_TESTNET_BASE_URL = 'https://testnet.ordinals.gorillapool.io';
 export const GORILLA_POOL_ARC_URL = 'https://arc.gorillapool.io/v1';
+
 export const MAINNET_ADDRESS_PREFIX = 0x00;
 export const TESTNET_ADDRESS_PREFIX = 0x6f;
 export const BSV_DECIMAL_CONVERSION = 100000000;
@@ -35,12 +33,15 @@ export const GENERIC_NFT_ICON = 'https://cdn-icons-png.flaticon.com/512/6228/622
 export const KNOWN_BURN_ADDRESSES = ['1111111111111111111114oLvT2', '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'];
 
 // MNEE
-export const MNEE_API = 'https://stg-api-cosigner.mnee.net'; // TODO: update to production
+// export const MNEE_API = 'https://stg-api-cosigner.mnee.net'; // SHOULD ONLY BE USED FOR TESTING and CURRENTLY REQUIRES VPN
+// export const MNEE_TOKEN_ID = '833a7720966a2a435db28d967385e8aa7284b6150ebb39482cc5228b73e1703f_0'; // STAGING
+export const MNEE_API = 'https://proxy-api.mnee.net';
+export const MNEE_API_TOKEN = '92982ec1c0975f31979da515d46bae9f';
 export const MNEE_SYM = 'MNEE';
-export const MNEE_TOKEN_ID = '833a7720966a2a435db28d967385e8aa7284b6150ebb39482cc5228b73e1703f_0'; // TODO: update to production
-export const MNEE_ICON_ID = '9c7f7f1788c6382d5ac737a4052334cf150b52d1e46c484ecfb1d6e00184f263_0'; // TODO: update to production
+export const MNEE_TOKEN_ID = 'ae59f3b898ec61acbdb6cc7a245fabeded0c094bf046f35206a3aec60ef88127_0';
+export const MNEE_ICON_ID = '9c7f7f1788c6382d5ac737a4052334cf150b52d1e46c484ecfb1d6e00184f263_0';
 export const MNEE_ICON_URL = `${GP_BASE_URL}/content/${MNEE_ICON_ID}`;
-export const MNEE_DECIMALS = 5; // TODO: update to production
+export const MNEE_DECIMALS = 5;
 export const MNEE_MOBILE_REFERRAL_LINK = 'https://rockwalletllc.pxf.io/6ygyKG';
 
 // DERIVATION PATHS
