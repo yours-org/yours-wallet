@@ -138,6 +138,7 @@ export class MNEEService {
       let tokensIn = 0;
       const signingAddresses: string[] = [];
 
+      let changeAddress = '';
       while (tokensIn < totalAtomicTokenAmount + fee) {
         const utxo = utxos.shift();
         if (!utxo) return { error: 'Insufficient MNEE balance' };
@@ -147,6 +148,7 @@ export class MNEEService {
 
         signingAddresses.push(utxo.owners[0]);
 
+        changeAddress = changeAddress || utxo.owners[0];
         tx.addInput({
           sourceTXID: utxo.txid,
           sourceOutputIndex: utxo.vout,
@@ -157,14 +159,12 @@ export class MNEEService {
         tokensIn += utxo.data.bsv21.amt;
       }
 
-      // Add outputs
-      const addresses = this.getAddresses();
       for (const req of request) {
         tx.addOutput(this.createInscription(req.address, this.toAtomicAmount(req.amount, config.decimals), config));
       }
 
       if (fee > 0) tx.addOutput(this.createInscription(config.feeAddress, fee, config));
-      tx.addOutput(this.createInscription(addresses.bsvAddress, tokensIn - totalAtomicTokenAmount - fee, config));
+      tx.addOutput(this.createInscription(changeAddress, tokensIn - totalAtomicTokenAmount - fee, config));
 
       // Signing transaction
       const sigRequests: SignatureRequest[] = tx.inputs.map((input, index) => {

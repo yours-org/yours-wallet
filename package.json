@@ -36,7 +36,7 @@
     "react": "^18.2.0",
     "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.2.0",
-    "react-icons": "^5.3.0",
+    "react-icons": "^5.5.0",
     "react-router-dom": "^6.16.0",
     "react-scripts": "^5.0.1",
     "replace-module-webpack-plugin": "^1.0.0",
@@ -44,7 +44,6 @@
     "stream-browserify": "^3.0.0",
     "styled-components": "^6.0.8",
     "ts-loader": "^9.5.1",
-    "typescript": "^4.9.5",
     "url": "^0.11.3",
     "util": "^0.12.5",
     "yours-wallet-provider": "^3.6.1"
@@ -85,6 +84,7 @@
     "husky": "^9.1.6",
     "prettier": "^3.3.2",
     "process": "^0.11.10",
-    "react-app-rewired": "^2.2.1"
+    "react-app-rewired": "^2.2.1",
+    "typescript": "^5.8.2"
   }
 }
