@@ -1,7 +1,7 @@
 import { PublicKey, Script, Transaction, TransactionSignature, UnlockingScript } from '@bsv/sdk';
 import axios from 'axios';
 import { Inscription, applyInscription } from 'js-1sat-ord';
-import { SPVStore } from 'spv-store';
+import { ParseMode, SPVStore } from 'spv-store';
 import { MNEEBalance, SendMNEE, SignatureRequest } from 'yours-wallet-provider';
 import { MNEE_API, MNEE_API_TOKEN } from '../utils/constants';
 import { ChromeStorageService } from './ChromeStorage.service';
@@ -66,7 +66,7 @@ export class MNEEService {
     }
   };
 
-  private toAtomicAmount(amount: number, decimals: number): number {
+  toAtomicAmount(amount: number, decimals: number): number {
     return Math.round(amount * 10 ** decimals);
   }
 
@@ -94,11 +94,22 @@ export class MNEEService {
         addresses.ordAddress,
         addresses.identityAddress,
       ]);
+
+      await this.oneSatSPV.ingestIfNew(
+        data.map((utxo) => ({
+          height: utxo.height,
+          txid: utxo.txid,
+          idx: utxo.idx,
+          parseMode: ParseMode.PersistSummary,
+        })),
+      );
+
       if (ops.length) {
         return data.filter((utxo) =>
           ops.includes(utxo.data.bsv21.op.toLowerCase() as 'transfer' | 'burn' | 'deploy+mint'),
         );
       }
+
       return data;
     } catch (error) {
       console.error('Failed to fetch UTXOs:', error);
@@ -164,7 +175,11 @@ export class MNEEService {
       }
 
       if (fee > 0) tx.addOutput(this.createInscription(config.feeAddress, fee, config));
-      tx.addOutput(this.createInscription(changeAddress, tokensIn - totalAtomicTokenAmount - fee, config));
+
+      const change = tokensIn - totalAtomicTokenAmount - fee;
+      if (change > 0) {
+        tx.addOutput(this.createInscription(changeAddress, change, config));
+      }
 
       // Signing transaction
       const sigRequests: SignatureRequest[] = tx.inputs.map((input, index) => {

@@ -564,6 +564,17 @@ export const BsvWallet = (props: BsvWalletProps) => {
     refreshUtxos();
   };
 
+  const handleSendAllMnee = async () => {
+    const config = await mneeService.getConfig();
+    if (!config) {
+      setMneeRecipientAmount(mneeBalance);
+      return;
+    }
+    const atomicBalance = mneeService.toAtomicAmount(mneeBalance, config.decimals);
+    const fee = config.fees.find((fee) => atomicBalance >= fee.min && atomicBalance <= fee.max)?.fee || 0;
+    setMneeRecipientAmount((atomicBalance - fee) / 10 ** config.decimals);
+  };
+
   const receive = (
     <ReceiveContent>
       <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
@@ -705,7 +716,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         <Text
           theme={theme}
           style={{ cursor: 'pointer' }}
-          onClick={() => setMneeRecipientAmount(mneeBalance)}
+          onClick={handleSendAllMnee}
         >{`Balance: ${formatNumberWithCommasAndDecimals(mneeBalance, 5)}`}</Text>
         <FormContainer noValidate onSubmit={(e) => handleSendMNEE(e)}>
           <InputWrapper>
