@@ -23,8 +23,13 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { WhiteLabelTheme } from '../theme.types';
-import { BSV_DECIMAL_CONVERSION, HOSTED_YOURS_IMAGE } from '../utils/constants';
-import { formatUSD } from '../utils/format';
+import {
+  BSV_DECIMAL_CONVERSION,
+  HOSTED_YOURS_IMAGE,
+  MNEE_ICON_URL,
+  MNEE_MOBILE_REFERRAL_LINK,
+} from '../utils/constants';
+import { formatNumberWithCommasAndDecimals, formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import copyIcon from '../assets/copy.svg';
 import { AssetRow } from '../components/AssetRow';
@@ -146,7 +151,13 @@ const UnitSwitcher = styled.div`
   cursor: pointer;
 `;
 
-type PageState = 'main' | 'receive' | 'send';
+const GetMneeContainer = styled(ReceiveContent)<WhiteLabelTheme>`
+  height: 100%;
+  background-color: ${({ theme }) => theme.color.global.walletBackground};
+  z-index: 9999;
+`;
+
+type PageState = 'main' | 'receive' | 'send' | 'sendMNEE' | 'getMNEE';
 type AmountType = 'bsv' | 'usd';
 
 export type BsvWalletProps = {
@@ -175,9 +186,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [pageState, setPageState] = useState<PageState>('main');
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService, ordinalService, oneSatSPV } = useServiceContext();
+  const { chromeStorageService, keysService, bsvService, ordinalService, oneSatSPV, mneeService } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
@@ -200,6 +210,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [filteredTokens, setFilteredTokens] = useState<Bsv20[]>([]);
   const [randomKey, setRandomKey] = useState(Math.random());
   const isTestnet = chromeStorageService.getNetwork() === 'testnet' ? true : false;
+  const [mneeBalance, setMneeBalance] = useState(0);
+  const [mneeRecipient, setMneeRecipient] = useState('');
+  const [mneeReciepientAmount, setMneeRecipientAmount] = useState<number | null>(null);
 
   const [recipients, setRecipients] = useState<Recipient[]>([
     { id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' },
@@ -258,6 +271,14 @@ export const BsvWallet = (props: BsvWalletProps) => {
     const totalBsv = recipients.reduce((acc, r) => acc + (r.satSendAmount ?? 0), 0);
     const totalUsd = recipients.reduce((acc, r) => acc + (r.usdSendAmount ?? 0), 0);
     return { totalBsv, totalUsd };
+  };
+
+  const updateMneeBalance = async () => {
+    if (!mneeService) return;
+    const res = await mneeService.getBalance();
+    if (res) {
+      setMneeBalance(res.decimalAmount);
+    }
   };
 
   const resetRecipientErrors = () => {
@@ -319,6 +340,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   useEffect(() => {
     loadLocks && loadLocks();
     getAndSetBsvBalance();
+    updateMneeBalance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -368,17 +390,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
     }
   }, [isOrdRequest, handleSelect]);
 
-  useEffect(() => {
-    if (!successTxId) return;
-    resetSendState();
-    setPageState('main');
-    setTimeout(() => refreshUtxos(), 1000); // slight delay to allow for transaction to be processed
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successTxId]);
-
   const resetSendState = () => {
     setPasswordConfirm('');
-    setSuccessTxId('');
     setIsProcessing(false);
     resetRecipients();
     setIsSendAllBsv(false);
@@ -389,6 +402,50 @@ export const BsvWallet = (props: BsvWalletProps) => {
     navigator.clipboard.writeText(bsvAddress).then(() => {
       addSnackbar('Copied!', 'success');
     });
+  };
+
+  const handleSendMNEE = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsProcessing(true);
+    await sleep(25);
+    if (!mneeRecipient || !mneeReciepientAmount) {
+      addSnackbar('Enter a recipient and amount!', 'info');
+      return;
+    }
+
+    if (!passwordConfirm) {
+      addSnackbar('You must enter a password!', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    if (mneeReciepientAmount > mneeBalance) {
+      addSnackbar('Insufficient MNEE balance!', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    if (mneeReciepientAmount <= 0.00001) {
+      addSnackbar('Minimum send amount is 0.00001 MNEE!', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    const res = await mneeService.transfer([{ address: mneeRecipient, amount: mneeReciepientAmount }], passwordConfirm);
+    if (!res.txid || res.error) {
+      addSnackbar(res.error ?? 'An unknown error occurred.', 'error');
+      setPasswordConfirm('');
+      setIsProcessing(false);
+      return;
+    }
+
+    setMneeRecipient('');
+    setMneeRecipientAmount(null);
+    setTimeout(updateMneeBalance, 1000);
+    setPasswordConfirm('');
+    setPageState('main');
+    addSnackbar('Transaction Successful!', 'success');
+    setIsProcessing(false);
   };
 
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -444,8 +501,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
       return;
     }
 
-    setSuccessTxId(sendRes.txid);
+    resetSendState();
+    setPageState('main');
+    setTimeout(() => refreshUtxos(), 1000);
     addSnackbar('Transaction Successful!', 'success');
+    setIsProcessing(false);
   };
 
   const fillInputWithAllBsv = () => {
@@ -478,6 +538,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
       : 'Enter Send Details';
   };
 
+  const getMneeLabel = () => {
+    return mneeReciepientAmount ? `Send ${mneeReciepientAmount.toFixed(5)} MNEE` : 'Enter Send Details';
+  };
+
   const handleSync = async () => {
     await refreshUtxos();
     await chromeStorageService.update({ hasUpgradedToSPV: true });
@@ -500,6 +564,17 @@ export const BsvWallet = (props: BsvWalletProps) => {
     refreshUtxos();
   };
 
+  const handleSendAllMnee = async () => {
+    const config = await mneeService.getConfig();
+    if (!config) {
+      setMneeRecipientAmount(mneeBalance);
+      return;
+    }
+    const atomicBalance = mneeService.toAtomicAmount(mneeBalance, config.decimals);
+    const fee = config.fees.find((fee) => atomicBalance >= fee.min && atomicBalance <= fee.max)?.fee || 0;
+    setMneeRecipientAmount((atomicBalance - fee) / 10 ** config.decimals);
+  };
+
   const receive = (
     <ReceiveContent>
       <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
@@ -514,7 +589,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         }
       >
         <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
-          You may safely send <Warning theme={theme}>BSV and Ordinals</Warning> to this address.
+          You may safely send <Warning theme={theme}>BSV, MNEE, and Ordinals</Warning> to this address.
         </Text>
       </Show>
 
@@ -579,6 +654,18 @@ export const BsvWallet = (props: BsvWalletProps) => {
           usdBalance={bsvBalance * exchangeRate}
           showPointer={false}
         />
+        <Show when={services.mnee && !isTestnet}>
+          <AssetRow
+            balance={mneeBalance}
+            icon={MNEE_ICON_URL}
+            ticker="MNEE USD"
+            usdBalance={mneeBalance}
+            showPointer={mneeBalance > 0}
+            isMNEE
+            onGetMneeClick={() => setPageState('getMNEE')}
+            onClick={() => (mneeBalance > 0 ? setPageState('sendMNEE') : null)}
+          />
+        </Show>
         {lockData && (
           <Show when={services.locks && lockData.totalLocked > 0}>
             <AssetRow
@@ -619,6 +706,107 @@ export const BsvWallet = (props: BsvWalletProps) => {
         </Show>
       </MiddleContainer>
     </MainContent>
+  );
+
+  const sendMNEE = (
+    <>
+      <ScrollableConfirmContent>
+        <Icon src={MNEE_ICON_URL} size="3rem" style={{ margin: 0, borderRadius: '50%' }} />
+        <HeaderText theme={theme}>Send MNEE</HeaderText>
+        <Text
+          theme={theme}
+          style={{ cursor: 'pointer' }}
+          onClick={handleSendAllMnee}
+        >{`Balance: ${formatNumberWithCommasAndDecimals(mneeBalance, 5)}`}</Text>
+        <FormContainer noValidate onSubmit={(e) => handleSendMNEE(e)}>
+          <InputWrapper>
+            <Input
+              theme={theme}
+              placeholder="Enter Address"
+              type="text"
+              onChange={(e) => setMneeRecipient(e.target.value)}
+              value={mneeRecipient}
+            />
+          </InputWrapper>
+          <InputWrapper>
+            <Input
+              theme={theme}
+              placeholder={'Enter MNEE Amount'}
+              type="number"
+              step="0.00001"
+              value={mneeReciepientAmount !== null && mneeReciepientAmount !== undefined ? mneeReciepientAmount : ''}
+              onChange={(e) => {
+                const inputValue = e.target.value;
+                if (inputValue === '') {
+                  setMneeRecipientAmount(null);
+                } else {
+                  setMneeRecipientAmount(Number(inputValue));
+                }
+              }}
+            />
+          </InputWrapper>
+
+          <Input
+            theme={theme}
+            placeholder="Enter Wallet Password"
+            type="password"
+            value={passwordConfirm}
+            onChange={(e) => setPasswordConfirm(e.target.value)}
+          />
+
+          <Button
+            theme={theme}
+            type="primary"
+            label={getMneeLabel()}
+            disabled={
+              isProcessing ||
+              mneeReciepientAmount === null ||
+              mneeReciepientAmount === undefined ||
+              mneeReciepientAmount <= 0
+            }
+            isSubmit
+          />
+        </FormContainer>
+
+        <Button
+          label="Go back"
+          theme={theme}
+          type="secondary"
+          onClick={() => {
+            setPageState('main');
+            setMneeRecipient('');
+            setMneeRecipientAmount(null);
+            setPasswordConfirm('');
+          }}
+        />
+      </ScrollableConfirmContent>
+    </>
+  );
+
+  const getMnee = (
+    <GetMneeContainer theme={theme}>
+      <Icon src={MNEE_ICON_URL} size="3rem" style={{ margin: 0, borderRadius: '50%' }} />
+      <HeaderText style={{ marginTop: '1rem' }} theme={theme}>
+        Get Started with MNEE
+      </HeaderText>
+      <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
+        MNEE is the <Warning theme={theme}>first USD backed stablecoin</Warning> to leverage the BSV blockchain. Each
+        token is equal to $1.00 USD and is fully collateralized with US T-bills and cash equivalents.
+      </Text>
+
+      <QrCode link={MNEE_MOBILE_REFERRAL_LINK} onClick={handleCopyToClipboard} />
+      <Text theme={theme} style={{ margin: '1rem 0', fontWeight: 700 }}>
+        Scan with your mobile device
+      </Text>
+      <Button
+        label="Go back"
+        theme={theme}
+        type="secondary"
+        onClick={() => {
+          setPageState('main');
+        }}
+      />
+    </GetMneeContainer>
   );
 
   const send = (
@@ -778,9 +966,14 @@ export const BsvWallet = (props: BsvWalletProps) => {
       <Show when={isProcessing && pageState === 'send'}>
         <PageLoader theme={theme} message="Sending BSV..." />
       </Show>
+      <Show when={isProcessing && pageState === 'sendMNEE'}>
+        <PageLoader theme={theme} message="Sending MNEE..." />
+      </Show>
       <Show when={!isProcessing && pageState === 'main'}>{main}</Show>
       <Show when={!isProcessing && pageState === 'receive'}>{receive}</Show>
       <Show when={!isProcessing && pageState === 'send'}>{send}</Show>
+      <Show when={!isProcessing && pageState === 'sendMNEE'}>{sendMNEE}</Show>
+      <Show when={!isProcessing && pageState === 'getMNEE'}>{getMnee}</Show>
     </>
   );
 };

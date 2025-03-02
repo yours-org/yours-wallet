@@ -20,6 +20,8 @@ import {
   SendBsv20Response,
   SendBsv20,
   GetPaginatedOrdinals,
+  SendMNEEResponse,
+  SendMNEE,
   LockRequest,
 } from 'yours-wallet-provider';
 import {
@@ -60,6 +62,7 @@ type CallbackResponse = (response: ResponseEventDetail) => void;
 let responseCallbackForConnectRequest: CallbackResponse | null = null;
 let responseCallbackForSendBsvRequest: CallbackResponse | null = null;
 let responseCallbackForSendBsv20Request: CallbackResponse | null = null;
+let responseCallbackForSendMNEERequest: CallbackResponse | null = null;
 let responseCallbackForTransferOrdinalRequest: CallbackResponse | null = null;
 let responseCallbackForPurchaseOrdinalRequest: CallbackResponse | null = null;
 let responseCallbackForSignMessageRequest: CallbackResponse | null = null;
@@ -173,6 +176,7 @@ if (isInServiceWorker) {
       YoursEventName.USER_CONNECT_RESPONSE,
       YoursEventName.SEND_BSV_RESPONSE,
       YoursEventName.SEND_BSV20_RESPONSE,
+      YoursEventName.SEND_MNEE_RESPONSE,
       YoursEventName.TRANSFER_ORDINAL_RESPONSE,
       YoursEventName.PURCHASE_ORDINAL_RESPONSE,
       YoursEventName.SIGN_MESSAGE_RESPONSE,
@@ -196,6 +200,8 @@ if (isInServiceWorker) {
           return processSendBsvResponse(message as SendBsvResponse);
         case YoursEventName.SEND_BSV20_RESPONSE:
           return processSendBsv20Response(message as SendBsv20Response);
+        case YoursEventName.SEND_MNEE_RESPONSE:
+          return processSendMNEEResponse(message as SendMNEEResponse);
         case YoursEventName.TRANSFER_ORDINAL_RESPONSE:
           return processTransferOrdinalResponse(message as { txid: string });
         case YoursEventName.PURCHASE_ORDINAL_RESPONSE:
@@ -246,6 +252,8 @@ if (isInServiceWorker) {
           return processGetPubKeysRequest(sendResponse);
         case YoursEventName.GET_BALANCE:
           return processGetBalanceRequest(sendResponse);
+        case YoursEventName.GET_MNEE_BALANCE:
+          return processGetMNEEBalanceRequest(sendResponse);
         case YoursEventName.GET_ADDRESSES:
           return processGetAddressesRequest(sendResponse);
         case YoursEventName.GET_NETWORK:
@@ -260,6 +268,8 @@ if (isInServiceWorker) {
           return processSendBsvRequest(message, sendResponse);
         case YoursEventName.SEND_BSV20:
           return processSendBsv20Request(message, sendResponse);
+        case YoursEventName.SEND_MNEE:
+          return processSendMNEERequest(message, sendResponse);
         case YoursEventName.TRANSFER_ORDINAL:
           return processTransferOrdinalRequest(message, sendResponse);
         case YoursEventName.PURCHASE_ORDINAL:
@@ -404,6 +414,26 @@ if (isInServiceWorker) {
     } catch (error) {
       sendResponse({
         type: YoursEventName.GET_BALANCE,
+        success: false,
+        error: JSON.stringify(error),
+      });
+    }
+  };
+
+  const processGetMNEEBalanceRequest = (sendResponse: CallbackResponse) => {
+    try {
+      chromeStorageService.getAndSetStorage().then(() => {
+        const { account } = chromeStorageService.getCurrentAccountObject();
+        if (!account) throw Error('No account found!');
+        sendResponse({
+          type: YoursEventName.GET_MNEE_BALANCE,
+          success: true,
+          data: account.mneeBalance,
+        });
+      });
+    } catch (error) {
+      sendResponse({
+        type: YoursEventName.GET_MNEE_BALANCE,
         success: false,
         error: JSON.stringify(error),
       });
@@ -661,7 +691,6 @@ if (isInServiceWorker) {
   };
 
   const processSendBsv20Request = (message: { params: SendBsv20 }, sendResponse: CallbackResponse) => {
-    console.log('processSendBsv20Request', message);
     if (!message.params) {
       sendResponse({
         type: YoursEventName.SEND_BSV20,
@@ -679,6 +708,30 @@ if (isInServiceWorker) {
     } catch (error) {
       sendResponse({
         type: YoursEventName.SEND_BSV20,
+        success: false,
+        error: JSON.stringify(error),
+      });
+    }
+  };
+
+  const processSendMNEERequest = (message: { params: { data: SendMNEE[] } }, sendResponse: CallbackResponse) => {
+    if (!message.params.data) {
+      sendResponse({
+        type: YoursEventName.SEND_MNEE,
+        success: false,
+        error: 'Must provide valid params!',
+      });
+      return;
+    }
+    try {
+      responseCallbackForSendMNEERequest = sendResponse;
+      const sendMNEERequest = message.params.data;
+      chromeStorageService.update({ sendMNEERequest }).then(() => {
+        launchPopUp();
+      });
+    } catch (error) {
+      sendResponse({
+        type: YoursEventName.SEND_MNEE,
         success: false,
         error: JSON.stringify(error),
       });
@@ -1063,6 +1116,27 @@ if (isInServiceWorker) {
     return true;
   };
 
+  const processSendMNEEResponse = (response: SendMNEEResponse) => {
+    if (!responseCallbackForSendMNEERequest) throw Error('Missing callback!');
+    try {
+      responseCallbackForSendMNEERequest({
+        type: YoursEventName.SEND_MNEE,
+        success: true,
+        data: { txid: response.txid, rawtx: response.rawtx },
+      });
+    } catch (error) {
+      responseCallbackForSendMNEERequest?.({
+        type: YoursEventName.SEND_MNEE,
+        success: false,
+        error: JSON.stringify(error),
+      });
+    } finally {
+      cleanup([YoursEventName.SEND_MNEE]);
+    }
+
+    return true;
+  };
+
   const processTransferOrdinalResponse = (response: { txid: string }) => {
     if (!responseCallbackForTransferOrdinalRequest) throw Error('Missing callback!');
     try {
@@ -1281,6 +1355,16 @@ if (isInServiceWorker) {
         });
         responseCallbackForSendBsvRequest = null;
         chromeStorageService.remove('sendBsv20Request');
+      }
+
+      if (responseCallbackForSendMNEERequest) {
+        responseCallbackForSendMNEERequest({
+          type: YoursEventName.SEND_MNEE,
+          success: false,
+          error: 'User dismissed the request!',
+        });
+        responseCallbackForSendBsvRequest = null;
+        chromeStorageService.remove('sendMNEERequest');
       }
 
       if (responseCallbackForSignMessageRequest) {

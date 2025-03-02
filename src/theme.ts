@@ -54,6 +54,7 @@ export const theme: Theme = {
       bsv20: true,
       locks: true,
       ordinals: true,
+      mnee: true,
     },
     walletName: 'Yours',
   },

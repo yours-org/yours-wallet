@@ -39,6 +39,7 @@ import { BlockHeightProvider } from './contexts/providers/BlockHeightProvider';
 import { QueueProvider } from './contexts/providers/QueueProvider';
 import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
 import { SnackbarProvider } from './contexts/providers/SnackbarProvider';
+import { MNEESendRequest } from './pages/requests/MNEESendRequest';
 
 const MainContainer = styled.div<WhiteLabelTheme & { $isMobile?: boolean }>`
   display: flex;
@@ -70,6 +71,7 @@ export const App = () => {
     connectRequest,
     sendBsvRequest,
     sendBsv20Request,
+    sendMNEERequest,
     transferOrdinalRequest,
     purchaseOrdinalRequest,
     signMessageRequest,
@@ -155,6 +157,7 @@ export const App = () => {
                             when={
                               !sendBsvRequest &&
                               !sendBsv20Request &&
+                              !sendMNEERequest &&
                               !signMessageRequest &&
                               !broadcastRequest &&
                               !getSignaturesRequest &&
@@ -175,6 +178,13 @@ export const App = () => {
                                   <Bsv20SendRequest
                                     request={sendBsv20Request!}
                                     onResponse={() => clearRequest('sendBsv20Request')}
+                                    popupId={popupId}
+                                  />
+                                </Show>
+                                <Show when={!!sendMNEERequest}>
+                                  <MNEESendRequest
+                                    request={sendMNEERequest!}
+                                    onResponse={() => clearRequest('sendMNEERequest')}
                                     popupId={popupId}
                                   />
                                 </Show>

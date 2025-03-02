@@ -13,6 +13,7 @@ import {
   OriginIndexer,
   ParseMode,
   SigmaIndexer,
+  CosignIndexer,
 } from 'spv-store';
 import { NetWork } from 'yours-wallet-provider';
 import { BlockHeightTrackerMessage } from './hooks/useBlockHeightTracker';
@@ -21,10 +22,13 @@ import { YoursEventName } from './inject';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { sendMessage } from './utils/chromeHelpers';
 import { theme } from './theme';
+import { MNEE_DECIMALS, MNEE_ICON_ID, MNEE_SYM, MNEE_TOKEN_ID } from './utils/constants';
+import { MNEEIndexer } from './utils/mneeIndexer';
 
 export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, startSync = false) => {
   const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
   const network = chromeStorageService.getNetwork();
+  const syncSources = new Set<string>(['fund', 'lock']);
 
   // Set true to sync full history of transactions.
   const SYNC_HISTORY = false;
@@ -34,14 +38,32 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
   if (!identityAddress) identityAddress = '';
   if (!ordAddress) ordAddress = '';
   const owners = new Set<string>([bsvAddress, identityAddress, ordAddress]);
-  const indexers: Indexer[] = [new FundIndexer(owners, network, SYNC_HISTORY)];
+  const indexers: Indexer[] = [new FundIndexer(owners, network, SYNC_HISTORY), new CosignIndexer(owners, network)];
 
   const lockIndexer = new LockIndexer(owners, network, SYNC_HISTORY);
 
   const bsv20Indexers = [
-    new Bsv21Indexer(owners, IndexMode.Trust, [], network),
+    new Bsv21Indexer(
+      owners,
+      IndexMode.Trust,
+      [
+        {
+          id: MNEE_TOKEN_ID,
+          icon: MNEE_ICON_ID,
+          sym: MNEE_SYM,
+          dec: MNEE_DECIMALS,
+          op: 'deploy+mint',
+          amt: 0n,
+          fundAddress: '',
+          status: 1,
+        },
+      ],
+      network,
+    ),
     new Bsv20Indexer(owners, IndexMode.Trust, network),
   ];
+
+  const mneeIndexer = new MNEEIndexer(owners, network);
 
   const ordIndexers = [
     // new OneSatIndexer(owners, network, SYNC_HISTORY),
@@ -53,8 +75,15 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
   ];
 
   if (theme.settings.services.locks) indexers.push(lockIndexer);
-  if (theme.settings.services.ordinals) indexers.push(...ordIndexers);
+  if (theme.settings.services.ordinals) {
+    syncSources.add('origin');
+    indexers.push(...ordIndexers);
+  }
   if (theme.settings.services.bsv20) indexers.push(...bsv20Indexers);
+  if (theme.settings.services.mnee) {
+    syncSources.add('mnee');
+    indexers.push(mneeIndexer);
+  }
 
   const oneSatSPV = await OneSatWebSPV.init(
     selectedAccount || '',
@@ -62,7 +91,7 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
     owners,
     network == NetWork.Mainnet ? NetWork.Mainnet : NetWork.Testnet,
     startSync && !!account,
-    new Set<string>(['fund', 'lock', 'origin']),
+    syncSources,
     ParseMode.Persist,
   );
 

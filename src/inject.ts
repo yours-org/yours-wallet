@@ -29,6 +29,9 @@ import {
   SendBsv20,
   PaginatedOrdinalsResponse,
   GetPaginatedOrdinals,
+  SendMNEEResponse,
+  SendMNEE,
+  MNEEBalance,
   LockRequest,
 } from 'yours-wallet-provider';
 
@@ -40,10 +43,12 @@ export enum YoursEventName {
   GET_ADDRESSES = 'getAddresses',
   GET_NETWORK = 'getNetwork',
   GET_BALANCE = 'getBalance',
+  GET_MNEE_BALANCE = 'getMNEEBalance',
   GET_ORDINALS = 'getOrdinals',
   GET_BSV20S = 'getBsv20s',
   SEND_BSV = 'sendBsvRequest',
   SEND_BSV20 = 'sendBsv20Request',
+  SEND_MNEE = 'sendMNEERequest',
   TRANSFER_ORDINAL = 'transferOrdinalRequest',
   SIGN_MESSAGE = 'signMessageRequest',
   BROADCAST = 'broadcastRequest',
@@ -63,6 +68,7 @@ export enum YoursEventName {
   USER_CONNECT_RESPONSE = 'userConnectResponse',
   SEND_BSV_RESPONSE = 'sendBsvResponse',
   SEND_BSV20_RESPONSE = 'sendBsv20Response',
+  SEND_MNEE_RESPONSE = 'sendMNEEResponse',
   TRANSFER_ORDINAL_RESPONSE = 'transferOrdinalResponse',
   PURCHASE_ORDINAL_RESPONSE = 'purchaseOrdinalResponse',
   SIGN_MESSAGE_RESPONSE = 'signMessageResponse',
@@ -91,6 +97,7 @@ export type RequestParams = {
   data?:
     | SendBsv[]
     | SendBsv20
+    | SendMNEE[]
     | GetPaginatedOrdinals
     | InscribeRequest[]
     | LockRequest[]
@@ -127,10 +134,13 @@ export type ResponseEventDetail = {
   data?: (
     | ConnectResponse
     | SendBsvResponse
+    | SendBsv20Response
+    | SendMNEEResponse
     | PubKeys
     | Addresses
     | NetWork
     | Balance
+    | MNEEBalance
     | Ordinal[]
     | PaginatedOrdinalsResponse
     | Bsv20[]
@@ -253,12 +263,14 @@ const provider: YoursProviderType = {
   getAddresses: createYoursMethod<Addresses | undefined, void>(YoursEventName.GET_ADDRESSES),
   getNetwork: createYoursMethod<NetWork | undefined, void>(YoursEventName.GET_NETWORK),
   getBalance: createYoursMethod<Balance | undefined, void>(YoursEventName.GET_BALANCE),
+  getMNEEBalance: createYoursMethod<MNEEBalance | undefined, void>(YoursEventName.GET_MNEE_BALANCE),
   getOrdinals: createYoursMethod<Ordinal[] | PaginatedOrdinalsResponse, GetPaginatedOrdinals>(
     YoursEventName.GET_ORDINALS,
   ),
   getBsv20s: createYoursMethod<Bsv20[] | undefined, void>(YoursEventName.GET_BSV20S),
   sendBsv: createYoursMethod<SendBsvResponse | undefined, SendBsv[]>(YoursEventName.SEND_BSV),
   sendBsv20: createYoursMethod<SendBsv20Response | undefined, SendBsv20>(YoursEventName.SEND_BSV20),
+  sendMNEE: createYoursMethod<SendMNEEResponse | undefined, SendMNEE[]>(YoursEventName.SEND_MNEE),
   transferOrdinal: createYoursMethod<string | undefined, TransferOrdinal>(YoursEventName.TRANSFER_ORDINAL),
   signMessage: createYoursMethod<SignedMessage | undefined, SignMessage>(YoursEventName.SIGN_MESSAGE),
   broadcast: createYoursMethod<string | undefined, Broadcast>(YoursEventName.BROADCAST),

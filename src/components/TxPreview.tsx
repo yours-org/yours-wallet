@@ -73,6 +73,7 @@ type TxPreviewProps = {
 };
 
 const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
+  console.log('txData', txData);
   const { theme } = useTheme();
   const labelMaxLength = 20;
   const mappedInputs = useMemo(() => txData?.spends.map((txo: Txo) => mapOrdinal(txo)), [txData]);
@@ -111,96 +112,105 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
     return null;
   };
 
+  if (!mappedInputs || !mappedOutputs) return null;
+
   return (
     <Container>
       <SectionHeader theme={theme} style={{ marginTop: '0.5rem' }}>
         Inputs
       </SectionHeader>
-      {mappedInputs.map((input: Ordinal, index: number) => (
-        <Row $toSign={!!inputsToSign?.includes(index)} key={index} theme={theme}>
-          <IndexOwnerWrapper>
-            <Index theme={theme}>#{index}</Index>
-            {<RowData theme={theme}>{input.owner ? truncate(input.owner, 6, 6) : 'Script/Contract'}</RowData>}
-            {!!inputsToSign?.includes(index) && (
-              <RowData style={{ marginLeft: '0.5rem' }} theme={theme}>
-                ✍️
-              </RowData>
-            )}
-          </IndexOwnerWrapper>
+      {mappedInputs.map((input: Ordinal, index: number) => {
+        return (
+          <Row $toSign={!!inputsToSign?.includes(index)} key={index} theme={theme}>
+            <IndexOwnerWrapper>
+              <Index theme={theme}>#{index}</Index>
+              {<RowData theme={theme}>{input.owner ? truncate(input.owner, 6, 6) : 'Script/Contract'}</RowData>}
+              {!!inputsToSign?.includes(index) && (
+                <RowData style={{ marginLeft: '0.5rem' }} theme={theme}>
+                  ✍️
+                </RowData>
+              )}
+            </IndexOwnerWrapper>
 
-          <AmountImageWrapper>
-            <RowData theme={theme}>
-              <Show
-                when={!!input.data.bsv20}
-                whenFalseContent={
-                  <Show
-                    when={!!input.origin?.data?.map?.name}
-                    whenFalseContent={
+            <AmountImageWrapper>
+              <RowData theme={theme}>
+                <Show
+                  when={!!input.data.bsv20}
+                  whenFalseContent={
+                    <Show
+                      when={!!input.origin?.data?.map?.name}
+                      whenFalseContent={
+                        <Label theme={theme}>
+                          {formatNumberWithCommasAndDecimals(input.satoshis, 0)} {input.satoshis > 1 ? 'sats' : 'sat'}
+                        </Label>
+                      }
+                    >
                       <Label theme={theme}>
-                        {formatNumberWithCommasAndDecimals(input.satoshis, 0)} {input.satoshis > 1 ? 'sats' : 'sat'}
+                        {input.origin?.data?.map?.name && truncate(input.origin.data.map.name, labelMaxLength, 0)}
                       </Label>
-                    }
-                  >
-                    <Label theme={theme}>
-                      {input.origin?.data?.map?.name && truncate(input.origin.data.map.name, labelMaxLength, 0)}
-                    </Label>
-                  </Show>
-                }
-              >
-                <Label theme={theme}>
-                  {convertAtomicValueToReadableTokenValue(Number(input.data.bsv20?.amt), Number(input.data.bsv20?.dec))}{' '}
-                  {truncate(input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT', labelMaxLength, 0)}
-                </Label>
-              </Show>
-            </RowData>
-            {renderNftOrTokenImage(input)}
-          </AmountImageWrapper>
-        </Row>
-      ))}
+                    </Show>
+                  }
+                >
+                  <Label theme={theme}>
+                    {convertAtomicValueToReadableTokenValue(
+                      Number(input.data.bsv20?.amt),
+                      Number(input.data.bsv20?.dec),
+                    )}{' '}
+                    {truncate(input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT', labelMaxLength, 0)}
+                  </Label>
+                </Show>
+              </RowData>
+              {renderNftOrTokenImage(input)}
+            </AmountImageWrapper>
+          </Row>
+        );
+      })}
 
       <SectionHeader theme={theme}>Outputs</SectionHeader>
-      {mappedOutputs.map((output: Ordinal, index: number) => (
-        <Row $toSign={false} key={index} theme={theme}>
-          <IndexOwnerWrapper>
-            <Index theme={theme}>#{index}</Index>
-            <RowData theme={theme}>{output.owner ? truncate(output.owner, 6, 6) : 'Script/Contract'}</RowData>
-            <Show when={!!output.owner && KNOWN_BURN_ADDRESSES.includes(output.owner)}>
-              <FaFire color={theme.color.component.snackbarError} size={'1rem'} style={{ marginLeft: '0.5rem' }} />
-            </Show>
-          </IndexOwnerWrapper>
-
-          <AmountImageWrapper>
-            <RowData theme={theme}>
-              <Show
-                when={!!output.data.bsv20}
-                whenFalseContent={
-                  <Show
-                    when={!!output.origin?.data?.map?.name}
-                    whenFalseContent={
-                      <Label theme={theme}>
-                        {formatNumberWithCommasAndDecimals(output.satoshis, 0)} {output.satoshis > 1 ? 'sats' : 'sat'}
-                      </Label>
-                    }
-                  >
-                    <Label theme={theme}>
-                      {output.origin?.data?.map?.name && truncate(output.origin.data.map.name, labelMaxLength, 0)}
-                    </Label>
-                  </Show>
-                }
-              >
-                <Label theme={theme}>
-                  {convertAtomicValueToReadableTokenValue(
-                    Number(output.data.bsv20?.amt),
-                    Number(output.data.bsv20?.dec),
-                  )}{' '}
-                  {truncate(output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT', labelMaxLength, 0)}
-                </Label>
+      {mappedOutputs.map((output: Ordinal, index: number) => {
+        return (
+          <Row $toSign={false} key={index} theme={theme}>
+            <IndexOwnerWrapper>
+              <Index theme={theme}>#{index}</Index>
+              <RowData theme={theme}>{output.owner ? truncate(output.owner, 6, 6) : 'Script/Contract'}</RowData>
+              <Show when={!!output.owner && KNOWN_BURN_ADDRESSES.includes(output.owner)}>
+                <FaFire color={theme.color.component.snackbarError} size={'1rem'} style={{ marginLeft: '0.5rem' }} />
               </Show>
-            </RowData>
-            {renderNftOrTokenImage(output)}
-          </AmountImageWrapper>
-        </Row>
-      ))}
+            </IndexOwnerWrapper>
+
+            <AmountImageWrapper>
+              <RowData theme={theme}>
+                <Show
+                  when={!!output.data.bsv20}
+                  whenFalseContent={
+                    <Show
+                      when={!!output.origin?.data?.map?.name}
+                      whenFalseContent={
+                        <Label theme={theme}>
+                          {formatNumberWithCommasAndDecimals(output.satoshis, 0)} {output.satoshis > 1 ? 'sats' : 'sat'}
+                        </Label>
+                      }
+                    >
+                      <Label theme={theme}>
+                        {output.origin?.data?.map?.name && truncate(output.origin.data.map.name, labelMaxLength, 0)}
+                      </Label>
+                    </Show>
+                  }
+                >
+                  <Label theme={theme}>
+                    {convertAtomicValueToReadableTokenValue(
+                      Number(output.data.bsv20?.amt),
+                      Number(output.data.bsv20?.dec),
+                    )}{' '}
+                    {truncate(output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT', labelMaxLength, 0)}
+                  </Label>
+                </Show>
+              </RowData>
+              {renderNftOrTokenImage(output)}
+            </AmountImageWrapper>
+          </Row>
+        );
+      })}
     </Container>
   );
 };

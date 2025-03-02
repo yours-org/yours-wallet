@@ -115,6 +115,10 @@ export class ChromeStorageService {
             satoshis: appState.balance?.satoshis ?? 0,
             usdInCents: appState.balance?.usdInCents ?? 0,
           },
+          mneeBalance: {
+            amount: 0,
+            decimalAmount: 0,
+          },
           pubKeys: {
             bsvPubKey: appState.pubKeys.bsvPubKey,
             ordPubKey: appState.pubKeys.ordPubKey,
@@ -223,7 +227,18 @@ export class ChromeStorageService {
       this.storage = await this.setOldAppStateIfMissing(this.storage);
       if (!(this.storage as DeprecatedStorage).appState) return;
       this.storage = await this.mapDeprecatedStorageToNewInterface(this.storage as DeprecatedStorage);
+    } else if (this.storage.version && this.storage.version < 2) {
+      // At version two we need to rebuild the block headers due to a misalignment in nameing convention
+      const dbs = await indexedDB.databases();
+      for (const db of dbs) {
+        if (db.name?.startsWith('block')) {
+          indexedDB.deleteDatabase(db.name);
+          console.log(`Deleted database: ${db.name}`);
+          await this.update({ version: CHROME_STORAGE_OBJECT_VERSION });
+        }
+      }
     }
+
     return this.storage;
   };
 

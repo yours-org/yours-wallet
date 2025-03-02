@@ -219,7 +219,7 @@ export function create(inscription: Inscription): Script {
   const contentBytes =
     inscription.content instanceof Buffer
       ? toByteString(inscription.content.toString('hex'))
-      : toByteString(inscription.content);
+      : toByteString(inscription.content as string);
   const asm = `OP_0 OP_IF 6f7264 OP_1 ${contentTypeBytes} OP_0 ${contentBytes} OP_ENDIF`;
   return Script.fromASM(asm);
 }

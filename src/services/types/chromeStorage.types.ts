@@ -16,6 +16,8 @@ import {
   DecryptRequest,
   SocialProfile,
   SendBsv20,
+  SendMNEE,
+  MNEEBalance,
 } from 'yours-wallet-provider';
 import { WhitelistedApp } from '../../inject';
 import { Theme } from '../../theme.types';
@@ -41,6 +43,7 @@ export interface Account {
   settings: Settings;
   addresses: Addresses;
   balance: Balance;
+  mneeBalance: MNEEBalance;
   pubKeys: PubKeys;
 }
 
@@ -72,6 +75,7 @@ export interface ChromeStorageObject {
   connectRequest?: ConnectRequest;
   sendBsvRequest?: SendBsv[];
   sendBsv20Request?: SendBsv20;
+  sendMNEERequest?: SendMNEE[];
   transferOrdinalRequest?: TransferOrdinal;
   purchaseOrdinalRequest?: PurchaseOrdinal;
   signMessageRequest?: SignMessage;
@@ -89,6 +93,7 @@ export type CurrentAccountObject = Omit<
   | 'connectRequest'
   | 'sendBsvRequest'
   | 'sendBsv20Request'
+  | 'sendMNEERequest'
   | 'transferOrdinalRequest'
   | 'purchaseOrdinalRequest'
   | 'signMessageRequest'
