@@ -20,7 +20,7 @@ export const QrCode = (props: QrCodeProps) => {
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const uri = link ?? `bitcoin:${address}`;
+    const uri = link ?? `${address}`;
     qr.toDataURL(uri, function (err, url) {
       if (err) {
         console.error(err);
