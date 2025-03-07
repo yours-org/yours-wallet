@@ -412,7 +412,7 @@ export const Settings = () => {
   };
 
   const handleMasterBackup = async () => {
-    await streamDataToZip(oneSatSPV, chromeStorageService, (e: MasterBackupProgressEvent) => {
+    await streamDataToZip(chromeStorageService, (e: MasterBackupProgressEvent) => {
       setMasterBackupEventText(e.message);
       const progress = e.endValue && e.value ? Math.ceil((e.value / e.endValue) * 100) : 0;
       setMasterBackupProgress(progress);

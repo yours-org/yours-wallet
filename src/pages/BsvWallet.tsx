@@ -141,7 +141,8 @@ const ScrollableConfirmContent = styled(ConfirmContent)`
   flex-direction: column;
 `;
 
-const UnitSwitcher = styled.div`
+const UnitSwitcher = styled.div<WhiteLabelTheme>`
+  color: ${({ theme }) => theme.color.global.gray};
   position: absolute;
   display: flex;
   align-items: center;
@@ -365,6 +366,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   useEffect(() => {
     if (!identityAddress || isSyncing) return;
+    getAndSetBsvBalance();
     if (!unlockAttempted && lockData?.unlockable) {
       (async () => {
         const res = await unlockLockedCoins();
@@ -876,7 +878,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
                       }
                     }}
                   />
-                  <UnitSwitcher>
+                  <UnitSwitcher theme={theme}>
                     {recipient.amountType === 'bsv' ? 'BSV' : 'USD'}
                     <FaArrowRightArrowLeft
                       size="1rem"
