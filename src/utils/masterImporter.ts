@@ -67,7 +67,7 @@ export const restoreMasterFromZip = async (
     const network = chromeStorageService.getNetwork();
     for (const account of accounts) {
       const owners = getOwners(chromeStorageService);
-      const indexers = getIndexers(owners, network, false);
+      const indexers = getIndexers(owners, network);
       const spvWallet = await OneSatWebSPV.init(account.addresses.identityAddress, indexers);
       const txoFiles = zip.file(new RegExp(`txos-${account.addresses.identityAddress}-.*.json`));
       if (txoFiles.length > 0) {
@@ -91,7 +91,7 @@ export const restoreMasterFromZip = async (
           });
           count++;
         }
-        await spvWallet.stores.txos?.storage.setState('lastSync', maxHeight.toString());
+        await spvWallet.stores.txos?.storage.setState('lastSync', (maxHeight * 1e9).toString());
       }
       await spvWallet.destroy();
     }

@@ -34,7 +34,7 @@ export const streamDataToZip = async (chromeStorageService: ChromeStorageService
     const network = chromeStorageService.getNetwork();
     for (const account of accounts) {
       const owners = getOwners(chromeStorageService);
-      const indexers = getIndexers(owners, network, false);
+      const indexers = getIndexers(owners, network);
       const spvWallet = await OneSatWebSPV.init(account.addresses.identityAddress, indexers);
 
       let from = undefined;
