@@ -127,7 +127,6 @@ const registerEventListeners = async (oneSatSPV: OneSatWebSPV, selectedAccount: 
 
   oneSatSPV.events.on('importing', (data: { tag: string; name: string }) => {
     const message: ImportTrackerMessage = { action: YoursEventName.IMPORT_STATUS_UPDATE, data };
-    console.log(message.data.tag);
     message.data.tag === 'wallet' && localStorage.setItem('walletImporting', 'true');
     try {
       sendMessage(message);

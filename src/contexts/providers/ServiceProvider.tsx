@@ -80,7 +80,6 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
     };
     initServices();
-
     return () => {
       localStorage.removeItem('walletImporting'); // See QueueBanner.tsx
     };

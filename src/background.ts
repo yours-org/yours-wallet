@@ -1338,6 +1338,9 @@ if (isInServiceWorker) {
 
   // HANDLE WINDOW CLOSE *****************************************
   chrome.windows.onRemoved.addListener((closedWindowId) => {
+    console.log('Window closed: ', closedWindowId);
+    localStorage.removeItem('walletImporting');
+
     if (closedWindowId === popupWindowId) {
       if (responseCallbackForConnectRequest) {
         responseCallbackForConnectRequest({
