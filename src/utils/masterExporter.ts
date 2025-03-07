@@ -3,6 +3,7 @@ import { saveAs } from 'file-saver';
 import { OneSatWebSPV } from 'spv-store';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { sleep } from './sleep';
+import { getIndexers, getOwners } from '../initSPVStore';
 
 export type MasterBackupProgressEvent = {
   message: string;
@@ -30,8 +31,11 @@ export const streamDataToZip = async (chromeStorageService: ChromeStorageService
   try {
     const accounts = chromeStorageService.getAllAccounts();
     let txnsLoaded = false;
+    const network = chromeStorageService.getNetwork();
     for (const account of accounts) {
-      const spvWallet = await OneSatWebSPV.init(account.addresses.identityAddress, []);
+      const owners = getOwners(chromeStorageService);
+      const indexers = getIndexers(owners, network, false);
+      const spvWallet = await OneSatWebSPV.init(account.addresses.identityAddress, indexers);
 
       let from = undefined;
       let page = 0;

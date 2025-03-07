@@ -1,8 +1,9 @@
 import JSZip from 'jszip';
-import { SPVStore, Txo } from 'spv-store';
+import { OneSatWebSPV, SPVStore, Txo } from 'spv-store';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { sleep } from './sleep';
+import { getIndexers, getOwners } from '../initSPVStore';
 
 export type MasterBackupProgressEvent = {
   message: string;
@@ -63,15 +64,24 @@ export const restoreMasterFromZip = async (
     progress({ message: 'Restoring transaction outputs...' });
     await sleep(1000);
 
+    const network = chromeStorageService.getNetwork();
     for (const account of accounts) {
+      const owners = getOwners(chromeStorageService);
+      const indexers = getIndexers(owners, network, false);
+      const spvWallet = await OneSatWebSPV.init(account.addresses.identityAddress, indexers);
       const txoFiles = zip.file(new RegExp(`txos-${account.addresses.identityAddress}-.*.json`));
       if (txoFiles.length > 0) {
         let count = 0;
 
+        let maxHeight = 0;
         for (const txoFile of txoFiles) {
           const txoData = await txoFile.async('string');
-          const txos: Txo[] = JSON.parse(txoData);
-          await oneSatSpv.restoreTxos(txos);
+          const txos: { block: { height: number } }[] = JSON.parse(txoData);
+          for (const txo of txos) {
+            maxHeight = Math.max(maxHeight, txo.block.height || 0);
+          }
+
+          await spvWallet.restoreTxos(txos);
           progress({
             message: `Restored ${count + 1} of ${txoFiles.length} txo pages for ${account.addresses.identityAddress}...`,
             value: count,
@@ -79,6 +89,7 @@ export const restoreMasterFromZip = async (
           });
           count++;
         }
+        await spvWallet.stores.txos?.storage.setState('lastSync', maxHeight.toString());
       }
     }
 
