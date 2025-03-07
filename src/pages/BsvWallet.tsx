@@ -181,9 +181,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const location = useLocation();
   const { updateBalance, isSyncing } = useQueueTracker();
   const urlParams = new URLSearchParams(location.search);
-  const isReload = urlParams.get('reload') === 'true';
+  const { handleSelect, query } = useBottomMenu();
+  const isReload = urlParams.get('reload') === 'true' || query === 'reload';
   urlParams.delete('reload');
-  const { handleSelect } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>('main');
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -302,9 +302,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
     (async () => {
       const obj = await chromeStorageService.getAndSetStorage();
       obj && !obj.hasUpgradedToSPV ? setShowUpgrade(true) : setShowUpgrade(false);
-      oneSatSPV.stores.txos?.syncTxLogs();
-      if (!ordinalService) return;
-      await getAndSetAccountAndBsv20s();
+      if (obj?.selectedAccount) {
+        oneSatSPV.stores.txos?.syncTxLogs();
+        if (!ordinalService) return;
+        await getAndSetAccountAndBsv20s();
+      }
     })();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps

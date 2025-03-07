@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { OneSatWebSPV, SPVStore, Txo } from 'spv-store';
+import { OneSatWebSPV, SPVStore } from 'spv-store';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { sleep } from './sleep';
@@ -78,7 +78,9 @@ export const restoreMasterFromZip = async (
           const txoData = await txoFile.async('string');
           const txos: { block: { height: number } }[] = JSON.parse(txoData);
           for (const txo of txos) {
-            maxHeight = Math.max(maxHeight, txo.block.height || 0);
+            if (txo.block && txo.block.height < 50000000) {
+              maxHeight = Math.max(maxHeight, txo.block.height || 0);
+            }
           }
 
           await spvWallet.restoreTxos(txos);
@@ -91,6 +93,7 @@ export const restoreMasterFromZip = async (
         }
         await spvWallet.stores.txos?.storage.setState('lastSync', maxHeight.toString());
       }
+      await spvWallet.destroy();
     }
 
     progress({ message: 'Txos restored successfully!' });
@@ -100,10 +103,11 @@ export const restoreMasterFromZip = async (
   try {
     const zipContent = await zip.loadAsync(file);
     const chromeObject = await readChromeStorage(zipContent);
-    const accounts = Object.values(chromeObject.accounts);
-
-    await restoreTxos(zipContent, accounts);
-    await restoreTxns(zipContent);
+    if (chromeObject.version || 0 >= 3) {
+      const accounts = Object.values(chromeObject.accounts);
+      await restoreTxos(zipContent, accounts);
+      await restoreTxns(zipContent);
+    }
     await chromeStorageService.update(chromeObject);
 
     progress({ message: 'Accounts restored successfully!' });

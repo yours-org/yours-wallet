@@ -316,6 +316,7 @@ export const Settings = () => {
 
   const signOut = async () => {
     await chromeStorageService.clear();
+    await oneSatSPV.destroy();
     setDecisionType(undefined);
     sendMessage({
       action: YoursEventName.SIGNED_OUT,
