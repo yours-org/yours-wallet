@@ -275,7 +275,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const updateMneeBalance = async () => {
     if (!mneeService) return;
-    const res = await mneeService.getBalance();
+    const res = await mneeService.balance(bsvAddress);
     if (res) {
       setMneeBalance(res.decimalAmount);
     }
@@ -431,7 +431,13 @@ export const BsvWallet = (props: BsvWalletProps) => {
       return;
     }
 
-    const res = await mneeService.transfer([{ address: mneeRecipient, amount: mneeReciepientAmount }], passwordConfirm);
+    const keys = await keysService.retrieveKeys(passwordConfirm);
+    if (!keys?.walletWif) {
+      addSnackbar('Invalid password!', 'error');
+      setIsProcessing(false);
+      return;
+    }
+    const res = await mneeService.transfer([{ address: mneeRecipient, amount: mneeReciepientAmount }], keys.walletWif);
     if (!res.txid || res.error) {
       addSnackbar(res.error ?? 'An unknown error occurred.', 'error');
       setPasswordConfirm('');
@@ -565,7 +571,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   };
 
   const handleSendAllMnee = async () => {
-    const config = await mneeService.getConfig();
+    const config = await mneeService.config();
     if (!config) {
       setMneeRecipientAmount(mneeBalance);
       return;

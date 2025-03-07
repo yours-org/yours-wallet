@@ -35,7 +35,7 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
   const { handleSelect, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, mneeService } = useServiceContext();
+  const { chromeStorageService, mneeService, keysService } = useServiceContext();
   const [isProcessing, setIsProcessing] = useState(false);
 
   const processMNEESend = async (password: string) => {
@@ -68,7 +68,13 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
         return;
       }
 
-      const sendRes = await mneeService.transfer(request, password);
+      const keys = await keysService.retrieveKeys(password);
+      if (!keys?.walletWif) {
+        addSnackbar('Invalid password!', 'error');
+        setIsProcessing(false);
+        return;
+      }
+      const sendRes = await mneeService.transfer(request, keys.walletWif);
       if (!sendRes.txid || !sendRes.rawtx || sendRes.error) {
         addSnackbar(getErrorMessage(sendRes.error), 'error');
         setIsProcessing(false);
@@ -77,7 +83,7 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
 
       addSnackbar('Transaction Successful!', 'success');
       await sleep(2000);
-      await mneeService.getBalance();
+      await mneeService.balance(keysService.bsvAddress);
       onResponse();
 
       sendMessage({

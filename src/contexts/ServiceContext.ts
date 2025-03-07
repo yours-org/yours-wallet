@@ -7,13 +7,13 @@ import { BsvService } from '../services/Bsv.service';
 import { OrdinalService } from '../services/Ordinal.service';
 import { SPVStore } from 'spv-store';
 import { GorillaPoolService } from '../services/GorillaPool.service';
-import { MNEEService } from '../services/Mnee.service';
+import { MneeInterface } from 'mnee';
 
 export interface ServiceContextProps {
   chromeStorageService: ChromeStorageService;
   keysService: KeysService;
   bsvService: BsvService;
-  mneeService: MNEEService;
+  mneeService: MneeInterface;
   ordinalService: OrdinalService;
   wocService: WhatsOnChainService;
   gorillaPoolService: GorillaPoolService;
