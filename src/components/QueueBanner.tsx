@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { useQueueTracker } from '../hooks/useQueueTracker';
+import { useServiceContext } from '../hooks/useServiceContext';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { WhiteLabelTheme } from '../theme.types';
 import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
@@ -28,6 +29,7 @@ const Banner = styled.div<WhiteLabelTheme & { $isSyncing: boolean }>`
 `;
 
 export const QueueBanner = () => {
+  const { keysService } = useServiceContext();
   const { isSyncing, showQueueBanner, theme, queueLength, importName, fetchingTxid } = useQueueTracker();
   const { addSnackbar } = useSnackbar();
   const [isInitializing, setIsInitializing] = useState(false);
@@ -38,10 +40,6 @@ export const QueueBanner = () => {
       console.log(`Local Storage Says Init Is: ${localVar}`);
       setIsInitializing(localVar === 'true');
     }, 1000);
-
-    return () => {
-      localStorage.removeItem('walletImporting');
-    };
   }, []);
 
   useEffect(() => {
@@ -60,7 +58,7 @@ export const QueueBanner = () => {
   }, [isSyncing, showQueueBanner]);
 
   return (
-    <Show when={isInitializing || showQueueBanner}>
+    <Show when={!!keysService?.bsvAddress && (isInitializing || showQueueBanner)}>
       {theme && (
         <Banner theme={theme} $isSyncing={isSyncing}>
           <Show when={isSyncing}>
