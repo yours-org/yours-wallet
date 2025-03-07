@@ -14,7 +14,6 @@ export type MasterBackupProgressEvent = {
 type MasterBackupProgress = (event: MasterBackupProgressEvent) => void;
 
 export const restoreMasterFromZip = async (
-  oneSatSpv: SPVStore,
   chromeStorageService: ChromeStorageService,
   progress: MasterBackupProgress,
   file: File,
@@ -41,10 +40,10 @@ export const restoreMasterFromZip = async (
     if (txnFiles.length > 0) {
       let count = 0;
       const endValue = txnFiles.length;
-
+      const spvWallet = await OneSatWebSPV.init('', []);
       for (const txnFile of txnFiles) {
         const txnData = await txnFile.async('uint8array');
-        await oneSatSpv.restoreTxns(Array.from(txnData));
+        await spvWallet.restoreTxns(Array.from(txnData));
         progress({
           message: `Restored ${count + 1} of ${endValue} txn pages...`,
           value: count,
@@ -52,6 +51,7 @@ export const restoreMasterFromZip = async (
         });
         count++;
       }
+      await spvWallet.destroy();
 
       progress({ message: 'Txns restored successfully!' });
       await sleep(1000);
@@ -105,8 +105,8 @@ export const restoreMasterFromZip = async (
     const chromeObject = await readChromeStorage(zipContent);
     if (chromeObject.version || 0 >= 3) {
       const accounts = Object.values(chromeObject.accounts);
-      await restoreTxos(zipContent, accounts);
       await restoreTxns(zipContent);
+      await restoreTxos(zipContent, accounts);
     }
     await chromeStorageService.update(chromeObject);
 
