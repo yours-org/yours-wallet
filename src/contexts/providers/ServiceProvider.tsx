@@ -5,11 +5,11 @@ import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { ContractService } from '../../services/Contract.service';
 import { GorillaPoolService } from '../../services/GorillaPool.service';
 import { KeysService } from '../../services/Keys.service';
-import { MNEEService } from '../../services/Mnee.service';
 import { OrdinalService } from '../../services/Ordinal.service';
 import { WhatsOnChainService } from '../../services/WhatsOnChain.service';
-import { INACTIVITY_LIMIT } from '../../utils/constants';
+import { INACTIVITY_LIMIT, MNEE_API_TOKEN } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
+import mnee from 'mnee';
 
 const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();
@@ -20,7 +20,7 @@ const initializeServices = async () => {
   const oneSatSPV = await oneSatSPVPromise;
   const keysService = new KeysService(chromeStorageService, oneSatSPV);
   const contractService = new ContractService(keysService, oneSatSPV);
-  const mneeService = new MNEEService(chromeStorageService, oneSatSPV, contractService);
+  const mneeService = new mnee(MNEE_API_TOKEN);
 
   const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, oneSatSPV);
   const ordinalService = new OrdinalService(
