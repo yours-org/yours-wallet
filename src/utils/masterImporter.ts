@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { OneSatWebSPV, SPVStore } from 'spv-store';
+import { OneSatWebSPV } from 'spv-store';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { sleep } from './sleep';
@@ -70,6 +70,7 @@ export const restoreMasterFromZip = async (
       const indexers = getIndexers(owners, network);
       const spvWallet = await OneSatWebSPV.init(account.addresses.identityAddress, indexers);
       const txoFiles = zip.file(new RegExp(`txos-${account.addresses.identityAddress}-.*.json`));
+      const txLogFiles = zip.file(new RegExp(`txlogs-${account.addresses.identityAddress}-.*.json`));
       if (txoFiles.length > 0) {
         let count = 0;
 
@@ -92,6 +93,21 @@ export const restoreMasterFromZip = async (
           count++;
         }
         await spvWallet.stores.txos?.storage.setState('lastSync', (maxHeight * 1e9).toString());
+      }
+
+      if (txLogFiles.length > 0) {
+        let count = 0;
+        for (const txLog of txLogFiles) {
+          const txLogData = await txLog.async('string');
+          const txLogs = JSON.parse(txLogData);
+          await spvWallet.restoreTxLogs(txLogs);
+          progress({
+            message: `Restored ${count + 1} of ${txLogFiles.length} txlog pages for ${account.addresses.identityAddress}...`,
+            value: count,
+            endValue: txLogFiles.length,
+          });
+          count++;
+        }
       }
       await spvWallet.destroy();
     }

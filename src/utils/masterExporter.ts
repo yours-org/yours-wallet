@@ -13,8 +13,6 @@ export type MasterBackupProgressEvent = {
 
 type MasterBackupProgress = (event: MasterBackupProgressEvent) => void;
 
-// TODO: NEED TO EXPORT MORE DATA. IMPORTING IS MAKING ALOT OF BEEF REQUESTS WHICH IT SHOULDN'T NEED TO DO
-
 // TODO: handle UI errors if it ever becomes a problem
 export const streamDataToZip = async (chromeStorageService: ChromeStorageService, progress: MasterBackupProgress) => {
   const zip = new JSZip();
@@ -46,7 +44,25 @@ export const streamDataToZip = async (chromeStorageService: ChromeStorageService
         //@ts-ignore
         const { txos, nextPage } = await spvWallet.backupTxos(100, from);
         progress({ message: `Processing txo page ${page + 1}...` });
-        zip.file(`txos-${account.addresses.identityAddress}-${(page++).toString().padStart(4, "0")}.json`, JSON.stringify(txos));
+        zip.file(
+          `txos-${account.addresses.identityAddress}-${(page++).toString().padStart(4, '0')}.json`,
+          JSON.stringify(txos),
+        );
+        hasNextPage = !!nextPage;
+        from = nextPage;
+      }
+
+      from = undefined;
+      page = 0;
+      hasNextPage = true;
+      while (hasNextPage) {
+        //@ts-ignore
+        const { logs, nextPage } = await spvWallet.backupTxLogs(100, from);
+        progress({ message: `Processing txo page ${page + 1}...` });
+        zip.file(
+          `txlogs-${account.addresses.identityAddress}-${(page++).toString().padStart(4, '0')}.json`,
+          JSON.stringify(logs),
+        );
         hasNextPage = !!nextPage;
         from = nextPage;
       }
@@ -61,7 +77,7 @@ export const streamDataToZip = async (chromeStorageService: ChromeStorageService
           //@ts-ignore
           const { data, nextPage } = await spvWallet.backupTxns(100, from);
           progress({ message: `Processing txn page ${page + 1}...` });
-          zip.file(`txns-${(page++).toString().padStart(4, "0")}.bin`, Buffer.from(data));
+          zip.file(`txns-${(page++).toString().padStart(4, '0')}.bin`, Buffer.from(data));
           hasNextPage = !!nextPage;
           from = nextPage;
         }
