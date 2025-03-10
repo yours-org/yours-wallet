@@ -34,7 +34,7 @@ export const streamDataToZip = async (chromeStorageService: ChromeStorageService
     const network = chromeStorageService.getNetwork();
     for (const account of accounts) {
       const owners = getOwners(chromeStorageService);
-      const indexers = getIndexers(owners, network, false);
+      const indexers = getIndexers(owners, network);
       const spvWallet = await OneSatWebSPV.init(account.addresses.identityAddress, indexers);
 
       let from = undefined;
@@ -46,7 +46,7 @@ export const streamDataToZip = async (chromeStorageService: ChromeStorageService
         //@ts-ignore
         const { txos, nextPage } = await spvWallet.backupTxos(100, from);
         progress({ message: `Processing txo page ${page + 1}...` });
-        zip.file(`txos-${account.addresses.identityAddress}-${page++}.json`, JSON.stringify(txos));
+        zip.file(`txos-${account.addresses.identityAddress}-${(page++).toString().padStart(4, "0")}.json`, JSON.stringify(txos));
         hasNextPage = !!nextPage;
         from = nextPage;
       }
@@ -61,7 +61,7 @@ export const streamDataToZip = async (chromeStorageService: ChromeStorageService
           //@ts-ignore
           const { data, nextPage } = await spvWallet.backupTxns(100, from);
           progress({ message: `Processing txn page ${page + 1}...` });
-          zip.file(`txns-${page++}.bin`, Buffer.from(data));
+          zip.file(`txns-${(page++).toString().padStart(4, "0")}.bin`, Buffer.from(data));
           hasNextPage = !!nextPage;
           from = nextPage;
         }

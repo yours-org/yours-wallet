@@ -25,7 +25,8 @@ import { theme } from './theme';
 import { MNEE_DECIMALS, MNEE_ICON_ID, MNEE_SYM, MNEE_TOKEN_ID } from './utils/constants';
 import { MNEEIndexer } from './utils/mneeIndexer';
 
-export const getIndexers = (owners: Set<string>, network: NetWork, SYNC_HISTORY: boolean) => {
+export const getIndexers = (owners: Set<string>, network: NetWork) => {
+  const SYNC_HISTORY = false;
   const indexers: Indexer[] = [new FundIndexer(owners, network, SYNC_HISTORY), new CosignIndexer(owners, network)];
   const lockIndexer = new LockIndexer(owners, network, SYNC_HISTORY);
   const bsv20Indexers = [
@@ -86,10 +87,8 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
   const syncSources = new Set<string>(['fund', 'lock']);
 
   // Set true to sync full history of transactions.
-  const SYNC_HISTORY = false;
-
   const owners = getOwners(chromeStorageService);
-  const indexers = getIndexers(owners, network, SYNC_HISTORY);
+  const indexers = getIndexers(owners, network);
 
   if (theme.settings.services.ordinals) {
     syncSources.add('origin');
