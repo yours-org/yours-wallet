@@ -1,9 +1,9 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { SPVStore, Ingest, OneSatWebSPV } from 'spv-store';
+import { OneSatWebSPV } from 'spv-store';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { sleep } from './sleep';
-import { formatNumberWithCommasAndDecimals } from './format';
+import { getIndexers, getOwners } from '../initSPVStore';
 
 export type MasterBackupProgressEvent = {
   message: string;
@@ -14,24 +14,9 @@ export type MasterBackupProgressEvent = {
 type MasterBackupProgress = (event: MasterBackupProgressEvent) => void;
 
 // TODO: handle UI errors if it ever becomes a problem
-export const streamDataToZip = async (
-  oneSatSpv: SPVStore,
-  chromeStorageService: ChromeStorageService,
-  progress: MasterBackupProgress,
-) => {
+export const streamDataToZip = async (chromeStorageService: ChromeStorageService, progress: MasterBackupProgress) => {
   const zip = new JSZip();
 
-  const zipAccountLogs = async (accountId: string, zip: JSZip): Promise<Ingest[]> => {
-    progress({ message: `Calculating dependencies for ${accountId}...` }); // UX thing again...
-    await sleep(1000); // UX thing again...
-    const spvWallet = await OneSatWebSPV.init(accountId, []);
-    const logs = await spvWallet.getBackupLogs();
-    zip.file(`${accountId}.json`, JSON.stringify(logs));
-    progress({ message: 'Account dependencies calculated successfully!' });
-    await spvWallet.destroy();
-    await sleep(1000); // UX thing again...
-    return logs;
-  };
   const zipChromeObject = async (zip: JSZip) => {
     progress({ message: 'Gathering data for all accounts...' });
     await sleep(1000); // UX thing again...
@@ -41,62 +26,69 @@ export const streamDataToZip = async (
     await sleep(1000); // UX thing again...
   };
 
-  const zipBlock = async (zip: JSZip) => {
-    progress({ message: 'Getting blocks data...' });
-    const blocks = await oneSatSpv.getBlocksBackup();
-    const folder = zip.folder('blocks');
-    if (!folder) throw new Error('Blocks folder not found');
-    for (const [i, headers] of blocks.entries()) {
-      folder.file(`${i.toString().padStart(3, '0')}.bin`, Buffer.from(headers));
-    }
-    progress({ message: 'Blocks data collected successfully!' });
-    await sleep(1000); // UX thing again...
-  };
-
-  const zipTxns = async (txids: string[], zip: JSZip) => {
-    progress({ message: 'Getting Txns data...' });
-    const txnFolder = zip.folder('txns');
-    if (!txnFolder) throw new Error('Txn folder not found');
-    let count = 0;
-    let errorCount = 0;
-    const endValue = txids.length;
-    for (const txid of txids) {
-      progress({
-        message: `Processed ${formatNumberWithCommasAndDecimals(count, 0)} of ${formatNumberWithCommasAndDecimals(endValue, 0)} txns...`,
-        value: count,
-        endValue,
-      });
-      const tx = await oneSatSpv.getBackupTx(txid);
-      if (!tx) {
-        console.error(`Failed to get tx with txid: ${txid}`);
-        errorCount++;
-        continue;
-      }
-      txnFolder.file(`${txid}.bin`, Buffer.from(tx));
-      count++;
-    }
-    progress({
-      message: `Processed ${formatNumberWithCommasAndDecimals(endValue, 0)} of ${formatNumberWithCommasAndDecimals(endValue, 0)} txns...`,
-      value: count,
-      endValue,
-    });
-    await sleep(1000); // UX thing again...
-    progress({ message: 'Txns process complete!' });
-    console.warn(`Failed to get ${errorCount} txns`);
-    await sleep(1000); // UX thing again...
-  };
-
   try {
     const accounts = chromeStorageService.getAllAccounts();
-    const txids = new Set<string>();
+    let txnsLoaded = false;
+    const network = chromeStorageService.getNetwork();
     for (const account of accounts) {
-      const logs = await zipAccountLogs(account.addresses.identityAddress, zip);
-      logs.forEach((log) => txids.add(log.txid));
+      const owners = getOwners(chromeStorageService);
+      const indexers = getIndexers(owners, network);
+      const spvWallet = await OneSatWebSPV.init(account.addresses.identityAddress, indexers);
+
+      let from = undefined;
+      let page = 0;
+      let hasNextPage = true;
+      progress({ message: `Gathering Txos for ${account.addresses.identityAddress}...` }); // UX thing again...
+      await sleep(1000); // UX thing again...
+      while (hasNextPage) {
+        //@ts-ignore
+        const { txos, nextPage } = await spvWallet.backupTxos(100, from);
+        progress({ message: `Processing txo page ${page + 1}...` });
+        zip.file(
+          `txos-${account.addresses.identityAddress}-${(page++).toString().padStart(4, '0')}.json`,
+          JSON.stringify(txos),
+        );
+        hasNextPage = !!nextPage;
+        from = nextPage;
+      }
+
+      from = undefined;
+      page = 0;
+      hasNextPage = true;
+      while (hasNextPage) {
+        //@ts-ignore
+        const { logs, nextPage } = await spvWallet.backupTxLogs(100, from);
+        progress({ message: `Processing txo page ${page + 1}...` });
+        zip.file(
+          `txlogs-${account.addresses.identityAddress}-${(page++).toString().padStart(4, '0')}.json`,
+          JSON.stringify(logs),
+        );
+        hasNextPage = !!nextPage;
+        from = nextPage;
+      }
+
+      if (!txnsLoaded) {
+        from = undefined;
+        page = 0;
+        hasNextPage = true;
+        progress({ message: `Gathering Txns...` }); // UX thing again...
+        await sleep(1000); // UX thing again...
+        while (hasNextPage) {
+          //@ts-ignore
+          const { data, nextPage } = await spvWallet.backupTxns(100, from);
+          progress({ message: `Processing txn page ${page + 1}...` });
+          zip.file(`txns-${(page++).toString().padStart(4, '0')}.bin`, Buffer.from(data));
+          hasNextPage = !!nextPage;
+          from = nextPage;
+        }
+        txnsLoaded = true;
+      }
+
+      progress({ message: 'Account dependencies calculated successfully!' });
+      await spvWallet.destroy();
     }
 
     await zipChromeObject(zip);
-    await zipBlock(zip);
-    await zipTxns(Array.from(txids), zip);
 
     // Generate zip file and trigger download
     progress({ message: 'Almost done, compressing data...' });

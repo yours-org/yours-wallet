@@ -141,7 +141,8 @@ const ScrollableConfirmContent = styled(ConfirmContent)`
   flex-direction: column;
 `;
 
-const UnitSwitcher = styled.div`
+const UnitSwitcher = styled.div<WhiteLabelTheme>`
+  color: ${({ theme }) => theme.color.global.gray};
   position: absolute;
   display: flex;
   align-items: center;
@@ -180,9 +181,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const location = useLocation();
   const { updateBalance, isSyncing } = useQueueTracker();
   const urlParams = new URLSearchParams(location.search);
-  const isReload = urlParams.get('reload') === 'true';
+  const { handleSelect, query } = useBottomMenu();
+  const isReload = urlParams.get('reload') === 'true' || query === 'reload';
   urlParams.delete('reload');
-  const { handleSelect } = useBottomMenu();
   const [pageState, setPageState] = useState<PageState>('main');
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -301,9 +302,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
     (async () => {
       const obj = await chromeStorageService.getAndSetStorage();
       obj && !obj.hasUpgradedToSPV ? setShowUpgrade(true) : setShowUpgrade(false);
-      oneSatSPV.stores.txos?.syncTxLogs();
-      if (!ordinalService) return;
-      await getAndSetAccountAndBsv20s();
+      if (obj?.selectedAccount) {
+        oneSatSPV.stores.txos?.syncTxLogs();
+        if (!ordinalService) return;
+        await getAndSetAccountAndBsv20s();
+      }
     })();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -365,6 +368,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   useEffect(() => {
     if (!identityAddress || isSyncing) return;
+    getAndSetBsvBalance();
     if (!unlockAttempted && lockData?.unlockable) {
       (async () => {
         const res = await unlockLockedCoins();
@@ -882,7 +886,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
                       }
                     }}
                   />
-                  <UnitSwitcher>
+                  <UnitSwitcher theme={theme}>
                     {recipient.amountType === 'bsv' ? 'BSV' : 'USD'}
                     <FaArrowRightArrowLeft
                       size="1rem"

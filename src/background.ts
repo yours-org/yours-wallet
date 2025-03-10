@@ -43,15 +43,27 @@ import { GorillaPoolService } from './services/GorillaPool.service';
 import { mapOrdinal } from './utils/providerHelper';
 import { TxoLookup, TxoSort } from 'spv-store';
 import { initOneSatSPV } from './initSPVStore';
-import { HOSTED_YOURS_IMAGE } from './utils/constants';
+import { CHROME_STORAGE_OBJECT_VERSION, HOSTED_YOURS_IMAGE } from './utils/constants';
 import { convertLockReqToSendBsvReq } from './utils/tools';
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
 const gorillaPoolService = new GorillaPoolService(chromeStorageService);
 
-export let oneSatSPVPromise = chromeStorageService
-  .getAndSetStorage()
-  .then(() => initOneSatSPV(chromeStorageService, isInServiceWorker));
+export let oneSatSPVPromise = chromeStorageService.getAndSetStorage().then(async (storage) => {
+  const version = storage?.version;
+  if (version && version < 3) {
+    // At version three we're forcing a full resync
+    const dbs = await indexedDB.databases();
+    for (const db of dbs) {
+      if (db.name) {
+        indexedDB.deleteDatabase(db.name);
+        console.log(`Deleted database: ${db.name}`);
+      }
+    }
+    await chromeStorageService.update({ version: CHROME_STORAGE_OBJECT_VERSION });
+  }
+  return initOneSatSPV(chromeStorageService, isInServiceWorker);
+});
 
 console.log('Yours Wallet Background Script Running!');
 
@@ -1326,6 +1338,9 @@ if (isInServiceWorker) {
 
   // HANDLE WINDOW CLOSE *****************************************
   chrome.windows.onRemoved.addListener((closedWindowId) => {
+    console.log('Window closed: ', closedWindowId);
+    localStorage.removeItem('walletImporting');
+
     if (closedWindowId === popupWindowId) {
       if (responseCallbackForConnectRequest) {
         responseCallbackForConnectRequest({

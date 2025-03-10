@@ -80,6 +80,9 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
     };
     initServices();
+    return () => {
+      localStorage.removeItem('walletImporting'); // See QueueBanner.tsx
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

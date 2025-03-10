@@ -25,23 +25,10 @@ import { theme } from './theme';
 import { MNEE_DECIMALS, MNEE_ICON_ID, MNEE_SYM, MNEE_TOKEN_ID } from './utils/constants';
 import { MNEEIndexer } from './utils/mneeIndexer';
 
-export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, startSync = false) => {
-  const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
-  const network = chromeStorageService.getNetwork();
-  const syncSources = new Set<string>(['fund', 'lock']);
-
-  // Set true to sync full history of transactions.
+export const getIndexers = (owners: Set<string>, network: NetWork) => {
   const SYNC_HISTORY = false;
-
-  let { bsvAddress, identityAddress, ordAddress } = account?.addresses || {};
-  if (!bsvAddress) bsvAddress = '';
-  if (!identityAddress) identityAddress = '';
-  if (!ordAddress) ordAddress = '';
-  const owners = new Set<string>([bsvAddress, identityAddress, ordAddress]);
   const indexers: Indexer[] = [new FundIndexer(owners, network, SYNC_HISTORY), new CosignIndexer(owners, network)];
-
   const lockIndexer = new LockIndexer(owners, network, SYNC_HISTORY);
-
   const bsv20Indexers = [
     new Bsv21Indexer(
       owners,
@@ -76,13 +63,39 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
 
   if (theme.settings.services.locks) indexers.push(lockIndexer);
   if (theme.settings.services.ordinals) {
-    syncSources.add('origin');
     indexers.push(...ordIndexers);
   }
   if (theme.settings.services.bsv20) indexers.push(...bsv20Indexers);
   if (theme.settings.services.mnee) {
-    syncSources.add('mnee');
     indexers.push(mneeIndexer);
+  }
+  return indexers;
+};
+
+export const getOwners = (chromeStorageService: ChromeStorageService) => {
+  const { account } = chromeStorageService.getCurrentAccountObject();
+  let { bsvAddress, identityAddress, ordAddress } = account?.addresses || {};
+  if (!bsvAddress) bsvAddress = '';
+  if (!identityAddress) identityAddress = '';
+  if (!ordAddress) ordAddress = '';
+  return new Set<string>([bsvAddress, identityAddress, ordAddress]);
+};
+
+export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, startSync = false) => {
+  const { selectedAccount, account } = chromeStorageService.getCurrentAccountObject();
+  const network = chromeStorageService.getNetwork();
+  const syncSources = new Set<string>(['fund', 'lock']);
+
+  // Set true to sync full history of transactions.
+  const owners = getOwners(chromeStorageService);
+  const indexers = getIndexers(owners, network);
+
+  if (theme.settings.services.ordinals) {
+    syncSources.add('origin');
+  }
+
+  if (theme.settings.services.mnee) {
+    syncSources.add('mnee');
   }
 
   const oneSatSPV = await OneSatWebSPV.init(
@@ -113,6 +126,7 @@ const registerEventListeners = async (oneSatSPV: OneSatWebSPV, selectedAccount: 
 
   oneSatSPV.events.on('importing', (data: { tag: string; name: string }) => {
     const message: ImportTrackerMessage = { action: YoursEventName.IMPORT_STATUS_UPDATE, data };
+    message.data.tag === 'wallet' && localStorage.setItem('walletImporting', 'true');
     try {
       sendMessage(message);
       // eslint-disable-next-line no-empty
