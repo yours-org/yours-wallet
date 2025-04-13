@@ -1,6 +1,6 @@
 {
   "name": "yours-wallet",
-  "version": "4.3.2",
+  "version": "4.4.0",
   "private": true,
   "dependencies": {
     "@bsv/paymail": "^2.0.2",
@@ -48,7 +48,7 @@
     "typescript": "^4.9.5",
     "url": "^0.11.3",
     "util": "^0.12.5",
-    "yours-wallet-provider": "^3.6.1"
+    "yours-wallet-provider": "^3.7.0"
   },
   "scripts": {
     "start": "react-app-rewired start",
