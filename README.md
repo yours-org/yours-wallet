@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Version: v4.3.2
+Version: v4.4.0
 
 <a href="https://chromewebstore.google.com/detail/yours-wallet/mlbnicldlpdimbjdcncnklfempedeipj" target="_blank">🌱 Download Chrome Extension 🌱</a>
 
