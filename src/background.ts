@@ -517,8 +517,11 @@ if (isInServiceWorker) {
       chromeStorageService.getAndSetStorage().then(async () => {
         const oneSatSPV = await oneSatSPVPromise;
         if (!oneSatSPV) throw Error('SPV not initialized!');
+        const lookup = message?.params?.mimeType
+          ? new TxoLookup('origin', 'type', message.params.mimeType)
+          : new TxoLookup('origin');
         if (message.params.from === undefined || message.params.from === null) {
-          const result = await oneSatSPV.search(new TxoLookup('origin'), TxoSort.DESC, 0);
+          const result = await oneSatSPV.search(lookup, TxoSort.DESC, 0);
           const mapped = result.txos.map(mapOrdinal);
           sendResponse({
             type: YoursEventName.GET_ORDINALS,
@@ -527,7 +530,7 @@ if (isInServiceWorker) {
           });
         } else {
           const results = await oneSatSPV.search(
-            new TxoLookup('origin'),
+            lookup,
             TxoSort.DESC,
             message.params.limit || 50,
             message.params.from || '',
