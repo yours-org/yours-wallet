@@ -4,7 +4,7 @@
   "private": true,
   "dependencies": {
     "@bsv/paymail": "^2.0.2",
-    "@bsv/sdk": "^1.3.20",
+    "@bsv/sdk": "^1.4.24",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@ramonak/react-progress-bar": "^5.2.0",
     "@tempfix/idb": "^8.0.3",

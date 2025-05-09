@@ -26,7 +26,7 @@ import {
   Transaction,
   Utils,
 } from '@bsv/sdk';
-import { SPVStore, Lock, TxoLookup } from 'spv-store';
+import { SPVStore, Lock, TxoLookup, TxoSort } from 'spv-store';
 import { theme } from '../theme';
 //@ts-ignore
 import { PaymailClient } from '@bsv/paymail/client';
@@ -404,7 +404,7 @@ export class BsvService {
   };
 
   fundingTxos = async () => {
-    const results = await this.oneSatSPV.search(new TxoLookup('fund'), undefined, 0);
+    const results = await this.oneSatSPV.search(new TxoLookup('fund'), TxoSort.ASC, 0);
     return results.txos;
   };
 

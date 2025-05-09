@@ -30,13 +30,14 @@ export const isValidEmail = (email: string) => {
 };
 
 export const getTxFromRawTxFormat = (rawTx: string | number[], format: TransactionFormat) => {
-  const tx =
-    format === 'tx'
-      ? Transaction.fromHex(rawTx as string)
-      : format === 'beef'
-        ? Transaction.fromAtomicBEEF(rawTx as number[])
-        : Transaction.fromEF(rawTx as number[]);
-  return tx;
+  switch (format) {
+    case 'beef':
+      return Transaction.fromAtomicBEEF(rawTx as number[]);
+    case 'ef':
+      return Transaction.fromEF(rawTx as number[]);
+    default:
+      return Transaction.fromHex(rawTx as string);
+  }
 };
 
 export const getErrorMessage = (error: string | undefined) => {
