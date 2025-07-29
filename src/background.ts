@@ -61,7 +61,18 @@ export let oneSatSPVPromise = chromeStorageService.getAndSetStorage().then(async
       }
     }
     await chromeStorageService.update({ version: CHROME_STORAGE_OBJECT_VERSION });
+  } else if (version && version < 4) {
+    // At version four we're deleting the txos-db to fix origin index issue.
+    const dbs = await indexedDB.databases();
+    for (const db of dbs) {
+      if (db.name && db.name.startsWith('txos-')) {
+        indexedDB.deleteDatabase(db.name);
+        console.log(`Deleted database: ${db.name}`);
+      }
+    }
+    await chromeStorageService.update({ version: CHROME_STORAGE_OBJECT_VERSION });
   }
+
   return initOneSatSPV(chromeStorageService, isInServiceWorker);
 });
 
