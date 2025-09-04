@@ -16,6 +16,7 @@ import { SendMNEE } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { getErrorMessage } from '../../utils/tools';
 import { MNEE_DECIMALS, MNEE_ICON_URL } from '../../utils/constants';
+import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 
 const Icon = styled.img`
   width: 3.5rem;
@@ -74,25 +75,95 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
         setIsProcessing(false);
         return;
       }
-      const sendRes = await mneeService.transfer(request, keys.walletWif);
-      if (!sendRes.txid || !sendRes.rawtx || sendRes.error) {
-        addSnackbar(getErrorMessage(sendRes.error), 'error');
+      // Initiate the transfer with broadcast flag
+      const sendRes = await mneeService.transfer(request, keys.walletWif, { broadcast: true });
+
+      // Handle ticket-based response
+      if (sendRes.ticketId) {
+        addSnackbar('Transaction initiated. Processing...', 'info');
+
+        // Poll for transaction status
+        let finalStatus = null;
+        let attempts = 0;
+        const maxAttempts = 30; // 30 attempts with 2 second intervals = 60 seconds max
+
+        while (attempts < maxAttempts) {
+          await sleep(2000); // Wait 2 seconds between polls
+
+          try {
+            const status = await mneeService.getTxStatus(sendRes.ticketId);
+
+            if (status.status === 'SUCCESS' || status.status === 'MINED') {
+              finalStatus = status;
+              break;
+            } else if (status.status === 'FAILED') {
+              addSnackbar(`Transaction failed: ${status.errors || 'Unknown error'}`, 'error');
+              setIsProcessing(false);
+              return;
+            }
+            // If BROADCASTING, continue polling
+          } catch (pollError) {
+            console.error('Error polling transaction status:', pollError);
+          }
+
+          attempts++;
+        }
+
+        if (!finalStatus) {
+          addSnackbar('Transaction timeout. Please check your transaction history.', 'error');
+          setIsProcessing(false);
+          return;
+        }
+
+        // Transaction successful
+        addSnackbar('Transaction Successful!', 'success');
+
+        // Fetch updated MNEE balance and update Chrome storage
+        const balanceRes = await mneeService.balance(keysService.bsvAddress);
+        if (balanceRes) {
+          const { account } = chromeStorageService.getCurrentAccountObject();
+          if (account) {
+            const key: keyof ChromeStorageObject = 'accounts';
+            const update: Partial<ChromeStorageObject['accounts']> = {
+              [keysService.identityAddress]: {
+                ...account,
+                mneeBalance: {
+                  amount: balanceRes.amount,
+                  decimalAmount: balanceRes.decimalAmount,
+                },
+              },
+            };
+            await chromeStorageService.updateNested(key, update);
+          }
+        }
+
+        onResponse();
+
+        sendMessage({
+          action: 'sendMNEEResponse',
+          txid: finalStatus.tx_id,
+          rawtx: finalStatus.tx_hex,
+        });
+      } else if (sendRes.rawtx) {
+        // Legacy response with raw transaction (shouldn't happen with broadcast: true)
+        addSnackbar('Transaction created but not broadcast. Please try again.', 'info');
+        setIsProcessing(false);
+        return;
+      } else {
+        // No valid response
+        addSnackbar('Transfer failed. No valid response from server.', 'error');
         setIsProcessing(false);
         return;
       }
-
-      addSnackbar('Transaction Successful!', 'success');
-      await sleep(2000);
-      await mneeService.balance(keysService.bsvAddress);
-      onResponse();
-
-      sendMessage({
-        action: 'sendMNEEResponse',
-        txid: sendRes.txid,
-        rawtx: sendRes.rawtx,
-      });
-    } catch (error) {
+    } catch (error: unknown) {
       console.log(error);
+      // Check for specific error messages
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('status: 423')) {
+        addSnackbar('The sending or receiving address may be frozen. Please contact support.', 'error');
+      } else {
+        addSnackbar(getErrorMessage(errorMessage) || 'Transfer failed. Please try again.', 'error');
+      }
     } finally {
       setIsProcessing(false);
     }

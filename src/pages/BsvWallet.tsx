@@ -50,7 +50,7 @@ import { FaListAlt, FaTrash } from 'react-icons/fa';
 import { FaArrowRightArrowLeft } from 'react-icons/fa6';
 import { FaHistory } from 'react-icons/fa';
 import { ManageTokens } from '../components/ManageTokens';
-import { Account } from '../services/types/chromeStorage.types';
+import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { SendBsv20View } from '../components/SendBsv20View';
 import { FaucetButton } from '../components/FaucetButton';
 import { TxHistory } from '../components/TxHistory';
@@ -279,6 +279,22 @@ export const BsvWallet = (props: BsvWalletProps) => {
     const res = await mneeService.balance(bsvAddress);
     if (res) {
       setMneeBalance(res.decimalAmount);
+
+      // Update MNEE balance in Chrome storage
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account) return;
+
+      const key: keyof ChromeStorageObject = 'accounts';
+      const update: Partial<ChromeStorageObject['accounts']> = {
+        [identityAddress]: {
+          ...account,
+          mneeBalance: {
+            amount: res.amount,
+            decimalAmount: res.decimalAmount,
+          },
+        },
+      };
+      await chromeStorageService.updateNested(key, update);
     }
   };
 
@@ -441,21 +457,87 @@ export const BsvWallet = (props: BsvWalletProps) => {
       setIsProcessing(false);
       return;
     }
-    const res = await mneeService.transfer([{ address: mneeRecipient, amount: mneeReciepientAmount }], keys.walletWif);
-    if (!res.txid || res.error) {
-      addSnackbar(res.error ?? 'An unknown error occurred.', 'error');
+
+    try {
+      // Initiate the transfer with broadcast flag
+      const res = await mneeService.transfer(
+        [{ address: mneeRecipient, amount: mneeReciepientAmount }],
+        keys.walletWif,
+        { broadcast: true },
+      );
+
+      // Handle ticket-based response
+      if (res.ticketId) {
+        addSnackbar('Transaction initiated. Processing...', 'info');
+
+        // Poll for transaction status
+        let finalStatus = null;
+        let attempts = 0;
+        const maxAttempts = 30; // 30 attempts with 2 second intervals = 60 seconds max
+
+        while (attempts < maxAttempts) {
+          await sleep(2000); // Wait 2 seconds between polls
+
+          try {
+            const status = await mneeService.getTxStatus(res.ticketId);
+
+            if (status.status === 'SUCCESS' || status.status === 'MINED') {
+              finalStatus = status;
+              break;
+            } else if (status.status === 'FAILED') {
+              addSnackbar(`Transaction failed: ${status.errors || 'Unknown error'}`, 'error');
+              setPasswordConfirm('');
+              setIsProcessing(false);
+              return;
+            }
+            // If BROADCASTING, continue polling
+          } catch (pollError) {
+            console.error('Error polling transaction status:', pollError);
+          }
+
+          attempts++;
+        }
+
+        if (!finalStatus) {
+          addSnackbar('Transaction timeout. Please check your transaction history.', 'error');
+          setPasswordConfirm('');
+          setIsProcessing(false);
+          return;
+        }
+
+        // Transaction successful
+        setMneeRecipient('');
+        setMneeRecipientAmount(null);
+        setTimeout(updateMneeBalance, 1000);
+        setPasswordConfirm('');
+        setPageState('main');
+        addSnackbar('Transaction Successful!', 'success');
+        setIsProcessing(false);
+      } else if (res.rawtx) {
+        // Legacy response with raw transaction (shouldn't happen with broadcast: true)
+        addSnackbar('Transaction created but not broadcast. Please try again.', 'info');
+        setPasswordConfirm('');
+        setIsProcessing(false);
+        return;
+      } else {
+        // No valid response
+        addSnackbar('Transfer failed. No valid response from server.', 'error');
+        setPasswordConfirm('');
+        setIsProcessing(false);
+        return;
+      }
+    } catch (error: unknown) {
+      console.error('MNEE transfer error:', error);
+      // Check for specific error messages
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('status: 423')) {
+        addSnackbar('The sending or receiving address may be frozen. Please contact support.', 'error');
+      } else {
+        addSnackbar(getErrorMessage(errorMessage) || 'Transfer failed. Please try again.', 'error');
+      }
       setPasswordConfirm('');
       setIsProcessing(false);
-      return;
     }
-
-    setMneeRecipient('');
-    setMneeRecipientAmount(null);
-    setTimeout(updateMneeBalance, 1000);
-    setPasswordConfirm('');
-    setPageState('main');
-    addSnackbar('Transaction Successful!', 'success');
-    setIsProcessing(false);
   };
 
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -580,7 +662,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
       setMneeRecipientAmount(mneeBalance);
       return;
     }
-    const atomicBalance = mneeService.toAtomicAmount(mneeBalance, config.decimals);
+    const atomicBalance = mneeService.toAtomicAmount(mneeBalance);
     const fee = config.fees.find((fee) => atomicBalance >= fee.min && atomicBalance <= fee.max)?.fee || 0;
     setMneeRecipientAmount((atomicBalance - fee) / 10 ** config.decimals);
   };
