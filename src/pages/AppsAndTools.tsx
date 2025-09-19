@@ -640,7 +640,7 @@ export const AppsAndTools = () => {
         theme={theme}
         type="primary"
         label="View Open Collective"
-        onClick={() => window.open('https://opencollective.com/panda-wallet', '_blank')}
+        onClick={() => window.open('https://opencollective.com/yours-wallet', '_blank')}
       />
       <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
     </PageWrapper>
