@@ -54,6 +54,7 @@ import { Account, ChromeStorageObject } from '../services/types/chromeStorage.ty
 import { SendBsv20View } from '../components/SendBsv20View';
 import { FaucetButton } from '../components/FaucetButton';
 import { TxHistory } from '../components/TxHistory';
+import { MNEEFee } from '@mnee/ts-sdk';
 
 const MiddleContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -663,7 +664,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
       return;
     }
     const atomicBalance = mneeService.toAtomicAmount(mneeBalance);
-    const fee = config.fees.find((fee) => atomicBalance >= fee.min && atomicBalance <= fee.max)?.fee || 0;
+    const fee = config.fees.find((fee: MNEEFee) => atomicBalance >= fee.min && atomicBalance <= fee.max)?.fee || 0;
     setMneeRecipientAmount((atomicBalance - fee) / 10 ** config.decimals);
   };
 

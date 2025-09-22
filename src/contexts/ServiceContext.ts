@@ -7,7 +7,7 @@ import { BsvService } from '../services/Bsv.service';
 import { OrdinalService } from '../services/Ordinal.service';
 import { SPVStore } from 'spv-store';
 import { GorillaPoolService } from '../services/GorillaPool.service';
-import { MneeInterface } from 'mnee';
+import { MneeInterface } from '@mnee/ts-sdk';
 
 export interface ServiceContextProps {
   chromeStorageService: ChromeStorageService;

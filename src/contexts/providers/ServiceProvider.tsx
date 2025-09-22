@@ -9,7 +9,7 @@ import { OrdinalService } from '../../services/Ordinal.service';
 import { WhatsOnChainService } from '../../services/WhatsOnChain.service';
 import { INACTIVITY_LIMIT, MNEE_API_TOKEN } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
-import mnee from 'mnee';
+import mnee from '@mnee/ts-sdk';
 
 const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();

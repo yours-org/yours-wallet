@@ -43,8 +43,13 @@ import { GorillaPoolService } from './services/GorillaPool.service';
 import { mapOrdinal } from './utils/providerHelper';
 import { TxoLookup, TxoSort } from 'spv-store';
 import { initOneSatSPV } from './initSPVStore';
-import { CHROME_STORAGE_OBJECT_VERSION, HOSTED_YOURS_IMAGE } from './utils/constants';
+import { CHROME_STORAGE_OBJECT_VERSION, HOSTED_YOURS_IMAGE, MNEE_API_TOKEN } from './utils/constants';
 import { convertLockReqToSendBsvReq } from './utils/tools';
+import Mnee from '@mnee/ts-sdk';
+
+// mnee instance for balance check
+const mnee = new Mnee({ environment: 'production', apiKey: MNEE_API_TOKEN });
+
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
 const gorillaPoolService = new GorillaPoolService(chromeStorageService);
@@ -448,10 +453,12 @@ if (isInServiceWorker) {
       chromeStorageService.getAndSetStorage().then(() => {
         const { account } = chromeStorageService.getCurrentAccountObject();
         if (!account) throw Error('No account found!');
-        sendResponse({
-          type: YoursEventName.GET_MNEE_BALANCE,
-          success: true,
-          data: account.mneeBalance,
+        mnee.balance(account.addresses.bsvAddress).then(({ amount, decimalAmount }) => {
+          sendResponse({
+            type: YoursEventName.GET_MNEE_BALANCE,
+            success: true,
+            data: { amount, decimalAmount },
+          });
         });
       });
     } catch (error) {

@@ -1,11 +1,12 @@
 {
   "name": "yours-wallet",
-  "version": "4.5.1",
+  "version": "4.5.2",
   "private": true,
   "dependencies": {
     "@bsv/paymail": "^2.0.2",
     "@bsv/sdk": "^1.4.24",
     "@fortawesome/react-fontawesome": "^0.2.2",
+    "@mnee/ts-sdk": "^1.0.1",
     "@ramonak/react-progress-bar": "^5.2.0",
     "@tempfix/idb": "^8.0.3",
     "@testing-library/jest-dom": "^6.5.0",
@@ -27,7 +28,6 @@
     "framer-motion": "^11.11.11",
     "js-1sat-ord": "^0.1.80",
     "jszip": "^3.10.1",
-    "mnee": "^3.0.2",
     "nth-check": "^2.1.1",
     "path-browserify": "^1.0.1",
     "postcss": "^8.4.47",
