@@ -190,6 +190,10 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
   };
 
   const clearRequest = async () => {
+    sendMessage({
+      action: 'sendMNEEResponse',
+      error: 'User cancelled the request',
+    });
     await chromeStorageService.remove('sendMNEERequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();

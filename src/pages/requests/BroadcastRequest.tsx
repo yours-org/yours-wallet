@@ -159,6 +159,10 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   };
 
   const clearRequest = async () => {
+    sendMessage({
+      action: 'broadcastResponse',
+      error: 'User cancelled the request',
+    });
     await chromeStorageService.remove('broadcastRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();

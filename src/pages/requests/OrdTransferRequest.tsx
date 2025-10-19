@@ -83,6 +83,10 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   };
 
   const clearRequest = async () => {
+    sendMessage({
+      action: 'transferOrdinalResponse',
+      error: 'User cancelled the request',
+    });
     await chromeStorageService.remove('transferOrdinalRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();

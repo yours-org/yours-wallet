@@ -119,6 +119,10 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   };
 
   const clearRequest = async () => {
+    sendMessage({
+      action: 'purchaseOrdinalResponse',
+      error: 'User cancelled the request',
+    });
     await chromeStorageService.remove('purchaseOrdinalRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();

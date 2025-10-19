@@ -96,6 +96,10 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
   };
 
   const clearRequest = async () => {
+    sendMessage({
+      action: 'signMessageResponse',
+      error: 'User cancelled the request',
+    });
     await chromeStorageService.remove('signMessageRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();

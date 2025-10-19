@@ -194,6 +194,10 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   };
 
   const clearRequest = async () => {
+    sendMessage({
+      action: 'sendBsvResponse',
+      error: 'User cancelled the request',
+    });
     await chromeStorageService.remove('sendBsvRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();

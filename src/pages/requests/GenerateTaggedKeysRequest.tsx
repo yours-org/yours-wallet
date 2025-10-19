@@ -188,6 +188,10 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
   };
 
   const clearRequest = async () => {
+    sendMessage({
+      action: 'generateTaggedKeysResponse',
+      error: 'User cancelled the request',
+    });
     await chromeStorageService.remove('generateTaggedKeysRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();

@@ -51,7 +51,7 @@ const TabButton = styled.button<WhiteLabelTheme & { $selected: boolean; $leftBut
   transition: background-color 0.2s ease-in-out;
 
   &:hover {
-    background: ${(props) => props.theme.primaryHover}; /* Optional: Change color on hover */
+    opacity: ${(props) => (props.$selected ? 1 : 0.8)};
   }
 `;
 

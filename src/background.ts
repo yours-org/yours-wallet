@@ -1089,11 +1089,19 @@ if (isInServiceWorker) {
   const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys }) => {
     if (!responseCallbackForConnectRequest) throw Error('Missing callback!');
     try {
-      responseCallbackForConnectRequest({
-        type: YoursEventName.CONNECT,
-        success: true,
-        data: response.decision === 'approved' ? response.pubKeys.identityPubKey : undefined,
-      });
+      if (response.decision === 'approved') {
+        responseCallbackForConnectRequest({
+          type: YoursEventName.CONNECT,
+          success: true,
+          data: response.pubKeys.identityPubKey,
+        });
+      } else {
+        responseCallbackForConnectRequest({
+          type: YoursEventName.CONNECT,
+          success: false,
+          error: 'User declined the connection request',
+        });
+      }
     } catch (error) {
       responseCallbackForConnectRequest?.({
         type: YoursEventName.CONNECT,

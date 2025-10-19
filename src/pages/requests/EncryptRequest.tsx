@@ -103,6 +103,10 @@ export const EncryptRequest = (props: EncryptRequestProps) => {
   };
 
   const clearRequest = async () => {
+    sendMessage({
+      action: 'encryptResponse',
+      error: 'User cancelled the request',
+    });
     await chromeStorageService.remove('encryptRequest');
     if (popupId) removeWindow(popupId);
     window.location.reload();
