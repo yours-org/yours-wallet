@@ -17,6 +17,10 @@ export type FetchingMessage = {
   data: { txid: string };
 };
 
+export type SignedOutMessage = {
+  action: YoursEventName.SIGNED_OUT;
+};
+
 export const useQueueTracker = () => {
   const { theme } = useTheme();
   const [queueLength, setQueueLength] = useState(0);
@@ -30,7 +34,34 @@ export const useQueueTracker = () => {
   const [fetchingTxid, setFetchingTxid] = useState<string | undefined>();
 
   useEffect(() => {
-    const handleQueueStatusUpdate = (message: QueueTrackerMessage | ImportTrackerMessage | FetchingMessage) => {
+    const handleQueueStatusUpdate = (message: QueueTrackerMessage | ImportTrackerMessage | FetchingMessage | SignedOutMessage) => {
+      // Handle sign out - reset all sync state
+      if (message.action === YoursEventName.SIGNED_OUT) {
+        setQueueLength(0);
+        setShowQueueBanner(false);
+        setIsSyncing(false);
+        setImportName(undefined);
+        setFetchingTxid(undefined);
+
+        // Clear all timeouts and intervals
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        if (twoSecondsTimeoutRef.current) {
+          clearTimeout(twoSecondsTimeoutRef.current);
+          twoSecondsTimeoutRef.current = null;
+        }
+
+        // Clear localStorage
+        localStorage.removeItem('walletImporting');
+        return;
+      }
+
       if (
         message.action === YoursEventName.QUEUE_STATUS_UPDATE ||
         message.action === YoursEventName.IMPORT_STATUS_UPDATE ||
