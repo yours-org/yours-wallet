@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { YoursEventName } from '../inject';
 
-export type BlockHeightTrackerMessage = {
-  action: YoursEventName.BLOCK_HEIGHT_UPDATE;
-  data: { currentHeight: number; lastHeight: number };
-};
+export type BlockHeightTrackerMessage =
+  | {
+      action: YoursEventName.BLOCK_HEIGHT_UPDATE;
+      data: { currentHeight: number; lastHeight: number };
+    }
+  | {
+      action: YoursEventName.SIGNED_OUT;
+    };
 
 export const useBlockHeightTracker = () => {
   const [percentCompleted, setPercentageComplete] = useState(0);
@@ -19,6 +23,10 @@ export const useBlockHeightTracker = () => {
         if (percent >= 100) {
           setShowSyncPage(false);
         }
+      }
+      if (message.action === YoursEventName.SIGNED_OUT) {
+        setShowSyncPage(false);
+        setPercentageComplete(0);
       }
     };
 
