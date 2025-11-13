@@ -38,6 +38,7 @@ npm run build
 ```
 
 7. **Run The Extension:** Load the extension into your browser using dev mode and ensure your changes look good in the chrome environment:
+
    - Navigate to `chrome://extensions` and turn on dev mode.
    - Click "Load Unpacked".
    - Upload the production `build` folder that was just created.

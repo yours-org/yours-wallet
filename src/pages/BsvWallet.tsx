@@ -46,7 +46,7 @@ import { getErrorMessage, isValidEmail } from '../utils/tools';
 import { UpgradeNotification } from '../components/UpgradeNotification';
 import { Bsv20 } from 'yours-wallet-provider';
 import { Bsv20TokensList } from '../components/Bsv20TokensList';
-import { FaListAlt, FaTrash } from 'react-icons/fa';
+import { FaListAlt, FaTrash, FaExternalLinkAlt } from 'react-icons/fa';
 import { FaArrowRightArrowLeft } from 'react-icons/fa6';
 import { FaHistory } from 'react-icons/fa';
 import { ManageTokens } from '../components/ManageTokens';
@@ -132,6 +132,36 @@ const InputWrapper = styled.div`
   width: 100%;
   position: relative;
   width: 100%;
+`;
+
+const SwapAndBridgeButtonContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  width: 100%;
+`;
+
+const SwapAndBridgeButton = styled.button<WhiteLabelTheme>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 87%;
+  height: 2.25rem;
+  background: linear-gradient(45deg, #ff9500, #ffb800);
+  color: #000000;
+  border: none;
+  border-radius: 0.25rem;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0.5rem;
+  cursor: pointer;
+  transition: 0.3s ease-in-out;
+  transform: scale(1);
+
+  &:hover {
+    transform: scale(1.02);
+  }
 `;
 
 const ScrollableConfirmContent = styled(ConfirmContent)`
@@ -860,6 +890,13 @@ export const BsvWallet = (props: BsvWalletProps) => {
             isSubmit
           />
         </FormContainer>
+
+        <SwapAndBridgeButtonContainer>
+          <SwapAndBridgeButton theme={theme} onClick={() => window.open('https://swap-user.mnee.net', '_blank')}>
+            Swap & Bridge
+            <FaExternalLinkAlt size="0.85rem" />
+          </SwapAndBridgeButton>
+        </SwapAndBridgeButtonContainer>
 
         <Button
           label="Go back"
