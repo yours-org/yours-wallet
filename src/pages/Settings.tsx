@@ -18,6 +18,7 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { WhitelistedApp, YoursEventName } from '../inject';
 import { WhiteLabelTheme } from '../theme.types';
 import { sendMessage } from '../utils/chromeHelpers';
+import { FEE_PER_KB } from '../utils/constants';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { CreateAccount } from './onboarding/CreateAccount';
 import { RestoreAccount } from './onboarding/RestoreAccount';
@@ -137,7 +138,7 @@ export const Settings = () => {
   const [masterBackupEventText, setMasterBackupEventText] = useState('');
   const currentAccount = chromeStorageService.getCurrentAccountObject();
   const [noApprovalLimit, setNoApprovalLimit] = useState(currentAccount.account?.settings.noApprovalLimit ?? 0);
-  const [customFeeRate, setCustomFeeRate] = useState(currentAccount.account?.settings.customFeeRate ?? 10);
+  const [customFeeRate, setCustomFeeRate] = useState(currentAccount.account?.settings.customFeeRate ?? FEE_PER_KB);
   const [selectedAccountIdentityAddress, setSelectedAccountIdentityAddress] = useState<string | undefined>();
 
   useEffect(() => {
@@ -614,7 +615,7 @@ export const Settings = () => {
       />
       <SettingsRow
         name="Custom Fee Rate"
-        description="Set a custom fee rate for transactions (default is 10 sat/kb)"
+        description="Set a custom fee rate for transactions (default is 100 sat/kb)"
         jsxElement={
           <Input
             theme={theme}

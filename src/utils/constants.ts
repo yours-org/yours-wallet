@@ -14,10 +14,9 @@ export const MAINNET_ADDRESS_PREFIX = 0x00;
 export const TESTNET_ADDRESS_PREFIX = 0x6f;
 export const BSV_DECIMAL_CONVERSION = 100000000;
 export const BSV20_INDEX_FEE = 1000;
-export const FEE_PER_KB = 10;
+export const FEE_PER_KB = 100;
 export const MAX_BYTES_PER_TX = 50000000; // 50MB;
 export const GLOBAL_ORDERBOOK_MARKET_RATE = 0.05;
-export const FEE_SATS = 125;
 export const P2PKH_INPUT_SIZE = 148;
 export const P2PKH_OUTPUT_SIZE = 34;
 export const DUST = 10;
@@ -105,7 +104,7 @@ export const DEFAULT_ACCOUNT = {
     isPasswordRequired: true,
     socialProfile: { avatar: HOSTED_YOURS_IMAGE, displayName: 'Anonymous' },
     favoriteTokens: [],
-    customFeeRate: 10,
+    customFeeRate: FEE_PER_KB,
   },
   balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
   mneeBalance: { amount: 0, decimalAmount: 0 },

@@ -7,6 +7,7 @@ import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
 import {
   CHROME_STORAGE_OBJECT_VERSION,
+  FEE_PER_KB,
   HOSTED_YOURS_IMAGE,
   MAINNET_ADDRESS_PREFIX,
   TESTNET_ADDRESS_PREFIX,
@@ -103,7 +104,7 @@ export class ChromeStorageService {
               avatar: socialProfile?.avatar ?? HOSTED_YOURS_IMAGE,
             },
             favoriteTokens: [],
-            customFeeRate: 10,
+            customFeeRate: FEE_PER_KB,
           },
           addresses: {
             bsvAddress: appState.addresses.bsvAddress,
@@ -304,10 +305,10 @@ export class ChromeStorageService {
   };
 
   getCustomFeeRate = (): number => {
-    if (!this.storage) return 10;
+    if (!this.storage) return FEE_PER_KB;
     const { accounts, selectedAccount } = this.storage as ChromeStorageObject;
-    if (!accounts || !selectedAccount) return 10;
-    return accounts[selectedAccount]?.settings?.customFeeRate ?? 10;
+    if (!accounts || !selectedAccount) return FEE_PER_KB;
+    return accounts[selectedAccount]?.settings?.customFeeRate ?? FEE_PER_KB;
   };
 
   isPasswordRequired = (): boolean => {
