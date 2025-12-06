@@ -169,7 +169,7 @@ export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
   const { query } = useBottomMenu();
-  const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
+  const { keysService, bsvService, chromeStorageService, oneSatSPV, walletServices } = useServiceContext();
   const { bsvAddress, ordAddress, identityAddress, getWifBalance, sweepWif } = keysService;
   const exchangeRate = chromeStorageService.getCurrentAccountObject().exchangeRateCache?.rate ?? 0;
   const [isProcessing, setIsProcessing] = useState(false);
@@ -245,7 +245,7 @@ export const AppsAndTools = () => {
 
   const getLockData = async () => {
     setIsProcessing(true);
-    setCurrentBlockHeight(await bsvService.getCurrentHeight());
+    setCurrentBlockHeight(await walletServices.getHeight());
     setLockedUtxos(await bsvService.getLockedTxos());
     setIsProcessing(false);
   };
@@ -343,9 +343,8 @@ export const AppsAndTools = () => {
   const handleBlockHeightChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const dateChoice = new Date(e.target.value).getTime();
     const blockCount = Math.ceil((dateChoice - Date.now()) / 1000 / 60 / 10);
-    const chainTip = await oneSatSPV.getChaintip();
-    if (!chainTip) return;
-    const blockHeight = chainTip.height + blockCount;
+    const chainTip = await walletServices.getHeight();
+    const blockHeight = chainTip + blockCount;
     setLockBlockHeight(blockHeight);
   };
 
@@ -355,8 +354,8 @@ export const AppsAndTools = () => {
       if (!lockBsvAmount || !lockBlockHeight) throw new Error('Invalid lock amount or block height');
       if (!lockPassword) throw new Error('Please enter a password');
       setIsProcessing(true);
-      const chainTip = await oneSatSPV.getChaintip();
-      if (chainTip?.height && chainTip.height >= lockBlockHeight) {
+      const chainTip = await walletServices.getHeight();
+      if (chainTip >= lockBlockHeight) {
         throw new Error('Invalid block height. Please choose a future block height.');
       }
       const sats = Math.round(lockBsvAmount * BSV_DECIMAL_CONVERSION);

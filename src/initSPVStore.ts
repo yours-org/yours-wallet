@@ -55,8 +55,8 @@ export const getIndexers = (owners: Set<string>, network: NetWork) => {
   const ordIndexers = [
     // new OneSatIndexer(owners, network, SYNC_HISTORY),
     new OrdLockIndexer(owners, network),
-    new InscriptionIndexer(owners, network),
-    new MapIndexer(owners, network),
+    // new InscriptionIndexer(owners, network),
+    // new MapIndexer(owners, network),
     new SigmaIndexer(owners, network),
     new OriginIndexer(owners, network, SYNC_HISTORY),
   ];

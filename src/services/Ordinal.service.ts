@@ -37,6 +37,7 @@ export class OrdinalService {
     private readonly oneSatSPV: SPVStore,
     private readonly chromeStorageService: ChromeStorageService,
     private readonly gorillaPoolService: GorillaPoolService,
+    private readonly walletStorage?: any,
   ) {}
 
   getOrdinals = async (from = ''): Promise<PaginatedOrdinalsResponse> => {
@@ -95,13 +96,13 @@ export class OrdinalService {
       if (!u) return { error: 'no-ordinal' };
       const pk = pkMap.get(u.owner || '');
       if (!pk) return { error: 'no-keys' };
-      const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
-      if (!sourceTransaction) {
+      const rawTx = await this.walletStorage?.getRawTxOfKnownValidTransaction(u.outpoint.txid);
+      if (!rawTx) {
         console.log(`Could not find source transaction ${u.outpoint.txid}`);
         return { error: 'source-tx-not-found' };
       }
       tx.addInput({
-        sourceTransaction,
+        sourceTransaction: Transaction.fromBinary(rawTx),
         sourceOutputIndex: u.outpoint.vout,
         sequence: 0xffffffff,
         unlockingScriptTemplate: new OrdP2PKH().unlock(pk),
@@ -133,13 +134,13 @@ export class OrdinalService {
       for await (const u of fundResults || []) {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
-        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
-        if (!sourceTransaction) {
+        const rawTx = await this.walletStorage?.getRawTxOfKnownValidTransaction(u.outpoint.txid);
+        if (!rawTx) {
           console.log(`Could not find source transaction ${u.outpoint.txid}`);
           return { error: 'source-tx-not-found' };
         }
         tx.addInput({
-          sourceTransaction,
+          sourceTransaction: Transaction.fromBinary(rawTx),
           sourceOutputIndex: u.outpoint.vout,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(pk),

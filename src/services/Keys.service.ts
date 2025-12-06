@@ -15,9 +15,10 @@ import { ChromeStorageService } from './ChromeStorage.service';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction, Utils } from '@bsv/sdk';
-import { SPVStore } from 'spv-store';
 import { WocUtxo } from './types/whatsOnChain.types';
 import axios from 'axios';
+import type { Wallet } from '@bsv/wallet-toolbox';
+import { broadcastTransaction } from '../utils/broadcast';
 
 export class KeysService {
   bsvAddress: string;
@@ -28,7 +29,7 @@ export class KeysService {
   identityPubKey: string;
   constructor(
     private readonly chromeStorageService: ChromeStorageService,
-    private readonly oneSatSPV: SPVStore,
+    private readonly walletStorage?: any,
   ) {
     this.bsvAddress = '';
     this.ordAddress = '';
@@ -123,7 +124,7 @@ export class KeysService {
     return keys;
   };
 
-  sweepLegacy = async (keys: Keys) => {
+  sweepLegacy = async (wallet: Wallet, keys: Keys) => {
     try {
       const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
       const tx = new Transaction();
@@ -135,8 +136,12 @@ export class KeysService {
       if (utxos.length === 0) return;
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       for await (const u of utxos || []) {
+        const rawTx = await this.walletStorage?.getRawTxOfKnownValidTransaction(u.tx_hash);
+        if (!rawTx) {
+          throw new Error(`Transaction ${u.tx_hash} not found in wallet storage`);
+        }
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash),
+          sourceTransaction: Transaction.fromBinary(rawTx),
           sourceOutputIndex: u.tx_pos,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(sweepWallet.privKey),
@@ -144,11 +149,11 @@ export class KeysService {
       }
       await tx.fee(feeModel);
       await tx.sign();
-      const response = await this.oneSatSPV.broadcast(tx);
-      if (response.status == 'error') return { error: response.description };
-      const txid = tx.id('hex');
-      console.log('Change sweep:', txid);
-      return { txid, rawtx: Utils.toHex(tx.toBinary()) };
+
+      const result = await broadcastTransaction(wallet, tx, 'Sweep legacy wallet');
+      if (result.error) return { error: result.error };
+      console.log('Legacy sweep:', result.txid);
+      return { txid: result.txid, rawtx: Utils.toHex(tx.toBinary()) };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.log(error);
@@ -170,7 +175,7 @@ export class KeysService {
     }
   };
 
-  sweepWif = async (wif: string) => {
+  sweepWif = async (wallet: Wallet, wif: string) => {
     try {
       const privKey = PrivateKey.fromWif(wif);
       const tx = new Transaction();
@@ -182,8 +187,12 @@ export class KeysService {
       if (utxos.length === 0) return;
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       for await (const u of utxos || []) {
+        const rawTx = await this.walletStorage?.getRawTxOfKnownValidTransaction(u.tx_hash);
+        if (!rawTx) {
+          throw new Error(`Transaction ${u.tx_hash} not found in wallet storage`);
+        }
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash),
+          sourceTransaction: Transaction.fromBinary(rawTx),
           sourceOutputIndex: u.tx_pos,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(privKey),
@@ -191,11 +200,11 @@ export class KeysService {
       }
       await tx.fee(feeModel);
       await tx.sign();
-      const response = await this.oneSatSPV.broadcast(tx);
-      if (response.status == 'error') return { error: response.description };
-      const txid = tx.id('hex');
-      console.log('Change sweep:', txid);
-      return { txid, rawtx: Utils.toHex(tx.toBinary()) };
+
+      const result = await broadcastTransaction(wallet, tx, 'Sweep WIF');
+      if (result.error) return { error: result.error };
+      console.log('WIF sweep:', result.txid);
+      return { txid: result.txid, rawtx: Utils.toHex(tx.toBinary()) };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.log(error);

@@ -8,6 +8,8 @@ import { OrdinalService } from '../services/Ordinal.service';
 import { SPVStore } from 'spv-store';
 import { GorillaPoolService } from '../services/GorillaPool.service';
 import { MneeInterface } from '@mnee/ts-sdk';
+import { Wallet } from '@bsv/wallet-toolbox';
+import { WalletServicesImpl } from '../services/WalletServices.service';
 
 export interface ServiceContextProps {
   chromeStorageService: ChromeStorageService;
@@ -23,6 +25,8 @@ export interface ServiceContextProps {
   setIsLocked: (isLocked: boolean) => void;
   lockWallet: () => Promise<void>;
   oneSatSPV: SPVStore;
+  wallet?: Wallet;
+  walletServices: WalletServicesImpl;
 }
 
 export const ServiceContext = createContext<ServiceContextProps | undefined>(undefined);

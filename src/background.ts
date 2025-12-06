@@ -43,6 +43,7 @@ import { GorillaPoolService } from './services/GorillaPool.service';
 import { mapOrdinal } from './utils/providerHelper';
 import { TxoLookup, TxoSort } from 'spv-store';
 import { initOneSatSPV } from './initSPVStore';
+import { initWallet } from './initWallet';
 import { CHROME_STORAGE_OBJECT_VERSION, HOSTED_YOURS_IMAGE, MNEE_API_TOKEN } from './utils/constants';
 import { convertLockReqToSendBsvReq } from './utils/tools';
 import Mnee from '@mnee/ts-sdk';
@@ -79,6 +80,15 @@ export let oneSatSPVPromise = chromeStorageService.getAndSetStorage().then(async
   }
 
   return initOneSatSPV(chromeStorageService, isInServiceWorker);
+});
+
+export let walletPromise = chromeStorageService.getAndSetStorage().then(async () => {
+  try {
+    return await initWallet(chromeStorageService);
+  } catch (error) {
+    console.error('Error initializing wallet:', error);
+    throw error;
+  }
 });
 
 console.log('Yours Wallet Background Script Running!');
