@@ -112,6 +112,7 @@ export class OriginIndexer extends Indexer {
       tags.push(`origin:${origin.outpoint || ''}`);
       if (origin.insc?.file?.type) {
         tags.push('type');
+        tags.push(`type:${origin.insc.file.type.split('/')[0]}`);
         tags.push(`type:${origin.insc.file.type}`);
       }
     }
