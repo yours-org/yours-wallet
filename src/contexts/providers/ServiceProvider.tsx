@@ -1,5 +1,6 @@
 import { ReactNode, useCallback, useEffect, useState } from 'react';
-import { oneSatSPVPromise } from '../../background';
+import { NetWork } from 'yours-wallet-provider';
+import { oneSatSPVPromise, walletPromise } from '../../background';
 import { BsvService } from '../../services/Bsv.service';
 import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { ContractService } from '../../services/Contract.service';
@@ -7,6 +8,7 @@ import { GorillaPoolService } from '../../services/GorillaPool.service';
 import { KeysService } from '../../services/Keys.service';
 import { OrdinalService } from '../../services/Ordinal.service';
 import { WhatsOnChainService } from '../../services/WhatsOnChain.service';
+import { WalletServicesImpl } from '../../services/WalletServices.service';
 import { INACTIVITY_LIMIT, MNEE_API_TOKEN } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import mnee from '@mnee/ts-sdk';
@@ -15,20 +17,34 @@ const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();
   await chromeStorageService.getAndSetStorage(); // Ensure the storage is initialized
 
+  const { account } = chromeStorageService.getCurrentAccountObject();
+  const network = account?.network || NetWork.Mainnet;
+
+  const walletServices = new WalletServicesImpl(network);
   const wocService = new WhatsOnChainService(chromeStorageService);
   const gorillaPoolService = new GorillaPoolService(chromeStorageService);
   const oneSatSPV = await oneSatSPVPromise;
-  const keysService = new KeysService(chromeStorageService, oneSatSPV);
-  const contractService = new ContractService(keysService, oneSatSPV);
-  const mneeService = new mnee({ environment: 'production', apiKey: MNEE_API_TOKEN });
 
-  const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, oneSatSPV);
+  // Initialize wallet
+  let wallet;
+  try {
+    wallet = await walletPromise;
+  } catch (error) {
+    console.error('Error initializing wallet:', error);
+    // wallet remains undefined
+  }
+
+  const keysService = new KeysService(chromeStorageService, oneSatSPV, wallet?.storage);
+  const contractService = new ContractService(keysService, oneSatSPV, wallet?.storage);
+  const mneeService = new mnee({ environment: 'production', apiKey: MNEE_API_TOKEN });
+  const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, oneSatSPV, walletServices, wallet?.storage);
   const ordinalService = new OrdinalService(
     keysService,
     bsvService,
     oneSatSPV,
     chromeStorageService,
     gorillaPoolService,
+    wallet?.storage,
   );
 
   return {
@@ -41,6 +57,8 @@ const initializeServices = async () => {
     gorillaPoolService,
     contractService,
     oneSatSPV,
+    wallet,
+    walletServices,
   };
 };
 

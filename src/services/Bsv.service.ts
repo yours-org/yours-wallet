@@ -11,6 +11,7 @@ import { getPrivateKeyFromTag, Keys } from '../utils/keys';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { ContractService } from './Contract.service';
 import { KeysService } from './Keys.service';
+import { WalletServicesImpl } from './WalletServices.service';
 import { FundRawTxResponse, LockData, InWalletBsvResponse } from './types/bsv.types';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { WhatsOnChainService } from './WhatsOnChain.service';
@@ -43,6 +44,8 @@ export class BsvService {
     private readonly contractService: ContractService,
     private readonly chromeStorageService: ChromeStorageService,
     private readonly oneSatSPV: SPVStore,
+    private readonly walletServices: WalletServicesImpl,
+    private readonly walletStorage?: any,
   ) {
     this.bsvBalance = 0;
     this.exchangeRate = 0;
@@ -59,7 +62,7 @@ export class BsvService {
 
     const lockTxos = await this.getLockedTxos();
     for (const txo of lockTxos) {
-      const height = await this.getCurrentHeight();
+      const height = await this.walletServices.getHeight();
       const lock = txo.data.lock?.data as Lock;
       if (!lock) continue;
       lockData.totalLocked += Number(txo.satoshis);
@@ -76,11 +79,6 @@ export class BsvService {
     return lockData;
   };
 
-  getCurrentHeight = async () => {
-    const header = await this.oneSatSPV.getSyncedBlock();
-    return header?.height || 0;
-  };
-
   getLockedTxos = async () => {
     const lockTxos = await this.oneSatSPV.search(new TxoLookup('lock'));
     return lockTxos.txos.filter((txo) => !txo.data.insc);
@@ -93,7 +91,7 @@ export class BsvService {
 
   unlockLockedCoins = async () => {
     if (!this.keysService.identityAddress) return;
-    const blockHeight = await this.getCurrentHeight();
+    const blockHeight = await this.walletServices.getHeight();
     const lockedTxos = await this.getLockedTxos();
     const txos = lockedTxos.filter((i) => Number(i.data.lock?.data.until) <= blockHeight);
     if (txos.length > 0) {
@@ -115,8 +113,12 @@ export class BsvService {
       for await (const u of fundResults || []) {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
+        const rawTx = await this.walletStorage?.getRawTxOfKnownValidTransaction(u.outpoint.txid);
+        if (!rawTx) {
+          throw new Error(`Transaction ${u.outpoint.txid} not found in wallet storage`);
+        }
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid),
+          sourceTransaction: Transaction.fromBinary(rawTx),
           sourceOutputIndex: u.outpoint.vout,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(pk),
@@ -260,14 +262,13 @@ export class BsvService {
       for await (const u of fundResults || []) {
         const pk = pkMap.get(u.owner || '');
         if (!pk) continue;
-        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
-        if (!sourceTransaction) {
+        const rawTx = await this.walletStorage?.getRawTxOfKnownValidTransaction(u.outpoint.txid);
+        if (!rawTx) {
           console.log(`Could not find source transaction ${u.outpoint.txid}`);
           return { error: 'source-tx-not-found' };
-          // continue;
         }
         tx.addInput({
-          sourceTransaction,
+          sourceTransaction: Transaction.fromBinary(rawTx),
           sourceOutputIndex: u.outpoint.vout,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(pk),
@@ -419,7 +420,11 @@ export class BsvService {
 
     let satsIn = 0;
     for (const input of tx.inputs) {
-      input.sourceTransaction = await this.oneSatSPV.getTx(input.sourceTXID ?? '');
+      const rawTx = await this.walletStorage?.getRawTxOfKnownValidTransaction(input.sourceTXID ?? '');
+      if (!rawTx) {
+        throw new Error(`Transaction ${input.sourceTXID} not found in wallet storage`);
+      }
+      input.sourceTransaction = Transaction.fromBinary(rawTx);
       satsIn += input.sourceTransaction?.outputs[input.sourceOutputIndex]?.satoshis || 0;
     }
 
@@ -433,8 +438,12 @@ export class BsvService {
     for await (const u of fundResults || []) {
       const pk = pkMap.get(u.owner || '');
       if (!pk) continue;
+      const rawTx = await this.walletStorage?.getRawTxOfKnownValidTransaction(u.outpoint.txid);
+      if (!rawTx) {
+        throw new Error(`Transaction ${u.outpoint.txid} not found in wallet storage`);
+      }
       tx.addInput({
-        sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid),
+        sourceTransaction: Transaction.fromBinary(rawTx),
         sourceOutputIndex: u.outpoint.vout,
         sequence: 0xffffffff,
         unlockingScriptTemplate: new P2PKH().unlock(pk),

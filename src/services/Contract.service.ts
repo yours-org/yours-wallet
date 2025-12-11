@@ -2,12 +2,14 @@ import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
 import { DEFAULT_SIGHASH_TYPE } from '../utils/constants';
 import { KeysService } from './Keys.service';
 import { Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
-import { SPVStore, Txo } from 'spv-store';
+import { Txo } from 'spv-store';
 import { LockTemplate } from 'spv-store';
+import type { Wallet } from '@bsv/wallet-toolbox';
+import { broadcastTransaction } from '../utils/broadcast';
 export class ContractService {
   constructor(
     private readonly keysService: KeysService,
-    private readonly oneSatSPV: SPVStore,
+    private readonly walletStorage?: any,
   ) {}
 
   getSignatures = async (
@@ -99,7 +101,7 @@ export class ContractService {
     }
   };
 
-  unlock = async (locks: Txo[], currentBlockHeight: number) => {
+  unlock = async (wallet: Wallet, locks: Txo[], currentBlockHeight: number) => {
     try {
       const pkMap = await this.keysService.retrievePrivateKeyMap(undefined, true);
       const bsvAddress = this.keysService.bsvAddress;
@@ -112,18 +114,12 @@ export class ContractService {
       for (const lock of locks) {
         const pk = pkMap.get(lock.owner || '');
         if (!pk) continue;
-        // const input = fromUtxo(
-        //   {
-        //     txid: lock.outpoint.txid,
-        //     vout: lock.outpoint.vout,
-        //     satoshis: Number(lock.satoshis),
-        //     script: Utils.toHex([...lock.script]),
-        //   },
-        //   new LockTemplate().unlock(pk, 'all', false, Number(lock.satoshis), Script.fromBinary(lock.script)),
-        // );
-        // input.sequence = 0;
+        const rawTx = await this.walletStorage?.getRawTxOfKnownValidTransaction(lock.outpoint.txid);
+        if (!rawTx) {
+          throw new Error(`Transaction ${lock.outpoint.txid} not found in wallet storage`);
+        }
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(lock.outpoint.txid),
+          sourceTransaction: Transaction.fromBinary(rawTx),
           sourceOutputIndex: lock.outpoint.vout,
           sequence: 0,
           unlockingScriptTemplate: new LockTemplate().unlock(
@@ -138,12 +134,8 @@ export class ContractService {
 
       await tx.fee();
       await tx.sign();
-      const response = await this.oneSatSPV.broadcast(tx);
-      if (response?.txid) {
-        return { txid: response.txid };
-      }
 
-      return { error: 'broadcast-failed' };
+      return await broadcastTransaction(wallet, tx, 'Unlock time-locked outputs');
     } catch (error) {
       console.error('unlock failed:', error);
       return { error: JSON.stringify(error) };
