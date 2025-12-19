@@ -26,7 +26,6 @@ import {
   Transaction,
   Utils,
 } from '@bsv/sdk';
-import { Lock } from '@bsv/templates';
 import { Outpoint, type OneSatWallet, type Txo } from '@1sat/wallet-toolbox';
 import { theme } from '../theme';
 //@ts-ignore
