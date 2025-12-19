@@ -3,7 +3,7 @@
   "version": "4.5.5",
   "private": true,
   "dependencies": {
-    "@1sat/wallet-toolbox": "file:../1sat-wallet-toolbox",
+    "@1sat/wallet-toolbox": "^0.0.2",
     "@bsv/paymail": "^2.0.2",
     "@bsv/sdk": "1.9.24",
     "@bsv/templates": "file:../ts-templates",
