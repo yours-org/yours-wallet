@@ -121,7 +121,7 @@ export const Settings = () => {
   const { addSnackbar } = useSnackbar();
   const { query, handleSelect } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
-  const { chromeStorageService, keysService, lockWallet, oneSatSPV } = useServiceContext();
+  const { chromeStorageService, keysService, lockWallet, wallet } = useServiceContext();
   const [page, setPage] = useState<SettingsPage>(query === 'manage-accounts' ? 'manage-accounts' : 'main');
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
@@ -317,7 +317,7 @@ export const Settings = () => {
 
   const signOut = async () => {
     await chromeStorageService.clear();
-    await oneSatSPV.destroy();
+    wallet?.close();
     setDecisionType(undefined);
     sendMessage({
       action: YoursEventName.SIGNED_OUT,
@@ -428,13 +428,15 @@ export const Settings = () => {
   };
 
   const resyncUTXOs = () => {
-    oneSatSPV.sync(true);
+    // TODO: Migrate sync to OneSatWallet - use wallet.syncAll()
+    wallet?.syncAll();
     addSnackbar('Resyncing UTXOs in the background...', 'info');
   };
 
   const updateSpends = () => {
-    oneSatSPV.stores.txos?.refreshSpends();
-    addSnackbar('Updating spends in the background...', 'info');
+    // TODO: Migrate refreshSpends to OneSatWallet
+    // oneSatSPV.stores.txos?.refreshSpends();
+    addSnackbar('Update spends not yet available...', 'info');
   };
 
   const main = (

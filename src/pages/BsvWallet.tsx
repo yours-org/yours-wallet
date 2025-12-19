@@ -219,7 +219,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService, ordinalService, oneSatSPV, mneeService } = useServiceContext();
+  const { chromeStorageService, keysService, bsvService, ordinalService, mneeService } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
@@ -350,7 +350,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
       const obj = await chromeStorageService.getAndSetStorage();
       obj && !obj.hasUpgradedToSPV ? setShowUpgrade(true) : setShowUpgrade(false);
       if (obj?.selectedAccount) {
-        oneSatSPV.stores.txos?.syncTxLogs();
+        // TODO: Migrate syncTxLogs to OneSatWallet
+        // oneSatSPV.stores.txos?.syncTxLogs();
         if (!ordinalService) return;
         await getAndSetAccountAndBsv20s();
       }
@@ -755,7 +756,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
           title={'Sync Transactions'}
           style={{ fontSize: '2rem', cursor: 'pointer' }}
           theme={theme}
-          onClick={() => oneSatSPV.stores.txos?.syncTxLogs()}
+          // eslint-disable-next-line @typescript-eslint/no-empty-function -- TODO: Migrate syncTxLogs to OneSatWallet
+          onClick={() => {}}
         >
           {formatUSD(bsvBalance * exchangeRate)}
         </HeaderText>

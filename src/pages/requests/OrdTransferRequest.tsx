@@ -1,10 +1,10 @@
 import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
 import { TransferOrdinal } from 'yours-wallet-provider';
+import type { Txo } from '@1sat/wallet-toolbox';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
-import { Ordinal as OrdType } from 'yours-wallet-provider';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
@@ -30,10 +30,10 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, ordinalService, gorillaPoolService } = useServiceContext();
+  const { chromeStorageService, ordinalService, wallet } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const network = chromeStorageService.getNetwork();
-  const [ordinal, setOrdinal] = useState<OrdType | undefined>();
+  const baseUrl = wallet.services.baseUrl;
+  const [txo, setTxo] = useState<Txo | undefined>();
 
   useEffect(() => {
     hideMenu();
@@ -41,11 +41,11 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
   }, []);
 
   useEffect(() => {
-    if (!ordinalService || !request?.outpoint) return;
-    ordinalService.getOrdinal(request.outpoint).then((ord) => {
-      setOrdinal(ord);
+    if (!request?.outpoint) return;
+    wallet.loadTxo(request.outpoint).then((result) => {
+      setTxo(result);
     });
-  }, [ordinalService, request.outpoint]);
+  }, [wallet, request.outpoint]);
 
   const handleTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -92,6 +92,10 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
     window.location.reload();
   };
 
+  // Extract origin outpoint for content URL
+  const originData = txo?.data?.origin?.data as { outpoint?: string } | undefined;
+  const originOutpoint = originData?.outpoint || request.origin;
+
   return (
     <>
       <Show when={isProcessing}>
@@ -101,14 +105,7 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
       <Show when={!isProcessing && !!request}>
         <ConfirmContent>
           <HeaderText theme={theme}>Approve Request</HeaderText>
-          {ordinal && (
-            <Ordinal
-              inscription={ordinal}
-              theme={theme}
-              url={`${gorillaPoolService.getBaseUrl(network)}/content/${request.origin}`}
-              selected={true}
-            />
-          )}
+          {txo && <Ordinal txo={txo} theme={theme} url={`${baseUrl}/content/${originOutpoint}`} selected={true} />}
           <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>
             <Text theme={theme} style={{ margin: '1rem 0' }}>
               {`Transfer to: ${truncate(request.address, 5, 5)}`}

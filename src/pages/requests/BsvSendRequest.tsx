@@ -14,7 +14,7 @@ import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendBsv } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { getErrorMessage, getTxFromRawTxFormat } from '../../utils/tools';
-import { IndexContext } from 'spv-store';
+import type { ParseContext } from '@1sat/wallet-toolbox';
 import TxPreview from '../../components/TxPreview';
 import { styled } from 'styled-components';
 
@@ -37,12 +37,12 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { bsvService, chromeStorageService, keysService, oneSatSPV } = useServiceContext();
+  const { bsvService, chromeStorageService, keysService, wallet } = useServiceContext();
   const { sendBsv, updateBsvBalance, getBsvBalance } = bsvService;
   const { bsvAddress } = keysService;
   const [hasSent, setHasSent] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [txData, setTxData] = useState<IndexContext>();
+  const [txData, setTxData] = useState<ParseContext>();
 
   const { account } = chromeStorageService.getCurrentAccountObject();
   if (!account) throw Error('No account found');
@@ -105,7 +105,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
       const sendRes = await sendBsv(request, passwordConfirm, noApprovalLimit, showPreview);
       if (!sendRes.txid && sendRes.rawtx) {
         const tx = getTxFromRawTxFormat(sendRes.rawtx, 'tx');
-        const parsedTx = await oneSatSPV.parseTx(tx);
+        const parsedTx = await wallet!.parseTransaction(tx);
         setTxData(parsedTx);
         return;
       }

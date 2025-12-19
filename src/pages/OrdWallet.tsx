@@ -4,7 +4,6 @@ import styled from 'styled-components';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Ordinal } from '../components/Ordinal';
-import { Ordinal as OrdType } from 'yours-wallet-provider';
 import { PageLoader } from '../components/PageLoader';
 import { ButtonContainer, ConfirmContent, FormContainer, HeaderText, Text } from '../components/Reusable';
 import { Show } from '../components/Show';
@@ -15,11 +14,11 @@ import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { sleep } from '../utils/sleep';
 import { TopNav } from '../components/TopNav';
 import { ListOrdinal } from '../services/types/ordinal.types';
-import { Ordinal as OrdinalType } from 'yours-wallet-provider';
 import { WhiteLabelTheme } from '../theme.types';
 import { getErrorMessage } from '../utils/tools';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
 import { truncate } from '../utils/format';
+import type { Txo } from '@1sat/wallet-toolbox';
 
 type Addresses = Record<string, string>;
 
@@ -141,18 +140,17 @@ type PageState = 'main' | 'transfer' | 'list' | 'cancel';
 export const OrdWallet = () => {
   const { theme } = useTheme();
   const [pageState, setPageState] = useState<PageState>('main');
-  const { chromeStorageService, ordinalService, gorillaPoolService } = useServiceContext();
+  const { chromeStorageService, ordinalService, wallet, isReady } = useServiceContext();
   const [isProcessing, setIsProcessing] = useState(false);
-  const { listOrdinalOnGlobalOrderbook, cancelGlobalOrderbookListing, getOrdinals, transferOrdinalsMulti } =
-    ordinalService;
+  const { listOrdinalOnGlobalOrderbook, cancelGlobalOrderbookListing, transferOrdinalsMulti } = ordinalService;
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const network = chromeStorageService.getNetwork();
-  const [selectedOrdinals, setSelectedOrdinals] = useState<OrdinalType[]>([]);
+  const baseUrl = wallet?.services?.baseUrl ?? '';
+  const [selectedOrdinals, setSelectedOrdinals] = useState<Txo[]>([]);
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [bsvListAmount, setBsvListAmount] = useState<number | null>();
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const [ordinals, setOrdinals] = useState<OrdType[]>([]);
+  const [ordinals, setOrdinals] = useState<Txo[]>([]);
   const [from, setFrom] = useState<string>();
   const listedOrdinals = ordinals && ordinals.filter((o) => o?.data?.list);
   const myOrdinals = ordinals && ordinals.filter((o) => !o?.data?.list);
@@ -161,16 +159,17 @@ export const OrdWallet = () => {
   const [addressErrors, setAddressErrors] = useState<Addresses>({});
   const [commonAddress, setCommonAddress] = useState('');
 
-  const toggleOrdinalSelection = (ord: OrdinalType) => {
-    const isSelected = selectedOrdinals.some((selected) => selected.outpoint === ord.outpoint);
-    const isListing = ord.data?.list;
+  const toggleOrdinalSelection = (ord: Txo) => {
+    const outpoint = ord.outpoint.toString();
+    const isSelected = selectedOrdinals.some((selected) => selected.outpoint.toString() === outpoint);
+    const isListing = !!ord.data?.list;
 
     if (isSelected) {
       // Deselect if already selected
-      setSelectedOrdinals(selectedOrdinals.filter((selected) => selected !== ord));
+      setSelectedOrdinals(selectedOrdinals.filter((selected) => selected.outpoint.toString() !== outpoint));
     } else {
       // Check if any selected ordinal is a listing or non-listing
-      const hasListings = selectedOrdinals.some((selected) => selected.data?.list);
+      const hasListings = selectedOrdinals.some((selected) => !!selected.data?.list);
       const hasNonListings = selectedOrdinals.some((selected) => !selected.data?.list);
 
       if (isListing) {
@@ -204,14 +203,30 @@ export const OrdWallet = () => {
   });
 
   const loadOrdinals = useCallback(async () => {
-    if (!ordinalService) return;
+    if (!wallet) return;
     if (ordinals.length === 0) setIsProcessing(true);
-    const data = await getOrdinals(from);
-    setFrom(data.from);
-    setOrdinals((prev) => [...prev, ...data.ordinals]);
+    const offset = from ? parseInt(from, 10) : 0;
+    console.log('[OrdWallet] loadOrdinals - calling listOutputs with offset:', offset);
+    const result = await wallet.listOutputs({ basket: '1sat', limit: 50, offset });
+    console.log('[OrdWallet] loadOrdinals - listOutputs returned:', result.outputs.length, 'outputs');
+
+    const txos: Txo[] = [];
+    for (const o of result.outputs) {
+      console.log('[OrdWallet] loadOrdinals - loading txo:', o.outpoint);
+      const txo = await wallet.loadTxo(o.outpoint);
+      console.log('[OrdWallet] loadOrdinals - txo loaded');
+      const originData = txo.data?.origin?.data as { insc?: { file?: { type?: string } } } | undefined;
+      if (originData?.insc?.file?.type !== 'panda/tag' && originData?.insc?.file?.type !== 'yours/tag') {
+        txos.push(txo);
+      }
+    }
+
+    console.log('[OrdWallet] loadOrdinals - done, setting state');
+    setFrom((offset + result.outputs.length).toString());
+    setOrdinals((prev) => [...prev, ...txos]);
     setIsProcessing(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordinalService, getOrdinals, from]);
+  }, [wallet, from]);
 
   useEffect(() => {
     if (isIntersecting && from) {
@@ -242,9 +257,19 @@ export const OrdWallet = () => {
   };
 
   const refreshOrdinals = async () => {
-    const data = await getOrdinals();
-    setOrdinals(data.ordinals);
-    setFrom(data.from);
+    const result = await wallet.listOutputs({ basket: '1sat', limit: 50, offset: 0 });
+
+    const txos: Txo[] = [];
+    for (const o of result.outputs) {
+      const txo = await wallet.loadTxo(o.outpoint);
+      const originData = txo.data?.origin?.data as { insc?: { file?: { type?: string } } } | undefined;
+      if (originData?.insc?.file?.type !== 'panda/tag' && originData?.insc?.file?.type !== 'yours/tag') {
+        txos.push(txo);
+      }
+    }
+
+    setOrdinals(txos);
+    setFrom(result.outputs.length.toString());
   };
 
   const handleMultiTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -299,7 +324,7 @@ export const OrdWallet = () => {
     }
 
     const listing: ListOrdinal = {
-      outpoint: selectedOrdinals[0].outpoint,
+      outpoint: selectedOrdinals[0].outpoint.toString(),
       password: passwordConfirm,
       price: Math.ceil(bsvListAmount * BSV_DECIMAL_CONVERSION),
     };
@@ -328,7 +353,7 @@ export const OrdWallet = () => {
       return;
     }
 
-    const ordinalOutpoint = selectedOrdinals[0].outpoint;
+    const ordinalOutpoint = selectedOrdinals[0].outpoint.toString();
 
     const cancelRes = await cancelGlobalOrderbookListing(ordinalOutpoint, passwordConfirm);
 
@@ -356,7 +381,7 @@ export const OrdWallet = () => {
       setCommonAddress(address);
       if (useSameAddress) {
         const newAddresses = selectedOrdinals.reduce<Addresses>((acc, ordinal) => {
-          acc[ordinal.outpoint] = address;
+          acc[ordinal.outpoint.toString()] = address;
           return acc;
         }, {});
         setAddresses(newAddresses);
@@ -366,7 +391,7 @@ export const OrdWallet = () => {
         const isValid = validate(address);
         setAddressErrors(
           selectedOrdinals.reduce<Addresses>((acc, ordinal) => {
-            acc[ordinal.outpoint] = isValid ? '' : 'Invalid 1sat address format';
+            acc[ordinal.outpoint.toString()] = isValid ? '' : 'Invalid 1sat address format';
             return acc;
           }, {}),
         );
@@ -415,37 +440,39 @@ export const OrdWallet = () => {
     </>
   );
 
-  const renderTransfers = (selectedOrdinals: OrdType[]) => {
-    return selectedOrdinals.map((ordinal) => (
-      <OrdinalItem theme={theme} key={ordinal.origin?.outpoint}>
-        <Ordinal
-          theme={theme}
-          inscription={ordinal as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${ordinal.origin?.outpoint}?outpoint=${ordinal?.outpoint}`}
-          isTransfer
-          size="3rem"
-        />
-        <OrdinalDetails>
-          <OrdinalTitle theme={theme}>
-            {truncate(
-              `${ordinal?.origin?.data?.map?.name ?? ordinal?.origin?.data?.map?.subTypeData?.name ?? 'Unknown'}`,
-              15,
-              0,
-            )}
-          </OrdinalTitle>
-          <Show when={!useSameAddress}>
-            <ReceiverInput
-              theme={theme}
-              placeholder="Receiver Address"
-              type="text"
-              onChange={(e) => handleAddressChange(ordinal.outpoint, e.target.value)}
-              value={addresses[ordinal.outpoint] || ''}
-            />
-            {addressErrors[ordinal.outpoint] && <span style={{ color: 'red' }}>{addressErrors[ordinal.outpoint]}</span>}
-          </Show>
-        </OrdinalDetails>
-      </OrdinalItem>
-    ));
+  const renderTransfers = (selectedOrdinals: Txo[]) => {
+    return selectedOrdinals.map((txo) => {
+      const originData = txo.data?.origin?.data as { outpoint?: string; map?: Record<string, unknown> } | undefined;
+      const originOutpoint = originData?.outpoint;
+      const outpoint = txo.outpoint.toString();
+      const mapData = originData?.map;
+      const name = (mapData?.name ?? (mapData?.subTypeData as Record<string, unknown>)?.name ?? 'Unknown') as string;
+
+      return (
+        <OrdinalItem theme={theme} key={originOutpoint}>
+          <Ordinal
+            theme={theme}
+            txo={txo}
+            url={`${baseUrl}/content/${originOutpoint}?outpoint=${outpoint}`}
+            isTransfer
+            size="3rem"
+          />
+          <OrdinalDetails>
+            <OrdinalTitle theme={theme}>{truncate(name, 15, 0)}</OrdinalTitle>
+            <Show when={!useSameAddress}>
+              <ReceiverInput
+                theme={theme}
+                placeholder="Receiver Address"
+                type="text"
+                onChange={(e) => handleAddressChange(outpoint, e.target.value)}
+                value={addresses[outpoint] || ''}
+              />
+              {addressErrors[outpoint] && <span style={{ color: 'red' }}>{addressErrors[outpoint]}</span>}
+            </Show>
+          </OrdinalDetails>
+        </OrdinalItem>
+      );
+    });
   };
 
   const MultiSendUI = (
@@ -486,8 +513,8 @@ export const OrdWallet = () => {
               onChange={(e) => handleCommonAddressChange(e.target.value)}
               value={commonAddress}
             />
-            {addressErrors[selectedOrdinals[0]?.outpoint] && (
-              <span style={{ color: 'red' }}>{addressErrors[selectedOrdinals[0]?.outpoint]}</span>
+            {addressErrors[selectedOrdinals[0]?.outpoint.toString()] && (
+              <span style={{ color: 'red' }}>{addressErrors[selectedOrdinals[0]?.outpoint.toString()]}</span>
             )}
           </Show>
 
@@ -516,6 +543,7 @@ export const OrdWallet = () => {
     </ContentWrapper>
   );
 
+  const cancelOriginData = selectedOrdinals[0]?.data?.origin?.data as { outpoint?: string } | undefined;
   const cancel = (
     <ContentWrapper>
       <ConfirmContent>
@@ -524,8 +552,8 @@ export const OrdWallet = () => {
         </HeaderText>
         <Ordinal
           theme={theme}
-          inscription={selectedOrdinals[0] as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinals[0]?.origin?.outpoint}?outpoint=${selectedOrdinals[0]?.outpoint}`}
+          txo={selectedOrdinals[0]}
+          url={`${baseUrl}/content/${cancelOriginData?.outpoint}?outpoint=${selectedOrdinals[0]?.outpoint.toString()}`}
           selected
           isTransfer
         />
@@ -555,25 +583,38 @@ export const OrdWallet = () => {
     </ContentWrapper>
   );
 
-  const renderOrdinals = (list: OrdType[]) => {
+  const renderOrdinals = (list: Txo[]) => {
     return list
-      .filter((l) => l.origin?.data?.insc?.file?.type !== 'application/bsv-20')
-      .map((ord) => (
-        <Ordinal
-          theme={theme}
-          inscription={ord}
-          key={ord.origin?.outpoint}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${ord.origin?.outpoint}?outpoint=${ord?.outpoint}`}
-          selected={selectedOrdinals.some((selected) => selected.outpoint === ord.outpoint)}
-          onClick={() => toggleOrdinalSelection(ord)}
-        />
-      ));
+      .filter((txo) => {
+        const originData = txo.data?.origin?.data as { insc?: { file?: { type?: string } } } | undefined;
+        return originData?.insc?.file?.type !== 'application/bsv-20';
+      })
+      .map((txo) => {
+        const originData = txo.data?.origin?.data as { outpoint?: string } | undefined;
+        const originOutpoint = originData?.outpoint;
+        const outpoint = txo.outpoint.toString();
+        return (
+          <Ordinal
+            theme={theme}
+            txo={txo}
+            key={originOutpoint}
+            url={`${baseUrl}/content/${originOutpoint}?outpoint=${outpoint}`}
+            selected={selectedOrdinals.some((selected) => selected.outpoint.toString() === outpoint)}
+            onClick={() => toggleOrdinalSelection(txo)}
+          />
+        );
+      });
   };
 
   const nft = (
     <>
       <Show
-        when={ordinals.filter((o) => o.origin?.data?.insc?.file?.type !== 'application/bsv-20').length > 0}
+        when={
+          ordinals.filter((txo) => {
+            const originData = txo.data?.origin?.data as { insc?: { file?: { type?: string } } } | undefined;
+            return originData?.insc?.file?.type !== 'application/bsv-20';
+          }).length > 0
+        }
         whenFalseContent={
           <NoInscriptionWrapper>
             <Text
@@ -626,18 +667,20 @@ export const OrdWallet = () => {
 
   const main = <Show when={theme.settings.services.ordinals}>{nft}</Show>;
 
+  const listOriginData = selectedOrdinals[0]?.data?.origin?.data as
+    | { outpoint?: string; map?: Record<string, unknown> }
+    | undefined;
+  const listName = (listOriginData?.map?.name ??
+    (listOriginData?.map?.subTypeData as Record<string, unknown>)?.name ??
+    'Ordinal') as string;
   const list = (
     <ContentWrapper>
       <ConfirmContent>
-        <HeaderText style={{ fontSize: '1.35rem' }} theme={theme}>{`List ${
-          selectedOrdinals[0]?.origin?.data?.map?.name ??
-          selectedOrdinals[0]?.origin?.data?.map?.subTypeData?.name ??
-          'Ordinal'
-        }`}</HeaderText>
+        <HeaderText style={{ fontSize: '1.35rem' }} theme={theme}>{`List ${listName}`}</HeaderText>
         <Ordinal
           theme={theme}
-          inscription={selectedOrdinals[0] as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinals[0]?.origin?.outpoint}?outpoint=${selectedOrdinals[0]?.outpoint}`}
+          txo={selectedOrdinals[0]}
+          url={`${baseUrl}/content/${listOriginData?.outpoint}?outpoint=${selectedOrdinals[0]?.outpoint.toString()}`}
           selected
           isTransfer
         />

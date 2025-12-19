@@ -39,10 +39,10 @@ import { removeWindow, sendTransactionNotification } from './utils/chromeHelpers
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { GorillaPoolService } from './services/GorillaPool.service';
-import { mapOrdinal } from './utils/providerHelper';
-import { TxoLookup, TxoSort } from 'spv-store';
-import { initOneSatSPV } from './initSPVStore';
+// TODO: mapOrdinal removed during migration - getOrdinals API temporarily disabled
+// import { mapOrdinal } from './utils/providerHelper';
+import { initWallet } from './initWallet';
+import type { OneSatWallet } from '@1sat/wallet-toolbox';
 import { CHROME_STORAGE_OBJECT_VERSION, HOSTED_YOURS_IMAGE, MNEE_API_TOKEN } from './utils/constants';
 import { convertLockReqToSendBsvReq } from './utils/tools';
 import Mnee from '@mnee/ts-sdk';
@@ -52,34 +52,10 @@ const mnee = new Mnee({ environment: 'production', apiKey: MNEE_API_TOKEN });
 
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
-const gorillaPoolService = new GorillaPoolService(chromeStorageService);
 
-export let oneSatSPVPromise = chromeStorageService.getAndSetStorage().then(async (storage) => {
-  const version = storage?.version;
-  if (version && version < 3) {
-    // At version three we're forcing a full resync
-    const dbs = await indexedDB.databases();
-    for (const db of dbs) {
-      if (db.name) {
-        indexedDB.deleteDatabase(db.name);
-        console.log(`Deleted database: ${db.name}`);
-      }
-    }
-    await chromeStorageService.update({ version: CHROME_STORAGE_OBJECT_VERSION });
-  } else if (version && version < 4) {
-    // At version four we're deleting the txos-db to fix origin index issue.
-    const dbs = await indexedDB.databases();
-    for (const db of dbs) {
-      if (db.name && db.name.startsWith('txos-')) {
-        indexedDB.deleteDatabase(db.name);
-        console.log(`Deleted database: ${db.name}`);
-      }
-    }
-    await chromeStorageService.update({ version: CHROME_STORAGE_OBJECT_VERSION });
-  }
-
-  return initOneSatSPV(chromeStorageService, isInServiceWorker);
-});
+export let walletPromise: Promise<OneSatWallet> = chromeStorageService
+  .getAndSetStorage()
+  .then(() => initWallet(chromeStorageService, !isInServiceWorker));
 
 console.log('Yours Wallet Background Script Running!');
 
@@ -105,21 +81,23 @@ const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 // only run in background worker
 if (isInServiceWorker) {
-  const initNewTxsListener = async () => {
-    const oneSatSPV = await oneSatSPVPromise;
-    oneSatSPV.events.on('newTxs', (data: number) => {
-      sendTransactionNotification(data);
-    });
-  };
-  initNewTxsListener();
+  // TODO: Re-enable notifications after initial sync is complete
+  // const initNewTxsListener = async () => {
+  //   const wallet = await walletPromise;
+  //   wallet.on('sync:parsed', (data: { internalizedCount: number }) => {
+  //     if (data.internalizedCount > 0) {
+  //       sendTransactionNotification(data.internalizedCount);
+  //     }
+  //   });
+  // };
+  // initNewTxsListener();
 
   const processSyncUtxos = async () => {
     try {
-      const oneSatSPV = await oneSatSPVPromise;
-      if (!oneSatSPV) throw Error('SPV not initialized!');
-      await chromeStorageService.update({ hasUpgradedToSPV: true });
-      await oneSatSPV.sync();
-      console.log('done importing');
+      const wallet = await walletPromise;
+      if (!wallet) throw Error('Wallet not initialized!');
+      wallet.syncAll();
+      console.log('sync started');
     } catch (error) {
       console.error('Error during sync:', error);
     }
@@ -139,16 +117,16 @@ if (isInServiceWorker) {
   };
 
   const signOut = async () => {
-    await (await oneSatSPVPromise).destroy();
+    (await walletPromise).close();
     await deleteAllIDBDatabases();
   };
 
   const switchAccount = async () => {
-    await (await oneSatSPVPromise).destroy();
+    (await walletPromise).close();
     chromeStorageService = new ChromeStorageService();
     await chromeStorageService.getAndSetStorage();
-    oneSatSPVPromise = initOneSatSPV(chromeStorageService, isInServiceWorker);
-    initNewTxsListener();
+    walletPromise = initWallet(chromeStorageService, !isInServiceWorker);
+    // initNewTxsListener();
   };
 
   const launchPopUp = () => {
@@ -530,65 +508,147 @@ if (isInServiceWorker) {
     }
   };
 
+  // TODO: Evaluate updating the API to return Txo instead of Ordinal
   const processGetOrdinalsRequest = (message: { params: GetPaginatedOrdinals }, sendResponse: CallbackResponse) => {
-    try {
-      chromeStorageService.getAndSetStorage().then(async () => {
-        const oneSatSPV = await oneSatSPVPromise;
-        if (!oneSatSPV) throw Error('SPV not initialized!');
-        const lookup = message?.params?.mimeType
-          ? new TxoLookup('origin', 'type', message.params.mimeType)
-          : new TxoLookup('origin');
-        if (message.params.from === undefined || message.params.from === null) {
-          const result = await oneSatSPV.search(lookup, TxoSort.DESC, 0);
-          const mapped = result.txos.map(mapOrdinal);
-          sendResponse({
-            type: YoursEventName.GET_ORDINALS,
-            success: true,
-            data: mapped,
-          });
-        } else {
-          const results = await oneSatSPV.search(
-            lookup,
-            TxoSort.DESC,
-            message.params.limit || 50,
-            message.params.from || '',
-          );
-          const mapped = results.txos.map(mapOrdinal);
-          sendResponse({
-            type: YoursEventName.GET_ORDINALS,
-            success: true,
-            data: { ordinals: mapped, from: results.nextPage },
-          });
-        }
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GET_ORDINALS,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
+    sendResponse({
+      type: YoursEventName.GET_ORDINALS,
+      success: false,
+      error: 'getOrdinals is temporarily unavailable during wallet migration',
+    });
+    // try {
+    //   chromeStorageService.getAndSetStorage().then(async () => {
+    //     const wallet = await walletPromise;
+    //     if (!wallet) throw Error('Wallet not initialized!');
+
+    //     const limit = message.params.limit || 50;
+    //     const offset = message.params.from ? parseInt(message.params.from, 10) : 0;
+
+    //     // List 1-sat ordinal outputs
+    //     const result = await wallet.listOutputs({
+    //       basket: '1sat',
+    //       limit,
+    //       offset,
+    //     });
+
+    //     // Parse each transaction to get full ordinal data
+    //     const ordinals = [];
+    //     for (const output of result.outputs) {
+    //       const [txid] = output.outpoint.split('.');
+    //       try {
+    //         const parseResult = await wallet.parse(txid);
+    //         const vout = parseInt(output.outpoint.split('.')[1], 10);
+    //         const txo = parseResult.txos[vout];
+    //         if (txo) {
+    //           ordinals.push(mapOrdinal(txo));
+    //         }
+    //       } catch (e) {
+    //         console.warn(`Failed to parse transaction ${txid}:`, e);
+    //       }
+    //     }
+
+    //     // Filter by mimeType if specified
+    //     const filtered = message?.params?.mimeType
+    //       ? ordinals.filter((o) => o.data?.insc?.file?.type === message.params.mimeType)
+    //       : ordinals;
+
+    //     if (message.params.from === undefined || message.params.from === null) {
+    //       sendResponse({
+    //         type: YoursEventName.GET_ORDINALS,
+    //         success: true,
+    //         data: filtered,
+    //       });
+    //     } else {
+    //       const nextOffset = offset + result.outputs.length;
+    //       sendResponse({
+    //         type: YoursEventName.GET_ORDINALS,
+    //         success: true,
+    //         data: { ordinals: filtered, from: nextOffset.toString() },
+    //       });
+    //     }
+    //   });
+    // } catch (error) {
+    //   sendResponse({
+    //     type: YoursEventName.GET_ORDINALS,
+    //     success: false,
+    //     error: JSON.stringify(error),
+    //   });
+    // }
   };
 
   const processGetBsv20sRequest = (sendResponse: CallbackResponse) => {
     try {
       chromeStorageService.getAndSetStorage().then(async () => {
-        let data: SerializedBsv20[] = [];
-        const obj = chromeStorageService.getCurrentAccountObject();
-        if (obj.account?.addresses?.bsvAddress && obj.account?.addresses?.ordAddress) {
-          const rawData = await gorillaPoolService.getBsv20Balances([
-            obj.account?.addresses.bsvAddress,
-            obj.account?.addresses.ordAddress,
-          ]);
+        const wallet = await walletPromise;
+        const result = await wallet.listOutputs({ basket: 'bsv21', includeTags: true });
 
-          data = rawData.map((d) => {
-            return {
-              ...d,
-              listed: { confirmed: d.listed.confirmed.toString(), pending: d.listed.pending.toString() },
-              all: { confirmed: d.all.confirmed.toString(), pending: d.all.pending.toString() },
-            };
-          });
+        // Aggregate balances by token id, tracking confirmed (valid) vs pending
+        // Tag format: id:{tokenId}:{status} where status is "valid", "invalid", or "pending"
+        const balanceMap = new Map<
+          string,
+          { id: string; confirmed: bigint; pending: bigint; icon?: string; sym?: string; dec: number }
+        >();
+
+        for (const o of result.outputs) {
+          const idTag = o.tags?.find((t: string) => t.startsWith('id:'));
+          const amtTag = o.tags?.find((t: string) => t.startsWith('amt:'))?.slice(4);
+          const symTag = o.tags?.find((t: string) => t.startsWith('sym:'))?.slice(4);
+          const iconTag = o.tags?.find((t: string) => t.startsWith('icon:'))?.slice(5);
+          const decTag = o.tags?.find((t: string) => t.startsWith('dec:'))?.slice(4);
+
+          if (!idTag || !amtTag) continue;
+
+          // Parse id:{tokenId}:{status} - status is last segment after final colon
+          const idContent = idTag.slice(3); // remove "id:" prefix
+          const lastColonIdx = idContent.lastIndexOf(':');
+          if (lastColonIdx === -1) continue;
+
+          const tokenId = idContent.slice(0, lastColonIdx);
+          const status = idContent.slice(lastColonIdx + 1);
+
+          // Skip invalid tokens
+          if (status === 'invalid') continue;
+
+          const isConfirmed = status === 'valid';
+          const amt = BigInt(amtTag);
+          const dec = decTag ? parseInt(decTag, 10) : 0;
+
+          const existing = balanceMap.get(tokenId);
+          if (existing) {
+            if (isConfirmed) {
+              existing.confirmed += amt;
+            } else {
+              existing.pending += amt;
+            }
+          } else {
+            balanceMap.set(tokenId, {
+              id: tokenId,
+              confirmed: isConfirmed ? amt : 0n,
+              pending: isConfirmed ? 0n : amt,
+              sym: symTag,
+              icon: iconTag,
+              dec,
+            });
+          }
         }
+
+        // Convert to SerializedBsv20[] format
+        const data: SerializedBsv20[] = Array.from(balanceMap.values()).map((b) => ({
+          p: 'bsv-20',
+          op: 'transfer',
+          dec: b.dec,
+          amt: (b.confirmed + b.pending).toString(),
+          id: b.id,
+          sym: b.sym,
+          icon: b.icon,
+          all: {
+            confirmed: b.confirmed.toString(),
+            pending: b.pending.toString(),
+          },
+          listed: {
+            confirmed: '0',
+            pending: '0',
+          },
+        }));
 
         sendResponse({
           type: YoursEventName.GET_BSV20S,
@@ -646,15 +706,16 @@ if (isInServiceWorker) {
   const processGetPaymentUtxos = (sendResponse: CallbackResponse) => {
     try {
       chromeStorageService.getAndSetStorage().then(async () => {
-        const oneSatSPV = await oneSatSPVPromise;
-        if (!oneSatSPV) throw Error('SPV not initialized!');
-        const results = await oneSatSPV.search(new TxoLookup('fund'), undefined, 0);
-        const utxos = results.txos.map((txo) => {
+        const wallet = await walletPromise;
+        if (!wallet) throw Error('Wallet not initialized!');
+        const result = await wallet.listOutputs({ basket: 'fund' });
+        const utxos = result.outputs.map((output) => {
+          const [txid, voutStr] = output.outpoint.split('.');
           return {
-            txid: txo.outpoint.txid,
-            vout: txo.outpoint.vout,
-            satoshis: Number(txo.satoshis),
-            script: Buffer.from(txo.script).toString('hex'),
+            txid,
+            vout: parseInt(voutStr, 10),
+            satoshis: output.satoshis,
+            script: output.lockingScript || '',
           };
         });
         sendResponse({

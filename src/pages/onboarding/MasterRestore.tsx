@@ -23,7 +23,7 @@ export const MasterRestore = () => {
   const { theme } = useTheme();
   const { handleSelect } = useBottomMenu();
   const navigate = useNavigate();
-  const { chromeStorageService, oneSatSPV } = useServiceContext();
+  const { chromeStorageService } = useServiceContext();
   const [loading, setLoading] = useState(false);
   const hiddenFileInput = useRef<HTMLInputElement>(null);
   const { addSnackbar } = useSnackbar();

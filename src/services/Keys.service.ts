@@ -15,7 +15,7 @@ import { ChromeStorageService } from './ChromeStorage.service';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction, Utils } from '@bsv/sdk';
-import { SPVStore } from 'spv-store';
+import type { OneSatWallet } from '@1sat/wallet-toolbox';
 import { WocUtxo } from './types/whatsOnChain.types';
 import axios from 'axios';
 
@@ -28,7 +28,7 @@ export class KeysService {
   identityPubKey: string;
   constructor(
     private readonly chromeStorageService: ChromeStorageService,
-    private readonly oneSatSPV: SPVStore,
+    private readonly wallet: OneSatWallet,
   ) {
     this.bsvAddress = '';
     this.ordAddress = '';
@@ -135,8 +135,13 @@ export class KeysService {
       if (utxos.length === 0) return;
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       for await (const u of utxos || []) {
+        const sourceTransaction = await this.wallet.loadTransaction(u.tx_hash);
+        if (!sourceTransaction) {
+          console.log(`Could not find source transaction ${u.tx_hash}`);
+          continue;
+        }
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash),
+          sourceTransaction,
           sourceOutputIndex: u.tx_pos,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(sweepWallet.privKey),
@@ -144,8 +149,7 @@ export class KeysService {
       }
       await tx.fee(feeModel);
       await tx.sign();
-      const response = await this.oneSatSPV.broadcast(tx);
-      if (response.status == 'error') return { error: response.description };
+      const response = await this.wallet.broadcast(tx, 'Sweep Legacy Wallet');
       const txid = tx.id('hex');
       console.log('Change sweep:', txid);
       return { txid, rawtx: Utils.toHex(tx.toBinary()) };
@@ -182,8 +186,13 @@ export class KeysService {
       if (utxos.length === 0) return;
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       for await (const u of utxos || []) {
+        const sourceTransaction = await this.wallet.loadTransaction(u.tx_hash);
+        if (!sourceTransaction) {
+          console.log(`Could not find source transaction ${u.tx_hash}`);
+          continue;
+        }
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash),
+          sourceTransaction,
           sourceOutputIndex: u.tx_pos,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(privKey),
@@ -191,8 +200,7 @@ export class KeysService {
       }
       await tx.fee(feeModel);
       await tx.sign();
-      const response = await this.oneSatSPV.broadcast(tx);
-      if (response.status == 'error') return { error: response.description };
+      await this.wallet.broadcast(tx, 'Sweep WIF');
       const txid = tx.id('hex');
       console.log('Change sweep:', txid);
       return { txid, rawtx: Utils.toHex(tx.toBinary()) };

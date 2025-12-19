@@ -53,8 +53,8 @@ export type Bsv20TokensListProps = {
 
 export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
   const { bsv20s, theme, onTokenClick, hideStatusLabels = false } = props;
-  const { gorillaPoolService, ordinalService, bsvService, chromeStorageService } = useServiceContext();
-  const network = chromeStorageService.getNetwork();
+  const { ordinalService, bsvService, chromeStorageService, wallet } = useServiceContext();
+  const baseUrl = wallet.services.baseUrl;
   const [priceData, setPriceData] = useState<PriceData[]>([]);
   const [tokens, setTokens] = useState<Bsv20[]>([]);
 
@@ -69,7 +69,8 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
         .map((id) => bsv20s.find((token) => token.id === id))
         .filter(Boolean) as Bsv20[];
 
-      const data = await gorillaPoolService.getTokenPriceInSats(bsv20s.map((d) => d?.id || ''));
+      // TODO: Re-implement token price fetching with new API
+      const data: PriceData[] = [];
       setTokens(orderedTokens.length ? orderedTokens : bsv20s);
       setPriceData(data);
     };
@@ -166,11 +167,7 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
                                     animate
                                     balance={Number(showAmount(t.all.confirmed, t.dec))}
                                     showPointer={true}
-                                    icon={
-                                      t.icon
-                                        ? `${gorillaPoolService.getBaseUrl(network)}/content/${t.icon}`
-                                        : GENERIC_TOKEN_ICON
-                                    }
+                                    icon={t.icon ? `${baseUrl}/content/${t.icon}` : GENERIC_TOKEN_ICON}
                                     ticker={truncate(ordinalService.getTokenName(t), 10, 0)}
                                     usdBalance={
                                       (priceData.find((p) => p.id === t.id)?.satPrice ?? 0) *
@@ -205,11 +202,7 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
                                 animate
                                 balance={Number(showAmount(b.all.pending, b.dec))}
                                 showPointer={true}
-                                icon={
-                                  b.icon
-                                    ? `${gorillaPoolService.getBaseUrl(network)}/content/${b.icon}`
-                                    : GENERIC_TOKEN_ICON
-                                }
+                                icon={b.icon ? `${baseUrl}/content/${b.icon}` : GENERIC_TOKEN_ICON}
                                 ticker={ordinalService.getTokenName(b)}
                                 usdBalance={
                                   (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *

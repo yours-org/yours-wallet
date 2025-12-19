@@ -26,7 +26,8 @@ import {
   Transaction,
   Utils,
 } from '@bsv/sdk';
-import { SPVStore, Lock, TxoLookup, TxoSort } from 'spv-store';
+import { Lock } from '@bsv/templates';
+import { Outpoint, type OneSatWallet, type Txo } from '@1sat/wallet-toolbox';
 import { theme } from '../theme';
 //@ts-ignore
 import { PaymailClient } from '@bsv/paymail/client';
@@ -42,7 +43,7 @@ export class BsvService {
     private readonly wocService: WhatsOnChainService,
     private readonly contractService: ContractService,
     private readonly chromeStorageService: ChromeStorageService,
-    private readonly oneSatSPV: SPVStore,
+    private readonly wallet: OneSatWallet,
   ) {
     this.bsvBalance = 0;
     this.exchangeRate = 0;
@@ -57,33 +58,35 @@ export class BsvService {
       nextUnlock: 0,
     };
 
-    const lockTxos = await this.getLockedTxos();
-    for (const txo of lockTxos) {
-      const height = await this.getCurrentHeight();
-      const lock = txo.data.lock?.data as Lock;
+    const result = await this.wallet.listOutputs({ basket: 'lock' });
+    const height = await this.getCurrentHeight();
+
+    for (const o of result.outputs) {
+      const outpoint = new Outpoint(o.outpoint.replace('.', '_'));
+      const output = {
+        lockingScript: Script.fromHex(o.lockingScript || ''),
+        satoshis: o.satoshis,
+      };
+      const txo = await this.wallet.parseOutput(output, outpoint);
+      const lock = txo.data.lock?.data as { until: number } | undefined;
       if (!lock) continue;
-      lockData.totalLocked += Number(txo.satoshis);
+      const satoshis = txo.output.satoshis || 0;
+      lockData.totalLocked += satoshis;
       if (lock.until <= height) {
-        lockData.unlockable += Number(txo.satoshis);
+        lockData.unlockable += satoshis;
       } else if (!lockData.nextUnlock || lock.until < lockData.nextUnlock) {
         lockData.nextUnlock = lock.until;
       }
     }
     // IF the fees required to unlock are greater than the unlockable amount, then the unlockable amount is 0
-    if (lockData.unlockable < 1500 * lockTxos.length) {
+    if (lockData.unlockable < 1500 * result.outputs.length) {
       lockData.unlockable = 0;
     }
     return lockData;
   };
 
-  getCurrentHeight = async () => {
-    const header = await this.oneSatSPV.getSyncedBlock();
-    return header?.height || 0;
-  };
-
-  getLockedTxos = async () => {
-    const lockTxos = await this.oneSatSPV.search(new TxoLookup('lock'));
-    return lockTxos.txos.filter((txo) => !txo.data.insc);
+  getCurrentHeight = async (): Promise<number> => {
+    return this.wallet.services.getHeight();
   };
 
   rate = async () => {
@@ -94,8 +97,22 @@ export class BsvService {
   unlockLockedCoins = async () => {
     if (!this.keysService.identityAddress) return;
     const blockHeight = await this.getCurrentHeight();
-    const lockedTxos = await this.getLockedTxos();
-    const txos = lockedTxos.filter((i) => Number(i.data.lock?.data.until) <= blockHeight);
+    const result = await this.wallet.listOutputs({ basket: 'lock' });
+
+    const txos: Txo[] = [];
+    for (const o of result.outputs) {
+      const outpoint = new Outpoint(o.outpoint.replace('.', '_'));
+      const output = {
+        lockingScript: Script.fromHex(o.lockingScript || ''),
+        satoshis: o.satoshis,
+      };
+      const txo = await this.wallet.parseOutput(output, outpoint);
+      const lock = txo.data.lock?.data as { until: number } | undefined;
+      if (lock && lock.until <= blockHeight) {
+        txos.push(txo);
+      }
+    }
+
     if (txos.length > 0) {
       return await this.contractService.unlock(txos, blockHeight);
     }
@@ -109,15 +126,18 @@ export class BsvService {
   sendAllBsv = async (destinationAddress: string, type: 'address' | 'paymail', password: string) => {
     try {
       const tx = new Transaction();
-      const fundResults = await this.fundingTxos();
+      const result = await this.wallet.listOutputs({ basket: 'fund', includeTags: true });
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       const pkMap = await this.keysService.retrievePrivateKeyMap(password);
-      for await (const u of fundResults || []) {
-        const pk = pkMap.get(u.owner || '');
+      for (const o of result.outputs) {
+        const [txid, voutStr] = o.outpoint.split('.');
+        const vout = parseInt(voutStr, 10);
+        const owner = o.tags?.find((t) => t.startsWith('own:'))?.slice(4);
+        const pk = pkMap.get(owner || '');
         if (!pk) continue;
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid),
-          sourceOutputIndex: u.outpoint.vout,
+          sourceTransaction: await this.wallet.loadTransaction(txid),
+          sourceOutputIndex: vout,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(pk),
         });
@@ -148,9 +168,7 @@ export class BsvService {
       }
 
       await tx.sign();
-      const response = await this.oneSatSPV.broadcast(tx);
-      console.log(`Transaction broadcast response: ${response}`);
-      if (response.status == 'error') return { error: response.description };
+      await this.wallet.broadcast(tx, 'Send All BSV');
       const txHex = tx.toHex();
       const chromeObj = this.chromeStorageService.getCurrentAccountObject();
       if (!chromeObj.account) return { error: 'no-account' };
@@ -252,27 +270,25 @@ export class BsvService {
         change: true,
       });
 
-      const fundResults = await this.fundingTxos();
+      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true });
 
       let satsIn = 0;
       let fee = 0;
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
-      for await (const u of fundResults || []) {
-        const pk = pkMap.get(u.owner || '');
+      for (const o of fundResult.outputs) {
+        const [txid, voutStr] = o.outpoint.split('.');
+        const vout = parseInt(voutStr, 10);
+        const owner = o.tags?.find((t) => t.startsWith('own:'))?.slice(4);
+        const pk = pkMap.get(owner || '');
         if (!pk) continue;
-        const sourceTransaction = await this.oneSatSPV.getTx(u.outpoint.txid);
-        if (!sourceTransaction) {
-          console.log(`Could not find source transaction ${u.outpoint.txid}`);
-          return { error: 'source-tx-not-found' };
-          // continue;
-        }
+        const sourceTransaction = await this.wallet.loadTransaction(txid);
         tx.addInput({
           sourceTransaction,
-          sourceOutputIndex: u.outpoint.vout,
+          sourceOutputIndex: vout,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(pk),
         });
-        satsIn += Number(u.satoshis);
+        satsIn += o.satoshis;
         fee = await feeModel.computeFee(tx);
         if (satsIn >= satsOut + fee) break;
       }
@@ -286,7 +302,7 @@ export class BsvService {
 
       if (showPreview) return { rawtx: tx.toHex() };
 
-      const response = await this.oneSatSPV.broadcast(tx);
+      await this.wallet.broadcast(tx, 'Send BSV');
 
       const txHex = tx.toHex();
       const chromeObj = this.chromeStorageService.getCurrentAccountObject();
@@ -298,8 +314,6 @@ export class BsvService {
           note: `P2P tx from ${theme.settings.walletName}`,
         });
       }
-
-      if (response.status == 'error') return { error: response.description };
       if (isBelowNoApprovalLimit) {
         const { noApprovalLimit } = chromeObj.account.settings;
         const key: keyof ChromeStorageObject = 'accounts';
@@ -383,8 +397,8 @@ export class BsvService {
   };
 
   updateBsvBalance = async () => {
-    const utxos = await this.fundingTxos();
-    const total = utxos.reduce((a, item) => a + Number(item.satoshis), 0);
+    const result = await this.wallet.listOutputs({ basket: 'fund' });
+    const total = result.outputs.reduce((a, o) => a + o.satoshis, 0);
     this.bsvBalance = (total ?? 0) / BSV_DECIMAL_CONVERSION;
     const balance = {
       bsv: this.bsvBalance,
@@ -403,11 +417,6 @@ export class BsvService {
     await this.chromeStorageService.updateNested(key, update);
   };
 
-  fundingTxos = async () => {
-    const results = await this.oneSatSPV.search(new TxoLookup('fund'), TxoSort.ASC, 0);
-    return results.txos;
-  };
-
   fundRawTx = async (rawtx: string, password: string): Promise<FundRawTxResponse> => {
     const isAuthenticated = await this.keysService.verifyPassword(password);
     if (!isAuthenticated) {
@@ -419,7 +428,7 @@ export class BsvService {
 
     let satsIn = 0;
     for (const input of tx.inputs) {
-      input.sourceTransaction = await this.oneSatSPV.getTx(input.sourceTXID ?? '');
+      input.sourceTransaction = await this.wallet.loadTransaction(input.sourceTXID ?? '');
       satsIn += input.sourceTransaction?.outputs[input.sourceOutputIndex]?.satoshis || 0;
     }
 
@@ -427,19 +436,22 @@ export class BsvService {
     let fee = 0;
     tx.addOutput({ change: true, lockingScript: new P2PKH().lock(this.keysService.bsvAddress) });
 
-    const fundResults = await this.fundingTxos();
+    const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true });
 
     const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
-    for await (const u of fundResults || []) {
-      const pk = pkMap.get(u.owner || '');
+    for (const o of fundResult.outputs) {
+      const [txid, voutStr] = o.outpoint.split('.');
+      const vout = parseInt(voutStr, 10);
+      const owner = o.tags?.find((t) => t.startsWith('own:'))?.slice(4);
+      const pk = pkMap.get(owner || '');
       if (!pk) continue;
       tx.addInput({
-        sourceTransaction: await this.oneSatSPV.getTx(u.outpoint.txid),
-        sourceOutputIndex: u.outpoint.vout,
+        sourceTransaction: await this.wallet.loadTransaction(txid),
+        sourceOutputIndex: vout,
         sequence: 0xffffffff,
         unlockingScriptTemplate: new P2PKH().unlock(pk),
       });
-      satsIn += Number(u.satoshis);
+      satsIn += o.satoshis;
       fee = await feeModel.computeFee(tx);
       if (satsIn >= satsOut + fee) break;
     }

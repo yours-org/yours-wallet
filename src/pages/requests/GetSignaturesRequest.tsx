@@ -12,7 +12,7 @@ import { useServiceContext } from '../../hooks/useServiceContext';
 import { removeWindow, sendMessage } from '../../utils/chromeHelpers';
 import { sleep } from '../../utils/sleep';
 import TxPreview from '../../components/TxPreview';
-import { IndexContext } from 'spv-store';
+import type { ParseContext } from '@1sat/wallet-toolbox';
 import { getErrorMessage, getTxFromRawTxFormat } from '../../utils/tools';
 import { styled } from 'styled-components';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
@@ -38,9 +38,9 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const { handleSelect, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, contractService, oneSatSPV, keysService } = useServiceContext();
+  const { chromeStorageService, contractService, wallet, keysService } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const [txData, setTxData] = useState<IndexContext>();
+  const [txData, setTxData] = useState<ParseContext>();
   const { bsvAddress, ordAddress, identityAddress } = keysService;
   const [satsOut, setSatsOut] = useState(0);
   const { request, onSignature, popupId } = props;
@@ -58,13 +58,13 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!bsvAddress || !ordAddress || !identityAddress || !oneSatSPV || !txData) return;
+    if (!bsvAddress || !ordAddress || !identityAddress || !wallet || !txData) return;
     (async () => {
       console.log(bsvAddress, ordAddress, identityAddress);
       // how much did the user put in to the tx
       let userSatsOut = txData.spends.reduce((acc, spend) => {
         if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
-          return acc + spend.satoshis;
+          return acc + BigInt(spend.output.satoshis || 0);
         }
         return acc;
       }, 0n);
@@ -72,7 +72,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
       // how much did the user get back from the tx
       userSatsOut = txData.txos.reduce((acc, txo) => {
         if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
-          return acc - txo.satoshis;
+          return acc - BigInt(txo.output.satoshis || 0);
         }
         return acc;
       }, userSatsOut);
@@ -84,14 +84,14 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
 
   useEffect(() => {
     (async () => {
-      if (!request.rawtx || !oneSatSPV) return;
+      if (!request.rawtx || !wallet) return;
       setIsLoading(true);
       const tx = getTxFromRawTxFormat(request.rawtx, request.format || 'tx');
-      const parsedTx = await oneSatSPV.parseTx(tx);
+      const parsedTx = await wallet.parseTransaction(tx);
       setTxData(parsedTx);
       setIsLoading(false);
     })();
-  }, [oneSatSPV, request]);
+  }, [wallet, request]);
 
   useEffect(() => {
     handleSelect('bsv');

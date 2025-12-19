@@ -3,7 +3,6 @@ import { Button } from './Button';
 import { useTheme } from '../hooks/useTheme';
 import { requestTestnetCoins } from '../api/faucet';
 import { useSnackbar } from '../hooks/useSnackbar';
-import { ParseMode } from 'spv-store';
 import { Transaction } from '@bsv/sdk';
 import { useServiceContext } from '../hooks/useServiceContext';
 
@@ -16,7 +15,7 @@ interface FaucetButtonProps {
 export function FaucetButton({ address, isTestnet, onConfirmation }: FaucetButtonProps) {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
-  const { oneSatSPV } = useServiceContext();
+  const { wallet } = useServiceContext();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGetCoins = async () => {
@@ -29,8 +28,8 @@ export function FaucetButton({ address, isTestnet, onConfirmation }: FaucetButto
 
       if (response.code === 0) {
         const tx = Transaction.fromHex(response.raw);
-        const res = await oneSatSPV.stores.txos?.ingest(tx, 'faucet', ParseMode.Persist);
-        if (res?.txid) {
+        const res = await wallet.ingestTransaction(tx, 'faucet');
+        if (res?.parseContext?.txid) {
           onConfirmation();
         } else {
           addSnackbar('Transaction sent, but not yet confirmed. Please check your balance later.', 'info');

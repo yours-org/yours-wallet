@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { YoursEventName } from '../inject';
 import { useTheme } from './useTheme';
+import { walletPromise } from '../background';
 
 export type QueueTrackerMessage = {
   action: YoursEventName.QUEUE_STATUS_UPDATE;
@@ -30,72 +31,75 @@ export const useQueueTracker = () => {
   const [fetchingTxid, setFetchingTxid] = useState<string | undefined>();
 
   useEffect(() => {
-    const handleQueueStatusUpdate = (message: QueueTrackerMessage | ImportTrackerMessage | FetchingMessage) => {
-      if (
-        message.action === YoursEventName.QUEUE_STATUS_UPDATE ||
-        message.action === YoursEventName.IMPORT_STATUS_UPDATE ||
-        message.action === YoursEventName.FETCHING_TX_STATUS_UPDATE
-      ) {
-        const importName = (message as ImportTrackerMessage).data.name;
-        if (importName) {
-          setImportName(importName);
-        } else {
-          setImportName(undefined);
-        }
+    let isMounted = true;
 
-        const fetchingTxid = (message as FetchingMessage).data.txid;
-        if (fetchingTxid) {
-          setFetchingTxid(fetchingTxid);
-        }
+    const setupWalletListeners = async () => {
+      const wallet = await walletPromise;
 
-        const queueLength = (message as QueueTrackerMessage).data.length;
-        queueLength && setQueueLength(queueLength);
+      const handleSyncStart = (data: { address: string }) => {
+        if (!isMounted) return;
+        setImportName(`Syncing ${data.address}`);
         setShowQueueBanner(true);
         setIsSyncing(true);
 
-        // Start the toggle mechanism for updating the balance
         if (!intervalRef.current) {
           intervalRef.current = setInterval(() => {
             setUpdateBalance((prev) => !prev);
           }, 5000);
         }
 
-        // Clear the 2-second timeout if a new event is received
         if (twoSecondsTimeoutRef.current) {
           clearTimeout(twoSecondsTimeoutRef.current);
           twoSecondsTimeoutRef.current = null;
         }
 
-        if (queueLength === 0) {
-          // Set a timeout to delay setting isSyncing to false
-          twoSecondsTimeoutRef.current = setTimeout(() => {
-            setUpdateBalance(true);
-            setIsSyncing(false);
-            setShowQueueBanner(false);
-            setFetchingTxid(undefined);
-          }, 3000);
-        }
-
-        // Reset the hide banner timeout whenever a new event is received
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
 
         timeoutRef.current = setTimeout(() => {
-          // Clear the interval and stop updating after sync is complete
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
           }
         }, 4000);
-      }
+      };
+
+      const handleSyncParsed = (data: { txid: string; internalizedCount: number }) => {
+        if (!isMounted) return;
+        if (data.internalizedCount > 0) {
+          setFetchingTxid(data.txid);
+          setShowQueueBanner(true);
+          setIsSyncing(true);
+        }
+      };
+
+      const handleSyncComplete = (data: { address: string }) => {
+        if (!isMounted) return;
+        setImportName(`Completed ${data.address}`);
+
+        twoSecondsTimeoutRef.current = setTimeout(() => {
+          setUpdateBalance(true);
+          setIsSyncing(false);
+          setShowQueueBanner(false);
+          setFetchingTxid(undefined);
+          setImportName(undefined);
+        }, 3000);
+      };
+
+      wallet.on('sync:start', handleSyncStart);
+      wallet.on('sync:parsed', handleSyncParsed);
+      wallet.on('sync:complete', handleSyncComplete);
     };
 
-    // Listen for messages from the background script
-    chrome.runtime.onMessage.addListener(handleQueueStatusUpdate);
+    setupWalletListeners();
+
+    // TODO: Investigate if chrome.runtime.onMessage is still needed for worker messages
+    // chrome.runtime.onMessage.addListener(handleQueueStatusUpdate);
 
     return () => {
-      chrome.runtime.onMessage.removeListener(handleQueueStatusUpdate);
+      isMounted = false;
+      // chrome.runtime.onMessage.removeListener(handleQueueStatusUpdate);
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }

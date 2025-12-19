@@ -1,5 +1,6 @@
 import styled from 'styled-components';
-import { Ordinal as OrdinalType } from 'yours-wallet-provider';
+import type { Txo } from '@1sat/wallet-toolbox';
+import { Utils } from '@bsv/sdk';
 import { WhiteLabelTheme, Theme } from '../theme.types';
 import { Text } from './Reusable';
 import { Show } from './Show';
@@ -86,7 +87,7 @@ export const Json = styled.pre<WhiteLabelTheme>`
 `;
 
 export const FlexWrapper = styled.div`
-  flex: 0 1 calc(33.333% - 1rem); // Adjust the percentage and subtraction to account for margins/gaps
+  flex: 0 1 calc(33.333% - 1rem);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -98,27 +99,65 @@ export const FlexWrapper = styled.div`
   }
 `;
 
+// Helper types for accessing Txo indexer data
+interface OriginData {
+  outpoint?: string;
+  insc?: {
+    file?: {
+      type?: string;
+      content?: number[];
+    };
+  };
+  map?: Record<string, unknown>;
+}
+
 export type OrdinalProps = {
   theme: Theme;
   url: string;
   isTransfer?: boolean;
   selected?: boolean;
   size?: string;
-  inscription: OrdinalType;
+  txo: Txo;
   onClick?: () => void;
 };
 
 export const Ordinal = (props: OrdinalProps) => {
-  const { url, selected, isTransfer, size, inscription, theme, onClick } = props;
-  const contentType = inscription?.origin?.data?.insc?.file?.type;
+  const { url, selected, isTransfer, size, txo, theme, onClick } = props;
 
-  // We can use this function to properly render unique use cases that may have different metadata than what is supported by default
-  const getOrdinalName = () => {
-    if (inscription?.origin?.data?.map?.name) {
-      return inscription.origin?.data?.map?.name;
-    } else if (inscription?.origin?.data?.map?.app === 'ssm') {
-      if (inscription?.origin?.data?.map?.chatName) {
-        return `SSM - ${inscription?.origin?.data?.map?.chatName}`;
+  // Extract origin data from Txo
+  const originData = txo.data?.origin?.data as OriginData | undefined;
+  const contentType = originData?.insc?.file?.type;
+  const mapData = originData?.map as Record<string, unknown> | undefined;
+
+  // Get text content if available
+  const getTextContent = (): string | undefined => {
+    const content = originData?.insc?.file?.content;
+    if (!content) return undefined;
+    try {
+      return Utils.toUTF8(content);
+    } catch {
+      return undefined;
+    }
+  };
+
+  // Get JSON content if available
+  const getJsonContent = (): Record<string, unknown> | undefined => {
+    if (!contentType?.startsWith('application/json')) return undefined;
+    const content = originData?.insc?.file?.content;
+    if (!content) return undefined;
+    try {
+      return JSON.parse(Utils.toUTF8(content));
+    } catch {
+      return undefined;
+    }
+  };
+
+  const getOrdinalName = (): string => {
+    if (mapData?.name) {
+      return String(mapData.name);
+    } else if (mapData?.app === 'ssm') {
+      if (mapData?.chatName) {
+        return `SSM - ${mapData.chatName}`;
       } else {
         return 'Unknown SSM Channel';
       }
@@ -142,19 +181,19 @@ export const Ordinal = (props: OrdinalProps) => {
       case contentType?.startsWith('application/op-ns'):
         return (
           <TextWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <OrdText theme={theme}>{inscription.origin?.data?.insc?.file?.text}</OrdText>
+            <OrdText theme={theme}>{getTextContent()}</OrdText>
           </TextWrapper>
         );
       case contentType?.startsWith('application/json'):
         return (
           <JsonWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <Json theme={theme}>{JSON.stringify(inscription.origin?.data?.insc?.file?.json, null, 2)}</Json>
+            <Json theme={theme}>{JSON.stringify(getJsonContent(), null, 2)}</Json>
           </JsonWrapper>
         );
       default:
         return (
           <TextWrapper size={size} selected={selected} theme={theme} onClick={onClick}>
-            <UnsupportedText theme={theme}>😩 Syncing or Unsupported File Type</UnsupportedText>
+            <UnsupportedText theme={theme}>Syncing or Unsupported File Type</UnsupportedText>
           </TextWrapper>
         );
     }

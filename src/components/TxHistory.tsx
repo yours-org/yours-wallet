@@ -13,7 +13,14 @@ import {
   URL_WHATSONCHAIN_TESTNET,
 } from '../utils/constants';
 import { FaTimes, FaChevronDown, FaChevronUp, FaLink, FaTag } from 'react-icons/fa'; // Import FaTag
-import { TxLog } from 'spv-store';
+// TODO: TxLog type needs to be implemented in 1sat-wallet-toolbox
+// import { TxLog } from 'spv-store';
+type TxLog = {
+  txid: string;
+  idx: number;
+  date: Date;
+  summary: Record<string, { amount: number; icon?: string }>;
+};
 import { Button } from './Button';
 import bsvCoin from '../assets/bsv-coin.svg';
 import lock from '../assets/lock.svg';
@@ -135,10 +142,9 @@ export type TxHistoryProps = {
 export const TxHistory = (props: TxHistoryProps) => {
   const { theme, onBack } = props;
   const [data, setData] = useState<TxLog[]>();
-  const { oneSatSPV } = useServiceContext();
+  const { wallet, chromeStorageService } = useServiceContext();
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
-  const { gorillaPoolService, chromeStorageService } = useServiceContext();
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const isTestnet = chromeStorageService.getNetwork() === NetWork.Testnet;
 
@@ -146,18 +152,19 @@ export const TxHistory = (props: TxHistoryProps) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!oneSatSPV) return;
-      try {
-        const tsx = await oneSatSPV.getRecentTxs();
-        console.log(tsx);
-        setData(tsx);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
+      // TODO: Implement getRecentTxs/TxLog in 1sat-wallet-toolbox
+      // try {
+      //   const tsx = await wallet.getRecentTxs();
+      //   console.log(tsx);
+      //   setData(tsx);
+      // } catch (error) {
+      //   console.error('Error fetching data:', error);
+      // }
+      setData([]);
     };
 
     fetchData();
-  }, [oneSatSPV]);
+  }, [wallet]);
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -196,11 +203,7 @@ export const TxHistory = (props: TxHistoryProps) => {
         );
       default:
         return icon ? (
-          <Icon
-            src={`${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${icon}`}
-            alt="Summary Icon"
-            $isNFT={tag === 'origin'}
-          />
+          <Icon src={`${wallet.services.baseUrl}/content/${icon}`} alt="Summary Icon" $isNFT={tag === 'origin'} />
         ) : tag === ('origin' as Tag) ? (
           <Icon src={GENERIC_NFT_ICON} alt="Generic NFT Icon" />
         ) : (
