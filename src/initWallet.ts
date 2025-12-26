@@ -1,5 +1,5 @@
 import { NetWork } from 'yours-wallet-provider';
-import { OneSatWallet } from '@1sat/wallet-toolbox';
+import { OneSatWallet, IndexedDbSyncQueue } from '@1sat/wallet-toolbox';
 import { WalletStorageManager, StorageProvider } from '@bsv/wallet-toolbox/mobile';
 import { StorageIdb } from '@bsv/wallet-toolbox/mobile/out/src/storage/StorageIdb';
 import { PrivateKey } from '@bsv/sdk';
@@ -44,6 +44,10 @@ export const initWallet = async (
   await storageProvider.migrate(`wallet-${selectedAccount || ''}`, identityPubKey);
   await storageProvider.makeAvailable();
 
+  // Create sync queue with identityAddress as accountId
+  const identityAddress = account?.addresses?.identityAddress || selectedAccount || '';
+  const syncQueue = new IndexedDbSyncQueue(identityAddress);
+
   // Create read-only wallet (public key = read-only mode)
   const wallet = new OneSatWallet({
     rootKey: identityPubKey,
@@ -51,12 +55,13 @@ export const initWallet = async (
     chain,
     owners,
     autoSync: false,
+    syncQueue,
   });
 
   registerEventListeners(wallet);
 
   if (startSync && account) {
-    wallet.syncAll();
+    wallet.sync();
   }
 
   return wallet;
@@ -66,42 +71,53 @@ export const initWallet = async (
  * Register event listeners to send sync status updates to the UI
  */
 const registerEventListeners = (wallet: OneSatWallet) => {
-  wallet.on('sync:start', (data: { address: string }) => {
+  wallet.on('sync:start', (data) => {
     try {
       sendMessage({
-        action: YoursEventName.IMPORT_STATUS_UPDATE,
-        data: { tag: 'wallet', name: `Syncing ${data.address}` },
+        action: YoursEventName.SYNC_STATUS_UPDATE,
+        data: { status: 'start', addressCount: data.addresses.length },
       });
     } catch (e) {
       // Ignore messaging errors
     }
   });
 
-  wallet.on('sync:parsed', (data: { txid: string; internalizedCount: number }) => {
-    if (data.internalizedCount > 0) {
-      try {
-        sendMessage({
-          action: YoursEventName.FETCHING_TX_STATUS_UPDATE,
-          data: { txid: data.txid },
-        });
-      } catch (e) {
-        // Ignore messaging errors
-      }
-    }
-  });
-
-  wallet.on('sync:complete', (data: { address: string }) => {
+  wallet.on('sync:progress', (data) => {
     try {
       sendMessage({
-        action: YoursEventName.IMPORT_STATUS_UPDATE,
-        data: { tag: 'complete', name: `Completed ${data.address}` },
+        action: YoursEventName.SYNC_STATUS_UPDATE,
+        data: {
+          status: 'progress',
+          pending: data.pending,
+          done: data.done,
+          failed: data.failed,
+        },
       });
     } catch (e) {
       // Ignore messaging errors
     }
   });
 
-  wallet.on('sync:error', (data: { address: string; error: Error }) => {
-    console.error(`Sync error for ${data.address}:`, data.error);
+  wallet.on('sync:complete', () => {
+    try {
+      sendMessage({
+        action: YoursEventName.SYNC_STATUS_UPDATE,
+        data: { status: 'complete' },
+      });
+    } catch (e) {
+      // Ignore messaging errors
+    }
+  });
+
+  wallet.on('sync:error', (data) => {
+    try {
+      sendMessage({
+        action: YoursEventName.SYNC_STATUS_UPDATE,
+        data: { status: 'error', message: data.message },
+      });
+    } catch (e) {
+      // Ignore messaging errors
+    }
+    console.error('Sync error:', data.message);
   });
 };

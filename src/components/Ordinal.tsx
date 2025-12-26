@@ -1,9 +1,9 @@
 import styled from 'styled-components';
-import type { Txo } from '@1sat/wallet-toolbox';
-import { Utils } from '@bsv/sdk';
+import type { WalletOutput } from '@bsv/sdk';
 import { WhiteLabelTheme, Theme } from '../theme.types';
 import { Text } from './Reusable';
 import { Show } from './Show';
+import { getTagValue } from '../utils/format';
 
 export type OrdinalDivProps = WhiteLabelTheme & {
   url?: string;
@@ -99,70 +99,29 @@ export const FlexWrapper = styled.div`
   }
 `;
 
-// Helper types for accessing Txo indexer data
-interface OriginData {
-  outpoint?: string;
-  insc?: {
-    file?: {
-      type?: string;
-      content?: number[];
-    };
-  };
-  map?: Record<string, unknown>;
-}
-
 export type OrdinalProps = {
   theme: Theme;
   url: string;
   isTransfer?: boolean;
   selected?: boolean;
   size?: string;
-  txo: Txo;
+  output: WalletOutput;
   onClick?: () => void;
 };
 
 export const Ordinal = (props: OrdinalProps) => {
-  const { url, selected, isTransfer, size, txo, theme, onClick } = props;
+  const { url, selected, isTransfer, size, output, theme, onClick } = props;
 
-  // Extract origin data from Txo
-  const originData = txo.data?.origin?.data as OriginData | undefined;
-  const contentType = originData?.insc?.file?.type;
-  const mapData = originData?.map as Record<string, unknown> | undefined;
+  const contentType = getTagValue(output.tags, 'type');
+  const name = getTagValue(output.tags, 'name') ?? 'Unknown';
+  const textContent = output.customInstructions;
 
-  // Get text content if available
-  const getTextContent = (): string | undefined => {
-    const content = originData?.insc?.file?.content;
-    if (!content) return undefined;
-    try {
-      return Utils.toUTF8(content);
-    } catch {
-      return undefined;
-    }
-  };
-
-  // Get JSON content if available
   const getJsonContent = (): Record<string, unknown> | undefined => {
-    if (!contentType?.startsWith('application/json')) return undefined;
-    const content = originData?.insc?.file?.content;
-    if (!content) return undefined;
+    if (!contentType?.startsWith('application/json') || !textContent) return undefined;
     try {
-      return JSON.parse(Utils.toUTF8(content));
+      return JSON.parse(textContent);
     } catch {
       return undefined;
-    }
-  };
-
-  const getOrdinalName = (): string => {
-    if (mapData?.name) {
-      return String(mapData.name);
-    } else if (mapData?.app === 'ssm') {
-      if (mapData?.chatName) {
-        return `SSM - ${mapData.chatName}`;
-      } else {
-        return 'Unknown SSM Channel';
-      }
-    } else {
-      return 'Unknown Name';
     }
   };
 
@@ -181,7 +140,7 @@ export const Ordinal = (props: OrdinalProps) => {
       case contentType?.startsWith('application/op-ns'):
         return (
           <TextWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <OrdText theme={theme}>{getTextContent()}</OrdText>
+            <OrdText theme={theme}>{textContent}</OrdText>
           </TextWrapper>
         );
       case contentType?.startsWith('application/json'):
@@ -208,7 +167,7 @@ export const Ordinal = (props: OrdinalProps) => {
           style={{ margin: '0.25rem 0', cursor: 'pointer', fontSize: '0.75rem' }}
           onClick={() => window.open(url, '_blank')}
         >
-          {getOrdinalName()}
+          {name}
         </Text>
       </Show>
     </FlexWrapper>

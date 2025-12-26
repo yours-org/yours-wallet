@@ -31,12 +31,12 @@ import { WhitelistedApp } from './inject';
 import { PageLoader } from './components/PageLoader';
 import { useServiceContext } from './hooks/useServiceContext';
 import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
-import { QueueBanner } from './components/QueueBanner';
+import { SyncBanner } from './components/SyncBanner';
 import { SyncingBlocks } from './components/SyncingBlocks';
 import { MasterRestore } from './pages/onboarding/MasterRestore';
 import { Bsv20SendRequest } from './pages/requests/Bsv20SendRequest';
 import { BlockHeightProvider } from './contexts/providers/BlockHeightProvider';
-import { QueueProvider } from './contexts/providers/QueueProvider';
+import { SyncProvider } from './contexts/providers/SyncProvider';
 import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
 import { SnackbarProvider } from './contexts/providers/SnackbarProvider';
 import { MNEESendRequest } from './pages/requests/MNEESendRequest';
@@ -122,11 +122,11 @@ export const App = () => {
   return (
     <MainContainer $isMobile={isMobile} theme={theme}>
       <BlockHeightProvider>
-        <QueueProvider>
+        <SyncProvider>
           <BottomMenuProvider network={chromeStorageService.getNetwork()}>
             <Container theme={theme}>
               <SnackbarProvider>
-                <QueueBanner />
+                <SyncBanner />
                 <SyncingBlocks />
                 <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
                   <Router>
@@ -273,7 +273,7 @@ export const App = () => {
               </SnackbarProvider>
             </Container>
           </BottomMenuProvider>
-        </QueueProvider>
+        </SyncProvider>
       </BlockHeightProvider>
     </MainContainer>
   );

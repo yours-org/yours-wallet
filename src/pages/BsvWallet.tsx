@@ -41,7 +41,7 @@ import { LockData } from '../services/types/bsv.types';
 import { sendMessage } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
 import { InWalletBsvResponse } from '../services/types/bsv.types';
-import { useQueueTracker } from '../hooks/useQueueTracker';
+import { useSyncTracker } from '../hooks/useSyncTracker';
 import { getErrorMessage, isValidEmail } from '../utils/tools';
 import { UpgradeNotification } from '../components/UpgradeNotification';
 import { Bsv20 } from 'yours-wallet-provider';
@@ -210,7 +210,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const { updateBalance, isSyncing } = useQueueTracker();
+  const { updateBalance, isSyncing } = useSyncTracker();
   const urlParams = new URLSearchParams(location.search);
   const { handleSelect, query } = useBottomMenu();
   const isReload = urlParams.get('reload') === 'true' || query === 'reload';

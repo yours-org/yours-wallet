@@ -2,6 +2,7 @@ import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
 import { PurchaseOrdinal } from 'yours-wallet-provider';
 import type { Txo } from '@1sat/wallet-toolbox';
+import type { WalletOutput } from '@bsv/sdk';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
@@ -23,6 +24,24 @@ import { sleep } from '../../utils/sleep';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { styled } from 'styled-components';
 import { getErrorMessage } from '../../utils/tools';
+
+/** Convert Txo to minimal WalletOutput for Ordinal component */
+const txoToWalletOutput = (txo: Txo): WalletOutput => {
+  const originData = txo.data?.origin?.data as
+    | { outpoint?: string; map?: Record<string, unknown>; insc?: { file?: { type?: string } } }
+    | undefined;
+  const tags: string[] = [];
+  if (originData?.outpoint) tags.push(`origin:${originData.outpoint}`);
+  if (originData?.insc?.file?.type) tags.push(`type:${originData.insc.file.type}`);
+  if (originData?.map?.name) tags.push(`name:${originData.map.name}`);
+
+  return {
+    satoshis: txo.output.satoshis ?? 1,
+    spendable: true,
+    outpoint: txo.outpoint.toString(),
+    tags,
+  };
+};
 
 const TokenIcon = styled.img`
   width: 3.5rem;
@@ -148,7 +167,12 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
               <TokenIcon src={bsv21Data?.icon ? `${baseUrl}/content/${bsv21Data.icon}` : GENERIC_TOKEN_ICON} />
             }
           >
-            <Ordinal txo={listingTxo!} theme={theme} url={`${baseUrl}/content/${originOutpoint}`} selected={true} />
+            <Ordinal
+              output={txoToWalletOutput(listingTxo!)}
+              theme={theme}
+              url={`${baseUrl}/content/${originOutpoint}`}
+              selected={true}
+            />
           </Show>
           <HeaderText theme={theme}>Purchase Request</HeaderText>
           <Show when={hasTokenData}>

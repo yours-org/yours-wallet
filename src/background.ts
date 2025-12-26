@@ -96,7 +96,7 @@ if (isInServiceWorker) {
     try {
       const wallet = await walletPromise;
       if (!wallet) throw Error('Wallet not initialized!');
-      wallet.syncAll();
+      wallet.sync();
       console.log('sync started');
     } catch (error) {
       console.error('Error during sync:', error);
@@ -160,11 +160,7 @@ if (isInServiceWorker) {
     action: YoursEventName;
     params: { domain: string };
   }): Promise<boolean> => {
-    if (
-      message.action === YoursEventName.QUEUE_STATUS_UPDATE ||
-      message.action === YoursEventName.IMPORT_STATUS_UPDATE ||
-      message.action === YoursEventName.FETCHING_TX_STATUS_UPDATE
-    ) {
+    if (message.action === YoursEventName.SYNC_STATUS_UPDATE) {
       return true;
     }
     const { params } = message;
@@ -175,6 +171,14 @@ if (isInServiceWorker) {
   chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
     if ([YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT].includes(message.action)) {
       emitEventToActiveTabs(message);
+    }
+
+    // Broadcast sync status updates to all extension views (popup can't receive its own messages)
+    if (message.action === YoursEventName.SYNC_STATUS_UPDATE) {
+      chrome.runtime.sendMessage(message).catch(() => {
+        // Ignore errors when no listeners
+      });
+      return;
     }
 
     const noAuthRequired = [
@@ -316,7 +320,11 @@ if (isInServiceWorker) {
     chrome.tabs.query({}, function (tabs) {
       tabs.forEach(function (tab: chrome.tabs.Tab) {
         if (tab.id) {
-          chrome.tabs.sendMessage(tab.id, { type: CustomListenerName.YOURS_EMIT_EVENT, action, params });
+          chrome.tabs.sendMessage(tab.id, {
+            type: CustomListenerName.YOURS_EMIT_EVENT,
+            action,
+            params,
+          });
         }
       });
     });
@@ -579,13 +587,23 @@ if (isInServiceWorker) {
     try {
       chromeStorageService.getAndSetStorage().then(async () => {
         const wallet = await walletPromise;
-        const result = await wallet.listOutputs({ basket: 'bsv21', includeTags: true });
+        const result = await wallet.listOutputs({
+          basket: 'bsv21',
+          includeTags: true,
+        });
 
         // Aggregate balances by token id, tracking confirmed (valid) vs pending
         // Tag format: id:{tokenId}:{status} where status is "valid", "invalid", or "pending"
         const balanceMap = new Map<
           string,
-          { id: string; confirmed: bigint; pending: bigint; icon?: string; sym?: string; dec: number }
+          {
+            id: string;
+            confirmed: bigint;
+            pending: bigint;
+            icon?: string;
+            sym?: string;
+            dec: number;
+          }
         >();
 
         for (const o of result.outputs) {
@@ -735,7 +753,9 @@ if (isInServiceWorker) {
 
   // Important note: We process the InscribeRequest as a SendBsv request.
   const processSendBsvRequest = (
-    message: { params: { data: SendBsv[] | InscribeRequest[] | LockRequest[] } },
+    message: {
+      params: { data: SendBsv[] | InscribeRequest[] | LockRequest[] };
+    },
     sendResponse: CallbackResponse,
   ) => {
     if (!message.params.data) {

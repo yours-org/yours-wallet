@@ -2,6 +2,7 @@ import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
 import { TransferOrdinal } from 'yours-wallet-provider';
 import type { Txo } from '@1sat/wallet-toolbox';
+import type { WalletOutput } from '@bsv/sdk';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
@@ -16,6 +17,24 @@ import { truncate } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { getErrorMessage } from '../../utils/tools';
+
+/** Convert Txo to minimal WalletOutput for Ordinal component */
+const txoToWalletOutput = (txo: Txo): WalletOutput => {
+  const originData = txo.data?.origin?.data as
+    | { outpoint?: string; map?: Record<string, unknown>; insc?: { file?: { type?: string } } }
+    | undefined;
+  const tags: string[] = [];
+  if (originData?.outpoint) tags.push(`origin:${originData.outpoint}`);
+  if (originData?.insc?.file?.type) tags.push(`type:${originData.insc.file.type}`);
+  if (originData?.map?.name) tags.push(`name:${originData.map.name}`);
+
+  return {
+    satoshis: txo.output.satoshis ?? 1,
+    spendable: true,
+    outpoint: txo.outpoint.toString(),
+    tags,
+  };
+};
 
 export type OrdTransferRequestProps = {
   request: TransferOrdinal;
@@ -105,7 +124,14 @@ export const OrdTransferRequest = (props: OrdTransferRequestProps) => {
       <Show when={!isProcessing && !!request}>
         <ConfirmContent>
           <HeaderText theme={theme}>Approve Request</HeaderText>
-          {txo && <Ordinal txo={txo} theme={theme} url={`${baseUrl}/content/${originOutpoint}`} selected={true} />}
+          {txo && (
+            <Ordinal
+              output={txoToWalletOutput(txo)}
+              theme={theme}
+              url={`${baseUrl}/content/${originOutpoint}`}
+              selected={true}
+            />
+          )}
           <FormContainer noValidate onSubmit={(e) => handleTransferOrdinal(e)}>
             <Text theme={theme} style={{ margin: '1rem 0' }}>
               {`Transfer to: ${truncate(request.address, 5, 5)}`}
