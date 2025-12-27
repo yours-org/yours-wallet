@@ -41,7 +41,10 @@ export const useSyncTracker = () => {
 
         case 'progress':
           setPendingCount(data.pending);
-          setShowSyncBanner(data.pending > 0);
+          setShowSyncBanner(data.pending > 0 || data.done > 0);
+          if (data.pending > 0 || data.done > 0) {
+            setSyncMessage(`Syncing: ${data.done} done, ${data.pending} pending`);
+          }
           break;
 
         case 'complete':

@@ -34,7 +34,7 @@ export class OrdinalService {
   ) {}
 
   getBsv20s = async (): Promise<Bsv20[]> => {
-    const result = await this.wallet.listOutputs({ basket: 'bsv21', includeTags: true });
+    const result = await this.wallet.listOutputs({ basket: 'bsv21', includeTags: true, limit: 10000 });
 
     // Aggregate balances by token id, tracking confirmed (valid) vs pending
     // Tag format: id:{tokenId}:{status} where status is "valid", "invalid", or "pending"
@@ -165,7 +165,7 @@ export class OrdinalService {
         change: true,
       });
 
-      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true });
+      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true, limit: 10000 });
 
       let satsIn = 0;
       let fee = 0;
@@ -257,7 +257,7 @@ export class OrdinalService {
       });
 
       // Load funding UTXOs
-      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true });
+      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true, limit: 10000 });
       const paymentUtxos: Utxo[] = [];
       for (const o of fundResult.outputs) {
         const [txid, voutStr] = o.outpoint.split('.');
@@ -302,7 +302,7 @@ export class OrdinalService {
       const pkMap = await this.keysService.retrievePrivateKeyMap(password);
 
       // Load funding UTXOs
-      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true });
+      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true, limit: 10000 });
       const fundingUtxos = fundResult.outputs.map((o) => {
         const [txid, voutStr] = o.outpoint.split('.');
         const owner = o.tags?.find((t) => t.startsWith('own:'))?.slice(4);
@@ -322,6 +322,7 @@ export class OrdinalService {
         basket: 'bsv21',
         tags: [`id:${idOrTick}:valid`],
         includeTags: true,
+        limit: 10000,
       });
       if (!tokenResult.outputs || tokenResult.outputs.length === 0) return { error: 'no-bsv20-utxo' };
 
@@ -404,7 +405,7 @@ export class OrdinalService {
       const ordPk = PrivateKey.fromWif(keys.ordWif);
 
       // Load funding UTXOs
-      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true });
+      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true, limit: 10000 });
       const fundingUtxos = fundResult.outputs.map((o) => {
         const [txid, voutStr] = o.outpoint.split('.');
         const owner = o.tags?.find((t) => t.startsWith('own:'))?.slice(4);
@@ -470,7 +471,7 @@ export class OrdinalService {
       const ordPk = PrivateKey.fromWif(keys.ordWif);
 
       // Load funding UTXOs
-      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true });
+      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true, limit: 10000 });
       const fundingUtxos = fundResult.outputs.map((o) => {
         const [txid, voutStr] = o.outpoint.split('.');
         const owner = o.tags?.find((t) => t.startsWith('own:'))?.slice(4);
@@ -530,7 +531,7 @@ export class OrdinalService {
       const pkMap = await this.keysService.retrievePrivateKeyMap(password);
 
       // Load funding UTXOs
-      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true });
+      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true, limit: 10000 });
 
       console.log('listingTxo', listingTxo);
       if (!listingTxo) return { error: 'no-ord-utxo' };

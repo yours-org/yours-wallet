@@ -590,6 +590,7 @@ if (isInServiceWorker) {
         const result = await wallet.listOutputs({
           basket: 'bsv21',
           includeTags: true,
+          limit: 10000,
         });
 
         // Aggregate balances by token id, tracking confirmed (valid) vs pending
@@ -726,7 +727,7 @@ if (isInServiceWorker) {
       chromeStorageService.getAndSetStorage().then(async () => {
         const wallet = await walletPromise;
         if (!wallet) throw Error('Wallet not initialized!');
-        const result = await wallet.listOutputs({ basket: 'fund' });
+        const result = await wallet.listOutputs({ basket: 'fund', limit: 10000 });
         const utxos = result.outputs.map((output) => {
           const [txid, voutStr] = output.outpoint.split('.');
           return {

@@ -254,7 +254,7 @@ export const AppsAndTools = () => {
     const height = await bsvService.getCurrentHeight();
     setCurrentBlockHeight(height);
 
-    const result = await wallet!.listOutputs({ basket: 'lock' });
+    const result = await wallet!.listOutputs({ basket: 'lock', limit: 10000 });
     const txos: Txo[] = [];
     for (const o of result.outputs) {
       const outpoint = new Outpoint(o.outpoint.replace('.', '_'));

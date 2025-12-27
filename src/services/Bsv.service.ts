@@ -57,7 +57,7 @@ export class BsvService {
       nextUnlock: 0,
     };
 
-    const result = await this.wallet.listOutputs({ basket: 'lock' });
+    const result = await this.wallet.listOutputs({ basket: 'lock', limit: 10000 });
     const height = await this.getCurrentHeight();
 
     for (const o of result.outputs) {
@@ -96,7 +96,7 @@ export class BsvService {
   unlockLockedCoins = async () => {
     if (!this.keysService.identityAddress) return;
     const blockHeight = await this.getCurrentHeight();
-    const result = await this.wallet.listOutputs({ basket: 'lock' });
+    const result = await this.wallet.listOutputs({ basket: 'lock', limit: 10000 });
 
     const txos: Txo[] = [];
     for (const o of result.outputs) {
@@ -125,7 +125,7 @@ export class BsvService {
   sendAllBsv = async (destinationAddress: string, type: 'address' | 'paymail', password: string) => {
     try {
       const tx = new Transaction();
-      const result = await this.wallet.listOutputs({ basket: 'fund', includeTags: true });
+      const result = await this.wallet.listOutputs({ basket: 'fund', includeTags: true, limit: 10000 });
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       const pkMap = await this.keysService.retrievePrivateKeyMap(password);
       for (const o of result.outputs) {
@@ -269,7 +269,7 @@ export class BsvService {
         change: true,
       });
 
-      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true });
+      const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true, limit: 10000 });
 
       let satsIn = 0;
       let fee = 0;
@@ -396,7 +396,7 @@ export class BsvService {
   };
 
   updateBsvBalance = async () => {
-    const result = await this.wallet.listOutputs({ basket: 'fund' });
+    const result = await this.wallet.listOutputs({ basket: 'fund', limit: 10000 });
     const total = result.outputs.reduce((a, o) => a + o.satoshis, 0);
     this.bsvBalance = (total ?? 0) / BSV_DECIMAL_CONVERSION;
     const balance = {
@@ -435,7 +435,7 @@ export class BsvService {
     let fee = 0;
     tx.addOutput({ change: true, lockingScript: new P2PKH().lock(this.keysService.bsvAddress) });
 
-    const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true });
+    const fundResult = await this.wallet.listOutputs({ basket: 'fund', includeTags: true, limit: 10000 });
 
     const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
     for (const o of fundResult.outputs) {
