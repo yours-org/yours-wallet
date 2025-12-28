@@ -14,6 +14,7 @@ import {
 } from 'yours-wallet-provider';
 import { RequestParams } from '../inject';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
+import type { CreateSignatureArgs, WalletEncryptArgs, WalletDecryptArgs, CreateActionArgs } from '../cwi';
 
 export type Web3RequestContextProps = {
   connectRequest: RequestParams | undefined;
@@ -28,6 +29,11 @@ export type Web3RequestContextProps = {
   generateTaggedKeysRequest: TaggedDerivationRequest | undefined;
   encryptRequest: EncryptRequest | undefined;
   decryptRequest: DecryptRequest | undefined;
+  // CWI (BRC-100) requests
+  cwiCreateSignatureRequest: CreateSignatureArgs | undefined;
+  cwiEncryptRequest: WalletEncryptArgs | undefined;
+  cwiDecryptRequest: WalletDecryptArgs | undefined;
+  cwiCreateActionRequest: CreateActionArgs | undefined;
   popupId: number | undefined;
   getStorageAndSetRequestState: (chromeStorageService: ChromeStorageService) => void;
   clearRequest: (type: keyof Omit<Web3RequestContextProps, 'clearRequest'>) => void;

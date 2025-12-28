@@ -5,7 +5,7 @@
     "": {
       "name": "yours-wallet",
       "dependencies": {
-        "@1sat/wallet-toolbox": "^0.0.4",
+        "@1sat/wallet-toolbox": "0.0.5",
         "@bsv/paymail": "^2.0.2",
         "@bsv/sdk": "1.9.24",
         "@bsv/wallet-toolbox": "^1.7.14",
@@ -68,7 +68,7 @@
     },
   },
   "packages": {
-    "@1sat/wallet-toolbox": ["@1sat/wallet-toolbox@0.0.4", "", { "dependencies": { "@bopen-io/ts-templates": "^1.1.0", "@bsv/sdk": "1.9.24", "@bsv/wallet-toolbox": "^1.7.14", "buffer": "^6.0.3" } }, "sha512-mVMP4+AJ7YVLdRFCHlo8LVBfvDmrN9HKio5MkUaoj4F7l2CMEHmwvOp+QUDt7PDLIkb3XcSxvYCrtDOsgfMzpg=="],
+    "@1sat/wallet-toolbox": ["@1sat/wallet-toolbox@0.0.5", "", { "dependencies": { "@bopen-io/ts-templates": "^1.1.0", "@bsv/sdk": "1.9.24", "@bsv/wallet-toolbox": "^1.7.14", "buffer": "^6.0.3" } }, "sha512-bjU5NE09eZjOFvHSqQ+lU+5VpzOH+k9y7SsfyCpLMFFRGRDIRYgLsetYR6KgwC5VamQybkzfwA+VMzg6biLIjQ=="],
 
     "@adobe/css-tools": ["@adobe/css-tools@4.4.4", "", {}, "sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg=="],
 

@@ -17,6 +17,7 @@ import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 import { sleep } from '../../utils/sleep';
 import { Web3RequestContext, Web3RequestContextProps } from '../Web3RequestContext';
+import type { CreateSignatureArgs, WalletEncryptArgs, WalletDecryptArgs, CreateActionArgs } from '../../cwi';
 
 export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [connectRequest, setConnectRequest] = useState<RequestParams | undefined>(undefined);
@@ -33,6 +34,11 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   );
   const [encryptRequest, setEncryptRequest] = useState<EncryptRequest | undefined>(undefined);
   const [decryptRequest, setDecryptRequest] = useState<DecryptRequest | undefined>(undefined);
+  // CWI (BRC-100) requests
+  const [cwiCreateSignatureRequest, setCwiCreateSignatureRequest] = useState<CreateSignatureArgs | undefined>(undefined);
+  const [cwiEncryptRequest, setCwiEncryptRequest] = useState<WalletEncryptArgs | undefined>(undefined);
+  const [cwiDecryptRequest, setCwiDecryptRequest] = useState<WalletDecryptArgs | undefined>(undefined);
+  const [cwiCreateActionRequest, setCwiCreateActionRequest] = useState<CreateActionArgs | undefined>(undefined);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
 
   const clearRequest = async (type: keyof Omit<Web3RequestContextProps, 'clearRequest'>) => {
@@ -74,6 +80,19 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       case 'decryptRequest':
         setDecryptRequest(undefined);
         break;
+      // CWI (BRC-100) requests
+      case 'cwiCreateSignatureRequest':
+        setCwiCreateSignatureRequest(undefined);
+        break;
+      case 'cwiEncryptRequest':
+        setCwiEncryptRequest(undefined);
+        break;
+      case 'cwiDecryptRequest':
+        setCwiDecryptRequest(undefined);
+        break;
+      case 'cwiCreateActionRequest':
+        setCwiCreateActionRequest(undefined);
+        break;
       default:
         break;
     }
@@ -100,6 +119,11 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       generateTaggedKeysRequest,
       encryptRequest,
       decryptRequest,
+      // CWI (BRC-100) requests
+      cwiCreateSignatureRequest,
+      cwiEncryptRequest,
+      cwiDecryptRequest,
+      cwiCreateActionRequest,
       popupWindowId,
     } = result;
 
@@ -115,6 +139,11 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (generateTaggedKeysRequest) setGenerateTaggedKeysRequest(generateTaggedKeysRequest);
     if (encryptRequest) setEncryptRequest(encryptRequest);
     if (decryptRequest) setDecryptRequest(decryptRequest);
+    // CWI (BRC-100) requests
+    if (cwiCreateSignatureRequest) setCwiCreateSignatureRequest(cwiCreateSignatureRequest);
+    if (cwiEncryptRequest) setCwiEncryptRequest(cwiEncryptRequest);
+    if (cwiDecryptRequest) setCwiDecryptRequest(cwiDecryptRequest);
+    if (cwiCreateActionRequest) setCwiCreateActionRequest(cwiCreateActionRequest);
     if (popupWindowId) setPopupId(popupWindowId);
   };
 
@@ -138,6 +167,11 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
         generateTaggedKeysRequest,
         encryptRequest,
         decryptRequest,
+        // CWI (BRC-100) requests
+        cwiCreateSignatureRequest,
+        cwiEncryptRequest,
+        cwiDecryptRequest,
+        cwiCreateActionRequest,
         clearRequest,
         popupId,
         getStorageAndSetRequestState,

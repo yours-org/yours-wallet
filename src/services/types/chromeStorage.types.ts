@@ -19,6 +19,7 @@ import {
   SendMNEE,
   MNEEBalance,
 } from 'yours-wallet-provider';
+import type { CreateSignatureArgs, WalletEncryptArgs, WalletDecryptArgs, CreateActionArgs } from '../../cwi';
 import { WhitelistedApp } from '../../inject';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
@@ -84,6 +85,11 @@ export interface ChromeStorageObject {
   generateTaggedKeysRequest?: TaggedDerivationRequest;
   encryptRequest?: EncryptRequest;
   decryptRequest?: DecryptRequest;
+  // CWI (BRC-100) requests
+  cwiCreateSignatureRequest?: CreateSignatureArgs;
+  cwiEncryptRequest?: WalletEncryptArgs;
+  cwiDecryptRequest?: WalletDecryptArgs;
+  cwiCreateActionRequest?: CreateActionArgs;
 }
 
 export type CurrentAccountObject = Omit<
@@ -102,6 +108,10 @@ export type CurrentAccountObject = Omit<
   | 'generateTaggedKeysRequest'
   | 'encryptRequest'
   | 'decryptRequest'
+  | 'cwiCreateSignatureRequest'
+  | 'cwiEncryptRequest'
+  | 'cwiDecryptRequest'
+  | 'cwiCreateActionRequest'
 > & { account: Account };
 
 type AppState = {

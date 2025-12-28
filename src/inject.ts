@@ -1,3 +1,21 @@
+// Import CWI to inject window.CWI (BRC-100 WalletInterface)
+import './cwi';
+import type {
+  ListOutputsResult,
+  GetPublicKeyResult,
+  GetNetworkResult,
+  GetHeightResult,
+  GetHeaderResult,
+  GetVersionResult,
+  AuthenticatedResult,
+  ListActionsResult,
+  CreateSignatureResult,
+  VerifySignatureResult,
+  CreateActionResult,
+  WalletEncryptResult,
+  WalletDecryptResult,
+} from './cwi';
+
 import {
   Addresses,
   Balance,
@@ -127,7 +145,7 @@ export type SerializedBsv20 = Omit<Bsv20, 'listed' | 'all'> & {
 };
 
 export type ResponseEventDetail = {
-  type: YoursEventName;
+  type: YoursEventName | string; // string to support CWI event names
   success: boolean;
   data?: (
     | ConnectResponse
@@ -154,6 +172,21 @@ export type ResponseEventDetail = {
     | number
     | string[]
     | undefined
+    // CWI (BRC-100) result types
+    | ListOutputsResult
+    | GetPublicKeyResult
+    | GetNetworkResult
+    | GetHeightResult
+    | GetHeaderResult
+    | GetVersionResult
+    | AuthenticatedResult
+    | ListActionsResult
+    | CreateSignatureResult
+    | VerifySignatureResult
+    | CreateActionResult
+    | WalletEncryptResult
+    | WalletDecryptResult
+    | { valid: boolean } // VerifyHmacResult
   ) & { popupId?: number };
   error?: string | undefined | boolean;
 };
