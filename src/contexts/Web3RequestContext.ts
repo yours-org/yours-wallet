@@ -14,7 +14,7 @@ import {
 } from 'yours-wallet-provider';
 import { RequestParams } from '../inject';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
-import type { CreateSignatureArgs, WalletEncryptArgs, WalletDecryptArgs, CreateActionArgs } from '../cwi';
+import type { CreateSignatureArgs, WalletEncryptArgs, WalletDecryptArgs, CreateActionArgs } from '@bsv/sdk';
 
 export type Web3RequestContextProps = {
   connectRequest: RequestParams | undefined;

@@ -12,10 +12,11 @@ import { useServiceContext } from '../../hooks/useServiceContext';
 import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
-import type { CreateSignatureArgs, CreateSignatureResult } from '../../cwi';
+import type { CreateSignatureArgs } from '@bsv/sdk';
 import { CWIEventName } from '../../cwi';
-import { Keys } from '../../utils/keys';
-import { BigNumber, ECDSA, Hash, PrivateKey, Utils } from '@bsv/sdk';
+import type { Keys } from '../../utils/keys';
+import { Utils } from '@bsv/sdk';
+import { initSigningWallet } from '../../initWallet';
 
 const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -82,40 +83,10 @@ export const CWICreateSignatureRequest = (props: CWICreateSignatureRequestProps)
     }
 
     try {
-      // Get keys with password
+      // Get keys with password and create signing wallet
       const keys = (await keysService.retrieveKeys(passwordConfirm)) as Keys;
-      if (!keys?.identityWif) {
-        addSnackbar('Failed to retrieve keys', 'error');
-        setIsProcessing(false);
-        return;
-      }
-
-      // Use identity key for signing (BRC-100 key derivation not yet implemented)
-      const privateKey = PrivateKey.fromWif(keys.identityWif);
-
-      // Determine what to sign
-      let hashToSign: number[];
-      if (request.hashToDirectlySign) {
-        hashToSign = request.hashToDirectlySign;
-      } else if (request.data) {
-        // Hash the data with SHA256
-        hashToSign = Hash.sha256(request.data);
-      } else {
-        addSnackbar('No data to sign', 'error');
-        setIsProcessing(false);
-        return;
-      }
-
-      // Sign the hash - convert to BigNumber for ECDSA
-      const hashBN = new BigNumber(hashToSign);
-      const signature = ECDSA.sign(hashBN, privateKey, true);
-      // toDER returns hex string, convert to number array
-      const signatureDER = signature.toDER() as unknown as string;
-      const signatureBytes = Utils.toArray(signatureDER, 'hex');
-
-      const result: CreateSignatureResult = {
-        signature: signatureBytes,
-      };
+      const wallet = await initSigningWallet(chromeStorageService, keys);
+      const result = await wallet.createSignature(request);
 
       addSnackbar('Successfully Signed!', 'success');
       await sleep(1000);

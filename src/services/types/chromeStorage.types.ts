@@ -19,7 +19,7 @@ import {
   SendMNEE,
   MNEEBalance,
 } from 'yours-wallet-provider';
-import type { CreateSignatureArgs, WalletEncryptArgs, WalletDecryptArgs, CreateActionArgs } from '../../cwi';
+import type { CreateSignatureArgs, WalletEncryptArgs, WalletDecryptArgs, CreateActionArgs } from '@bsv/sdk';
 import { WhitelistedApp } from '../../inject';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';

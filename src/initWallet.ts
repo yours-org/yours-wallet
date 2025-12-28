@@ -10,6 +10,7 @@ import { PrivateKey } from '@bsv/sdk';
 import { YoursEventName } from './inject';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { sendMessage } from './utils/chromeHelpers';
+import type { Keys } from './utils/keys';
 
 // Default public key for when no account exists (PrivateKey = 1)
 const DEFAULT_PUBKEY = PrivateKey.fromString('0000000000000000000000000000000000000000000000000000000000000001', 'hex')
@@ -76,6 +77,42 @@ export const initWallet = async (
   }
 
   return wallet;
+};
+
+/**
+ * Initialize a signing-capable OneSatWallet with decrypted keys.
+ * Use this for operations that require signing (createSignature, encrypt, decrypt, createAction).
+ */
+export const initSigningWallet = async (
+  chromeStorageService: ChromeStorageService,
+  keys: Keys,
+): Promise<OneSatWallet> => {
+  if (!keys?.identityWif) {
+    throw new Error('Failed to retrieve keys');
+  }
+
+  const { selectedAccount } = chromeStorageService.getCurrentAccountObject();
+  const network = chromeStorageService.getNetwork();
+  const chain = network === NetWork.Mainnet ? 'main' : 'test';
+
+  const identityKey = PrivateKey.fromWif(keys.identityWif);
+  const identityPubKey = identityKey.toPublicKey().toString();
+
+  // Create storage
+  const storageOptions = StorageProvider.createStorageBaseOptions(chain);
+  const storageProvider = new StorageIdb(storageOptions);
+  const storage = new WalletStorageManager(identityPubKey, storageProvider);
+
+  // Initialize storage
+  await storageProvider.migrate(`wallet-${selectedAccount || ''}`, identityPubKey);
+  await storageProvider.makeAvailable();
+
+  // Create signing wallet with PrivateKey (not public key string)
+  return new OneSatWallet({
+    rootKey: identityKey,
+    storage,
+    chain,
+  });
 };
 
 /**

@@ -14,7 +14,7 @@ import type {
   CreateActionResult,
   WalletEncryptResult,
   WalletDecryptResult,
-} from './cwi';
+} from '@bsv/sdk';
 
 import {
   Addresses,

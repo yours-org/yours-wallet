@@ -12,9 +12,10 @@ import { useServiceContext } from '../../hooks/useServiceContext';
 import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
-import type { CreateActionArgs, CreateActionResult } from '../../cwi';
+import type { CreateActionArgs } from '@bsv/sdk';
 import { CWIEventName } from '../../cwi';
-import { Keys } from '../../utils/keys';
+import type { Keys } from '../../utils/keys';
+import { initSigningWallet } from '../../initWallet';
 
 const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -48,7 +49,7 @@ export const CWICreateActionRequest = (props: CWICreateActionRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [hasCreated, setHasCreated] = useState(false);
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, keysService, wallet } = useServiceContext();
+  const { chromeStorageService, keysService } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -81,42 +82,10 @@ export const CWICreateActionRequest = (props: CWICreateActionRequestProps) => {
     }
 
     try {
-      // Get keys with password to verify authentication
+      // Get keys with password and create signing wallet
       const keys = (await keysService.retrieveKeys(passwordConfirm)) as Keys;
-      if (!keys?.identityWif) {
-        addSnackbar('Failed to retrieve keys', 'error');
-        setIsProcessing(false);
-        return;
-      }
-
-      // Use the wallet's createAction if available
-      if (!wallet) {
-        addSnackbar('Wallet not initialized', 'error');
-        setIsProcessing(false);
-        return;
-      }
-
-      // Call the wallet's createAction method
-      // Note: The wallet expects specific types for inputs/outputs
-      // BRC-100 uses more generic Record<string, unknown> types
-      // We cast here, trusting the app sends correctly shaped data
-      const actionResult = await wallet.createAction({
-        description: request.description,
-        inputs: request.inputs as Parameters<typeof wallet.createAction>[0]['inputs'],
-        outputs: request.outputs as Parameters<typeof wallet.createAction>[0]['outputs'],
-        lockTime: request.lockTime,
-        version: request.version,
-        labels: request.labels,
-        options: request.options as Parameters<typeof wallet.createAction>[0]['options'],
-      });
-
-      const result: CreateActionResult = {
-        txid: actionResult.txid,
-        tx: actionResult.tx ? Array.from(actionResult.tx) : undefined,
-        noSendChange: actionResult.noSendChange,
-        sendWithResults: actionResult.sendWithResults,
-        signableTransaction: actionResult.signableTransaction,
-      };
+      const signingWallet = await initSigningWallet(chromeStorageService, keys);
+      const result = await signingWallet.createAction(request);
 
       addSnackbar('Action Created Successfully!', 'success');
       await sleep(1000);

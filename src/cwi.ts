@@ -3,7 +3,44 @@
  * Bridges to the 1sat wallet via postMessage/CustomEvent pattern
  */
 
-import { CustomListenerName } from './inject';
+// Use string directly to avoid circular dependency with inject.ts
+const YOURS_REQUEST = 'YoursRequest';
+import type {
+  ListOutputsArgs,
+  ListOutputsResult,
+  ListActionsArgs,
+  ListActionsResult,
+  GetPublicKeyArgs,
+  GetPublicKeyResult,
+  GetHeaderArgs,
+  GetHeaderResult,
+  GetHeightResult,
+  GetNetworkResult,
+  GetVersionResult,
+  AuthenticatedResult,
+  CreateActionArgs,
+  CreateActionResult,
+  SignActionArgs,
+  SignActionResult,
+  AbortActionArgs,
+  AbortActionResult,
+  InternalizeActionArgs,
+  InternalizeActionResult,
+  CreateSignatureArgs,
+  CreateSignatureResult,
+  VerifySignatureArgs,
+  VerifySignatureResult,
+  WalletEncryptArgs,
+  WalletEncryptResult,
+  WalletDecryptArgs,
+  WalletDecryptResult,
+  CreateHmacArgs,
+  CreateHmacResult,
+  VerifyHmacArgs,
+  VerifyHmacResult,
+  RelinquishOutputArgs,
+  RelinquishOutputResult,
+} from '@bsv/sdk';
 
 // BRC-100 Event Names
 export enum CWIEventName {
@@ -50,215 +87,12 @@ export enum CWIEventName {
   CREATE_ACTION_RESPONSE = 'cwi_createActionResponse',
 }
 
-// BRC-100 Types (simplified for injection)
-export type WalletNetwork = 'mainnet' | 'testnet';
-
-export interface ListOutputsArgs {
-  basket: string;
-  tags?: string[];
-  tagQueryMode?: 'all' | 'any';
-  include?: 'locking scripts' | 'entire transactions';
-  includeCustomInstructions?: boolean;
-  includeTags?: boolean;
-  includeLabels?: boolean;
-  limit?: number;
-  offset?: number;
-  seekPermission?: boolean;
-}
-
-export interface WalletOutput {
-  satoshis: number;
-  lockingScript?: string;
-  spendable: boolean;
-  customInstructions?: string;
-  tags?: string[];
-  outpoint: string;
-  labels?: string[];
-}
-
-export interface ListOutputsResult {
-  totalOutputs: number;
-  BEEF?: number[];
-  outputs: WalletOutput[];
-}
-
-export interface GetPublicKeyArgs {
-  identityKey?: boolean;
-  protocolID?: [number, string];
-  keyID?: string;
-  counterparty?: string;
-  forSelf?: boolean;
-  privileged?: boolean;
-  privilegedReason?: string;
-  seekPermission?: boolean;
-}
-
-export interface GetPublicKeyResult {
-  publicKey: string;
-}
-
-export interface CreateSignatureArgs {
-  data?: number[];
-  hashToDirectlySign?: number[];
-  protocolID?: [number, string];
-  keyID?: string;
-  counterparty?: string;
-  privileged?: boolean;
-  privilegedReason?: string;
-  seekPermission?: boolean;
-}
-
-export interface CreateSignatureResult {
-  signature: number[];
-}
-
-export interface VerifySignatureArgs {
-  data?: number[];
-  hashToDirectlyVerify?: number[];
-  signature: number[];
-  protocolID?: [number, string];
-  keyID?: string;
-  counterparty?: string;
-  forSelf?: boolean;
-  privileged?: boolean;
-  privilegedReason?: string;
-  seekPermission?: boolean;
-}
-
-export interface VerifySignatureResult {
-  valid: boolean;
-}
-
-export interface WalletEncryptArgs {
-  plaintext: number[];
-  protocolID: [number, string];
-  keyID: string;
-  counterparty?: string;
-  privileged?: boolean;
-  privilegedReason?: string;
-  seekPermission?: boolean;
-}
-
-export interface WalletEncryptResult {
-  ciphertext: number[];
-}
-
-export interface WalletDecryptArgs {
-  ciphertext: number[];
-  protocolID: [number, string];
-  keyID: string;
-  counterparty?: string;
-  privileged?: boolean;
-  privilegedReason?: string;
-  seekPermission?: boolean;
-}
-
-export interface WalletDecryptResult {
-  plaintext: number[];
-}
-
-export interface CreateActionArgs {
-  description: string;
-  inputs?: Record<string, unknown>[];
-  outputs?: Record<string, unknown>[];
-  lockTime?: number;
-  version?: number;
-  labels?: string[];
-  options?: Record<string, unknown>;
-  seekPermission?: boolean;
-}
-
-export interface CreateActionResult {
-  txid?: string;
-  tx?: number[];
-  noSendChange?: string[];
-  sendWithResults?: unknown[];
-  signableTransaction?: unknown;
-}
-
-export interface SignActionArgs {
-  spends: Record<string, unknown>;
-  reference: string;
-  options?: Record<string, unknown>;
-  seekPermission?: boolean;
-}
-
-export interface SignActionResult {
-  txid?: string;
-  tx?: number[];
-  sendWithResults?: unknown[];
-}
-
-export interface AbortActionArgs {
-  reference: string;
-  seekPermission?: boolean;
-}
-
-export interface AbortActionResult {
-  aborted: boolean;
-}
-
-export interface ListActionsArgs {
-  labels: string[];
-  labelQueryMode?: 'all' | 'any';
-  includeLabels?: boolean;
-  includeInputs?: boolean;
-  includeInputSourceLockingScripts?: boolean;
-  includeInputUnlockingScripts?: boolean;
-  includeOutputs?: boolean;
-  includeOutputLockingScripts?: boolean;
-  limit?: number;
-  offset?: number;
-  seekPermission?: boolean;
-}
-
-export interface ListActionsResult {
-  totalActions: number;
-  actions: unknown[];
-}
-
-export interface InternalizeActionArgs {
-  tx: number[];
-  outputs: unknown[];
-  description: string;
-  labels?: string[];
-  seekPermission?: boolean;
-}
-
-export interface InternalizeActionResult {
-  accepted: boolean;
-}
-
-export interface GetHeightResult {
-  height: number;
-}
-
-export interface GetHeaderArgs {
-  height: number;
-}
-
-export interface GetHeaderResult {
-  header: string;
-}
-
-export interface GetNetworkResult {
-  network: WalletNetwork;
-}
-
-export interface GetVersionResult {
-  version: string;
-}
-
-export interface AuthenticatedResult {
-  authenticated: boolean;
-}
-
 // Helper to create CWI methods with postMessage pattern
 const createCWIMethod = <TResult, TArgs = Record<string, unknown>>(eventName: CWIEventName) => {
   return async (args: TArgs, originator?: string): Promise<TResult> => {
     return new Promise<TResult>((resolve, reject) => {
       const messageId = `${eventName}-${Date.now()}-${Math.random()}`;
-      const requestEvent = new CustomEvent(CustomListenerName.YOURS_REQUEST, {
+      const requestEvent = new CustomEvent(YOURS_REQUEST, {
         detail: { messageId, type: eventName, params: { ...args, originator } },
       });
 
@@ -282,9 +116,7 @@ const createCWIMethod = <TResult, TArgs = Record<string, unknown>>(eventName: CW
 export const CWI = {
   // Output Management
   listOutputs: createCWIMethod<ListOutputsResult, ListOutputsArgs>(CWIEventName.LIST_OUTPUTS),
-  relinquishOutput: createCWIMethod<{ relinquished: boolean }, { basket: string; output: string }>(
-    CWIEventName.RELINQUISH_OUTPUT,
-  ),
+  relinquishOutput: createCWIMethod<RelinquishOutputResult, RelinquishOutputArgs>(CWIEventName.RELINQUISH_OUTPUT),
 
   // Action Management
   createAction: createCWIMethod<CreateActionResult, CreateActionArgs>(CWIEventName.CREATE_ACTION),
@@ -303,13 +135,8 @@ export const CWI = {
   // Cryptographic Operations
   encrypt: createCWIMethod<WalletEncryptResult, WalletEncryptArgs>(CWIEventName.ENCRYPT),
   decrypt: createCWIMethod<WalletDecryptResult, WalletDecryptArgs>(CWIEventName.DECRYPT),
-  createHmac: createCWIMethod<{ hmac: number[] }, { data: number[]; protocolID: [number, string]; keyID: string }>(
-    CWIEventName.CREATE_HMAC,
-  ),
-  verifyHmac: createCWIMethod<
-    { valid: boolean },
-    { data: number[]; hmac: number[]; protocolID: [number, string]; keyID: string }
-  >(CWIEventName.VERIFY_HMAC),
+  createHmac: createCWIMethod<CreateHmacResult, CreateHmacArgs>(CWIEventName.CREATE_HMAC),
+  verifyHmac: createCWIMethod<VerifyHmacResult, VerifyHmacArgs>(CWIEventName.VERIFY_HMAC),
   createSignature: createCWIMethod<CreateSignatureResult, CreateSignatureArgs>(CWIEventName.CREATE_SIGNATURE),
   verifySignature: createCWIMethod<VerifySignatureResult, VerifySignatureArgs>(CWIEventName.VERIFY_SIGNATURE),
 

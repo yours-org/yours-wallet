@@ -17,7 +17,7 @@ import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 import { sleep } from '../../utils/sleep';
 import { Web3RequestContext, Web3RequestContextProps } from '../Web3RequestContext';
-import type { CreateSignatureArgs, WalletEncryptArgs, WalletDecryptArgs, CreateActionArgs } from '../../cwi';
+import type { CreateSignatureArgs, WalletEncryptArgs, WalletDecryptArgs, CreateActionArgs } from '@bsv/sdk';
 
 export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [connectRequest, setConnectRequest] = useState<RequestParams | undefined>(undefined);

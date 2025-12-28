@@ -12,10 +12,11 @@ import { useServiceContext } from '../../hooks/useServiceContext';
 import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
-import type { WalletEncryptArgs, WalletEncryptResult } from '../../cwi';
+import type { WalletEncryptArgs } from '@bsv/sdk';
 import { CWIEventName } from '../../cwi';
-import { Keys } from '../../utils/keys';
-import { ECIES, PrivateKey, PublicKey, Utils } from '@bsv/sdk';
+import type { Keys } from '../../utils/keys';
+import { Utils } from '@bsv/sdk';
+import { initSigningWallet } from '../../initWallet';
 
 const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -82,32 +83,10 @@ export const CWIEncryptRequest = (props: CWIEncryptRequestProps) => {
     }
 
     try {
-      // Get keys with password
+      // Get keys with password and create signing wallet
       const keys = (await keysService.retrieveKeys(passwordConfirm)) as Keys;
-      if (!keys?.identityWif) {
-        addSnackbar('Failed to retrieve keys', 'error');
-        setIsProcessing(false);
-        return;
-      }
-
-      // Use identity key for encryption (BRC-100 key derivation not yet implemented)
-      const privateKey = PrivateKey.fromWif(keys.identityWif);
-      const publicKey = privateKey.toPublicKey();
-
-      // Get counterparty public key if specified, otherwise encrypt to self
-      let recipientPubKey: PublicKey;
-      if (request.counterparty && request.counterparty !== 'self') {
-        recipientPubKey = PublicKey.fromString(request.counterparty);
-      } else {
-        recipientPubKey = publicKey;
-      }
-
-      // Encrypt the plaintext using ECIES
-      const ciphertext = ECIES.electrumEncrypt(request.plaintext, recipientPubKey, privateKey);
-
-      const result: WalletEncryptResult = {
-        ciphertext: Array.from(ciphertext),
-      };
+      const wallet = await initSigningWallet(chromeStorageService, keys);
+      const result = await wallet.encrypt(request);
 
       addSnackbar('Successfully Encrypted!', 'success');
       await sleep(1000);
