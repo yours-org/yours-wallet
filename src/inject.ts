@@ -26,7 +26,6 @@ import {
   GetTaggedKeysRequest,
   InscribeRequest,
   NetWork,
-  Ordinal,
   PubKeys,
   PurchaseOrdinal,
   SendBsv,
@@ -45,8 +44,6 @@ import {
   Bsv20,
   SendBsv20Response,
   SendBsv20,
-  PaginatedOrdinalsResponse,
-  GetPaginatedOrdinals,
   SendMNEEResponse,
   SendMNEE,
   MNEEBalance,
@@ -62,7 +59,6 @@ export enum YoursEventName {
   GET_NETWORK = 'getNetwork',
   GET_BALANCE = 'getBalance',
   GET_MNEE_BALANCE = 'getMNEEBalance',
-  GET_ORDINALS = 'getOrdinals',
   GET_BSV20S = 'getBsv20s',
   SEND_BSV = 'sendBsvRequest',
   SEND_BSV20 = 'sendBsv20Request',
@@ -114,7 +110,6 @@ export type RequestParams = {
     | SendBsv[]
     | SendBsv20
     | SendMNEE[]
-    | GetPaginatedOrdinals
     | InscribeRequest[]
     | LockRequest[]
     | TransferOrdinal
@@ -157,8 +152,6 @@ export type ResponseEventDetail = {
     | NetWork
     | Balance
     | MNEEBalance
-    | Ordinal[]
-    | PaginatedOrdinalsResponse
     | Bsv20[]
     | SerializedBsv20[]
     | SignatureResponse[]
@@ -295,9 +288,6 @@ const provider: YoursProviderType = {
   getNetwork: createYoursMethod<NetWork | undefined, void>(YoursEventName.GET_NETWORK),
   getBalance: createYoursMethod<Balance | undefined, void>(YoursEventName.GET_BALANCE),
   getMNEEBalance: createYoursMethod<MNEEBalance | undefined, void>(YoursEventName.GET_MNEE_BALANCE),
-  getOrdinals: createYoursMethod<Ordinal[] | PaginatedOrdinalsResponse, GetPaginatedOrdinals>(
-    YoursEventName.GET_ORDINALS,
-  ),
   getBsv20s: createYoursMethod<Bsv20[] | undefined, void>(YoursEventName.GET_BSV20S),
   sendBsv: createYoursMethod<SendBsvResponse | undefined, SendBsv[]>(YoursEventName.SEND_BSV),
   sendBsv20: createYoursMethod<SendBsv20Response | undefined, SendBsv20>(YoursEventName.SEND_BSV20),

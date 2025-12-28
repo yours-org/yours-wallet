@@ -19,7 +19,6 @@ import {
   NetWork,
   SendBsv20Response,
   SendBsv20,
-  GetPaginatedOrdinals,
   SendMNEEResponse,
   SendMNEE,
   LockRequest,
@@ -56,8 +55,6 @@ import { removeWindow, sendTransactionNotification } from './utils/chromeHelpers
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-// TODO: mapOrdinal removed during migration - getOrdinals API temporarily disabled
-// import { mapOrdinal } from './utils/providerHelper';
 import { initWallet } from './initWallet';
 import type { OneSatWallet } from '@1sat/wallet-toolbox';
 import { CHROME_STORAGE_OBJECT_VERSION, HOSTED_YOURS_IMAGE, MNEE_API_TOKEN } from './utils/constants';
@@ -290,8 +287,6 @@ if (isInServiceWorker) {
           return processGetAddressesRequest(sendResponse);
         case YoursEventName.GET_NETWORK:
           return processGetNetworkRequest(sendResponse);
-        case YoursEventName.GET_ORDINALS:
-          return processGetOrdinalsRequest(message, sendResponse);
         case YoursEventName.GET_BSV20S:
           return processGetBsv20sRequest(sendResponse);
         case YoursEventName.SEND_BSV:
@@ -587,74 +582,6 @@ if (isInServiceWorker) {
         error: JSON.stringify(error),
       });
     }
-  };
-
-  // TODO: Evaluate updating the API to return Txo instead of Ordinal
-  const processGetOrdinalsRequest = (message: { params: GetPaginatedOrdinals }, sendResponse: CallbackResponse) => {
-    // Return empty array during migration
-    sendResponse({
-      type: YoursEventName.GET_ORDINALS,
-      success: true,
-      data: [],
-    });
-    // try {
-    //   chromeStorageService.getAndSetStorage().then(async () => {
-    //     const wallet = await walletPromise;
-    //     if (!wallet) throw Error('Wallet not initialized!');
-
-    //     const limit = message.params.limit || 50;
-    //     const offset = message.params.from ? parseInt(message.params.from, 10) : 0;
-
-    //     // List 1-sat ordinal outputs
-    //     const result = await wallet.listOutputs({
-    //       basket: '1sat',
-    //       limit,
-    //       offset,
-    //     });
-
-    //     // Parse each transaction to get full ordinal data
-    //     const ordinals = [];
-    //     for (const output of result.outputs) {
-    //       const [txid] = output.outpoint.split('.');
-    //       try {
-    //         const parseResult = await wallet.parse(txid);
-    //         const vout = parseInt(output.outpoint.split('.')[1], 10);
-    //         const txo = parseResult.txos[vout];
-    //         if (txo) {
-    //           ordinals.push(mapOrdinal(txo));
-    //         }
-    //       } catch (e) {
-    //         console.warn(`Failed to parse transaction ${txid}:`, e);
-    //       }
-    //     }
-
-    //     // Filter by mimeType if specified
-    //     const filtered = message?.params?.mimeType
-    //       ? ordinals.filter((o) => o.data?.insc?.file?.type === message.params.mimeType)
-    //       : ordinals;
-
-    //     if (message.params.from === undefined || message.params.from === null) {
-    //       sendResponse({
-    //         type: YoursEventName.GET_ORDINALS,
-    //         success: true,
-    //         data: filtered,
-    //       });
-    //     } else {
-    //       const nextOffset = offset + result.outputs.length;
-    //       sendResponse({
-    //         type: YoursEventName.GET_ORDINALS,
-    //         success: true,
-    //         data: { ordinals: filtered, from: nextOffset.toString() },
-    //       });
-    //     }
-    //   });
-    // } catch (error) {
-    //   sendResponse({
-    //     type: YoursEventName.GET_ORDINALS,
-    //     success: false,
-    //     error: JSON.stringify(error),
-    //   });
-    // }
   };
 
   const processGetBsv20sRequest = (sendResponse: CallbackResponse) => {
