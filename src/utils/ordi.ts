@@ -1,4 +1,5 @@
 import { P2PKH, Script, Utils } from '@bsv/sdk';
+import { toToken, toTokenSat } from 'satoshi-token';
 
 export const ContentType = {
   BSV20: 'application/bsv-20',
@@ -272,36 +273,17 @@ export function toByteString(str: string): string {
 }
 
 export function showAmount(amt: bigint, dec: number): string {
-  const amtStr = amt.toString().replace(/n/, '');
-  if (dec === 0) {
-    return amtStr;
+  if (!Number.isFinite(dec) || dec < 0) {
+    return amt.toString();
   }
-  const left = amt / BigInt(Math.pow(10, dec));
-  const right = amt % BigInt(Math.pow(10, dec));
-  const rightStr = right.toString().padStart(dec, '0');
-
-  if (right > 0) {
-    return `${left}.${rightStr}`;
-  }
-
-  return `${left}`;
+  return toToken(amt.toString(), dec, 'string');
 }
 
 export function normalize(amt: string, dec: number): string {
-  if (dec === 0) {
-    if (/\d+\.\d+/.test(amt)) {
-      return amt.split('.')[0];
-    }
-
-    return amt;
-  } else {
-    if (/\d+\.\d+/.test(amt)) {
-      const [l, r] = amt.split('.');
-      return (BigInt(l) * BigInt(Math.pow(10, dec)) + BigInt(r.slice(0, dec))).toString().replace(/n/, '');
-    } else {
-      return amt.split('.')[0] + Math.pow(10, dec).toString().replace(/1/, '');
-    }
+  if (!Number.isFinite(dec) || dec < 0) {
+    return amt.split('.')[0];
   }
+  return toTokenSat(amt, dec, 'string');
 }
 
 export function isBSV20v2(tick: string) {
