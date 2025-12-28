@@ -80,7 +80,6 @@ const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv';
 
 type CallbackResponse = (response: ResponseEventDetail) => void;
 
-let responseCallbackForConnectRequest: CallbackResponse | null = null;
 let responseCallbackForSendBsvRequest: CallbackResponse | null = null;
 let responseCallbackForSendBsv20Request: CallbackResponse | null = null;
 let responseCallbackForSendMNEERequest: CallbackResponse | null = null;
@@ -97,6 +96,8 @@ let responseCallbackForCWICreateSignature: CallbackResponse | null = null;
 let responseCallbackForCWIEncrypt: CallbackResponse | null = null;
 let responseCallbackForCWIDecrypt: CallbackResponse | null = null;
 let responseCallbackForCWICreateAction: CallbackResponse | null = null;
+let responseCallbackForConnectRequest: CallbackResponse | null = null;
+let responseCallbackForCWIWaitForAuthentication: CallbackResponse | null = null;
 let popupWindowId: number | undefined;
 
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
@@ -220,6 +221,8 @@ if (isInServiceWorker) {
       YoursEventName.SYNC_UTXOS,
       YoursEventName.SWITCH_ACCOUNT,
       YoursEventName.SIGNED_OUT,
+      // CWI auth check (no auth required - just checks status)
+      CWIEventName.IS_AUTHENTICATED,
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -256,6 +259,9 @@ if (isInServiceWorker) {
           return switchAccount();
         case YoursEventName.SIGNED_OUT:
           return signOut();
+        // CWI auth check
+        case CWIEventName.IS_AUTHENTICATED:
+          return processCWIIsAuthenticated(message.params as { originator?: string }, sendResponse);
         default:
           break;
       }
@@ -266,6 +272,11 @@ if (isInServiceWorker) {
     authorizeRequest(message).then((isAuthorized) => {
       if (message.action === YoursEventName.CONNECT) {
         return processConnectRequest(message, sendResponse, isAuthorized);
+      }
+
+      // CWI waitForAuthentication - same flow as connect
+      if (message.action === CWIEventName.WAIT_FOR_AUTHENTICATION) {
+        return processCWIWaitForAuthentication(message, sendResponse, isAuthorized);
       }
 
       if (!isAuthorized) {
@@ -343,8 +354,6 @@ if (isInServiceWorker) {
           return true;
         case CWIEventName.GET_VERSION:
           return processCWIGetVersion(sendResponse);
-        case CWIEventName.IS_AUTHENTICATED:
-          return processCWIIsAuthenticated(sendResponse);
         case CWIEventName.GET_PUBLIC_KEY:
           processCWIGetPublicKey(message, sendResponse);
           return true;
@@ -406,21 +415,44 @@ if (isInServiceWorker) {
 
   // REQUESTS ***************************************
 
+  // Shared helper: if already authorized, respond immediately; otherwise launch popup
+  const handleConnectOrAuth = (
+    request: ConnectRequest,
+    sendResponse: CallbackResponse,
+    isAuthorized: boolean,
+    setCallback: (cb: CallbackResponse) => void,
+    immediateResponse: () => void,
+  ) => {
+    if (isAuthorized) {
+      immediateResponse();
+      return true;
+    }
+    setCallback(sendResponse);
+    chromeStorageService.update({ connectRequest: request }).then(() => {
+      launchPopUp();
+    });
+    return true;
+  };
+
   const processConnectRequest = (
     message: { params: RequestParams },
     sendResponse: CallbackResponse,
     isAuthorized: boolean,
   ) => {
-    responseCallbackForConnectRequest = sendResponse;
-    chromeStorageService
-      .update({
-        connectRequest: { ...message.params, isAuthorized } as ConnectRequest,
-      })
-      .then(() => {
-        launchPopUp();
-      });
-
-    return true;
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    return handleConnectOrAuth(
+      { ...message.params, isAuthorized } as ConnectRequest,
+      sendResponse,
+      isAuthorized,
+      (cb) => { responseCallbackForConnectRequest = cb; },
+      () => {
+        sendResponse({
+          type: YoursEventName.CONNECT,
+          success: true,
+          data: account?.pubKeys?.identityPubKey,
+        });
+      },
+    );
   };
 
   const processDisconnectRequest = (message: { params: { domain: string } }, sendResponse: CallbackResponse) => {
@@ -459,30 +491,38 @@ if (isInServiceWorker) {
     }
   };
 
-  const processIsConnectedRequest = (params: { domain: string }, sendResponse: CallbackResponse) => {
-    try {
-      chromeStorageService.getAndSetStorage().then(() => {
-        const result = chromeStorageService.getCurrentAccountObject();
-        if (!result?.account) throw Error('No account found!');
-        const currentTime = Date.now();
-        const lastActiveTime = result.lastActiveTime;
+  // Shared helper to check if a domain is authenticated
+  const checkIsAuthenticated = async (domain?: string): Promise<boolean> => {
+    await chromeStorageService.getAndSetStorage();
+    const result = chromeStorageService.getCurrentAccountObject();
+    if (!result?.account) return false;
 
+    const currentTime = Date.now();
+    const lastActiveTime = result.lastActiveTime;
+
+    return (
+      !result.isLocked &&
+      currentTime - Number(lastActiveTime) < INACTIVITY_LIMIT &&
+      (!domain || result.account.settings.whitelist?.map((i: { domain: string }) => i.domain).includes(domain))
+    );
+  };
+
+  const processIsConnectedRequest = (params: { domain: string }, sendResponse: CallbackResponse) => {
+    checkIsAuthenticated(params.domain)
+      .then((isConnected) => {
         sendResponse({
           type: YoursEventName.IS_CONNECTED,
           success: true,
-          data:
-            !result.isLocked &&
-            currentTime - Number(lastActiveTime) < INACTIVITY_LIMIT &&
-            result.account.settings.whitelist?.map((i: { domain: string }) => i.domain).includes(params.domain),
+          data: isConnected,
+        });
+      })
+      .catch(() => {
+        sendResponse({
+          type: YoursEventName.IS_CONNECTED,
+          success: true,
+          data: false,
         });
       });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.IS_CONNECTED,
-        success: true, // This is true in the catch because we want to return a boolean
-        error: false,
-      });
-    }
 
     return true;
   };
@@ -1345,25 +1385,53 @@ if (isInServiceWorker) {
     return true;
   };
 
-  const processCWIIsAuthenticated = async (sendResponse: CallbackResponse) => {
-    try {
-      const wallet = await walletPromise;
-      if (!wallet) throw Error('Wallet not initialized!');
+  const processCWIIsAuthenticated = (
+    params: { originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    checkIsAuthenticated(params.originator)
+      .then((isAuthenticated) => {
+        sendResponse({
+          type: CWIEventName.IS_AUTHENTICATED,
+          success: true,
+          data: { authenticated: isAuthenticated },
+        });
+      })
+      .catch(() => {
+        sendResponse({
+          type: CWIEventName.IS_AUTHENTICATED,
+          success: true,
+          data: { authenticated: false },
+        });
+      });
 
-      const result = await wallet.isAuthenticated({});
-      sendResponse({
-        type: CWIEventName.IS_AUTHENTICATED,
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      sendResponse({
-        type: CWIEventName.IS_AUTHENTICATED,
-        success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
-      });
-    }
     return true;
+  };
+
+  const processCWIWaitForAuthentication = (
+    message: { params: { originator?: string } },
+    sendResponse: CallbackResponse,
+    isAuthorized: boolean,
+  ) => {
+    const domain = message.params?.originator;
+    return handleConnectOrAuth(
+      {
+        domain: domain || 'unknown',
+        appName: domain || 'Unknown App',
+        appIcon: HOSTED_YOURS_IMAGE,
+        isAuthorized,
+      } as ConnectRequest,
+      sendResponse,
+      isAuthorized,
+      (cb) => { responseCallbackForCWIWaitForAuthentication = cb; },
+      () => {
+        sendResponse({
+          type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+          success: true,
+          data: { authenticated: true },
+        });
+      },
+    );
   };
 
   const processCWIGetPublicKey = async (
@@ -1683,6 +1751,36 @@ if (isInServiceWorker) {
   };
 
   const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys }) => {
+    // Handle CWI waitForAuthentication callback if present
+    if (responseCallbackForCWIWaitForAuthentication) {
+      try {
+        if (response.decision === 'approved') {
+          responseCallbackForCWIWaitForAuthentication({
+            type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+            success: true,
+            data: { authenticated: true },
+          });
+        } else {
+          responseCallbackForCWIWaitForAuthentication({
+            type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+            success: false,
+            error: 'User declined the connection request',
+          });
+        }
+      } catch (error) {
+        responseCallbackForCWIWaitForAuthentication?.({
+          type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+          success: false,
+          error: JSON.stringify(error),
+        });
+      } finally {
+        responseCallbackForCWIWaitForAuthentication = null;
+        cleanup([YoursEventName.CONNECT]);
+      }
+      return true;
+    }
+
+    // Handle legacy connect callback
     if (!responseCallbackForConnectRequest) throw Error('Missing callback!');
     try {
       if (response.decision === 'approved') {

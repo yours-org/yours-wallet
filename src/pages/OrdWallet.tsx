@@ -200,7 +200,6 @@ export const OrdWallet = () => {
     if (ordinals.length === 0) setIsProcessing(true);
     const offset = from ? parseInt(from, 10) : 0;
     const result = await wallet.listOutputs({ basket: '1sat', limit: 50, offset, includeTags: true, includeCustomInstructions: true });
-    console.log('listOutputs result:', result.outputs);
 
     // Filter out panda/tag and yours/tag types
     const filtered = result.outputs.filter((o) => {

@@ -63,13 +63,6 @@ export const initWallet = async (
     syncQueue,
   });
 
-  // Wrap broadcast to log raw tx before sending
-  const originalBroadcast = wallet.broadcast.bind(wallet);
-  wallet.broadcast = async (tx, description, labels) => {
-    console.debug('Broadcasting tx:', tx.toHex());
-    return originalBroadcast(tx, description, labels);
-  };
-
   registerEventListeners(wallet);
 
   if (startSync && account) {

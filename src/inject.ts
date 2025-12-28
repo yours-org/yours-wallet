@@ -179,7 +179,7 @@ export type ResponseEventDetail = {
     | GetHeightResult
     | GetHeaderResult
     | GetVersionResult
-    | AuthenticatedResult
+    | { authenticated: boolean } // AuthenticatedResult only types {authenticated: true}
     | ListActionsResult
     | CreateSignatureResult
     | VerifySignatureResult
