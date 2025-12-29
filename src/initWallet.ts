@@ -1,12 +1,12 @@
 import { NetWork } from 'yours-wallet-provider';
+import { OneSatWallet, OneSatServices, IndexedDbSyncQueue, ReadOnlySigner } from '@1sat/wallet-toolbox';
 import {
-  OneSatWallet,
-  IndexedDbSyncQueue,
+  Wallet,
   WalletStorageManager,
   StorageProvider,
   StorageIdb,
-} from '@1sat/wallet-toolbox';
-import { PrivateKey } from '@bsv/sdk';
+} from '@bsv/wallet-toolbox-mobile';
+import { KeyDeriver, PrivateKey } from '@bsv/sdk';
 import { YoursEventName } from './inject';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { sendMessage } from './utils/chromeHelpers';
@@ -27,7 +27,25 @@ export const getOwners = (chromeStorageService: ChromeStorageService): Set<strin
 };
 
 /**
- * Initialize the OneSatWallet for the current account
+ * Initialize storage for a wallet
+ */
+const initStorage = async (
+  chain: 'main' | 'test',
+  identityPubKey: string,
+  selectedAccount: string,
+): Promise<{ storage: WalletStorageManager; storageProvider: StorageIdb }> => {
+  const storageOptions = StorageProvider.createStorageBaseOptions(chain);
+  const storageProvider = new StorageIdb(storageOptions);
+  const storage = new WalletStorageManager(identityPubKey, storageProvider);
+
+  await storageProvider.migrate(`wallet-${selectedAccount || ''}`, identityPubKey);
+  await storageProvider.makeAvailable();
+
+  return { storage, storageProvider };
+};
+
+/**
+ * Initialize the OneSatWallet for the current account (read-only mode)
  */
 export const initWallet = async (
   chromeStorageService: ChromeStorageService,
@@ -41,21 +59,24 @@ export const initWallet = async (
   const identityPubKey = account?.pubKeys?.identityPubKey || DEFAULT_PUBKEY;
 
   // Create storage
-  const storageOptions = StorageProvider.createStorageBaseOptions(chain);
-  const storageProvider = new StorageIdb(storageOptions);
-  const storage = new WalletStorageManager(identityPubKey, storageProvider);
+  const { storage } = await initStorage(chain, identityPubKey, selectedAccount || '');
 
-  // Initialize storage
-  await storageProvider.migrate(`wallet-${selectedAccount || ''}`, identityPubKey);
-  await storageProvider.makeAvailable();
+  // Create services
+  const services = new OneSatServices(chain, undefined, storage);
+
+  // Create read-only key deriver
+  const keyDeriver = new ReadOnlySigner(identityPubKey);
+
+  // Create the underlying BRC-100 Wallet
+  const wallet = new Wallet({ chain, keyDeriver, storage, services });
 
   // Create sync queue with identityAddress as accountId
   const identityAddress = account?.addresses?.identityAddress || selectedAccount || '';
   const syncQueue = new IndexedDbSyncQueue(identityAddress);
 
-  // Create read-only wallet (public key = read-only mode)
-  const wallet = new OneSatWallet({
-    rootKey: identityPubKey,
+  // Create OneSatWallet wrapping the BRC-100 wallet
+  const oneSatWallet = new OneSatWallet({
+    wallet,
     storage,
     chain,
     owners,
@@ -63,13 +84,13 @@ export const initWallet = async (
     syncQueue,
   });
 
-  registerEventListeners(wallet);
+  registerEventListeners(oneSatWallet);
 
   if (startSync && account) {
-    wallet.sync();
+    oneSatWallet.sync();
   }
 
-  return wallet;
+  return oneSatWallet;
 };
 
 /**
@@ -92,17 +113,20 @@ export const initSigningWallet = async (
   const identityPubKey = identityKey.toPublicKey().toString();
 
   // Create storage
-  const storageOptions = StorageProvider.createStorageBaseOptions(chain);
-  const storageProvider = new StorageIdb(storageOptions);
-  const storage = new WalletStorageManager(identityPubKey, storageProvider);
+  const { storage } = await initStorage(chain, identityPubKey, selectedAccount || '');
 
-  // Initialize storage
-  await storageProvider.migrate(`wallet-${selectedAccount || ''}`, identityPubKey);
-  await storageProvider.makeAvailable();
+  // Create services
+  const services = new OneSatServices(chain, undefined, storage);
 
-  // Create signing wallet with PrivateKey (not public key string)
+  // Create signing key deriver
+  const keyDeriver = new KeyDeriver(identityKey);
+
+  // Create the underlying BRC-100 Wallet with signing capability
+  const wallet = new Wallet({ chain, keyDeriver, storage, services });
+
+  // Create OneSatWallet wrapping the BRC-100 wallet
   return new OneSatWallet({
-    rootKey: identityKey,
+    wallet,
     storage,
     chain,
   });
