@@ -1,13 +1,11 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { resolve } from 'path';
 
-// Main config for popup/extension pages
+// Inject script config - IIFE format (runs in page context)
 export default defineConfig({
   base: './',
   plugins: [
-    react(),
     nodePolyfills({
       include: ['buffer', 'process', 'util', 'stream', 'crypto', 'assert', 'url', 'path'],
       globals: {
@@ -22,24 +20,18 @@ export default defineConfig({
     },
     preserveSymlinks: true,
   },
-  optimizeDeps: {
-    exclude: ['@1sat/wallet-toolbox'],
-  },
-  publicDir: 'public',
   build: {
     outDir: 'build',
-    emptyOutDir: true,
-    commonjsOptions: {
-      exclude: [/1sat-wallet-toolbox/],
+    emptyOutDir: false,
+    lib: {
+      entry: resolve(__dirname, 'src/inject.ts'),
+      name: 'inject',
+      formats: ['iife'],
+      fileName: () => 'inject.js',
     },
     rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'index.html'),
-      },
       output: {
-        entryFileNames: 'assets/[name]-[hash].js',
-        chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
+        extend: true,
       },
     },
     sourcemap: true,

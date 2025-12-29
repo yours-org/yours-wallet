@@ -1,13 +1,11 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { resolve } from 'path';
 
-// Main config for popup/extension pages
+// Background service worker config - ES module format
 export default defineConfig({
   base: './',
   plugins: [
-    react(),
     nodePolyfills({
       include: ['buffer', 'process', 'util', 'stream', 'crypto', 'assert', 'url', 'path'],
       globals: {
@@ -25,22 +23,20 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@1sat/wallet-toolbox'],
   },
-  publicDir: 'public',
   build: {
     outDir: 'build',
-    emptyOutDir: true,
+    emptyOutDir: false,
     commonjsOptions: {
       exclude: [/1sat-wallet-toolbox/],
     },
+    lib: {
+      entry: resolve(__dirname, 'src/background.ts'),
+      name: 'background',
+      formats: ['es'],
+      fileName: () => 'background.js',
+    },
     rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'index.html'),
-      },
-      output: {
-        entryFileNames: 'assets/[name]-[hash].js',
-        chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
-      },
+      external: ['chrome'],
     },
     sourcemap: true,
   },
