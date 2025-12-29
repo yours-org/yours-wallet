@@ -92,3 +92,28 @@ export const convertAtomicValueToReadableTokenValue = (value: number, decimals: 
   const tokenValue = convertToTokenValue(value, decimals);
   return removeTrailingZeros(formatNumberWithCommasAndDecimals(tokenValue, decimals));
 };
+
+/**
+ * Get the value for a tag prefix from a tags array.
+ * Tags are in format "prefix:value", e.g., "origin:abc123_0"
+ * For 'type' prefix, prefers the most specific tag (one containing '/').
+ */
+export const getTagValue = (tags: string[] | undefined, prefix: string): string | undefined => {
+  if (!tags) return undefined;
+  const matchingTags = tags.filter((t) => t.startsWith(`${prefix}:`));
+  if (matchingTags.length === 0) return undefined;
+  // For 'type' prefix, prefer the most specific one (contains '/')
+  if (prefix === 'type') {
+    const specific = matchingTags.find((t) => t.includes('/'));
+    if (specific) return specific.slice(prefix.length + 1);
+  }
+  return matchingTags[0].slice(prefix.length + 1);
+};
+
+/**
+ * Check if a tag prefix exists in a tags array.
+ */
+export const hasTag = (tags: string[] | undefined, prefix: string): boolean => {
+  if (!tags) return false;
+  return tags.some((t) => t.startsWith(`${prefix}:`));
+};

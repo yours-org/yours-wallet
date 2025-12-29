@@ -1,3 +1,21 @@
+// Import CWI to inject window.CWI (BRC-100 WalletInterface)
+import './cwi';
+import type {
+  ListOutputsResult,
+  GetPublicKeyResult,
+  GetNetworkResult,
+  GetHeightResult,
+  GetHeaderResult,
+  GetVersionResult,
+  AuthenticatedResult,
+  ListActionsResult,
+  CreateSignatureResult,
+  VerifySignatureResult,
+  CreateActionResult,
+  WalletEncryptResult,
+  WalletDecryptResult,
+} from '@bsv/sdk';
+
 import {
   Addresses,
   Balance,
@@ -8,7 +26,6 @@ import {
   GetTaggedKeysRequest,
   InscribeRequest,
   NetWork,
-  Ordinal,
   PubKeys,
   PurchaseOrdinal,
   SendBsv,
@@ -27,8 +44,6 @@ import {
   Bsv20,
   SendBsv20Response,
   SendBsv20,
-  PaginatedOrdinalsResponse,
-  GetPaginatedOrdinals,
   SendMNEEResponse,
   SendMNEE,
   MNEEBalance,
@@ -44,7 +59,6 @@ export enum YoursEventName {
   GET_NETWORK = 'getNetwork',
   GET_BALANCE = 'getBalance',
   GET_MNEE_BALANCE = 'getMNEEBalance',
-  GET_ORDINALS = 'getOrdinals',
   GET_BSV20S = 'getBsv20s',
   SEND_BSV = 'sendBsvRequest',
   SEND_BSV20 = 'sendBsv20Request',
@@ -78,9 +92,7 @@ export enum YoursEventName {
   ENCRYPT_RESPONSE = 'encryptResponse',
   DECRYPT_RESPONSE = 'decryptResponse',
   SYNC_UTXOS = 'syncUtxos', // This is not exposed on the provider
-  QUEUE_STATUS_UPDATE = 'queueStatusUpdate', // This is not exposed on the provider
-  IMPORT_STATUS_UPDATE = 'importStatusUpdate', // This is not exposed on the provider
-  FETCHING_TX_STATUS_UPDATE = 'fetchingTx', // This is not exposed on the provider
+  SYNC_STATUS_UPDATE = 'syncStatusUpdate', // This is not exposed on the provider
   BLOCK_HEIGHT_UPDATE = 'blockHeightUpdate', // This is not exposed on the provider
   SWITCH_ACCOUNT = 'switchAccount', // This is not exposed on the provider
 }
@@ -98,7 +110,6 @@ export type RequestParams = {
     | SendBsv[]
     | SendBsv20
     | SendMNEE[]
-    | GetPaginatedOrdinals
     | InscribeRequest[]
     | LockRequest[]
     | TransferOrdinal
@@ -129,7 +140,7 @@ export type SerializedBsv20 = Omit<Bsv20, 'listed' | 'all'> & {
 };
 
 export type ResponseEventDetail = {
-  type: YoursEventName;
+  type: YoursEventName | string; // string to support CWI event names
   success: boolean;
   data?: (
     | ConnectResponse
@@ -141,8 +152,6 @@ export type ResponseEventDetail = {
     | NetWork
     | Balance
     | MNEEBalance
-    | Ordinal[]
-    | PaginatedOrdinalsResponse
     | Bsv20[]
     | SerializedBsv20[]
     | SignatureResponse[]
@@ -156,6 +165,21 @@ export type ResponseEventDetail = {
     | number
     | string[]
     | undefined
+    // CWI (BRC-100) result types
+    | ListOutputsResult
+    | GetPublicKeyResult
+    | GetNetworkResult
+    | GetHeightResult
+    | GetHeaderResult
+    | GetVersionResult
+    | { authenticated: boolean } // AuthenticatedResult only types {authenticated: true}
+    | ListActionsResult
+    | CreateSignatureResult
+    | VerifySignatureResult
+    | CreateActionResult
+    | WalletEncryptResult
+    | WalletDecryptResult
+    | { valid: boolean } // VerifyHmacResult
   ) & { popupId?: number };
   error?: string | undefined | boolean;
 };
@@ -264,9 +288,6 @@ const provider: YoursProviderType = {
   getNetwork: createYoursMethod<NetWork | undefined, void>(YoursEventName.GET_NETWORK),
   getBalance: createYoursMethod<Balance | undefined, void>(YoursEventName.GET_BALANCE),
   getMNEEBalance: createYoursMethod<MNEEBalance | undefined, void>(YoursEventName.GET_MNEE_BALANCE),
-  getOrdinals: createYoursMethod<Ordinal[] | PaginatedOrdinalsResponse, GetPaginatedOrdinals>(
-    YoursEventName.GET_ORDINALS,
-  ),
   getBsv20s: createYoursMethod<Bsv20[] | undefined, void>(YoursEventName.GET_BSV20S),
   sendBsv: createYoursMethod<SendBsvResponse | undefined, SendBsv[]>(YoursEventName.SEND_BSV),
   sendBsv20: createYoursMethod<SendBsv20Response | undefined, SendBsv20>(YoursEventName.SEND_BSV20),

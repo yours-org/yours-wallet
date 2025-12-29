@@ -19,7 +19,6 @@ import {
   NetWork,
   SendBsv20Response,
   SendBsv20,
-  GetPaginatedOrdinals,
   SendMNEEResponse,
   SendMNEE,
   LockRequest,
@@ -33,16 +32,31 @@ import {
   WhitelistedApp,
   YoursEventName,
 } from './inject';
+import { CWIEventName } from './cwi';
+import type {
+  ListOutputsArgs,
+  ListActionsArgs,
+  GetPublicKeyArgs,
+  GetHeaderArgs,
+  CreateSignatureArgs,
+  CreateSignatureResult,
+  VerifySignatureArgs,
+  VerifyHmacArgs,
+  CreateActionArgs,
+  CreateActionResult,
+  WalletEncryptArgs,
+  WalletEncryptResult,
+  WalletDecryptArgs,
+  WalletDecryptResult,
+} from '@bsv/sdk';
 import { EncryptResponse } from './pages/requests/EncryptRequest';
 import { DecryptResponse } from './pages/requests/DecryptRequest';
 import { removeWindow, sendTransactionNotification } from './utils/chromeHelpers';
 import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { GorillaPoolService } from './services/GorillaPool.service';
-import { mapOrdinal } from './utils/providerHelper';
-import { TxoLookup, TxoSort } from 'spv-store';
-import { initOneSatSPV } from './initSPVStore';
+import { initWallet } from './initWallet';
+import type { OneSatWallet } from '@1sat/wallet-toolbox';
 import { CHROME_STORAGE_OBJECT_VERSION, HOSTED_YOURS_IMAGE, MNEE_API_TOKEN } from './utils/constants';
 import { convertLockReqToSendBsvReq } from './utils/tools';
 import Mnee from '@mnee/ts-sdk';
@@ -52,34 +66,10 @@ const mnee = new Mnee({ environment: 'production', apiKey: MNEE_API_TOKEN });
 
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
-const gorillaPoolService = new GorillaPoolService(chromeStorageService);
 
-export let oneSatSPVPromise = chromeStorageService.getAndSetStorage().then(async (storage) => {
-  const version = storage?.version;
-  if (version && version < 3) {
-    // At version three we're forcing a full resync
-    const dbs = await indexedDB.databases();
-    for (const db of dbs) {
-      if (db.name) {
-        indexedDB.deleteDatabase(db.name);
-        console.log(`Deleted database: ${db.name}`);
-      }
-    }
-    await chromeStorageService.update({ version: CHROME_STORAGE_OBJECT_VERSION });
-  } else if (version && version < 4) {
-    // At version four we're deleting the txos-db to fix origin index issue.
-    const dbs = await indexedDB.databases();
-    for (const db of dbs) {
-      if (db.name && db.name.startsWith('txos-')) {
-        indexedDB.deleteDatabase(db.name);
-        console.log(`Deleted database: ${db.name}`);
-      }
-    }
-    await chromeStorageService.update({ version: CHROME_STORAGE_OBJECT_VERSION });
-  }
-
-  return initOneSatSPV(chromeStorageService, isInServiceWorker);
-});
+export let walletPromise: Promise<OneSatWallet> = chromeStorageService
+  .getAndSetStorage()
+  .then(() => initWallet(chromeStorageService, !isInServiceWorker));
 
 console.log('Yours Wallet Background Script Running!');
 
@@ -87,7 +77,6 @@ const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv';
 
 type CallbackResponse = (response: ResponseEventDetail) => void;
 
-let responseCallbackForConnectRequest: CallbackResponse | null = null;
 let responseCallbackForSendBsvRequest: CallbackResponse | null = null;
 let responseCallbackForSendBsv20Request: CallbackResponse | null = null;
 let responseCallbackForSendMNEERequest: CallbackResponse | null = null;
@@ -99,27 +88,36 @@ let responseCallbackForGetSignaturesRequest: CallbackResponse | null = null;
 let responseCallbackForGenerateTaggedKeysRequest: CallbackResponse | null = null;
 let responseCallbackForEncryptRequest: CallbackResponse | null = null;
 let responseCallbackForDecryptRequest: CallbackResponse | null = null;
+// CWI (BRC-100) callbacks
+let responseCallbackForCWICreateSignature: CallbackResponse | null = null;
+let responseCallbackForCWIEncrypt: CallbackResponse | null = null;
+let responseCallbackForCWIDecrypt: CallbackResponse | null = null;
+let responseCallbackForCWICreateAction: CallbackResponse | null = null;
+let responseCallbackForConnectRequest: CallbackResponse | null = null;
+let responseCallbackForCWIWaitForAuthentication: CallbackResponse | null = null;
 let popupWindowId: number | undefined;
 
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
 
 // only run in background worker
 if (isInServiceWorker) {
-  const initNewTxsListener = async () => {
-    const oneSatSPV = await oneSatSPVPromise;
-    oneSatSPV.events.on('newTxs', (data: number) => {
-      sendTransactionNotification(data);
-    });
-  };
-  initNewTxsListener();
+  // TODO: Re-enable notifications after initial sync is complete
+  // const initNewTxsListener = async () => {
+  //   const wallet = await walletPromise;
+  //   wallet.on('sync:parsed', (data: { internalizedCount: number }) => {
+  //     if (data.internalizedCount > 0) {
+  //       sendTransactionNotification(data.internalizedCount);
+  //     }
+  //   });
+  // };
+  // initNewTxsListener();
 
   const processSyncUtxos = async () => {
     try {
-      const oneSatSPV = await oneSatSPVPromise;
-      if (!oneSatSPV) throw Error('SPV not initialized!');
-      await chromeStorageService.update({ hasUpgradedToSPV: true });
-      await oneSatSPV.sync();
-      console.log('done importing');
+      const wallet = await walletPromise;
+      if (!wallet) throw Error('Wallet not initialized!');
+      wallet.sync();
+      console.log('sync started');
     } catch (error) {
       console.error('Error during sync:', error);
     }
@@ -139,16 +137,16 @@ if (isInServiceWorker) {
   };
 
   const signOut = async () => {
-    await (await oneSatSPVPromise).destroy();
+    (await walletPromise).close();
     await deleteAllIDBDatabases();
   };
 
   const switchAccount = async () => {
-    await (await oneSatSPVPromise).destroy();
+    (await walletPromise).close();
     chromeStorageService = new ChromeStorageService();
     await chromeStorageService.getAndSetStorage();
-    oneSatSPVPromise = initOneSatSPV(chromeStorageService, isInServiceWorker);
-    initNewTxsListener();
+    walletPromise = initWallet(chromeStorageService, !isInServiceWorker);
+    // initNewTxsListener();
   };
 
   const launchPopUp = () => {
@@ -182,11 +180,7 @@ if (isInServiceWorker) {
     action: YoursEventName;
     params: { domain: string };
   }): Promise<boolean> => {
-    if (
-      message.action === YoursEventName.QUEUE_STATUS_UPDATE ||
-      message.action === YoursEventName.IMPORT_STATUS_UPDATE ||
-      message.action === YoursEventName.FETCHING_TX_STATUS_UPDATE
-    ) {
+    if (message.action === YoursEventName.SYNC_STATUS_UPDATE) {
       return true;
     }
     const { params } = message;
@@ -197,6 +191,14 @@ if (isInServiceWorker) {
   chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
     if ([YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT].includes(message.action)) {
       emitEventToActiveTabs(message);
+    }
+
+    // Broadcast sync status updates to all extension views (popup can't receive its own messages)
+    if (message.action === YoursEventName.SYNC_STATUS_UPDATE) {
+      chrome.runtime.sendMessage(message).catch(() => {
+        // Ignore errors when no listeners
+      });
+      return;
     }
 
     const noAuthRequired = [
@@ -216,6 +218,8 @@ if (isInServiceWorker) {
       YoursEventName.SYNC_UTXOS,
       YoursEventName.SWITCH_ACCOUNT,
       YoursEventName.SIGNED_OUT,
+      // CWI auth check (no auth required - just checks status)
+      CWIEventName.IS_AUTHENTICATED,
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -252,6 +256,9 @@ if (isInServiceWorker) {
           return switchAccount();
         case YoursEventName.SIGNED_OUT:
           return signOut();
+        // CWI auth check
+        case CWIEventName.IS_AUTHENTICATED:
+          return processCWIIsAuthenticated(message.params as { originator?: string }, sendResponse);
         default:
           break;
       }
@@ -262,6 +269,11 @@ if (isInServiceWorker) {
     authorizeRequest(message).then((isAuthorized) => {
       if (message.action === YoursEventName.CONNECT) {
         return processConnectRequest(message, sendResponse, isAuthorized);
+      }
+
+      // CWI waitForAuthentication - same flow as connect
+      if (message.action === CWIEventName.WAIT_FOR_AUTHENTICATION) {
+        return processCWIWaitForAuthentication(message, sendResponse, isAuthorized);
       }
 
       if (!isAuthorized) {
@@ -286,8 +298,6 @@ if (isInServiceWorker) {
           return processGetAddressesRequest(sendResponse);
         case YoursEventName.GET_NETWORK:
           return processGetNetworkRequest(sendResponse);
-        case YoursEventName.GET_ORDINALS:
-          return processGetOrdinalsRequest(message, sendResponse);
         case YoursEventName.GET_BSV20S:
           return processGetBsv20sRequest(sendResponse);
         case YoursEventName.SEND_BSV:
@@ -323,6 +333,55 @@ if (isInServiceWorker) {
           return processEncryptRequest(message, sendResponse);
         case YoursEventName.DECRYPT:
           return processDecryptRequest(message, sendResponse);
+
+        // CWI (BRC-100) handlers
+        // Note: async handlers must NOT be returned - call them and return true synchronously
+        case CWIEventName.LIST_OUTPUTS:
+          processCWIListOutputs(message, sendResponse);
+          return true;
+        case CWIEventName.GET_NETWORK:
+          return processCWIGetNetwork(sendResponse);
+        case CWIEventName.GET_HEIGHT:
+          processCWIGetHeight(sendResponse);
+          return true;
+        case CWIEventName.GET_HEADER_FOR_HEIGHT:
+          processCWIGetHeaderForHeight(message, sendResponse);
+          return true;
+        case CWIEventName.GET_VERSION:
+          return processCWIGetVersion(sendResponse);
+        case CWIEventName.GET_PUBLIC_KEY:
+          processCWIGetPublicKey(message, sendResponse);
+          return true;
+        case CWIEventName.LIST_ACTIONS:
+          processCWIListActions(message, sendResponse);
+          return true;
+        case CWIEventName.VERIFY_SIGNATURE:
+          processCWIVerifySignature(message, sendResponse);
+          return true;
+        case CWIEventName.VERIFY_HMAC:
+          processCWIVerifyHmac(message, sendResponse);
+          return true;
+
+        // CWI signing operations (require popup for password)
+        case CWIEventName.CREATE_SIGNATURE:
+          return processCWICreateSignatureRequest(message, sendResponse);
+        case CWIEventName.ENCRYPT:
+          return processCWIEncryptRequest(message, sendResponse);
+        case CWIEventName.DECRYPT:
+          return processCWIDecryptRequest(message, sendResponse);
+        case CWIEventName.CREATE_ACTION:
+          return processCWICreateActionRequest(message, sendResponse);
+
+        // CWI response handlers (from popup)
+        case CWIEventName.CREATE_SIGNATURE_RESPONSE:
+          return processCWICreateSignatureResponse(message as CreateSignatureResult);
+        case CWIEventName.CREATE_ACTION_RESPONSE:
+          return processCWICreateActionResponse(message as CreateActionResult);
+        case CWIEventName.ENCRYPT_RESPONSE:
+          return processCWIEncryptResponse(message as WalletEncryptResult);
+        case CWIEventName.DECRYPT_RESPONSE:
+          return processCWIDecryptResponse(message as WalletDecryptResult);
+
         default:
           break;
       }
@@ -338,7 +397,11 @@ if (isInServiceWorker) {
     chrome.tabs.query({}, function (tabs) {
       tabs.forEach(function (tab: chrome.tabs.Tab) {
         if (tab.id) {
-          chrome.tabs.sendMessage(tab.id, { type: CustomListenerName.YOURS_EMIT_EVENT, action, params });
+          chrome.tabs.sendMessage(tab.id, {
+            type: CustomListenerName.YOURS_EMIT_EVENT,
+            action,
+            params,
+          });
         }
       });
     });
@@ -347,21 +410,44 @@ if (isInServiceWorker) {
 
   // REQUESTS ***************************************
 
+  // Shared helper: if already authorized, respond immediately; otherwise launch popup
+  const handleConnectOrAuth = (
+    request: ConnectRequest,
+    sendResponse: CallbackResponse,
+    isAuthorized: boolean,
+    setCallback: (cb: CallbackResponse) => void,
+    immediateResponse: () => void,
+  ) => {
+    if (isAuthorized) {
+      immediateResponse();
+      return true;
+    }
+    setCallback(sendResponse);
+    chromeStorageService.update({ connectRequest: request }).then(() => {
+      launchPopUp();
+    });
+    return true;
+  };
+
   const processConnectRequest = (
     message: { params: RequestParams },
     sendResponse: CallbackResponse,
     isAuthorized: boolean,
   ) => {
-    responseCallbackForConnectRequest = sendResponse;
-    chromeStorageService
-      .update({
-        connectRequest: { ...message.params, isAuthorized } as ConnectRequest,
-      })
-      .then(() => {
-        launchPopUp();
-      });
-
-    return true;
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    return handleConnectOrAuth(
+      { ...message.params, isAuthorized } as ConnectRequest,
+      sendResponse,
+      isAuthorized,
+      (cb) => { responseCallbackForConnectRequest = cb; },
+      () => {
+        sendResponse({
+          type: YoursEventName.CONNECT,
+          success: true,
+          data: account?.pubKeys?.identityPubKey,
+        });
+      },
+    );
   };
 
   const processDisconnectRequest = (message: { params: { domain: string } }, sendResponse: CallbackResponse) => {
@@ -400,30 +486,38 @@ if (isInServiceWorker) {
     }
   };
 
-  const processIsConnectedRequest = (params: { domain: string }, sendResponse: CallbackResponse) => {
-    try {
-      chromeStorageService.getAndSetStorage().then(() => {
-        const result = chromeStorageService.getCurrentAccountObject();
-        if (!result?.account) throw Error('No account found!');
-        const currentTime = Date.now();
-        const lastActiveTime = result.lastActiveTime;
+  // Shared helper to check if a domain is authenticated
+  const checkIsAuthenticated = async (domain?: string): Promise<boolean> => {
+    await chromeStorageService.getAndSetStorage();
+    const result = chromeStorageService.getCurrentAccountObject();
+    if (!result?.account) return false;
 
+    const currentTime = Date.now();
+    const lastActiveTime = result.lastActiveTime;
+
+    return (
+      !result.isLocked &&
+      currentTime - Number(lastActiveTime) < INACTIVITY_LIMIT &&
+      (!domain || result.account.settings.whitelist?.map((i: { domain: string }) => i.domain).includes(domain))
+    );
+  };
+
+  const processIsConnectedRequest = (params: { domain: string }, sendResponse: CallbackResponse) => {
+    checkIsAuthenticated(params.domain)
+      .then((isConnected) => {
         sendResponse({
           type: YoursEventName.IS_CONNECTED,
           success: true,
-          data:
-            !result.isLocked &&
-            currentTime - Number(lastActiveTime) < INACTIVITY_LIMIT &&
-            result.account.settings.whitelist?.map((i: { domain: string }) => i.domain).includes(params.domain),
+          data: isConnected,
+        });
+      })
+      .catch(() => {
+        sendResponse({
+          type: YoursEventName.IS_CONNECTED,
+          success: true,
+          data: false,
         });
       });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.IS_CONNECTED,
-        success: true, // This is true in the catch because we want to return a boolean
-        error: false,
-      });
-    }
 
     return true;
   };
@@ -530,65 +624,91 @@ if (isInServiceWorker) {
     }
   };
 
-  const processGetOrdinalsRequest = (message: { params: GetPaginatedOrdinals }, sendResponse: CallbackResponse) => {
-    try {
-      chromeStorageService.getAndSetStorage().then(async () => {
-        const oneSatSPV = await oneSatSPVPromise;
-        if (!oneSatSPV) throw Error('SPV not initialized!');
-        const lookup = message?.params?.mimeType
-          ? new TxoLookup('origin', 'type', message.params.mimeType)
-          : new TxoLookup('origin');
-        if (message.params.from === undefined || message.params.from === null) {
-          const result = await oneSatSPV.search(lookup, TxoSort.DESC, 0);
-          const mapped = result.txos.map(mapOrdinal);
-          sendResponse({
-            type: YoursEventName.GET_ORDINALS,
-            success: true,
-            data: mapped,
-          });
-        } else {
-          const results = await oneSatSPV.search(
-            lookup,
-            TxoSort.DESC,
-            message.params.limit || 50,
-            message.params.from || '',
-          );
-          const mapped = results.txos.map(mapOrdinal);
-          sendResponse({
-            type: YoursEventName.GET_ORDINALS,
-            success: true,
-            data: { ordinals: mapped, from: results.nextPage },
-          });
-        }
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GET_ORDINALS,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
   const processGetBsv20sRequest = (sendResponse: CallbackResponse) => {
     try {
       chromeStorageService.getAndSetStorage().then(async () => {
-        let data: SerializedBsv20[] = [];
-        const obj = chromeStorageService.getCurrentAccountObject();
-        if (obj.account?.addresses?.bsvAddress && obj.account?.addresses?.ordAddress) {
-          const rawData = await gorillaPoolService.getBsv20Balances([
-            obj.account?.addresses.bsvAddress,
-            obj.account?.addresses.ordAddress,
-          ]);
+        const wallet = await walletPromise;
+        const result = await wallet.listOutputs({
+          basket: 'bsv21',
+          includeTags: true,
+          limit: 10000,
+        });
 
-          data = rawData.map((d) => {
-            return {
-              ...d,
-              listed: { confirmed: d.listed.confirmed.toString(), pending: d.listed.pending.toString() },
-              all: { confirmed: d.all.confirmed.toString(), pending: d.all.pending.toString() },
-            };
-          });
+        // Aggregate balances by token id, tracking confirmed (valid) vs pending
+        // Tag format: id:{tokenId}:{status} where status is "valid", "invalid", or "pending"
+        const balanceMap = new Map<
+          string,
+          {
+            id: string;
+            confirmed: bigint;
+            pending: bigint;
+            icon?: string;
+            sym?: string;
+            dec: number;
+          }
+        >();
+
+        for (const o of result.outputs) {
+          const idTag = o.tags?.find((t: string) => t.startsWith('id:'));
+          const amtTag = o.tags?.find((t: string) => t.startsWith('amt:'))?.slice(4);
+          const symTag = o.tags?.find((t: string) => t.startsWith('sym:'))?.slice(4);
+          const iconTag = o.tags?.find((t: string) => t.startsWith('icon:'))?.slice(5);
+          const decTag = o.tags?.find((t: string) => t.startsWith('dec:'))?.slice(4);
+
+          if (!idTag || !amtTag) continue;
+
+          // Parse id:{tokenId}:{status} - status is last segment after final colon
+          const idContent = idTag.slice(3); // remove "id:" prefix
+          const lastColonIdx = idContent.lastIndexOf(':');
+          if (lastColonIdx === -1) continue;
+
+          const tokenId = idContent.slice(0, lastColonIdx);
+          const status = idContent.slice(lastColonIdx + 1);
+
+          // Skip invalid tokens
+          if (status === 'invalid') continue;
+
+          const isConfirmed = status === 'valid';
+          const amt = BigInt(amtTag);
+          const dec = decTag ? parseInt(decTag, 10) : 0;
+
+          const existing = balanceMap.get(tokenId);
+          if (existing) {
+            if (isConfirmed) {
+              existing.confirmed += amt;
+            } else {
+              existing.pending += amt;
+            }
+          } else {
+            balanceMap.set(tokenId, {
+              id: tokenId,
+              confirmed: isConfirmed ? amt : 0n,
+              pending: isConfirmed ? 0n : amt,
+              sym: symTag,
+              icon: iconTag,
+              dec,
+            });
+          }
         }
+
+        // Convert to SerializedBsv20[] format
+        const data: SerializedBsv20[] = Array.from(balanceMap.values()).map((b) => ({
+          p: 'bsv-20',
+          op: 'transfer',
+          dec: b.dec,
+          amt: (b.confirmed + b.pending).toString(),
+          id: b.id,
+          sym: b.sym,
+          icon: b.icon,
+          all: {
+            confirmed: b.confirmed.toString(),
+            pending: b.pending.toString(),
+          },
+          listed: {
+            confirmed: '0',
+            pending: '0',
+          },
+        }));
 
         sendResponse({
           type: YoursEventName.GET_BSV20S,
@@ -646,15 +766,16 @@ if (isInServiceWorker) {
   const processGetPaymentUtxos = (sendResponse: CallbackResponse) => {
     try {
       chromeStorageService.getAndSetStorage().then(async () => {
-        const oneSatSPV = await oneSatSPVPromise;
-        if (!oneSatSPV) throw Error('SPV not initialized!');
-        const results = await oneSatSPV.search(new TxoLookup('fund'), undefined, 0);
-        const utxos = results.txos.map((txo) => {
+        const wallet = await walletPromise;
+        if (!wallet) throw Error('Wallet not initialized!');
+        const result = await wallet.listOutputs({ basket: 'fund', limit: 10000 });
+        const utxos = result.outputs.map((output) => {
+          const [txid, voutStr] = output.outpoint.split('.');
           return {
-            txid: txo.outpoint.txid,
-            vout: txo.outpoint.vout,
-            satoshis: Number(txo.satoshis),
-            script: Buffer.from(txo.script).toString('hex'),
+            txid,
+            vout: parseInt(voutStr, 10),
+            satoshis: output.satoshis,
+            script: output.lockingScript || '',
           };
         });
         sendResponse({
@@ -674,7 +795,9 @@ if (isInServiceWorker) {
 
   // Important note: We process the InscribeRequest as a SendBsv request.
   const processSendBsvRequest = (
-    message: { params: { data: SendBsv[] | InscribeRequest[] | LockRequest[] } },
+    message: {
+      params: { data: SendBsv[] | InscribeRequest[] | LockRequest[] };
+    },
     sendResponse: CallbackResponse,
   ) => {
     if (!message.params.data) {
@@ -1075,6 +1198,474 @@ if (isInServiceWorker) {
     return true;
   };
 
+  // CWI (BRC-100) HANDLERS ********************************
+
+  const processCWIListOutputs = async (
+    message: { params: ListOutputsArgs },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const wallet = await walletPromise;
+      if (!wallet) throw Error('Wallet not initialized!');
+
+      const result = await wallet.listOutputs(message.params);
+
+      sendResponse({
+        type: CWIEventName.LIST_OUTPUTS,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.LIST_OUTPUTS,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIGetNetwork = async (sendResponse: CallbackResponse) => {
+    try {
+      const wallet = await walletPromise;
+      if (!wallet) throw Error('Wallet not initialized!');
+
+      const result = await wallet.getNetwork({});
+      sendResponse({
+        type: CWIEventName.GET_NETWORK,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.GET_NETWORK,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIGetHeight = async (sendResponse: CallbackResponse) => {
+    try {
+      const wallet = await walletPromise;
+      if (!wallet) throw Error('Wallet not initialized!');
+
+      const result = await wallet.getHeight({});
+      sendResponse({
+        type: CWIEventName.GET_HEIGHT,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.GET_HEIGHT,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIGetHeaderForHeight = async (
+    message: { params: GetHeaderArgs },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const wallet = await walletPromise;
+      if (!wallet) throw Error('Wallet not initialized!');
+
+      const result = await wallet.getHeaderForHeight(message.params);
+      sendResponse({
+        type: CWIEventName.GET_HEADER_FOR_HEIGHT,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.GET_HEADER_FOR_HEIGHT,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIGetVersion = async (sendResponse: CallbackResponse) => {
+    try {
+      const wallet = await walletPromise;
+      if (!wallet) throw Error('Wallet not initialized!');
+
+      const result = await wallet.getVersion({});
+      sendResponse({
+        type: CWIEventName.GET_VERSION,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.GET_VERSION,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIIsAuthenticated = (
+    params: { originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    checkIsAuthenticated(params.originator)
+      .then((isAuthenticated) => {
+        sendResponse({
+          type: CWIEventName.IS_AUTHENTICATED,
+          success: true,
+          data: { authenticated: isAuthenticated },
+        });
+      })
+      .catch(() => {
+        sendResponse({
+          type: CWIEventName.IS_AUTHENTICATED,
+          success: true,
+          data: { authenticated: false },
+        });
+      });
+
+    return true;
+  };
+
+  const processCWIWaitForAuthentication = (
+    message: { params: { originator?: string } },
+    sendResponse: CallbackResponse,
+    isAuthorized: boolean,
+  ) => {
+    const domain = message.params?.originator;
+    return handleConnectOrAuth(
+      {
+        domain: domain || 'unknown',
+        appName: domain || 'Unknown App',
+        appIcon: HOSTED_YOURS_IMAGE,
+        isAuthorized,
+      } as ConnectRequest,
+      sendResponse,
+      isAuthorized,
+      (cb) => { responseCallbackForCWIWaitForAuthentication = cb; },
+      () => {
+        sendResponse({
+          type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+          success: true,
+          data: { authenticated: true },
+        });
+      },
+    );
+  };
+
+  const processCWIGetPublicKey = async (
+    message: { params: GetPublicKeyArgs },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const wallet = await walletPromise;
+      if (!wallet) throw Error('Wallet not initialized!');
+
+      const result = await wallet.getPublicKey(message.params);
+      sendResponse({
+        type: CWIEventName.GET_PUBLIC_KEY,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.GET_PUBLIC_KEY,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIListActions = async (
+    message: { params: ListActionsArgs },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const wallet = await walletPromise;
+      if (!wallet) throw Error('Wallet not initialized!');
+
+      const result = await wallet.listActions(message.params);
+
+      sendResponse({
+        type: CWIEventName.LIST_ACTIONS,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.LIST_ACTIONS,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIVerifySignature = async (
+    message: { params: VerifySignatureArgs },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const wallet = await walletPromise;
+      if (!wallet) throw Error('Wallet not initialized!');
+
+      const result = await wallet.verifySignature(message.params);
+      sendResponse({
+        type: CWIEventName.VERIFY_SIGNATURE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.VERIFY_SIGNATURE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIVerifyHmac = async (
+    message: { params: VerifyHmacArgs },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const wallet = await walletPromise;
+      if (!wallet) throw Error('Wallet not initialized!');
+
+      const result = await wallet.verifyHmac(message.params);
+      sendResponse({
+        type: CWIEventName.VERIFY_HMAC,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.VERIFY_HMAC,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  // CWI SIGNING REQUESTS ********************************
+
+  const processCWICreateSignatureRequest = (
+    message: { params: CreateSignatureArgs },
+    sendResponse: CallbackResponse,
+  ) => {
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) {
+      sendResponse({
+        type: CWIEventName.CREATE_SIGNATURE,
+        success: false,
+        error: 'No account found!',
+      });
+      return true;
+    }
+    responseCallbackForCWICreateSignature = sendResponse;
+    chromeStorageService
+      .update({
+        cwiCreateSignatureRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+    return true;
+  };
+
+  const processCWIEncryptRequest = (
+    message: { params: WalletEncryptArgs },
+    sendResponse: CallbackResponse,
+  ) => {
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) {
+      sendResponse({
+        type: CWIEventName.ENCRYPT,
+        success: false,
+        error: 'No account found!',
+      });
+      return true;
+    }
+    responseCallbackForCWIEncrypt = sendResponse;
+    chromeStorageService
+      .update({
+        cwiEncryptRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+    return true;
+  };
+
+  const processCWIDecryptRequest = (
+    message: { params: WalletDecryptArgs },
+    sendResponse: CallbackResponse,
+  ) => {
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) {
+      sendResponse({
+        type: CWIEventName.DECRYPT,
+        success: false,
+        error: 'No account found!',
+      });
+      return true;
+    }
+    responseCallbackForCWIDecrypt = sendResponse;
+    chromeStorageService
+      .update({
+        cwiDecryptRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+    return true;
+  };
+
+  const processCWICreateActionRequest = (
+    message: { params: CreateActionArgs },
+    sendResponse: CallbackResponse,
+  ) => {
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) {
+      sendResponse({
+        type: CWIEventName.CREATE_ACTION,
+        success: false,
+        error: 'No account found!',
+      });
+      return true;
+    }
+    responseCallbackForCWICreateAction = sendResponse;
+    chromeStorageService
+      .update({
+        cwiCreateActionRequest: message.params,
+      })
+      .then(() => {
+        launchPopUp();
+      });
+    return true;
+  };
+
+  // CWI SIGNING RESPONSES ********************************
+
+  const processCWICreateSignatureResponse = (response: CreateSignatureResult) => {
+    if (!responseCallbackForCWICreateSignature) throw Error('Missing callback!');
+    try {
+      responseCallbackForCWICreateSignature({
+        type: CWIEventName.CREATE_SIGNATURE,
+        success: true,
+        data: response,
+      });
+    } catch (error) {
+      responseCallbackForCWICreateSignature?.({
+        type: CWIEventName.CREATE_SIGNATURE,
+        success: false,
+        error: JSON.stringify(error),
+      });
+    } finally {
+      responseCallbackForCWICreateSignature = null;
+      chromeStorageService.remove('cwiCreateSignatureRequest');
+      chromeStorageService.getAndSetStorage().then((res) => {
+        if (res?.popupWindowId) {
+          removeWindow(res.popupWindowId);
+          chromeStorageService.remove('popupWindowId');
+        }
+      });
+    }
+    return true;
+  };
+
+  const processCWIEncryptResponse = (response: WalletEncryptResult) => {
+    if (!responseCallbackForCWIEncrypt) throw Error('Missing callback!');
+    try {
+      responseCallbackForCWIEncrypt({
+        type: CWIEventName.ENCRYPT,
+        success: true,
+        data: response,
+      });
+    } catch (error) {
+      responseCallbackForCWIEncrypt?.({
+        type: CWIEventName.ENCRYPT,
+        success: false,
+        error: JSON.stringify(error),
+      });
+    } finally {
+      responseCallbackForCWIEncrypt = null;
+      chromeStorageService.remove('cwiEncryptRequest');
+      chromeStorageService.getAndSetStorage().then((res) => {
+        if (res?.popupWindowId) {
+          removeWindow(res.popupWindowId);
+          chromeStorageService.remove('popupWindowId');
+        }
+      });
+    }
+    return true;
+  };
+
+  const processCWIDecryptResponse = (response: WalletDecryptResult) => {
+    if (!responseCallbackForCWIDecrypt) throw Error('Missing callback!');
+    try {
+      responseCallbackForCWIDecrypt({
+        type: CWIEventName.DECRYPT,
+        success: true,
+        data: response,
+      });
+    } catch (error) {
+      responseCallbackForCWIDecrypt?.({
+        type: CWIEventName.DECRYPT,
+        success: false,
+        error: JSON.stringify(error),
+      });
+    } finally {
+      responseCallbackForCWIDecrypt = null;
+      chromeStorageService.remove('cwiDecryptRequest');
+      chromeStorageService.getAndSetStorage().then((res) => {
+        if (res?.popupWindowId) {
+          removeWindow(res.popupWindowId);
+          chromeStorageService.remove('popupWindowId');
+        }
+      });
+    }
+    return true;
+  };
+
+  const processCWICreateActionResponse = (response: CreateActionResult) => {
+    if (!responseCallbackForCWICreateAction) throw Error('Missing callback!');
+    try {
+      responseCallbackForCWICreateAction({
+        type: CWIEventName.CREATE_ACTION,
+        success: true,
+        data: response,
+      });
+    } catch (error) {
+      responseCallbackForCWICreateAction?.({
+        type: CWIEventName.CREATE_ACTION,
+        success: false,
+        error: JSON.stringify(error),
+      });
+    } finally {
+      responseCallbackForCWICreateAction = null;
+      chromeStorageService.remove('cwiCreateActionRequest');
+      chromeStorageService.getAndSetStorage().then((res) => {
+        if (res?.popupWindowId) {
+          removeWindow(res.popupWindowId);
+          chromeStorageService.remove('popupWindowId');
+        }
+      });
+    }
+    return true;
+  };
+
   // RESPONSES ********************************
 
   const cleanup = (types: YoursEventName[]) => {
@@ -1087,6 +1678,36 @@ if (isInServiceWorker) {
   };
 
   const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys }) => {
+    // Handle CWI waitForAuthentication callback if present
+    if (responseCallbackForCWIWaitForAuthentication) {
+      try {
+        if (response.decision === 'approved') {
+          responseCallbackForCWIWaitForAuthentication({
+            type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+            success: true,
+            data: { authenticated: true },
+          });
+        } else {
+          responseCallbackForCWIWaitForAuthentication({
+            type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+            success: false,
+            error: 'User declined the connection request',
+          });
+        }
+      } catch (error) {
+        responseCallbackForCWIWaitForAuthentication?.({
+          type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+          success: false,
+          error: JSON.stringify(error),
+        });
+      } finally {
+        responseCallbackForCWIWaitForAuthentication = null;
+        cleanup([YoursEventName.CONNECT]);
+      }
+      return true;
+    }
+
+    // Handle legacy connect callback
     if (!responseCallbackForConnectRequest) throw Error('Missing callback!');
     try {
       if (response.decision === 'approved') {
@@ -1489,6 +2110,47 @@ if (isInServiceWorker) {
         });
         responseCallbackForDecryptRequest = null;
         chromeStorageService.remove('decryptRequest');
+      }
+
+      // CWI (BRC-100) popup dismiss handlers
+      if (responseCallbackForCWICreateSignature) {
+        responseCallbackForCWICreateSignature({
+          type: CWIEventName.CREATE_SIGNATURE,
+          success: false,
+          error: 'User dismissed the request!',
+        });
+        responseCallbackForCWICreateSignature = null;
+        chromeStorageService.remove('cwiCreateSignatureRequest');
+      }
+
+      if (responseCallbackForCWIEncrypt) {
+        responseCallbackForCWIEncrypt({
+          type: CWIEventName.ENCRYPT,
+          success: false,
+          error: 'User dismissed the request!',
+        });
+        responseCallbackForCWIEncrypt = null;
+        chromeStorageService.remove('cwiEncryptRequest');
+      }
+
+      if (responseCallbackForCWIDecrypt) {
+        responseCallbackForCWIDecrypt({
+          type: CWIEventName.DECRYPT,
+          success: false,
+          error: 'User dismissed the request!',
+        });
+        responseCallbackForCWIDecrypt = null;
+        chromeStorageService.remove('cwiDecryptRequest');
+      }
+
+      if (responseCallbackForCWICreateAction) {
+        responseCallbackForCWICreateAction({
+          type: CWIEventName.CREATE_ACTION,
+          success: false,
+          error: 'User dismissed the request!',
+        });
+        responseCallbackForCWICreateAction = null;
+        chromeStorageService.remove('cwiCreateActionRequest');
       }
 
       popupWindowId = undefined;

@@ -79,7 +79,7 @@ export type Bsv20TokensListProps = {
 
 export const ManageTokens = (props: Bsv20TokensListProps) => {
   const { bsv20s, theme, onBack } = props;
-  const { ordinalService, chromeStorageService, keysService, gorillaPoolService } = useServiceContext();
+  const { ordinalService, chromeStorageService, keysService, wallet } = useServiceContext();
   const [favoriteTokens, setFavoriteTokens] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -142,13 +142,7 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
         filteredTokens.map((t) => (
           <FavoriteRow theme={theme} key={t.id}>
             <TickerWrapper>
-              <Icon
-                src={
-                  t.icon
-                    ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${t.icon}`
-                    : GENERIC_TOKEN_ICON
-                }
-              />
+              <Icon src={t.icon ? `${wallet.services.baseUrl}/content/${t.icon}` : GENERIC_TOKEN_ICON} />
               <TickerTextWrapper>
                 <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
                   {ordinalService.getTokenName(t)}

@@ -13,7 +13,7 @@ import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { getTxFromRawTxFormat } from '../../utils/tools';
-import { IndexContext } from 'spv-store';
+import type { ParseContext } from '@1sat/wallet-toolbox';
 import TxPreview from '../../components/TxPreview';
 import { styled } from 'styled-components';
 
@@ -42,16 +42,16 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   const [satsOut, setSatsOut] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [txData, setTxData] = useState<IndexContext>();
-  const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
+  const [txData, setTxData] = useState<ParseContext>();
+  const { keysService, bsvService, chromeStorageService, wallet } = useServiceContext();
   const { bsvAddress, ordAddress, identityAddress } = keysService;
 
   useEffect(() => {
     (async () => {
-      if (!request.rawtx || !oneSatSPV || !!txData) return;
+      if (!request.rawtx || !wallet || !!txData) return;
       setIsLoading(true);
       const tx = getTxFromRawTxFormat(request.rawtx, request.format || 'tx');
-      const parsedTx = await oneSatSPV.parseTx(tx);
+      const parsedTx = await wallet.parseTransaction(tx);
       setTxData(parsedTx);
       setIsLoading(false);
     })();
@@ -78,13 +78,13 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
   }, [message, txid]);
 
   useEffect(() => {
-    if (!bsvAddress || !ordAddress || !identityAddress || !oneSatSPV || !txData) return;
+    if (!bsvAddress || !ordAddress || !identityAddress || !wallet || !txData) return;
     (async () => {
       console.log(bsvAddress, ordAddress, identityAddress);
       // how much did the user put in to the tx
       let userSatsOut = txData.spends.reduce((acc, spend) => {
         if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
-          return acc + spend.satoshis;
+          return acc + BigInt(spend.output.satoshis || 0);
         }
         return acc;
       }, 0n);
@@ -92,7 +92,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
       // how much did the user get back from the tx
       userSatsOut = txData.txos.reduce((acc, txo) => {
         if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
-          return acc - txo.satoshis;
+          return acc - BigInt(txo.output.satoshis || 0);
         }
         return acc;
       }, userSatsOut);
@@ -130,22 +130,25 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
         rawtx = res.rawtx;
       }
       const tx = getTxFromRawTxFormat(rawtx, request.format || 'tx');
+      const broadcastTxid = tx.id('hex');
 
-      const resp = await oneSatSPV.broadcast(tx, 'provider');
-      if (resp.status === 'error') {
+      try {
+        await wallet!.broadcast(tx, 'provider');
+      } catch (broadcastError) {
         addSnackbar('Error broadcasting the raw tx!', 'error');
         setIsProcessing(false);
         sendMessage({
           action: 'broadcastResponse',
-          error: resp.description ?? 'Unknown error',
+          error: broadcastError instanceof Error ? broadcastError.message : 'Unknown error',
         });
         onBroadcast();
         return;
       }
-      setTxid(resp.txid);
+
+      setTxid(broadcastTxid);
       sendMessage({
         action: 'broadcastResponse',
-        txid: resp.txid,
+        txid: broadcastTxid,
       });
 
       addSnackbar('Successfully broadcasted the tx!', 'success');

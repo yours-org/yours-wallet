@@ -5,8 +5,7 @@ import { KeysService } from '../services/Keys.service';
 import { ContractService } from '../services/Contract.service';
 import { BsvService } from '../services/Bsv.service';
 import { OrdinalService } from '../services/Ordinal.service';
-import { SPVStore } from 'spv-store';
-import { GorillaPoolService } from '../services/GorillaPool.service';
+import type { OneSatWallet } from '@1sat/wallet-toolbox';
 import { MneeInterface } from '@mnee/ts-sdk';
 
 export interface ServiceContextProps {
@@ -16,13 +15,12 @@ export interface ServiceContextProps {
   mneeService: MneeInterface;
   ordinalService: OrdinalService;
   wocService: WhatsOnChainService;
-  gorillaPoolService: GorillaPoolService;
   contractService: ContractService;
   isLocked: boolean;
   isReady: boolean;
   setIsLocked: (isLocked: boolean) => void;
   lockWallet: () => Promise<void>;
-  oneSatSPV: SPVStore;
+  wallet: OneSatWallet;
 }
 
 export const ServiceContext = createContext<ServiceContextProps | undefined>(undefined);

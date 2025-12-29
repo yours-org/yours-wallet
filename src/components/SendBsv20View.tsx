@@ -63,7 +63,7 @@ export type SendBsv20ViewProps = {
 };
 
 export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
-  const { ordinalService, chromeStorageService, gorillaPoolService } = useServiceContext();
+  const { ordinalService, chromeStorageService, wallet } = useServiceContext();
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
   const { getTokenName, sendBSV20 } = ordinalService;
@@ -74,7 +74,7 @@ export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [receiveAddress, setReceiveAddress] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
-  const network = chromeStorageService.getNetwork();
+  const baseUrl = wallet.services.baseUrl;
 
   useEffect(() => {
     if (!successTxId) return;
@@ -154,10 +154,7 @@ export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
       {token ? (
         <ConfirmContent>
           <Show when={!!token.info.icon && token.info.icon.length > 0}>
-            <TokenIcon
-              style={{ marginBottom: '0.5rem' }}
-              src={`${gorillaPoolService.getBaseUrl(network)}/content/${token.info.icon}`}
-            />
+            <TokenIcon style={{ marginBottom: '0.5rem' }} src={`${baseUrl}/content/${token.info.icon}`} />
           </Show>
           <TransferBSV20Header theme={theme}>Send {getTokenName(token.info)}</TransferBSV20Header>
           <BSV20Container>

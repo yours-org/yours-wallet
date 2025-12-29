@@ -2,12 +2,88 @@ import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
 import { DEFAULT_SIGHASH_TYPE } from '../utils/constants';
 import { KeysService } from './Keys.service';
 import { Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
-import { SPVStore, Txo } from 'spv-store';
-import { LockTemplate } from 'spv-store';
+import type { OneSatWallet, Txo } from '@1sat/wallet-toolbox';
+
+// LockTemplate for time-locked coins - simplified version
+// TODO: Move to a shared templates module
+class LockTemplate {
+  private lockPrefix = '20d37f4de0d1c735b4d51a5572df0f3d9104d1d9e99db8694fdd1b1a92e1f0dce1757601687f76a9';
+  private lockSuffix = '88ac7e7601207f75a9011488';
+
+  lock(address: string, until: number): Script {
+    const pkh = Utils.fromBase58Check(address).data as number[];
+    return new Script()
+      .writeScript(Script.fromHex(this.lockPrefix))
+      .writeBin(pkh)
+      .writeNumber(until)
+      .writeScript(Script.fromHex(this.lockSuffix));
+  }
+
+  unlock(
+    privateKey: PrivateKey,
+    signOutputs: 'all' | 'none' | 'single' = 'all',
+    anyoneCanPay = false,
+    sourceSatoshis?: number,
+    lockingScript?: Script,
+  ): {
+    sign: (tx: Transaction, inputIndex: number) => Promise<Script>;
+    estimateLength: (tx: Transaction, inputIndex: number) => Promise<number>;
+  } {
+    return {
+      sign: async (tx: Transaction, inputIndex: number) => {
+        let signatureScope = TransactionSignature.SIGHASH_FORKID;
+        if (signOutputs === 'all') {
+          signatureScope |= TransactionSignature.SIGHASH_ALL;
+        }
+        if (signOutputs === 'none') {
+          signatureScope |= TransactionSignature.SIGHASH_NONE;
+        }
+        if (signOutputs === 'single') {
+          signatureScope |= TransactionSignature.SIGHASH_SINGLE;
+        }
+        if (anyoneCanPay) {
+          signatureScope |= TransactionSignature.SIGHASH_ANYONECANPAY;
+        }
+        const input = tx.inputs[inputIndex];
+        const otherInputs = tx.inputs.filter((_, index) => index !== inputIndex);
+        const sourceTXID = input.sourceTXID ? input.sourceTXID : input.sourceTransaction?.id('hex');
+        if (!sourceTXID) {
+          throw new Error('The input sourceTXID or sourceTransaction is required for transaction signing.');
+        }
+        const sats = sourceSatoshis ?? input.sourceTransaction?.outputs[input.sourceOutputIndex]?.satoshis ?? 0;
+        const subscript =
+          lockingScript ?? input.sourceTransaction?.outputs[input.sourceOutputIndex]?.lockingScript ?? new Script();
+        const preimage = TransactionSignature.format({
+          sourceTXID,
+          sourceOutputIndex: input.sourceOutputIndex,
+          sourceSatoshis: sats,
+          transactionVersion: tx.version,
+          otherInputs,
+          inputIndex,
+          outputs: tx.outputs,
+          inputSequence: input.sequence ?? 0xffffffff,
+          subscript,
+          lockTime: tx.lockTime,
+          scope: signatureScope,
+        });
+        const rawSignature = privateKey.sign(Hash.sha256(preimage));
+        const sig = new TransactionSignature(rawSignature.r, rawSignature.s, signatureScope);
+        const pubKey = privateKey.toPublicKey();
+        return new Script().writeBin(sig.toChecksigFormat()).writeBin(pubKey.encode(true) as number[]);
+      },
+      estimateLength: async () => {
+        return 108; // Approximate signature + pubkey length
+      },
+    };
+  }
+}
+
+// LockTxo interface removed - now using Txo from @1sat/wallet-toolbox
+
 export class ContractService {
   constructor(
     private readonly keysService: KeysService,
-    private readonly oneSatSPV: SPVStore,
+    private readonly wallet: OneSatWallet,
   ) {}
 
   getSignatures = async (
@@ -109,41 +185,28 @@ export class ContractService {
         lockingScript: new P2PKH().lock(bsvAddress),
         change: true,
       });
-      for (const lock of locks) {
-        const pk = pkMap.get(lock.owner || '');
+      for (const txo of locks) {
+        const pk = pkMap.get(txo.owner || '');
         if (!pk) continue;
-        // const input = fromUtxo(
-        //   {
-        //     txid: lock.outpoint.txid,
-        //     vout: lock.outpoint.vout,
-        //     satoshis: Number(lock.satoshis),
-        //     script: Utils.toHex([...lock.script]),
-        //   },
-        //   new LockTemplate().unlock(pk, 'all', false, Number(lock.satoshis), Script.fromBinary(lock.script)),
-        // );
-        // input.sequence = 0;
+        const sourceTransaction = await this.wallet.loadTransaction(txo.outpoint.txid);
+        if (!sourceTransaction) {
+          console.log(`Could not find source transaction ${txo.outpoint.txid}`);
+          continue;
+        }
+        const satoshis = txo.output.satoshis || 0;
         tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(lock.outpoint.txid),
-          sourceOutputIndex: lock.outpoint.vout,
+          sourceTransaction,
+          sourceOutputIndex: txo.outpoint.vout,
           sequence: 0,
-          unlockingScriptTemplate: new LockTemplate().unlock(
-            pk,
-            'all',
-            false,
-            Number(lock.satoshis),
-            Script.fromBinary(lock.script),
-          ),
+          unlockingScriptTemplate: new LockTemplate().unlock(pk, 'all', false, satoshis, txo.output.lockingScript),
         });
       }
 
       await tx.fee();
       await tx.sign();
-      const response = await this.oneSatSPV.broadcast(tx);
-      if (response?.txid) {
-        return { txid: response.txid };
-      }
-
-      return { error: 'broadcast-failed' };
+      const txid = tx.id('hex');
+      await this.wallet.broadcast(tx, 'Unlock Locked Coins');
+      return { txid };
     } catch (error) {
       console.error('unlock failed:', error);
       return { error: JSON.stringify(error) };

@@ -17,7 +17,6 @@ import { PublicKey } from '@bsv/sdk';
 import { OrdP2PKH } from 'js-1sat-ord';
 import { convertAddressToMainnet, convertAddressToTestnet, getErrorMessage } from '../../utils/tools';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
-import { setDerivationTags } from '../../services/serviceHelpers';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 
 export type GenerateTaggedKeysRequestProps = {
@@ -41,7 +40,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService, oneSatSPV } = useServiceContext();
+  const { chromeStorageService, keysService, bsvService } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
 
   useEffect(() => {
@@ -172,7 +171,8 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
     }
 
     await sleep(3000); // give enough time for indexer to index newly created tag
-    await setDerivationTags(keys, oneSatSPV, chromeStorageService);
+    // TODO: Migrate setDerivationTags to use OneSatWallet
+    // await setDerivationTags(keys, wallet, chromeStorageService);
 
     setSuccessTxId(res.pubKey);
     addSnackbar('Successfully generated key!', 'success');

@@ -1,9 +1,8 @@
 import { ReactNode, useCallback, useEffect, useState } from 'react';
-import { oneSatSPVPromise } from '../../background';
+import { walletPromise } from '../../background';
 import { BsvService } from '../../services/Bsv.service';
 import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { ContractService } from '../../services/Contract.service';
-import { GorillaPoolService } from '../../services/GorillaPool.service';
 import { KeysService } from '../../services/Keys.service';
 import { OrdinalService } from '../../services/Ordinal.service';
 import { WhatsOnChainService } from '../../services/WhatsOnChain.service';
@@ -13,23 +12,16 @@ import mnee from '@mnee/ts-sdk';
 
 const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();
-  await chromeStorageService.getAndSetStorage(); // Ensure the storage is initialized
+  await chromeStorageService.getAndSetStorage();
 
   const wocService = new WhatsOnChainService(chromeStorageService);
-  const gorillaPoolService = new GorillaPoolService(chromeStorageService);
-  const oneSatSPV = await oneSatSPVPromise;
-  const keysService = new KeysService(chromeStorageService, oneSatSPV);
-  const contractService = new ContractService(keysService, oneSatSPV);
+  const wallet = await walletPromise;
+  const keysService = new KeysService(chromeStorageService, wallet);
+  const contractService = new ContractService(keysService, wallet);
   const mneeService = new mnee({ environment: 'production', apiKey: MNEE_API_TOKEN });
 
-  const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, oneSatSPV);
-  const ordinalService = new OrdinalService(
-    keysService,
-    bsvService,
-    oneSatSPV,
-    chromeStorageService,
-    gorillaPoolService,
-  );
+  const bsvService = new BsvService(keysService, wocService, contractService, chromeStorageService, wallet);
+  const ordinalService = new OrdinalService(keysService, wallet, chromeStorageService);
 
   return {
     chromeStorageService,
@@ -38,9 +30,8 @@ const initializeServices = async () => {
     mneeService,
     ordinalService,
     wocService,
-    gorillaPoolService,
     contractService,
-    oneSatSPV,
+    wallet,
   };
 };
 
@@ -81,7 +72,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
     initServices();
     return () => {
-      localStorage.removeItem('walletImporting'); // See QueueBanner.tsx
+      localStorage.removeItem('walletImporting'); // See SyncBanner.tsx
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

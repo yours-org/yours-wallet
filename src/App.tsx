@@ -31,15 +31,19 @@ import { WhitelistedApp } from './inject';
 import { PageLoader } from './components/PageLoader';
 import { useServiceContext } from './hooks/useServiceContext';
 import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
-import { QueueBanner } from './components/QueueBanner';
+import { SyncBanner } from './components/SyncBanner';
 import { SyncingBlocks } from './components/SyncingBlocks';
 import { MasterRestore } from './pages/onboarding/MasterRestore';
 import { Bsv20SendRequest } from './pages/requests/Bsv20SendRequest';
 import { BlockHeightProvider } from './contexts/providers/BlockHeightProvider';
-import { QueueProvider } from './contexts/providers/QueueProvider';
+import { SyncProvider } from './contexts/providers/SyncProvider';
 import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
 import { SnackbarProvider } from './contexts/providers/SnackbarProvider';
 import { MNEESendRequest } from './pages/requests/MNEESendRequest';
+import { CWICreateSignatureRequest } from './pages/requests/CWICreateSignatureRequest';
+import { CWIEncryptRequest } from './pages/requests/CWIEncryptRequest';
+import { CWIDecryptRequest } from './pages/requests/CWIDecryptRequest';
+import { CWICreateActionRequest } from './pages/requests/CWICreateActionRequest';
 
 const MainContainer = styled.div<WhiteLabelTheme & { $isMobile?: boolean }>`
   display: flex;
@@ -80,6 +84,11 @@ export const App = () => {
     generateTaggedKeysRequest,
     encryptRequest,
     decryptRequest,
+    // CWI (BRC-100) requests
+    cwiCreateSignatureRequest,
+    cwiEncryptRequest,
+    cwiDecryptRequest,
+    cwiCreateActionRequest,
     clearRequest,
     popupId,
     getStorageAndSetRequestState,
@@ -122,11 +131,11 @@ export const App = () => {
   return (
     <MainContainer $isMobile={isMobile} theme={theme}>
       <BlockHeightProvider>
-        <QueueProvider>
+        <SyncProvider>
           <BottomMenuProvider network={chromeStorageService.getNetwork()}>
             <Container theme={theme}>
               <SnackbarProvider>
-                <QueueBanner />
+                <SyncBanner />
                 <SyncingBlocks />
                 <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
                   <Router>
@@ -163,7 +172,11 @@ export const App = () => {
                               !getSignaturesRequest &&
                               !generateTaggedKeysRequest &&
                               !encryptRequest &&
-                              !decryptRequest
+                              !decryptRequest &&
+                              !cwiCreateSignatureRequest &&
+                              !cwiEncryptRequest &&
+                              !cwiDecryptRequest &&
+                              !cwiCreateActionRequest
                             }
                             whenFalseContent={
                               <>
@@ -230,6 +243,35 @@ export const App = () => {
                                     popupId={popupId}
                                   />
                                 </Show>
+                                {/* CWI (BRC-100) requests */}
+                                <Show when={!!cwiCreateSignatureRequest}>
+                                  <CWICreateSignatureRequest
+                                    request={cwiCreateSignatureRequest!}
+                                    onSignature={() => clearRequest('cwiCreateSignatureRequest')}
+                                    popupId={popupId}
+                                  />
+                                </Show>
+                                <Show when={!!cwiEncryptRequest}>
+                                  <CWIEncryptRequest
+                                    request={cwiEncryptRequest!}
+                                    onEncrypt={() => clearRequest('cwiEncryptRequest')}
+                                    popupId={popupId}
+                                  />
+                                </Show>
+                                <Show when={!!cwiDecryptRequest}>
+                                  <CWIDecryptRequest
+                                    request={cwiDecryptRequest!}
+                                    onDecrypt={() => clearRequest('cwiDecryptRequest')}
+                                    popupId={popupId}
+                                  />
+                                </Show>
+                                <Show when={!!cwiCreateActionRequest}>
+                                  <CWICreateActionRequest
+                                    request={cwiCreateActionRequest!}
+                                    onAction={() => clearRequest('cwiCreateActionRequest')}
+                                    popupId={popupId}
+                                  />
+                                </Show>
                               </>
                             }
                           >
@@ -273,7 +315,7 @@ export const App = () => {
               </SnackbarProvider>
             </Container>
           </BottomMenuProvider>
-        </QueueProvider>
+        </SyncProvider>
       </BlockHeightProvider>
     </MainContainer>
   );

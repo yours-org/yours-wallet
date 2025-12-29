@@ -16,8 +16,13 @@ import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendBsv20 } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { normalize } from '../../utils/ordi';
-import { Token } from '../../services/types/gorillaPool.types';
 import { getErrorMessage } from '../../utils/tools';
+
+type TokenInfo = {
+  sym?: string;
+  icon?: string;
+  dec: number;
+};
 
 const Icon = styled.img`
   width: 3.5rem;
@@ -37,21 +42,35 @@ export const Bsv20SendRequest = (props: Bsv20SendRequestProps) => {
   const { handleSelect, hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { ordinalService, chromeStorageService, gorillaPoolService } = useServiceContext();
+  const { ordinalService, chromeStorageService, wallet } = useServiceContext();
   const { sendBSV20 } = ordinalService;
   const [isProcessing, setIsProcessing] = useState(false);
-  const [token, setToken] = useState<Token>();
+  const [token, setToken] = useState<TokenInfo>();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const tokenIcon =
-    (token?.icon && `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${token.icon}`) ||
-    GENERIC_TOKEN_ICON;
+  const tokenIcon = (token?.icon && `${wallet.services.baseUrl}/content/${token.icon}`) || GENERIC_TOKEN_ICON;
 
   useEffect(() => {
     (async () => {
       if (!request) return;
-      const token = await gorillaPoolService.getBsv20Details(request.idOrTick);
-      if (!token) return;
-      setToken(token);
+      // Get token metadata from wallet's stored BSV21 data
+      const result = await wallet.listOutputs({
+        basket: 'bsv21',
+        tags: [`id:${request.idOrTick}:valid`],
+        includeTags: true,
+        limit: 1,
+      });
+      if (result.outputs.length === 0) return;
+
+      const o = result.outputs[0];
+      const symTag = o.tags?.find((t: string) => t.startsWith('sym:'))?.slice(4);
+      const iconTag = o.tags?.find((t: string) => t.startsWith('icon:'))?.slice(5);
+      const decTag = o.tags?.find((t: string) => t.startsWith('dec:'))?.slice(4);
+
+      setToken({
+        sym: symTag,
+        icon: iconTag,
+        dec: decTag ? parseInt(decTag, 10) : 0,
+      });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -164,7 +183,7 @@ export const Bsv20SendRequest = (props: Bsv20SendRequestProps) => {
             <Button
               theme={theme}
               type="primary"
-              label={`Approve ${request.amount} ${token?.sym || token?.tick}`}
+              label={`Approve ${request.amount} ${token?.sym}`}
               disabled={isProcessing}
               isSubmit
             />

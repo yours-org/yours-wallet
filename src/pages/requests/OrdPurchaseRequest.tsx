@@ -1,6 +1,8 @@
 import validate from 'bitcoin-address-validation';
 import { useEffect, useState } from 'react';
-import { Ordinal as OrdinalType, PurchaseOrdinal } from 'yours-wallet-provider';
+import { PurchaseOrdinal } from 'yours-wallet-provider';
+import type { Txo } from '@1sat/wallet-toolbox';
+import type { WalletOutput } from '@bsv/sdk';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Ordinal } from '../../components/Ordinal';
@@ -21,8 +23,25 @@ import {
 import { sleep } from '../../utils/sleep';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { styled } from 'styled-components';
-import { Token } from '../../services/types/gorillaPool.types';
 import { getErrorMessage } from '../../utils/tools';
+
+/** Convert Txo to minimal WalletOutput for Ordinal component */
+const txoToWalletOutput = (txo: Txo): WalletOutput => {
+  const originData = txo.data?.origin?.data as
+    | { outpoint?: string; map?: Record<string, unknown>; insc?: { file?: { type?: string } } }
+    | undefined;
+  const tags: string[] = [];
+  if (originData?.outpoint) tags.push(`origin:${originData.outpoint}`);
+  if (originData?.insc?.file?.type) tags.push(`type:${originData.insc.file.type}`);
+  if (originData?.map?.name) tags.push(`name:${originData.map.name}`);
+
+  return {
+    satoshis: txo.output.satoshis ?? 1,
+    spendable: true,
+    outpoint: txo.outpoint.toString(),
+    tags,
+  };
+};
 
 const TokenIcon = styled.img`
   width: 3.5rem;
@@ -42,30 +61,29 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
   const { hideMenu } = useBottomMenu();
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { gorillaPoolService, ordinalService, chromeStorageService } = useServiceContext();
-  const [inscription, setInscription] = useState<OrdinalType | undefined>();
+  const { ordinalService, chromeStorageService, wallet } = useServiceContext();
+  const [listingTxo, setListingTxo] = useState<Txo | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [tokenDetails, setTokenDetails] = useState<Token>();
   const [isLoaded, setIsLoaded] = useState(false);
   const marketplaceAddress = request.marketplaceAddress ?? YOURS_DEV_WALLET;
   const marketplaceRate = request.marketplaceRate ?? GLOBAL_ORDERBOOK_MARKET_RATE;
   const outpoint = request.outpoint;
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const network = chromeStorageService.getNetwork();
+  const baseUrl = wallet.services.baseUrl;
+
+  // Extract token data from Txo
+  const bsv21Data = listingTxo?.data?.bsv21?.data as
+    | { id?: string; sym?: string; icon?: string; amt?: bigint }
+    | undefined;
+  const hasTokenData = !!bsv21Data;
 
   useEffect(() => {
     hideMenu();
     if (!request.outpoint) return;
     const getOrigin = async () => {
       setIsProcessing(true);
-      const res = await gorillaPoolService.getUtxoByOutpoint(request.outpoint);
-      setInscription(res);
-      if (res?.data?.bsv20) {
-        const tokenDetails = await gorillaPoolService.getBsv20Details(
-          res?.data.bsv20?.id || res.data.bsv20?.tick || '',
-        );
-        setTokenDetails(tokenDetails);
-      }
+      const txo = await wallet.loadTxo(request.outpoint);
+      setListingTxo(txo);
       setIsProcessing(false);
       setIsLoaded(true);
     };
@@ -76,7 +94,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
 
   const handlePurchaseOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!inscription) {
+    if (!listingTxo) {
       addSnackbar('Could not locate the ordinal!', 'error');
       return;
     }
@@ -101,7 +119,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
       outpoint,
       password: passwordConfirm,
     };
-    const purchaseRes = await ordinalService.purchaseGlobalOrderbookListing(purchaseListing, inscription, tokenDetails);
+    const purchaseRes = await ordinalService.purchaseGlobalOrderbookListing(purchaseListing, listingTxo);
 
     if (!purchaseRes.txid || purchaseRes.error) {
       addSnackbar(getErrorMessage(purchaseRes.error), 'error');
@@ -128,37 +146,38 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
     window.location.reload();
   };
 
+  // Extract origin data for content URL
+  const originData = listingTxo?.data?.origin?.data as { outpoint?: string; map?: Record<string, unknown> } | undefined;
+  const originOutpoint = originData?.outpoint;
+  const listData = listingTxo?.data?.list?.data as { price?: number } | undefined;
+  const price = listData?.price ?? 0;
+  const tokenName = bsv21Data?.sym || (originData?.map?.name as string) || 'Unknown Token';
+
   return (
     <>
       <Show when={isProcessing}>
         <PageLoader theme={theme} message={isLoaded ? 'Purchasing Ordinal...' : 'Processing...'} />
       </Show>
 
-      <Show when={!isProcessing && !!request && !!inscription}>
+      <Show when={!isProcessing && !!request && !!listingTxo}>
         <ConfirmContent>
           <Show
-            when={!tokenDetails}
+            when={!hasTokenData}
             whenFalseContent={
-              <TokenIcon
-                src={
-                  tokenDetails?.icon
-                    ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${tokenDetails.icon}`
-                    : GENERIC_TOKEN_ICON
-                }
-              />
+              <TokenIcon src={bsv21Data?.icon ? `${baseUrl}/content/${bsv21Data.icon}` : GENERIC_TOKEN_ICON} />
             }
           >
             <Ordinal
-              inscription={inscription as OrdinalType}
+              output={txoToWalletOutput(listingTxo!)}
               theme={theme}
-              url={`${gorillaPoolService.getBaseUrl(network)}/content/${inscription?.origin?.outpoint}`}
+              url={`${baseUrl}/content/${originOutpoint}`}
               selected={true}
             />
           </Show>
           <HeaderText theme={theme}>Purchase Request</HeaderText>
-          <Show when={!!tokenDetails}>
+          <Show when={hasTokenData}>
             <Text theme={theme} style={{ color: theme.color.global.gray }}>
-              {tokenDetails?.sym || tokenDetails?.tick || inscription?.origin?.data?.map?.name || 'Unknown Token'}
+              {tokenName}
             </Text>
           </Show>
           <FormContainer noValidate onSubmit={(e) => handlePurchaseOrdinal(e)}>
@@ -178,8 +197,7 @@ export const OrdPurchaseRequest = (props: OrdPurchaseRequestProps) => {
               theme={theme}
               type="primary"
               label={`Pay ${(
-                (Number(inscription?.data?.list?.price) * (1 + marketplaceRate) +
-                  (tokenDetails ? BSV20_INDEX_FEE : 0)) /
+                (price * (1 + marketplaceRate) + (hasTokenData ? BSV20_INDEX_FEE : 0)) /
                 BSV_DECIMAL_CONVERSION
               ).toFixed(8)} BSV`}
               disabled={isProcessing}

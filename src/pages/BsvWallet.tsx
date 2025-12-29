@@ -41,7 +41,7 @@ import { LockData } from '../services/types/bsv.types';
 import { sendMessage } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
 import { InWalletBsvResponse } from '../services/types/bsv.types';
-import { useQueueTracker } from '../hooks/useQueueTracker';
+import { useSyncTracker } from '../hooks/useSyncTracker';
 import { getErrorMessage, isValidEmail } from '../utils/tools';
 import { UpgradeNotification } from '../components/UpgradeNotification';
 import { Bsv20 } from 'yours-wallet-provider';
@@ -210,7 +210,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const { updateBalance, isSyncing } = useQueueTracker();
+  const { updateBalance, isSyncing } = useSyncTracker();
   const urlParams = new URLSearchParams(location.search);
   const { handleSelect, query } = useBottomMenu();
   const isReload = urlParams.get('reload') === 'true' || query === 'reload';
@@ -219,7 +219,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService, ordinalService, oneSatSPV, mneeService } = useServiceContext();
+  const { chromeStorageService, keysService, bsvService, ordinalService, mneeService } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
@@ -350,7 +350,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
       const obj = await chromeStorageService.getAndSetStorage();
       obj && !obj.hasUpgradedToSPV ? setShowUpgrade(true) : setShowUpgrade(false);
       if (obj?.selectedAccount) {
-        oneSatSPV.stores.txos?.syncTxLogs();
+        // TODO: Migrate syncTxLogs to OneSatWallet
+        // oneSatSPV.stores.txos?.syncTxLogs();
         if (!ordinalService) return;
         await getAndSetAccountAndBsv20s();
       }
@@ -755,7 +756,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
           title={'Sync Transactions'}
           style={{ fontSize: '2rem', cursor: 'pointer' }}
           theme={theme}
-          onClick={() => oneSatSPV.stores.txos?.syncTxLogs()}
+          // eslint-disable-next-line @typescript-eslint/no-empty-function -- TODO: Migrate syncTxLogs to OneSatWallet
+          onClick={() => {}}
         >
           {formatUSD(bsvBalance * exchangeRate)}
         </HeaderText>

@@ -1,8 +1,9 @@
 import styled from 'styled-components';
-import { Ordinal as OrdinalType } from 'yours-wallet-provider';
+import type { WalletOutput } from '@bsv/sdk';
 import { WhiteLabelTheme, Theme } from '../theme.types';
 import { Text } from './Reusable';
 import { Show } from './Show';
+import { getTagValue } from '../utils/format';
 
 export type OrdinalDivProps = WhiteLabelTheme & {
   url?: string;
@@ -86,7 +87,7 @@ export const Json = styled.pre<WhiteLabelTheme>`
 `;
 
 export const FlexWrapper = styled.div`
-  flex: 0 1 calc(33.333% - 1rem); // Adjust the percentage and subtraction to account for margins/gaps
+  flex: 0 1 calc(33.333% - 1rem);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -104,26 +105,23 @@ export type OrdinalProps = {
   isTransfer?: boolean;
   selected?: boolean;
   size?: string;
-  inscription: OrdinalType;
+  output: WalletOutput;
   onClick?: () => void;
 };
 
 export const Ordinal = (props: OrdinalProps) => {
-  const { url, selected, isTransfer, size, inscription, theme, onClick } = props;
-  const contentType = inscription?.origin?.data?.insc?.file?.type;
+  const { url, selected, isTransfer, size, output, theme, onClick } = props;
 
-  // We can use this function to properly render unique use cases that may have different metadata than what is supported by default
-  const getOrdinalName = () => {
-    if (inscription?.origin?.data?.map?.name) {
-      return inscription.origin?.data?.map?.name;
-    } else if (inscription?.origin?.data?.map?.app === 'ssm') {
-      if (inscription?.origin?.data?.map?.chatName) {
-        return `SSM - ${inscription?.origin?.data?.map?.chatName}`;
-      } else {
-        return 'Unknown SSM Channel';
-      }
-    } else {
-      return 'Unknown Name';
+  const contentType = getTagValue(output.tags, 'type');
+  const name = getTagValue(output.tags, 'name') ?? 'Unknown';
+  const textContent = output.customInstructions;
+
+  const getJsonContent = (): Record<string, unknown> | undefined => {
+    if (!contentType?.startsWith('application/json') || !textContent) return undefined;
+    try {
+      return JSON.parse(textContent);
+    } catch {
+      return undefined;
     }
   };
 
@@ -142,19 +140,19 @@ export const Ordinal = (props: OrdinalProps) => {
       case contentType?.startsWith('application/op-ns'):
         return (
           <TextWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <OrdText theme={theme}>{inscription.origin?.data?.insc?.file?.text}</OrdText>
+            <OrdText theme={theme}>{textContent}</OrdText>
           </TextWrapper>
         );
       case contentType?.startsWith('application/json'):
         return (
           <JsonWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <Json theme={theme}>{JSON.stringify(inscription.origin?.data?.insc?.file?.json, null, 2)}</Json>
+            <Json theme={theme}>{JSON.stringify(getJsonContent(), null, 2)}</Json>
           </JsonWrapper>
         );
       default:
         return (
           <TextWrapper size={size} selected={selected} theme={theme} onClick={onClick}>
-            <UnsupportedText theme={theme}>😩 Syncing or Unsupported File Type</UnsupportedText>
+            <UnsupportedText theme={theme}>Syncing or Unsupported File Type</UnsupportedText>
           </TextWrapper>
         );
     }
@@ -169,7 +167,7 @@ export const Ordinal = (props: OrdinalProps) => {
           style={{ margin: '0.25rem 0', cursor: 'pointer', fontSize: '0.75rem' }}
           onClick={() => window.open(url, '_blank')}
         >
-          {getOrdinalName()}
+          {name}
         </Text>
       </Show>
     </FlexWrapper>
