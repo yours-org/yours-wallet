@@ -1,11 +1,6 @@
 import { NetWork } from 'yours-wallet-provider';
 import { OneSatWallet, OneSatServices, IndexedDbSyncQueue, ReadOnlySigner } from '@1sat/wallet-toolbox';
-import {
-  Wallet,
-  WalletStorageManager,
-  StorageProvider,
-  StorageIdb,
-} from '@bsv/wallet-toolbox-mobile';
+import { Wallet, WalletStorageManager, StorageProvider, StorageIdb } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
 import { KeyDeriver, PrivateKey } from '@bsv/sdk';
 import { YoursEventName } from './inject';
 import { ChromeStorageService } from './services/ChromeStorage.service';

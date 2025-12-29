@@ -9,7 +9,7 @@ export class WhatsOnChainService {
   apiKey: string;
   config: { headers: { 'woc-api-key': string } };
   constructor(private readonly chromeStorageService: ChromeStorageService) {
-    this.apiKey = process.env.REACT_APP_WOC_API_KEY as string;
+    this.apiKey = import.meta.env.VITE_WOC_API_KEY as string;
     this.config = {
       headers: {
         'woc-api-key': this.apiKey,
