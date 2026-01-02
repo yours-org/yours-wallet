@@ -63,18 +63,23 @@ export type SendBsv20ViewProps = {
 };
 
 export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
-  const { ordinalService, chromeStorageService, wallet } = useServiceContext();
+  const { chromeStorageService, oneSatApi } = useServiceContext();
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
-  const { getTokenName, sendBSV20 } = ordinalService;
+  // TODO: sendBSV20 needs to be reimplemented with oneSatApi
+  const getTokenName = (b: { sym?: string }): string => b.sym || 'Null';
+  const sendBSV20 = async (): Promise<{ txid: string } | undefined> => {
+    console.log('sendBSV20: Not yet implemented with new wallet architecture');
+    return undefined;
+  };
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const tokenType = token && (token.info.id || token.info.tick || '').length > 64 ? TokenType.BSV21 : TokenType.BSV20;
+  const tokenType = token && (token.info.id || '').length > 64 ? TokenType.BSV21 : TokenType.BSV20;
   const [tokenSendAmount, setTokenSendAmount] = useState<bigint | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [receiveAddress, setReceiveAddress] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
-  const baseUrl = wallet.services.baseUrl;
+  const baseUrl = oneSatApi.getContentUrl('');
 
   useEffect(() => {
     if (!successTxId) return;

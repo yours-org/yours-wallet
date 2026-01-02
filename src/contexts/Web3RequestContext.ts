@@ -1,6 +1,5 @@
 import { createContext } from 'react';
 import {
-  Broadcast,
   DecryptRequest,
   EncryptRequest,
   GetSignatures,
@@ -14,7 +13,8 @@ import {
 } from 'yours-wallet-provider';
 import { RequestParams } from '../inject';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
-import type { CreateSignatureArgs, WalletEncryptArgs, WalletDecryptArgs, CreateActionArgs } from '@bsv/sdk';
+import type { PermissionRequest } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
+import type { ApprovalContext } from '../yoursApi';
 
 export type Web3RequestContextProps = {
   connectRequest: RequestParams | undefined;
@@ -24,16 +24,14 @@ export type Web3RequestContextProps = {
   transferOrdinalRequest: TransferOrdinal | undefined;
   purchaseOrdinalRequest: PurchaseOrdinal | undefined;
   signMessageRequest: SignMessage | undefined;
-  broadcastRequest: Broadcast | undefined;
   getSignaturesRequest: GetSignatures | undefined;
   generateTaggedKeysRequest: TaggedDerivationRequest | undefined;
   encryptRequest: EncryptRequest | undefined;
   decryptRequest: DecryptRequest | undefined;
-  // CWI (BRC-100) requests
-  cwiCreateSignatureRequest: CreateSignatureArgs | undefined;
-  cwiEncryptRequest: WalletEncryptArgs | undefined;
-  cwiDecryptRequest: WalletDecryptArgs | undefined;
-  cwiCreateActionRequest: CreateActionArgs | undefined;
+  // Permission request from WalletPermissionsManager
+  permissionRequest: (PermissionRequest & { requestID: string }) | undefined;
+  // Transaction approval request from YoursApi
+  transactionApprovalRequest: ApprovalContext | undefined;
   popupId: number | undefined;
   getStorageAndSetRequestState: (chromeStorageService: ChromeStorageService) => void;
   clearRequest: (type: keyof Omit<Web3RequestContextProps, 'clearRequest'>) => void;

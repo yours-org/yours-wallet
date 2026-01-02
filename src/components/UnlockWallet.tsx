@@ -9,6 +9,7 @@ import { Input } from './Input';
 import { FormContainer, HeaderText, Text } from './Reusable';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursIcon } from './YoursIcon';
+import { sendMessage } from '../utils/chromeHelpers';
 
 const Container = styled.div<WhiteLabelTheme & { $isMobile: boolean }>`
   display: flex;
@@ -35,7 +36,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
   const { isMobile } = useViewport();
-  const { keysService, chromeStorageService } = useServiceContext();
+  const { chromeStorageService } = useServiceContext();
 
   const handleUnlock = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -43,14 +44,15 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    const isVerified = await keysService.verifyPassword(password);
+    const isVerified = chromeStorageService.verifyPassword(password);
     if (isVerified) {
       setVerificationFailed(false);
       const timestamp = Date.now();
       await chromeStorageService.update({ lastActiveTime: timestamp });
-      // TODO: Migrate setDerivationTags to use OneSatWallet
-      // const keys = (await keysService.retrieveKeys(password)) as Keys;
-      // await setDerivationTags(keys, wallet, chromeStorageService);
+
+      // Tell the service worker to reinitialize the wallet with the passKey
+      await sendMessage({ action: 'WALLET_UNLOCKED' });
+
       onUnlock();
     } else {
       setVerificationFailed(true);

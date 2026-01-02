@@ -14,7 +14,6 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { sleep } from '../utils/sleep';
 import { TopNav } from '../components/TopNav';
-import { ListOrdinal } from '../services/types/ordinal.types';
 import { WhiteLabelTheme } from '../theme.types';
 import { getErrorMessage } from '../utils/tools';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
@@ -140,11 +139,9 @@ type PageState = 'main' | 'transfer' | 'list' | 'cancel';
 export const OrdWallet = () => {
   const { theme } = useTheme();
   const [pageState, setPageState] = useState<PageState>('main');
-  const { chromeStorageService, ordinalService, wallet, isReady } = useServiceContext();
+  const { chromeStorageService, oneSatApi } = useServiceContext();
   const [isProcessing, setIsProcessing] = useState(false);
-  const { listOrdinalOnGlobalOrderbook, cancelGlobalOrderbookListing, transferOrdinalsMulti } = ordinalService;
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const baseUrl = wallet?.services?.baseUrl ?? '';
   const [selectedOrdinals, setSelectedOrdinals] = useState<WalletOutput[]>([]);
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [bsvListAmount, setBsvListAmount] = useState<number | null>();
@@ -196,22 +193,22 @@ export const OrdWallet = () => {
   });
 
   const loadOrdinals = useCallback(async () => {
-    if (!wallet) return;
+    if (!oneSatApi) return;
     if (ordinals.length === 0) setIsProcessing(true);
     const offset = from ? parseInt(from, 10) : 0;
-    const result = await wallet.listOutputs({ basket: '1sat', limit: 50, offset, includeTags: true, includeCustomInstructions: true });
+    const outputs = await oneSatApi.listOrdinals({ limit: 50, offset });
 
     // Filter out panda/tag and yours/tag types
-    const filtered = result.outputs.filter((o) => {
+    const filtered = outputs.filter((o) => {
       const contentType = getTagValue(o.tags, 'type');
       return contentType !== 'panda/tag' && contentType !== 'yours/tag';
     });
 
-    setFrom((offset + result.outputs.length).toString());
+    setFrom((offset + outputs.length).toString());
     setOrdinals((prev) => [...prev, ...filtered]);
     setIsProcessing(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallet, from]);
+  }, [oneSatApi, from]);
 
   useEffect(() => {
     if (isIntersecting && from) {
@@ -242,15 +239,15 @@ export const OrdWallet = () => {
   };
 
   const refreshOrdinals = async () => {
-    const result = await wallet.listOutputs({ basket: '1sat', limit: 50, offset: 0, includeTags: true, includeCustomInstructions: true });
+    const outputs = await oneSatApi.listOrdinals({ limit: 50, offset: 0 });
 
-    const filtered = result.outputs.filter((o) => {
+    const filtered = outputs.filter((o) => {
       const contentType = getTagValue(o.tags, 'type');
       return contentType !== 'panda/tag' && contentType !== 'yours/tag';
     });
 
     setOrdinals(filtered);
-    setFrom(result.outputs.length.toString());
+    setFrom(outputs.length.toString());
   };
 
   const handleMultiTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -265,18 +262,23 @@ export const OrdWallet = () => {
       return;
     }
 
-    const destinationAddresses = Object.values(addresses);
+    // Transfer each ordinal individually
     const outpoints = Object.keys(addresses);
+    let lastTxid = '';
 
-    const transferRes = await transferOrdinalsMulti({ outpoints, destinationAddresses, password: passwordConfirm });
+    for (const outpoint of outpoints) {
+      const destination = addresses[outpoint];
+      const transferRes = await oneSatApi.transferOrdinal({ outpoint, destination });
 
-    if (!transferRes.txid || transferRes.error) {
-      addSnackbar(getErrorMessage(transferRes.error), 'error');
-      setIsProcessing(false);
-      return;
+      if (!transferRes.txid || transferRes.error) {
+        addSnackbar(getErrorMessage(transferRes.error), 'error');
+        setIsProcessing(false);
+        return;
+      }
+      lastTxid = transferRes.txid;
     }
 
-    setSuccessTxId(transferRes.txid);
+    setSuccessTxId(lastTxid);
     addSnackbar('Transfer Successful!', 'success');
     refreshOrdinals();
   };
@@ -304,13 +306,15 @@ export const OrdWallet = () => {
       return;
     }
 
-    const listing: ListOrdinal = {
-      outpoint: selectedOrdinals[0].outpoint,
-      password: passwordConfirm,
-      price: Math.ceil(bsvListAmount * BSV_DECIMAL_CONVERSION),
-    };
+    // TODO: Get payAddress from BRC-29 receive address
+    // For now, we need to implement this - the payAddress should come from the wallet's receive address
+    const payAddress = ''; // Placeholder - needs proper implementation
 
-    const listRes = await listOrdinalOnGlobalOrderbook(listing);
+    const listRes = await oneSatApi.listOrdinal({
+      outpoint: selectedOrdinals[0].outpoint,
+      price: Math.ceil(bsvListAmount * BSV_DECIMAL_CONVERSION),
+      payAddress,
+    });
 
     if (!listRes.txid || listRes.error) {
       addSnackbar(getErrorMessage(listRes.error), 'error');
@@ -336,7 +340,7 @@ export const OrdWallet = () => {
 
     const ordinalOutpoint = selectedOrdinals[0].outpoint;
 
-    const cancelRes = await cancelGlobalOrderbookListing(ordinalOutpoint, passwordConfirm);
+    const cancelRes = await oneSatApi.cancelListing(ordinalOutpoint);
 
     if (!cancelRes.txid || cancelRes.error) {
       addSnackbar(getErrorMessage(cancelRes.error), 'error');
@@ -432,7 +436,7 @@ export const OrdWallet = () => {
           <Ordinal
             theme={theme}
             output={output}
-            url={`${baseUrl}/content/${originOutpoint}?outpoint=${outpoint}`}
+            url={`${oneSatApi.getContentUrl(originOutpoint || '')}?outpoint=${outpoint}`}
             isTransfer
             size="3rem"
           />
@@ -532,7 +536,7 @@ export const OrdWallet = () => {
         <Ordinal
           theme={theme}
           output={selectedOrdinals[0]}
-          url={`${baseUrl}/content/${cancelOriginOutpoint}?outpoint=${selectedOrdinals[0]?.outpoint}`}
+          url={`${oneSatApi.getContentUrl(cancelOriginOutpoint || '')}?outpoint=${selectedOrdinals[0]?.outpoint}`}
           selected
           isTransfer
         />
@@ -576,7 +580,7 @@ export const OrdWallet = () => {
             theme={theme}
             output={output}
             key={originOutpoint}
-            url={`${baseUrl}/content/${originOutpoint}?outpoint=${outpoint}`}
+            url={`${oneSatApi.getContentUrl(originOutpoint || '')}?outpoint=${outpoint}`}
             selected={selectedOrdinals.some((selected) => selected.outpoint === outpoint)}
             onClick={() => toggleOrdinalSelection(output)}
           />
@@ -654,7 +658,7 @@ export const OrdWallet = () => {
         <Ordinal
           theme={theme}
           output={selectedOrdinals[0]}
-          url={`${baseUrl}/content/${listOriginOutpoint}?outpoint=${selectedOrdinals[0]?.outpoint}`}
+          url={`${oneSatApi.getContentUrl(listOriginOutpoint || '')}?outpoint=${selectedOrdinals[0]?.outpoint}`}
           selected
           isTransfer
         />

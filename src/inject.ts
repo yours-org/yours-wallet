@@ -1,5 +1,8 @@
 // Import CWI to inject window.CWI (BRC-100 WalletInterface)
 import './cwi';
+import { CWI } from './cwi';
+import { OneSatApi } from '@1sat/wallet-toolbox';
+import { createYoursApi, YoursApi } from './yoursApi';
 import type {
   ListOutputsResult,
   GetPublicKeyResult,
@@ -7,11 +10,12 @@ import type {
   GetHeightResult,
   GetHeaderResult,
   GetVersionResult,
-  AuthenticatedResult,
   ListActionsResult,
   CreateSignatureResult,
   VerifySignatureResult,
   CreateActionResult,
+  SignActionResult,
+  AbortActionResult,
   WalletEncryptResult,
   WalletDecryptResult,
 } from '@bsv/sdk';
@@ -33,7 +37,7 @@ import {
   SignatureResponse,
   SignedMessage,
   SignMessage,
-  SocialProfile,
+  SocialProfile as YoursSocialProfile,
   TaggedDerivationRequest,
   TaggedDerivationResponse,
   TransferOrdinal,
@@ -55,7 +59,8 @@ export enum YoursEventName {
   DISCONNECT = 'disconnect',
   IS_CONNECTED = 'isConnected',
   GET_PUB_KEYS = 'getPubKeys',
-  GET_ADDRESSES = 'getAddresses',
+  GET_LEGACY_ADDRESSES = 'getLegacyAddresses',
+  GET_RECEIVE_ADDRESS = 'getReceiveAddress',
   GET_NETWORK = 'getNetwork',
   GET_BALANCE = 'getBalance',
   GET_MNEE_BALANCE = 'getMNEEBalance',
@@ -95,6 +100,16 @@ export enum YoursEventName {
   SYNC_STATUS_UPDATE = 'syncStatusUpdate', // This is not exposed on the provider
   BLOCK_HEIGHT_UPDATE = 'blockHeightUpdate', // This is not exposed on the provider
   SWITCH_ACCOUNT = 'switchAccount', // This is not exposed on the provider
+
+  // YoursApi transactional methods (with custom approval UI)
+  YOURS_SEND_BSV = 'yoursSendBsv',
+  YOURS_SEND_ALL_BSV = 'yoursSendAllBsv',
+  YOURS_TRANSFER_ORDINAL = 'yoursTransferOrdinal',
+  YOURS_LIST_ORDINAL = 'yoursListOrdinal',
+  YOURS_INSCRIBE = 'yoursInscribe',
+  YOURS_LOCK_BSV = 'yoursLockBsv',
+  // Approval response from popup
+  TRANSACTION_APPROVAL_RESPONSE = 'transactionApprovalResponse',
 }
 
 export enum CustomListenerName {
@@ -155,7 +170,7 @@ export type ResponseEventDetail = {
     | Bsv20[]
     | SerializedBsv20[]
     | SignatureResponse[]
-    | SocialProfile
+    | YoursSocialProfile
     | TaggedDerivationResponse
     | TaggedDerivationResponse[]
     | SignedMessage
@@ -177,6 +192,8 @@ export type ResponseEventDetail = {
     | CreateSignatureResult
     | VerifySignatureResult
     | CreateActionResult
+    | SignActionResult
+    | AbortActionResult
     | WalletEncryptResult
     | WalletDecryptResult
     | { valid: boolean } // VerifyHmacResult
@@ -206,6 +223,7 @@ export type WhitelistedApp = {
 export type Decision = 'approved' | 'declined';
 export type ConnectResponse = { decision: Decision; pubKeys: PubKeys };
 
+// Helper to create yours extension methods via postMessage
 const createYoursMethod = <T, P = RequestParams>(type: YoursEventName) => {
   return async (params?: P) => {
     return new Promise<T>((resolve, reject) => {
@@ -232,13 +250,13 @@ const createYoursMethod = <T, P = RequestParams>(type: YoursEventName) => {
   };
 };
 
-const whitelistedEvents: string[] = [YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT]; // Whitelisted event names
+// Event emitter for yours-specific events
+const whitelistedEvents: string[] = [YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT];
 
 const createYoursEventEmitter = () => {
-  const eventListeners = new Map<string, YoursEventListeners[]>(); // Object to store event listeners
+  const eventListeners = new Map<string, YoursEventListeners[]>();
 
   const on = (eventName: YoursEvents, callback: YoursEventListeners) => {
-    // Check if the provided event name is in the whitelist
     if (whitelistedEvents.includes(eventName)) {
       if (!eventListeners.has(eventName)) {
         eventListeners.set(eventName, []);
@@ -266,29 +284,34 @@ const createYoursEventEmitter = () => {
     }
   };
 
-  return {
-    on,
-    removeListener,
-    emit,
-  };
+  return { on, removeListener, emit };
 };
 
 const { on, removeListener, emit } = createYoursEventEmitter();
 
+// =============================================================================
+// window.yours - Extension-specific interface (legacy compatibility + extension features)
+// =============================================================================
+
 //@ts-ignore TODO: remove this once MNEE is released.
-const provider: YoursProviderType = {
+const yoursProvider: YoursProviderType = {
   isReady: true,
   on,
   removeListener,
+  // Connection (maps to CWI auth)
   connect: createYoursMethod<string | undefined, void>(YoursEventName.CONNECT),
   disconnect: createYoursMethod<boolean, void>(YoursEventName.DISCONNECT),
   isConnected: createYoursMethod<boolean, void>(YoursEventName.IS_CONNECTED),
+  // Legacy identity methods (for backwards compatibility during transition)
   getPubKeys: createYoursMethod<PubKeys | undefined, void>(YoursEventName.GET_PUB_KEYS),
-  getAddresses: createYoursMethod<Addresses | undefined, void>(YoursEventName.GET_ADDRESSES),
+  getAddresses: createYoursMethod<Addresses | undefined, void>(YoursEventName.GET_LEGACY_ADDRESSES),
   getNetwork: createYoursMethod<NetWork | undefined, void>(YoursEventName.GET_NETWORK),
+  // Balance (use onesat.getBalance() for new code)
   getBalance: createYoursMethod<Balance | undefined, void>(YoursEventName.GET_BALANCE),
   getMNEEBalance: createYoursMethod<MNEEBalance | undefined, void>(YoursEventName.GET_MNEE_BALANCE),
+  // Tokens (use onesat.getBsv21s() for new code)
   getBsv20s: createYoursMethod<Bsv20[] | undefined, void>(YoursEventName.GET_BSV20S),
+  // Transactions (use onesat methods for new code)
   sendBsv: createYoursMethod<SendBsvResponse | undefined, SendBsv[]>(YoursEventName.SEND_BSV),
   sendBsv20: createYoursMethod<SendBsv20Response | undefined, SendBsv20>(YoursEventName.SEND_BSV20),
   sendMNEE: createYoursMethod<SendMNEEResponse | undefined, SendMNEE[]>(YoursEventName.SEND_MNEE),
@@ -296,26 +319,58 @@ const provider: YoursProviderType = {
   signMessage: createYoursMethod<SignedMessage | undefined, SignMessage>(YoursEventName.SIGN_MESSAGE),
   broadcast: createYoursMethod<string | undefined, Broadcast>(YoursEventName.BROADCAST),
   getSignatures: createYoursMethod<SignatureResponse[] | undefined, GetSignatures>(YoursEventName.GET_SIGNATURES),
-  getSocialProfile: createYoursMethod<SocialProfile | undefined, void>(YoursEventName.GET_SOCIAL_PROFILE),
+  getSocialProfile: createYoursMethod<YoursSocialProfile | undefined, void>(YoursEventName.GET_SOCIAL_PROFILE),
   getPaymentUtxos: createYoursMethod<Utxo[] | undefined, void>(YoursEventName.GET_PAYMENT_UTXOS),
   getExchangeRate: createYoursMethod<number | undefined, void>(YoursEventName.GET_EXCHANGE_RATE),
   purchaseOrdinal: createYoursMethod<string | undefined, PurchaseOrdinal>(YoursEventName.PURCHASE_ORDINAL),
   purchaseBsv20: createYoursMethod<string | undefined, PurchaseOrdinal>(YoursEventName.PURCHASE_BSV20),
+  // Key derivation
   generateTaggedKeys: createYoursMethod<TaggedDerivationResponse, TaggedDerivationRequest>(
     YoursEventName.GENERATE_TAGGED_KEYS,
   ),
   getTaggedKeys: createYoursMethod<TaggedDerivationResponse[] | undefined, GetTaggedKeysRequest>(
     YoursEventName.GET_TAGGED_KEYS,
   ),
+  // Inscriptions and locks (use onesat methods for new code)
   inscribe: createYoursMethod<SendBsvResponse | undefined, InscribeRequest[]>(YoursEventName.INSCRIBE),
   lockBsv: createYoursMethod<SendBsvResponse | undefined, LockRequest[]>(YoursEventName.LOCK_BSV),
+  // Encryption (use CWI.encrypt/decrypt for new code)
   encrypt: createYoursMethod<string[] | undefined, EncryptRequest>(YoursEventName.ENCRYPT),
   decrypt: createYoursMethod<string[] | undefined, DecryptRequest>(YoursEventName.DECRYPT),
 };
 
+// =============================================================================
+// window.onesat - 1Sat API (standard prompts via WalletPermissionsManager)
+// =============================================================================
+
+// Create the 1sat API using CWI directly
+const onesatApi = new OneSatApi(CWI);
+
+// =============================================================================
+// window.yours.api - YoursApi (custom approval UI with transaction preview)
+// =============================================================================
+
+// Create YoursApi wrapping OneSatApi builders with custom approval flow
+// Transactional methods post to service worker; read-only methods use OneSatApi directly
+const yoursApi = createYoursApi(onesatApi);
+
+// =============================================================================
+// Inject on window
+// =============================================================================
+
 if (typeof window !== 'undefined') {
-  window.panda = provider;
-  window.yours = provider;
+  // Yours-specific methods (connection, keys, encryption, events)
+  // Also includes YoursApi for transactional methods with custom approval UI
+  (window.yours as typeof yoursProvider & { api: YoursApi }) = {
+    ...yoursProvider,
+    api: yoursApi,
+  };
+
+  // 1sat ecosystem API (wallet operations with standard WalletPermissionsManager prompts)
+  (window as unknown as { onesat: typeof onesatApi }).onesat = onesatApi;
+
+  // BRC-100 WalletInterface
+  // window.CWI is already injected by ./cwi
 }
 
 // Utility function to filter and emit only whitelisted events

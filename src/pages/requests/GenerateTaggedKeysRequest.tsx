@@ -40,7 +40,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService } = useServiceContext();
+  const { chromeStorageService, keysService, oneSatApi } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
 
   useEffect(() => {
@@ -101,11 +101,12 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
         dataB64: encryptedMessages[0],
         contentType: 'yours/tag',
       });
-      const txid = await bsvService.sendBsv([{ satoshis: 1, script: insScript.toHex() }], password);
+      const sendRes = await oneSatApi.sendBsv([{ satoshis: 1, script: insScript.toHex() }]);
 
-      if (!txid) {
-        return { error: 'no-tag-inscription-txid' };
+      if (!sendRes.txid || sendRes.error) {
+        return { error: sendRes.error || 'no-tag-inscription-txid' };
       }
+      const txid = sendRes.txid;
 
       const network = chromeStorageService.getNetwork();
       const taggedAddress =

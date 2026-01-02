@@ -15,7 +15,6 @@ import { ImportAccount } from './pages/onboarding/ImportAccount';
 import { RestoreAccount } from './pages/onboarding/RestoreAccount';
 import { Start } from './pages/onboarding/Start';
 import { OrdWallet } from './pages/OrdWallet';
-import { BroadcastRequest } from './pages/requests/BroadcastRequest';
 import { BsvSendRequest } from './pages/requests/BsvSendRequest';
 import { ConnectRequest } from './pages/requests/ConnectRequest';
 import { DecryptRequest } from './pages/requests/DecryptRequest';
@@ -40,10 +39,8 @@ import { SyncProvider } from './contexts/providers/SyncProvider';
 import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
 import { SnackbarProvider } from './contexts/providers/SnackbarProvider';
 import { MNEESendRequest } from './pages/requests/MNEESendRequest';
-import { CWICreateSignatureRequest } from './pages/requests/CWICreateSignatureRequest';
-import { CWIEncryptRequest } from './pages/requests/CWIEncryptRequest';
-import { CWIDecryptRequest } from './pages/requests/CWIDecryptRequest';
-import { CWICreateActionRequest } from './pages/requests/CWICreateActionRequest';
+import { PermissionRequestPage } from './pages/requests/PermissionRequest';
+import { TransactionApprovalRequest } from './pages/requests/TransactionApprovalRequest';
 
 const MainContainer = styled.div<WhiteLabelTheme & { $isMobile?: boolean }>`
   display: flex;
@@ -79,16 +76,12 @@ export const App = () => {
     transferOrdinalRequest,
     purchaseOrdinalRequest,
     signMessageRequest,
-    broadcastRequest,
     getSignaturesRequest,
     generateTaggedKeysRequest,
     encryptRequest,
     decryptRequest,
-    // CWI (BRC-100) requests
-    cwiCreateSignatureRequest,
-    cwiEncryptRequest,
-    cwiDecryptRequest,
-    cwiCreateActionRequest,
+    permissionRequest,
+    transactionApprovalRequest,
     clearRequest,
     popupId,
     getStorageAndSetRequestState,
@@ -168,15 +161,12 @@ export const App = () => {
                               !sendBsv20Request &&
                               !sendMNEERequest &&
                               !signMessageRequest &&
-                              !broadcastRequest &&
                               !getSignaturesRequest &&
                               !generateTaggedKeysRequest &&
                               !encryptRequest &&
                               !decryptRequest &&
-                              !cwiCreateSignatureRequest &&
-                              !cwiEncryptRequest &&
-                              !cwiDecryptRequest &&
-                              !cwiCreateActionRequest
+                              !permissionRequest &&
+                              !transactionApprovalRequest
                             }
                             whenFalseContent={
                               <>
@@ -208,13 +198,6 @@ export const App = () => {
                                     popupId={popupId}
                                   />
                                 </Show>
-                                <Show when={!!broadcastRequest}>
-                                  <BroadcastRequest
-                                    request={broadcastRequest!}
-                                    onBroadcast={() => clearRequest('broadcastRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
                                 <Show when={!!getSignaturesRequest}>
                                   <GetSignaturesRequest
                                     request={getSignaturesRequest!}
@@ -243,32 +226,19 @@ export const App = () => {
                                     popupId={popupId}
                                   />
                                 </Show>
-                                {/* CWI (BRC-100) requests */}
-                                <Show when={!!cwiCreateSignatureRequest}>
-                                  <CWICreateSignatureRequest
-                                    request={cwiCreateSignatureRequest!}
-                                    onSignature={() => clearRequest('cwiCreateSignatureRequest')}
+                                {/* Permission request from WalletPermissionsManager */}
+                                <Show when={!!permissionRequest}>
+                                  <PermissionRequestPage
+                                    request={permissionRequest!}
+                                    onResponse={() => clearRequest('permissionRequest')}
                                     popupId={popupId}
                                   />
                                 </Show>
-                                <Show when={!!cwiEncryptRequest}>
-                                  <CWIEncryptRequest
-                                    request={cwiEncryptRequest!}
-                                    onEncrypt={() => clearRequest('cwiEncryptRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!cwiDecryptRequest}>
-                                  <CWIDecryptRequest
-                                    request={cwiDecryptRequest!}
-                                    onDecrypt={() => clearRequest('cwiDecryptRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!cwiCreateActionRequest}>
-                                  <CWICreateActionRequest
-                                    request={cwiCreateActionRequest!}
-                                    onAction={() => clearRequest('cwiCreateActionRequest')}
+                                {/* Transaction approval request from YoursApi */}
+                                <Show when={!!transactionApprovalRequest}>
+                                  <TransactionApprovalRequest
+                                    request={transactionApprovalRequest!}
+                                    onResponse={() => clearRequest('transactionApprovalRequest')}
                                     popupId={popupId}
                                   />
                                 </Show>

@@ -13,9 +13,7 @@ import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendBsv } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
-import { getErrorMessage, getTxFromRawTxFormat } from '../../utils/tools';
-import type { ParseContext } from '@1sat/wallet-toolbox';
-import TxPreview from '../../components/TxPreview';
+import { getErrorMessage } from '../../utils/tools';
 import { styled } from 'styled-components';
 
 const Wrapper = styled(ConfirmContent)`
@@ -37,12 +35,16 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { bsvService, chromeStorageService, keysService, wallet } = useServiceContext();
-  const { sendBsv, updateBsvBalance, getBsvBalance } = bsvService;
+  const { chromeStorageService, keysService, oneSatApi } = useServiceContext();
   const { bsvAddress } = keysService;
   const [hasSent, setHasSent] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [txData, setTxData] = useState<ParseContext>();
+  const [bsvBalance, setBsvBalance] = useState<number>(0);
+
+  const refreshBalance = async () => {
+    const balance = await oneSatApi.getBalance();
+    setBsvBalance(balance.bsv);
+  };
 
   const { account } = chromeStorageService.getCurrentAccountObject();
   if (!account) throw Error('No account found');
@@ -53,7 +55,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
   const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
 
-  const processBsvSend = async (showPreview = false) => {
+  const processBsvSend = async () => {
     try {
       const validationFail = new Map<string, boolean>();
       validationFail.set('address', false);
@@ -102,13 +104,16 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         return;
       }
 
-      const sendRes = await sendBsv(request, passwordConfirm, noApprovalLimit, showPreview);
-      if (!sendRes.txid && sendRes.rawtx) {
-        const tx = getTxFromRawTxFormat(sendRes.rawtx, 'tx');
-        const parsedTx = await wallet!.parseTransaction(tx);
-        setTxData(parsedTx);
-        return;
-      }
+      // Convert request to OneSatApi format
+      const sendRequests = request.map((r) => ({
+        address: r.address,
+        paymail: r.paymail,
+        satoshis: r.satoshis,
+        script: r.script,
+        data: r.data,
+      }));
+
+      const sendRes = await oneSatApi.sendBsv(sendRequests);
 
       if (!sendRes.txid || sendRes.error) {
         addSnackbar(getErrorMessage(sendRes.error), 'error');
@@ -134,11 +139,11 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     }
   };
 
+  // Load balance on mount
   useEffect(() => {
-    if (!request) return;
-    processBsvSend(true); // Show preview
+    refreshBalance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request]);
+  }, []);
 
   // This useEffect used to auto process requests when an approval limit is set
   useEffect(() => {
@@ -150,7 +155,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         setIsProcessing(true);
         await processBsvSend();
         setIsProcessing(false);
-        await updateBsvBalance();
+        await refreshBalance();
       }, 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -173,7 +178,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     if (!successTxId) return;
     if (!message && bsvAddress) {
       resetSendState();
-      updateBsvBalance();
+      refreshBalance();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress, message, successTxId]);
@@ -214,7 +219,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           <Text
             theme={theme}
             style={{ cursor: 'pointer', margin: '0.75rem 0' }}
-          >{`Available Balance: ${getBsvBalance()}`}</Text>
+          >{`Available Balance: ${bsvBalance} BSV`}</Text>
           <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
             <Show when={isPasswordRequired}>
               <Input
@@ -225,7 +230,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
                 onChange={(e) => setPasswordConfirm(e.target.value)}
               />
             </Show>
-            {txData && <TxPreview txData={txData} />}
             <Button
               theme={theme}
               type="primary"

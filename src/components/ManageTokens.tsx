@@ -79,7 +79,7 @@ export type Bsv20TokensListProps = {
 
 export const ManageTokens = (props: Bsv20TokensListProps) => {
   const { bsv20s, theme, onBack } = props;
-  const { ordinalService, chromeStorageService, keysService, wallet } = useServiceContext();
+  const { chromeStorageService, keysService, oneSatApi } = useServiceContext();
   const [favoriteTokens, setFavoriteTokens] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -109,16 +109,18 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
     await chromeStorageService.updateNested(key, update);
   };
 
+  const getTokenName = (b: Bsv20): string => b.sym || 'Null';
+
   const filteredTokens = bsv20s
     .filter(
       (b) =>
-        ordinalService.getTokenName(b).toLowerCase().includes(searchQuery.toLowerCase()) ||
+        getTokenName(b).toLowerCase().includes(searchQuery.toLowerCase()) ||
         (b?.id && b.id.toLowerCase().includes(searchQuery.toLowerCase())),
     )
-    // Sort by sym or tick alphabetically
+    // Sort by sym alphabetically
     .sort((a, b) => {
-      const aLabel = a.sym ?? a.tick ?? '';
-      const bLabel = b.sym ?? b.tick ?? '';
+      const aLabel = a.sym ?? '';
+      const bLabel = b.sym ?? '';
 
       return aLabel.toLowerCase().localeCompare(bLabel.toLowerCase());
     });
@@ -142,10 +144,10 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
         filteredTokens.map((t) => (
           <FavoriteRow theme={theme} key={t.id}>
             <TickerWrapper>
-              <Icon src={t.icon ? `${wallet.services.baseUrl}/content/${t.icon}` : GENERIC_TOKEN_ICON} />
+              <Icon src={t.icon ? oneSatApi.getContentUrl(t.icon) : GENERIC_TOKEN_ICON} />
               <TickerTextWrapper>
                 <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
-                  {ordinalService.getTokenName(t)}
+                  {getTokenName(t)}
                 </HeaderText>
                 <Text
                   theme={theme}

@@ -12,7 +12,7 @@ import {
   MAINNET_ADDRESS_PREFIX,
   TESTNET_ADDRESS_PREFIX,
 } from '../utils/constants';
-import { decrypt } from '../utils/crypto';
+import { decrypt, deriveKey } from '../utils/crypto';
 import { Keys } from '../utils/keys';
 import { deepMerge } from './serviceHelpers';
 import { Account, ChromeStorageObject, CurrentAccountObject, DeprecatedStorage } from './types/chromeStorage.types';
@@ -343,5 +343,21 @@ export class ChromeStorageService {
   switchAccount = async (identityAddress: string): Promise<void> => {
     await this.update({ selectedAccount: identityAddress });
     sendMessage({ action: YoursEventName.SWITCH_ACCOUNT });
+  };
+
+  /**
+   * Verify a password against the stored passKey.
+   * Used for unlocking the wallet.
+   */
+  verifyPassword = (password: string): boolean => {
+    if (!this.isPasswordRequired()) return true;
+    const { salt, passKey } = this.getCurrentAccountObject();
+    if (!salt || !passKey) return false;
+    try {
+      const derivedKey = deriveKey(password, salt);
+      return derivedKey === passKey;
+    } catch (error) {
+      return false;
+    }
   };
 }

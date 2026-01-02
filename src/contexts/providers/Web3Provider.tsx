@@ -1,6 +1,5 @@
 import { ReactNode, useState } from 'react';
 import {
-  Broadcast,
   DecryptRequest,
   EncryptRequest,
   GetSignatures,
@@ -17,7 +16,8 @@ import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 import { sleep } from '../../utils/sleep';
 import { Web3RequestContext, Web3RequestContextProps } from '../Web3RequestContext';
-import type { CreateSignatureArgs, WalletEncryptArgs, WalletDecryptArgs, CreateActionArgs } from '@bsv/sdk';
+import type { PermissionRequest } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
+import type { ApprovalContext } from '../../yoursApi';
 
 export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [connectRequest, setConnectRequest] = useState<RequestParams | undefined>(undefined);
@@ -27,18 +27,16 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [transferOrdinalRequest, setTransferOrdinalRequest] = useState<TransferOrdinal | undefined>(undefined);
   const [purchaseOrdinalRequest, setPurchaseOrdinalRequest] = useState<PurchaseOrdinal | undefined>(undefined);
   const [signMessageRequest, setSignMessageRequest] = useState<SignMessage | undefined>(undefined);
-  const [broadcastRequest, setBroadcastRequest] = useState<Broadcast | undefined>(undefined);
   const [getSignaturesRequest, setGetSignaturesRequest] = useState<GetSignatures | undefined>(undefined);
   const [generateTaggedKeysRequest, setGenerateTaggedKeysRequest] = useState<TaggedDerivationRequest | undefined>(
     undefined,
   );
   const [encryptRequest, setEncryptRequest] = useState<EncryptRequest | undefined>(undefined);
   const [decryptRequest, setDecryptRequest] = useState<DecryptRequest | undefined>(undefined);
-  // CWI (BRC-100) requests
-  const [cwiCreateSignatureRequest, setCwiCreateSignatureRequest] = useState<CreateSignatureArgs | undefined>(undefined);
-  const [cwiEncryptRequest, setCwiEncryptRequest] = useState<WalletEncryptArgs | undefined>(undefined);
-  const [cwiDecryptRequest, setCwiDecryptRequest] = useState<WalletDecryptArgs | undefined>(undefined);
-  const [cwiCreateActionRequest, setCwiCreateActionRequest] = useState<CreateActionArgs | undefined>(undefined);
+  // Permission request from WalletPermissionsManager
+  const [permissionRequest, setPermissionRequest] = useState<(PermissionRequest & { requestID: string }) | undefined>(undefined);
+  // Transaction approval request from YoursApi
+  const [transactionApprovalRequest, setTransactionApprovalRequest] = useState<ApprovalContext | undefined>(undefined);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
 
   const clearRequest = async (type: keyof Omit<Web3RequestContextProps, 'clearRequest'>) => {
@@ -65,9 +63,6 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       case 'signMessageRequest':
         setSignMessageRequest(undefined);
         break;
-      case 'broadcastRequest':
-        setBroadcastRequest(undefined);
-        break;
       case 'getSignaturesRequest':
         setGetSignaturesRequest(undefined);
         break;
@@ -80,18 +75,13 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       case 'decryptRequest':
         setDecryptRequest(undefined);
         break;
-      // CWI (BRC-100) requests
-      case 'cwiCreateSignatureRequest':
-        setCwiCreateSignatureRequest(undefined);
+      // Permission request from WalletPermissionsManager
+      case 'permissionRequest':
+        setPermissionRequest(undefined);
         break;
-      case 'cwiEncryptRequest':
-        setCwiEncryptRequest(undefined);
-        break;
-      case 'cwiDecryptRequest':
-        setCwiDecryptRequest(undefined);
-        break;
-      case 'cwiCreateActionRequest':
-        setCwiCreateActionRequest(undefined);
+      // Transaction approval request from YoursApi
+      case 'transactionApprovalRequest':
+        setTransactionApprovalRequest(undefined);
         break;
       default:
         break;
@@ -114,16 +104,12 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       transferOrdinalRequest,
       purchaseOrdinalRequest,
       signMessageRequest,
-      broadcastRequest,
       getSignaturesRequest,
       generateTaggedKeysRequest,
       encryptRequest,
       decryptRequest,
-      // CWI (BRC-100) requests
-      cwiCreateSignatureRequest,
-      cwiEncryptRequest,
-      cwiDecryptRequest,
-      cwiCreateActionRequest,
+      permissionRequest,
+      transactionApprovalRequest,
       popupWindowId,
     } = result;
 
@@ -134,16 +120,12 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (transferOrdinalRequest) setTransferOrdinalRequest(transferOrdinalRequest);
     if (purchaseOrdinalRequest) setPurchaseOrdinalRequest(purchaseOrdinalRequest);
     if (signMessageRequest) setSignMessageRequest(signMessageRequest);
-    if (broadcastRequest) setBroadcastRequest(broadcastRequest);
     if (getSignaturesRequest) setGetSignaturesRequest(getSignaturesRequest);
     if (generateTaggedKeysRequest) setGenerateTaggedKeysRequest(generateTaggedKeysRequest);
     if (encryptRequest) setEncryptRequest(encryptRequest);
     if (decryptRequest) setDecryptRequest(decryptRequest);
-    // CWI (BRC-100) requests
-    if (cwiCreateSignatureRequest) setCwiCreateSignatureRequest(cwiCreateSignatureRequest);
-    if (cwiEncryptRequest) setCwiEncryptRequest(cwiEncryptRequest);
-    if (cwiDecryptRequest) setCwiDecryptRequest(cwiDecryptRequest);
-    if (cwiCreateActionRequest) setCwiCreateActionRequest(cwiCreateActionRequest);
+    if (permissionRequest) setPermissionRequest(permissionRequest);
+    if (transactionApprovalRequest) setTransactionApprovalRequest(transactionApprovalRequest);
     if (popupWindowId) setPopupId(popupWindowId);
   };
 
@@ -162,16 +144,12 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
         transferOrdinalRequest,
         purchaseOrdinalRequest,
         signMessageRequest,
-        broadcastRequest,
         getSignaturesRequest,
         generateTaggedKeysRequest,
         encryptRequest,
         decryptRequest,
-        // CWI (BRC-100) requests
-        cwiCreateSignatureRequest,
-        cwiEncryptRequest,
-        cwiDecryptRequest,
-        cwiCreateActionRequest,
+        permissionRequest,
+        transactionApprovalRequest,
         clearRequest,
         popupId,
         getStorageAndSetRequestState,

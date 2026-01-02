@@ -51,12 +51,22 @@ export type Bsv20TokensListProps = {
   onTokenClick: (token: Bsv20) => void;
 };
 
+const getTokenName = (b: Bsv20): string => b.sym || 'Null';
+
 export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
   const { bsv20s, theme, onTokenClick, hideStatusLabels = false } = props;
-  const { ordinalService, bsvService, chromeStorageService, wallet } = useServiceContext();
-  const baseUrl = wallet.services.baseUrl;
+  const { chromeStorageService, oneSatApi } = useServiceContext();
   const [priceData, setPriceData] = useState<PriceData[]>([]);
   const [tokens, setTokens] = useState<Bsv20[]>([]);
+  const [exchangeRate, setExchangeRate] = useState<number>(0);
+
+  useEffect(() => {
+    const loadExchangeRate = async () => {
+      const rate = await oneSatApi.getExchangeRate();
+      setExchangeRate(rate);
+    };
+    loadExchangeRate();
+  }, [oneSatApi]);
 
   useEffect(() => {
     const loadSavedTokens = async () => {
@@ -167,11 +177,11 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
                                     animate
                                     balance={Number(showAmount(t.all.confirmed, t.dec))}
                                     showPointer={true}
-                                    icon={t.icon ? `${baseUrl}/content/${t.icon}` : GENERIC_TOKEN_ICON}
-                                    ticker={truncate(ordinalService.getTokenName(t), 10, 0)}
+                                    icon={t.icon ? oneSatApi.getContentUrl(t.icon) : GENERIC_TOKEN_ICON}
+                                    ticker={truncate(getTokenName(t), 10, 0)}
                                     usdBalance={
                                       (priceData.find((p) => p.id === t.id)?.satPrice ?? 0) *
-                                      (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
+                                      (exchangeRate / BSV_DECIMAL_CONVERSION) *
                                       Number(showAmount(t.all.confirmed, t.dec))
                                     }
                                   />
@@ -202,11 +212,11 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
                                 animate
                                 balance={Number(showAmount(b.all.pending, b.dec))}
                                 showPointer={true}
-                                icon={b.icon ? `${baseUrl}/content/${b.icon}` : GENERIC_TOKEN_ICON}
-                                ticker={ordinalService.getTokenName(b)}
+                                icon={b.icon ? oneSatApi.getContentUrl(b.icon) : GENERIC_TOKEN_ICON}
+                                ticker={getTokenName(b)}
                                 usdBalance={
                                   (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
-                                  (bsvService.getExchangeRate() / BSV_DECIMAL_CONVERSION) *
+                                  (exchangeRate / BSV_DECIMAL_CONVERSION) *
                                   Number(showAmount(b.all.confirmed, b.dec))
                                 }
                               />

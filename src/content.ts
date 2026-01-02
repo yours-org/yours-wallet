@@ -39,9 +39,10 @@ self.addEventListener(CustomListenerName.YOURS_REQUEST, (e: Event) => {
     params = { ...params, ...originalParams };
   }
 
-  params.domain = window.location.hostname;
+  // Use originator at message level (BRC-100 standard)
+  const originator = window.location.hostname;
 
-  chrome.runtime.sendMessage({ action: type, params }, buildResponseCallback(messageId));
+  chrome.runtime.sendMessage({ action: type, params, originator }, buildResponseCallback(messageId));
 });
 
 const buildResponseCallback = (messageId: string) => {

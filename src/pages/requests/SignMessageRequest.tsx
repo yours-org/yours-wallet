@@ -44,7 +44,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [signature, setSignature] = useState<string | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, bsvService } = useServiceContext();
+  const { chromeStorageService, oneSatApi } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -77,9 +77,8 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const signRes = (await bsvService.signMessage(request, passwordConfirm)) as SignedMessage & { error?: string };
-    if (!signRes?.sig || signRes.error) {
+    const signRes = await oneSatApi.signMessage(request);
+    if ('error' in signRes) {
       addSnackbar(getErrorMessage(signRes.error), 'error');
       setIsProcessing(false);
       return;

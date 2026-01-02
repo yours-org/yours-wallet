@@ -19,10 +19,11 @@ import {
   SendMNEE,
   MNEEBalance,
 } from 'yours-wallet-provider';
-import type { CreateSignatureArgs, WalletEncryptArgs, WalletDecryptArgs, CreateActionArgs } from '@bsv/sdk';
+import type { PermissionRequest } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
 import { WhitelistedApp } from '../../inject';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
+import type { ApprovalContext } from '../../yoursApi';
 
 export type Dispatch<T> = (value: T) => void;
 
@@ -85,11 +86,10 @@ export interface ChromeStorageObject {
   generateTaggedKeysRequest?: TaggedDerivationRequest;
   encryptRequest?: EncryptRequest;
   decryptRequest?: DecryptRequest;
-  // CWI (BRC-100) requests
-  cwiCreateSignatureRequest?: CreateSignatureArgs;
-  cwiEncryptRequest?: WalletEncryptArgs;
-  cwiDecryptRequest?: WalletDecryptArgs;
-  cwiCreateActionRequest?: CreateActionArgs;
+  // Permission request from WalletPermissionsManager
+  permissionRequest?: PermissionRequest & { requestID: string };
+  // Transaction approval request from YoursApi
+  transactionApprovalRequest?: ApprovalContext;
 }
 
 export type CurrentAccountObject = Omit<
@@ -108,10 +108,8 @@ export type CurrentAccountObject = Omit<
   | 'generateTaggedKeysRequest'
   | 'encryptRequest'
   | 'decryptRequest'
-  | 'cwiCreateSignatureRequest'
-  | 'cwiEncryptRequest'
-  | 'cwiDecryptRequest'
-  | 'cwiCreateActionRequest'
+  | 'permissionRequest'
+  | 'transactionApprovalRequest'
 > & { account: Account };
 
 type AppState = {

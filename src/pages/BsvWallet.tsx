@@ -37,10 +37,9 @@ import lockIcon from '../assets/lock.svg';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useWeb3RequestContext } from '../hooks/useWeb3RequestContext';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { LockData } from '../services/types/bsv.types';
-import { sendMessage } from '../utils/chromeHelpers';
+import type { LockData } from '@1sat/wallet-toolbox';
+import { sendMessage, sendMessageAsync } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
-import { InWalletBsvResponse } from '../services/types/bsv.types';
 import { useSyncTracker } from '../hooks/useSyncTracker';
 import { getErrorMessage, isValidEmail } from '../utils/tools';
 import { UpgradeNotification } from '../components/UpgradeNotification';
@@ -219,17 +218,17 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, keysService, bsvService, ordinalService, mneeService } = useServiceContext();
+  const { chromeStorageService, mneeService, oneSatApi } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const [isProcessing, setIsProcessing] = useState(false);
-  const { bsvAddress, identityAddress } = keysService;
-  const { getBsvBalance, getExchangeRate, getLockData, unlockLockedCoins, updateBsvBalance, sendBsv, sendAllBsv } =
-    bsvService;
-  const [bsvBalance, setBsvBalance] = useState<number>(getBsvBalance());
-  const [exchangeRate, setExchangeRate] = useState<number>(getExchangeRate());
+  // Get identityAddress from chrome storage (selected account)
+  const identityAddress = chromeStorageService.getCurrentAccountObject().account?.addresses?.identityAddress || '';
+  const [receiveAddress, setReceiveAddress] = useState<string>('');
+  const [bsvBalance, setBsvBalance] = useState<number>(0);
+  const [exchangeRate, setExchangeRate] = useState<number>(0);
   const [lockData, setLockData] = useState<LockData>();
   const [isSendAllBsv, setIsSendAllBsv] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -306,8 +305,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
   };
 
   const updateMneeBalance = async () => {
-    if (!mneeService) return;
-    const res = await mneeService.balance(bsvAddress);
+    if (!mneeService || !receiveAddress) return;
+    const res = await mneeService.balance(receiveAddress);
     if (res) {
       setMneeBalance(res.decimalAmount);
 
@@ -334,8 +333,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
   };
 
   const getAndSetAccountAndBsv20s = async () => {
-    const res = await ordinalService.getBsv20s();
-    setBsv20s(res);
+    const res = await oneSatApi.getBsv21Balances();
+    // Map Bsv21Balance to Bsv20 format (they're compatible)
+    setBsv20s(res as unknown as Bsv20[]);
     setAccount(chromeStorageService.getCurrentAccountObject().account);
   };
 
@@ -350,14 +350,27 @@ export const BsvWallet = (props: BsvWalletProps) => {
       const obj = await chromeStorageService.getAndSetStorage();
       obj && !obj.hasUpgradedToSPV ? setShowUpgrade(true) : setShowUpgrade(false);
       if (obj?.selectedAccount) {
-        // TODO: Migrate syncTxLogs to OneSatWallet
-        // oneSatSPV.stores.txos?.syncTxLogs();
-        if (!ordinalService) return;
         await getAndSetAccountAndBsv20s();
       }
     })();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch receive address from service worker
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await sendMessageAsync<{ success: boolean; data?: string }>({
+          action: YoursEventName.GET_RECEIVE_ADDRESS,
+        });
+        if (response?.success && response.data) {
+          setReceiveAddress(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to get receive address:', error);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -366,8 +379,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
   }, [satSendAmount, bsvBalance]);
 
   const getAndSetBsvBalance = async () => {
-    await updateBsvBalance();
-    setBsvBalance(getBsvBalance());
+    const balance = await oneSatApi.getBalance();
+    setBsvBalance(balance.bsv);
+    // Exchange rate is fetched inside getBalance(), get it separately for state
+    const rate = await oneSatApi.getExchangeRate();
+    setExchangeRate(rate);
   };
 
   useEffect(() => {
@@ -383,8 +399,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   }, [isReload]);
 
   const loadLocks = async () => {
-    if (!bsvService) return;
-    const lockData = await getLockData();
+    const lockData = await oneSatApi.getLockData();
     setLockData(lockData);
   };
 
@@ -397,9 +412,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
   const refreshUtxos = async (showLoad = false) => {
     showLoad && setIsProcessing(true);
-    await updateBsvBalance();
-    setBsvBalance(getBsvBalance());
-    setExchangeRate(getExchangeRate());
+    await getAndSetBsvBalance();
     loadLocks && loadLocks();
 
     sendMessage({ action: YoursEventName.SYNC_UTXOS });
@@ -417,19 +430,18 @@ export const BsvWallet = (props: BsvWalletProps) => {
   useEffect(() => {
     if (!identityAddress || isSyncing) return;
     getAndSetBsvBalance();
+    // Auto-unlock: attempt to unlock matured coins via CWI
     if (!unlockAttempted && lockData?.unlockable) {
       (async () => {
-        const res = await unlockLockedCoins();
+        const res = await oneSatApi.unlockBsv();
         setUnlockAttempted(true);
-        if (res) {
-          if (res.error) addSnackbar('Error unlocking coins!', 'error');
-          if (res.txid) {
-            await refreshUtxos();
-            await unlockLockedCoins();
-            await sleep(1000);
-            addSnackbar('Successfully unlocked coins!', 'success');
-          }
+        if (res.txid) {
+          await refreshUtxos();
+          await sleep(1000);
+          addSnackbar('Successfully unlocked coins!', 'success');
         }
+        // Note: unlockBsv may return error if it requires direct key access
+        // In that case, unlocking happens on the service worker side
       })();
     }
 
@@ -451,7 +463,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   };
 
   const handleCopyToClipboard = () => {
-    navigator.clipboard.writeText(bsvAddress).then(() => {
+    navigator.clipboard.writeText(receiveAddress).then(() => {
       addSnackbar('Copied!', 'success');
     });
   };
@@ -483,6 +495,14 @@ export const BsvWallet = (props: BsvWalletProps) => {
       return;
     }
 
+    // TODO: MNEE requires direct key access for cosigning flow.
+    // Need to implement message-based MNEE transfer in background.ts
+    // For now, show a message that MNEE is temporarily unavailable
+    addSnackbar('MNEE transfers are temporarily unavailable during wallet upgrade.', 'info');
+    setIsProcessing(false);
+    return;
+
+    /* MNEE transfer code disabled during refactor - requires service worker implementation
     const keys = await keysService.retrieveKeys(passwordConfirm);
     if (!keys?.walletWif) {
       addSnackbar('Invalid password!', 'error');
@@ -570,6 +590,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
       setPasswordConfirm('');
       setIsProcessing(false);
     }
+    */
   };
 
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -610,12 +631,13 @@ export const BsvWallet = (props: BsvWalletProps) => {
       return isValidEmail(r.address) ? { paymail: r.address, satoshis } : { address: r.address, satoshis };
     });
 
-    let sendRes: InWalletBsvResponse;
+    let sendRes;
     if (isSendAllBsv) {
       const r = sendRecipients[0];
-      sendRes = await sendAllBsv(r.address ?? r.paymail, r.address ? 'address' : 'paymail', passwordConfirm);
+      const destination = r.address ?? r.paymail ?? '';
+      sendRes = await oneSatApi.sendAllBsv(destination);
     } else {
-      sendRes = await sendBsv(sendRecipients, passwordConfirm);
+      sendRes = await oneSatApi.sendBsv(sendRecipients);
     }
 
     if (!sendRes.txid || sendRes.error) {
@@ -717,7 +739,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         </Text>
       </Show>
 
-      <QrCode address={bsvAddress} onClick={handleCopyToClipboard} />
+      <QrCode address={receiveAddress} onClick={handleCopyToClipboard} />
       <Text theme={theme} style={{ margin: '1rem 0 -1.25rem 0', fontWeight: 700 }}>
         Scan or copy the address
       </Text>
@@ -731,7 +753,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
             fontSize: '0.75rem',
           }}
         >
-          {bsvAddress}
+          {receiveAddress}
         </Text>
       </CopyAddressWrapper>
       <Button
@@ -740,7 +762,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         type="secondary"
         onClick={() => {
           setPageState('main');
-          updateBsvBalance();
+          getAndSetBsvBalance();
         }}
       />
     </ReceiveContent>
@@ -771,7 +793,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
           <Button theme={theme} type="primary" label="Receive" onClick={() => setPageState('receive')} />
           <Button theme={theme} type="primary" label="Send" onClick={() => setPageState('send')} />
         </ButtonContainer>
-        <FaucetButton onConfirmation={handleTestNetFaucetConfirmation} address={bsvAddress} isTestnet={isTestnet} />
+        <FaucetButton onConfirmation={handleTestNetFaucetConfirmation} address={receiveAddress} isTestnet={isTestnet} />
         <AssetRow
           balance={bsvBalance}
           icon={bsvCoin}
