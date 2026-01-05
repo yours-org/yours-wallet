@@ -7,7 +7,6 @@
     "@1sat/wallet-toolbox": "^0.0.8",
     "@bsv/paymail": "^2.0.2",
     "@bsv/sdk": "^1.9.29",
-    "@bsv/wallet-toolbox": "^1.7.18",
     "@bsv/wallet-toolbox-mobile": "^1.7.18",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@mnee/ts-sdk": "^1.0.1",

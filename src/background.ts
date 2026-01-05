@@ -40,7 +40,7 @@ import type { ApprovalContext, YoursApprovalType } from './yoursApi';
 import { removeWindow } from './utils/chromeHelpers';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { initWallet, closeAccountContext, type AccountContext } from './initWallet';
+import { initWallet, type AccountContext } from './initWallet';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 
 let chromeStorageService = new ChromeStorageService();
@@ -49,76 +49,62 @@ const isInServiceWorker = self?.document === undefined;
 // Account context - null if locked or not initialized
 let accountContext: AccountContext | null = null;
 
-// Initialize wallet on startup (will be null if locked)
-const initializeWallet = async (): Promise<void> => {
-  accountContext = await initWallet(chromeStorageService);
-  if (accountContext) {
-    bindPermissionCallbacks(accountContext.wallet);
-    bindSyncProcessorListeners(accountContext);
-    // Start queue processor automatically after wallet initialization
-    // The queue is populated by SyncFetcher in the UI context
-    accountContext.syncProcessor.start().catch((error) => {
-      console.error('Failed to start sync processor:', error);
-    });
-  }
+/**
+ * Send a balance update notification to the popup.
+ * Uses the SYNC_STATUS_UPDATE event which useSyncTracker listens for.
+ */
+const notifyBalanceUpdate = () => {
+  chrome.runtime.sendMessage({
+    action: YoursEventName.SYNC_STATUS_UPDATE,
+    data: { status: 'complete' },
+  }).catch(() => {
+    // Ignore errors if popup is not open
+  });
 };
 
-/**
- * Bind sync processor event listeners to forward events to the popup.
- * The service worker only runs the queue processor (not SSE fetching).
- */
-const bindSyncProcessorListeners = (ctx: AccountContext) => {
-  const { syncProcessor } = ctx;
+// Initialize wallet on startup (will be null if locked)
+const initializeWallet = async (): Promise<WalletInterface | null> => {
+  console.log('[background] initializeWallet: starting, current accountContext:', !!accountContext);
+  if (accountContext) {
+    console.log('[background] initializeWallet: closing existing context');
+    await accountContext?.close();
+    accountContext = null;
+  }
 
-  syncProcessor.on('process:start', () => {
-    console.log('Sync processor started');
+  console.log('[background] initializeWallet: calling initWallet...');
+  accountContext = await initWallet(chromeStorageService, {
+    onTransactionBroadcasted: (txid: string) => {
+      console.log('[background] Transaction broadcasted:', txid);
+      notifyBalanceUpdate();
+    },
+    onTransactionProven: (txid: string) => {
+      console.log('[background] Transaction proven:', txid);
+      notifyBalanceUpdate();
+    },
   });
+  console.log('[background] initializeWallet: initWallet returned, accountContext:', !!accountContext);
 
-  syncProcessor.on('process:progress', (data) => {
-    console.log('Sync progress:', data);
-    // Could forward to popup via chrome.runtime.sendMessage if needed
-  });
+  if (accountContext) {
+    bindPermissionCallbacks(accountContext.wallet);
+    console.log('[background] initializeWallet: bound permission callbacks');
+    // Sync is started in initWallet, events are forwarded to popup there
+  }
 
-  syncProcessor.on('process:complete', () => {
-    console.log('Sync processor complete');
-  });
-
-  syncProcessor.on('process:error', (data) => {
-    console.error('Sync processor error:', data.message);
-  });
-
-  syncProcessor.on('process:parsed', (data) => {
-    console.log('Synced outputs internalized:', data.internalizedCount);
-  });
+  return accountContext?.wallet ?? null;
 };
 
 // Start initialization
-chromeStorageService.getAndSetStorage().then(() => initializeWallet());
+chromeStorageService.getAndSetStorage().then(() => initializeWallet()).catch((error) => {
+  // Log initialization errors - could be expected (locked wallet) or unexpected
+  console.error('[background] Startup initialization failed:', error);
+});
 
 /**
  * Get the current wallet instance (WalletPermissionsManager).
  * Returns null if wallet is locked or not initialized.
  */
-export const getWallet = (): WalletInterface | null => accountContext?.wallet ?? null;
-
-/**
- * Reinitialize the wallet (call after unlock or account switch).
- */
-export const reinitializeWallet = async (): Promise<WalletInterface | null> => {
-  if (accountContext) {
-    // Stop existing sync processor before closing wallet
-    accountContext.syncProcessor.stop();
-    await closeAccountContext(accountContext);
-  }
-  accountContext = await initWallet(chromeStorageService);
-  if (accountContext) {
-    bindPermissionCallbacks(accountContext.wallet);
-    bindSyncProcessorListeners(accountContext);
-    // Start queue processor for new wallet
-    accountContext.syncProcessor.start().catch((error) => {
-      console.error('Failed to start sync processor:', error);
-    });
-  }
+export const getWallet = (): WalletInterface | null => {
+  console.log('[background] getWallet called, accountContext:', !!accountContext, 'wallet:', !!accountContext?.wallet);
   return accountContext?.wallet ?? null;
 };
 
@@ -217,29 +203,27 @@ if (isInServiceWorker) {
   };
 
   const signOut = async () => {
-    if (accountContext) {
-      accountContext.syncProcessor.stop();
-    }
-    await closeAccountContext(accountContext);
+    await accountContext?.close();
     accountContext = null;
     await deleteAllIDBDatabases();
   };
 
   const switchAccount = async () => {
-    if (accountContext) {
-      accountContext.syncProcessor.stop();
-    }
-    await closeAccountContext(accountContext);
-    chromeStorageService = new ChromeStorageService();
-    await chromeStorageService.getAndSetStorage();
-    accountContext = await initWallet(chromeStorageService);
-    if (accountContext) {
-      bindPermissionCallbacks(accountContext.wallet);
-      bindSyncProcessorListeners(accountContext);
-      // Start queue processor for switched account
-      accountContext.syncProcessor.start().catch((error) => {
-        console.error('Failed to start sync processor after account switch:', error);
-      });
+    console.log('[background] switchAccount: starting');
+    try {
+      // Close existing wallet before switching
+      if (accountContext) {
+        console.log('[background] switchAccount: closing existing wallet');
+        await accountContext.close();
+        accountContext = null;
+      }
+      chromeStorageService = new ChromeStorageService();
+      await chromeStorageService.getAndSetStorage();
+      console.log('[background] switchAccount: storage loaded, initializing wallet');
+      await initializeWallet();
+      console.log('[background] switchAccount: wallet initialized successfully');
+    } catch (error) {
+      console.error('[background] switchAccount: failed to initialize wallet:', error);
     }
   };
 
@@ -350,11 +334,11 @@ if (isInServiceWorker) {
         case 'WALLET_UNLOCKED':
           // Reinitialize wallet after user unlocks with password
           chromeStorageService.getAndSetStorage().then(() => {
-            reinitializeWallet().then((wallet) => {
-              sendResponse({ success: !!wallet });
-            }).catch((error) => {
-              console.error('Failed to reinitialize wallet:', error);
-              sendResponse({ success: false, error: error.message });
+            initializeWallet().then((wallet) => {
+              sendResponse({ type: 'WALLET_UNLOCKED', success: !!wallet });
+            }).catch((error: Error) => {
+              console.error('Failed to initialize wallet:', error);
+              sendResponse({ type: 'WALLET_UNLOCKED', success: false, error: error.message });
             });
           });
           return true;
@@ -570,7 +554,7 @@ if (isInServiceWorker) {
         });
         return;
       }
-      const address = accountContext.addressManager.getPrimaryAddress();
+      const address = accountContext.syncContext.addressManager.getPrimaryAddress();
       sendResponse({
         type: YoursEventName.GET_RECEIVE_ADDRESS,
         success: true,

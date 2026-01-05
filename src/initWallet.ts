@@ -1,25 +1,22 @@
 import { NetWork } from 'yours-wallet-provider';
-import {
-  OneSatServices,
-  AddressManager,
-  SyncProcessor,
-  type SyncProcessorEvents,
-  type IndexedDbSyncQueue,
-} from '@1sat/wallet-toolbox';
-import { initSyncContext } from './initSyncContext';
+import { SyncProcessor } from '@1sat/wallet-toolbox';
 import {
   Wallet,
   WalletStorageManager,
   StorageProvider,
   StorageIdb,
   WalletPermissionsManager,
+  Services,
+  Monitor,
   type sdk as toolboxSdk,
   type PermissionsManagerConfig,
 } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
 import { KeyDeriver, PrivateKey } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { decrypt } from './utils/crypto';
-import type { Keys } from './utils/keys'; // Used by decryptKeys
+import type { Keys } from './utils/keys';
+import { FEE_PER_KB } from './utils/constants';
+import { initSyncContext, type SyncContext } from './initSyncContext';
 
 // Type alias for chain
 type Chain = 'main' | 'test';
@@ -72,7 +69,7 @@ const DEFAULT_PERMISSIONS_CONFIG: PermissionsManagerConfig = {
 };
 
 /**
- * Initialize storage for a wallet
+ * Initialize storage for a wallet (browser-specific: uses wallet-toolbox-mobile)
  */
 const initStorage = async (
   chain: Chain,
@@ -80,11 +77,12 @@ const initStorage = async (
   selectedAccount: string,
 ): Promise<{ storage: WalletStorageManager; storageProvider: StorageIdb }> => {
   const storageOptions = StorageProvider.createStorageBaseOptions(chain);
+  storageOptions.feeModel = { model: 'sat/kb', value: FEE_PER_KB };
   const storageProvider = new StorageIdb(storageOptions);
   const storage = new WalletStorageManager(identityPubKey, storageProvider);
 
   await storageProvider.migrate(`wallet-${selectedAccount || ''}`, identityPubKey);
-  await storageProvider.makeAvailable();
+  await storage.makeAvailable();
 
   return { storage, storageProvider };
 };
@@ -108,40 +106,38 @@ const decryptKeys = (chromeStorageService: ChromeStorageService): Keys => {
 };
 
 /**
- * Account context containing wallet, sync components, and services.
+ * Account context containing wallet and necessary sync components.
  * All components share the same lifecycle (account-specific).
- *
- * The syncQueue and services are exposed so the UI can create a SyncFetcher
- * to populate the queue via SSE, while the service worker runs the SyncProcessor
- * to process the queue.
  */
 export interface AccountContext {
   wallet: WalletPermissionsManager;
-  underlyingWallet: Wallet;
-  syncProcessor: SyncProcessor;
-  syncQueue: IndexedDbSyncQueue;
-  services: OneSatServices;
-  addressManager: AddressManager;
+  syncContext: SyncContext;
+  /** Call to stop sync and destroy wallet */
+  close: () => Promise<void>;
 }
 
-// Re-export SyncProcessorEvents for use in background.ts
-export type { SyncProcessorEvents };
+export interface InitWalletOptions {
+  onTransactionBroadcasted?: (txid: string) => void;
+  onTransactionProven?: (txid: string) => void;
+}
 
 /**
- * Initialize the Wallet instance wrapped with WalletPermissionsManager.
+ * Initialize the Wallet instance with all sync components.
  *
- * This creates a signing-capable Wallet using keys from chrome storage.
+ * This creates a signing-capable Wallet using keys from chrome storage,
+ * then wires up all sync infrastructure (SyncProcessor, Monitor).
+ *
  * Throws if account or passKey is missing (caller should ensure authentication first).
- *
  * Call this after user authentication (unlock).
  */
 export const initWallet = async (
   chromeStorageService: ChromeStorageService,
+  options?: InitWalletOptions,
 ): Promise<AccountContext> => {
   // Ensure storage is loaded
   await chromeStorageService.getAndSetStorage();
 
-  // Decrypt keys - throws if account or passKey is missing
+  // 1. BROWSER-SPECIFIC: Decrypt keys
   const keys = decryptKeys(chromeStorageService);
   if (!keys.identityWif) {
     throw new Error('No identity key found in decrypted keys');
@@ -156,32 +152,32 @@ export const initWallet = async (
   const identityPubKey = identityKey.toPublicKey().toString();
   const keyDeriver = new KeyDeriver(identityKey);
 
-  // Create storage
+  // 2. BROWSER-SPECIFIC: Create storage (wallet-toolbox-mobile)
   const { storage } = await initStorage(chain, identityPubKey, selectedAccount || '');
 
-  // Create OneSatServices first (needed for Wallet creation)
-  const services = new OneSatServices(chain);
+  // 3. Create fallback services (wallet-toolbox-mobile Services for APIs we don't implement)
+  const fallbackServices = new Services(chain);
 
-  // Create the BRC-100 Wallet with signing capability
-  // Type assertion needed because OneSatServices is built against @bsv/wallet-toolbox
-  // but we're using @bsv/wallet-toolbox-mobile. The interfaces are structurally identical.
+  // 4. Import OneSatServices to create proper services with fallback
+  const { OneSatServices } = await import('@1sat/wallet-toolbox');
+  const oneSatServices = new OneSatServices(chain, undefined, fallbackServices as unknown as WalletServices);
+
+  // 5. Create the BRC-100 Wallet with signing capability
   const underlyingWallet = new Wallet({
     chain,
     keyDeriver,
     storage,
-    services: services as unknown as WalletServices,
+    services: oneSatServices as unknown as WalletServices,
   });
 
-  // Wrap with WalletPermissionsManager for permission handling
-  // Admin originator (the extension) bypasses all permission checks
+  // 5. Wrap with WalletPermissionsManager for permission handling
   const wallet = new WalletPermissionsManager(
     underlyingWallet,
     ADMIN_ORIGINATOR,
     DEFAULT_PERMISSIONS_CONFIG,
   );
 
-  // Initialize sync context
-  // TODO: Load maxKeyIndex from chrome.storage, for now use 5 addresses
+  // 6. Initialize sync context (derives addresses, creates services, queue, addressManager)
   const maxKeyIndex = 4; // 0-4 = 5 addresses
   const syncContext = await initSyncContext({
     wallet,
@@ -190,10 +186,10 @@ export const initWallet = async (
     maxKeyIndex,
   });
 
-  const { syncQueue, addressManager } = syncContext;
+  const { services, syncQueue, addressManager } = syncContext;
 
-  // Create SyncProcessor for queue processing (runs in service worker)
-  const syncProcessor = new SyncProcessor({
+  // 7. Create SyncProcessor (processes external payments from queue)
+  const processor = new SyncProcessor({
     wallet,
     services,
     syncQueue,
@@ -201,21 +197,88 @@ export const initWallet = async (
     network: chain === 'main' ? 'mainnet' : 'testnet',
   });
 
+  // Subscribe to processor events and forward to popup
+  const sendSyncStatus = (data: { status: string; [key: string]: unknown }) => {
+    chrome.runtime.sendMessage({
+      action: 'syncStatusUpdate',
+      data,
+    }).catch(() => {
+      // Ignore errors if popup is not open
+    });
+  };
+
+  processor.on('process:start', () => {
+    sendSyncStatus({ status: 'start', addressCount: maxKeyIndex + 1 });
+  });
+
+  processor.on('process:progress', (data) => {
+    sendSyncStatus({ status: 'progress', ...data });
+  });
+
+  processor.on('process:complete', () => {
+    sendSyncStatus({ status: 'complete' });
+  });
+
+  processor.on('process:error', (data) => {
+    sendSyncStatus({ status: 'error', message: data.message });
+  });
+
+  // 9. Create Monitor (transaction lifecycle: broadcast/proof)
+  // Use OneSatServices which wraps fallbackServices for 1Sat API
+  // TODO: Remove cast after bsv-blockchain/wallet-toolbox#104 is merged
+  const monitor = new Monitor({
+    chain,
+    services: oneSatServices as unknown as typeof fallbackServices,
+    storage,
+    chaintracks: services.chaintracks,
+    msecsWaitPerMerkleProofServiceReq: 500,
+    taskRunWaitMsecs: 5000,
+    abandonedMsecs: 1000 * 60 * 5, // 5 minutes
+    unprovenAttemptsLimitTest: 10,
+    unprovenAttemptsLimitMain: 144,
+    onTransactionProven: options?.onTransactionProven
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? async (status: any) => {
+          console.log('[Monitor] Transaction proven:', status.txid);
+          options.onTransactionProven!(status.txid);
+        }
+      : undefined,
+    onTransactionBroadcasted: options?.onTransactionBroadcasted
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? async (result: any) => {
+          console.log('[Monitor] Transaction broadcasted:', result);
+          if (result.txid) {
+            options.onTransactionBroadcasted!(result.txid);
+          }
+        }
+      : undefined,
+  });
+
+  // 10. Start sync operations (don't await - let them run in background)
+  console.log('[initWallet] Starting processor...');
+  processor.start().catch((error) => {
+    console.error('[initWallet] Failed to start processor:', error);
+  });
+  console.log('[initWallet] Adding default tasks to monitor...');
+  monitor.addDefaultTasks();
+  console.log('[initWallet] Starting monitor tasks...');
+  // Don't await startTasks - it runs continuously and never resolves
+  monitor.startTasks().catch((error) => {
+    console.error('[initWallet] Monitor tasks error:', error);
+  });
+  console.log('[initWallet] Returning context');
+
+  // Create close function that captures processor and monitor
+  const close = async () => {
+    processor.stop();
+    monitor.stopTasks();
+    await monitor.destroy();
+    await underlyingWallet.destroy();
+  };
+
   return {
     wallet,
-    underlyingWallet,
-    syncProcessor,
-    syncQueue,
-    services,
-    addressManager,
+    syncContext,
+    close,
   };
-};
-
-/**
- * Close/destroy an account context
- */
-export const closeAccountContext = async (accountContext: AccountContext | null): Promise<void> => {
-  if (accountContext?.underlyingWallet) {
-    await accountContext.underlyingWallet.destroy();
-  }
 };
