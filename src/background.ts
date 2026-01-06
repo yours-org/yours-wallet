@@ -87,7 +87,9 @@ const initializeWallet = async (): Promise<WalletInterface | null> => {
   if (accountContext) {
     bindPermissionCallbacks(accountContext.wallet);
     console.log('[background] initializeWallet: bound permission callbacks');
+    console.log('[background] initializeWallet: remoteStorageConnected:', accountContext.remoteStorageConnected);
     // Sync is started in initWallet, events are forwarded to popup there
+    // Remote storage retry happens naturally when service worker restarts
   }
 
   return accountContext?.wallet ?? null;
@@ -127,9 +129,8 @@ let pendingTransactionApproval: {
   eventType: YoursEventName;
 } | null = null;
 
-// Callbacks for connect/auth flow
-let responseCallbackForConnectRequest: CallbackResponse | null = null;
-let responseCallbackForCWIWaitForAuthentication: CallbackResponse | null = null;
+// Callback for connect/auth flow (used by both yours.connect and CWI.waitForAuthentication)
+let responseCallbackForConnectRequest: ((decision: Decision, pubKeys?: PubKeys) => void) | null = null;
 let popupWindowId: number | undefined;
 
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
@@ -288,6 +289,8 @@ if (isInServiceWorker) {
       YoursEventName.SIGNED_OUT,
       // CWI auth check (no auth required - just checks status)
       CWIEventName.IS_AUTHENTICATED,
+      // Legacy yours.isConnected() check (no auth required - just checks status)
+      YoursEventName.IS_CONNECTED,
       // Permission response from popup
       'PERMISSION_RESPONSE',
       // Transaction approval response from popup
@@ -311,7 +314,10 @@ if (isInServiceWorker) {
           return signOut();
         // CWI auth check
         case CWIEventName.IS_AUTHENTICATED:
-          return processCWIIsAuthenticated(message.params as { originator?: string }, sendResponse);
+          return processCWIIsAuthenticated(message.originator, sendResponse);
+        // Legacy yours.isConnected() check
+        case YoursEventName.IS_CONNECTED:
+          return processIsConnected(message.originator, sendResponse);
         // Permission response from popup UI
         case 'PERMISSION_RESPONSE':
           return processPermissionResponse(message as { requestID: string; granted: boolean; expiry?: number });
@@ -353,6 +359,12 @@ if (isInServiceWorker) {
       // CWI waitForAuthentication - same flow as connect
       if (message.action === CWIEventName.WAIT_FOR_AUTHENTICATION) {
         return processCWIWaitForAuthentication(message, sendResponse, isAuthorized);
+      }
+
+      // Legacy yours.connect() flow
+      if (message.action === YoursEventName.CONNECT) {
+        console.log('[background] Processing connect request, isAuthorized:', isAuthorized);
+        return processConnectRequest(message, sendResponse, isAuthorized);
       }
 
       if (!isAuthorized) {
@@ -597,16 +609,16 @@ if (isInServiceWorker) {
   // Shared helper: if already authorized, respond immediately; otherwise launch popup
   const handleConnectOrAuth = (
     request: ConnectRequest,
-    sendResponse: CallbackResponse,
+    _sendResponse: CallbackResponse,
     isAuthorized: boolean,
-    setCallback: (cb: CallbackResponse) => void,
+    setCallback: () => void,
     immediateResponse: () => void,
   ) => {
     if (isAuthorized) {
       immediateResponse();
       return true;
     }
-    setCallback(sendResponse);
+    setCallback();
     chromeStorageService.update({ connectRequest: request }).then(() => {
       launchPopUp();
     });
@@ -630,10 +642,10 @@ if (isInServiceWorker) {
   };
 
   const processCWIIsAuthenticated = (
-    params: { originator?: string },
+    originator: string | undefined,
     sendResponse: CallbackResponse,
   ) => {
-    checkIsAuthenticated(params.originator)
+    checkIsAuthenticated(originator)
       .then((isAuthenticated) => {
         sendResponse({
           type: CWIEventName.IS_AUTHENTICATED,
@@ -653,11 +665,11 @@ if (isInServiceWorker) {
   };
 
   const processCWIWaitForAuthentication = (
-    message: { params: { originator?: string } },
+    message: { params: RequestParams; originator?: string },
     sendResponse: CallbackResponse,
     isAuthorized: boolean,
   ) => {
-    const domain = message.params?.originator;
+    const domain = message.originator;
     return handleConnectOrAuth(
       {
         domain: domain || 'unknown',
@@ -667,8 +679,23 @@ if (isInServiceWorker) {
       } as ConnectRequest,
       sendResponse,
       isAuthorized,
-      (cb) => {
-        responseCallbackForCWIWaitForAuthentication = cb;
+      () => {
+        // Wrap sendResponse to format CWI response
+        responseCallbackForConnectRequest = (decision: Decision) => {
+          if (decision === 'approved') {
+            sendResponse({
+              type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+              success: true,
+              data: { authenticated: true },
+            });
+          } else {
+            sendResponse({
+              type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+              success: false,
+              error: 'User declined the connection request',
+            });
+          }
+        };
       },
       () => {
         sendResponse({
@@ -678,6 +705,77 @@ if (isInServiceWorker) {
         });
       },
     );
+  };
+
+  const processConnectRequest = (
+    message: { params: RequestParams; originator?: string },
+    sendResponse: CallbackResponse,
+    isAuthorized: boolean,
+  ) => {
+    const domain = message.originator;
+    const appName = message.params?.appName;
+    const appIcon = message.params?.appIcon;
+
+    return handleConnectOrAuth(
+      {
+        domain: domain || 'unknown',
+        appName: appName || domain || 'Unknown App',
+        appIcon: appIcon || HOSTED_YOURS_IMAGE,
+        isAuthorized,
+      } as ConnectRequest,
+      sendResponse,
+      isAuthorized,
+      () => {
+        // Wrap sendResponse to format legacy connect response
+        responseCallbackForConnectRequest = (decision: Decision, pubKeys?: PubKeys) => {
+          console.log('[processConnectRequest callback] decision:', decision, 'pubKeys:', pubKeys, 'identityPubKey:', pubKeys?.identityPubKey);
+          if (decision === 'approved' && pubKeys) {
+            sendResponse({
+              type: YoursEventName.CONNECT,
+              success: true,
+              data: pubKeys.identityPubKey,
+            });
+          } else {
+            sendResponse({
+              type: YoursEventName.CONNECT,
+              success: false,
+              error: 'User declined the connection request',
+            });
+          }
+        };
+      },
+      () => {
+        // Already authorized - return the identity pubkey
+        chromeStorageService.getAndSetStorage().then(() => {
+          const { account } = chromeStorageService.getCurrentAccountObject();
+          sendResponse({
+            type: YoursEventName.CONNECT,
+            success: true,
+            data: account?.pubKeys?.identityPubKey,
+          });
+        });
+      },
+    );
+  };
+
+  const processIsConnected = (originator: string | undefined, sendResponse: CallbackResponse) => {
+    checkIsAuthenticated(originator)
+      .then((isConnected) => {
+        sendResponse({
+          type: YoursEventName.IS_CONNECTED,
+          success: true,
+          data: isConnected,
+        });
+      })
+      .catch(() => {
+        sendResponse({
+          type: YoursEventName.IS_CONNECTED,
+          success: true,
+          data: false,
+        });
+      });
+
+    return true;
   };
 
   // Direct passthrough handlers - wallet handles permissions internally
@@ -1360,62 +1458,15 @@ if (isInServiceWorker) {
   // CONNECT RESPONSE ********************************
 
   const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys }) => {
-    // Handle CWI waitForAuthentication callback if present
-    if (responseCallbackForCWIWaitForAuthentication) {
-      try {
-        if (response.decision === 'approved') {
-          responseCallbackForCWIWaitForAuthentication({
-            type: CWIEventName.WAIT_FOR_AUTHENTICATION,
-            success: true,
-            data: { authenticated: true },
-          });
-        } else {
-          responseCallbackForCWIWaitForAuthentication({
-            type: CWIEventName.WAIT_FOR_AUTHENTICATION,
-            success: false,
-            error: 'User declined the connection request',
-          });
-        }
-      } catch (error) {
-        responseCallbackForCWIWaitForAuthentication?.({
-          type: CWIEventName.WAIT_FOR_AUTHENTICATION,
-          success: false,
-          error: JSON.stringify(error),
-        });
-      } finally {
-        responseCallbackForCWIWaitForAuthentication = null;
-        chromeStorageService.getAndSetStorage().then((res) => {
-          if (res?.popupWindowId) {
-            removeWindow(res.popupWindowId);
-            chromeStorageService.remove(['connectRequest', 'popupWindowId']);
-          }
-        });
-      }
+    console.log('[processConnectResponse] decision:', response.decision, 'pubKeys:', response.pubKeys, 'hasCallback:', !!responseCallbackForConnectRequest);
+    if (!responseCallbackForConnectRequest) {
+      console.error('[processConnectResponse] Missing callback!');
       return true;
     }
-
-    // Handle legacy connect callback
-    if (!responseCallbackForConnectRequest) throw Error('Missing callback!');
     try {
-      if (response.decision === 'approved') {
-        responseCallbackForConnectRequest({
-          type: YoursEventName.CONNECT,
-          success: true,
-          data: response.pubKeys.identityPubKey,
-        });
-      } else {
-        responseCallbackForConnectRequest({
-          type: YoursEventName.CONNECT,
-          success: false,
-          error: 'User declined the connection request',
-        });
-      }
+      responseCallbackForConnectRequest(response.decision, response.pubKeys);
     } catch (error) {
-      responseCallbackForConnectRequest?.({
-        type: YoursEventName.CONNECT,
-        success: false,
-        error: JSON.stringify(error),
-      });
+      console.error('Error in connect response callback:', error);
     } finally {
       responseCallbackForConnectRequest = null;
       chromeStorageService.getAndSetStorage().then((res) => {
@@ -1432,26 +1483,11 @@ if (isInServiceWorker) {
   // HANDLE WINDOW CLOSE *****************************************
   chrome.windows.onRemoved.addListener((closedWindowId) => {
     console.log('Window closed: ', closedWindowId);
-    localStorage.removeItem('walletImporting');
 
     if (closedWindowId === popupWindowId) {
       if (responseCallbackForConnectRequest) {
-        responseCallbackForConnectRequest({
-          type: YoursEventName.CONNECT,
-          success: false,
-          error: 'User dismissed the request!',
-        });
+        responseCallbackForConnectRequest('declined');
         responseCallbackForConnectRequest = null;
-        chromeStorageService.remove('connectRequest');
-      }
-
-      if (responseCallbackForCWIWaitForAuthentication) {
-        responseCallbackForCWIWaitForAuthentication({
-          type: CWIEventName.WAIT_FOR_AUTHENTICATION,
-          success: false,
-          error: 'User dismissed the request!',
-        });
-        responseCallbackForCWIWaitForAuthentication = null;
         chromeStorageService.remove('connectRequest');
       }
 

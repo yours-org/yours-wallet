@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@1sat/wallet-toolbox": "^0.0.8",
+    "@1sat/wallet-toolbox": "file:vendor/1sat-wallet-toolbox-0.0.8.tgz",
     "@bsv/paymail": "^2.0.2",
-    "@bsv/sdk": "^1.9.29",
-    "@bsv/wallet-toolbox-mobile": "^1.7.18",
+    "@bsv/sdk": "^1.9.31",
+    "@bsv/wallet-toolbox-mobile": "file:vendor/bsv-wallet-toolbox-mobile-1.7.19.tgz",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@mnee/ts-sdk": "^1.0.1",
     "@ramonak/react-progress-bar": "^5.2.0",

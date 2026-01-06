@@ -5,13 +5,14 @@ import {
   WalletStorageManager,
   StorageProvider,
   StorageIdb,
+  StorageClient,
   WalletPermissionsManager,
   Services,
   Monitor,
   type sdk as toolboxSdk,
   type PermissionsManagerConfig,
 } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
-import { KeyDeriver, PrivateKey } from '@bsv/sdk';
+import { KeyDeriver, PrivateKey, type WalletInterface } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
@@ -68,24 +69,8 @@ const DEFAULT_PERMISSIONS_CONFIG: PermissionsManagerConfig = {
   differentiatePrivilegedOperations: true,
 };
 
-/**
- * Initialize storage for a wallet (browser-specific: uses wallet-toolbox-mobile)
- */
-const initStorage = async (
-  chain: Chain,
-  identityPubKey: string,
-  selectedAccount: string,
-): Promise<{ storage: WalletStorageManager; storageProvider: StorageIdb }> => {
-  const storageOptions = StorageProvider.createStorageBaseOptions(chain);
-  storageOptions.feeModel = { model: 'sat/kb', value: FEE_PER_KB };
-  const storageProvider = new StorageIdb(storageOptions);
-  const storage = new WalletStorageManager(identityPubKey, storageProvider);
-
-  await storageProvider.migrate(`wallet-${selectedAccount || ''}`, identityPubKey);
-  await storage.makeAvailable();
-
-  return { storage, storageProvider };
-};
+// Timeout for remote storage connection attempts (ms)
+const REMOTE_STORAGE_TIMEOUT = 5000;
 
 /**
  * Decrypt keys from chrome storage using the stored passKey.
@@ -112,6 +97,8 @@ const decryptKeys = (chromeStorageService: ChromeStorageService): Keys => {
 export interface AccountContext {
   wallet: WalletPermissionsManager;
   syncContext: SyncContext;
+  /** Whether remote storage backup is connected */
+  remoteStorageConnected: boolean;
   /** Call to stop sync and destroy wallet */
   close: () => Promise<void>;
 }
@@ -152,25 +139,61 @@ export const initWallet = async (
   const identityPubKey = identityKey.toPublicKey().toString();
   const keyDeriver = new KeyDeriver(identityKey);
 
-  // 2. BROWSER-SPECIFIC: Create storage (wallet-toolbox-mobile)
-  const { storage } = await initStorage(chain, identityPubKey, selectedAccount || '');
-
-  // 3. Create fallback services (wallet-toolbox-mobile Services for APIs we don't implement)
+  // 2. Create fallback services (wallet-toolbox-mobile Services for APIs we don't implement)
   const fallbackServices = new Services(chain);
 
-  // 4. Import OneSatServices to create proper services with fallback
+  // 3. Import OneSatServices to create proper services with fallback
   const { OneSatServices } = await import('@1sat/wallet-toolbox');
   const oneSatServices = new OneSatServices(chain, undefined, fallbackServices as unknown as WalletServices);
 
-  // 5. Create the BRC-100 Wallet with signing capability
+  // 4. Create local storage first (needed before wallet, but wallet needed for remote auth)
+  const storageOptions = StorageProvider.createStorageBaseOptions(chain);
+  storageOptions.feeModel = { model: 'sat/kb', value: FEE_PER_KB };
+  const localStorageProvider = new StorageIdb(storageOptions);
+  await localStorageProvider.migrate(`wallet-${selectedAccount || ''}`, identityPubKey);
+
+  // 5. Create initial wallet with local-only storage (needed for remote storage auth)
+  const localOnlyStorage = new WalletStorageManager(identityPubKey, localStorageProvider);
+  await localOnlyStorage.makeAvailable();
+
   const underlyingWallet = new Wallet({
     chain,
     keyDeriver,
-    storage,
+    storage: localOnlyStorage,
     services: oneSatServices as unknown as WalletServices,
   });
 
-  // 5. Wrap with WalletPermissionsManager for permission handling
+  // 6. Try to connect remote storage for backup (graceful degradation)
+  // Access storageUrl via type assertion since it's dynamically imported
+  const storageUrl = (oneSatServices as unknown as { storageUrl: string }).storageUrl;
+  let remoteStorageConnected = false;
+  try {
+    console.log('[initWallet] Attempting to connect to remote storage:', storageUrl);
+    const remoteClient = new StorageClient(underlyingWallet as unknown as WalletInterface, storageUrl);
+
+    // Test connection with a timeout
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Remote storage connection timeout')), REMOTE_STORAGE_TIMEOUT)
+    );
+    await Promise.race([remoteClient.makeAvailable(), timeoutPromise]);
+
+    // Remote connected - add it as a backup to the storage manager
+    // Note: We need to add the backup after initial setup
+    // For now, we'll recreate the storage manager with the remote backup
+    const storageWithRemote = new WalletStorageManager(identityPubKey, localStorageProvider, [remoteClient]);
+    await storageWithRemote.makeAvailable();
+
+    // Update the wallet's storage reference
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (underlyingWallet as any)._storage = storageWithRemote;
+
+    remoteStorageConnected = true;
+    console.log('[initWallet] Remote storage connected successfully');
+  } catch (error) {
+    console.warn('[initWallet] Remote storage unavailable, continuing with local only:', error);
+  }
+
+  // 7. Wrap with WalletPermissionsManager for permission handling
   const wallet = new WalletPermissionsManager(
     underlyingWallet,
     ADMIN_ORIGINATOR,
@@ -229,7 +252,7 @@ export const initWallet = async (
   const monitor = new Monitor({
     chain,
     services: oneSatServices as unknown as typeof fallbackServices,
-    storage,
+    storage: localOnlyStorage,
     chaintracks: services.chaintracks,
     msecsWaitPerMerkleProofServiceReq: 500,
     taskRunWaitMsecs: 5000,
@@ -279,6 +302,7 @@ export const initWallet = async (
   return {
     wallet,
     syncContext,
+    remoteStorageConnected,
     close,
   };
 };
