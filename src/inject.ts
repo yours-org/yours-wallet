@@ -25,7 +25,6 @@ import {
   Broadcast,
   DecryptRequest,
   EncryptRequest,
-  GetSignatures,
   GetTaggedKeysRequest,
   InscribeRequest,
   NetWork,
@@ -33,7 +32,6 @@ import {
   PurchaseOrdinal,
   SendBsv,
   SendBsvResponse,
-  SignatureResponse,
   SignedMessage,
   SignMessage,
   SocialProfile as YoursSocialProfile,
@@ -130,7 +128,6 @@ export type RequestParams = {
     | PurchaseOrdinal
     | SignMessage
     | Broadcast
-    | GetSignatures
     | TaggedDerivationRequest
     | EncryptRequest
     | DecryptRequest;
@@ -168,7 +165,6 @@ export type ResponseEventDetail = {
     | MNEEBalance
     | Bsv20[]
     | SerializedBsv20[]
-    | SignatureResponse[]
     | YoursSocialProfile
     | TaggedDerivationResponse
     | TaggedDerivationResponse[]
@@ -328,7 +324,6 @@ const yoursProvider: YoursProviderType = {
   lockBsv: (requests: LockRequest[]) => onesatApi.lockBsv(requests),
   // Signing - delegate to OneSatApi
   signMessage: (request: SignMessage) => onesatApi.signMessage(request),
-  getSignatures: (request: GetSignatures) => onesatApi.getSignatures(request),
   broadcast: (request: Broadcast) => onesatApi.broadcast(request),
   // Encryption - delegate to CWI
   encrypt: async (request: EncryptRequest) => {
