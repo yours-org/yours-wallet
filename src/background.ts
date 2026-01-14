@@ -1,5 +1,4 @@
 /* global chrome */
-import { PubKeys } from 'yours-wallet-provider';
 import {
   CustomListenerName,
   Decision,
@@ -28,15 +27,6 @@ import type {
   PermissionRequest,
   WalletPermissionsManager,
 } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
-import {
-  OneSatApi,
-  type SendBsvRequest,
-  type TransferOrdinalRequest,
-  type ListOrdinalRequest,
-  type InscribeRequest,
-  type LockBsvRequest,
-} from '@1sat/wallet-toolbox';
-import type { ApprovalContext, YoursApprovalType } from './yoursApi';
 import { removeWindow } from './utils/chromeHelpers';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
@@ -121,16 +111,8 @@ const pendingPermissionRequests = new Map<string, {
   reject: (error: Error) => void;
 }>();
 
-// Pending transaction approval (YoursApi with custom UI)
-// Only one pending approval at a time - new requests abort the previous one
-let pendingTransactionApproval: {
-  context: ApprovalContext;
-  sendResponse: CallbackResponse;
-  eventType: YoursEventName;
-} | null = null;
-
-// Callback for connect/auth flow (used by both yours.connect and CWI.waitForAuthentication)
-let responseCallbackForConnectRequest: ((decision: Decision, pubKeys?: PubKeys) => void) | null = null;
+// Callback for CWI.waitForAuthentication flow
+let responseCallbackForConnectRequest: ((decision: Decision) => void) | null = null;
 let popupWindowId: number | undefined;
 
 const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
@@ -289,12 +271,8 @@ if (isInServiceWorker) {
       YoursEventName.SIGNED_OUT,
       // CWI auth check (no auth required - just checks status)
       CWIEventName.IS_AUTHENTICATED,
-      // Legacy yours.isConnected() check (no auth required - just checks status)
-      YoursEventName.IS_CONNECTED,
       // Permission response from popup
       'PERMISSION_RESPONSE',
-      // Transaction approval response from popup
-      YoursEventName.TRANSACTION_APPROVAL_RESPONSE,
       // Internal UI requests (no external domain)
       YoursEventName.GET_PUB_KEYS,
       YoursEventName.GET_LEGACY_ADDRESSES,
@@ -307,7 +285,7 @@ if (isInServiceWorker) {
     if (noAuthRequired.includes(message.action)) {
       switch (message.action) {
         case YoursEventName.USER_CONNECT_RESPONSE:
-          return processConnectResponse(message as { decision: Decision; pubKeys: PubKeys });
+          return processConnectResponse(message as { decision: Decision });
         case YoursEventName.SWITCH_ACCOUNT:
           return switchAccount();
         case YoursEventName.SIGNED_OUT:
@@ -315,15 +293,9 @@ if (isInServiceWorker) {
         // CWI auth check
         case CWIEventName.IS_AUTHENTICATED:
           return processCWIIsAuthenticated(message.originator, sendResponse);
-        // Legacy yours.isConnected() check
-        case YoursEventName.IS_CONNECTED:
-          return processIsConnected(message.originator, sendResponse);
         // Permission response from popup UI
         case 'PERMISSION_RESPONSE':
           return processPermissionResponse(message as { requestID: string; granted: boolean; expiry?: number });
-        // Transaction approval response from popup UI
-        case YoursEventName.TRANSACTION_APPROVAL_RESPONSE:
-          return processTransactionApprovalResponse(message as { approved: boolean });
         // Internal UI requests (no external domain, direct from popup)
         case YoursEventName.GET_PUB_KEYS:
           processGetPubKeysRequest(sendResponse);
@@ -356,15 +328,9 @@ if (isInServiceWorker) {
     }
 
     authorizeRequest(message).then((isAuthorized) => {
-      // CWI waitForAuthentication - same flow as connect
+      // CWI waitForAuthentication
       if (message.action === CWIEventName.WAIT_FOR_AUTHENTICATION) {
         return processCWIWaitForAuthentication(message, sendResponse, isAuthorized);
-      }
-
-      // Legacy yours.connect() flow
-      if (message.action === YoursEventName.CONNECT) {
-        console.log('[background] Processing connect request, isAuthorized:', isAuthorized);
-        return processConnectRequest(message, sendResponse, isAuthorized);
       }
 
       if (!isAuthorized) {
@@ -423,26 +389,6 @@ if (isInServiceWorker) {
           return true;
         case CWIEventName.ABORT_ACTION:
           processCWIAbortAction(message, sendResponse);
-          return true;
-
-        // YoursApi handlers (custom approval UI with transaction preview)
-        case YoursEventName.YOURS_SEND_BSV:
-          processYoursSendBsv(message, sendResponse);
-          return true;
-        case YoursEventName.YOURS_SEND_ALL_BSV:
-          processYoursSendAllBsv(message, sendResponse);
-          return true;
-        case YoursEventName.YOURS_TRANSFER_ORDINAL:
-          processYoursTransferOrdinal(message, sendResponse);
-          return true;
-        case YoursEventName.YOURS_LIST_ORDINAL:
-          processYoursListOrdinal(message, sendResponse);
-          return true;
-        case YoursEventName.YOURS_INSCRIBE:
-          processYoursInscribe(message, sendResponse);
-          return true;
-        case YoursEventName.YOURS_LOCK_BSV:
-          processYoursLockBsv(message, sendResponse);
           return true;
 
         default:
@@ -705,77 +651,6 @@ if (isInServiceWorker) {
         });
       },
     );
-  };
-
-  const processConnectRequest = (
-    message: { params: RequestParams; originator?: string },
-    sendResponse: CallbackResponse,
-    isAuthorized: boolean,
-  ) => {
-    const domain = message.originator;
-    const appName = message.params?.appName;
-    const appIcon = message.params?.appIcon;
-
-    return handleConnectOrAuth(
-      {
-        domain: domain || 'unknown',
-        appName: appName || domain || 'Unknown App',
-        appIcon: appIcon || HOSTED_YOURS_IMAGE,
-        isAuthorized,
-      } as ConnectRequest,
-      sendResponse,
-      isAuthorized,
-      () => {
-        // Wrap sendResponse to format legacy connect response
-        responseCallbackForConnectRequest = (decision: Decision, pubKeys?: PubKeys) => {
-          console.log('[processConnectRequest callback] decision:', decision, 'pubKeys:', pubKeys, 'identityPubKey:', pubKeys?.identityPubKey);
-          if (decision === 'approved' && pubKeys) {
-            sendResponse({
-              type: YoursEventName.CONNECT,
-              success: true,
-              data: pubKeys.identityPubKey,
-            });
-          } else {
-            sendResponse({
-              type: YoursEventName.CONNECT,
-              success: false,
-              error: 'User declined the connection request',
-            });
-          }
-        };
-      },
-      () => {
-        // Already authorized - return the identity pubkey
-        chromeStorageService.getAndSetStorage().then(() => {
-          const { account } = chromeStorageService.getCurrentAccountObject();
-          sendResponse({
-            type: YoursEventName.CONNECT,
-            success: true,
-            data: account?.pubKeys?.identityPubKey,
-          });
-        });
-      },
-    );
-  };
-
-  const processIsConnected = (originator: string | undefined, sendResponse: CallbackResponse) => {
-    checkIsAuthenticated(originator)
-      .then((isConnected) => {
-        sendResponse({
-          type: YoursEventName.IS_CONNECTED,
-          success: true,
-          data: isConnected,
-        });
-      })
-      .catch(() => {
-        sendResponse({
-          type: YoursEventName.IS_CONNECTED,
-          success: true,
-          data: false,
-        });
-      });
-
-    return true;
   };
 
   // Direct passthrough handlers - wallet handles permissions internally
@@ -1133,338 +1008,16 @@ if (isInServiceWorker) {
     return true;
   };
 
-  // YOURS API HANDLERS ********************************
-  // These use OneSatApi builders + two-step createAction/signAction flow with custom approval UI
-
-  /**
-   * Generate a unique request ID for approval tracking
-   */
-  const generateRequestId = (): string => {
-    return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-  };
-
-  /**
-   * Get or create OneSatApi instance for the current wallet
-   */
-  const getOneSatApi = (): OneSatApi | null => {
-    const w = getWallet();
-    if (!w) return null;
-    return new OneSatApi(w);
-  };
-
-  /**
-   * Abort any pending transaction approval and release UTXOs
-   */
-  const abortPendingApproval = async () => {
-    if (pendingTransactionApproval) {
-      const { context, sendResponse, eventType } = pendingTransactionApproval;
-
-      // Abort the pending action to release UTXOs
-      if (context.walletReference) {
-        try {
-          const w = getWallet();
-          if (w) {
-            await w.abortAction({ reference: context.walletReference });
-          }
-        } catch (e) {
-          console.warn('Failed to abort pending action:', e);
-        }
-      }
-
-      // Send rejection response to the previous request
-      sendResponse({
-        type: eventType,
-        success: false,
-        error: 'Request superseded by new transaction',
-      });
-
-      pendingTransactionApproval = null;
-    }
-  };
-
-  /**
-   * Generic handler for YoursApi transactional methods
-   * Implements the two-step createAction/signAction flow with approval UI
-   */
-  const processYoursTransaction = async <TRequest>(
-    eventType: YoursEventName,
-    approvalType: YoursApprovalType,
-    request: TRequest,
-    buildParams: () => Promise<{ params: { description?: string }; error?: string }>,
-    sendResponse: CallbackResponse,
-  ) => {
-    try {
-      const w = getWallet();
-      if (!w) {
-        sendResponse({ type: eventType, success: false, error: 'Wallet not initialized!' });
-        return;
-      }
-
-      // Build the CreateActionArgs using OneSatApi builder
-      const buildResult = await buildParams();
-      if (buildResult.error || !buildResult.params) {
-        sendResponse({ type: eventType, success: false, error: buildResult.error || 'Failed to build transaction' });
-        return;
-      }
-
-      const params = buildResult.params;
-
-      // Step 1: Create action with signAndProcess=false to get signable transaction
-      const createResult = await w.createAction({
-        ...params,
-        description: params.description || 'Transaction',
-        options: { signAndProcess: false },
-      });
-
-      if (!createResult.signableTransaction) {
-        sendResponse({ type: eventType, success: false, error: 'No signable transaction returned' });
-        return;
-      }
-
-      const { reference, tx } = createResult.signableTransaction;
-
-      // Abort any pending approval before starting a new one
-      await abortPendingApproval();
-
-      // Build approval context
-      const context: ApprovalContext = {
-        requestId: generateRequestId(),
-        type: approvalType,
-        description: params.description || `${approvalType} transaction`,
-        createActionParams: params as import('@1sat/wallet-toolbox').CreateActionArgs,
-        walletReference: reference,
-        signableTransactionBEEF: tx,
-        originalRequest: request,
-      };
-
-      // Store pending approval
-      pendingTransactionApproval = { context, sendResponse, eventType };
-
-      // Store approval context in chrome storage for popup to read
-      await chromeStorageService.update({ transactionApprovalRequest: context });
-
-      // Launch approval popup
-      launchPopUp();
-
-    } catch (error) {
-      sendResponse({
-        type: eventType,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  };
-
-  const processYoursSendBsv = async (
-    message: { params: { data: SendBsvRequest[] } },
-    sendResponse: CallbackResponse,
-  ) => {
-    const api = getOneSatApi();
-    if (!api) {
-      sendResponse({ type: YoursEventName.YOURS_SEND_BSV, success: false, error: 'Wallet not initialized!' });
-      return;
-    }
-
-    await processYoursTransaction(
-      YoursEventName.YOURS_SEND_BSV,
-      'sendBsv',
-      message.params.data,
-      async () => {
-        const result = api.buildSendBsv(message.params.data);
-        if ('error' in result) return { params: {}, error: result.error };
-        return { params: result };
-      },
-      sendResponse,
-    );
-  };
-
-  const processYoursSendAllBsv = async (
-    message: { params: { data: string } },
-    sendResponse: CallbackResponse,
-  ) => {
-    const api = getOneSatApi();
-    if (!api) {
-      sendResponse({ type: YoursEventName.YOURS_SEND_ALL_BSV, success: false, error: 'Wallet not initialized!' });
-      return;
-    }
-
-    await processYoursTransaction(
-      YoursEventName.YOURS_SEND_ALL_BSV,
-      'sendAllBsv',
-      message.params.data,
-      async () => {
-        const result = await api.buildSendAllBsv(message.params.data);
-        if ('error' in result) return { params: {}, error: result.error };
-        return { params: result };
-      },
-      sendResponse,
-    );
-  };
-
-  const processYoursTransferOrdinal = async (
-    message: { params: { data: TransferOrdinalRequest } },
-    sendResponse: CallbackResponse,
-  ) => {
-    const api = getOneSatApi();
-    if (!api) {
-      sendResponse({ type: YoursEventName.YOURS_TRANSFER_ORDINAL, success: false, error: 'Wallet not initialized!' });
-      return;
-    }
-
-    await processYoursTransaction(
-      YoursEventName.YOURS_TRANSFER_ORDINAL,
-      'transferOrdinal',
-      message.params.data,
-      async () => {
-        const result = await api.buildTransferOrdinal(message.params.data);
-        if ('error' in result) return { params: {}, error: result.error };
-        return { params: result };
-      },
-      sendResponse,
-    );
-  };
-
-  const processYoursListOrdinal = async (
-    message: { params: { data: ListOrdinalRequest } },
-    sendResponse: CallbackResponse,
-  ) => {
-    const api = getOneSatApi();
-    if (!api) {
-      sendResponse({ type: YoursEventName.YOURS_LIST_ORDINAL, success: false, error: 'Wallet not initialized!' });
-      return;
-    }
-
-    await processYoursTransaction(
-      YoursEventName.YOURS_LIST_ORDINAL,
-      'listOrdinal',
-      message.params.data,
-      async () => {
-        const result = await api.buildListOrdinal(message.params.data);
-        if ('error' in result) return { params: {}, error: result.error };
-        return { params: result };
-      },
-      sendResponse,
-    );
-  };
-
-  const processYoursInscribe = async (
-    message: { params: { data: InscribeRequest } },
-    sendResponse: CallbackResponse,
-  ) => {
-    const api = getOneSatApi();
-    if (!api) {
-      sendResponse({ type: YoursEventName.YOURS_INSCRIBE, success: false, error: 'Wallet not initialized!' });
-      return;
-    }
-
-    await processYoursTransaction(
-      YoursEventName.YOURS_INSCRIBE,
-      'inscribe',
-      message.params.data,
-      async () => {
-        const result = api.buildInscribe(message.params.data);
-        if ('error' in result) return { params: {}, error: result.error };
-        return { params: result };
-      },
-      sendResponse,
-    );
-  };
-
-  const processYoursLockBsv = async (
-    message: { params: { data: LockBsvRequest[] } },
-    sendResponse: CallbackResponse,
-  ) => {
-    const api = getOneSatApi();
-    if (!api) {
-      sendResponse({ type: YoursEventName.YOURS_LOCK_BSV, success: false, error: 'Wallet not initialized!' });
-      return;
-    }
-
-    await processYoursTransaction(
-      YoursEventName.YOURS_LOCK_BSV,
-      'lockBsv',
-      message.params.data,
-      async () => {
-        const result = api.buildLockBsv(message.params.data);
-        if ('error' in result) return { params: {}, error: result.error };
-        return { params: result };
-      },
-      sendResponse,
-    );
-  };
-
-  // TRANSACTION APPROVAL RESPONSE HANDLER ********************************
-
-  const processTransactionApprovalResponse = async (response: { approved: boolean }) => {
-    if (!pendingTransactionApproval) {
-      console.warn('No pending transaction approval found');
-      return;
-    }
-
-    const { context, sendResponse, eventType } = pendingTransactionApproval;
-    pendingTransactionApproval = null;
-
-    try {
-      const w = getWallet();
-      if (!w) {
-        sendResponse({ type: eventType, success: false, error: 'Wallet not initialized!' });
-        return;
-      }
-
-      if (response.approved && context.walletReference) {
-        // User approved - sign and broadcast the transaction
-        const signResult = await w.signAction({ reference: context.walletReference, spends: {} });
-
-        if (!signResult.txid) {
-          sendResponse({ type: eventType, success: false, error: 'No txid returned from signAction' });
-          return;
-        }
-
-        sendResponse({
-          type: eventType,
-          success: true,
-          data: { txid: signResult.txid },
-        });
-      } else {
-        // User rejected - abort the action to release UTXOs
-        if (context.walletReference) {
-          await w.abortAction({ reference: context.walletReference });
-        }
-
-        sendResponse({
-          type: eventType,
-          success: false,
-          error: 'User rejected the transaction',
-        });
-      }
-    } catch (error) {
-      sendResponse({
-        type: eventType,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    } finally {
-      // Clean up chrome storage and close popup
-      chromeStorageService.remove('transactionApprovalRequest');
-      chromeStorageService.getAndSetStorage().then((res) => {
-        if (res?.popupWindowId) {
-          removeWindow(res.popupWindowId);
-          chromeStorageService.remove('popupWindowId');
-        }
-      });
-    }
-  };
-
   // CONNECT RESPONSE ********************************
 
-  const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys }) => {
-    console.log('[processConnectResponse] decision:', response.decision, 'pubKeys:', response.pubKeys, 'hasCallback:', !!responseCallbackForConnectRequest);
+  const processConnectResponse = (response: { decision: Decision }) => {
+    console.log('[processConnectResponse] decision:', response.decision, 'hasCallback:', !!responseCallbackForConnectRequest);
     if (!responseCallbackForConnectRequest) {
       console.error('[processConnectResponse] Missing callback!');
       return true;
     }
     try {
-      responseCallbackForConnectRequest(response.decision, response.pubKeys);
+      responseCallbackForConnectRequest(response.decision);
     } catch (error) {
       console.error('Error in connect response callback:', error);
     } finally {
