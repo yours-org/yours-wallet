@@ -9,6 +9,9 @@ import { HeaderText, Text } from './Reusable';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { GENERIC_TOKEN_ICON } from '../utils/constants';
 import { FaTimes } from 'react-icons/fa';
+import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/wallet-toolbox';
+
+const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
 
 const Container = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -79,7 +82,7 @@ export type Bsv20TokensListProps = {
 
 export const ManageTokens = (props: Bsv20TokensListProps) => {
   const { bsv20s, theme, onBack } = props;
-  const { chromeStorageService, keysService, oneSatApi } = useServiceContext();
+  const { chromeStorageService, keysService } = useServiceContext();
   const [favoriteTokens, setFavoriteTokens] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -144,7 +147,7 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
         filteredTokens.map((t) => (
           <FavoriteRow theme={theme} key={t.id}>
             <TickerWrapper>
-              <Icon src={t.icon ? oneSatApi.getContentUrl(t.icon) : GENERIC_TOKEN_ICON} />
+              <Icon src={t.icon ? getContentUrl(t.icon) : GENERIC_TOKEN_ICON} />
               <TickerTextWrapper>
                 <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
                   {getTokenName(t)}

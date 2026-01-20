@@ -14,6 +14,7 @@ import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { getErrorMessage } from '../../utils/tools';
+import { signMessage } from '@1sat/wallet-toolbox';
 
 const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -44,7 +45,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [signature, setSignature] = useState<string | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, oneSatApi } = useServiceContext();
+  const { chromeStorageService, apiContext } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -77,7 +78,7 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
       return;
     }
 
-    const signRes = await oneSatApi.signMessage(request);
+    const signRes = await signMessage.execute(apiContext, request);
     if ('error' in signRes) {
       addSnackbar(getErrorMessage(signRes.error), 'error');
       setIsProcessing(false);

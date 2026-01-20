@@ -1,7 +1,7 @@
 import { createContext } from 'react';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { KeysService } from '../services/Keys.service';
-import type { OneSatApi } from '@1sat/wallet-toolbox';
+import type { OneSatContext } from '@1sat/wallet-toolbox';
 import { MneeInterface } from '@mnee/ts-sdk';
 
 export interface ServiceContextProps {
@@ -12,8 +12,8 @@ export interface ServiceContextProps {
   isReady: boolean;
   setIsLocked: (isLocked: boolean) => void;
   lockWallet: () => Promise<void>;
-  /** 1Sat API - uses ChromeCWI to communicate with service worker */
-  oneSatApi: OneSatApi;
+  /** API context for calling 1Sat skills - uses ChromeCWI to communicate with service worker */
+  apiContext: OneSatContext;
 }
 
 export const ServiceContext = createContext<ServiceContextProps | undefined>(undefined);

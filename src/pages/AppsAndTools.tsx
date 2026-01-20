@@ -15,7 +15,7 @@ import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { Outpoint, type ParseContext, type Txo } from '@1sat/wallet-toolbox';
+import { Outpoint, type ParseContext, type Txo, getChainInfo, unlockBsv, lockBsv } from '@1sat/wallet-toolbox';
 import { Script } from '@bsv/sdk';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 
@@ -175,7 +175,7 @@ export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
   const { query } = useBottomMenu();
-  const { keysService, chromeStorageService, wallet, oneSatApi } = useServiceContext();
+  const { keysService, chromeStorageService, wallet, apiContext } = useServiceContext();
   const { bsvAddress, ordAddress, identityAddress, getWifBalance, sweepWif } = keysService;
   const exchangeRate = chromeStorageService.getCurrentAccountObject().exchangeRateCache?.rate ?? 0;
   const [isProcessing, setIsProcessing] = useState(false);
@@ -251,7 +251,8 @@ export const AppsAndTools = () => {
 
   const getLockData = async () => {
     setIsProcessing(true);
-    const height = await oneSatApi.getBlockHeight();
+    const chainInfo = await getChainInfo.execute(apiContext, {});
+    const height = chainInfo?.blocks ?? 0;
     setCurrentBlockHeight(height);
 
     const result = await wallet!.listOutputs({ basket: 'lock', limit: 10000 });
@@ -341,7 +342,7 @@ export const AppsAndTools = () => {
   const handleUnlock = async () => {
     try {
       setIsProcessing(true);
-      const res = await oneSatApi.unlockBsv();
+      const res = await unlockBsv.execute(apiContext, {});
       if (!res?.txid) {
         addSnackbar(`Error unlocking funds. ${res?.error ?? 'Please try again.'}`, 'error');
         return;
@@ -359,7 +360,8 @@ export const AppsAndTools = () => {
   const handleBlockHeightChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const dateChoice = new Date(e.target.value).getTime();
     const blockCount = Math.ceil((dateChoice - Date.now()) / 1000 / 60 / 10);
-    const currentHeight = await oneSatApi.getBlockHeight();
+    const chainInfo = await getChainInfo.execute(apiContext, {});
+    const currentHeight = chainInfo?.blocks ?? 0;
     const blockHeight = currentHeight + blockCount;
     setLockBlockHeight(blockHeight);
   };
@@ -370,14 +372,15 @@ export const AppsAndTools = () => {
       if (!lockBsvAmount || !lockBlockHeight) throw new Error('Invalid lock amount or block height');
       if (!lockPassword) throw new Error('Please enter a password');
       setIsProcessing(true);
-      const currentHeight = await oneSatApi.getBlockHeight();
+      const chainInfo = await getChainInfo.execute(apiContext, {});
+      const currentHeight = chainInfo?.blocks ?? 0;
       if (currentHeight >= lockBlockHeight) {
         throw new Error('Invalid block height. Please choose a future block height.');
       }
       const sats = Math.round(lockBsvAmount * BSV_DECIMAL_CONVERSION);
-      const res = await oneSatApi.lockBsv([
-        { lockAddress: identityAddress, until: lockBlockHeight, satoshis: sats },
-      ]);
+      const res = await lockBsv.execute(apiContext, {
+        locks: [{ lockAddress: identityAddress, until: lockBlockHeight, satoshis: sats }],
+      });
 
       if (!res?.txid) throw new Error(`${res?.error ?? 'An error occurred. Please try again.'}`);
 

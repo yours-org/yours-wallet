@@ -14,6 +14,7 @@ import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendBsv } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { getErrorMessage } from '../../utils/tools';
+import { getBalance, sendBsv } from '@1sat/wallet-toolbox';
 import { styled } from 'styled-components';
 
 const Wrapper = styled(ConfirmContent)`
@@ -35,14 +36,14 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, keysService, oneSatApi } = useServiceContext();
+  const { chromeStorageService, keysService, apiContext } = useServiceContext();
   const { bsvAddress } = keysService;
   const [hasSent, setHasSent] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [bsvBalance, setBsvBalance] = useState<number>(0);
 
   const refreshBalance = async () => {
-    const balance = await oneSatApi.getBalance();
+    const balance = await getBalance.execute(apiContext, {});
     setBsvBalance(balance.bsv);
   };
 
@@ -104,7 +105,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         return;
       }
 
-      // Convert request to OneSatApi format
+      // Convert request to sendBsv format
       const sendRequests = request.map((r) => ({
         address: r.address,
         paymail: r.paymail,
@@ -113,7 +114,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         data: r.data,
       }));
 
-      const sendRes = await oneSatApi.sendBsv(sendRequests);
+      const sendRes = await sendBsv.execute(apiContext, { recipients: sendRequests });
 
       if (!sendRes.txid || sendRes.error) {
         addSnackbar(getErrorMessage(sendRes.error), 'error');

@@ -16,6 +16,7 @@ import { Button } from './Button';
 import { Input } from './Input';
 import { ConfirmContent, FormContainer, HeaderText, Text } from './Reusable';
 import { Show } from './Show';
+import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/wallet-toolbox';
 
 const TransferBSV20Header = styled(HeaderText)`
   overflow: hidden;
@@ -63,10 +64,10 @@ export type SendBsv20ViewProps = {
 };
 
 export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
-  const { chromeStorageService, oneSatApi } = useServiceContext();
+  const { chromeStorageService } = useServiceContext();
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
-  // TODO: sendBSV20 needs to be reimplemented with oneSatApi
+  // TODO: sendBSV20 needs to be reimplemented with skill functions
   const getTokenName = (b: { sym?: string }): string => b.sym || 'Null';
   const sendBSV20 = async (): Promise<{ txid: string } | undefined> => {
     console.log('sendBSV20: Not yet implemented with new wallet architecture');
@@ -79,7 +80,7 @@ export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [receiveAddress, setReceiveAddress] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
-  const baseUrl = oneSatApi.getContentUrl('');
+  const baseUrl = ONESAT_MAINNET_CONTENT_URL;
 
   useEffect(() => {
     if (!successTxId) return;

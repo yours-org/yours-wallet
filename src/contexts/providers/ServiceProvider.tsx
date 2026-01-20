@@ -4,7 +4,7 @@ import { KeysService } from '../../services/Keys.service';
 import { INACTIVITY_LIMIT, MNEE_API_TOKEN } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import mnee from '@mnee/ts-sdk';
-import { createChromeCWI, OneSatApi, SyncFetcher } from '@1sat/wallet-toolbox';
+import { createChromeCWI, createContext, getExchangeRate, getChainInfo, SyncFetcher } from '@1sat/wallet-toolbox';
 import { initSyncContext } from '../../initSyncContext';
 import { NetWork } from 'yours-wallet-provider';
 
@@ -16,15 +16,17 @@ const initializeServices = async () => {
 
   const mneeService = new mnee({ environment: 'production', apiKey: MNEE_API_TOKEN });
 
-  // Create OneSatApi using ChromeCWI (communicates with service worker via chrome.runtime.sendMessage)
+  // Create context using ChromeCWI (communicates with service worker via chrome.runtime.sendMessage)
   const chromeCWI = createChromeCWI();
-  const oneSatApi = new OneSatApi(chromeCWI);
+  const network = chromeStorageService.getNetwork();
+  const chain = network === NetWork.Mainnet ? 'main' : 'test';
+  const apiContext = createContext(chromeCWI, { chain });
 
   return {
     chromeStorageService,
     keysService,
     mneeService,
-    oneSatApi,
+    apiContext,
   };
 };
 
@@ -46,12 +48,12 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const initServices = async () => {
       try {
         const initializedServices = await initializeServices();
-        const { chromeStorageService, oneSatApi } = initializedServices;
+        const { chromeStorageService, apiContext } = initializedServices;
         const { account } = chromeStorageService.getCurrentAccountObject();
 
         if (account) {
           // Pre-fetch exchange rate to cache it
-          await oneSatApi.getExchangeRate();
+          await getExchangeRate.execute(apiContext, {});
         }
 
         setServices({ ...initializedServices, isLocked, isReady, lockWallet });
@@ -69,7 +71,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Start SyncFetcher when wallet is unlocked (isLocked changes to false)
   useEffect(() => {
-    if (!isReady || isLocked || !services?.chromeStorageService || !services?.oneSatApi) {
+    if (!isReady || isLocked || !services?.chromeStorageService || !services?.apiContext) {
       return;
     }
 
@@ -98,7 +100,8 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
         syncFetcherRef.current = fetcher;
 
         // Get current block height and start fetching
-        const height = await services.oneSatApi!.getBlockHeight();
+        const chainInfo = await getChainInfo.execute(services.apiContext!, {});
+        const height = chainInfo?.blocks ?? 0;
         fetcher.fetch(height).catch((err) => {
           console.error('SyncFetcher error:', err);
         });
@@ -114,7 +117,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
       syncFetcherRef.current?.stop();
       syncFetcherRef.current = null;
     };
-  }, [isReady, isLocked, services?.chromeStorageService, services?.oneSatApi]);
+  }, [isReady, isLocked, services?.chromeStorageService, services?.apiContext]);
 
   const lockWallet = useCallback(async () => {
     if (!isReady) return;

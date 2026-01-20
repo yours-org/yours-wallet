@@ -18,6 +18,7 @@ import { OrdP2PKH } from 'js-1sat-ord';
 import { convertAddressToMainnet, convertAddressToTestnet, getErrorMessage } from '../../utils/tools';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
+import { sendBsv } from '@1sat/wallet-toolbox';
 
 export type GenerateTaggedKeysRequestProps = {
   request: TaggedDerivationRequest & { domain?: string };
@@ -40,7 +41,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, keysService, oneSatApi } = useServiceContext();
+  const { chromeStorageService, keysService, apiContext } = useServiceContext();
   const isPasswordRequired = chromeStorageService.isPasswordRequired();
 
   useEffect(() => {
@@ -101,7 +102,9 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
         dataB64: encryptedMessages[0],
         contentType: 'yours/tag',
       });
-      const sendRes = await oneSatApi.sendBsv([{ satoshis: 1, script: insScript.toHex() }]);
+      const sendRes = await sendBsv.execute(apiContext, {
+        recipients: [{ satoshis: 1, script: insScript.toHex() }],
+      });
 
       if (!sendRes.txid || sendRes.error) {
         return { error: sendRes.error || 'no-tag-inscription-txid' };

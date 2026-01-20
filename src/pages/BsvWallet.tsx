@@ -38,6 +38,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useWeb3RequestContext } from '../hooks/useWeb3RequestContext';
 import { useServiceContext } from '../hooks/useServiceContext';
 import type { LockData } from '@1sat/wallet-toolbox';
+import { getBalance, getExchangeRate, getBsv21Balances, getLockData, sendBsv, sendAllBsv, unlockBsv } from '@1sat/wallet-toolbox';
 import { sendMessage, sendMessageAsync } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
 import { useSyncTracker } from '../hooks/useSyncTracker';
@@ -218,7 +219,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, mneeService, oneSatApi } = useServiceContext();
+  const { chromeStorageService, mneeService, apiContext } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
@@ -333,7 +334,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   };
 
   const getAndSetAccountAndBsv20s = async () => {
-    const res = await oneSatApi.getBsv21Balances();
+    const res = await getBsv21Balances.execute(apiContext, {});
     // Map Bsv21Balance to Bsv20 format (they're compatible)
     setBsv20s(res as unknown as Bsv20[]);
     setAccount(chromeStorageService.getCurrentAccountObject().account);
@@ -379,10 +380,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
   }, [satSendAmount, bsvBalance]);
 
   const getAndSetBsvBalance = async () => {
-    const balance = await oneSatApi.getBalance();
+    const balance = await getBalance.execute(apiContext, {});
     setBsvBalance(balance.bsv);
     // Exchange rate is fetched inside getBalance(), get it separately for state
-    const rate = await oneSatApi.getExchangeRate();
+    const rate = await getExchangeRate.execute(apiContext, {});
     setExchangeRate(rate);
   };
 
@@ -399,7 +400,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   }, [isReload]);
 
   const loadLocks = async () => {
-    const lockData = await oneSatApi.getLockData();
+    const lockData = await getLockData.execute(apiContext, {});
     setLockData(lockData);
   };
 
@@ -433,7 +434,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
     // Auto-unlock: attempt to unlock matured coins via CWI
     if (!unlockAttempted && lockData?.unlockable) {
       (async () => {
-        const res = await oneSatApi.unlockBsv();
+        const res = await unlockBsv.execute(apiContext, {});
         setUnlockAttempted(true);
         if (res.txid) {
           await refreshUtxos();
@@ -635,9 +636,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
     if (isSendAllBsv) {
       const r = sendRecipients[0];
       const destination = r.address ?? r.paymail ?? '';
-      sendRes = await oneSatApi.sendAllBsv(destination);
+      sendRes = await sendAllBsv.execute(apiContext, { destination });
     } else {
-      sendRes = await oneSatApi.sendBsv(sendRecipients);
+      sendRes = await sendBsv.execute(apiContext, { recipients: sendRecipients });
     }
 
     if (!sendRes.txid || sendRes.error) {
