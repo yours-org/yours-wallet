@@ -6,7 +6,7 @@ export type SyncStatusMessage = {
   action: YoursEventName.SYNC_STATUS_UPDATE;
   data:
     | { status: 'start'; addressCount: number }
-    | { status: 'progress'; pending: number; done: number; failed: number }
+    | { status: 'progress'; pending: number; done: number; failed: number; message?: string }
     | { status: 'complete' }
     | { status: 'error'; message: string };
 };
@@ -41,8 +41,10 @@ export const useSyncTracker = () => {
 
         case 'progress':
           setPendingCount(data.pending);
-          setShowSyncBanner(data.pending > 0 || data.done > 0);
-          if (data.pending > 0 || data.done > 0) {
+          setShowSyncBanner(data.pending > 0 || data.done > 0 || !!data.message);
+          if (data.message) {
+            setSyncMessage(data.message);
+          } else if (data.pending > 0 || data.done > 0) {
             setSyncMessage(`Syncing: ${data.done} done, ${data.pending} pending`);
           }
           break;

@@ -1,5 +1,5 @@
 import { NetWork } from 'yours-wallet-provider';
-import { SyncProcessor, createWebWallet, type WebWalletConfig } from '@1sat/wallet-toolbox';
+import { SyncProcessor, createWebWallet, type WebWalletConfig, type FullSyncResult, type FullSyncStage } from '@1sat/wallet-toolbox';
 import type { PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { decrypt } from './utils/crypto';
@@ -81,6 +81,8 @@ export interface AccountContext {
   syncContext: SyncContext;
   /** Whether remote storage backup is connected */
   remoteStorageConnected: boolean;
+  /** Full sync with remote storage (push/pull) */
+  fullSync?: (onProgress?: (stage: FullSyncStage, message: string) => void) => Promise<FullSyncResult>;
   /** Call to stop sync and destroy wallet */
   close: () => Promise<void>;
 }
@@ -132,6 +134,7 @@ export const initWallet = async (
     wallet,
     monitor,
     destroy: destroyWallet,
+    fullSync,
   } = await createWebWallet(walletConfig);
 
   // 3. Initialize sync context (derives addresses, creates services, queue, addressManager)
@@ -216,7 +219,8 @@ export const initWallet = async (
   return {
     wallet,
     syncContext,
-    remoteStorageConnected: false, // TODO: expose from factory if needed
+    remoteStorageConnected: !!fullSync,
+    fullSync,
     close,
   };
 };

@@ -280,6 +280,8 @@ if (isInServiceWorker) {
       YoursEventName.GET_SOCIAL_PROFILE,
       // Wallet unlock - reinitialize after user enters password
       'WALLET_UNLOCKED',
+      // Full sync with remote storage
+      'FULL_SYNC',
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -319,6 +321,9 @@ if (isInServiceWorker) {
               sendResponse({ type: 'WALLET_UNLOCKED', success: false, error: error.message });
             });
           });
+          return true;
+        case 'FULL_SYNC':
+          processFullSync(sendResponse);
           return true;
         default:
           break;
@@ -545,6 +550,59 @@ if (isInServiceWorker) {
         type: YoursEventName.GET_SOCIAL_PROFILE,
         success: false,
         error: JSON.stringify(error),
+      });
+    }
+  };
+
+  const processFullSync = async (sendResponse: CallbackResponse) => {
+    try {
+      if (!accountContext?.fullSync) {
+        sendResponse({
+          type: 'FULL_SYNC',
+          success: false,
+          error: 'Remote sync not available',
+        });
+        return;
+      }
+
+      // Send sync start to show banner
+      chrome.runtime.sendMessage({
+        action: YoursEventName.SYNC_STATUS_UPDATE,
+        data: { status: 'start', addressCount: 1 },
+      }).catch(() => {});
+
+      const result = await accountContext.fullSync((stage, message) => {
+        // Map fullSync stages to sync status updates
+        if (stage === 'complete') {
+          chrome.runtime.sendMessage({
+            action: YoursEventName.SYNC_STATUS_UPDATE,
+            data: { status: 'complete' },
+          }).catch(() => {});
+        } else {
+          // For pushing/resetting/pulling, show progress with the message
+          chrome.runtime.sendMessage({
+            action: YoursEventName.SYNC_STATUS_UPDATE,
+            data: { status: 'progress', pending: 1, done: 0, failed: 0, message },
+          }).catch(() => {});
+        }
+      });
+
+      sendResponse({
+        type: 'FULL_SYNC',
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      // Send error status
+      chrome.runtime.sendMessage({
+        action: YoursEventName.SYNC_STATUS_UPDATE,
+        data: { status: 'error', message: error instanceof Error ? error.message : String(error) },
+      }).catch(() => {});
+
+      sendResponse({
+        type: 'FULL_SYNC',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   };

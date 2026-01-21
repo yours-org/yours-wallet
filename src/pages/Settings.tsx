@@ -469,9 +469,22 @@ export const Settings = () => {
     handleSelect("bsv");
   };
 
-  const resyncUTXOs = () => {
-    wallet?.sync();
-    addSnackbar("Resyncing UTXOs in the background...", "info");
+  const resyncUTXOs = async () => {
+    addSnackbar("Syncing with cloud...", "info");
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'FULL_SYNC' });
+      if (response.success) {
+        const { pushed, pulled } = response.data;
+        addSnackbar(
+          `Sync complete: ↑${pushed.inserts}/${pushed.updates} ↓${pulled.inserts}/${pulled.updates}`,
+          "success"
+        );
+      } else {
+        addSnackbar(response.error || "Sync failed", "error");
+      }
+    } catch (error) {
+      addSnackbar("Sync failed: " + (error instanceof Error ? error.message : String(error)), "error");
+    }
   };
 
   const updateSpends = () => {
