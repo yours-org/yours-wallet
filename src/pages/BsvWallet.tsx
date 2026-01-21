@@ -638,7 +638,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
       const destination = r.address ?? r.paymail ?? '';
       sendRes = await sendAllBsv.execute(apiContext, { destination });
     } else {
-      sendRes = await sendBsv.execute(apiContext, { recipients: sendRecipients });
+      sendRes = await sendBsv.execute(apiContext, { requests: sendRecipients });
     }
 
     if (!sendRes.txid || sendRes.error) {
