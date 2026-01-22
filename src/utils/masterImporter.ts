@@ -1,10 +1,4 @@
-// TODO: Re-implement master restore using OneSatWallet storage APIs
-// import JSZip from 'jszip';
-// import { OneSatWebSPV } from 'spv-store';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
-// import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
-// import { sleep } from './sleep';
-// import { getIndexers, getOwners } from '../initSPVStore';
 
 export type MasterBackupProgressEvent = {
   message: string;
@@ -14,14 +8,47 @@ export type MasterBackupProgressEvent = {
 
 type MasterBackupProgress = (event: MasterBackupProgressEvent) => void;
 
-// TODO: Re-implement master restore using OneSatWallet storage APIs
-// The restore functionality needs to be rewritten to use the new wallet-toolbox
-// storage provider's import capabilities once they are available.
+/**
+ * Initiates master restore by sending a message to the background script.
+ * The background script has access to the wallet storage manager and can
+ * perform the actual restore.
+ */
 export const restoreMasterFromZip = async (
   _chromeStorageService: ChromeStorageService,
   progress: MasterBackupProgress,
-  _file: File,
+  file: File,
+  password: string,
 ) => {
-  progress({ message: 'Master restore is temporarily unavailable during wallet migration.' });
-  throw new Error('Master restore is temporarily unavailable. Please check back after the next update.');
+  progress({ message: 'Reading backup file...' });
+
+  try {
+    // Read file as base64 to send to background script
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64Data = btoa(binary);
+
+    progress({ message: 'Verifying password and restoring...' });
+
+    const response = await chrome.runtime.sendMessage({
+      action: 'MASTER_RESTORE',
+      fileData: base64Data,
+      password,
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Restore failed');
+    }
+
+    progress({ message: 'Restore complete!' });
+
+    return response.manifest;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    progress({ message: `Restore failed: ${message}` });
+    throw error;
+  }
 };

@@ -32,6 +32,7 @@ import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStor
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { initWallet, type AccountContext } from './initWallet';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
+import { WalletBackupService } from './backup/WalletBackupService';
 
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
@@ -80,6 +81,32 @@ const initializeWallet = async (): Promise<WalletInterface | null> => {
     console.log('[background] initializeWallet: remoteStorageConnected:', accountContext.remoteStorageConnected);
     // Sync is started in initWallet, events are forwarded to popup there
     // Remote storage retry happens naturally when service worker restarts
+
+    // Check for pending restore data from Phase 1 of two-phase restore
+    const hasPending = await WalletBackupService.hasPendingRestore();
+    console.log('[background] initializeWallet: hasPendingRestore:', hasPending);
+    if (hasPending) {
+      console.log('[background] initializeWallet: Found pending restore data, importing...');
+      try {
+        const walletAny = accountContext.wallet as unknown as {
+          underlying: { _storage: unknown };
+        };
+        const storage = walletAny.underlying?._storage;
+        if (storage) {
+          await WalletBackupService.importPendingWalletData(
+            storage,
+            (event) => {
+              console.log('[background] PendingRestore:', event.message);
+            },
+          );
+          console.log('[background] initializeWallet: Pending restore complete');
+        }
+      } catch (error) {
+        console.error('[background] initializeWallet: Pending restore failed:', error);
+        // Clear the pending restore to avoid repeated failures
+        await WalletBackupService.clearPendingRestore();
+      }
+    }
   }
 
   return accountContext?.wallet ?? null;
@@ -282,6 +309,9 @@ if (isInServiceWorker) {
       'WALLET_UNLOCKED',
       // Full sync with remote storage
       'FULL_SYNC',
+      // Master backup/restore
+      'MASTER_BACKUP',
+      'MASTER_RESTORE',
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -324,6 +354,12 @@ if (isInServiceWorker) {
           return true;
         case 'FULL_SYNC':
           processFullSync(sendResponse);
+          return true;
+        case 'MASTER_BACKUP':
+          processMasterBackup(sendResponse);
+          return true;
+        case 'MASTER_RESTORE':
+          processMasterRestore(message.fileData, message.password, sendResponse);
           return true;
         default:
           break;
@@ -601,6 +637,117 @@ if (isInServiceWorker) {
 
       sendResponse({
         type: 'FULL_SYNC',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  // MASTER BACKUP/RESTORE HANDLERS ********************************
+
+  const processMasterBackup = async (sendResponse: CallbackResponse) => {
+    try {
+      if (!accountContext) {
+        sendResponse({
+          type: 'MASTER_BACKUP',
+          success: false,
+          error: 'Wallet not initialized',
+        });
+        return;
+      }
+
+      const network = chromeStorageService.getNetwork();
+      const chain = network === 'mainnet' ? 'main' : 'test';
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      const identityKey = account?.pubKeys?.identityPubKey || '';
+
+      // Get the storage manager from the wallet
+      // WalletPermissionsManager wraps the underlying Wallet, which has _storage
+      const walletAny = accountContext.wallet as unknown as {
+        underlying: { _storage: unknown };
+      };
+      const storage = walletAny.underlying?._storage;
+      if (!storage) {
+        sendResponse({
+          type: 'MASTER_BACKUP',
+          success: false,
+          error: 'Storage manager not available',
+        });
+        return;
+      }
+
+      const blob = await WalletBackupService.exportToFile(
+        storage,
+        chromeStorageService,
+        chain as 'main' | 'test',
+        identityKey,
+        (event) => {
+          console.log('[MasterBackup]', event.message);
+        },
+      );
+
+      // Convert blob to base64 for message passing
+      const arrayBuffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64Data = btoa(binary);
+
+      sendResponse({
+        type: 'MASTER_BACKUP',
+        success: true,
+        data: base64Data,
+      });
+    } catch (error) {
+      console.error('[MasterBackup] Error:', error);
+      sendResponse({
+        type: 'MASTER_BACKUP',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const processMasterRestore = async (fileData: string, password: string, sendResponse: CallbackResponse) => {
+    try {
+      // Convert base64 back to File
+      const binaryString = atob(fileData);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const file = new File([bytes], 'backup.zip', { type: 'application/zip' });
+
+      // Restore Chrome storage with password validation
+      console.log('[MasterRestore] Restoring from backup...');
+      const manifest = await WalletBackupService.restoreChromeStorage(
+        chromeStorageService,
+        file,
+        password,
+        (event) => {
+          console.log('[MasterRestore]', event.message);
+        },
+      );
+
+      // Refresh chrome storage service to pick up restored data (including passKey)
+      await chromeStorageService.getAndSetStorage();
+      console.log('[MasterRestore] Chrome storage refreshed, initializing wallet...');
+
+      // Initialize wallet now that user is authenticated
+      const wallet = await initializeWallet();
+      console.log('[MasterRestore] Wallet initialized:', !!wallet);
+
+      sendResponse({
+        type: 'MASTER_RESTORE',
+        success: true,
+        manifest,
+      });
+    } catch (error) {
+      console.error('[MasterRestore] Error:', error);
+      sendResponse({
+        type: 'MASTER_RESTORE',
         success: false,
         error: error instanceof Error ? error.message : String(error),
       });
