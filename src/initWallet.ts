@@ -128,6 +128,11 @@ export const initWallet = async (
     remoteStorageUrl: chain === 'main'
       ? 'https://1sat.shruggr.cloud/1sat/wallet'
       : 'https://testnet.api.1sat.app/1sat/wallet',
+    // Callbacks are called by factory AFTER remote sync (if connected)
+    onTransactionBroadcasted: options?.onTransactionBroadcasted,
+    onTransactionProven: options?.onTransactionProven
+      ? (txid, _blockHeight) => options.onTransactionProven!(txid)
+      : undefined,
   };
 
   const {
@@ -183,23 +188,10 @@ export const initWallet = async (
     sendSyncStatus({ status: 'error', message: data.message });
   });
 
-  // 5. Wire up monitor callbacks
-  if (options?.onTransactionProven) {
-    monitor.onTransactionProven = async (status: { txid: string }) => {
-      console.log('[Monitor] Transaction proven:', status.txid);
-      options.onTransactionProven!(status.txid);
-    };
-  }
-  if (options?.onTransactionBroadcasted) {
-    monitor.onTransactionBroadcasted = async (result: { txid?: string }) => {
-      console.log('[Monitor] Transaction broadcasted:', result);
-      if (result.txid) {
-        options.onTransactionBroadcasted!(result.txid);
-      }
-    };
-  }
-
-  // 6. Start sync operations (don't await - let them run in background)
+  // 5. Start sync operations (don't await - let them run in background)
+  // Note: Monitor callbacks (onTransactionBroadcasted/onTransactionProven) are
+  // configured in walletConfig above. The factory handles remote sync first,
+  // then calls our callbacks.
   console.log('[initWallet] Starting processor...');
   processor.start().catch((error: unknown) => {
     console.error('[initWallet] Failed to start processor:', error);
