@@ -168,6 +168,8 @@ export const Settings = () => {
   useEffect(() => {
     const getWhitelist = async (): Promise<WhitelistedApp[]> => {
       try {
+        // Refresh cache from chrome storage before reading
+        await chromeStorageService.getAndSetStorage();
         const { account } = chromeStorageService.getCurrentAccountObject();
         if (!account) return [];
         const { whitelist } = account.settings;
@@ -185,11 +187,11 @@ export const Settings = () => {
 
   const handleRemoveDomain = async (domain: string) => {
     const newList = connectedApps.filter((app) => app.domain !== domain);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) return [];
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) return;
     const key: keyof ChromeStorageObject = "accounts";
     const update: Partial<ChromeStorageObject["accounts"]> = {
-      [keysService.identityAddress]: {
+      [selectedAccount]: {
         ...account,
         settings: {
           ...account.settings,
@@ -397,12 +399,12 @@ export const Settings = () => {
 
   const handleUpdatePasswordRequirement = async (isRequired: boolean) => {
     setIsPasswordRequired(isRequired);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error("No account found");
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) throw new Error("No account found");
     const accountSettings = account.settings;
     const key: keyof ChromeStorageObject = "accounts";
     const update: Partial<ChromeStorageObject["accounts"]> = {
-      [keysService.identityAddress]: {
+      [selectedAccount]: {
         ...account,
         settings: {
           ...accountSettings,
@@ -415,11 +417,11 @@ export const Settings = () => {
 
   const handleUpdateApprovalLimit = async (amount: number) => {
     setNoApprovalLimit(amount);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error("No account found");
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) throw new Error("No account found");
     const key: keyof ChromeStorageObject = "accounts";
     const update: Partial<ChromeStorageObject["accounts"]> = {
-      [keysService.identityAddress]: {
+      [selectedAccount]: {
         ...account,
         settings: {
           ...account.settings,
@@ -436,11 +438,11 @@ export const Settings = () => {
       return;
     }
     setCustomFeeRate(rate);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error("No account found");
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) throw new Error("No account found");
     const key: keyof ChromeStorageObject = "accounts";
     const update: Partial<ChromeStorageObject["accounts"]> = {
-      [keysService.identityAddress]: {
+      [selectedAccount]: {
         ...account,
         settings: {
           ...account.settings,
@@ -487,12 +489,6 @@ export const Settings = () => {
     }
   };
 
-  const updateSpends = () => {
-    // TODO: Migrate refreshSpends to OneSatWallet
-    // oneSatSPV.stores.txos?.refreshSpends();
-    addSnackbar("Update spends not yet available...", "info");
-  };
-
   const main = (
     <>
       <SettingsRow
@@ -523,11 +519,6 @@ export const Settings = () => {
         name="Re-Sync UTXOs"
         description="Re-sync your wallets spendable coins"
         onClick={resyncUTXOs}
-      />
-      <SettingsRow
-        name="Update Spends"
-        description="Update your wallet's spent coins"
-        onClick={updateSpends}
       />
       <SettingsRow
         name="Lock Wallet"

@@ -3,7 +3,7 @@ import type { WalletOutput } from '@bsv/sdk';
 import { WhiteLabelTheme, Theme } from '../theme.types';
 import { Text } from './Reusable';
 import { Show } from './Show';
-import { getTagValue } from '../utils/format';
+import { getTagValue, getOutputName } from '../utils/format';
 
 export type OrdinalDivProps = WhiteLabelTheme & {
   url?: string;
@@ -113,8 +113,8 @@ export const Ordinal = (props: OrdinalProps) => {
   const { url, selected, isTransfer, size, output, theme, onClick } = props;
 
   const contentType = getTagValue(output.tags, 'type');
-  const name = getTagValue(output.tags, 'name') ?? 'Unknown';
   const textContent = output.customInstructions;
+  const name = getOutputName(output);
 
   const getJsonContent = (): Record<string, unknown> | undefined => {
     if (!contentType?.startsWith('application/json') || !textContent) return undefined;

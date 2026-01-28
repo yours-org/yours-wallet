@@ -9,7 +9,7 @@ import { Input } from './Input';
 import { FormContainer, HeaderText, Text } from './Reusable';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursIcon } from './YoursIcon';
-import { sendMessage } from '../utils/chromeHelpers';
+import { sendMessageAsync } from '../utils/chromeHelpers';
 
 const Container = styled.div<WhiteLabelTheme & { $isMobile: boolean }>`
   display: flex;
@@ -50,8 +50,19 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       const timestamp = Date.now();
       await chromeStorageService.update({ lastActiveTime: timestamp });
 
-      // Tell the service worker to reinitialize the wallet with the passKey
-      await sendMessage({ action: 'WALLET_UNLOCKED' });
+      // Tell the service worker to reinitialize the wallet and wait for it to complete
+      try {
+        const response = await sendMessageAsync<{ success: boolean; error?: string }>({
+          action: 'WALLET_UNLOCKED',
+        });
+        if (!response?.success) {
+          console.error('Wallet unlock failed:', response?.error);
+          // Still proceed - the wallet may work locally even if remote sync failed
+        }
+      } catch (error) {
+        console.error('Wallet unlock error:', error);
+        // Still proceed - the wallet may work locally
+      }
 
       onUnlock();
     } else {

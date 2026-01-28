@@ -121,11 +121,11 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
         // Fetch updated MNEE balance and update Chrome storage
         const balanceRes = await mneeService.balance(keysService.bsvAddress);
         if (balanceRes) {
-          const { account } = chromeStorageService.getCurrentAccountObject();
-          if (account) {
+          const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+          if (account && selectedAccount) {
             const key: keyof ChromeStorageObject = 'accounts';
             const update: Partial<ChromeStorageObject['accounts']> = {
-              [keysService.identityAddress]: {
+              [selectedAccount]: {
                 ...account,
                 mneeBalance: {
                   amount: balanceRes.amount,

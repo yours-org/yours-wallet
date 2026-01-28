@@ -11,7 +11,7 @@ import { Show } from '../components/Show';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { listOrdinals, transferOrdinal, listOrdinal, cancelListing, ONESAT_MAINNET_CONTENT_URL } from '@1sat/wallet-toolbox';
+import { listOrdinals, transferOrdinals, listOrdinal, cancelListing, ONESAT_MAINNET_CONTENT_URL, ORDINALS_BASKET } from '@1sat/wallet-toolbox';
 
 const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
@@ -20,7 +20,7 @@ import { TopNav } from '../components/TopNav';
 import { WhiteLabelTheme } from '../theme.types';
 import { getErrorMessage } from '../utils/tools';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
-import { truncate, getTagValue, hasTag } from '../utils/format';
+import { truncate, getTagValue, getOutputName, hasTag } from '../utils/format';
 
 type Addresses = Record<string, string>;
 
@@ -265,25 +265,48 @@ export const OrdWallet = () => {
       return;
     }
 
-    // Transfer each ordinal individually
-    const outpoints = Object.keys(addresses);
-    let lastTxid = '';
+    try {
+      // Get BEEF for all ordinal outputs
+      const { BEEF } = await apiContext.wallet.listOutputs({
+        basket: ORDINALS_BASKET,
+        include: 'entire transactions',
+        limit: 10000,
+      });
 
-    for (const outpoint of outpoints) {
-      const destination = addresses[outpoint];
-      const transferRes = await transferOrdinal.execute(apiContext, { outpoint, destination });
+      if (!BEEF) {
+        console.error('[OrdWallet] listOutputs returned no BEEF');
+        addSnackbar('Failed to get transaction data', 'error');
+        setIsProcessing(false);
+        return;
+      }
+
+      // Build transfer items from selected ordinals + addresses
+      const transfers = selectedOrdinals.map((ordinal) => ({
+        ordinal,
+        address: addresses[ordinal.outpoint],
+      }));
+
+      const transferRes = await transferOrdinals.execute(apiContext, {
+        transfers,
+        inputBEEF: BEEF,
+      });
 
       if (!transferRes.txid || transferRes.error) {
+        console.error('[OrdWallet] Transfer failed:', transferRes.error);
         addSnackbar(getErrorMessage(transferRes.error), 'error');
         setIsProcessing(false);
         return;
       }
-      lastTxid = transferRes.txid;
-    }
 
-    setSuccessTxId(lastTxid);
-    addSnackbar('Transfer Successful!', 'success');
-    refreshOrdinals();
+      console.log('[OrdWallet] Transfer success:', transferRes.txid);
+      setSuccessTxId(transferRes.txid);
+      addSnackbar('Transfer Successful!', 'success');
+      refreshOrdinals();
+    } catch (error) {
+      console.error('[OrdWallet] Transfer exception:', error);
+      addSnackbar(error instanceof Error ? error.message : 'Transfer failed', 'error');
+      setIsProcessing(false);
+    }
   };
 
   const handleListOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -313,8 +336,21 @@ export const OrdWallet = () => {
     // For now, we need to implement this - the payAddress should come from the wallet's receive address
     const payAddress = ''; // Placeholder - needs proper implementation
 
+    const { BEEF } = await apiContext.wallet.listOutputs({
+      basket: ORDINALS_BASKET,
+      include: 'entire transactions',
+      limit: 10000,
+    });
+
+    if (!BEEF) {
+      addSnackbar('Failed to get transaction data', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
     const listRes = await listOrdinal.execute(apiContext, {
-      outpoint: selectedOrdinals[0].outpoint,
+      ordinal: selectedOrdinals[0],
+      inputBEEF: BEEF,
       price: Math.ceil(bsvListAmount * BSV_DECIMAL_CONVERSION),
       payAddress,
     });
@@ -341,9 +377,22 @@ export const OrdWallet = () => {
       return;
     }
 
-    const ordinalOutpoint = selectedOrdinals[0].outpoint;
+    const { BEEF } = await apiContext.wallet.listOutputs({
+      basket: ORDINALS_BASKET,
+      include: 'entire transactions',
+      limit: 10000,
+    });
 
-    const cancelRes = await cancelListing.execute(apiContext, { outpoint: ordinalOutpoint });
+    if (!BEEF) {
+      addSnackbar('Failed to get transaction data', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    const cancelRes = await cancelListing.execute(apiContext, {
+      listing: selectedOrdinals[0],
+      inputBEEF: BEEF,
+    });
 
     if (!cancelRes.txid || cancelRes.error) {
       addSnackbar(getErrorMessage(cancelRes.error), 'error');
@@ -432,7 +481,7 @@ export const OrdWallet = () => {
     return outputs.map((output) => {
       const originOutpoint = getTagValue(output.tags, 'origin');
       const outpoint = output.outpoint;
-      const name = getTagValue(output.tags, 'name') ?? 'Unknown';
+      const name = getOutputName(output);
 
       return (
         <OrdinalItem theme={theme} key={originOutpoint}>
@@ -653,7 +702,7 @@ export const OrdWallet = () => {
   const main = <Show when={theme.settings.services.ordinals}>{nft}</Show>;
 
   const listOriginOutpoint = getTagValue(selectedOrdinals[0]?.tags, 'origin');
-  const listName = getTagValue(selectedOrdinals[0]?.tags, 'name') ?? 'Ordinal';
+  const listName = selectedOrdinals[0] ? getOutputName(selectedOrdinals[0], 'Ordinal') : 'Ordinal';
   const list = (
     <ContentWrapper>
       <ConfirmContent>

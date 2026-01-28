@@ -49,7 +49,17 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
       try {
         const initializedServices = await initializeServices();
         const { chromeStorageService, apiContext } = initializedServices;
-        const { account } = chromeStorageService.getCurrentAccountObject();
+        const { account, lastActiveTime } = chromeStorageService.getCurrentAccountObject();
+
+        // Determine initial lock state before marking ready
+        // If no encrypted keys exist, user needs onboarding - not the unlock screen
+        if (!account?.encryptedKeys) {
+          setIsLocked(false);
+        } else if (lastActiveTime && Date.now() - lastActiveTime <= INACTIVITY_LIMIT) {
+          // Has keys but was recently active - unlock
+          setIsLocked(false);
+        }
+        // Otherwise keep isLocked=true (has keys, inactive)
 
         if (account) {
           // Pre-fetch exchange rate to cache it

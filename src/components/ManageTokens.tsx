@@ -95,11 +95,11 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
   const handleToggleFavorite = async (tokenId: string) => {
     setFavoriteTokens((prev) => (prev.includes(tokenId) ? prev.filter((id) => id !== tokenId) : [...prev, tokenId]));
 
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) return;
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) return;
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
+      [selectedAccount]: {
         ...account,
         settings: {
           ...account.settings,

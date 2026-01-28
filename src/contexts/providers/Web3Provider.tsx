@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import {
   DecryptRequest,
   EncryptRequest,
@@ -39,7 +39,25 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [transactionApprovalRequest, setTransactionApprovalRequest] = useState<ApprovalContext | undefined>(undefined);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
 
+  // Listen for storage changes so popup can detect new permission requests while open
+  useEffect(() => {
+    const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes.permissionRequest?.newValue) {
+        setPermissionRequest(changes.permissionRequest.newValue);
+      }
+    };
+    chrome.storage.local.onChanged.addListener(listener);
+    return () => chrome.storage.local.onChanged.removeListener(listener);
+  }, []);
+
   const clearRequest = async (type: keyof Omit<Web3RequestContextProps, 'clearRequest'>) => {
+    // Permission requests: just clear React state immediately.
+    // Service worker manages storage and popup lifecycle for sequential permissions.
+    if (type === 'permissionRequest') {
+      setPermissionRequest(undefined);
+      return;
+    }
+
     await sleep(1000);
     switch (type) {
       case 'connectRequest':
@@ -75,11 +93,6 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       case 'decryptRequest':
         setDecryptRequest(undefined);
         break;
-      // Permission request from WalletPermissionsManager
-      case 'permissionRequest':
-        setPermissionRequest(undefined);
-        break;
-      // Transaction approval request from YoursApi
       case 'transactionApprovalRequest':
         setTransactionApprovalRequest(undefined);
         break;

@@ -58,7 +58,11 @@ const initializeWallet = async (): Promise<WalletInterface | null> => {
   console.log('[background] initializeWallet: starting, current accountContext:', !!accountContext);
   if (accountContext) {
     console.log('[background] initializeWallet: closing existing context');
-    await accountContext?.close();
+    try {
+      await accountContext.close();
+    } catch (error) {
+      console.error('[background] initializeWallet: failed to close existing context (continuing anyway):', error);
+    }
     accountContext = null;
   }
 
@@ -192,7 +196,16 @@ const showPermissionPrompt = (request: PermissionRequest & { requestID: string }
     chromeStorageService.update({
       permissionRequest: request,
     }).then(() => {
-      launchPopUp();
+      // Reuse existing popup if open, otherwise create new one
+      if (popupWindowId) {
+        chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
+          // Window no longer exists, create new one
+          popupWindowId = undefined;
+          launchPopUp();
+        });
+      } else {
+        launchPopUp();
+      }
     });
   });
 };
@@ -342,6 +355,13 @@ if (isInServiceWorker) {
           processGetSocialProfileRequest(sendResponse);
           return true;
         case 'WALLET_UNLOCKED':
+          // If wallet context already exists and has pending requests, skip reinitialization
+          // to preserve active CWI operations (e.g., createAction waiting for permission)
+          if (accountContext && pendingPermissionRequests.size > 0) {
+            console.log('[background] WALLET_UNLOCKED: skipping reinitialization, pending requests:', pendingPermissionRequests.size);
+            sendResponse({ type: 'WALLET_UNLOCKED', success: true });
+            return true;
+          }
           // Reinitialize wallet after user unlocks with password
           chromeStorageService.getAndSetStorage().then(() => {
             initializeWallet().then((wallet) => {
@@ -453,10 +473,10 @@ if (isInServiceWorker) {
 
     if (response.granted) {
       // Grant the permission through the manager
+      // expiry defaults to 0 (never expires), ephemeral defaults to false (persist on-chain)
       accountContext?.wallet.grantPermission({
         requestID: response.requestID,
         expiry: response.expiry,
-        ephemeral: !response.expiry, // If no expiry, it's ephemeral (one-time)
       }).then(() => {
         pending.resolve();
       }).catch((error) => {
@@ -471,14 +491,8 @@ if (isInServiceWorker) {
       });
     }
 
-    // Clean up and close popup
+    // Clear the permission request from storage (popup stays open for sequential permissions)
     chromeStorageService.remove('permissionRequest');
-    chromeStorageService.getAndSetStorage().then((res) => {
-      if (res?.popupWindowId) {
-        removeWindow(res.popupWindowId);
-        chromeStorageService.remove('popupWindowId');
-      }
-    });
 
     return true;
   };
@@ -1140,6 +1154,14 @@ if (isInServiceWorker) {
     return true;
   };
 
+  const closePermissionPopup = () => {
+    if (popupWindowId) {
+      removeWindow(popupWindowId);
+      popupWindowId = undefined;
+      chromeStorageService.remove('popupWindowId');
+    }
+  };
+
   const processCWICreateAction = async (
     message: { params: CreateActionArgs; originator?: string },
     sendResponse: CallbackResponse,
@@ -1148,20 +1170,35 @@ if (isInServiceWorker) {
       const w = getWallet();
       if (!w) throw Error('Wallet not initialized!');
 
+      console.log('[createAction] Starting with originator:', message.originator);
+      console.log('[createAction] Params:', JSON.stringify({
+        description: message.params.description,
+        inputCount: message.params.inputs?.length ?? 0,
+        outputCount: message.params.outputs?.length ?? 0,
+        options: message.params.options,
+      }));
+
       // WalletPermissionsManager will trigger spending authorization callback if needed
       const result = await w.createAction(message.params, message.originator);
+      console.log('[createAction] Success');
       sendResponse({
         type: CWIEventName.CREATE_ACTION,
         success: true,
         data: result,
       });
     } catch (error) {
+      const errorName = error instanceof Error ? error.name : 'Unknown';
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error('[createAction] Error:', errorName, errorMessage);
+      if (errorStack) console.error('[createAction] Stack:', errorStack);
       sendResponse({
         type: CWIEventName.CREATE_ACTION,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        error: errorMessage,
       });
     }
+    closePermissionPopup();
     return true;
   };
 
@@ -1186,6 +1223,7 @@ if (isInServiceWorker) {
         error: error instanceof Error ? error.message : JSON.stringify(error),
       });
     }
+    closePermissionPopup();
     return true;
   };
 

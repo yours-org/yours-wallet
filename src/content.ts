@@ -36,7 +36,10 @@ self.addEventListener(CustomListenerName.YOURS_REQUEST, (e: Event) => {
 
 const buildResponseCallback = (messageId: string) => {
   return (response: ResponseEventDetail) => {
-    const responseEvent = new CustomEvent(messageId, { detail: response });
+    const detail = chrome.runtime.lastError
+      ? { success: false, error: chrome.runtime.lastError.message || 'Message channel closed' }
+      : response ?? { success: false, error: 'No response from service worker' };
+    const responseEvent = new CustomEvent(messageId, { detail });
     self.dispatchEvent(responseEvent);
   };
 };

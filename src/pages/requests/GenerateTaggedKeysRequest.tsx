@@ -74,8 +74,8 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
         return { error: 'no-keys' };
       }
 
-      const { account } = chromeStorageService.getCurrentAccountObject();
-      if (!account) throw Error('No account found');
+      const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+      if (!account || !selectedAccount) throw Error('No account found');
       const derivationTags = account.derivationTags ?? [];
 
       const existingTag = derivationTags.find(
@@ -125,7 +125,7 @@ export const GenerateTaggedKeysRequest = (props: GenerateTaggedKeysRequestProps)
 
       const key: keyof ChromeStorageObject = 'accounts';
       const update: Partial<ChromeStorageObject['accounts']> = {
-        [keysService.identityAddress]: {
+        [selectedAccount]: {
           ...account,
           derivationTags: [...derivationTags, newTag],
         },
