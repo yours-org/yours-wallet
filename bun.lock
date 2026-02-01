@@ -4,10 +4,10 @@
     "": {
       "name": "yours-wallet",
       "dependencies": {
-        "@1sat/wallet-toolbox": "0.0.54",
+        "@1sat/wallet-toolbox": "0.0.58",
         "@bsv/paymail": "^2.0.2",
-        "@bsv/sdk": "^1.10.1",
-        "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@^1.7.20-idb-fix.30",
+        "@bsv/sdk": "^1.10.2",
+        "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@^1.7.22-idb-fix.1",
         "@fortawesome/react-fontawesome": "^0.2.2",
         "@mnee/ts-sdk": "^1.0.1",
         "@ramonak/react-progress-bar": "^5.2.0",
@@ -62,7 +62,7 @@
     },
   },
   "packages": {
-    "@1sat/wallet-toolbox": ["@1sat/wallet-toolbox@0.0.54", "", { "dependencies": { "@1sat/wallet-toolbox": "0.0.52", "@bopen-io/templates": "^1.1.6", "@bsv/sdk": "^1.10.1", "@msgpack/msgpack": "^3.1.3", "buffer": "^6.0.3", "fflate": "^0.8.2" }, "peerDependencies": { "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@^1.7.20-idb-fix.30" }, "optionalPeers": ["@bsv/wallet-toolbox-mobile"] }, "sha512-HWpVL/493td0PaLmmlKHQXKpFe9iWlWUjPtFOz4DMm03H1Dq99VEgDyq+SFcE3cmP3t9IYweuOPP11B1It/oCg=="],
+    "@1sat/wallet-toolbox": ["@1sat/wallet-toolbox@0.0.58", "", { "dependencies": { "@1sat/wallet-toolbox": "0.0.52", "@bopen-io/templates": "^1.1.7", "@bsv/sdk": "^1.10.2", "@msgpack/msgpack": "^3.1.3", "buffer": "^6.0.3", "fflate": "^0.8.2" }, "peerDependencies": { "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@^1.7.22-idb-fix.1" }, "optionalPeers": ["@bsv/wallet-toolbox-mobile"] }, "sha512-eTalLdjZzPnrfME8ppZhAgfMfFiOpGT6o4gET8CtwtKeX0cKiEeoRbUNQ5z6Bxvwb4xjZuQuOUGoYqZ3HEGT4g=="],
 
     "@adobe/css-tools": ["@adobe/css-tools@4.4.4", "", {}, "sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg=="],
 
@@ -142,13 +142,13 @@
 
     "@bcoe/v8-coverage": ["@bcoe/v8-coverage@0.2.3", "", {}, "sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw=="],
 
-    "@bopen-io/templates": ["@bopen-io/templates@1.1.6", "", { "dependencies": { "@bsv/sdk": "^1.10.1" }, "peerDependencies": { "sigma-protocol": "^0.1.8" }, "optionalPeers": ["sigma-protocol"] }, "sha512-A8USfKAmbQzOPYXJ4+QZnoWR1MYGjUquxlcoXSIuvZlg21Jt7fUkQylpWZvzu25EwD+Qx13dbNoBUlQUWkYk3A=="],
+    "@bopen-io/templates": ["@bopen-io/templates@1.1.7", "", { "dependencies": { "@bsv/sdk": "^1.10.2" }, "peerDependencies": { "sigma-protocol": "^0.1.8" }, "optionalPeers": ["sigma-protocol"] }, "sha512-0UU9ZTQ9CDdR9xwtU/KZaqDyTa1vx+n+YjybLj2dfLBTFN0iSpBGuCYVGEQ0NhN5a+2HWIFWoqIkLTZ0TB0aXQ=="],
 
     "@bsv/paymail": ["@bsv/paymail@2.1.2", "", { "dependencies": { "@bsv/sdk": "^1.7.5", "@types/jest": "^30.0.0", "cross-fetch": "^4.1.0", "express": "^5.1.0", "jest": "^30.1.3", "joi": "^18.0.1", "node-fetch": "^3", "supertest": "^7.1.4", "ts-jest": "^29.4.1", "ts2md": "^0.2.8", "tsconfig-to-dual-package": "^1.2.0", "typescript": "^5.9.2" } }, "sha512-6dBIL25ryKABxpn4rYr4KNJhm+qnnA8MzqOtBypB2FtYE34w71QJvPe5sSpT7hkuM6Km8QVCbIlnO67mZBdNiA=="],
 
-    "@bsv/sdk": ["@bsv/sdk@1.10.1", "", {}, "sha512-YhlkVvUZkYaSRSgpDOfCXUn8Tua4adWb8D2LIB63LjBe5kZXdRLWORWdTg5/fwE8fF4V9obSlxIeNSO9dTIzYg=="],
+    "@bsv/sdk": ["@bsv/sdk@1.10.3", "", {}, "sha512-3olJE3s3pttwVFd/OYuTeXmllFwNTYPwu5EdD9NV8am70eJjTBPq4JTq4Q1vZG/pFZm3A4a99WMzdq8f6Wmu7w=="],
 
-    "@bsv/wallet-toolbox-mobile": ["@bopen-io/wallet-toolbox-mobile@1.7.20-idb-fix.30", "", { "dependencies": { "@bsv/sdk": "^1.9.29" } }, "sha512-R4/fk0sqDFCEer2mHIMu55wZAMpAFo/8qWHBQeBNr9NKevEi5oaoTaDUDpwXYQ4C6HMchoMqnt58h1KKPPclQA=="],
+    "@bsv/wallet-toolbox-mobile": ["@bopen-io/wallet-toolbox-mobile@1.7.22-idb-fix.1", "", { "dependencies": { "@bsv/sdk": "^1.9.29" } }, "sha512-mIZfFMvmwE9o/0KbtSpD8RXRFDrL6g39GGv2DKfxjPieV4DBAT0MrBKyYleBZG2SjOVO1fQhXdJFOo47eL5/fw=="],
 
     "@emnapi/core": ["@emnapi/core@1.8.1", "", { "dependencies": { "@emnapi/wasi-threads": "1.1.0", "tslib": "^2.4.0" } }, "sha512-AvT9QFpxK0Zd8J0jopedNm+w/2fIzvtPKPjqyw9jwvBaReTTqPBk9Hixaz7KbjimP+QNz605/XnjFcDAL2pqBg=="],
 
@@ -1412,6 +1412,8 @@
 
     "@1sat/wallet-toolbox/@1sat/wallet-toolbox": ["@1sat/wallet-toolbox@0.0.52", "", { "dependencies": { "@1sat/wallet-toolbox": "0.0.50", "@bopen-io/templates": "^1.1.6", "@bsv/sdk": "^1.10.1", "@msgpack/msgpack": "^3.1.3", "buffer": "^6.0.3", "fflate": "^0.8.2" }, "peerDependencies": { "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@^1.7.20-idb-fix.21" }, "optionalPeers": ["@bsv/wallet-toolbox-mobile"] }, "sha512-KYHzshe/jz0zsT5QvfmCF4+6HfAIsbnXj0cbKuSDF01kfym6FCkzKdEJ4ta9ofw/sOORin20WF+cnLr0G+RxVg=="],
 
+    "@bsv/paymail/@bsv/sdk": ["@bsv/sdk@1.10.1", "", {}, "sha512-YhlkVvUZkYaSRSgpDOfCXUn8Tua4adWb8D2LIB63LjBe5kZXdRLWORWdTg5/fwE8fF4V9obSlxIeNSO9dTIzYg=="],
+
     "@isaacs/cliui/string-width": ["string-width@5.1.2", "", { "dependencies": { "eastasianwidth": "^0.2.0", "emoji-regex": "^9.2.2", "strip-ansi": "^7.0.1" } }, "sha512-HnLOCR3vjcY8beoNLtcjZ5/nxn2afmME6lhrDrebokqMap+XbeW8n9TXpPDOqdGK5qcI3oT0GKTW6wC7EMiVqA=="],
 
     "@isaacs/cliui/strip-ansi": ["strip-ansi@7.1.2", "", { "dependencies": { "ansi-regex": "^6.0.1" } }, "sha512-gmBGslpoQJtgnMAvOVqGZpEz9dyoKTCzy2nfz/n8aIFhN/jCE/rCmcxabB6jOOHV+0WNnylOxaxBQPSvcWklhA=="],
@@ -1459,6 +1461,8 @@
     "jest-validate/camelcase": ["camelcase@6.3.0", "", {}, "sha512-Gmy6FhYlCY7uOElZUSbxo2UCDH8owEk996gkbrpsgGtrJLM3J7jGxl9Ic7Qwwj4ivOE5AWZWRMecDdF7hqGjFA=="],
 
     "jest-worker/supports-color": ["supports-color@8.1.1", "", { "dependencies": { "has-flag": "^4.0.0" } }, "sha512-MpUEN2OodtUzxvKQl72cUF7RQ5EiHsGvSsVG0ia9c5RbWGL2CI4C7EpPS8UTBIplnlzZiNuV56w+FuNxy3ty2Q=="],
+
+    "js-1sat-ord/@bopen-io/templates": ["@bopen-io/templates@1.1.6", "", { "dependencies": { "@bsv/sdk": "^1.10.1" }, "peerDependencies": { "sigma-protocol": "^0.1.8" }, "optionalPeers": ["sigma-protocol"] }, "sha512-A8USfKAmbQzOPYXJ4+QZnoWR1MYGjUquxlcoXSIuvZlg21Jt7fUkQylpWZvzu25EwD+Qx13dbNoBUlQUWkYk3A=="],
 
     "make-dir/semver": ["semver@7.7.3", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q=="],
 
@@ -1510,6 +1514,10 @@
 
     "@1sat/wallet-toolbox/@1sat/wallet-toolbox/@1sat/wallet-toolbox": ["@1sat/wallet-toolbox@0.0.50", "", { "dependencies": { "@bopen-io/templates": "^1.1.6", "@bsv/sdk": "^1.10.1", "@msgpack/msgpack": "^3.1.3", "buffer": "^6.0.3", "fflate": "^0.8.2" }, "peerDependencies": { "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@^1.7.20-idb-fix.21" }, "optionalPeers": ["@bsv/wallet-toolbox-mobile"] }, "sha512-TbltjU0Q1Y0rndFyjuKbLzhPEYE2ZehIOrPSLYR78OR7Y0M9whxWvamYOHyQkV/JSyrCOV6ArXgEBoEJGQ5alg=="],
 
+    "@1sat/wallet-toolbox/@1sat/wallet-toolbox/@bopen-io/templates": ["@bopen-io/templates@1.1.6", "", { "dependencies": { "@bsv/sdk": "^1.10.1" }, "peerDependencies": { "sigma-protocol": "^0.1.8" }, "optionalPeers": ["sigma-protocol"] }, "sha512-A8USfKAmbQzOPYXJ4+QZnoWR1MYGjUquxlcoXSIuvZlg21Jt7fUkQylpWZvzu25EwD+Qx13dbNoBUlQUWkYk3A=="],
+
+    "@1sat/wallet-toolbox/@1sat/wallet-toolbox/@bsv/sdk": ["@bsv/sdk@1.10.1", "", {}, "sha512-YhlkVvUZkYaSRSgpDOfCXUn8Tua4adWb8D2LIB63LjBe5kZXdRLWORWdTg5/fwE8fF4V9obSlxIeNSO9dTIzYg=="],
+
     "@isaacs/cliui/string-width/emoji-regex": ["emoji-regex@9.2.2", "", {}, "sha512-L18DaJsXSUk2+42pv8mLs5jJT2hqFkFE4j21wOmgbUqsZ2hL72NsUU785g9RXgo3s0ZNgVl42TiHp3ZtOv/Vyg=="],
 
     "@isaacs/cliui/strip-ansi/ansi-regex": ["ansi-regex@6.2.2", "", {}, "sha512-Bq3SmSpyFHaWjPk8If9yc6svM8c56dB5BAtW4Qbw5jHTwwXXcTLoRMkpDJp6VL0XzlWaCHTXrkFURMYmD0sLqg=="],
@@ -1523,6 +1531,8 @@
     "jest-cli/yargs/cliui": ["cliui@8.0.1", "", { "dependencies": { "string-width": "^4.2.0", "strip-ansi": "^6.0.1", "wrap-ansi": "^7.0.0" } }, "sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ=="],
 
     "jest-cli/yargs/y18n": ["y18n@5.0.8", "", {}, "sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA=="],
+
+    "js-1sat-ord/@bopen-io/templates/@bsv/sdk": ["@bsv/sdk@1.10.1", "", {}, "sha512-YhlkVvUZkYaSRSgpDOfCXUn8Tua4adWb8D2LIB63LjBe5kZXdRLWORWdTg5/fwE8fF4V9obSlxIeNSO9dTIzYg=="],
 
     "pkg-dir/find-up/locate-path": ["locate-path@6.0.0", "", { "dependencies": { "p-locate": "^5.0.0" } }, "sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw=="],
 
