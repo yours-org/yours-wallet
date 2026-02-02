@@ -151,7 +151,7 @@ export const initWallet = async (
     remoteStorageUrl: chain === 'main'
       ? 'https://1sat.shruggr.cloud/1sat/wallet'
       : 'https://testnet.api.1sat.app/1sat/wallet',
-    deviceId,
+    storageIdentityKey: deviceId,
     // Callbacks are called by factory AFTER remote sync (if connected)
     onTransactionBroadcasted: options?.onTransactionBroadcasted,
     onTransactionProven: options?.onTransactionProven
