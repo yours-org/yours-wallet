@@ -1,7 +1,7 @@
 import validate from 'bitcoin-address-validation';
 import { useCallback, useEffect, useState } from 'react';
 import styled from 'styled-components';
-import type { WalletOutput } from '@bsv/sdk';
+import { Beef, type WalletOutput } from '@bsv/sdk';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Ordinal } from '../components/Ordinal';
@@ -11,7 +11,7 @@ import { Show } from '../components/Show';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { listOrdinals, transferOrdinals, listOrdinal, cancelListing, ONESAT_MAINNET_CONTENT_URL, ORDINALS_BASKET } from '@1sat/wallet-toolbox';
+import { getOrdinals, transferOrdinals, listOrdinal, cancelListing, ONESAT_MAINNET_CONTENT_URL } from '@1sat/wallet-toolbox';
 
 const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
@@ -151,6 +151,7 @@ export const OrdWallet = () => {
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const [ordinals, setOrdinals] = useState<WalletOutput[]>([]);
+  const [ordinalsBEEFs, setOrdinalsBEEFs] = useState<number[][]>([]);
   const [from, setFrom] = useState<string>();
   const listedOrdinals = ordinals.filter((o) => hasTag(o.tags, 'list'));
   const myOrdinals = ordinals.filter((o) => !hasTag(o.tags, 'list'));
@@ -199,7 +200,12 @@ export const OrdWallet = () => {
     if (!apiContext) return;
     if (ordinals.length === 0) setIsProcessing(true);
     const offset = from ? parseInt(from, 10) : 0;
-    const outputs = await listOrdinals.execute(apiContext, { limit: 50, offset });
+    const { outputs, BEEF } = await getOrdinals.execute(apiContext, { limit: 50, offset });
+
+    // Store BEEF arrays as loaded - merge at transfer time
+    if (BEEF) {
+      setOrdinalsBEEFs(prev => [...prev, BEEF]);
+    }
 
     // Filter out panda/tag and yours/tag types
     const filtered = outputs.filter((o) => {
@@ -242,7 +248,10 @@ export const OrdWallet = () => {
   };
 
   const refreshOrdinals = async () => {
-    const outputs = await listOrdinals.execute(apiContext, { limit: 50, offset: 0 });
+    const { outputs, BEEF } = await getOrdinals.execute(apiContext, { limit: 50, offset: 0 });
+
+    // Reset BEEFs with fresh data
+    setOrdinalsBEEFs(BEEF ? [BEEF] : []);
 
     const filtered = outputs.filter((o) => {
       const contentType = getTagValue(o.tags, 'type');
@@ -251,6 +260,26 @@ export const OrdWallet = () => {
 
     setOrdinals(filtered);
     setFrom(outputs.length.toString());
+  };
+
+  // Merge stored BEEFs to extract only transactions needed for selected ordinals
+  const getMergedBeefForOrdinals = (selected: WalletOutput[]): number[] | undefined => {
+    if (ordinalsBEEFs.length === 0) return undefined;
+
+    const neededTxids = new Set(selected.map(o => o.outpoint.split('.')[0]));
+    const merged = new Beef();
+
+    for (const beefBytes of ordinalsBEEFs) {
+      const beef = Beef.fromBinary(beefBytes);
+      for (const txid of neededTxids) {
+        if (beef.findTxid(txid)?.tx) {
+          merged.mergeBeef(beef);
+          break;
+        }
+      }
+    }
+
+    return merged.toBinary();
   };
 
   const handleMultiTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -266,16 +295,10 @@ export const OrdWallet = () => {
     }
 
     try {
-      // Get BEEF for all ordinal outputs
-      const { BEEF } = await apiContext.wallet.listOutputs({
-        basket: ORDINALS_BASKET,
-        include: 'entire transactions',
-        limit: 10000,
-      });
-
-      if (!BEEF) {
-        console.error('[OrdWallet] listOutputs returned no BEEF');
-        addSnackbar('Failed to get transaction data', 'error');
+      const inputBEEF = getMergedBeefForOrdinals(selectedOrdinals);
+      if (!inputBEEF) {
+        console.error('[OrdWallet] No BEEF available');
+        addSnackbar('No transaction data available', 'error');
         setIsProcessing(false);
         return;
       }
@@ -288,7 +311,7 @@ export const OrdWallet = () => {
 
       const transferRes = await transferOrdinals.execute(apiContext, {
         transfers,
-        inputBEEF: BEEF,
+        inputBEEF,
       });
 
       if (!transferRes.txid || transferRes.error) {
@@ -332,25 +355,20 @@ export const OrdWallet = () => {
       return;
     }
 
-    // TODO: Get payAddress from BRC-29 receive address
-    // For now, we need to implement this - the payAddress should come from the wallet's receive address
-    const payAddress = ''; // Placeholder - needs proper implementation
-
-    const { BEEF } = await apiContext.wallet.listOutputs({
-      basket: ORDINALS_BASKET,
-      include: 'entire transactions',
-      limit: 10000,
-    });
-
-    if (!BEEF) {
-      addSnackbar('Failed to get transaction data', 'error');
+    const inputBEEF = getMergedBeefForOrdinals(selectedOrdinals);
+    if (!inputBEEF) {
+      addSnackbar('No transaction data available', 'error');
       setIsProcessing(false);
       return;
     }
 
+    // TODO: Get payAddress from BRC-29 receive address
+    // For now, we need to implement this - the payAddress should come from the wallet's receive address
+    const payAddress = ''; // Placeholder - needs proper implementation
+
     const listRes = await listOrdinal.execute(apiContext, {
       ordinal: selectedOrdinals[0],
-      inputBEEF: BEEF,
+      inputBEEF,
       price: Math.ceil(bsvListAmount * BSV_DECIMAL_CONVERSION),
       payAddress,
     });
@@ -377,21 +395,16 @@ export const OrdWallet = () => {
       return;
     }
 
-    const { BEEF } = await apiContext.wallet.listOutputs({
-      basket: ORDINALS_BASKET,
-      include: 'entire transactions',
-      limit: 10000,
-    });
-
-    if (!BEEF) {
-      addSnackbar('Failed to get transaction data', 'error');
+    const inputBEEF = getMergedBeefForOrdinals(selectedOrdinals);
+    if (!inputBEEF) {
+      addSnackbar('No transaction data available', 'error');
       setIsProcessing(false);
       return;
     }
 
     const cancelRes = await cancelListing.execute(apiContext, {
       listing: selectedOrdinals[0],
-      inputBEEF: BEEF,
+      inputBEEF,
     });
 
     if (!cancelRes.txid || cancelRes.error) {

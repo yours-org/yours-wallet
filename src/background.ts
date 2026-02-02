@@ -1176,6 +1176,8 @@ if (isInServiceWorker) {
         inputCount: message.params.inputs?.length ?? 0,
         outputCount: message.params.outputs?.length ?? 0,
         options: message.params.options,
+        hasInputBEEF: !!message.params.inputBEEF,
+        inputBEEFLength: message.params.inputBEEF?.length ?? 0,
       }));
 
       // WalletPermissionsManager will trigger spending authorization callback if needed
