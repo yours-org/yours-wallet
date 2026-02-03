@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@1sat/wallet-toolbox": "0.0.63",
+    "@1sat/wallet-toolbox": "0.0.71",
     "@bsv/paymail": "^2.0.2",
     "@bsv/sdk": "^1.10.2",
     "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@1.7.22-idb-fix.3",
