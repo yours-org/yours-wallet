@@ -55,7 +55,8 @@ export class KeysService {
       passKey,
       salt,
       version: CHROME_STORAGE_OBJECT_VERSION,
-      hasUpgradedToSPV: true,
+      showWelcome: false,
+      deviceId: crypto.randomUUID(),
       accountNumber,
     });
     const key: keyof ChromeStorageObject = 'accounts';

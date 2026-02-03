@@ -57,7 +57,8 @@ interface BackupChromeStorage {
   accountNumber: number;
   salt: string;
   colorTheme?: Theme;
-  hasUpgradedToSPV?: boolean;
+  showWelcome?: boolean;
+  deviceId?: string;
   version?: number;
 }
 
@@ -221,7 +222,8 @@ export class WalletBackupService {
       accountNumber: chromeStorage?.accountNumber || 1,
       salt: chromeStorage?.salt || '',
       colorTheme: chromeStorage?.colorTheme,
-      hasUpgradedToSPV: chromeStorage?.hasUpgradedToSPV,
+      showWelcome: chromeStorage?.showWelcome,
+      deviceId: chromeStorage?.deviceId,
       version: chromeStorage?.version,
     };
 
@@ -384,7 +386,8 @@ export class WalletBackupService {
       salt: backupChromeStorage.salt,
       passKey, // Include the derived passKey so user is authenticated
       colorTheme: backupChromeStorage.colorTheme,
-      hasUpgradedToSPV: backupChromeStorage.hasUpgradedToSPV,
+      showWelcome: backupChromeStorage.showWelcome,
+      deviceId: backupChromeStorage.deviceId,
       version: backupChromeStorage.version,
       lastActiveTime: Date.now(), // Mark as recently active
     });

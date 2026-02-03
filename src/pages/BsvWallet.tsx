@@ -232,7 +232,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [exchangeRate, setExchangeRate] = useState<number>(0);
   const [lockData, setLockData] = useState<LockData>();
   const [isSendAllBsv, setIsSendAllBsv] = useState(false);
-  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [bsv20s, setBsv20s] = useState<Bsv20[]>([]);
   const [manageFavorites, setManageFavorites] = useState(false);
   const [historyTx, setHistoryTx] = useState(false);
@@ -349,7 +349,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   useEffect(() => {
     (async () => {
       const obj = await chromeStorageService.getAndSetStorage();
-      obj && !obj.hasUpgradedToSPV ? setShowUpgrade(true) : setShowUpgrade(false);
+      setShowWelcome(!!obj?.showWelcome);
       if (obj?.selectedAccount) {
         await getAndSetAccountAndBsv20s();
       }
@@ -689,10 +689,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
     return mneeReciepientAmount ? `Send ${mneeReciepientAmount.toFixed(5)} MNEE` : 'Enter Send Details';
   };
 
-  const handleSync = async () => {
-    await refreshUtxos();
-    await chromeStorageService.update({ hasUpgradedToSPV: true });
-    window.location.reload();
+  const handleDismissWelcome = async () => {
+    await chromeStorageService.update({ showWelcome: false });
+    setShowWelcome(false);
   };
 
   const handleBsv20TokenClick = (token: Bsv20) => {
@@ -1087,8 +1086,8 @@ export const BsvWallet = (props: BsvWalletProps) => {
     return <SendBsv20View token={token} onBack={() => setToken(null)} />;
   }
 
-  if (showUpgrade) {
-    return <UpgradeNotification onSync={handleSync} />;
+  if (showWelcome) {
+    return <UpgradeNotification onDismiss={handleDismissWelcome} />;
   }
 
   return (

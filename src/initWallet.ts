@@ -10,26 +10,6 @@ import { initSyncContext, type SyncContext } from './initSyncContext';
 // Type alias for chain
 type Chain = 'main' | 'test';
 
-// Storage key for device ID
-const DEVICE_ID_KEY = 'yours_wallet_device_id';
-
-/**
- * Get or create a unique device ID for sync isolation.
- * This ID persists across sessions to ensure consistent sync state.
- */
-const getOrCreateDeviceId = async (): Promise<string> => {
-  const result = await chrome.storage.local.get(DEVICE_ID_KEY);
-  if (result[DEVICE_ID_KEY]) {
-    return result[DEVICE_ID_KEY];
-  }
-
-  // Generate a new UUID
-  const deviceId = crypto.randomUUID();
-  await chrome.storage.local.set({ [DEVICE_ID_KEY]: deviceId });
-  console.log('[initWallet] Generated new device ID:', deviceId);
-  return deviceId;
-};
-
 // Admin originator for the extension (bypasses all permission checks)
 // Uses chrome-extension://<id> format to match what ChromeCWI sends
 const ADMIN_ORIGINATOR = `chrome-extension://${chrome.runtime.id}`;
@@ -138,8 +118,10 @@ export const initWallet = async (
   const network = chromeStorageService.getNetwork();
   const chain: Chain = network === NetWork.Mainnet ? 'main' : 'test';
 
-  // Get or create device ID for sync isolation
-  const deviceId = await getOrCreateDeviceId();
+  const deviceId = chromeStorageService.storage?.deviceId;
+  if (!deviceId) {
+    throw new Error('No deviceId found in storage - migration may not have run');
+  }
 
   // 2. Create wallet using factory
   const walletConfig: WebWalletConfig = {

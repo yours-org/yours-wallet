@@ -40,22 +40,22 @@ const Description = styled.p<WhiteLabelTheme>`
   color: ${({ theme }) => theme.color.global.gray};
 `;
 
-export type UpradeNotificationProps = {
-  onSync: () => void;
+export type UpgradeNotificationProps = {
+  onDismiss: () => void;
 };
 
-export const UpgradeNotification = ({ onSync }: UpradeNotificationProps) => {
+export const UpgradeNotification = ({ onDismiss }: UpgradeNotificationProps) => {
   const { theme } = useTheme();
 
   return (
     <Container theme={theme}>
       <YoursIcon width="4rem" />
-      <Title theme={theme}>Major Update!</Title>
+      <Title theme={theme}>Welcome to Yours Wallet 5.0</Title>
       <Description theme={theme}>
-        Version 4.0 introduces a number of new features including "Simplified Payment Verification" (SPV). To get
-        started, please start the sync process.
+        This update brings a completely new wallet engine with improved reliability and performance. Your wallet will
+        sync automatically.
       </Description>
-      <Button theme={theme} type="secondary-outline" label="Sync SPV Wallet" onClick={onSync} />
+      <Button theme={theme} type="secondary-outline" label="Get Started" onClick={onDismiss} />
     </Container>
   );
 };

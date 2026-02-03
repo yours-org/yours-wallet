@@ -137,8 +137,9 @@ export class ChromeStorageService {
       lastActiveTime,
       passKey,
       salt,
-      version: CHROME_STORAGE_OBJECT_VERSION, // Version 1 is the first version of the new storage object and should be updated if it ever changes
-      hasUpgradedToSPV: false,
+      version: CHROME_STORAGE_OBJECT_VERSION,
+      deviceId: crypto.randomUUID(),
+      showWelcome: true,
     };
 
     await this.set(newInterface);
@@ -222,12 +223,36 @@ export class ChromeStorageService {
     return storage;
   };
 
+  private migrateToV5 = async (): Promise<void> => {
+    await this.remove(['hasUpgradedToSPV']);
+    await this.set({
+      version: 5,
+      deviceId: crypto.randomUUID(),
+      showWelcome: true,
+    });
+  };
+
+  private runMigrations = async (): Promise<void> => {
+    const currentVersion = this.storage?.version ?? 0;
+    if (currentVersion < 5) {
+      await this.migrateToV5();
+    }
+  };
+
   getAndSetStorage = async (): Promise<Partial<ChromeStorageObject> | undefined> => {
     this.storage = await this.get(null); // fetches all chrome storage by passing null
-    if (!this.storage.version && !this.storage.hasUpgradedToSPV) {
+
+    // Migrate from ancient deprecated format (pre-versioned storage)
+    if (!this.storage.version && !this.storage.deviceId) {
       this.storage = await this.setOldAppStateIfMissing(this.storage);
       if (!(this.storage as DeprecatedStorage).appState) return;
       this.storage = await this.mapDeprecatedStorageToNewInterface(this.storage as DeprecatedStorage);
+    }
+
+    // Run version-based migrations
+    if ((this.storage.version ?? 0) < CHROME_STORAGE_OBJECT_VERSION) {
+      await this.runMigrations();
+      this.storage = await this.get(null);
     }
 
     return this.storage;
