@@ -15,7 +15,7 @@ import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { Outpoint, type ParseContext, type Txo, getChainInfo, unlockBsv, lockBsv } from '@1sat/wallet-toolbox';
+import { Outpoint, type ParseContext, type Txo, unlockBsv, lockBsv } from '@1sat/wallet-toolbox';
 import { Script } from '@bsv/sdk';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 
@@ -251,8 +251,7 @@ export const AppsAndTools = () => {
 
   const getLockData = async () => {
     setIsProcessing(true);
-    const chainInfo = await getChainInfo.execute(apiContext, {});
-    const height = chainInfo?.blocks ?? 0;
+    const height = await apiContext.services!.chaintracks.currentHeight();
     setCurrentBlockHeight(height);
 
     const result = await wallet!.listOutputs({ basket: 'lock', limit: 10000 });
@@ -360,8 +359,7 @@ export const AppsAndTools = () => {
   const handleBlockHeightChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const dateChoice = new Date(e.target.value).getTime();
     const blockCount = Math.ceil((dateChoice - Date.now()) / 1000 / 60 / 10);
-    const chainInfo = await getChainInfo.execute(apiContext, {});
-    const currentHeight = chainInfo?.blocks ?? 0;
+    const currentHeight = await apiContext.services!.chaintracks.currentHeight();
     const blockHeight = currentHeight + blockCount;
     setLockBlockHeight(blockHeight);
   };
@@ -372,8 +370,7 @@ export const AppsAndTools = () => {
       if (!lockBsvAmount || !lockBlockHeight) throw new Error('Invalid lock amount or block height');
       if (!lockPassword) throw new Error('Please enter a password');
       setIsProcessing(true);
-      const chainInfo = await getChainInfo.execute(apiContext, {});
-      const currentHeight = chainInfo?.blocks ?? 0;
+      const currentHeight = await apiContext.services!.chaintracks.currentHeight();
       if (currentHeight >= lockBlockHeight) {
         throw new Error('Invalid block height. Please choose a future block height.');
       }

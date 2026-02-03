@@ -4,7 +4,7 @@ import { KeysService } from '../../services/Keys.service';
 import { INACTIVITY_LIMIT, MNEE_API_TOKEN } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import mnee from '@mnee/ts-sdk';
-import { createChromeCWI, createContext, getExchangeRate, getChainInfo, SyncFetcher } from '@1sat/wallet-toolbox';
+import { createChromeCWI, createContext, getExchangeRate, OneSatServices, SyncFetcher } from '@1sat/wallet-toolbox';
 import { initSyncContext } from '../../initSyncContext';
 import { NetWork } from 'yours-wallet-provider';
 
@@ -20,7 +20,8 @@ const initializeServices = async () => {
   const chromeCWI = createChromeCWI();
   const network = chromeStorageService.getNetwork();
   const chain = network === NetWork.Mainnet ? 'main' : 'test';
-  const apiContext = createContext(chromeCWI, { chain });
+  const services = new OneSatServices(chain);
+  const apiContext = createContext(chromeCWI, { chain, services });
 
   return {
     chromeStorageService,
@@ -110,8 +111,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
         syncFetcherRef.current = fetcher;
 
         // Get current block height and start fetching
-        const chainInfo = await getChainInfo.execute(services.apiContext!, {});
-        const height = chainInfo?.blocks ?? 0;
+        const height = await syncContext.services.chaintracks.currentHeight();
         fetcher.fetch(height).catch((err) => {
           console.error('SyncFetcher error:', err);
         });
