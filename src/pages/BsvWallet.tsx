@@ -375,7 +375,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   }, []);
 
   useEffect(() => {
-    const bsvBalanceInSats = bsvBalance * BSV_DECIMAL_CONVERSION;
+    const bsvBalanceInSats = Math.round(bsvBalance * BSV_DECIMAL_CONVERSION);
     setIsSendAllBsv(satSendAmount === bsvBalanceInSats);
   }, [satSendAmount, bsvBalance]);
 
