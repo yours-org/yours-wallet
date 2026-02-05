@@ -193,7 +193,6 @@ export const AppsAndTools = () => {
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [lockBlockHeight, setLockBlockHeight] = useState(0);
   const [lockBsvAmount, setLockBsvAmount] = useState<number | null>(null);
-  const [lockPassword, setLockPassword] = useState('');
 
   const [wifKey, setWifKey] = useState('');
   const [sweepBalance, setSweepBalance] = useState(0);
@@ -368,7 +367,6 @@ export const AppsAndTools = () => {
     try {
       if (!identityAddress) return;
       if (!lockBsvAmount || !lockBlockHeight) throw new Error('Invalid lock amount or block height');
-      if (!lockPassword) throw new Error('Please enter a password');
       setIsProcessing(true);
       const currentHeight = await apiContext.services!.chaintracks.currentHeight();
       if (currentHeight >= lockBlockHeight) {
@@ -487,13 +485,6 @@ export const AppsAndTools = () => {
         }}
       />
       <DateTimePicker theme={theme} onChange={handleBlockHeightChange} />
-      <Input
-        theme={theme}
-        placeholder={'Password'}
-        type="password"
-        value={lockPassword}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLockPassword(e.target.value)}
-      />
       <Button
         style={{ margin: '1rem' }}
         theme={theme}

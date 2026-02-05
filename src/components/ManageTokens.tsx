@@ -1,6 +1,6 @@
 import { styled } from 'styled-components';
-import { Bsv20 } from 'yours-wallet-provider';
 import { Theme, WhiteLabelTheme } from '../theme.types';
+import type { Bsv21Balance } from '@1sat/wallet-toolbox';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { truncate } from '../utils/format';
 import { useEffect, useState } from 'react';
@@ -74,14 +74,14 @@ const SearchInput = styled.input<WhiteLabelTheme>`
   }
 `;
 
-export type Bsv20TokensListProps = {
-  bsv20s: Bsv20[];
+export type ManageTokensProps = {
+  tokens: Bsv21Balance[];
   theme: Theme;
   onBack: () => void;
 };
 
-export const ManageTokens = (props: Bsv20TokensListProps) => {
-  const { bsv20s, theme, onBack } = props;
+export const ManageTokens = (props: ManageTokensProps) => {
+  const { tokens: tokensProp, theme, onBack } = props;
   const { chromeStorageService, keysService } = useServiceContext();
   const [favoriteTokens, setFavoriteTokens] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,9 +112,9 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
     await chromeStorageService.updateNested(key, update);
   };
 
-  const getTokenName = (b: Bsv20): string => b.sym || 'Null';
+  const getTokenName = (b: Bsv21Balance): string => b.sym || 'Null';
 
-  const filteredTokens = bsv20s
+  const filteredTokens = tokensProp
     .filter(
       (b) =>
         getTokenName(b).toLowerCase().includes(searchQuery.toLowerCase()) ||

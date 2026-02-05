@@ -54,8 +54,8 @@ export const getErrorMessage = (error: string | undefined) => {
     case 'fee-too-high':
       return 'Miner fee too high!';
 
-    case 'no-bsv20-utxo':
-      return 'No bsv20 token found!';
+    case 'no-bsv21-utxo':
+      return 'No BSV21 token found!';
 
     case 'token-details':
       return 'Could not gather token details!';
@@ -65,6 +65,12 @@ export const getErrorMessage = (error: string | undefined) => {
 
     case 'broadcast-error':
       return 'There was an error broadcasting the tx!';
+
+    case 'insufficient-tokens':
+      return 'Insufficient token balance!';
+
+    case 'overlay-validation-failed':
+      return 'Could not validate tokens against the overlay!';
 
     case 'source-tx-not-found':
       return 'Source transaction not found!';

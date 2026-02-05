@@ -132,7 +132,7 @@ const ListIconWrapper = styled.div<WhiteLabelTheme>`
   height: 2.25rem;
 `;
 
-type Tag = 'bsv21' | 'bsv20' | 'origin' | 'list' | 'lock' | 'fund';
+type Tag = 'bsv21' | 'origin' | 'list' | 'lock' | 'fund';
 
 export type TxHistoryProps = {
   theme: Theme;
@@ -148,7 +148,7 @@ export const TxHistory = (props: TxHistoryProps) => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const isTestnet = chromeStorageService.getNetwork() === NetWork.Testnet;
 
-  const tagPriorityOrder: Tag[] = ['list', 'bsv21', 'bsv20', 'origin', 'lock', 'fund']; // The order of these tags will determine the order of the icons and which is prioritized
+  const tagPriorityOrder: Tag[] = ['list', 'bsv21', 'origin', 'lock', 'fund']; // The order of these tags will determine the order of the icons and which is prioritized
 
   useEffect(() => {
     const fetchData = async () => {
@@ -232,7 +232,6 @@ export const TxHistory = (props: TxHistoryProps) => {
   const getHeaderText = (tag: Tag, tokenName?: string) => {
     switch (tag) {
       case 'bsv21':
-      case 'bsv20':
         return tokenName || 'Token';
       case 'origin':
         return 'NFT';
@@ -263,7 +262,6 @@ export const TxHistory = (props: TxHistoryProps) => {
       case 'fund':
         return amount / BSV_DECIMAL_CONVERSION;
       case 'bsv21':
-      case 'bsv20':
         return amount;
       case 'lock':
         return amount / BSV_DECIMAL_CONVERSION + ' BSV';

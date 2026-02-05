@@ -1,7 +1,7 @@
 export type ThemeServices = {
   locks: boolean;
   ordinals: boolean;
-  bsv20: boolean;
+  bsv21: boolean;
   apps: boolean;
   mnee: boolean;
 };

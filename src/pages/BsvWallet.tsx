@@ -44,14 +44,14 @@ import { YoursEventName } from '../inject';
 import { useSyncTracker } from '../hooks/useSyncTracker';
 import { getErrorMessage, isValidEmail } from '../utils/tools';
 import { UpgradeNotification } from '../components/UpgradeNotification';
-import { Bsv20 } from 'yours-wallet-provider';
-import { Bsv20TokensList } from '../components/Bsv20TokensList';
+import { Bsv21TokensList } from '../components/Bsv21TokensList';
 import { FaListAlt, FaTrash, FaExternalLinkAlt } from 'react-icons/fa';
 import { FaArrowRightArrowLeft } from 'react-icons/fa6';
 import { FaHistory } from 'react-icons/fa';
 import { ManageTokens } from '../components/ManageTokens';
 import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
-import { SendBsv20View } from '../components/SendBsv20View';
+import { SendBsv21View } from '../components/SendBsv21View';
+import type { Bsv21Balance } from '@1sat/wallet-toolbox';
 import { FaucetButton } from '../components/FaucetButton';
 import { TxHistory } from '../components/TxHistory';
 import { MNEEFee } from '@mnee/ts-sdk';
@@ -192,9 +192,7 @@ const GetMneeContainer = styled(ReceiveContent)<WhiteLabelTheme>`
 type PageState = 'main' | 'receive' | 'send' | 'sendMNEE' | 'getMNEE';
 type AmountType = 'bsv' | 'usd';
 
-export type BsvWalletProps = {
-  isOrdRequest: boolean;
-};
+
 
 export type Recipient = {
   id: string;
@@ -205,8 +203,7 @@ export type Recipient = {
   error?: string;
 };
 
-export const BsvWallet = (props: BsvWalletProps) => {
-  const { isOrdRequest } = props;
+export const BsvWallet = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -217,13 +214,11 @@ export const BsvWallet = (props: BsvWalletProps) => {
   urlParams.delete('reload');
   const [pageState, setPageState] = useState<PageState>('main');
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
-  const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
   const { chromeStorageService, mneeService, apiContext } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const [isProcessing, setIsProcessing] = useState(false);
   // Get identityAddress from chrome storage (selected account)
   const identityAddress = chromeStorageService.getCurrentAccountObject().account?.addresses?.identityAddress || '';
@@ -233,13 +228,13 @@ export const BsvWallet = (props: BsvWalletProps) => {
   const [lockData, setLockData] = useState<LockData>();
   const [isSendAllBsv, setIsSendAllBsv] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
-  const [bsv20s, setBsv20s] = useState<Bsv20[]>([]);
+  const [bsv21s, setBsv21s] = useState<Bsv21Balance[]>([]);
   const [manageFavorites, setManageFavorites] = useState(false);
   const [historyTx, setHistoryTx] = useState(false);
   const [account, setAccount] = useState<Account>();
-  const [token, setToken] = useState<{ isConfirmed: boolean; info: Bsv20 } | null>(null);
+  const [token, setToken] = useState<{ isConfirmed: boolean; info: Bsv21Balance } | null>(null);
   const services = theme.settings.services;
-  const [filteredTokens, setFilteredTokens] = useState<Bsv20[]>([]);
+  const [filteredTokens, setFilteredTokens] = useState<Bsv21Balance[]>([]);
   const [randomKey, setRandomKey] = useState(Math.random());
   const isTestnet = chromeStorageService.getNetwork() === 'testnet' ? true : false;
   const [mneeBalance, setMneeBalance] = useState(0);
@@ -333,25 +328,24 @@ export const BsvWallet = (props: BsvWalletProps) => {
     setRecipients((prev) => [...prev.map((r) => ({ ...r, error: undefined }))]);
   };
 
-  const getAndSetAccountAndBsv20s = async () => {
+  const getAndSetAccountAndBsv21s = async () => {
     const res = await getBsv21Balances.execute(apiContext, {});
-    // Map Bsv21Balance to Bsv20 format (they're compatible)
-    setBsv20s(res as unknown as Bsv20[]);
+    setBsv21s(res);
     setAccount(chromeStorageService.getCurrentAccountObject().account);
   };
 
   useEffect(() => {
-    if (!bsv20s || !account) return;
-    const filtered = bsv20s.filter((t) => t.id && account?.settings?.favoriteTokens?.includes(t.id));
+    if (!bsv21s || !account) return;
+    const filtered = bsv21s.filter((t) => t.id && account?.settings?.favoriteTokens?.includes(t.id));
     setFilteredTokens(filtered);
-  }, [bsv20s, account]);
+  }, [bsv21s, account]);
 
   useEffect(() => {
     (async () => {
       const obj = await chromeStorageService.getAndSetStorage();
       setShowWelcome(!!obj?.showWelcome);
       if (obj?.selectedAccount) {
-        await getAndSetAccountAndBsv20s();
+        await getAndSetAccountAndBsv21s();
       }
     })();
 
@@ -449,14 +443,9 @@ export const BsvWallet = (props: BsvWalletProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identityAddress, isSyncing, lockData]);
 
-  useEffect(() => {
-    if (isOrdRequest) {
-      handleSelect('ords');
-    }
-  }, [isOrdRequest, handleSelect]);
+
 
   const resetSendState = () => {
-    setPasswordConfirm('');
     setIsProcessing(false);
     resetRecipients();
     setIsSendAllBsv(false);
@@ -475,12 +464,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
     await sleep(25);
     if (!mneeRecipient || !mneeReciepientAmount) {
       addSnackbar('Enter a recipient and amount!', 'info');
-      return;
-    }
-
-    if (!passwordConfirm) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
       return;
     }
 
@@ -617,12 +600,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
       }
     }
 
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
-
     //? multi-send calculate all amounts
     const sendRecipients = recipients.map((r) => {
       let satoshis = r.satSendAmount ?? 0;
@@ -643,7 +620,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
 
     if (!sendRes.txid || sendRes.error) {
       addSnackbar(getErrorMessage(sendRes.error), 'error');
-      setPasswordConfirm('');
       setIsProcessing(false);
       return;
     }
@@ -694,7 +670,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
     setShowWelcome(false);
   };
 
-  const handleBsv20TokenClick = (token: Bsv20) => {
+  const handleTokenClick = (token: Bsv21Balance) => {
     if (token.all.pending > 0n) {
       addSnackbar('Pending tokens cannot be sent!', 'error', 2000);
       return;
@@ -727,7 +703,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         Receive Assets
       </HeaderText>
       <Show
-        when={services.ordinals || services.bsv20}
+        when={services.ordinals || services.bsv21}
         whenFalseContent={
           <Text style={{ marginBottom: '1.25rem' }} theme={theme}>
             You may safely send <Warning theme={theme}>Bitcoin SV (BSV)</Warning> to this address.
@@ -828,14 +804,14 @@ export const BsvWallet = (props: BsvWalletProps) => {
             />
           </Show>
         )}
-        <Show when={services.bsv20}>
+        <Show when={services.bsv21}>
           {filteredTokens.length > 0 && (
-            <Bsv20TokensList
+            <Bsv21TokensList
               key={randomKey}
               hideStatusLabels
-              bsv20s={filteredTokens}
+              tokens={filteredTokens}
               theme={theme}
-              onTokenClick={(t: Bsv20) => handleBsv20TokenClick(t)}
+              onTokenClick={(t: Bsv21Balance) => handleTokenClick(t)}
             />
           )}
           <ManageTokenListWrapper onClick={() => setManageFavorites(!manageFavorites)}>
@@ -893,14 +869,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
             />
           </InputWrapper>
 
-          <Input
-            theme={theme}
-            placeholder="Enter Wallet Password"
-            type="password"
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-          />
-
           <Button
             theme={theme}
             type="primary"
@@ -930,7 +898,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
             setPageState('main');
             setMneeRecipient('');
             setMneeRecipientAmount(null);
-            setPasswordConfirm('');
           }}
         />
       </ScrollableConfirmContent>
@@ -1046,15 +1013,6 @@ export const BsvWallet = (props: BsvWalletProps) => {
           <Show when={!isSendAllBsv}>
             <Button type="secondary-outline" label="+ Add Recipient" onClick={addRecipient} theme={theme} />
           </Show>
-          <Show when={isPasswordRequired}>
-            <Input
-              theme={theme}
-              placeholder="Enter Wallet Password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
-          </Show>
           <Button
             theme={theme}
             type="primary"
@@ -1083,7 +1041,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
   );
 
   if (token) {
-    return <SendBsv20View token={token} onBack={() => setToken(null)} />;
+    return <SendBsv21View token={token} onBack={() => setToken(null)} />;
   }
 
   if (showWelcome) {
@@ -1096,10 +1054,10 @@ export const BsvWallet = (props: BsvWalletProps) => {
         <ManageTokens
           onBack={() => {
             setManageFavorites(false);
-            getAndSetAccountAndBsv20s();
+            getAndSetAccountAndBsv21s();
             setRandomKey(Math.random());
           }}
-          bsv20s={bsv20s}
+          tokens={bsv21s}
           theme={theme}
         />
       </Show>
@@ -1107,7 +1065,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
         <TxHistory
           onBack={() => {
             setHistoryTx(false);
-            getAndSetAccountAndBsv20s();
+            getAndSetAccountAndBsv21s();
             setRandomKey(Math.random());
           }}
           theme={theme}

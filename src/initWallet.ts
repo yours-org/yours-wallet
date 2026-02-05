@@ -1,6 +1,6 @@
 import { NetWork } from 'yours-wallet-provider';
 import { SyncProcessor, createWebWallet, type WebWalletConfig, type FullSyncResult, type FullSyncStage } from '@1sat/wallet-toolbox';
-import type { PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
+import { WalletPermissionsManager, type PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
@@ -77,7 +77,7 @@ const decryptKeys = (chromeStorageService: ChromeStorageService): Keys => {
  * All components share the same lifecycle (account-specific).
  */
 export interface AccountContext {
-  wallet: Awaited<ReturnType<typeof createWebWallet>>['wallet'];
+  wallet: WalletPermissionsManager;
   syncContext: SyncContext;
   /** Whether remote storage backup is connected */
   remoteStorageConnected: boolean;
@@ -127,14 +127,11 @@ export const initWallet = async (
   const walletConfig: WebWalletConfig = {
     privateKey: keys.identityWif,
     chain,
-    adminOriginator: ADMIN_ORIGINATOR,
-    permissionsConfig: DEFAULT_PERMISSIONS_CONFIG,
     feeModel: { model: 'sat/kb', value: FEE_PER_KB },
     remoteStorageUrl: chain === 'main'
       ? 'https://1sat.shruggr.cloud/1sat/wallet'
       : 'https://testnet.api.1sat.app/1sat/wallet',
     storageIdentityKey: deviceId,
-    // Callbacks are called by factory AFTER remote sync (if connected)
     onTransactionBroadcasted: options?.onTransactionBroadcasted,
     onTransactionProven: options?.onTransactionProven
       ? (txid, _blockHeight) => options.onTransactionProven!(txid)
@@ -142,13 +139,20 @@ export const initWallet = async (
   };
 
   const {
-    wallet,
+    wallet: baseWallet,
     monitor,
     destroy: destroyWallet,
     fullSync,
   } = await createWebWallet(walletConfig);
 
-  // 3. Initialize sync context (derives addresses, creates services, queue, addressManager)
+  // 3. Wrap with permissions manager for external app access control
+  const wallet = new WalletPermissionsManager(
+    baseWallet,
+    ADMIN_ORIGINATOR,
+    DEFAULT_PERMISSIONS_CONFIG,
+  );
+
+  // 4. Initialize sync context (derives addresses, creates services, queue, addressManager)
   const maxKeyIndex = 4; // 0-4 = 5 addresses
   const syncContext = await initSyncContext({
     wallet,
@@ -159,7 +163,7 @@ export const initWallet = async (
 
   const { services, syncQueue, addressManager } = syncContext;
 
-  // 4. Create SyncProcessor (processes external payments from queue)
+  // 5. Create SyncProcessor (processes external payments from queue)
   const processor = new SyncProcessor({
     wallet,
     services,
@@ -194,7 +198,7 @@ export const initWallet = async (
     sendSyncStatus({ status: 'error', message: data.message });
   });
 
-  // 5. Start sync operations (don't await - let them run in background)
+  // 6. Start sync operations (don't await - let them run in background)
   // Note: Monitor callbacks (onTransactionBroadcasted/onTransactionProven) are
   // configured in walletConfig above. The factory handles remote sync first,
   // then calls our callbacks.

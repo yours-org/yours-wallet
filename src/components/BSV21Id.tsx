@@ -26,7 +26,7 @@ const TokenId = styled(Text)<WhiteLabelTheme>`
   cursor: pointer;
 `;
 
-export type BSV20IdProps = {
+export type BSV21IdProps = {
   theme: Theme;
   id: string;
   onCopyTokenId: () => void;
@@ -36,7 +36,7 @@ function showId(id: string) {
   return id.substring(0, 5) + '...' + id.substring(id.length - 6);
 }
 
-export const BSV20Id = (props: BSV20IdProps) => {
+export const BSV21Id = (props: BSV21IdProps) => {
   const { id, theme, onCopyTokenId } = props;
 
   const copy = (e: React.MouseEvent<HTMLElement, MouseEvent>) => {

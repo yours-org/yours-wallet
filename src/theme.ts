@@ -51,7 +51,7 @@ export const theme: Theme = {
     repo: 'https://github.com/yours-org/yours-wallet',
     services: {
       apps: true,
-      bsv20: true,
+      bsv21: true,
       locks: true,
       ordinals: true,
       mnee: true,

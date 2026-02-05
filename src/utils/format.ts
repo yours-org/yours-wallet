@@ -1,3 +1,19 @@
+import { toToken, toTokenSat } from 'satoshi-token';
+
+export function showAmount(amt: bigint, dec: number): string {
+  if (!Number.isFinite(dec) || dec < 0) {
+    return amt.toString();
+  }
+  return toToken(amt.toString(), dec, 'string');
+}
+
+export function normalize(amt: string, dec: number): string {
+  if (!Number.isFinite(dec) || dec < 0) {
+    return amt.split('.')[0];
+  }
+  return toTokenSat(amt, dec, 'string');
+}
+
 export const formatUSD = (value: number): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',

@@ -17,12 +17,6 @@ import { Start } from './pages/onboarding/Start';
 import { OrdWallet } from './pages/OrdWallet';
 import { BsvSendRequest } from './pages/requests/BsvSendRequest';
 import { ConnectRequest } from './pages/requests/ConnectRequest';
-import { DecryptRequest } from './pages/requests/DecryptRequest';
-import { EncryptRequest } from './pages/requests/EncryptRequest';
-import { GenerateTaggedKeysRequest } from './pages/requests/GenerateTaggedKeysRequest';
-import { GetSignaturesRequest } from './pages/requests/GetSignaturesRequest';
-import { OrdPurchaseRequest } from './pages/requests/OrdPurchaseRequest';
-import { OrdTransferRequest } from './pages/requests/OrdTransferRequest';
 import { SignMessageRequest } from './pages/requests/SignMessageRequest';
 import { Settings } from './pages/Settings';
 import { WhiteLabelTheme } from './theme.types';
@@ -33,7 +27,6 @@ import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
 import { SyncBanner } from './components/SyncBanner';
 import { SyncingBlocks } from './components/SyncingBlocks';
 import { MasterRestore } from './pages/onboarding/MasterRestore';
-import { Bsv20SendRequest } from './pages/requests/Bsv20SendRequest';
 import { BlockHeightProvider } from './contexts/providers/BlockHeightProvider';
 import { SyncProvider } from './contexts/providers/SyncProvider';
 import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
@@ -71,15 +64,8 @@ export const App = () => {
   const {
     connectRequest,
     sendBsvRequest,
-    sendBsv20Request,
     sendMNEERequest,
-    transferOrdinalRequest,
-    purchaseOrdinalRequest,
     signMessageRequest,
-    getSignaturesRequest,
-    generateTaggedKeysRequest,
-    encryptRequest,
-    decryptRequest,
     permissionRequest,
     transactionApprovalRequest,
     clearRequest,
@@ -106,12 +92,6 @@ export const App = () => {
     setIsLocked(false);
     menuContext?.handleSelect('bsv');
   };
-
-  useEffect(() => {
-    if (transferOrdinalRequest || purchaseOrdinalRequest) {
-      menuContext?.handleSelect('ords');
-    }
-  }, [transferOrdinalRequest, purchaseOrdinalRequest, menuContext]);
 
   if (!isReady) {
     return (
@@ -158,13 +138,8 @@ export const App = () => {
                           <Show
                             when={
                               !sendBsvRequest &&
-                              !sendBsv20Request &&
                               !sendMNEERequest &&
                               !signMessageRequest &&
-                              !getSignaturesRequest &&
-                              !generateTaggedKeysRequest &&
-                              !encryptRequest &&
-                              !decryptRequest &&
                               !permissionRequest &&
                               !transactionApprovalRequest
                             }
@@ -174,13 +149,6 @@ export const App = () => {
                                   <BsvSendRequest
                                     request={sendBsvRequest!}
                                     onResponse={() => clearRequest('sendBsvRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!sendBsv20Request}>
-                                  <Bsv20SendRequest
-                                    request={sendBsv20Request!}
-                                    onResponse={() => clearRequest('sendBsv20Request')}
                                     popupId={popupId}
                                   />
                                 </Show>
@@ -195,34 +163,6 @@ export const App = () => {
                                   <SignMessageRequest
                                     request={signMessageRequest!}
                                     onSignature={() => clearRequest('signMessageRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!getSignaturesRequest}>
-                                  <GetSignaturesRequest
-                                    request={getSignaturesRequest!}
-                                    onSignature={() => clearRequest('getSignaturesRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!generateTaggedKeysRequest}>
-                                  <GenerateTaggedKeysRequest
-                                    request={generateTaggedKeysRequest!}
-                                    onResponse={() => clearRequest('generateTaggedKeysRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!encryptRequest}>
-                                  <EncryptRequest
-                                    request={encryptRequest!}
-                                    onEncrypt={() => clearRequest('encryptRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!decryptRequest}>
-                                  <DecryptRequest
-                                    request={decryptRequest!}
-                                    onDecrypt={() => clearRequest('decryptRequest')}
                                     popupId={popupId}
                                   />
                                 </Show>
@@ -245,38 +185,11 @@ export const App = () => {
                               </>
                             }
                           >
-                            <BsvWallet isOrdRequest={!!transferOrdinalRequest || !!purchaseOrdinalRequest} />
+                            <BsvWallet />
                           </Show>
                         }
                       />
-                      <Route
-                        path="/ord-wallet"
-                        element={
-                          <Show
-                            when={!transferOrdinalRequest && !purchaseOrdinalRequest}
-                            whenFalseContent={
-                              <>
-                                <Show when={!!purchaseOrdinalRequest}>
-                                  <OrdPurchaseRequest
-                                    request={purchaseOrdinalRequest!}
-                                    onResponse={() => clearRequest('purchaseOrdinalRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!transferOrdinalRequest}>
-                                  <OrdTransferRequest
-                                    request={transferOrdinalRequest!}
-                                    onResponse={() => clearRequest('transferOrdinalRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                              </>
-                            }
-                          >
-                            <OrdWallet />
-                          </Show>
-                        }
-                      />
+                      <Route path="/ord-wallet" element={<OrdWallet />} />
                       <Route path="/tools" element={<AppsAndTools />} />
                       <Route path="/settings" element={<Settings />} />
                     </Routes>

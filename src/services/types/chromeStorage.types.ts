@@ -6,16 +6,9 @@ import {
   PubKeys,
   TaggedDerivationResponse,
   SendBsv,
-  TransferOrdinal,
-  PurchaseOrdinal,
   SignMessage,
   Broadcast,
-  GetSignatures,
-  TaggedDerivationRequest,
-  EncryptRequest,
-  DecryptRequest,
   SocialProfile,
-  SendBsv20,
   SendMNEE,
   MNEEBalance,
 } from 'yours-wallet-provider';
@@ -77,16 +70,9 @@ export interface ChromeStorageObject {
   showWelcome?: boolean;
   connectRequest?: ConnectRequest;
   sendBsvRequest?: SendBsv[];
-  sendBsv20Request?: SendBsv20;
   sendMNEERequest?: SendMNEE[];
-  transferOrdinalRequest?: TransferOrdinal;
-  purchaseOrdinalRequest?: PurchaseOrdinal;
   signMessageRequest?: SignMessage;
   broadcastRequest?: Broadcast;
-  getSignaturesRequest?: GetSignatures;
-  generateTaggedKeysRequest?: TaggedDerivationRequest;
-  encryptRequest?: EncryptRequest;
-  decryptRequest?: DecryptRequest;
   // Permission request from WalletPermissionsManager
   permissionRequest?: PermissionRequest & { requestID: string };
   // Transaction approval request from YoursApi
@@ -99,16 +85,9 @@ export type CurrentAccountObject = Omit<
   | 'popupWindowId'
   | 'connectRequest'
   | 'sendBsvRequest'
-  | 'sendBsv20Request'
   | 'sendMNEERequest'
-  | 'transferOrdinalRequest'
-  | 'purchaseOrdinalRequest'
   | 'signMessageRequest'
   | 'broadcastRequest'
-  | 'getSignaturesRequest'
-  | 'generateTaggedKeysRequest'
-  | 'encryptRequest'
-  | 'decryptRequest'
   | 'permissionRequest'
   | 'transactionApprovalRequest'
 > & { account: Account };

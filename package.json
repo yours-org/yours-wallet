@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@1sat/wallet-toolbox": "0.0.73",
+    "@1sat/wallet-toolbox": "0.0.76",
     "@bsv/paymail": "^2.0.2",
     "@bsv/sdk": "^1.10.2",
     "@bsv/wallet-toolbox": "npm:@bopen-io/wallet-toolbox@1.7.24-idb-fix.1",
@@ -24,7 +24,6 @@
     "file-saver": "^2.0.5",
     "framer-motion": "^11.11.11",
     "idb": "^8.0.3",
-    "js-1sat-ord": "^0.1.91",
     "jszip": "^3.10.1",
     "path-browserify": "^1.0.1",
     "promise-queue-manager": "^3.0.5",

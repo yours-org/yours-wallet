@@ -61,12 +61,6 @@ export const OrdButtonContainer = styled(ButtonContainer)<WhiteLabelTheme & { $b
   backdrop-filter: ${({ $blur }) => ($blur ? 'blur(8px)' : 'none')};
 `;
 
-export const BSV20Header = styled.div`
-  display: flex;
-  align-items: center;
-  width: 100%;
-  margin-left: 1rem;
-`;
 
 const SectionHeader = styled.h2<WhiteLabelTheme>`
   width: 100%;
@@ -142,11 +136,9 @@ type PageState = 'main' | 'transfer' | 'list' | 'cancel';
 export const OrdWallet = () => {
   const { theme } = useTheme();
   const [pageState, setPageState] = useState<PageState>('main');
-  const { chromeStorageService, apiContext } = useServiceContext();
+  const { apiContext } = useServiceContext();
   const [isProcessing, setIsProcessing] = useState(false);
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const [selectedOrdinals, setSelectedOrdinals] = useState<WalletOutput[]>([]);
-  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [bsvListAmount, setBsvListAmount] = useState<number | null>();
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
@@ -238,7 +230,6 @@ export const OrdWallet = () => {
   }, []);
 
   const resetSendState = () => {
-    setPasswordConfirm('');
     setSuccessTxId('');
     setBsvListAmount(undefined);
     setIsProcessing(false);
@@ -288,12 +279,6 @@ export const OrdWallet = () => {
 
     await sleep(25);
 
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
-
     try {
       const inputBEEF = getMergedBeefForOrdinals(selectedOrdinals);
       if (!inputBEEF) {
@@ -337,11 +322,6 @@ export const OrdWallet = () => {
     setIsProcessing(true);
 
     await sleep(25);
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
 
     if (Number(bsvListAmount) < 0.00000001) {
       addSnackbar('Must be more than 1 sat', 'error');
@@ -389,11 +369,6 @@ export const OrdWallet = () => {
     setIsProcessing(true);
 
     await sleep(25);
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
 
     const inputBEEF = getMergedBeefForOrdinals(selectedOrdinals);
     if (!inputBEEF) {
@@ -566,16 +541,6 @@ export const OrdWallet = () => {
             )}
           </Show>
 
-          <Show when={isPasswordRequired}>
-            <Input
-              theme={theme}
-              placeholder="Password"
-              name="password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
-          </Show>
           <Button theme={theme} type="primary" label="Transfer Now" disabled={isProcessing} isSubmit />
         </FormContainer>
         <Button
@@ -606,15 +571,6 @@ export const OrdWallet = () => {
           isTransfer
         />
         <FormContainer noValidate onSubmit={(e) => handleCancelListing(e)}>
-          <Show when={isPasswordRequired}>
-            <Input
-              theme={theme}
-              placeholder="Password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
-          </Show>
           <Button theme={theme} type="primary" label="Cancel Now" disabled={isProcessing} isSubmit />
           <Button
             theme={theme}
@@ -745,15 +701,6 @@ export const OrdWallet = () => {
             }}
             value={bsvListAmount !== null && bsvListAmount !== undefined ? bsvListAmount : ''}
           />
-          <Show when={isPasswordRequired}>
-            <Input
-              theme={theme}
-              placeholder="Password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
-          </Show>
           <Text theme={theme} style={{ margin: '1rem 0 0 0' }}>
             Confirm global orderbook listing
           </Text>

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { validate } from 'bitcoin-address-validation';
 import { Button } from '../../components/Button';
-import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
@@ -33,7 +32,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const { request, requestWithinApp, popupId, onResponse } = props;
   const { theme } = useTheme();
   const { handleSelect, hideMenu } = useBottomMenu();
-  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const { chromeStorageService, keysService, apiContext } = useServiceContext();
@@ -51,7 +49,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   if (!account) throw Error('No account found');
   const { settings } = account;
   const noApprovalLimit = settings.noApprovalLimit ?? 0;
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
 
   const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
   const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
@@ -170,7 +167,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   }, [requestWithinApp, handleSelect, hideMenu]);
 
   const resetSendState = () => {
-    setPasswordConfirm('');
     setSuccessTxId('');
     setIsProcessing(false);
   };
@@ -190,11 +186,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     await sleep(25);
 
     if (noApprovalLimit === undefined) throw Error('No approval limit must be a number');
-    if (!passwordConfirm && isPasswordRequired && bsvSendAmount > noApprovalLimit) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
 
     processBsvSend();
   };
@@ -222,15 +213,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
             style={{ cursor: 'pointer', margin: '0.75rem 0' }}
           >{`Available Balance: ${bsvBalance} BSV`}</Text>
           <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
-            <Show when={isPasswordRequired}>
-              <Input
-                theme={theme}
-                placeholder="Enter Wallet Password"
-                type="password"
-                value={passwordConfirm}
-                onChange={(e) => setPasswordConfirm(e.target.value)}
-              />
-            </Show>
             <Button
               theme={theme}
               type="primary"

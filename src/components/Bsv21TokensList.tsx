@@ -1,18 +1,17 @@
 import { styled } from 'styled-components';
 import { Text } from './Reusable';
 import { Show } from './Show';
-import { Bsv20 } from 'yours-wallet-provider';
 import { Theme } from '../theme.types';
 import { SubHeaderText } from './Reusable';
 import { AssetRow } from './AssetRow';
-import { showAmount } from '../utils/ordi';
+import { showAmount } from '../utils/format';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { truncate } from '../utils/format';
 import { BSV_DECIMAL_CONVERSION, GENERIC_TOKEN_ICON } from '../utils/constants';
 import { useEffect, useState } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
-import { ONESAT_MAINNET_CONTENT_URL, getExchangeRate } from '@1sat/wallet-toolbox';
+import { ONESAT_MAINNET_CONTENT_URL, getExchangeRate, type Bsv21Balance } from '@1sat/wallet-toolbox';
 
 const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
 
@@ -25,7 +24,7 @@ const NoInscriptionWrapper = styled.div`
   width: 100%;
 `;
 
-const BSV20List = styled.div`
+const TokenList = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -35,7 +34,7 @@ const BSV20List = styled.div`
   height: calc(100% - 4rem);
 `;
 
-export const BSV20Header = styled.div`
+const TokenHeader = styled.div`
   display: flex;
   align-items: center;
   width: 100%;
@@ -47,20 +46,20 @@ type PriceData = {
   satPrice: number;
 };
 
-export type Bsv20TokensListProps = {
-  bsv20s: Bsv20[];
+export type Bsv21TokensListProps = {
+  tokens: Bsv21Balance[];
   theme: Theme;
   hideStatusLabels?: boolean;
-  onTokenClick: (token: Bsv20) => void;
+  onTokenClick: (token: Bsv21Balance) => void;
 };
 
-const getTokenName = (b: Bsv20): string => b.sym || 'Null';
+const getTokenName = (b: Bsv21Balance): string => b.sym || 'Null';
 
-export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
-  const { bsv20s, theme, onTokenClick, hideStatusLabels = false } = props;
+export const Bsv21TokensList = (props: Bsv21TokensListProps) => {
+  const { tokens: tokensProp, theme, onTokenClick, hideStatusLabels = false } = props;
   const { chromeStorageService, apiContext } = useServiceContext();
   const [priceData, setPriceData] = useState<PriceData[]>([]);
-  const [tokens, setTokens] = useState<Bsv20[]>([]);
+  const [tokens, setTokens] = useState<Bsv21Balance[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(0);
 
   useEffect(() => {
@@ -73,18 +72,18 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
 
   useEffect(() => {
     const loadSavedTokens = async () => {
-      if (!bsv20s.length) return;
+      if (!tokensProp.length) return;
       const { account } = chromeStorageService.getCurrentAccountObject();
       if (!account) return;
       const favoriteTokenIds = account?.settings?.favoriteTokens || [];
 
       const orderedTokens = favoriteTokenIds
-        .map((id) => bsv20s.find((token) => token.id === id))
-        .filter(Boolean) as Bsv20[];
+        .map((id) => tokensProp.find((token) => token.id === id))
+        .filter(Boolean) as Bsv21Balance[];
 
       // TODO: Re-implement token price fetching with new API
       const data: PriceData[] = [];
-      setTokens(orderedTokens.length ? orderedTokens : bsv20s);
+      setTokens(orderedTokens.length ? orderedTokens : tokensProp);
       setPriceData(data);
     };
 
@@ -134,7 +133,7 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
                 marginTop: '4rem',
               }}
             >
-              {theme.settings.services.bsv20
+              {theme.settings.services.bsv21
                 ? "You don't have any tokens"
                 : 'Wallet configuration does not support tokens!'}
             </Text>
@@ -142,26 +141,26 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
         }
       >
         <DragDropContext onDragEnd={handleOnDragEnd}>
-          <Droppable droppableId="bsv20-list">
+          <Droppable droppableId="bsv21-list">
             {(provided) => (
-              <BSV20List ref={provided.innerRef} {...provided.droppableProps}>
+              <TokenList ref={provided.innerRef} {...provided.droppableProps}>
                 <>
                   <Show when={!hideStatusLabels}>
-                    <BSV20Header>
+                    <TokenHeader>
                       <SubHeaderText
                         style={{ margin: '0.5rem 0 0 1rem', color: theme.color.global.gray }}
                         theme={theme}
                       >
                         Confirmed
                       </SubHeaderText>
-                    </BSV20Header>
+                    </TokenHeader>
                   </Show>
                   <div style={{ width: '100%' }}>
                     {tokens
                       .filter((t) => t.all.confirmed > 0n)
                       .map(
                         (t, index) =>
-                          t?.id && (
+                          t.id && (
                             <Draggable key={t.id} draggableId={t.id} index={index}>
                               {(provided) => (
                                 <div
@@ -194,16 +193,16 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
                           ),
                       )}
                   </div>
-                  <Show when={bsv20s.filter((d) => d.all.pending > 0n).length > 0}>
+                  <Show when={tokensProp.filter((d) => d.all.pending > 0n).length > 0}>
                     <Show when={!hideStatusLabels}>
-                      <BSV20Header style={{ marginTop: '2rem' }}>
+                      <TokenHeader style={{ marginTop: '2rem' }}>
                         <SubHeaderText style={{ marginLeft: '1rem', color: theme.color.global.gray }} theme={theme}>
                           Pending
                         </SubHeaderText>
-                      </BSV20Header>
+                      </TokenHeader>
                     </Show>
                     <div style={{ width: '100%' }}>
-                      {bsv20s
+                      {tokensProp
                         .filter((d) => d.all.pending > 0n)
                         .map((b) => {
                           return (
@@ -230,7 +229,7 @@ export const Bsv20TokensList = (props: Bsv20TokensListProps) => {
                   </Show>
                   {provided.placeholder}
                 </>
-              </BSV20List>
+              </TokenList>
             )}
           </Droppable>
         </DragDropContext>

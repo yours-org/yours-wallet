@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Transaction } from '@bsv/sdk';
 import { Button } from '../../components/Button';
-import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
@@ -71,10 +70,8 @@ const getApprovalTitle = (type: YoursApprovalType): string => {
 export const TransactionApprovalRequest = (props: TransactionApprovalRequestProps) => {
   const { theme } = useTheme();
   const { handleSelect, hideMenu } = useBottomMenu();
-  const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const { chromeStorageService, keysService, wallet } = useServiceContext();
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
   const { bsvAddress, ordAddress, identityAddress } = keysService;
   const { request, onResponse, popupId } = props;
   const [isProcessing, setIsProcessing] = useState(false);
@@ -139,7 +136,6 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
   }, [handleSelect, hideMenu]);
 
   const resetState = () => {
-    setPasswordConfirm('');
     setIsProcessing(false);
   };
 
@@ -154,23 +150,7 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
     setIsProcessing(true);
     await sleep(25);
 
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error', 3000);
-      setIsProcessing(false);
-      return;
-    }
-
-    // Verify password if required
-    if (isPasswordRequired) {
-      const passwordValid = await keysService.verifyPassword(passwordConfirm);
-      if (!passwordValid) {
-        addSnackbar('Invalid password', 'error', 3000);
-        setIsProcessing(false);
-        return;
-      }
-    }
-
-    // Send approval response - use the YoursEventName constant
+    // Send approval response
     sendMessage({
       action: 'transactionApprovalResponse',
       approved: true,
@@ -237,14 +217,6 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
           </Show>
 
           <FormContainer noValidate onSubmit={(e) => handleApprove(e)}>
-            <Show when={isPasswordRequired}>
-              <Input
-                theme={theme}
-                placeholder="Enter Wallet Password"
-                type="password"
-                onChange={(e) => setPasswordConfirm(e.target.value)}
-              />
-            </Show>
             <Button
               theme={theme}
               type="primary"

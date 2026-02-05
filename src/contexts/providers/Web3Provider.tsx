@@ -1,16 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
-import {
-  DecryptRequest,
-  EncryptRequest,
-  GetSignatures,
-  PurchaseOrdinal,
-  SendBsv,
-  SendBsv20,
-  SendMNEE,
-  SignMessage,
-  TaggedDerivationRequest,
-  TransferOrdinal,
-} from 'yours-wallet-provider';
+import { SendBsv, SendMNEE, SignMessage } from 'yours-wallet-provider';
 import { RequestParams } from '../../inject';
 import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
@@ -22,17 +11,8 @@ import type { ApprovalContext } from '../../yoursApi';
 export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [connectRequest, setConnectRequest] = useState<RequestParams | undefined>(undefined);
   const [sendBsvRequest, setSendBsvRequest] = useState<SendBsv[] | undefined>(undefined);
-  const [sendBsv20Request, setSendBsv20Request] = useState<SendBsv20 | undefined>(undefined);
   const [sendMNEERequest, setSendMNEERequest] = useState<SendMNEE[] | undefined>(undefined);
-  const [transferOrdinalRequest, setTransferOrdinalRequest] = useState<TransferOrdinal | undefined>(undefined);
-  const [purchaseOrdinalRequest, setPurchaseOrdinalRequest] = useState<PurchaseOrdinal | undefined>(undefined);
   const [signMessageRequest, setSignMessageRequest] = useState<SignMessage | undefined>(undefined);
-  const [getSignaturesRequest, setGetSignaturesRequest] = useState<GetSignatures | undefined>(undefined);
-  const [generateTaggedKeysRequest, setGenerateTaggedKeysRequest] = useState<TaggedDerivationRequest | undefined>(
-    undefined,
-  );
-  const [encryptRequest, setEncryptRequest] = useState<EncryptRequest | undefined>(undefined);
-  const [decryptRequest, setDecryptRequest] = useState<DecryptRequest | undefined>(undefined);
   // Permission request from WalletPermissionsManager
   const [permissionRequest, setPermissionRequest] = useState<(PermissionRequest & { requestID: string }) | undefined>(undefined);
   // Transaction approval request from YoursApi
@@ -66,32 +46,11 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       case 'sendBsvRequest':
         setSendBsvRequest(undefined);
         break;
-      case 'sendBsv20Request':
-        setSendBsv20Request(undefined);
-        break;
       case 'sendMNEERequest':
         setSendMNEERequest(undefined);
         break;
-      case 'transferOrdinalRequest':
-        setTransferOrdinalRequest(undefined);
-        break;
-      case 'purchaseOrdinalRequest':
-        setPurchaseOrdinalRequest(undefined);
-        break;
       case 'signMessageRequest':
         setSignMessageRequest(undefined);
-        break;
-      case 'getSignaturesRequest':
-        setGetSignaturesRequest(undefined);
-        break;
-      case 'generateTaggedKeysRequest':
-        setGenerateTaggedKeysRequest(undefined);
-        break;
-      case 'encryptRequest':
-        setEncryptRequest(undefined);
-        break;
-      case 'decryptRequest':
-        setDecryptRequest(undefined);
         break;
       case 'transactionApprovalRequest':
         setTransactionApprovalRequest(undefined);
@@ -112,15 +71,8 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     const {
       connectRequest,
       sendBsvRequest,
-      sendBsv20Request,
       sendMNEERequest,
-      transferOrdinalRequest,
-      purchaseOrdinalRequest,
       signMessageRequest,
-      getSignaturesRequest,
-      generateTaggedKeysRequest,
-      encryptRequest,
-      decryptRequest,
       permissionRequest,
       transactionApprovalRequest,
       popupWindowId,
@@ -128,15 +80,8 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     if (connectRequest) setConnectRequest(connectRequest);
     if (sendBsvRequest) setSendBsvRequest(sendBsvRequest);
-    if (sendBsv20Request) setSendBsv20Request(sendBsv20Request);
     if (sendMNEERequest) setSendMNEERequest(sendMNEERequest);
-    if (transferOrdinalRequest) setTransferOrdinalRequest(transferOrdinalRequest);
-    if (purchaseOrdinalRequest) setPurchaseOrdinalRequest(purchaseOrdinalRequest);
     if (signMessageRequest) setSignMessageRequest(signMessageRequest);
-    if (getSignaturesRequest) setGetSignaturesRequest(getSignaturesRequest);
-    if (generateTaggedKeysRequest) setGenerateTaggedKeysRequest(generateTaggedKeysRequest);
-    if (encryptRequest) setEncryptRequest(encryptRequest);
-    if (decryptRequest) setDecryptRequest(decryptRequest);
     if (permissionRequest) setPermissionRequest(permissionRequest);
     if (transactionApprovalRequest) setTransactionApprovalRequest(transactionApprovalRequest);
     if (popupWindowId) setPopupId(popupWindowId);
@@ -152,15 +97,8 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       value={{
         connectRequest,
         sendBsvRequest,
-        sendBsv20Request,
         sendMNEERequest,
-        transferOrdinalRequest,
-        purchaseOrdinalRequest,
         signMessageRequest,
-        getSignaturesRequest,
-        generateTaggedKeysRequest,
-        encryptRequest,
-        decryptRequest,
         permissionRequest,
         transactionApprovalRequest,
         clearRequest,
