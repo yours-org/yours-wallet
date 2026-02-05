@@ -1,6 +1,12 @@
 import { NetWork } from 'yours-wallet-provider';
-import { SyncProcessor, createWebWallet, type WebWalletConfig, type FullSyncResult, type FullSyncStage } from '@1sat/wallet-toolbox';
-import { WalletPermissionsManager, type PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
+import {
+  AddressSyncProcessor,
+  createWebWallet,
+  type FullSyncResult,
+  type FullSyncStage,
+  type WebWalletConfig,
+} from '@1sat/wallet/browser';
+import { WalletPermissionsManager, type PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
@@ -163,8 +169,8 @@ export const initWallet = async (
 
   const { services, syncQueue, addressManager } = syncContext;
 
-  // 5. Create SyncProcessor (processes external payments from queue)
-  const processor = new SyncProcessor({
+  // 5. Create AddressSyncProcessor (processes external payments from queue)
+  const processor = new AddressSyncProcessor({
     wallet,
     services,
     syncQueue,

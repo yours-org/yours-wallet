@@ -5,7 +5,7 @@ import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 import { sleep } from '../../utils/sleep';
 import { Web3RequestContext, Web3RequestContextProps } from '../Web3RequestContext';
-import type { PermissionRequest } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
+import type { PermissionRequest } from '@bsv/wallet-toolbox-mobile';
 import type { ApprovalContext } from '../../yoursApi';
 
 export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {

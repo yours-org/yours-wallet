@@ -6,12 +6,12 @@ import {
   type BackupManifest,
   type BackupProgressCallback,
   type Unzipped,
-} from '@1sat/wallet-toolbox';
+} from '@1sat/wallet/browser';
 import { encode } from '@msgpack/msgpack';
 import type {
   WalletStorageManager,
   sdk,
-} from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
+} from '@bsv/wallet-toolbox-mobile';
 import type { ChromeStorageService } from '../services/ChromeStorage.service';
 import type { Account, Theme } from '../services/types/chromeStorage.types';
 import { decrypt, deriveKey } from '../utils/crypto';

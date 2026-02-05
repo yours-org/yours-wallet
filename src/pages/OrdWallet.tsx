@@ -11,7 +11,13 @@ import { Show } from '../components/Show';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { getOrdinals, transferOrdinals, listOrdinal, cancelListing, ONESAT_MAINNET_CONTENT_URL } from '@1sat/wallet-toolbox';
+import {
+  cancelListing,
+  getOrdinals,
+  listOrdinal,
+  ONESAT_MAINNET_CONTENT_URL,
+  transferOrdinals,
+} from '@1sat/actions';
 
 const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';

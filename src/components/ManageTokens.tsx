@@ -1,6 +1,6 @@
 import { styled } from 'styled-components';
 import { Theme, WhiteLabelTheme } from '../theme.types';
-import type { Bsv21Balance } from '@1sat/wallet-toolbox';
+import type { Bsv21Balance } from '@1sat/actions';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { truncate } from '../utils/format';
 import { useEffect, useState } from 'react';
@@ -9,7 +9,7 @@ import { HeaderText, Text } from './Reusable';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { GENERIC_TOKEN_ICON } from '../utils/constants';
 import { FaTimes } from 'react-icons/fa';
-import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/wallet-toolbox';
+import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 
 const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
 

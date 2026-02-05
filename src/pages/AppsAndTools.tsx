@@ -15,7 +15,8 @@ import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { Outpoint, type ParseContext, type Txo, unlockBsv, lockBsv } from '@1sat/wallet-toolbox';
+import { lockBsv, unlockBsv } from '@1sat/actions';
+import { Outpoint, type ParseContext, type Txo } from '@1sat/wallet/browser';
 import { Script } from '@bsv/sdk';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 
@@ -374,7 +375,7 @@ export const AppsAndTools = () => {
       }
       const sats = Math.round(lockBsvAmount * BSV_DECIMAL_CONVERSION);
       const res = await lockBsv.execute(apiContext, {
-        locks: [{ lockAddress: identityAddress, until: lockBlockHeight, satoshis: sats }],
+        requests: [{ until: lockBlockHeight, satoshis: sats }],
       });
 
       if (!res?.txid) throw new Error(`${res?.error ?? 'An error occurred. Please try again.'}`);

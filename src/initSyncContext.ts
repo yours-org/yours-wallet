@@ -8,13 +8,13 @@
 
 import { PublicKey, Utils, type WalletInterface } from '@bsv/sdk';
 import {
+  AddressSyncQueueIdb,
   OneSatServices,
-  IndexedDbSyncQueue,
   AddressManager,
   YOURS_PREFIX,
   BRC29_PROTOCOL_ID,
   type AddressDerivation,
-} from '@1sat/wallet-toolbox';
+} from '@1sat/wallet/browser';
 
 // Admin originator for the extension
 const ADMIN_ORIGINATOR = `chrome-extension://${chrome.runtime.id}`;
@@ -37,7 +37,7 @@ export interface SyncContext {
   /** 1Sat services for SSE and transaction fetching */
   services: OneSatServices;
   /** Sync queue (IndexedDB-backed) */
-  syncQueue: IndexedDbSyncQueue;
+  syncQueue: AddressSyncQueueIdb;
   /** Address manager for looking up addresses */
   addressManager: AddressManager;
 }
@@ -110,7 +110,7 @@ export async function initSyncContext(options: SyncContextOptions): Promise<Sync
   const services = new OneSatServices(chain);
 
   // Create sync queue (IndexedDB)
-  const syncQueue = new IndexedDbSyncQueue(accountId);
+  const syncQueue = new AddressSyncQueueIdb(accountId);
 
   return {
     services,

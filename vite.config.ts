@@ -22,16 +22,10 @@ export default defineConfig({
     },
     preserveSymlinks: true,
   },
-  optimizeDeps: {
-    exclude: ['@1sat/wallet-toolbox'],
-  },
   publicDir: 'public',
   build: {
     outDir: 'build',
     emptyOutDir: true,
-    commonjsOptions: {
-      exclude: [/1sat-wallet-toolbox/],
-    },
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),

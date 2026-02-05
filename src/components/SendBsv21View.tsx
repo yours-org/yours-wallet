@@ -13,7 +13,11 @@ import { Button } from './Button';
 import { Input } from './Input';
 import { ConfirmContent, FormContainer, HeaderText, Text } from './Reusable';
 import { Show } from './Show';
-import { ONESAT_MAINNET_CONTENT_URL, sendBsv21, type Bsv21Balance } from '@1sat/wallet-toolbox';
+import {
+  ONESAT_MAINNET_CONTENT_URL,
+  sendBsv21,
+  type Bsv21Balance,
+} from '@1sat/actions';
 
 const TransferHeader = styled(HeaderText)`
   overflow: hidden;

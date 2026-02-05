@@ -20,15 +20,9 @@ export default defineConfig({
     },
     preserveSymlinks: true,
   },
-  optimizeDeps: {
-    exclude: ['@1sat/wallet-toolbox'],
-  },
   build: {
     outDir: 'build',
     emptyOutDir: false,
-    commonjsOptions: {
-      exclude: [/1sat-wallet-toolbox/],
-    },
     lib: {
       entry: resolve(__dirname, 'src/background.ts'),
       name: 'background',

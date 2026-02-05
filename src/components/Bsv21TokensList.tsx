@@ -11,7 +11,11 @@ import { BSV_DECIMAL_CONVERSION, GENERIC_TOKEN_ICON } from '../utils/constants';
 import { useEffect, useState } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
-import { ONESAT_MAINNET_CONTENT_URL, getExchangeRate, type Bsv21Balance } from '@1sat/wallet-toolbox';
+import {
+  getExchangeRate,
+  ONESAT_MAINNET_CONTENT_URL,
+  type Bsv21Balance,
+} from '@1sat/actions';
 
 const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
 

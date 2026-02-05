@@ -11,13 +11,13 @@ import {
   Monitor,
   type MonitorOptions,
   type WalletStorageManager,
-} from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
+} from '@bsv/wallet-toolbox-mobile';
 import {
-  OneSatServices,
-  SyncProcessor,
+  AddressSyncProcessor,
+  type AddressSyncQueueStorage,
   AddressManager,
-  type SyncQueueStorage,
-} from '@1sat/wallet-toolbox';
+  OneSatServices,
+} from '@1sat/wallet/browser';
 
 type Chain = 'main' | 'test';
 
@@ -25,7 +25,7 @@ export interface WalletSyncManagerOptions {
   wallet: WalletInterface;
   storage: WalletStorageManager;
   services: OneSatServices;
-  syncQueue: SyncQueueStorage;
+  syncQueue: AddressSyncQueueStorage;
   addressManager: AddressManager;
   chain: Chain;
   onTransactionBroadcasted?: (txid: string) => void;
@@ -33,7 +33,7 @@ export interface WalletSyncManagerOptions {
 }
 
 export class WalletSyncManager {
-  private processor: SyncProcessor;
+  private processor: AddressSyncProcessor;
   private monitor: Monitor | null = null;
   private readonly wallet: WalletInterface;
   private readonly storage: WalletStorageManager;
@@ -51,7 +51,7 @@ export class WalletSyncManager {
     this.onTransactionProven = options.onTransactionProven;
 
     // Create queue processor for external payment sync
-    this.processor = new SyncProcessor({
+    this.processor = new AddressSyncProcessor({
       wallet: options.wallet,
       services: options.services,
       syncQueue: options.syncQueue,
@@ -114,7 +114,7 @@ export class WalletSyncManager {
   /**
    * Get the processor for event binding.
    */
-  getProcessor(): SyncProcessor {
+  getProcessor(): AddressSyncProcessor {
     return this.processor;
   }
 }

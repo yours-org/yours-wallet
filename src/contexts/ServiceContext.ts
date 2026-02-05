@@ -1,7 +1,7 @@
 import { createContext } from 'react';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import { KeysService } from '../services/Keys.service';
-import type { OneSatContext } from '@1sat/wallet-toolbox';
+import type { OneSatContext } from '@1sat/actions';
 import { MneeInterface } from '@mnee/ts-sdk';
 
 export interface ServiceContextProps {

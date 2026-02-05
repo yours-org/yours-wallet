@@ -13,7 +13,7 @@ import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendBsv } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { getErrorMessage } from '../../utils/tools';
-import { getBalance, sendBsv } from '@1sat/wallet-toolbox';
+import { getBalance, sendBsv } from '@1sat/actions';
 import { styled } from 'styled-components';
 
 const Wrapper = styled(ConfirmContent)`
@@ -111,7 +111,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         data: r.data,
       }));
 
-      const sendRes = await sendBsv.execute(apiContext, { recipients: sendRequests });
+      const sendRes = await sendBsv.execute(apiContext, { requests: sendRequests });
 
       if (!sendRes.txid || sendRes.error) {
         addSnackbar(getErrorMessage(sendRes.error), 'error');

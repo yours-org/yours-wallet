@@ -13,7 +13,7 @@ import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { getErrorMessage } from '../../utils/tools';
-import { signMessage } from '@1sat/wallet-toolbox';
+import { signMessage } from '@1sat/actions';
 
 const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;

@@ -2,7 +2,7 @@
  * Types for the Yours wallet approval flow
  */
 
-import type { CreateActionArgs } from '@1sat/wallet-toolbox';
+import type { CreateActionArgs } from '@1sat/actions';
 
 // Approval context passed to the approval UI (used by service worker)
 export interface ApprovalContext {

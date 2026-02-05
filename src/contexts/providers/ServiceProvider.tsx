@@ -4,7 +4,8 @@ import { KeysService } from '../../services/Keys.service';
 import { INACTIVITY_LIMIT, MNEE_API_TOKEN } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import mnee from '@mnee/ts-sdk';
-import { createChromeCWI, createContext, getExchangeRate, OneSatServices, SyncFetcher } from '@1sat/wallet-toolbox';
+import { createContext, getExchangeRate } from '@1sat/actions';
+import { AddressSyncFetcher, createChromeCWI, OneSatServices } from '@1sat/wallet/browser';
 import { initSyncContext } from '../../initSyncContext';
 import { NetWork } from 'yours-wallet-provider';
 
@@ -35,7 +36,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [services, setServices] = useState<Partial<ServiceContextProps>>({});
   const [isLocked, setIsLocked] = useState<boolean>(true); // Start locked until checkLockState runs
   const [isReady, setIsReady] = useState<boolean>(false);
-  const syncFetcherRef = useRef<SyncFetcher | null>(null);
+  const syncFetcherRef = useRef<AddressSyncFetcher | null>(null);
 
   useEffect(() => {
     if (services?.chromeStorageService) {
@@ -102,8 +103,8 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
           maxKeyIndex,
         });
 
-        // Create and start SyncFetcher
-        const fetcher = new SyncFetcher({
+        // Create and start address sync fetcher
+        const fetcher = new AddressSyncFetcher({
           services: syncContext.services,
           syncQueue: syncContext.syncQueue,
           addressManager: syncContext.addressManager,

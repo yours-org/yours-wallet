@@ -8,7 +8,7 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { WhiteLabelTheme } from '../../theme.types';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
-import type { PermissionRequest as PermissionRequestType } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
+import type { PermissionRequest as PermissionRequestType } from '@bsv/wallet-toolbox-mobile';
 
 const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;

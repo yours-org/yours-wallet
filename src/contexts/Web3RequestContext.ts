@@ -2,7 +2,7 @@ import { createContext } from 'react';
 import { SendBsv, SendMNEE, SignMessage } from 'yours-wallet-provider';
 import { RequestParams } from '../inject';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
-import type { PermissionRequest } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
+import type { PermissionRequest } from '@bsv/wallet-toolbox-mobile';
 import type { ApprovalContext } from '../yoursApi';
 
 export type Web3RequestContextProps = {

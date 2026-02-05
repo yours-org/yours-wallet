@@ -8,7 +8,7 @@
  * compatibility with existing user data. These helpers convert at the boundary.
  */
 
-import type { sdk } from "@bsv/wallet-toolbox-mobile/out/src/index.client.js";
+import type { sdk } from "@bsv/wallet-toolbox-mobile";
 
 /**
  * Network values stored in chrome storage (legacy format).

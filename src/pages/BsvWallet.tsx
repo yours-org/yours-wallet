@@ -37,8 +37,17 @@ import lockIcon from '../assets/lock.svg';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useWeb3RequestContext } from '../hooks/useWeb3RequestContext';
 import { useServiceContext } from '../hooks/useServiceContext';
-import type { LockData } from '@1sat/wallet-toolbox';
-import { getBalance, getExchangeRate, getBsv21Balances, getLockData, sendBsv, sendAllBsv, unlockBsv } from '@1sat/wallet-toolbox';
+import {
+  getBalance,
+  getBsv21Balances,
+  getExchangeRate,
+  getLockData,
+  sendAllBsv,
+  sendBsv,
+  unlockBsv,
+  type Bsv21Balance,
+  type LockData,
+} from '@1sat/actions';
 import { sendMessage, sendMessageAsync } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
 import { useSyncTracker } from '../hooks/useSyncTracker';
@@ -51,7 +60,6 @@ import { FaHistory } from 'react-icons/fa';
 import { ManageTokens } from '../components/ManageTokens';
 import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { SendBsv21View } from '../components/SendBsv21View';
-import type { Bsv21Balance } from '@1sat/wallet-toolbox';
 import { FaucetButton } from '../components/FaucetButton';
 import { TxHistory } from '../components/TxHistory';
 import { MNEEFee } from '@mnee/ts-sdk';

@@ -12,7 +12,7 @@ import {
   SendMNEE,
   MNEEBalance,
 } from 'yours-wallet-provider';
-import type { PermissionRequest } from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
+import type { PermissionRequest } from '@bsv/wallet-toolbox-mobile';
 import { WhitelistedApp } from '../../inject';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';

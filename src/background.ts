@@ -26,7 +26,7 @@ import type {
 import type {
   PermissionRequest,
   WalletPermissionsManager,
-} from '@bsv/wallet-toolbox-mobile/out/src/index.client.js';
+} from '@bsv/wallet-toolbox-mobile';
 import { removeWindow } from './utils/chromeHelpers';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
