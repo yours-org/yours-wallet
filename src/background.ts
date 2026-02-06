@@ -25,6 +25,10 @@ import type {
 } from '@bsv/sdk';
 import type {
   PermissionRequest,
+  GroupedPermissionRequest,
+  GroupedPermissions,
+  CounterpartyPermissionRequest,
+  CounterpartyPermissions,
   WalletPermissionsManager,
 } from '@bsv/wallet-toolbox-mobile';
 import { removeWindow } from './utils/chromeHelpers';
@@ -142,6 +146,18 @@ const pendingPermissionRequests = new Map<string, {
   reject: (error: Error) => void;
 }>();
 
+const pendingGroupedPermissionRequests = new Map<string, {
+  request: GroupedPermissionRequest;
+  resolve: () => void;
+  reject: (error: Error) => void;
+}>();
+
+const pendingCounterpartyPermissionRequests = new Map<string, {
+  request: CounterpartyPermissionRequest;
+  resolve: () => void;
+  reject: (error: Error) => void;
+}>();
+
 // Callback for CWI.waitForAuthentication flow
 let responseCallbackForConnectRequest: ((decision: Decision) => void) | null = null;
 let popupWindowId: number | undefined;
@@ -181,6 +197,18 @@ const bindPermissionCallbacks = (manager: WalletPermissionsManager) => {
     console.log('Spending authorization requested:', request);
     await showPermissionPrompt(request);
   });
+
+  // Grouped permission (all permissions from manifest.json bundled)
+  manager.bindCallback('onGroupedPermissionRequested', async (request: GroupedPermissionRequest) => {
+    console.log('Grouped permission requested:', request);
+    await showGroupedPermissionPrompt(request);
+  });
+
+  // Counterparty pact (level-2 protocols for a specific counterparty)
+  manager.bindCallback('onCounterpartyPermissionRequested', async (request: CounterpartyPermissionRequest) => {
+    console.log('Counterparty permission requested:', request);
+    await showCounterpartyPermissionPrompt(request);
+  });
 };
 
 /**
@@ -189,17 +217,42 @@ const bindPermissionCallbacks = (manager: WalletPermissionsManager) => {
  */
 const showPermissionPrompt = (request: PermissionRequest & { requestID: string }): Promise<void> => {
   return new Promise((resolve, reject) => {
-    // Store the pending request
     pendingPermissionRequests.set(request.requestID, { request, resolve, reject });
-
-    // Store request details in chrome storage for popup to read
-    chromeStorageService.update({
-      permissionRequest: request,
-    }).then(() => {
-      // Reuse existing popup if open, otherwise create new one
+    chromeStorageService.update({ permissionRequest: request }).then(() => {
       if (popupWindowId) {
         chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
-          // Window no longer exists, create new one
+          popupWindowId = undefined;
+          launchPopUp();
+        });
+      } else {
+        launchPopUp();
+      }
+    });
+  });
+};
+
+const showGroupedPermissionPrompt = (request: GroupedPermissionRequest): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    pendingGroupedPermissionRequests.set(request.requestID, { request, resolve, reject });
+    chromeStorageService.update({ groupedPermissionRequest: request }).then(() => {
+      if (popupWindowId) {
+        chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
+          popupWindowId = undefined;
+          launchPopUp();
+        });
+      } else {
+        launchPopUp();
+      }
+    });
+  });
+};
+
+const showCounterpartyPermissionPrompt = (request: CounterpartyPermissionRequest): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    pendingCounterpartyPermissionRequests.set(request.requestID, { request, resolve, reject });
+    chromeStorageService.update({ counterpartyPermissionRequest: request }).then(() => {
+      if (popupWindowId) {
+        chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
           popupWindowId = undefined;
           launchPopUp();
         });
@@ -311,8 +364,10 @@ if (isInServiceWorker) {
       YoursEventName.SIGNED_OUT,
       // CWI auth check (no auth required - just checks status)
       CWIEventName.IS_AUTHENTICATED,
-      // Permission response from popup
+      // Permission responses from popup
       'PERMISSION_RESPONSE',
+      'GROUPED_PERMISSION_RESPONSE',
+      'COUNTERPARTY_PERMISSION_RESPONSE',
       // Internal UI requests (no external domain)
       YoursEventName.GET_PUB_KEYS,
       YoursEventName.GET_LEGACY_ADDRESSES,
@@ -338,9 +393,13 @@ if (isInServiceWorker) {
         // CWI auth check
         case CWIEventName.IS_AUTHENTICATED:
           return processCWIIsAuthenticated(message.originator, sendResponse);
-        // Permission response from popup UI
+        // Permission responses from popup UI
         case 'PERMISSION_RESPONSE':
           return processPermissionResponse(message as { requestID: string; granted: boolean; expiry?: number });
+        case 'GROUPED_PERMISSION_RESPONSE':
+          return processGroupedPermissionResponse(message as { requestID: string; granted: Partial<GroupedPermissions> | null; expiry?: number });
+        case 'COUNTERPARTY_PERMISSION_RESPONSE':
+          return processCounterpartyPermissionResponse(message as { requestID: string; granted: Partial<CounterpartyPermissions> | null; expiry?: number });
         // Internal UI requests (no external domain, direct from popup)
         case YoursEventName.GET_PUB_KEYS:
           processGetPubKeysRequest(sendResponse);
@@ -491,9 +550,69 @@ if (isInServiceWorker) {
       });
     }
 
-    // Clear the permission request from storage (popup stays open for sequential permissions)
     chromeStorageService.remove('permissionRequest');
+    return true;
+  };
 
+  const processGroupedPermissionResponse = (response: { requestID: string; granted: Partial<GroupedPermissions> | null; expiry?: number }) => {
+    const pending = pendingGroupedPermissionRequests.get(response.requestID);
+    if (!pending) {
+      console.warn('No pending grouped permission request found for:', response.requestID);
+      return;
+    }
+
+    pendingGroupedPermissionRequests.delete(response.requestID);
+
+    if (response.granted) {
+      accountContext?.wallet.grantGroupedPermission({
+        requestID: response.requestID,
+        granted: response.granted,
+        expiry: response.expiry,
+      }).then(() => {
+        pending.resolve();
+      }).catch((error) => {
+        pending.reject(error);
+      });
+    } else {
+      accountContext?.wallet.denyGroupedPermission(response.requestID).then(() => {
+        pending.reject(new Error('Grouped permission denied by user'));
+      }).catch((error) => {
+        pending.reject(error);
+      });
+    }
+
+    chromeStorageService.remove('groupedPermissionRequest');
+    return true;
+  };
+
+  const processCounterpartyPermissionResponse = (response: { requestID: string; granted: Partial<CounterpartyPermissions> | null; expiry?: number }) => {
+    const pending = pendingCounterpartyPermissionRequests.get(response.requestID);
+    if (!pending) {
+      console.warn('No pending counterparty permission request found for:', response.requestID);
+      return;
+    }
+
+    pendingCounterpartyPermissionRequests.delete(response.requestID);
+
+    if (response.granted) {
+      accountContext?.wallet.grantCounterpartyPermission({
+        requestID: response.requestID,
+        granted: response.granted,
+        expiry: response.expiry,
+      }).then(() => {
+        pending.resolve();
+      }).catch((error) => {
+        pending.reject(error);
+      });
+    } else {
+      accountContext?.wallet.denyCounterpartyPermission(response.requestID).then(() => {
+        pending.reject(new Error('Counterparty permission denied by user'));
+      }).catch((error) => {
+        pending.reject(error);
+      });
+    }
+
+    chromeStorageService.remove('counterpartyPermissionRequest');
     return true;
   };
 
@@ -835,6 +954,20 @@ if (isInServiceWorker) {
     isAuthorized: boolean,
   ) => {
     const domain = message.originator;
+
+    const forwardToManager = async () => {
+      try {
+        await accountContext?.wallet.waitForAuthentication({}, domain);
+      } catch (e) {
+        console.warn('[background] waitForAuthentication grouped flow error:', e);
+      }
+      sendResponse({
+        type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+        success: true,
+        data: { authenticated: true },
+      });
+    };
+
     return handleConnectOrAuth(
       {
         domain: domain || 'unknown',
@@ -845,14 +978,9 @@ if (isInServiceWorker) {
       sendResponse,
       isAuthorized,
       () => {
-        // Wrap sendResponse to format CWI response
         responseCallbackForConnectRequest = (decision: Decision) => {
           if (decision === 'approved') {
-            sendResponse({
-              type: CWIEventName.WAIT_FOR_AUTHENTICATION,
-              success: true,
-              data: { authenticated: true },
-            });
+            forwardToManager();
           } else {
             sendResponse({
               type: CWIEventName.WAIT_FOR_AUTHENTICATION,
@@ -863,11 +991,7 @@ if (isInServiceWorker) {
         };
       },
       () => {
-        sendResponse({
-          type: CWIEventName.WAIT_FOR_AUTHENTICATION,
-          success: true,
-          data: { authenticated: true },
-        });
+        forwardToManager();
       },
     );
   };
@@ -1296,6 +1420,20 @@ if (isInServiceWorker) {
       }
       pendingPermissionRequests.clear();
       chromeStorageService.remove('permissionRequest');
+
+      for (const [requestID, pending] of pendingGroupedPermissionRequests) {
+        accountContext?.wallet.denyGroupedPermission(requestID).catch(console.error);
+        pending.reject(new Error('User dismissed the request'));
+      }
+      pendingGroupedPermissionRequests.clear();
+      chromeStorageService.remove('groupedPermissionRequest');
+
+      for (const [requestID, pending] of pendingCounterpartyPermissionRequests) {
+        accountContext?.wallet.denyCounterpartyPermission(requestID).catch(console.error);
+        pending.reject(new Error('User dismissed the request'));
+      }
+      pendingCounterpartyPermissionRequests.clear();
+      chromeStorageService.remove('counterpartyPermissionRequest');
 
       popupWindowId = undefined;
       chromeStorageService.remove('popupWindowId');

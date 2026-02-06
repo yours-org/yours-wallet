@@ -13,7 +13,8 @@ import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendBsv } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { getErrorMessage } from '../../utils/tools';
-import { getBalance, sendBsv } from '@1sat/actions';
+import { sendBsv } from '@1sat/actions';
+import { getWalletBalance } from '../../utils/wallet';
 import { styled } from 'styled-components';
 
 const Wrapper = styled(ConfirmContent)`
@@ -41,8 +42,8 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const [bsvBalance, setBsvBalance] = useState<number>(0);
 
   const refreshBalance = async () => {
-    const balance = await getBalance.execute(apiContext, {});
-    setBsvBalance(balance.bsv);
+    const satoshis = await getWalletBalance(apiContext.wallet);
+    setBsvBalance(satoshis / 100_000_000);
   };
 
   const { account } = chromeStorageService.getCurrentAccountObject();

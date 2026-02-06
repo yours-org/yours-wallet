@@ -38,9 +38,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useWeb3RequestContext } from '../hooks/useWeb3RequestContext';
 import { useServiceContext } from '../hooks/useServiceContext';
 import {
-  getBalance,
   getBsv21Balances,
-  getExchangeRate,
   getLockData,
   sendAllBsv,
   sendBsv,
@@ -48,6 +46,7 @@ import {
   type Bsv21Balance,
   type LockData,
 } from '@1sat/actions';
+import { getWalletBalance, fetchExchangeRate } from '../utils/wallet';
 import { sendMessage, sendMessageAsync } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
 import { useSyncTracker } from '../hooks/useSyncTracker';
@@ -382,10 +381,9 @@ export const BsvWallet = () => {
   }, [satSendAmount, bsvBalance]);
 
   const getAndSetBsvBalance = async () => {
-    const balance = await getBalance.execute(apiContext, {});
-    setBsvBalance(balance.bsv);
-    // Exchange rate is fetched inside getBalance(), get it separately for state
-    const rate = await getExchangeRate.execute(apiContext, {});
+    const satoshis = await getWalletBalance(apiContext.wallet);
+    setBsvBalance(satoshis / 100_000_000);
+    const rate = await fetchExchangeRate(apiContext.chain, apiContext.wocApiKey);
     setExchangeRate(rate);
   };
 

@@ -12,7 +12,7 @@ import {
   SendMNEE,
   MNEEBalance,
 } from 'yours-wallet-provider';
-import type { PermissionRequest } from '@bsv/wallet-toolbox-mobile';
+import type { PermissionRequest, GroupedPermissionRequest, CounterpartyPermissionRequest } from '@bsv/wallet-toolbox-mobile';
 import { WhitelistedApp } from '../../inject';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
@@ -73,8 +73,10 @@ export interface ChromeStorageObject {
   sendMNEERequest?: SendMNEE[];
   signMessageRequest?: SignMessage;
   broadcastRequest?: Broadcast;
-  // Permission request from WalletPermissionsManager
+  // Permission requests from WalletPermissionsManager
   permissionRequest?: PermissionRequest & { requestID: string };
+  groupedPermissionRequest?: GroupedPermissionRequest;
+  counterpartyPermissionRequest?: CounterpartyPermissionRequest;
   // Transaction approval request from YoursApi
   transactionApprovalRequest?: ApprovalContext;
 }

@@ -5,7 +5,7 @@ import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 import { sleep } from '../../utils/sleep';
 import { Web3RequestContext, Web3RequestContextProps } from '../Web3RequestContext';
-import type { PermissionRequest } from '@bsv/wallet-toolbox-mobile';
+import type { PermissionRequest, GroupedPermissionRequest, CounterpartyPermissionRequest } from '@bsv/wallet-toolbox-mobile';
 import type { ApprovalContext } from '../../yoursApi';
 
 export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -13,9 +13,9 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [sendBsvRequest, setSendBsvRequest] = useState<SendBsv[] | undefined>(undefined);
   const [sendMNEERequest, setSendMNEERequest] = useState<SendMNEE[] | undefined>(undefined);
   const [signMessageRequest, setSignMessageRequest] = useState<SignMessage | undefined>(undefined);
-  // Permission request from WalletPermissionsManager
   const [permissionRequest, setPermissionRequest] = useState<(PermissionRequest & { requestID: string }) | undefined>(undefined);
-  // Transaction approval request from YoursApi
+  const [groupedPermissionRequest, setGroupedPermissionRequest] = useState<GroupedPermissionRequest | undefined>(undefined);
+  const [counterpartyPermissionRequest, setCounterpartyPermissionRequest] = useState<CounterpartyPermissionRequest | undefined>(undefined);
   const [transactionApprovalRequest, setTransactionApprovalRequest] = useState<ApprovalContext | undefined>(undefined);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
 
@@ -24,6 +24,12 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
       if (changes.permissionRequest?.newValue) {
         setPermissionRequest(changes.permissionRequest.newValue);
+      }
+      if (changes.groupedPermissionRequest?.newValue) {
+        setGroupedPermissionRequest(changes.groupedPermissionRequest.newValue);
+      }
+      if (changes.counterpartyPermissionRequest?.newValue) {
+        setCounterpartyPermissionRequest(changes.counterpartyPermissionRequest.newValue);
       }
     };
     chrome.storage.local.onChanged.addListener(listener);
@@ -35,6 +41,14 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     // Service worker manages storage and popup lifecycle for sequential permissions.
     if (type === 'permissionRequest') {
       setPermissionRequest(undefined);
+      return;
+    }
+    if (type === 'groupedPermissionRequest') {
+      setGroupedPermissionRequest(undefined);
+      return;
+    }
+    if (type === 'counterpartyPermissionRequest') {
+      setCounterpartyPermissionRequest(undefined);
       return;
     }
 
@@ -74,6 +88,8 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       sendMNEERequest,
       signMessageRequest,
       permissionRequest,
+      groupedPermissionRequest,
+      counterpartyPermissionRequest,
       transactionApprovalRequest,
       popupWindowId,
     } = result;
@@ -83,6 +99,8 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (sendMNEERequest) setSendMNEERequest(sendMNEERequest);
     if (signMessageRequest) setSignMessageRequest(signMessageRequest);
     if (permissionRequest) setPermissionRequest(permissionRequest);
+    if (groupedPermissionRequest) setGroupedPermissionRequest(groupedPermissionRequest);
+    if (counterpartyPermissionRequest) setCounterpartyPermissionRequest(counterpartyPermissionRequest);
     if (transactionApprovalRequest) setTransactionApprovalRequest(transactionApprovalRequest);
     if (popupWindowId) setPopupId(popupWindowId);
   };
@@ -100,6 +118,8 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
         sendMNEERequest,
         signMessageRequest,
         permissionRequest,
+        groupedPermissionRequest,
+        counterpartyPermissionRequest,
         transactionApprovalRequest,
         clearRequest,
         popupId,

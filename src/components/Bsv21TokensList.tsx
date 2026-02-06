@@ -12,10 +12,10 @@ import { useEffect, useState } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import {
-  getExchangeRate,
   ONESAT_MAINNET_CONTENT_URL,
   type Bsv21Balance,
 } from '@1sat/actions';
+import { fetchExchangeRate } from '../utils/wallet';
 
 const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
 
@@ -68,7 +68,7 @@ export const Bsv21TokensList = (props: Bsv21TokensListProps) => {
 
   useEffect(() => {
     const loadExchangeRate = async () => {
-      const rate = await getExchangeRate.execute(apiContext, {});
+      const rate = await fetchExchangeRate(apiContext.chain, apiContext.wocApiKey);
       setExchangeRate(rate);
     };
     loadExchangeRate();

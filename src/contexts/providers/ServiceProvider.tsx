@@ -4,7 +4,8 @@ import { KeysService } from '../../services/Keys.service';
 import { INACTIVITY_LIMIT, MNEE_API_TOKEN } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import mnee from '@mnee/ts-sdk';
-import { createContext, getExchangeRate } from '@1sat/actions';
+import { createContext } from '@1sat/actions';
+import { fetchExchangeRate } from '../../utils/wallet';
 import { AddressSyncFetcher, createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
 import { initSyncContext } from '../../initSyncContext';
 import { NetWork } from 'yours-wallet-provider';
@@ -65,7 +66,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         if (account) {
           // Pre-fetch exchange rate to cache it
-          await getExchangeRate.execute(apiContext, {});
+          await fetchExchangeRate(apiContext.chain, apiContext.wocApiKey);
         }
 
         setServices({ ...initializedServices, isLocked, isReady, lockWallet });

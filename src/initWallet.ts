@@ -54,7 +54,7 @@ const DEFAULT_PERMISSIONS_CONFIG: PermissionsManagerConfig = {
   seekSpendingPermissions: true,
 
   // Grouped permissions (BRC-73)
-  seekGroupedPermission: false, // We'll use individual prompts for now
+  seekGroupedPermission: true,
 
   // Distinguish privileged operations
   differentiatePrivilegedOperations: true,

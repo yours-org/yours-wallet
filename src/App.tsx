@@ -33,6 +33,8 @@ import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
 import { SnackbarProvider } from './contexts/providers/SnackbarProvider';
 import { MNEESendRequest } from './pages/requests/MNEESendRequest';
 import { PermissionRequestPage } from './pages/requests/PermissionRequest';
+import { GroupedPermissionRequestPage } from './pages/requests/GroupedPermissionRequest';
+import { CounterpartyPermissionRequestPage } from './pages/requests/CounterpartyPermissionRequest';
 import { TransactionApprovalRequest } from './pages/requests/TransactionApprovalRequest';
 
 const MainContainer = styled.div<WhiteLabelTheme & { $isMobile?: boolean }>`
@@ -67,6 +69,8 @@ export const App = () => {
     sendMNEERequest,
     signMessageRequest,
     permissionRequest,
+    groupedPermissionRequest,
+    counterpartyPermissionRequest,
     transactionApprovalRequest,
     clearRequest,
     popupId,
@@ -140,6 +144,8 @@ export const App = () => {
                               !sendBsvRequest &&
                               !sendMNEERequest &&
                               !signMessageRequest &&
+                              !groupedPermissionRequest &&
+                              !counterpartyPermissionRequest &&
                               !permissionRequest &&
                               !transactionApprovalRequest
                             }
@@ -166,7 +172,20 @@ export const App = () => {
                                     popupId={popupId}
                                   />
                                 </Show>
-                                {/* Permission request from WalletPermissionsManager */}
+                                <Show when={!!groupedPermissionRequest}>
+                                  <GroupedPermissionRequestPage
+                                    request={groupedPermissionRequest!}
+                                    onResponse={() => clearRequest('groupedPermissionRequest')}
+                                    popupId={popupId}
+                                  />
+                                </Show>
+                                <Show when={!!counterpartyPermissionRequest}>
+                                  <CounterpartyPermissionRequestPage
+                                    request={counterpartyPermissionRequest!}
+                                    onResponse={() => clearRequest('counterpartyPermissionRequest')}
+                                    popupId={popupId}
+                                  />
+                                </Show>
                                 <Show when={!!permissionRequest}>
                                   <PermissionRequestPage
                                     request={permissionRequest!}
@@ -174,7 +193,6 @@ export const App = () => {
                                     popupId={popupId}
                                   />
                                 </Show>
-                                {/* Transaction approval request from YoursApi */}
                                 <Show when={!!transactionApprovalRequest}>
                                   <TransactionApprovalRequest
                                     request={transactionApprovalRequest!}
