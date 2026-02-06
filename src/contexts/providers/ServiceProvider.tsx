@@ -5,7 +5,7 @@ import { INACTIVITY_LIMIT, MNEE_API_TOKEN } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import mnee from '@mnee/ts-sdk';
 import { createContext, getExchangeRate } from '@1sat/actions';
-import { AddressSyncFetcher, createChromeCWI, OneSatServices } from '@1sat/wallet/browser';
+import { AddressSyncFetcher, createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
 import { initSyncContext } from '../../initSyncContext';
 import { NetWork } from 'yours-wallet-provider';
 

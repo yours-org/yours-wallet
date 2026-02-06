@@ -14,7 +14,7 @@ import {
   YOURS_PREFIX,
   BRC29_PROTOCOL_ID,
   type AddressDerivation,
-} from '@1sat/wallet/browser';
+} from '@1sat/wallet-browser';
 
 // Admin originator for the extension
 const ADMIN_ORIGINATOR = `chrome-extension://${chrome.runtime.id}`;

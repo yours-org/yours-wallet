@@ -5,7 +5,7 @@ import {
   type FullSyncResult,
   type FullSyncStage,
   type WebWalletConfig,
-} from '@1sat/wallet/browser';
+} from '@1sat/wallet-browser';
 import { WalletPermissionsManager, type PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { decrypt } from './utils/crypto';

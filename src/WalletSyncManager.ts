@@ -17,7 +17,7 @@ import {
   type AddressSyncQueueStorage,
   AddressManager,
   OneSatServices,
-} from '@1sat/wallet/browser';
+} from '@1sat/wallet-browser';
 
 type Chain = 'main' | 'test';
 

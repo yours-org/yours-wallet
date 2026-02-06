@@ -6,7 +6,7 @@ import {
   type BackupManifest,
   type BackupProgressCallback,
   type Unzipped,
-} from '@1sat/wallet/browser';
+} from '@1sat/wallet-browser';
 import { encode } from '@msgpack/msgpack';
 import type {
   WalletStorageManager,

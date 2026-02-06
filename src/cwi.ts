@@ -1,10 +1,10 @@
 /**
  * CWI (Chrome Wallet Interface) - BRC-100 WalletInterface implementation
- * Re-exports from @1sat/wallet/browser for browser page context
+ * Re-exports from @1sat/wallet-browser for browser page context
  */
 
 import type { WalletInterface } from '@bsv/sdk';
-import { createEventCWI, CWIEventName } from '@1sat/wallet/browser';
+import { createEventCWI, CWIEventName } from '@1sat/wallet-browser';
 
 // Re-export for backwards compatibility
 export { CWIEventName };

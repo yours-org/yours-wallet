@@ -6,7 +6,7 @@ import { convertAtomicValueToReadableTokenValue, formatNumberWithCommasAndDecima
 import { Show } from './Show';
 import lockImage from '../assets/lock.svg';
 import { FaFire } from 'react-icons/fa';
-import type { ParseContext, Txo } from '@1sat/wallet/browser';
+import type { ParseContext, Txo } from '@1sat/wallet-browser';
 import { useServiceContext } from '../hooks/useServiceContext';
 
 // Helper types for indexed data
