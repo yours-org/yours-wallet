@@ -257,7 +257,7 @@ export const AppsAndTools = () => {
     const result = await wallet!.listOutputs({ basket: 'lock', limit: 10000 });
     const txos: Txo[] = [];
     for (const o of result.outputs) {
-      const outpoint = new Outpoint(o.outpoint.replace('.', '_'));
+      const outpoint = new Outpoint(o.outpoint);
       const output = {
         lockingScript: Script.fromHex(o.lockingScript || ''),
         satoshis: o.satoshis,
