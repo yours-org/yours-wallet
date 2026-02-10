@@ -171,7 +171,7 @@ export const initWallet = async (
 
   // 5. Create AddressSyncProcessor (processes external payments from queue)
   const processor = new AddressSyncProcessor({
-    wallet,
+    wallet: baseWallet,
     services,
     syncQueue,
     addressManager,
