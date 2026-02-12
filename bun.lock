@@ -6,7 +6,7 @@
       "dependencies": {
         "@1sat/actions": "^0.0.7",
         "@1sat/client": "^0.0.6",
-        "@1sat/wallet-browser": "^0.0.9",
+        "@1sat/wallet-browser": "^0.0.10",
         "@bsv/paymail": "^2.0.2",
         "@bsv/sdk": "^2.0.1",
         "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@2.0.5-idb-fix.2",
@@ -69,9 +69,9 @@
 
     "@1sat/types": ["@1sat/types@0.0.5", "", { "peerDependencies": { "@bsv/sdk": "^2.0.1" } }, "sha512-QdlONdQGpftze/OYHrjAPgtTssArjWCc9pX0RfqvXqtDlBXNc8cAACI5hHuMkOOOW66AEAvVbRz4/Qye2E4UBA=="],
 
-    "@1sat/wallet": ["@1sat/wallet@0.0.12", "", { "dependencies": { "@1sat/client": "^0.0.6", "@1sat/types": "^0.0.5", "@bopen-io/templates": "^1.1.8", "@msgpack/msgpack": "^3.1.3", "fflate": "^0.8.2" }, "peerDependencies": { "@bsv/sdk": "^2.0.1" } }, "sha512-NEMnbFcg6TTpF+Rdx4jG5oZdcD2w+PNtJoGI2MmQI2g5XxR/F0aUaP+CvGHrA7YJIwX8aH8nX3Bz74TMA7OGVQ=="],
+    "@1sat/wallet": ["@1sat/wallet@0.0.13", "", { "dependencies": { "@1sat/client": "^0.0.6", "@1sat/types": "^0.0.5", "@bopen-io/templates": "^1.1.8", "@msgpack/msgpack": "^3.1.3", "fflate": "^0.8.2" }, "peerDependencies": { "@bsv/sdk": "^2.0.1" } }, "sha512-ko4TKNbsc4zmWFVFz2sARJ9F7fSIkuaqWZn2U7FVKDS0lqcXYBeXOphWmcrjtYVsF3FL+c20tiBUtZ3TZwllKg=="],
 
-    "@1sat/wallet-browser": ["@1sat/wallet-browser@0.0.9", "", { "dependencies": { "@1sat/wallet": "^0.0.12" }, "peerDependencies": { "@1sat/client": "^0.0.6", "@bsv/sdk": "^2.0.1", "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@2.0.5-idb-fix.2" } }, "sha512-MVhjI7q8svglfL15ABqvU6UjCoEmE0KLC7Z5zK6HZNiJDnsgktEV2UzVho9wq18ODQNA+fZjx6jzFDltM60Rcw=="],
+    "@1sat/wallet-browser": ["@1sat/wallet-browser@0.0.10", "", { "dependencies": { "@1sat/wallet": "^0.0.13" }, "peerDependencies": { "@1sat/client": "^0.0.6", "@bsv/sdk": "^2.0.1", "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@2.0.5-idb-fix.2" } }, "sha512-mRIb7hMUHamQbjIaB+NwRqtRWSeZaCFiutOJ4F2sauuyTUbdUD1k9ETwsPKPAhk7FN5nz/OOv4ksqFGxRHFgqg=="],
 
     "@adobe/css-tools": ["@adobe/css-tools@4.4.4", "", {}, "sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg=="],
 
