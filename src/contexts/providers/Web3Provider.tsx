@@ -5,7 +5,11 @@ import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 import { sleep } from '../../utils/sleep';
 import { Web3RequestContext, Web3RequestContextProps } from '../Web3RequestContext';
-import type { PermissionRequest, GroupedPermissionRequest, CounterpartyPermissionRequest } from '@bsv/wallet-toolbox-mobile';
+import type {
+  PermissionRequest,
+  GroupedPermissionRequest,
+  CounterpartyPermissionRequest,
+} from '@bsv/wallet-toolbox-mobile';
 import type { ApprovalContext } from '../../yoursApi';
 
 export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -13,9 +17,15 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [sendBsvRequest, setSendBsvRequest] = useState<SendBsv[] | undefined>(undefined);
   const [sendMNEERequest, setSendMNEERequest] = useState<SendMNEE[] | undefined>(undefined);
   const [signMessageRequest, setSignMessageRequest] = useState<SignMessage | undefined>(undefined);
-  const [permissionRequest, setPermissionRequest] = useState<(PermissionRequest & { requestID: string }) | undefined>(undefined);
-  const [groupedPermissionRequest, setGroupedPermissionRequest] = useState<GroupedPermissionRequest | undefined>(undefined);
-  const [counterpartyPermissionRequest, setCounterpartyPermissionRequest] = useState<CounterpartyPermissionRequest | undefined>(undefined);
+  const [permissionRequest, setPermissionRequest] = useState<(PermissionRequest & { requestID: string }) | undefined>(
+    undefined,
+  );
+  const [groupedPermissionRequest, setGroupedPermissionRequest] = useState<GroupedPermissionRequest | undefined>(
+    undefined,
+  );
+  const [counterpartyPermissionRequest, setCounterpartyPermissionRequest] = useState<
+    CounterpartyPermissionRequest | undefined
+  >(undefined);
   const [transactionApprovalRequest, setTransactionApprovalRequest] = useState<ApprovalContext | undefined>(undefined);
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
 

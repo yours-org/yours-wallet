@@ -142,7 +142,7 @@ export type TxHistoryProps = {
 export const TxHistory = (props: TxHistoryProps) => {
   const { theme, onBack } = props;
   const [data, setData] = useState<TxLog[]>();
-  const { wallet, chromeStorageService } = useServiceContext();
+  const { chromeStorageService, apiContext } = useServiceContext();
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -152,19 +152,44 @@ export const TxHistory = (props: TxHistoryProps) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      // TODO: Implement getRecentTxs/TxLog in 1sat-wallet-toolbox
-      // try {
-      //   const tsx = await wallet.getRecentTxs();
-      //   console.log(tsx);
-      //   setData(tsx);
-      // } catch (error) {
-      //   console.error('Error fetching data:', error);
-      // }
-      setData([]);
+      try {
+        const result = await apiContext.wallet.listActions({
+          labels: [],
+          includeLabels: true,
+          includeOutputs: true,
+          limit: 100,
+          offset: 0,
+        });
+
+        // TODO: Categorize transactions by type using action.labels and output baskets:
+        // - BSV-21 tokens: check for 'bsv21' basket/labels, use token symbol & icon, show token amounts
+        // - 1Sat Ordinals/NFTs: check for 'origin'/'1sat' basket, show NFT icon & transfer info
+        // - Lock contracts: check for 'lock' basket, show lock/unlock amounts
+        // - Listings: check for 'ordlock' basket, show list/cancel/purchase
+        // - Filter or group mixed transactions (e.g. a send that includes both BSV and a token)
+        // Currently all transactions are shown as BSV fund transfers.
+        //
+        // TODO: Use actual transaction dates once WalletAction exposes created_at
+        const txLogs: TxLog[] = result.actions.map((action, idx) => ({
+          txid: action.txid,
+          idx,
+          date: new Date(),
+          summary: {
+            fund: {
+              amount: action.satoshis,
+            },
+          },
+        }));
+
+        setData(txLogs);
+      } catch (error) {
+        console.error('Error fetching transaction history:', error);
+        setData([]);
+      }
     };
 
     fetchData();
-  }, [wallet]);
+  }, [apiContext.wallet]);
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -203,7 +228,7 @@ export const TxHistory = (props: TxHistoryProps) => {
         );
       default:
         return icon ? (
-          <Icon src={`${wallet.services.baseUrl}/content/${icon}`} alt="Summary Icon" $isNFT={tag === 'origin'} />
+          <Icon src={`${apiContext.services?.baseUrl}/content/${icon}`} alt="Summary Icon" $isNFT={tag === 'origin'} />
         ) : tag === ('origin' as Tag) ? (
           <Icon src={GENERIC_NFT_ICON} alt="Generic NFT Icon" />
         ) : (

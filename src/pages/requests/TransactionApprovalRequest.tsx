@@ -122,10 +122,7 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
   }, [txData, bsvAddress, ordAddress, identityAddress, wallet]);
 
   // Fallback to CreateActionArgs if BEEF parsing not available
-  const totalOutputSats = request.createActionParams.outputs?.reduce(
-    (sum, output) => sum + output.satoshis,
-    0
-  ) || 0;
+  const totalOutputSats = request.createActionParams.outputs?.reduce((sum, output) => sum + output.satoshis, 0) || 0;
 
   const outputCount = request.createActionParams.outputs?.length || 0;
   const inputCount = request.createActionParams.inputs?.length || 0;
@@ -175,9 +172,8 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
 
   // Display amount: prefer calculated satsOut, fall back to totalOutputSats
   const displayAmount = txData ? satsOut : totalOutputSats;
-  const amountLabel = displayAmount > 0
-    ? `Approve - ${(displayAmount / BSV_DECIMAL_CONVERSION).toFixed(8)} BSV`
-    : 'Approve';
+  const amountLabel =
+    displayAmount > 0 ? `Approve - ${(displayAmount / BSV_DECIMAL_CONVERSION).toFixed(8)} BSV` : 'Approve';
 
   return (
     <>
@@ -192,9 +188,7 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
           </Text>
 
           {/* Show TxPreview if BEEF was parsed successfully */}
-          <Show when={!!txData}>
-            {txData && <TxPreview txData={txData} />}
-          </Show>
+          <Show when={!!txData}>{txData && <TxPreview txData={txData} />}</Show>
 
           {/* Fallback to basic info if no TxPreview */}
           <Show when={!txData}>
@@ -217,13 +211,7 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
           </Show>
 
           <FormContainer noValidate onSubmit={(e) => handleApprove(e)}>
-            <Button
-              theme={theme}
-              type="primary"
-              label={amountLabel}
-              isSubmit
-              disabled={isProcessing}
-            />
+            <Button theme={theme} type="primary" label={amountLabel} isSubmit disabled={isProcessing} />
             <Button theme={theme} type="secondary" label="Reject" onClick={handleReject} disabled={isProcessing} />
           </FormContainer>
         </Wrapper>

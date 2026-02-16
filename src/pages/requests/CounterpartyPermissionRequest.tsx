@@ -8,7 +8,10 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { WhiteLabelTheme } from '../../theme.types';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
-import type { CounterpartyPermissionRequest as CounterpartyPermissionRequestType, CounterpartyPermissions } from '@bsv/wallet-toolbox-mobile';
+import type {
+  CounterpartyPermissionRequest as CounterpartyPermissionRequestType,
+  CounterpartyPermissions,
+} from '@bsv/wallet-toolbox-mobile';
 
 const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -79,9 +82,7 @@ export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionR
   const [isProcessing, setIsProcessing] = useState(false);
   const { permissions } = request;
 
-  const [protocolChecked, setProtocolChecked] = useState<boolean[]>(
-    () => permissions.protocols.map(() => true),
-  );
+  const [protocolChecked, setProtocolChecked] = useState<boolean[]>(() => permissions.protocols.map(() => true));
 
   useEffect(() => {
     handleSelect('bsv');
@@ -131,10 +132,10 @@ export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionR
     window.location.reload();
   };
 
-  const toggleProtocol = (i: number) => setProtocolChecked(prev => prev.map((v, j) => j === i ? !v : v));
+  const toggleProtocol = (i: number) => setProtocolChecked((prev) => prev.map((v, j) => (j === i ? !v : v)));
 
-  const counterpartyDisplay = request.counterpartyLabel
-    ?? `${request.counterparty.slice(0, 8)}...${request.counterparty.slice(-8)}`;
+  const counterpartyDisplay =
+    request.counterpartyLabel ?? `${request.counterparty.slice(0, 8)}...${request.counterparty.slice(-8)}`;
 
   return (
     <ConfirmContent>

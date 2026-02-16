@@ -126,12 +126,17 @@ export const getTagValue = (tags: string[] | undefined, prefix: string): string 
   return matchingTags[0].slice(prefix.length + 1);
 };
 
-export const getOutputName = (output: { customInstructions?: string; tags?: string[] }, fallback = 'Unknown'): string => {
+export const getOutputName = (
+  output: { customInstructions?: string; tags?: string[] },
+  fallback = 'Unknown',
+): string => {
   if (output.customInstructions) {
     try {
       const parsed = JSON.parse(output.customInstructions);
       if (parsed.name) return parsed.name;
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
   return getTagValue(output.tags, 'name') ?? fallback;
 };

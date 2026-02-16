@@ -134,9 +134,8 @@ export const initWallet = async (
     privateKey: keys.identityWif,
     chain,
     feeModel: { model: 'sat/kb', value: FEE_PER_KB },
-    remoteStorageUrl: chain === 'main'
-      ? 'https://1sat.shruggr.cloud/1sat/wallet'
-      : 'https://testnet.api.1sat.app/1sat/wallet',
+    remoteStorageUrl:
+      chain === 'main' ? 'https://1sat.shruggr.cloud/1sat/wallet' : 'https://testnet.api.1sat.app/1sat/wallet',
     storageIdentityKey: deviceId,
     onTransactionBroadcasted: options?.onTransactionBroadcasted,
     onTransactionProven: options?.onTransactionProven
@@ -144,19 +143,10 @@ export const initWallet = async (
       : undefined,
   };
 
-  const {
-    wallet: baseWallet,
-    monitor,
-    destroy: destroyWallet,
-    fullSync,
-  } = await createWebWallet(walletConfig);
+  const { wallet: baseWallet, monitor, destroy: destroyWallet, fullSync } = await createWebWallet(walletConfig);
 
   // 3. Wrap with permissions manager for external app access control
-  const wallet = new WalletPermissionsManager(
-    baseWallet,
-    ADMIN_ORIGINATOR,
-    DEFAULT_PERMISSIONS_CONFIG,
-  );
+  const wallet = new WalletPermissionsManager(baseWallet, ADMIN_ORIGINATOR, DEFAULT_PERMISSIONS_CONFIG);
 
   // 4. Initialize sync context (derives addresses, creates services, queue, addressManager)
   const maxKeyIndex = 4; // 0-4 = 5 addresses
@@ -180,12 +170,14 @@ export const initWallet = async (
 
   // Subscribe to processor events and forward to popup
   const sendSyncStatus = (data: { status: string; [key: string]: unknown }) => {
-    chrome.runtime.sendMessage({
-      action: 'syncStatusUpdate',
-      data,
-    }).catch(() => {
-      // Ignore errors if popup is not open
-    });
+    chrome.runtime
+      .sendMessage({
+        action: 'syncStatusUpdate',
+        data,
+      })
+      .catch(() => {
+        // Ignore errors if popup is not open
+      });
   };
 
   processor.on('process:start', () => {

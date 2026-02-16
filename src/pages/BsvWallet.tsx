@@ -199,8 +199,6 @@ const GetMneeContainer = styled(ReceiveContent)<WhiteLabelTheme>`
 type PageState = 'main' | 'receive' | 'send' | 'sendMNEE' | 'getMNEE';
 type AmountType = 'bsv' | 'usd';
 
-
-
 export type Recipient = {
   id: string;
   address: string;
@@ -448,8 +446,6 @@ export const BsvWallet = () => {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identityAddress, isSyncing, lockData]);
-
-
 
   const resetSendState = () => {
     setIsProcessing(false);
@@ -826,13 +822,13 @@ export const BsvWallet = () => {
               Manage Tokens List
             </Text>
           </ManageTokenListWrapper>
-          <ManageTokenListWrapper onClick={() => setHistoryTx(!historyTx)}>
-            <FaHistory size="1rem" color={theme.color.global.gray} />
-            <Text theme={theme} style={{ margin: '0 0 0 0.5rem', fontWeight: 700, color: theme.color.global.gray }}>
-              Recent Activity
-            </Text>
-          </ManageTokenListWrapper>
         </Show>
+        <ManageTokenListWrapper onClick={() => setHistoryTx(!historyTx)}>
+          <FaHistory size="1rem" color={theme.color.global.gray} />
+          <Text theme={theme} style={{ margin: '0 0 0 0.5rem', fontWeight: 700, color: theme.color.global.gray }}>
+            Recent Activity
+          </Text>
+        </ManageTokenListWrapper>
       </MiddleContainer>
     </MainContent>
   );

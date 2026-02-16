@@ -11,13 +11,7 @@ import { Show } from '../components/Show';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
-import {
-  cancelListing,
-  getOrdinals,
-  listOrdinal,
-  ONESAT_MAINNET_CONTENT_URL,
-  transferOrdinals,
-} from '@1sat/actions';
+import { cancelListing, getOrdinals, listOrdinal, ONESAT_MAINNET_CONTENT_URL, transferOrdinals } from '@1sat/actions';
 
 const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
@@ -66,7 +60,6 @@ export const OrdButtonContainer = styled(ButtonContainer)<WhiteLabelTheme & { $b
   background-color: ${({ theme, $blur }) => ($blur ? theme.color.global.walletBackground + '95' : 'transparent')};
   backdrop-filter: ${({ $blur }) => ($blur ? 'blur(8px)' : 'none')};
 `;
-
 
 const SectionHeader = styled.h2<WhiteLabelTheme>`
   width: 100%;
@@ -202,7 +195,7 @@ export const OrdWallet = () => {
 
     // Store BEEF arrays as loaded - merge at transfer time
     if (BEEF) {
-      setOrdinalsBEEFs(prev => [...prev, BEEF]);
+      setOrdinalsBEEFs((prev) => [...prev, BEEF]);
     }
 
     // Filter out panda/tag and yours/tag types
@@ -263,7 +256,7 @@ export const OrdWallet = () => {
   const getMergedBeefForOrdinals = (selected: WalletOutput[]): number[] | undefined => {
     if (ordinalsBEEFs.length === 0) return undefined;
 
-    const neededTxids = new Set(selected.map(o => o.outpoint.split('.')[0]));
+    const neededTxids = new Set(selected.map((o) => o.outpoint.split('.')[0]));
     const merged = new Beef();
 
     for (const beefBytes of ordinalsBEEFs) {

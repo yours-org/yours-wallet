@@ -7,11 +7,7 @@
  */
 
 import type { WalletInterface } from '@bsv/sdk';
-import {
-  Monitor,
-  type MonitorOptions,
-  type WalletStorageManager,
-} from '@bsv/wallet-toolbox-mobile';
+import { Monitor, type MonitorOptions, type WalletStorageManager } from '@bsv/wallet-toolbox-mobile';
 import {
   AddressSyncProcessor,
   type AddressSyncQueueStorage,

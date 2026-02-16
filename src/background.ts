@@ -49,12 +49,14 @@ let accountContext: AccountContext | null = null;
  * Uses the SYNC_STATUS_UPDATE event which useSyncTracker listens for.
  */
 const notifyBalanceUpdate = () => {
-  chrome.runtime.sendMessage({
-    action: YoursEventName.SYNC_STATUS_UPDATE,
-    data: { status: 'complete' },
-  }).catch(() => {
-    // Ignore errors if popup is not open
-  });
+  chrome.runtime
+    .sendMessage({
+      action: YoursEventName.SYNC_STATUS_UPDATE,
+      data: { status: 'complete' },
+    })
+    .catch(() => {
+      // Ignore errors if popup is not open
+    });
 };
 
 // Initialize wallet on startup (will be null if locked)
@@ -101,12 +103,9 @@ const initializeWallet = async (): Promise<WalletInterface | null> => {
         };
         const storage = walletAny.underlying?._storage;
         if (storage) {
-          await WalletBackupService.importPendingWalletData(
-            storage,
-            (event) => {
-              console.log('[background] PendingRestore:', event.message);
-            },
-          );
+          await WalletBackupService.importPendingWalletData(storage, (event) => {
+            console.log('[background] PendingRestore:', event.message);
+          });
           console.log('[background] initializeWallet: Pending restore complete');
         }
       } catch (error) {
@@ -121,10 +120,13 @@ const initializeWallet = async (): Promise<WalletInterface | null> => {
 };
 
 // Start initialization
-chromeStorageService.getAndSetStorage().then(() => initializeWallet()).catch((error) => {
-  // Log initialization errors - could be expected (locked wallet) or unexpected
-  console.error('[background] Startup initialization failed:', error);
-});
+chromeStorageService
+  .getAndSetStorage()
+  .then(() => initializeWallet())
+  .catch((error) => {
+    // Log initialization errors - could be expected (locked wallet) or unexpected
+    console.error('[background] Startup initialization failed:', error);
+  });
 
 /**
  * Get the current wallet instance (WalletPermissionsManager).
@@ -140,23 +142,32 @@ console.log('Yours Wallet Background Script Running!');
 type CallbackResponse = (response: ResponseEventDetail) => void;
 
 // Pending permission requests waiting for user approval
-const pendingPermissionRequests = new Map<string, {
-  request: PermissionRequest & { requestID: string };
-  resolve: () => void;
-  reject: (error: Error) => void;
-}>();
+const pendingPermissionRequests = new Map<
+  string,
+  {
+    request: PermissionRequest & { requestID: string };
+    resolve: () => void;
+    reject: (error: Error) => void;
+  }
+>();
 
-const pendingGroupedPermissionRequests = new Map<string, {
-  request: GroupedPermissionRequest;
-  resolve: () => void;
-  reject: (error: Error) => void;
-}>();
+const pendingGroupedPermissionRequests = new Map<
+  string,
+  {
+    request: GroupedPermissionRequest;
+    resolve: () => void;
+    reject: (error: Error) => void;
+  }
+>();
 
-const pendingCounterpartyPermissionRequests = new Map<string, {
-  request: CounterpartyPermissionRequest;
-  resolve: () => void;
-  reject: (error: Error) => void;
-}>();
+const pendingCounterpartyPermissionRequests = new Map<
+  string,
+  {
+    request: CounterpartyPermissionRequest;
+    resolve: () => void;
+    reject: (error: Error) => void;
+  }
+>();
 
 // Callback for CWI.waitForAuthentication flow
 let responseCallbackForConnectRequest: ((decision: Decision) => void) | null = null;
@@ -193,10 +204,13 @@ const bindPermissionCallbacks = (manager: WalletPermissionsManager) => {
   });
 
   // Spending authorization
-  manager.bindCallback('onSpendingAuthorizationRequested', async (request: PermissionRequest & { requestID: string }) => {
-    console.log('Spending authorization requested:', request);
-    await showPermissionPrompt(request);
-  });
+  manager.bindCallback(
+    'onSpendingAuthorizationRequested',
+    async (request: PermissionRequest & { requestID: string }) => {
+      console.log('Spending authorization requested:', request);
+      await showPermissionPrompt(request);
+    },
+  );
 
   // Grouped permission (all permissions from manifest.json bundled)
   manager.bindCallback('onGroupedPermissionRequested', async (request: GroupedPermissionRequest) => {
@@ -335,7 +349,10 @@ if (isInServiceWorker) {
     console.log('[verifyAccess] accounts:', !!accounts, 'selectedAccount:', selectedAccount);
     if (!accounts || !selectedAccount) return false;
     const whitelist = accounts[selectedAccount].settings.whitelist;
-    console.log('[verifyAccess] whitelist:', whitelist?.map((i: WhitelistedApp) => i.domain));
+    console.log(
+      '[verifyAccess] whitelist:',
+      whitelist?.map((i: WhitelistedApp) => i.domain),
+    );
     if (!whitelist) return false;
     // External sites use hostname as originator, check against whitelist
     return whitelist.map((i: WhitelistedApp) => i.domain).includes(requestingOriginator);
@@ -397,9 +414,13 @@ if (isInServiceWorker) {
         case 'PERMISSION_RESPONSE':
           return processPermissionResponse(message as { requestID: string; granted: boolean; expiry?: number });
         case 'GROUPED_PERMISSION_RESPONSE':
-          return processGroupedPermissionResponse(message as { requestID: string; granted: Partial<GroupedPermissions> | null; expiry?: number });
+          return processGroupedPermissionResponse(
+            message as { requestID: string; granted: Partial<GroupedPermissions> | null; expiry?: number },
+          );
         case 'COUNTERPARTY_PERMISSION_RESPONSE':
-          return processCounterpartyPermissionResponse(message as { requestID: string; granted: Partial<CounterpartyPermissions> | null; expiry?: number });
+          return processCounterpartyPermissionResponse(
+            message as { requestID: string; granted: Partial<CounterpartyPermissions> | null; expiry?: number },
+          );
         // Internal UI requests (no external domain, direct from popup)
         case YoursEventName.GET_PUB_KEYS:
           processGetPubKeysRequest(sendResponse);
@@ -417,18 +438,23 @@ if (isInServiceWorker) {
           // If wallet context already exists and has pending requests, skip reinitialization
           // to preserve active CWI operations (e.g., createAction waiting for permission)
           if (accountContext && pendingPermissionRequests.size > 0) {
-            console.log('[background] WALLET_UNLOCKED: skipping reinitialization, pending requests:', pendingPermissionRequests.size);
+            console.log(
+              '[background] WALLET_UNLOCKED: skipping reinitialization, pending requests:',
+              pendingPermissionRequests.size,
+            );
             sendResponse({ type: 'WALLET_UNLOCKED', success: true });
             return true;
           }
           // Reinitialize wallet after user unlocks with password
           chromeStorageService.getAndSetStorage().then(() => {
-            initializeWallet().then((wallet) => {
-              sendResponse({ type: 'WALLET_UNLOCKED', success: !!wallet });
-            }).catch((error: Error) => {
-              console.error('Failed to initialize wallet:', error);
-              sendResponse({ type: 'WALLET_UNLOCKED', success: false, error: error.message });
-            });
+            initializeWallet()
+              .then((wallet) => {
+                sendResponse({ type: 'WALLET_UNLOCKED', success: !!wallet });
+              })
+              .catch((error: Error) => {
+                console.error('Failed to initialize wallet:', error);
+                sendResponse({ type: 'WALLET_UNLOCKED', success: false, error: error.message });
+              });
           });
           return true;
         case 'FULL_SYNC':
@@ -533,28 +559,38 @@ if (isInServiceWorker) {
     if (response.granted) {
       // Grant the permission through the manager
       // expiry defaults to 0 (never expires), ephemeral defaults to false (persist on-chain)
-      accountContext?.wallet.grantPermission({
-        requestID: response.requestID,
-        expiry: response.expiry,
-      }).then(() => {
-        pending.resolve();
-      }).catch((error) => {
-        pending.reject(error);
-      });
+      accountContext?.wallet
+        .grantPermission({
+          requestID: response.requestID,
+          expiry: response.expiry,
+        })
+        .then(() => {
+          pending.resolve();
+        })
+        .catch((error) => {
+          pending.reject(error);
+        });
     } else {
       // Deny the permission
-      accountContext?.wallet.denyPermission(response.requestID).then(() => {
-        pending.reject(new Error('Permission denied by user'));
-      }).catch((error) => {
-        pending.reject(error);
-      });
+      accountContext?.wallet
+        .denyPermission(response.requestID)
+        .then(() => {
+          pending.reject(new Error('Permission denied by user'));
+        })
+        .catch((error) => {
+          pending.reject(error);
+        });
     }
 
     chromeStorageService.remove('permissionRequest');
     return true;
   };
 
-  const processGroupedPermissionResponse = (response: { requestID: string; granted: Partial<GroupedPermissions> | null; expiry?: number }) => {
+  const processGroupedPermissionResponse = (response: {
+    requestID: string;
+    granted: Partial<GroupedPermissions> | null;
+    expiry?: number;
+  }) => {
     const pending = pendingGroupedPermissionRequests.get(response.requestID);
     if (!pending) {
       console.warn('No pending grouped permission request found for:', response.requestID);
@@ -564,28 +600,38 @@ if (isInServiceWorker) {
     pendingGroupedPermissionRequests.delete(response.requestID);
 
     if (response.granted) {
-      accountContext?.wallet.grantGroupedPermission({
-        requestID: response.requestID,
-        granted: response.granted,
-        expiry: response.expiry,
-      }).then(() => {
-        pending.resolve();
-      }).catch((error) => {
-        pending.reject(error);
-      });
+      accountContext?.wallet
+        .grantGroupedPermission({
+          requestID: response.requestID,
+          granted: response.granted,
+          expiry: response.expiry,
+        })
+        .then(() => {
+          pending.resolve();
+        })
+        .catch((error) => {
+          pending.reject(error);
+        });
     } else {
-      accountContext?.wallet.denyGroupedPermission(response.requestID).then(() => {
-        pending.reject(new Error('Grouped permission denied by user'));
-      }).catch((error) => {
-        pending.reject(error);
-      });
+      accountContext?.wallet
+        .denyGroupedPermission(response.requestID)
+        .then(() => {
+          pending.reject(new Error('Grouped permission denied by user'));
+        })
+        .catch((error) => {
+          pending.reject(error);
+        });
     }
 
     chromeStorageService.remove('groupedPermissionRequest');
     return true;
   };
 
-  const processCounterpartyPermissionResponse = (response: { requestID: string; granted: Partial<CounterpartyPermissions> | null; expiry?: number }) => {
+  const processCounterpartyPermissionResponse = (response: {
+    requestID: string;
+    granted: Partial<CounterpartyPermissions> | null;
+    expiry?: number;
+  }) => {
     const pending = pendingCounterpartyPermissionRequests.get(response.requestID);
     if (!pending) {
       console.warn('No pending counterparty permission request found for:', response.requestID);
@@ -595,21 +641,27 @@ if (isInServiceWorker) {
     pendingCounterpartyPermissionRequests.delete(response.requestID);
 
     if (response.granted) {
-      accountContext?.wallet.grantCounterpartyPermission({
-        requestID: response.requestID,
-        granted: response.granted,
-        expiry: response.expiry,
-      }).then(() => {
-        pending.resolve();
-      }).catch((error) => {
-        pending.reject(error);
-      });
+      accountContext?.wallet
+        .grantCounterpartyPermission({
+          requestID: response.requestID,
+          granted: response.granted,
+          expiry: response.expiry,
+        })
+        .then(() => {
+          pending.resolve();
+        })
+        .catch((error) => {
+          pending.reject(error);
+        });
     } else {
-      accountContext?.wallet.denyCounterpartyPermission(response.requestID).then(() => {
-        pending.reject(new Error('Counterparty permission denied by user'));
-      }).catch((error) => {
-        pending.reject(error);
-      });
+      accountContext?.wallet
+        .denyCounterpartyPermission(response.requestID)
+        .then(() => {
+          pending.reject(new Error('Counterparty permission denied by user'));
+        })
+        .catch((error) => {
+          pending.reject(error);
+        });
     }
 
     chromeStorageService.remove('counterpartyPermissionRequest');
@@ -735,24 +787,30 @@ if (isInServiceWorker) {
       }
 
       // Send sync start to show banner
-      chrome.runtime.sendMessage({
-        action: YoursEventName.SYNC_STATUS_UPDATE,
-        data: { status: 'start', addressCount: 1 },
-      }).catch(() => {});
+      chrome.runtime
+        .sendMessage({
+          action: YoursEventName.SYNC_STATUS_UPDATE,
+          data: { status: 'start', addressCount: 1 },
+        })
+        .catch(() => {});
 
       const result = await accountContext.fullSync((stage, message) => {
         // Map fullSync stages to sync status updates
         if (stage === 'complete') {
-          chrome.runtime.sendMessage({
-            action: YoursEventName.SYNC_STATUS_UPDATE,
-            data: { status: 'complete' },
-          }).catch(() => {});
+          chrome.runtime
+            .sendMessage({
+              action: YoursEventName.SYNC_STATUS_UPDATE,
+              data: { status: 'complete' },
+            })
+            .catch(() => {});
         } else {
           // For pushing/resetting/pulling, show progress with the message
-          chrome.runtime.sendMessage({
-            action: YoursEventName.SYNC_STATUS_UPDATE,
-            data: { status: 'progress', pending: 1, done: 0, failed: 0, message },
-          }).catch(() => {});
+          chrome.runtime
+            .sendMessage({
+              action: YoursEventName.SYNC_STATUS_UPDATE,
+              data: { status: 'progress', pending: 1, done: 0, failed: 0, message },
+            })
+            .catch(() => {});
         }
       });
 
@@ -763,10 +821,12 @@ if (isInServiceWorker) {
       });
     } catch (error) {
       // Send error status
-      chrome.runtime.sendMessage({
-        action: YoursEventName.SYNC_STATUS_UPDATE,
-        data: { status: 'error', message: error instanceof Error ? error.message : String(error) },
-      }).catch(() => {});
+      chrome.runtime
+        .sendMessage({
+          action: YoursEventName.SYNC_STATUS_UPDATE,
+          data: { status: 'error', message: error instanceof Error ? error.message : String(error) },
+        })
+        .catch(() => {});
 
       sendResponse({
         type: 'FULL_SYNC',
@@ -855,14 +915,9 @@ if (isInServiceWorker) {
 
       // Restore Chrome storage with password validation
       console.log('[MasterRestore] Restoring from backup...');
-      const manifest = await WalletBackupService.restoreChromeStorage(
-        chromeStorageService,
-        file,
-        password,
-        (event) => {
-          console.log('[MasterRestore]', event.message);
-        },
-      );
+      const manifest = await WalletBackupService.restoreChromeStorage(chromeStorageService, file, password, (event) => {
+        console.log('[MasterRestore]', event.message);
+      });
 
       // Refresh chrome storage service to pick up restored data (including passKey)
       await chromeStorageService.getAndSetStorage();
@@ -925,10 +980,7 @@ if (isInServiceWorker) {
     );
   };
 
-  const processCWIIsAuthenticated = (
-    originator: string | undefined,
-    sendResponse: CallbackResponse,
-  ) => {
+  const processCWIIsAuthenticated = (originator: string | undefined, sendResponse: CallbackResponse) => {
     checkIsAuthenticated(originator)
       .then((isAuthenticated) => {
         sendResponse({
@@ -1063,10 +1115,7 @@ if (isInServiceWorker) {
     return true;
   };
 
-  const processCWIGetHeaderForHeight = async (
-    message: { params: GetHeaderArgs },
-    sendResponse: CallbackResponse,
-  ) => {
+  const processCWIGetHeaderForHeight = async (message: { params: GetHeaderArgs }, sendResponse: CallbackResponse) => {
     try {
       const w = getWallet();
       if (!w) throw Error('Wallet not initialized!');
@@ -1295,14 +1344,17 @@ if (isInServiceWorker) {
       if (!w) throw Error('Wallet not initialized!');
 
       console.log('[createAction] Starting with originator:', message.originator);
-      console.log('[createAction] Params:', JSON.stringify({
-        description: message.params.description,
-        inputCount: message.params.inputs?.length ?? 0,
-        outputCount: message.params.outputs?.length ?? 0,
-        options: message.params.options,
-        hasInputBEEF: !!message.params.inputBEEF,
-        inputBEEFLength: message.params.inputBEEF?.length ?? 0,
-      }));
+      console.log(
+        '[createAction] Params:',
+        JSON.stringify({
+          description: message.params.description,
+          inputCount: message.params.inputs?.length ?? 0,
+          outputCount: message.params.outputs?.length ?? 0,
+          options: message.params.options,
+          hasInputBEEF: !!message.params.inputBEEF,
+          inputBEEFLength: message.params.inputBEEF?.length ?? 0,
+        }),
+      );
 
       // WalletPermissionsManager will trigger spending authorization callback if needed
       const result = await w.createAction(message.params, message.originator);
@@ -1380,7 +1432,12 @@ if (isInServiceWorker) {
   // CONNECT RESPONSE ********************************
 
   const processConnectResponse = (response: { decision: Decision }) => {
-    console.log('[processConnectResponse] decision:', response.decision, 'hasCallback:', !!responseCallbackForConnectRequest);
+    console.log(
+      '[processConnectResponse] decision:',
+      response.decision,
+      'hasCallback:',
+      !!responseCallbackForConnectRequest,
+    );
     if (!responseCallbackForConnectRequest) {
       console.error('[processConnectResponse] Missing callback!');
       return true;

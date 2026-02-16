@@ -13,10 +13,7 @@ type MasterBackupProgress = (event: MasterBackupProgressEvent) => void;
  * The background script has access to the wallet storage manager and can
  * perform the actual backup.
  */
-export const streamDataToZip = async (
-  _chromeStorageService: ChromeStorageService,
-  progress: MasterBackupProgress,
-) => {
+export const streamDataToZip = async (_chromeStorageService: ChromeStorageService, progress: MasterBackupProgress) => {
   progress({ message: 'Starting backup...' });
 
   try {

@@ -117,13 +117,7 @@ export const MasterRestore = () => {
                   autoFocus
                   onKeyDown={(e) => e.stopPropagation()}
                 />
-                <Button
-                  theme={theme}
-                  type="primary"
-                  label="Restore Wallet"
-                  disabled={!password}
-                  isSubmit
-                />
+                <Button theme={theme} type="primary" label="Restore Wallet" disabled={!password} isSubmit />
               </FormContainer>
             </>
           }

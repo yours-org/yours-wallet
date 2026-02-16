@@ -1,12 +1,6 @@
 /* global chrome */
 
-import {
-  CustomListenerName,
-  EmitEventDetail,
-  RequestEventDetail,
-  RequestParams,
-  ResponseEventDetail,
-} from './inject';
+import { CustomListenerName, EmitEventDetail, RequestEventDetail, RequestParams, ResponseEventDetail } from './inject';
 
 console.log('🌱 Yours Wallet Loaded');
 
@@ -38,7 +32,7 @@ const buildResponseCallback = (messageId: string) => {
   return (response: ResponseEventDetail) => {
     const detail = chrome.runtime.lastError
       ? { success: false, error: chrome.runtime.lastError.message || 'Message channel closed' }
-      : response ?? { success: false, error: 'No response from service worker' };
+      : (response ?? { success: false, error: 'No response from service worker' });
     const responseEvent = new CustomEvent(messageId, { detail });
     self.dispatchEvent(responseEvent);
   };

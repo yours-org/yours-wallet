@@ -12,7 +12,11 @@ import {
   SendMNEE,
   MNEEBalance,
 } from 'yours-wallet-provider';
-import type { PermissionRequest, GroupedPermissionRequest, CounterpartyPermissionRequest } from '@bsv/wallet-toolbox-mobile';
+import type {
+  PermissionRequest,
+  GroupedPermissionRequest,
+  CounterpartyPermissionRequest,
+} from '@bsv/wallet-toolbox-mobile';
 import { WhitelistedApp } from '../../inject';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';

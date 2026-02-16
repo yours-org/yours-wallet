@@ -8,7 +8,10 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { WhiteLabelTheme } from '../../theme.types';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
-import type { GroupedPermissionRequest as GroupedPermissionRequestType, GroupedPermissions } from '@bsv/wallet-toolbox-mobile';
+import type {
+  GroupedPermissionRequest as GroupedPermissionRequestType,
+  GroupedPermissions,
+} from '@bsv/wallet-toolbox-mobile';
 
 const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -66,14 +69,12 @@ export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProp
   const { permissions } = request;
 
   // Track which items are checked — all on by default
-  const [protocolChecked, setProtocolChecked] = useState<boolean[]>(
-    () => (permissions.protocolPermissions ?? []).map(() => true),
+  const [protocolChecked, setProtocolChecked] = useState<boolean[]>(() =>
+    (permissions.protocolPermissions ?? []).map(() => true),
   );
-  const [basketChecked, setBasketChecked] = useState<boolean[]>(
-    () => (permissions.basketAccess ?? []).map(() => true),
-  );
-  const [certChecked, setCertChecked] = useState<boolean[]>(
-    () => (permissions.certificateAccess ?? []).map(() => true),
+  const [basketChecked, setBasketChecked] = useState<boolean[]>(() => (permissions.basketAccess ?? []).map(() => true));
+  const [certChecked, setCertChecked] = useState<boolean[]>(() =>
+    (permissions.certificateAccess ?? []).map(() => true),
   );
   const [spendingChecked, setSpendingChecked] = useState(!!permissions.spendingAuthorization);
 
@@ -133,9 +134,9 @@ export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProp
     window.location.reload();
   };
 
-  const toggleProtocol = (i: number) => setProtocolChecked(prev => prev.map((v, j) => j === i ? !v : v));
-  const toggleBasket = (i: number) => setBasketChecked(prev => prev.map((v, j) => j === i ? !v : v));
-  const toggleCert = (i: number) => setCertChecked(prev => prev.map((v, j) => j === i ? !v : v));
+  const toggleProtocol = (i: number) => setProtocolChecked((prev) => prev.map((v, j) => (j === i ? !v : v)));
+  const toggleBasket = (i: number) => setBasketChecked((prev) => prev.map((v, j) => (j === i ? !v : v)));
+  const toggleCert = (i: number) => setCertChecked((prev) => prev.map((v, j) => (j === i ? !v : v)));
 
   return (
     <ConfirmContent>
@@ -187,7 +188,9 @@ export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProp
               <input type="checkbox" checked={certChecked[i]} onChange={() => toggleCert(i)} />
               <div>
                 <PermissionLabel theme={theme}>{c.type}</PermissionLabel>
-                <PermissionDesc theme={theme}>{c.description} — fields: {c.fields.join(', ')}</PermissionDesc>
+                <PermissionDesc theme={theme}>
+                  {c.description} — fields: {c.fields.join(', ')}
+                </PermissionDesc>
               </div>
             </PermissionRow>
           ))}

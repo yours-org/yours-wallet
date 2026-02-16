@@ -18,10 +18,4 @@ export interface ApprovalContext {
   originalRequest?: unknown;
 }
 
-export type YoursApprovalType =
-  | 'sendBsv'
-  | 'sendAllBsv'
-  | 'transferOrdinal'
-  | 'listOrdinal'
-  | 'inscribe'
-  | 'lockBsv';
+export type YoursApprovalType = 'sendBsv' | 'sendAllBsv' | 'transferOrdinal' | 'listOrdinal' | 'inscribe' | 'lockBsv';

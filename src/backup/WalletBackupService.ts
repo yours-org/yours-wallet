@@ -8,10 +8,7 @@ import {
   type Unzipped,
 } from '@1sat/wallet-browser';
 import { encode } from '@msgpack/msgpack';
-import type {
-  WalletStorageManager,
-  sdk,
-} from '@bsv/wallet-toolbox-mobile';
+import type { WalletStorageManager, sdk } from '@bsv/wallet-toolbox-mobile';
 import type { ChromeStorageService } from '../services/ChromeStorage.service';
 import type { Account, Theme } from '../services/types/chromeStorage.types';
 import { decrypt, deriveKey } from '../utils/crypto';
@@ -229,10 +226,7 @@ export class WalletBackupService {
 
     const chromeStorageDeflate = new ZipDeflate('chromeStorage.json', { level: 6 });
     zip.add(chromeStorageDeflate);
-    chromeStorageDeflate.push(
-      new TextEncoder().encode(JSON.stringify(backupChromeStorage, null, 2)),
-      true,
-    );
+    chromeStorageDeflate.push(new TextEncoder().encode(JSON.stringify(backupChromeStorage, null, 2)), true);
 
     // Add settings
     const settingsDeflate = new ZipDeflate('settings.bin', { level: 6 });
@@ -250,10 +244,7 @@ export class WalletBackupService {
 
     const manifestDeflate = new ZipDeflate('manifest.json', { level: 6 });
     zip.add(manifestDeflate);
-    manifestDeflate.push(
-      new TextEncoder().encode(JSON.stringify(manifest, null, 2)),
-      true,
-    );
+    manifestDeflate.push(new TextEncoder().encode(JSON.stringify(manifest, null, 2)), true);
 
     // Finalize the ZIP
     zip.end();
@@ -282,9 +273,7 @@ export class WalletBackupService {
       throw new Error('Invalid backup file: missing manifest.json');
     }
 
-    const manifest = JSON.parse(
-      new TextDecoder().decode(manifestData),
-    ) as BackupManifest;
+    const manifest = JSON.parse(new TextDecoder().decode(manifestData)) as BackupManifest;
 
     if (manifest.version !== 1) {
       throw new Error(`Unsupported backup version: ${manifest.version}`);
@@ -335,9 +324,7 @@ export class WalletBackupService {
       throw new Error('Invalid backup file: missing manifest.json');
     }
 
-    const manifest = JSON.parse(
-      new TextDecoder().decode(manifestData),
-    ) as BackupManifest;
+    const manifest = JSON.parse(new TextDecoder().decode(manifestData)) as BackupManifest;
 
     if (manifest.version !== 1) {
       throw new Error(`Unsupported backup version: ${manifest.version}`);
@@ -350,9 +337,7 @@ export class WalletBackupService {
       throw new Error('Invalid backup file: missing chromeStorage.json');
     }
 
-    const backupChromeStorage = JSON.parse(
-      new TextDecoder().decode(chromeStorageData),
-    ) as BackupChromeStorage;
+    const backupChromeStorage = JSON.parse(new TextDecoder().decode(chromeStorageData)) as BackupChromeStorage;
 
     // Verify password by deriving passKey and decrypting keys
     onProgress({ stage: 'importing', message: 'Verifying password...' });
