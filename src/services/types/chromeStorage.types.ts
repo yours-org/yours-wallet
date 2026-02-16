@@ -6,22 +6,21 @@ import {
   PubKeys,
   TaggedDerivationResponse,
   SendBsv,
-  TransferOrdinal,
-  PurchaseOrdinal,
   SignMessage,
   Broadcast,
-  GetSignatures,
-  TaggedDerivationRequest,
-  EncryptRequest,
-  DecryptRequest,
   SocialProfile,
-  SendBsv20,
   SendMNEE,
   MNEEBalance,
 } from 'yours-wallet-provider';
+import type {
+  PermissionRequest,
+  GroupedPermissionRequest,
+  CounterpartyPermissionRequest,
+} from '@bsv/wallet-toolbox-mobile';
 import { WhitelistedApp } from '../../inject';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
+import type { ApprovalContext } from '../../yoursApi';
 
 export type Dispatch<T> = (value: T) => void;
 
@@ -71,19 +70,19 @@ export interface ChromeStorageObject {
   isLocked: boolean;
   colorTheme: Theme;
   version?: number;
-  hasUpgradedToSPV?: boolean;
+  deviceId?: string;
+  showWelcome?: boolean;
   connectRequest?: ConnectRequest;
   sendBsvRequest?: SendBsv[];
-  sendBsv20Request?: SendBsv20;
   sendMNEERequest?: SendMNEE[];
-  transferOrdinalRequest?: TransferOrdinal;
-  purchaseOrdinalRequest?: PurchaseOrdinal;
   signMessageRequest?: SignMessage;
   broadcastRequest?: Broadcast;
-  getSignaturesRequest?: GetSignatures;
-  generateTaggedKeysRequest?: TaggedDerivationRequest;
-  encryptRequest?: EncryptRequest;
-  decryptRequest?: DecryptRequest;
+  // Permission requests from WalletPermissionsManager
+  permissionRequest?: PermissionRequest & { requestID: string };
+  groupedPermissionRequest?: GroupedPermissionRequest;
+  counterpartyPermissionRequest?: CounterpartyPermissionRequest;
+  // Transaction approval request from YoursApi
+  transactionApprovalRequest?: ApprovalContext;
 }
 
 export type CurrentAccountObject = Omit<
@@ -92,16 +91,11 @@ export type CurrentAccountObject = Omit<
   | 'popupWindowId'
   | 'connectRequest'
   | 'sendBsvRequest'
-  | 'sendBsv20Request'
   | 'sendMNEERequest'
-  | 'transferOrdinalRequest'
-  | 'purchaseOrdinalRequest'
   | 'signMessageRequest'
   | 'broadcastRequest'
-  | 'getSignaturesRequest'
-  | 'generateTaggedKeysRequest'
-  | 'encryptRequest'
-  | 'decryptRequest'
+  | 'permissionRequest'
+  | 'transactionApprovalRequest'
 > & { account: Account };
 
 type AppState = {

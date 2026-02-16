@@ -113,7 +113,7 @@ const FlexContainer = styled.div`
 
 export const TopNav = () => {
   const { theme } = useTheme();
-  const { chromeStorageService, oneSatSPV } = useServiceContext();
+  const { chromeStorageService, wallet } = useServiceContext();
   const { handleSelect } = useBottomMenu();
   const navigate = useNavigate();
   const { addSnackbar } = useSnackbar();
@@ -129,7 +129,7 @@ export const TopNav = () => {
   };
 
   const handleSwitchAccount = async (identityAddress: string) => {
-    await oneSatSPV.destroy();
+    wallet?.close();
     await chromeStorageService.switchAccount(identityAddress);
     setDropdownVisible(false);
     navigate('/bsv-wallet?reload=true');

@@ -85,12 +85,12 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
   }, [request, identityPubKey, bsvPubKey, ordPubKey, onDecision]);
 
   const handleAccept = async () => {
-    const { account } = chromeStorageService.getCurrentAccountObject();
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
     if (!account) throw Error('No account found');
-    const { settings } = account;
+    const { settings, pubKeys } = account;
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
-      [identityAddress]: {
+      [selectedAccount]: {
         ...account,
         settings: {
           ...settings,
@@ -111,7 +111,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
     sendMessage({
       action: 'userConnectResponse',
       decision: 'approved',
-      pubKeys: { bsvPubKey, ordPubKey, identityPubKey },
+      pubKeys,
     });
   };
 

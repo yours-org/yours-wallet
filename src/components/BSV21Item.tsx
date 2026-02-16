@@ -3,8 +3,7 @@ import styled from 'styled-components';
 import { Theme } from '../theme.types';
 import { HeaderText, Text } from './Reusable';
 import { Show } from './Show';
-import { isBSV20v2 } from '../utils/ordi';
-import { BSV20Id } from './BSV20Id';
+import { BSV21Id } from './BSV21Id';
 
 const Container = styled.div<{ color: string; $clickable: string }>`
   display: flex;
@@ -68,7 +67,7 @@ const TokenIcon = styled.img`
   margin-right: 1rem;
 `;
 
-export type BSV20ItemProps = {
+export type BSV21ItemProps = {
   theme: Theme;
   id: string;
   name: string;
@@ -79,7 +78,7 @@ export type BSV20ItemProps = {
   onCopyTokenId: () => void;
 };
 
-export const BSV20Item = (props: BSV20ItemProps) => {
+export const BSV21Item = (props: BSV21ItemProps) => {
   const { id, iconUrl, name, amount, theme, onClick, onCopyTokenId } = props;
 
   const [containerColor, setContainerColor] = useState(theme.color.global.row);
@@ -102,9 +101,7 @@ export const BSV20Item = (props: BSV20ItemProps) => {
         <Amount theme={theme}>{amount}</Amount>
       </RowContainer>
 
-      <Show when={isBSV20v2(id)}>
-        <BSV20Id theme={theme} id={id} onCopyTokenId={onCopyTokenId}></BSV20Id>
-      </Show>
+      <BSV21Id theme={theme} id={id} onCopyTokenId={onCopyTokenId} />
     </Container>
   );
 };

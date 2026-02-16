@@ -1,3 +1,19 @@
+import { toToken, toTokenSat } from 'satoshi-token';
+
+export function showAmount(amt: bigint, dec: number): string {
+  if (!Number.isFinite(dec) || dec < 0) {
+    return amt.toString();
+  }
+  return toToken(amt.toString(), dec, 'string');
+}
+
+export function normalize(amt: string, dec: number): string {
+  if (!Number.isFinite(dec) || dec < 0) {
+    return amt.split('.')[0];
+  }
+  return toTokenSat(amt, dec, 'string');
+}
+
 export const formatUSD = (value: number): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -91,4 +107,44 @@ const removeTrailingZeros = (numStr: string): string => {
 export const convertAtomicValueToReadableTokenValue = (value: number, decimals: number): string => {
   const tokenValue = convertToTokenValue(value, decimals);
   return removeTrailingZeros(formatNumberWithCommasAndDecimals(tokenValue, decimals));
+};
+
+/**
+ * Get the value for a tag prefix from a tags array.
+ * Tags are in format "prefix:value", e.g., "origin:abc123_0"
+ * For 'type' prefix, prefers the most specific tag (one containing '/').
+ */
+export const getTagValue = (tags: string[] | undefined, prefix: string): string | undefined => {
+  if (!tags) return undefined;
+  const matchingTags = tags.filter((t) => t.startsWith(`${prefix}:`));
+  if (matchingTags.length === 0) return undefined;
+  // For 'type' prefix, prefer the most specific one (contains '/')
+  if (prefix === 'type') {
+    const specific = matchingTags.find((t) => t.includes('/'));
+    if (specific) return specific.slice(prefix.length + 1);
+  }
+  return matchingTags[0].slice(prefix.length + 1);
+};
+
+export const getOutputName = (
+  output: { customInstructions?: string; tags?: string[] },
+  fallback = 'Unknown',
+): string => {
+  if (output.customInstructions) {
+    try {
+      const parsed = JSON.parse(output.customInstructions);
+      if (parsed.name) return parsed.name;
+    } catch {
+      /* ignore */
+    }
+  }
+  return getTagValue(output.tags, 'name') ?? fallback;
+};
+
+/**
+ * Check if a tag prefix exists in a tags array.
+ */
+export const hasTag = (tags: string[] | undefined, prefix: string): boolean => {
+  if (!tags) return false;
+  return tags.some((t) => t.startsWith(`${prefix}:`));
 };

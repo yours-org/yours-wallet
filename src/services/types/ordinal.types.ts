@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Bsv20, Ordinal } from 'yours-wallet-provider';
+import { Ordinal } from 'yours-wallet-provider';
 
 export type OrdinalResponse = Ordinal[];
 
@@ -38,13 +38,3 @@ export type MultiSendOrdinals = {
   destinationAddresses: string[];
   password: string;
 };
-
-// export interface BSV20Data {
-//   initialized: boolean;
-//   data: Bsv20[];
-// }
-
-// export interface OrdinalData {
-//   initialized: boolean;
-//   data: Ordinal[];
-// }

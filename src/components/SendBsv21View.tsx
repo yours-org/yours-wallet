@@ -1,23 +1,21 @@
 import validate from 'bitcoin-address-validation';
-import { TokenType } from 'js-1sat-ord';
 import { useEffect, useState } from 'react';
 import { styled } from 'styled-components';
-import { Bsv20 } from 'yours-wallet-provider';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { ONE_SAT_MARKET_URL } from '../utils/constants';
-import { formatNumberWithCommasAndDecimals } from '../utils/format';
-import { isBSV20v2, normalize, showAmount } from '../utils/ordi';
+import { formatNumberWithCommasAndDecimals, normalize, showAmount } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import { getErrorMessage } from '../utils/tools';
-import { BSV20Id } from './BSV20Id';
+import { BSV21Id } from './BSV21Id';
 import { Button } from './Button';
 import { Input } from './Input';
 import { ConfirmContent, FormContainer, HeaderText, Text } from './Reusable';
 import { Show } from './Show';
+import { ONESAT_MAINNET_CONTENT_URL, sendBsv21, type Bsv21Balance } from '@1sat/actions';
 
-const TransferBSV20Header = styled(HeaderText)`
+const TransferHeader = styled(HeaderText)`
   overflow: hidden;
   max-width: 16rem;
   white-space: nowrap;
@@ -42,7 +40,7 @@ const Balance = styled(Text)`
   width: 100%;
 `;
 
-const BSV20Container = styled.div`
+const TokenIdContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -54,27 +52,24 @@ const BSV20Container = styled.div`
 
 export interface Token {
   isConfirmed: boolean;
-  info: Bsv20;
+  info: Bsv21Balance;
 }
 
-export type SendBsv20ViewProps = {
+export type SendBsv21ViewProps = {
   token: Token;
   onBack: () => void;
 };
 
-export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
-  const { ordinalService, chromeStorageService, gorillaPoolService } = useServiceContext();
+export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
+  const { apiContext } = useServiceContext();
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
-  const { getTokenName, sendBSV20 } = ordinalService;
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const tokenType = token && (token.info.id || token.info.tick || '').length > 64 ? TokenType.BSV21 : TokenType.BSV20;
+  const getTokenName = (b: { sym?: string }): string => b.sym || 'Null';
   const [tokenSendAmount, setTokenSendAmount] = useState<bigint | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [receiveAddress, setReceiveAddress] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
-  const network = chromeStorageService.getNetwork();
+  const baseUrl = ONESAT_MAINNET_CONTENT_URL;
 
   useEffect(() => {
     if (!successTxId) return;
@@ -85,7 +80,6 @@ export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
 
   const userSelectedAmount = (inputValue: string, token: Token) => {
     const amtStr = normalize(inputValue, token.info.dec);
-
     const amt = BigInt(amtStr);
     setTokenSendAmount(amt);
     const total = token.isConfirmed ? token.info.all.confirmed : token.info.all.pending;
@@ -98,13 +92,12 @@ export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
 
   const resetSendState = () => {
     setReceiveAddress('');
-    setPasswordConfirm('');
     setSuccessTxId('');
     setIsProcessing(false);
     setTokenSendAmount(null);
   };
 
-  const handleSendBSV20 = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSendBSV21 = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
 
@@ -115,37 +108,39 @@ export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
       return;
     }
 
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
-
     if (token === null || tokenSendAmount === null) {
       setIsProcessing(false);
       return;
     }
 
-    if (!token.info.tick && !token.info.id) {
+    if (!token.info.id) {
       addSnackbar('Missing token ID!', 'error');
       setIsProcessing(false);
       return;
     }
 
-    const sendBSV20Res = await sendBSV20(
-      token.info?.tick || token.info?.id || '',
-      receiveAddress,
-      BigInt(tokenSendAmount),
-      passwordConfirm,
-    );
-
-    if (!sendBSV20Res.txid || sendBSV20Res.error) {
+    let sendRes: Awaited<ReturnType<typeof sendBsv21.execute>>;
+    try {
+      sendRes = await sendBsv21.execute(apiContext, {
+        tokenId: token.info.id,
+        address: receiveAddress,
+        amount: tokenSendAmount,
+      });
+    } catch (error) {
+      console.error('[SendBsv21View] sendBsv21.execute threw:', error);
       setIsProcessing(false);
-      addSnackbar(getErrorMessage(sendBSV20Res.error), 'error');
+      addSnackbar(getErrorMessage(undefined), 'error');
       return;
     }
 
-    setSuccessTxId(sendBSV20Res.txid);
+    if (!sendRes.txid || sendRes.error) {
+      console.error('[SendBsv21View] sendBsv21 error:', sendRes.error);
+      setIsProcessing(false);
+      addSnackbar(getErrorMessage(sendRes.error), 'error');
+      return;
+    }
+
+    setSuccessTxId(sendRes.txid);
     addSnackbar('Tokens Sent!', 'success');
   };
 
@@ -154,32 +149,27 @@ export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
       {token ? (
         <ConfirmContent>
           <Show when={!!token.info.icon && token.info.icon.length > 0}>
-            <TokenIcon
-              style={{ marginBottom: '0.5rem' }}
-              src={`${gorillaPoolService.getBaseUrl(network)}/content/${token.info.icon}`}
-            />
+            <TokenIcon style={{ marginBottom: '0.5rem' }} src={`${baseUrl}/${token.info.icon}`} />
           </Show>
-          <TransferBSV20Header theme={theme}>Send {getTokenName(token.info)}</TransferBSV20Header>
-          <BSV20Container>
+          <TransferHeader theme={theme}>Send {getTokenName(token.info)}</TransferHeader>
+          <TokenIdContainer>
             <Balance theme={theme} onClick={() => userSelectedAmount(String(Number(token.info.all.confirmed)), token)}>
               {`Balance: ${formatNumberWithCommasAndDecimals(
                 Number(showAmount(token.info.all.confirmed, token.info.dec)),
                 token.info.dec,
               )}`}
             </Balance>
-          </BSV20Container>
-          <Show when={isBSV20v2(token.info.id ?? '')}>
-            <BSV20Container>
-              <BSV20Id
-                theme={theme}
-                id={token.info.id ?? ''}
-                onCopyTokenId={() => {
-                  addSnackbar('Copied', 'success');
-                }}
-              ></BSV20Id>
-            </BSV20Container>
-          </Show>
-          <FormContainer noValidate onSubmit={(e) => handleSendBSV20(e)}>
+          </TokenIdContainer>
+          <TokenIdContainer>
+            <BSV21Id
+              theme={theme}
+              id={token.info.id}
+              onCopyTokenId={() => {
+                addSnackbar('Copied', 'success');
+              }}
+            />
+          </TokenIdContainer>
+          <FormContainer noValidate onSubmit={(e) => handleSendBSV21(e)}>
             <Input
               theme={theme}
               name="address"
@@ -205,28 +195,13 @@ export const SendBsv20View = ({ token, onBack }: SendBsv20ViewProps) => {
                 }
               }}
             />
-            <Show when={isPasswordRequired}>
-              <Input
-                theme={theme}
-                name="password"
-                placeholder="Password"
-                type="password"
-                value={passwordConfirm}
-                onChange={(e) => setPasswordConfirm(e.target.value)}
-              />
-            </Show>
             <Button theme={theme} type="primary" label="Send" disabled={isProcessing} isSubmit />
           </FormContainer>
           <Button
             theme={theme}
             type="secondary-outline"
             label="Trade"
-            onClick={() =>
-              window.open(
-                `${ONE_SAT_MARKET_URL}/${tokenType === TokenType.BSV20 ? 'bsv20' : 'bsv21'}/${tokenType === TokenType.BSV20 ? token.info.tick : token.info.id}`,
-                '_blank',
-              )
-            }
+            onClick={() => window.open(`${ONE_SAT_MARKET_URL}/bsv21/${token.info.id}`, '_blank')}
           />
           <Button
             theme={theme}

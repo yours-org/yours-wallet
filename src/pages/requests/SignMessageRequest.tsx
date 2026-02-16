@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { SignedMessage, SignMessage } from 'yours-wallet-provider';
 import { Button } from '../../components/Button';
-import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
@@ -14,6 +13,7 @@ import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { getErrorMessage } from '../../utils/tools';
+import { signMessage } from '@1sat/actions';
 
 const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -41,11 +41,9 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
   const { request, onSignature, popupId } = props;
   const { theme } = useTheme();
   const { handleSelect, hideMenu } = useBottomMenu();
-  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [signature, setSignature] = useState<string | undefined>(undefined);
   const { addSnackbar, message } = useSnackbar();
-  const { chromeStorageService, bsvService } = useServiceContext();
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
+  const { chromeStorageService, apiContext } = useServiceContext();
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
@@ -54,7 +52,6 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
   }, [handleSelect, hideMenu]);
 
   const resetSendState = () => {
-    setPasswordConfirm('');
     setIsProcessing(false);
   };
 
@@ -71,15 +68,8 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const signRes = (await bsvService.signMessage(request, passwordConfirm)) as SignedMessage & { error?: string };
-    if (!signRes?.sig || signRes.error) {
+    const signRes = await signMessage.execute(apiContext, request);
+    if ('error' in signRes) {
       addSnackbar(getErrorMessage(signRes.error), 'error');
       setIsProcessing(false);
       return;
@@ -139,15 +129,6 @@ export const SignMessageRequest = (props: SignMessageRequestProps) => {
                 >{`Message: ${request.message}`}</Text>
               }
             </RequestDetailsContainer>
-            <Show when={isPasswordRequired}>
-              <Input
-                theme={theme}
-                placeholder="Enter Wallet Password"
-                type="password"
-                value={passwordConfirm}
-                onChange={(e) => setPasswordConfirm(e.target.value)}
-              />
-            </Show>
             <Button theme={theme} type="primary" label="Sign Message" disabled={isProcessing} isSubmit />
             <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
           </FormContainer>

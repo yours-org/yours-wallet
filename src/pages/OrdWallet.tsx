@@ -1,25 +1,26 @@
 import validate from 'bitcoin-address-validation';
 import { useCallback, useEffect, useState } from 'react';
 import styled from 'styled-components';
+import { Beef, type WalletOutput } from '@bsv/sdk';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Ordinal } from '../components/Ordinal';
-import { Ordinal as OrdType } from 'yours-wallet-provider';
 import { PageLoader } from '../components/PageLoader';
 import { ButtonContainer, ConfirmContent, FormContainer, HeaderText, Text } from '../components/Reusable';
 import { Show } from '../components/Show';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
+import { cancelListing, getOrdinals, listOrdinal, ONESAT_MAINNET_CONTENT_URL, transferOrdinals } from '@1sat/actions';
+
+const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { sleep } from '../utils/sleep';
 import { TopNav } from '../components/TopNav';
-import { ListOrdinal } from '../services/types/ordinal.types';
-import { Ordinal as OrdinalType } from 'yours-wallet-provider';
 import { WhiteLabelTheme } from '../theme.types';
 import { getErrorMessage } from '../utils/tools';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
-import { truncate } from '../utils/format';
+import { truncate, getTagValue, getOutputName, hasTag } from '../utils/format';
 
 type Addresses = Record<string, string>;
 
@@ -58,13 +59,6 @@ export const OrdButtonContainer = styled(ButtonContainer)<WhiteLabelTheme & { $b
   width: 100%;
   background-color: ${({ theme, $blur }) => ($blur ? theme.color.global.walletBackground + '95' : 'transparent')};
   backdrop-filter: ${({ $blur }) => ($blur ? 'blur(8px)' : 'none')};
-`;
-
-export const BSV20Header = styled.div`
-  display: flex;
-  align-items: center;
-  width: 100%;
-  margin-left: 1rem;
 `;
 
 const SectionHeader = styled.h2<WhiteLabelTheme>`
@@ -141,57 +135,47 @@ type PageState = 'main' | 'transfer' | 'list' | 'cancel';
 export const OrdWallet = () => {
   const { theme } = useTheme();
   const [pageState, setPageState] = useState<PageState>('main');
-  const { chromeStorageService, ordinalService, gorillaPoolService } = useServiceContext();
+  const { apiContext } = useServiceContext();
   const [isProcessing, setIsProcessing] = useState(false);
-  const { listOrdinalOnGlobalOrderbook, cancelGlobalOrderbookListing, getOrdinals, transferOrdinalsMulti } =
-    ordinalService;
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
-  const network = chromeStorageService.getNetwork();
-  const [selectedOrdinals, setSelectedOrdinals] = useState<OrdinalType[]>([]);
-  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [selectedOrdinals, setSelectedOrdinals] = useState<WalletOutput[]>([]);
   const [bsvListAmount, setBsvListAmount] = useState<number | null>();
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const [ordinals, setOrdinals] = useState<OrdType[]>([]);
+  const [ordinals, setOrdinals] = useState<WalletOutput[]>([]);
+  const [ordinalsBEEFs, setOrdinalsBEEFs] = useState<number[][]>([]);
   const [from, setFrom] = useState<string>();
-  const listedOrdinals = ordinals && ordinals.filter((o) => o?.data?.list);
-  const myOrdinals = ordinals && ordinals.filter((o) => !o?.data?.list);
+  const listedOrdinals = ordinals.filter((o) => hasTag(o.tags, 'list'));
+  const myOrdinals = ordinals.filter((o) => !hasTag(o.tags, 'list'));
   const [useSameAddress, setUseSameAddress] = useState(false);
   const [addresses, setAddresses] = useState<Addresses>({});
   const [addressErrors, setAddressErrors] = useState<Addresses>({});
   const [commonAddress, setCommonAddress] = useState('');
 
-  const toggleOrdinalSelection = (ord: OrdinalType) => {
-    const isSelected = selectedOrdinals.some((selected) => selected.outpoint === ord.outpoint);
-    const isListing = ord.data?.list;
+  const toggleOrdinalSelection = (ord: WalletOutput) => {
+    const outpoint = ord.outpoint;
+    const isSelected = selectedOrdinals.some((selected) => selected.outpoint === outpoint);
+    const isListing = hasTag(ord.tags, 'list');
 
     if (isSelected) {
-      // Deselect if already selected
-      setSelectedOrdinals(selectedOrdinals.filter((selected) => selected !== ord));
+      setSelectedOrdinals(selectedOrdinals.filter((selected) => selected.outpoint !== outpoint));
     } else {
-      // Check if any selected ordinal is a listing or non-listing
-      const hasListings = selectedOrdinals.some((selected) => selected.data?.list);
-      const hasNonListings = selectedOrdinals.some((selected) => !selected.data?.list);
+      const hasListingsSelected = selectedOrdinals.some((selected) => hasTag(selected.tags, 'list'));
+      const hasNonListingsSelected = selectedOrdinals.some((selected) => !hasTag(selected.tags, 'list'));
 
       if (isListing) {
         if (selectedOrdinals.length === 0) {
-          // If nothing is selected, allow selecting a listing
           setSelectedOrdinals([ord]);
-        } else if (hasNonListings) {
-          // If non-listings are already selected, prevent selecting a listing
+        } else if (hasNonListingsSelected) {
           addSnackbar('Multiselect listings not supported!', 'info');
         } else if (selectedOrdinals.length === 1) {
-          // Allow only one listing to be selected
           addSnackbar('You can only select one listing at a time!', 'info');
         } else {
           setSelectedOrdinals([ord]);
         }
       } else {
-        if (hasListings) {
-          // Prevent selecting non-listings if listings are selected
+        if (hasListingsSelected) {
           addSnackbar('Multiselect listings not supported!', 'info');
         } else {
-          // Add to selection if all selected ordinals are non-listings
           setSelectedOrdinals([...selectedOrdinals, ord]);
         }
       }
@@ -204,14 +188,27 @@ export const OrdWallet = () => {
   });
 
   const loadOrdinals = useCallback(async () => {
-    if (!ordinalService) return;
+    if (!apiContext) return;
     if (ordinals.length === 0) setIsProcessing(true);
-    const data = await getOrdinals(from);
-    setFrom(data.from);
-    setOrdinals((prev) => [...prev, ...data.ordinals]);
+    const offset = from ? parseInt(from, 10) : 0;
+    const { outputs, BEEF } = await getOrdinals.execute(apiContext, { limit: 50, offset });
+
+    // Store BEEF arrays as loaded - merge at transfer time
+    if (BEEF) {
+      setOrdinalsBEEFs((prev) => [...prev, BEEF]);
+    }
+
+    // Filter out panda/tag and yours/tag types
+    const filtered = outputs.filter((o) => {
+      const contentType = getTagValue(o.tags, 'type');
+      return contentType !== 'panda/tag' && contentType !== 'yours/tag';
+    });
+
+    setFrom((offset + outputs.length).toString());
+    setOrdinals((prev) => [...prev, ...filtered]);
     setIsProcessing(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordinalService, getOrdinals, from]);
+  }, [apiContext, from]);
 
   useEffect(() => {
     if (isIntersecting && from) {
@@ -232,7 +229,6 @@ export const OrdWallet = () => {
   }, []);
 
   const resetSendState = () => {
-    setPasswordConfirm('');
     setSuccessTxId('');
     setBsvListAmount(undefined);
     setIsProcessing(false);
@@ -242,9 +238,38 @@ export const OrdWallet = () => {
   };
 
   const refreshOrdinals = async () => {
-    const data = await getOrdinals();
-    setOrdinals(data.ordinals);
-    setFrom(data.from);
+    const { outputs, BEEF } = await getOrdinals.execute(apiContext, { limit: 50, offset: 0 });
+
+    // Reset BEEFs with fresh data
+    setOrdinalsBEEFs(BEEF ? [BEEF] : []);
+
+    const filtered = outputs.filter((o) => {
+      const contentType = getTagValue(o.tags, 'type');
+      return contentType !== 'panda/tag' && contentType !== 'yours/tag';
+    });
+
+    setOrdinals(filtered);
+    setFrom(outputs.length.toString());
+  };
+
+  // Merge stored BEEFs to extract only transactions needed for selected ordinals
+  const getMergedBeefForOrdinals = (selected: WalletOutput[]): number[] | undefined => {
+    if (ordinalsBEEFs.length === 0) return undefined;
+
+    const neededTxids = new Set(selected.map((o) => o.outpoint.split('.')[0]));
+    const merged = new Beef();
+
+    for (const beefBytes of ordinalsBEEFs) {
+      const beef = Beef.fromBinary(beefBytes);
+      for (const txid of neededTxids) {
+        if (beef.findTxid(txid)?.tx) {
+          merged.mergeBeef(beef);
+          break;
+        }
+      }
+    }
+
+    return merged.toBinary();
   };
 
   const handleMultiTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -253,26 +278,42 @@ export const OrdWallet = () => {
 
     await sleep(25);
 
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
+    try {
+      const inputBEEF = getMergedBeefForOrdinals(selectedOrdinals);
+      if (!inputBEEF) {
+        console.error('[OrdWallet] No BEEF available');
+        addSnackbar('No transaction data available', 'error');
+        setIsProcessing(false);
+        return;
+      }
+
+      // Build transfer items from selected ordinals + addresses
+      const transfers = selectedOrdinals.map((ordinal) => ({
+        ordinal,
+        address: addresses[ordinal.outpoint],
+      }));
+
+      const transferRes = await transferOrdinals.execute(apiContext, {
+        transfers,
+        inputBEEF,
+      });
+
+      if (!transferRes.txid || transferRes.error) {
+        console.error('[OrdWallet] Transfer failed:', transferRes.error);
+        addSnackbar(getErrorMessage(transferRes.error), 'error');
+        setIsProcessing(false);
+        return;
+      }
+
+      console.log('[OrdWallet] Transfer success:', transferRes.txid);
+      setSuccessTxId(transferRes.txid);
+      addSnackbar('Transfer Successful!', 'success');
+      refreshOrdinals();
+    } catch (error) {
+      console.error('[OrdWallet] Transfer exception:', error);
+      addSnackbar(error instanceof Error ? error.message : 'Transfer failed', 'error');
       setIsProcessing(false);
-      return;
     }
-
-    const destinationAddresses = Object.values(addresses);
-    const outpoints = Object.keys(addresses);
-
-    const transferRes = await transferOrdinalsMulti({ outpoints, destinationAddresses, password: passwordConfirm });
-
-    if (!transferRes.txid || transferRes.error) {
-      addSnackbar(getErrorMessage(transferRes.error), 'error');
-      setIsProcessing(false);
-      return;
-    }
-
-    setSuccessTxId(transferRes.txid);
-    addSnackbar('Transfer Successful!', 'success');
-    refreshOrdinals();
   };
 
   const handleListOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -280,11 +321,6 @@ export const OrdWallet = () => {
     setIsProcessing(true);
 
     await sleep(25);
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
 
     if (Number(bsvListAmount) < 0.00000001) {
       addSnackbar('Must be more than 1 sat', 'error');
@@ -298,13 +334,23 @@ export const OrdWallet = () => {
       return;
     }
 
-    const listing: ListOrdinal = {
-      outpoint: selectedOrdinals[0].outpoint,
-      password: passwordConfirm,
-      price: Math.ceil(bsvListAmount * BSV_DECIMAL_CONVERSION),
-    };
+    const inputBEEF = getMergedBeefForOrdinals(selectedOrdinals);
+    if (!inputBEEF) {
+      addSnackbar('No transaction data available', 'error');
+      setIsProcessing(false);
+      return;
+    }
 
-    const listRes = await listOrdinalOnGlobalOrderbook(listing);
+    // TODO: Get payAddress from BRC-29 receive address
+    // For now, we need to implement this - the payAddress should come from the wallet's receive address
+    const payAddress = ''; // Placeholder - needs proper implementation
+
+    const listRes = await listOrdinal.execute(apiContext, {
+      ordinal: selectedOrdinals[0],
+      inputBEEF,
+      price: Math.ceil(bsvListAmount * BSV_DECIMAL_CONVERSION),
+      payAddress,
+    });
 
     if (!listRes.txid || listRes.error) {
       addSnackbar(getErrorMessage(listRes.error), 'error');
@@ -322,15 +368,18 @@ export const OrdWallet = () => {
     setIsProcessing(true);
 
     await sleep(25);
-    if (!passwordConfirm && isPasswordRequired) {
-      addSnackbar('You must enter a password!', 'error');
+
+    const inputBEEF = getMergedBeefForOrdinals(selectedOrdinals);
+    if (!inputBEEF) {
+      addSnackbar('No transaction data available', 'error');
       setIsProcessing(false);
       return;
     }
 
-    const ordinalOutpoint = selectedOrdinals[0].outpoint;
-
-    const cancelRes = await cancelGlobalOrderbookListing(ordinalOutpoint, passwordConfirm);
+    const cancelRes = await cancelListing.execute(apiContext, {
+      listing: selectedOrdinals[0],
+      inputBEEF,
+    });
 
     if (!cancelRes.txid || cancelRes.error) {
       addSnackbar(getErrorMessage(cancelRes.error), 'error');
@@ -415,37 +464,37 @@ export const OrdWallet = () => {
     </>
   );
 
-  const renderTransfers = (selectedOrdinals: OrdType[]) => {
-    return selectedOrdinals.map((ordinal) => (
-      <OrdinalItem theme={theme} key={ordinal.origin?.outpoint}>
-        <Ordinal
-          theme={theme}
-          inscription={ordinal as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${ordinal.origin?.outpoint}?outpoint=${ordinal?.outpoint}`}
-          isTransfer
-          size="3rem"
-        />
-        <OrdinalDetails>
-          <OrdinalTitle theme={theme}>
-            {truncate(
-              `${ordinal?.origin?.data?.map?.name ?? ordinal?.origin?.data?.map?.subTypeData?.name ?? 'Unknown'}`,
-              15,
-              0,
-            )}
-          </OrdinalTitle>
-          <Show when={!useSameAddress}>
-            <ReceiverInput
-              theme={theme}
-              placeholder="Receiver Address"
-              type="text"
-              onChange={(e) => handleAddressChange(ordinal.outpoint, e.target.value)}
-              value={addresses[ordinal.outpoint] || ''}
-            />
-            {addressErrors[ordinal.outpoint] && <span style={{ color: 'red' }}>{addressErrors[ordinal.outpoint]}</span>}
-          </Show>
-        </OrdinalDetails>
-      </OrdinalItem>
-    ));
+  const renderTransfers = (outputs: WalletOutput[]) => {
+    return outputs.map((output) => {
+      const originOutpoint = getTagValue(output.tags, 'origin');
+      const outpoint = output.outpoint;
+      const name = getOutputName(output);
+
+      return (
+        <OrdinalItem theme={theme} key={originOutpoint}>
+          <Ordinal
+            theme={theme}
+            output={output}
+            url={`${getContentUrl(originOutpoint || '')}?outpoint=${outpoint}`}
+            isTransfer
+            size="3rem"
+          />
+          <OrdinalDetails>
+            <OrdinalTitle theme={theme}>{truncate(name, 15, 0)}</OrdinalTitle>
+            <Show when={!useSameAddress}>
+              <ReceiverInput
+                theme={theme}
+                placeholder="Receiver Address"
+                type="text"
+                onChange={(e) => handleAddressChange(outpoint, e.target.value)}
+                value={addresses[outpoint] || ''}
+              />
+              {addressErrors[outpoint] && <span style={{ color: 'red' }}>{addressErrors[outpoint]}</span>}
+            </Show>
+          </OrdinalDetails>
+        </OrdinalItem>
+      );
+    });
   };
 
   const MultiSendUI = (
@@ -491,16 +540,6 @@ export const OrdWallet = () => {
             )}
           </Show>
 
-          <Show when={isPasswordRequired}>
-            <Input
-              theme={theme}
-              placeholder="Password"
-              name="password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
-          </Show>
           <Button theme={theme} type="primary" label="Transfer Now" disabled={isProcessing} isSubmit />
         </FormContainer>
         <Button
@@ -516,6 +555,7 @@ export const OrdWallet = () => {
     </ContentWrapper>
   );
 
+  const cancelOriginOutpoint = getTagValue(selectedOrdinals[0]?.tags, 'origin');
   const cancel = (
     <ContentWrapper>
       <ConfirmContent>
@@ -524,21 +564,12 @@ export const OrdWallet = () => {
         </HeaderText>
         <Ordinal
           theme={theme}
-          inscription={selectedOrdinals[0] as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinals[0]?.origin?.outpoint}?outpoint=${selectedOrdinals[0]?.outpoint}`}
+          output={selectedOrdinals[0]}
+          url={`${getContentUrl(cancelOriginOutpoint || '')}?outpoint=${selectedOrdinals[0]?.outpoint}`}
           selected
           isTransfer
         />
         <FormContainer noValidate onSubmit={(e) => handleCancelListing(e)}>
-          <Show when={isPasswordRequired}>
-            <Input
-              theme={theme}
-              placeholder="Password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
-          </Show>
           <Button theme={theme} type="primary" label="Cancel Now" disabled={isProcessing} isSubmit />
           <Button
             theme={theme}
@@ -555,25 +586,37 @@ export const OrdWallet = () => {
     </ContentWrapper>
   );
 
-  const renderOrdinals = (list: OrdType[]) => {
+  const renderOrdinals = (list: WalletOutput[]) => {
     return list
-      .filter((l) => l.origin?.data?.insc?.file?.type !== 'application/bsv-20')
-      .map((ord) => (
-        <Ordinal
-          theme={theme}
-          inscription={ord}
-          key={ord.origin?.outpoint}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${ord.origin?.outpoint}?outpoint=${ord?.outpoint}`}
-          selected={selectedOrdinals.some((selected) => selected.outpoint === ord.outpoint)}
-          onClick={() => toggleOrdinalSelection(ord)}
-        />
-      ));
+      .filter((output) => {
+        const contentType = getTagValue(output.tags, 'type');
+        return contentType !== 'application/bsv-20';
+      })
+      .map((output) => {
+        const originOutpoint = getTagValue(output.tags, 'origin');
+        const outpoint = output.outpoint;
+        return (
+          <Ordinal
+            theme={theme}
+            output={output}
+            key={originOutpoint}
+            url={`${getContentUrl(originOutpoint || '')}?outpoint=${outpoint}`}
+            selected={selectedOrdinals.some((selected) => selected.outpoint === outpoint)}
+            onClick={() => toggleOrdinalSelection(output)}
+          />
+        );
+      });
   };
 
   const nft = (
     <>
       <Show
-        when={ordinals.filter((o) => o.origin?.data?.insc?.file?.type !== 'application/bsv-20').length > 0}
+        when={
+          ordinals.filter((output) => {
+            const contentType = getTagValue(output.tags, 'type');
+            return contentType !== 'application/bsv-20';
+          }).length > 0
+        }
         whenFalseContent={
           <NoInscriptionWrapper>
             <Text
@@ -603,7 +646,7 @@ export const OrdWallet = () => {
       <OrdButtonContainer theme={theme} $blur={selectedOrdinals.length > 0}>
         <Show when={!!selectedOrdinals.length}>
           <Show
-            when={selectedOrdinals.length === 1 && !!selectedOrdinals[0].data?.list}
+            when={selectedOrdinals.length === 1 && hasTag(selectedOrdinals[0].tags, 'list')}
             whenFalseContent={transferAndListButtons}
           >
             <Button
@@ -626,18 +669,16 @@ export const OrdWallet = () => {
 
   const main = <Show when={theme.settings.services.ordinals}>{nft}</Show>;
 
+  const listOriginOutpoint = getTagValue(selectedOrdinals[0]?.tags, 'origin');
+  const listName = selectedOrdinals[0] ? getOutputName(selectedOrdinals[0], 'Ordinal') : 'Ordinal';
   const list = (
     <ContentWrapper>
       <ConfirmContent>
-        <HeaderText style={{ fontSize: '1.35rem' }} theme={theme}>{`List ${
-          selectedOrdinals[0]?.origin?.data?.map?.name ??
-          selectedOrdinals[0]?.origin?.data?.map?.subTypeData?.name ??
-          'Ordinal'
-        }`}</HeaderText>
+        <HeaderText style={{ fontSize: '1.35rem' }} theme={theme}>{`List ${listName}`}</HeaderText>
         <Ordinal
           theme={theme}
-          inscription={selectedOrdinals[0] as OrdinalType}
-          url={`${gorillaPoolService.getBaseUrl(network)}/content/${selectedOrdinals[0]?.origin?.outpoint}?outpoint=${selectedOrdinals[0]?.outpoint}`}
+          output={selectedOrdinals[0]}
+          url={`${getContentUrl(listOriginOutpoint || '')}?outpoint=${selectedOrdinals[0]?.outpoint}`}
           selected
           isTransfer
         />
@@ -659,15 +700,6 @@ export const OrdWallet = () => {
             }}
             value={bsvListAmount !== null && bsvListAmount !== undefined ? bsvListAmount : ''}
           />
-          <Show when={isPasswordRequired}>
-            <Input
-              theme={theme}
-              placeholder="Password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
-          </Show>
           <Text theme={theme} style={{ margin: '1rem 0 0 0' }}>
             Confirm global orderbook listing
           </Text>

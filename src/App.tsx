@@ -15,15 +15,8 @@ import { ImportAccount } from './pages/onboarding/ImportAccount';
 import { RestoreAccount } from './pages/onboarding/RestoreAccount';
 import { Start } from './pages/onboarding/Start';
 import { OrdWallet } from './pages/OrdWallet';
-import { BroadcastRequest } from './pages/requests/BroadcastRequest';
 import { BsvSendRequest } from './pages/requests/BsvSendRequest';
 import { ConnectRequest } from './pages/requests/ConnectRequest';
-import { DecryptRequest } from './pages/requests/DecryptRequest';
-import { EncryptRequest } from './pages/requests/EncryptRequest';
-import { GenerateTaggedKeysRequest } from './pages/requests/GenerateTaggedKeysRequest';
-import { GetSignaturesRequest } from './pages/requests/GetSignaturesRequest';
-import { OrdPurchaseRequest } from './pages/requests/OrdPurchaseRequest';
-import { OrdTransferRequest } from './pages/requests/OrdTransferRequest';
 import { SignMessageRequest } from './pages/requests/SignMessageRequest';
 import { Settings } from './pages/Settings';
 import { WhiteLabelTheme } from './theme.types';
@@ -31,15 +24,18 @@ import { WhitelistedApp } from './inject';
 import { PageLoader } from './components/PageLoader';
 import { useServiceContext } from './hooks/useServiceContext';
 import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
-import { QueueBanner } from './components/QueueBanner';
+import { SyncBanner } from './components/SyncBanner';
 import { SyncingBlocks } from './components/SyncingBlocks';
 import { MasterRestore } from './pages/onboarding/MasterRestore';
-import { Bsv20SendRequest } from './pages/requests/Bsv20SendRequest';
 import { BlockHeightProvider } from './contexts/providers/BlockHeightProvider';
-import { QueueProvider } from './contexts/providers/QueueProvider';
+import { SyncProvider } from './contexts/providers/SyncProvider';
 import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
 import { SnackbarProvider } from './contexts/providers/SnackbarProvider';
 import { MNEESendRequest } from './pages/requests/MNEESendRequest';
+import { PermissionRequestPage } from './pages/requests/PermissionRequest';
+import { GroupedPermissionRequestPage } from './pages/requests/GroupedPermissionRequest';
+import { CounterpartyPermissionRequestPage } from './pages/requests/CounterpartyPermissionRequest';
+import { TransactionApprovalRequest } from './pages/requests/TransactionApprovalRequest';
 
 const MainContainer = styled.div<WhiteLabelTheme & { $isMobile?: boolean }>`
   display: flex;
@@ -70,16 +66,12 @@ export const App = () => {
   const {
     connectRequest,
     sendBsvRequest,
-    sendBsv20Request,
     sendMNEERequest,
-    transferOrdinalRequest,
-    purchaseOrdinalRequest,
     signMessageRequest,
-    broadcastRequest,
-    getSignaturesRequest,
-    generateTaggedKeysRequest,
-    encryptRequest,
-    decryptRequest,
+    permissionRequest,
+    groupedPermissionRequest,
+    counterpartyPermissionRequest,
+    transactionApprovalRequest,
     clearRequest,
     popupId,
     getStorageAndSetRequestState,
@@ -105,12 +97,6 @@ export const App = () => {
     menuContext?.handleSelect('bsv');
   };
 
-  useEffect(() => {
-    if (transferOrdinalRequest || purchaseOrdinalRequest) {
-      menuContext?.handleSelect('ords');
-    }
-  }, [transferOrdinalRequest, purchaseOrdinalRequest, menuContext]);
-
   if (!isReady) {
     return (
       <MainContainer $isMobile={isMobile} theme={theme}>
@@ -122,11 +108,11 @@ export const App = () => {
   return (
     <MainContainer $isMobile={isMobile} theme={theme}>
       <BlockHeightProvider>
-        <QueueProvider>
+        <SyncProvider>
           <BottomMenuProvider network={chromeStorageService.getNetwork()}>
             <Container theme={theme}>
               <SnackbarProvider>
-                <QueueBanner />
+                <SyncBanner />
                 <SyncingBlocks />
                 <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
                   <Router>
@@ -156,14 +142,12 @@ export const App = () => {
                           <Show
                             when={
                               !sendBsvRequest &&
-                              !sendBsv20Request &&
                               !sendMNEERequest &&
                               !signMessageRequest &&
-                              !broadcastRequest &&
-                              !getSignaturesRequest &&
-                              !generateTaggedKeysRequest &&
-                              !encryptRequest &&
-                              !decryptRequest
+                              !groupedPermissionRequest &&
+                              !counterpartyPermissionRequest &&
+                              !permissionRequest &&
+                              !transactionApprovalRequest
                             }
                             whenFalseContent={
                               <>
@@ -171,13 +155,6 @@ export const App = () => {
                                   <BsvSendRequest
                                     request={sendBsvRequest!}
                                     onResponse={() => clearRequest('sendBsvRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!sendBsv20Request}>
-                                  <Bsv20SendRequest
-                                    request={sendBsv20Request!}
-                                    onResponse={() => clearRequest('sendBsv20Request')}
                                     popupId={popupId}
                                   />
                                 </Show>
@@ -195,76 +172,42 @@ export const App = () => {
                                     popupId={popupId}
                                   />
                                 </Show>
-                                <Show when={!!broadcastRequest}>
-                                  <BroadcastRequest
-                                    request={broadcastRequest!}
-                                    onBroadcast={() => clearRequest('broadcastRequest')}
+                                <Show when={!!groupedPermissionRequest}>
+                                  <GroupedPermissionRequestPage
+                                    request={groupedPermissionRequest!}
+                                    onResponse={() => clearRequest('groupedPermissionRequest')}
                                     popupId={popupId}
                                   />
                                 </Show>
-                                <Show when={!!getSignaturesRequest}>
-                                  <GetSignaturesRequest
-                                    request={getSignaturesRequest!}
-                                    onSignature={() => clearRequest('getSignaturesRequest')}
+                                <Show when={!!counterpartyPermissionRequest}>
+                                  <CounterpartyPermissionRequestPage
+                                    request={counterpartyPermissionRequest!}
+                                    onResponse={() => clearRequest('counterpartyPermissionRequest')}
                                     popupId={popupId}
                                   />
                                 </Show>
-                                <Show when={!!generateTaggedKeysRequest}>
-                                  <GenerateTaggedKeysRequest
-                                    request={generateTaggedKeysRequest!}
-                                    onResponse={() => clearRequest('generateTaggedKeysRequest')}
+                                <Show when={!!permissionRequest}>
+                                  <PermissionRequestPage
+                                    request={permissionRequest!}
+                                    onResponse={() => clearRequest('permissionRequest')}
                                     popupId={popupId}
                                   />
                                 </Show>
-                                <Show when={!!encryptRequest}>
-                                  <EncryptRequest
-                                    request={encryptRequest!}
-                                    onEncrypt={() => clearRequest('encryptRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!decryptRequest}>
-                                  <DecryptRequest
-                                    request={decryptRequest!}
-                                    onDecrypt={() => clearRequest('decryptRequest')}
+                                <Show when={!!transactionApprovalRequest}>
+                                  <TransactionApprovalRequest
+                                    request={transactionApprovalRequest!}
+                                    onResponse={() => clearRequest('transactionApprovalRequest')}
                                     popupId={popupId}
                                   />
                                 </Show>
                               </>
                             }
                           >
-                            <BsvWallet isOrdRequest={!!transferOrdinalRequest || !!purchaseOrdinalRequest} />
+                            <BsvWallet />
                           </Show>
                         }
                       />
-                      <Route
-                        path="/ord-wallet"
-                        element={
-                          <Show
-                            when={!transferOrdinalRequest && !purchaseOrdinalRequest}
-                            whenFalseContent={
-                              <>
-                                <Show when={!!purchaseOrdinalRequest}>
-                                  <OrdPurchaseRequest
-                                    request={purchaseOrdinalRequest!}
-                                    onResponse={() => clearRequest('purchaseOrdinalRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!transferOrdinalRequest}>
-                                  <OrdTransferRequest
-                                    request={transferOrdinalRequest!}
-                                    onResponse={() => clearRequest('transferOrdinalRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                              </>
-                            }
-                          >
-                            <OrdWallet />
-                          </Show>
-                        }
-                      />
+                      <Route path="/ord-wallet" element={<OrdWallet />} />
                       <Route path="/tools" element={<AppsAndTools />} />
                       <Route path="/settings" element={<Settings />} />
                     </Routes>
@@ -273,7 +216,7 @@ export const App = () => {
               </SnackbarProvider>
             </Container>
           </BottomMenuProvider>
-        </QueueProvider>
+        </SyncProvider>
       </BlockHeightProvider>
     </MainContainer>
   );

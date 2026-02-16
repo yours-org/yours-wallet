@@ -15,7 +15,8 @@ import { ChromeStorageService } from './ChromeStorage.service';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction, Utils } from '@bsv/sdk';
-import { SPVStore } from 'spv-store';
+// TODO: OneSatWallet type no longer exists - need to determine correct wallet type for sweep functions
+// import type { OneSatWallet } from '@1sat/wallet-browser';
 import { WocUtxo } from './types/whatsOnChain.types';
 import axios from 'axios';
 
@@ -26,9 +27,10 @@ export class KeysService {
   bsvPubKey: string;
   ordPubKey: string;
   identityPubKey: string;
+  // TODO: wallet parameter commented out until we determine correct type for sweep functions
   constructor(
     private readonly chromeStorageService: ChromeStorageService,
-    private readonly oneSatSPV: SPVStore,
+    // private readonly wallet: OneSatWallet,
   ) {
     this.bsvAddress = '';
     this.ordAddress = '';
@@ -53,7 +55,8 @@ export class KeysService {
       passKey,
       salt,
       version: CHROME_STORAGE_OBJECT_VERSION,
-      hasUpgradedToSPV: true,
+      showWelcome: false,
+      deviceId: crypto.randomUUID(),
       accountNumber,
     });
     const key: keyof ChromeStorageObject = 'accounts';
@@ -134,18 +137,25 @@ export class KeysService {
       const utxos = data;
       if (utxos.length === 0) return;
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
-      for await (const u of utxos || []) {
-        tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash),
-          sourceOutputIndex: u.tx_pos,
-          sequence: 0xffffffff,
-          unlockingScriptTemplate: new P2PKH().unlock(sweepWallet.privKey),
-        });
-      }
-      await tx.fee(feeModel);
-      await tx.sign();
-      const response = await this.oneSatSPV.broadcast(tx);
-      if (response.status == 'error') return { error: response.description };
+      // TODO: Re-enable when wallet type is available
+      // for await (const u of utxos || []) {
+      //   const sourceTransaction = await this.wallet.loadTransaction(u.tx_hash);
+      //   if (!sourceTransaction) {
+      //     console.log(`Could not find source transaction ${u.tx_hash}`);
+      //     continue;
+      //   }
+      //   tx.addInput({
+      //     sourceTransaction,
+      //     sourceOutputIndex: u.tx_pos,
+      //     sequence: 0xffffffff,
+      //     unlockingScriptTemplate: new P2PKH().unlock(sweepWallet.privKey),
+      //   });
+      // }
+      // await tx.fee(feeModel);
+      // await tx.sign();
+      // const response = await this.wallet.broadcast(tx, 'Sweep Legacy Wallet');
+      console.log('sweepLegacy: wallet not available yet');
+      return;
       const txid = tx.id('hex');
       console.log('Change sweep:', txid);
       return { txid, rawtx: Utils.toHex(tx.toBinary()) };
@@ -181,21 +191,28 @@ export class KeysService {
       const utxos = data;
       if (utxos.length === 0) return;
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
-      for await (const u of utxos || []) {
-        tx.addInput({
-          sourceTransaction: await this.oneSatSPV.getTx(u.tx_hash),
-          sourceOutputIndex: u.tx_pos,
-          sequence: 0xffffffff,
-          unlockingScriptTemplate: new P2PKH().unlock(privKey),
-        });
-      }
-      await tx.fee(feeModel);
-      await tx.sign();
-      const response = await this.oneSatSPV.broadcast(tx);
-      if (response.status == 'error') return { error: response.description };
-      const txid = tx.id('hex');
-      console.log('Change sweep:', txid);
-      return { txid, rawtx: Utils.toHex(tx.toBinary()) };
+      // TODO: Re-enable when wallet type is available
+      // for await (const u of utxos || []) {
+      //   const sourceTransaction = await this.wallet.loadTransaction(u.tx_hash);
+      //   if (!sourceTransaction) {
+      //     console.log(`Could not find source transaction ${u.tx_hash}`);
+      //     continue;
+      //   }
+      //   tx.addInput({
+      //     sourceTransaction,
+      //     sourceOutputIndex: u.tx_pos,
+      //     sequence: 0xffffffff,
+      //     unlockingScriptTemplate: new P2PKH().unlock(privKey),
+      //   });
+      // }
+      // await tx.fee(feeModel);
+      // await tx.sign();
+      // await this.wallet.broadcast(tx, 'Sweep WIF');
+      // const txid = tx.id('hex');
+      // console.log('Change sweep:', txid);
+      // return { txid, rawtx: Utils.toHex(tx.toBinary()) };
+      console.log('sweepWif: wallet not available yet');
+      return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.log(error);

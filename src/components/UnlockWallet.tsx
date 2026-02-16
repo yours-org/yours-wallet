@@ -9,8 +9,7 @@ import { Input } from './Input';
 import { FormContainer, HeaderText, Text } from './Reusable';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursIcon } from './YoursIcon';
-import { setDerivationTags } from '../services/serviceHelpers';
-import { Keys } from '../utils/keys';
+import { sendMessageAsync } from '../utils/chromeHelpers';
 
 const Container = styled.div<WhiteLabelTheme & { $isMobile: boolean }>`
   display: flex;
@@ -37,7 +36,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
   const { isMobile } = useViewport();
-  const { keysService, chromeStorageService, oneSatSPV } = useServiceContext();
+  const { chromeStorageService } = useServiceContext();
 
   const handleUnlock = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -45,13 +44,26 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    const isVerified = await keysService.verifyPassword(password);
+    const isVerified = chromeStorageService.verifyPassword(password);
     if (isVerified) {
       setVerificationFailed(false);
       const timestamp = Date.now();
       await chromeStorageService.update({ lastActiveTime: timestamp });
-      const keys = (await keysService.retrieveKeys(password)) as Keys;
-      await setDerivationTags(keys, oneSatSPV, chromeStorageService);
+
+      // Tell the service worker to reinitialize the wallet and wait for it to complete
+      try {
+        const response = await sendMessageAsync<{ success: boolean; error?: string }>({
+          action: 'WALLET_UNLOCKED',
+        });
+        if (!response?.success) {
+          console.error('Wallet unlock failed:', response?.error);
+          // Still proceed - the wallet may work locally even if remote sync failed
+        }
+      } catch (error) {
+        console.error('Wallet unlock error:', error);
+        // Still proceed - the wallet may work locally
+      }
+
       onUnlock();
     } else {
       setVerificationFailed(true);

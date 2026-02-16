@@ -121,7 +121,7 @@ export const Settings = () => {
   const { addSnackbar } = useSnackbar();
   const { query, handleSelect } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
-  const { chromeStorageService, keysService, lockWallet, oneSatSPV } = useServiceContext();
+  const { chromeStorageService, keysService, lockWallet, wallet } = useServiceContext();
   const [page, setPage] = useState<SettingsPage>(query === 'manage-accounts' ? 'manage-accounts' : 'main');
   const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
@@ -144,6 +144,8 @@ export const Settings = () => {
   useEffect(() => {
     const getWhitelist = async (): Promise<WhitelistedApp[]> => {
       try {
+        // Refresh cache from chrome storage before reading
+        await chromeStorageService.getAndSetStorage();
         const { account } = chromeStorageService.getCurrentAccountObject();
         if (!account) return [];
         const { whitelist } = account.settings;
@@ -161,11 +163,11 @@ export const Settings = () => {
 
   const handleRemoveDomain = async (domain: string) => {
     const newList = connectedApps.filter((app) => app.domain !== domain);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) return [];
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) return;
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
+      [selectedAccount]: {
         ...account,
         settings: {
           ...account.settings,
@@ -317,7 +319,7 @@ export const Settings = () => {
 
   const signOut = async () => {
     await chromeStorageService.clear();
-    await oneSatSPV.destroy();
+    wallet?.close();
     setDecisionType(undefined);
     sendMessage({
       action: YoursEventName.SIGNED_OUT,
@@ -359,12 +361,12 @@ export const Settings = () => {
 
   const handleUpdatePasswordRequirement = async (isRequired: boolean) => {
     setIsPasswordRequired(isRequired);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found');
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) throw new Error('No account found');
     const accountSettings = account.settings;
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
+      [selectedAccount]: {
         ...account,
         settings: {
           ...accountSettings,
@@ -377,11 +379,11 @@ export const Settings = () => {
 
   const handleUpdateApprovalLimit = async (amount: number) => {
     setNoApprovalLimit(amount);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found');
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) throw new Error('No account found');
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
+      [selectedAccount]: {
         ...account,
         settings: {
           ...account.settings,
@@ -398,11 +400,11 @@ export const Settings = () => {
       return;
     }
     setCustomFeeRate(rate);
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) throw new Error('No account found');
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) throw new Error('No account found');
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
+      [selectedAccount]: {
         ...account,
         settings: {
           ...account.settings,
@@ -427,14 +429,22 @@ export const Settings = () => {
     handleSelect('bsv');
   };
 
-  const resyncUTXOs = () => {
-    oneSatSPV.sync(true);
-    addSnackbar('Resyncing UTXOs in the background...', 'info');
-  };
-
-  const updateSpends = () => {
-    oneSatSPV.stores.txos?.refreshSpends();
-    addSnackbar('Updating spends in the background...', 'info');
+  const resyncUTXOs = async () => {
+    addSnackbar('Syncing with cloud...', 'info');
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'FULL_SYNC' });
+      if (response.success) {
+        const { pushed, pulled } = response.data;
+        addSnackbar(
+          `Sync complete: ↑${pushed.inserts}/${pushed.updates} ↓${pulled.inserts}/${pulled.updates}`,
+          'success',
+        );
+      } else {
+        addSnackbar(response.error || 'Sync failed', 'error');
+      }
+    } catch (error) {
+      addSnackbar('Sync failed: ' + (error instanceof Error ? error.message : String(error)), 'error');
+    }
   };
 
   const main = (
@@ -464,7 +474,6 @@ export const Settings = () => {
         jsxElement={<ForwardButton color={theme.color.global.contrast} />}
       />
       <SettingsRow name="Re-Sync UTXOs" description="Re-sync your wallets spendable coins" onClick={resyncUTXOs} />
-      <SettingsRow name="Update Spends" description="Update your wallet's spent coins" onClick={updateSpends} />
       <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={handleLockWallet} />
       <Text
         style={{

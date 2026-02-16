@@ -1,28 +1,19 @@
 import { createContext } from 'react';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
-import { WhatsOnChainService } from '../services/WhatsOnChain.service';
 import { KeysService } from '../services/Keys.service';
-import { ContractService } from '../services/Contract.service';
-import { BsvService } from '../services/Bsv.service';
-import { OrdinalService } from '../services/Ordinal.service';
-import { SPVStore } from 'spv-store';
-import { GorillaPoolService } from '../services/GorillaPool.service';
+import type { OneSatContext } from '@1sat/actions';
 import { MneeInterface } from '@mnee/ts-sdk';
 
 export interface ServiceContextProps {
   chromeStorageService: ChromeStorageService;
   keysService: KeysService;
-  bsvService: BsvService;
   mneeService: MneeInterface;
-  ordinalService: OrdinalService;
-  wocService: WhatsOnChainService;
-  gorillaPoolService: GorillaPoolService;
-  contractService: ContractService;
   isLocked: boolean;
   isReady: boolean;
   setIsLocked: (isLocked: boolean) => void;
   lockWallet: () => Promise<void>;
-  oneSatSPV: SPVStore;
+  /** API context for calling 1Sat skills - uses ChromeCWI to communicate with service worker */
+  apiContext: OneSatContext;
 }
 
 export const ServiceContext = createContext<ServiceContextProps | undefined>(undefined);

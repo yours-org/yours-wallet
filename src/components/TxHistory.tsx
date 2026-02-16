@@ -13,7 +13,14 @@ import {
   URL_WHATSONCHAIN_TESTNET,
 } from '../utils/constants';
 import { FaTimes, FaChevronDown, FaChevronUp, FaLink, FaTag } from 'react-icons/fa'; // Import FaTag
-import { TxLog } from 'spv-store';
+// TODO: TxLog type needs to be implemented in 1sat-wallet-toolbox
+// import { TxLog } from 'spv-store';
+type TxLog = {
+  txid: string;
+  idx: number;
+  date: Date;
+  summary: Record<string, { amount: number; icon?: string }>;
+};
 import { Button } from './Button';
 import bsvCoin from '../assets/bsv-coin.svg';
 import lock from '../assets/lock.svg';
@@ -125,7 +132,7 @@ const ListIconWrapper = styled.div<WhiteLabelTheme>`
   height: 2.25rem;
 `;
 
-type Tag = 'bsv21' | 'bsv20' | 'origin' | 'list' | 'lock' | 'fund';
+type Tag = 'bsv21' | 'origin' | 'list' | 'lock' | 'fund';
 
 export type TxHistoryProps = {
   theme: Theme;
@@ -135,29 +142,54 @@ export type TxHistoryProps = {
 export const TxHistory = (props: TxHistoryProps) => {
   const { theme, onBack } = props;
   const [data, setData] = useState<TxLog[]>();
-  const { oneSatSPV } = useServiceContext();
+  const { chromeStorageService, apiContext } = useServiceContext();
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
-  const { gorillaPoolService, chromeStorageService } = useServiceContext();
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const isTestnet = chromeStorageService.getNetwork() === NetWork.Testnet;
 
-  const tagPriorityOrder: Tag[] = ['list', 'bsv21', 'bsv20', 'origin', 'lock', 'fund']; // The order of these tags will determine the order of the icons and which is prioritized
+  const tagPriorityOrder: Tag[] = ['list', 'bsv21', 'origin', 'lock', 'fund']; // The order of these tags will determine the order of the icons and which is prioritized
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!oneSatSPV) return;
       try {
-        const tsx = await oneSatSPV.getRecentTxs();
-        console.log(tsx);
-        setData(tsx);
+        const result = await apiContext.wallet.listActions({
+          labels: [],
+          includeLabels: true,
+          includeOutputs: true,
+          limit: 100,
+          offset: 0,
+        });
+
+        // TODO: Categorize transactions by type using action.labels and output baskets:
+        // - BSV-21 tokens: check for 'bsv21' basket/labels, use token symbol & icon, show token amounts
+        // - 1Sat Ordinals/NFTs: check for 'origin'/'1sat' basket, show NFT icon & transfer info
+        // - Lock contracts: check for 'lock' basket, show lock/unlock amounts
+        // - Listings: check for 'ordlock' basket, show list/cancel/purchase
+        // - Filter or group mixed transactions (e.g. a send that includes both BSV and a token)
+        // Currently all transactions are shown as BSV fund transfers.
+        //
+        // TODO: Use actual transaction dates once WalletAction exposes created_at
+        const txLogs: TxLog[] = result.actions.map((action, idx) => ({
+          txid: action.txid,
+          idx,
+          date: new Date(),
+          summary: {
+            fund: {
+              amount: action.satoshis,
+            },
+          },
+        }));
+
+        setData(txLogs);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching transaction history:', error);
+        setData([]);
       }
     };
 
     fetchData();
-  }, [oneSatSPV]);
+  }, [apiContext.wallet]);
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -196,11 +228,7 @@ export const TxHistory = (props: TxHistoryProps) => {
         );
       default:
         return icon ? (
-          <Icon
-            src={`${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${icon}`}
-            alt="Summary Icon"
-            $isNFT={tag === 'origin'}
-          />
+          <Icon src={`${apiContext.services?.baseUrl}/content/${icon}`} alt="Summary Icon" $isNFT={tag === 'origin'} />
         ) : tag === ('origin' as Tag) ? (
           <Icon src={GENERIC_NFT_ICON} alt="Generic NFT Icon" />
         ) : (
@@ -229,7 +257,6 @@ export const TxHistory = (props: TxHistoryProps) => {
   const getHeaderText = (tag: Tag, tokenName?: string) => {
     switch (tag) {
       case 'bsv21':
-      case 'bsv20':
         return tokenName || 'Token';
       case 'origin':
         return 'NFT';
@@ -260,7 +287,6 @@ export const TxHistory = (props: TxHistoryProps) => {
       case 'fund':
         return amount / BSV_DECIMAL_CONVERSION;
       case 'bsv21':
-      case 'bsv20':
         return amount;
       case 'lock':
         return amount / BSV_DECIMAL_CONVERSION + ' BSV';

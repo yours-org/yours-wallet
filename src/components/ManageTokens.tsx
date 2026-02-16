@@ -1,6 +1,6 @@
 import { styled } from 'styled-components';
-import { Bsv20 } from 'yours-wallet-provider';
 import { Theme, WhiteLabelTheme } from '../theme.types';
+import type { Bsv21Balance } from '@1sat/actions';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { truncate } from '../utils/format';
 import { useEffect, useState } from 'react';
@@ -9,6 +9,9 @@ import { HeaderText, Text } from './Reusable';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { GENERIC_TOKEN_ICON } from '../utils/constants';
 import { FaTimes } from 'react-icons/fa';
+import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
+
+const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
 
 const Container = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -71,15 +74,15 @@ const SearchInput = styled.input<WhiteLabelTheme>`
   }
 `;
 
-export type Bsv20TokensListProps = {
-  bsv20s: Bsv20[];
+export type ManageTokensProps = {
+  tokens: Bsv21Balance[];
   theme: Theme;
   onBack: () => void;
 };
 
-export const ManageTokens = (props: Bsv20TokensListProps) => {
-  const { bsv20s, theme, onBack } = props;
-  const { ordinalService, chromeStorageService, keysService, gorillaPoolService } = useServiceContext();
+export const ManageTokens = (props: ManageTokensProps) => {
+  const { tokens: tokensProp, theme, onBack } = props;
+  const { chromeStorageService, keysService } = useServiceContext();
   const [favoriteTokens, setFavoriteTokens] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -92,11 +95,11 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
   const handleToggleFavorite = async (tokenId: string) => {
     setFavoriteTokens((prev) => (prev.includes(tokenId) ? prev.filter((id) => id !== tokenId) : [...prev, tokenId]));
 
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) return;
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) return;
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
-      [keysService.identityAddress]: {
+      [selectedAccount]: {
         ...account,
         settings: {
           ...account.settings,
@@ -109,16 +112,18 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
     await chromeStorageService.updateNested(key, update);
   };
 
-  const filteredTokens = bsv20s
+  const getTokenName = (b: Bsv21Balance): string => b.sym || 'Null';
+
+  const filteredTokens = tokensProp
     .filter(
       (b) =>
-        ordinalService.getTokenName(b).toLowerCase().includes(searchQuery.toLowerCase()) ||
+        getTokenName(b).toLowerCase().includes(searchQuery.toLowerCase()) ||
         (b?.id && b.id.toLowerCase().includes(searchQuery.toLowerCase())),
     )
-    // Sort by sym or tick alphabetically
+    // Sort by sym alphabetically
     .sort((a, b) => {
-      const aLabel = a.sym ?? a.tick ?? '';
-      const bLabel = b.sym ?? b.tick ?? '';
+      const aLabel = a.sym ?? '';
+      const bLabel = b.sym ?? '';
 
       return aLabel.toLowerCase().localeCompare(bLabel.toLowerCase());
     });
@@ -142,16 +147,10 @@ export const ManageTokens = (props: Bsv20TokensListProps) => {
         filteredTokens.map((t) => (
           <FavoriteRow theme={theme} key={t.id}>
             <TickerWrapper>
-              <Icon
-                src={
-                  t.icon
-                    ? `${gorillaPoolService.getBaseUrl(chromeStorageService.getNetwork())}/content/${t.icon}`
-                    : GENERIC_TOKEN_ICON
-                }
-              />
+              <Icon src={t.icon ? getContentUrl(t.icon) : GENERIC_TOKEN_ICON} />
               <TickerTextWrapper>
                 <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
-                  {ordinalService.getTokenName(t)}
+                  {getTokenName(t)}
                 </HeaderText>
                 <Text
                   theme={theme}

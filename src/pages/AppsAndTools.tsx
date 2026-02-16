@@ -15,8 +15,15 @@ import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { IndexContext, Txo } from 'spv-store';
+import { lockBsv, unlockBsv } from '@1sat/actions';
+import { Outpoint, type ParseContext, type Txo } from '@1sat/wallet-browser';
+import { Script } from '@bsv/sdk';
 import { FaExternalLinkAlt } from 'react-icons/fa';
+
+// Helper type for lock data stored in Txo.data.lock.data
+interface LockData {
+  until: number;
+}
 import { Input } from '../components/Input';
 import TxPreview from '../components/TxPreview';
 import { TransactionFormat } from 'yours-wallet-provider';
@@ -169,7 +176,7 @@ export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
   const { query } = useBottomMenu();
-  const { keysService, bsvService, chromeStorageService, oneSatSPV } = useServiceContext();
+  const { keysService, chromeStorageService, wallet, apiContext } = useServiceContext();
   const { bsvAddress, ordAddress, identityAddress, getWifBalance, sweepWif } = keysService;
   const exchangeRate = chromeStorageService.getCurrentAccountObject().exchangeRateCache?.rate ?? 0;
   const [isProcessing, setIsProcessing] = useState(false);
@@ -180,14 +187,13 @@ export const AppsAndTools = () => {
   const [didSubmit, setDidSubmit] = useState(false);
   const [lockedUtxos, setLockedUtxos] = useState<Txo[]>([]);
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
-  const [txData, setTxData] = useState<IndexContext>();
+  const [txData, setTxData] = useState<ParseContext>();
   const [rawTx, setRawTx] = useState<string | number[]>('');
   const [transactionFormat, setTransactionFormat] = useState<TransactionFormat>('tx');
   const [satsOut, setSatsOut] = useState(0);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [lockBlockHeight, setLockBlockHeight] = useState(0);
   const [lockBsvAmount, setLockBsvAmount] = useState<number | null>(null);
-  const [lockPassword, setLockPassword] = useState('');
 
   const [wifKey, setWifKey] = useState('');
   const [sweepBalance, setSweepBalance] = useState(0);
@@ -245,8 +251,21 @@ export const AppsAndTools = () => {
 
   const getLockData = async () => {
     setIsProcessing(true);
-    setCurrentBlockHeight(await bsvService.getCurrentHeight());
-    setLockedUtxos(await bsvService.getLockedTxos());
+    const height = await apiContext.services!.chaintracks.currentHeight();
+    setCurrentBlockHeight(height);
+
+    const result = await wallet!.listOutputs({ basket: 'lock', limit: 10000 });
+    const txos: Txo[] = [];
+    for (const o of result.outputs) {
+      const outpoint = new Outpoint(o.outpoint);
+      const output = {
+        lockingScript: Script.fromHex(o.lockingScript || ''),
+        satoshis: o.satoshis,
+      };
+      const txo = await wallet!.parseOutput(output, outpoint);
+      txos.push(txo);
+    }
+    setLockedUtxos(txos);
     setIsProcessing(false);
   };
 
@@ -273,11 +292,11 @@ export const AppsAndTools = () => {
     setIsProcessing(true);
     try {
       const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
-      const data = await oneSatSPV.parseTx(tx);
+      const data = await wallet!.parseTransaction(tx);
       setTxData(data);
       let userSatsOut = data.spends.reduce((acc, spend) => {
         if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
-          return acc + spend.satoshis;
+          return acc + BigInt(spend.output.satoshis || 0);
         }
         return acc;
       }, 0n);
@@ -285,7 +304,7 @@ export const AppsAndTools = () => {
       // how much did the user get back from the tx
       userSatsOut = data.txos.reduce((acc, txo) => {
         if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
-          return acc - txo.satoshis;
+          return acc - BigInt(txo.output.satoshis || 0);
         }
         return acc;
       }, userSatsOut);
@@ -306,16 +325,13 @@ export const AppsAndTools = () => {
       setIsBroadcasting(true);
       setIsProcessing(true);
       const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
-      const res = await oneSatSPV.broadcast(tx, 'manual');
-      if (!res.txid) {
-        addSnackbar('An error occurred while broadcasting the transaction', 'error');
-        setPage('decode-broadcast');
-        return;
-      }
+      await wallet!.broadcast(tx, 'manual');
       addSnackbar('Transaction broadcasted successfully', 'success');
       setPage('decode-broadcast');
     } catch (error) {
       console.log(error);
+      addSnackbar('An error occurred while broadcasting the transaction', 'error');
+      setPage('decode-broadcast');
     } finally {
       setIsBroadcasting(false);
       setIsProcessing(false);
@@ -325,7 +341,7 @@ export const AppsAndTools = () => {
   const handleUnlock = async () => {
     try {
       setIsProcessing(true);
-      const res = await bsvService.unlockLockedCoins();
+      const res = await unlockBsv.execute(apiContext, {});
       if (!res?.txid) {
         addSnackbar(`Error unlocking funds. ${res?.error ?? 'Please try again.'}`, 'error');
         return;
@@ -343,9 +359,8 @@ export const AppsAndTools = () => {
   const handleBlockHeightChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const dateChoice = new Date(e.target.value).getTime();
     const blockCount = Math.ceil((dateChoice - Date.now()) / 1000 / 60 / 10);
-    const chainTip = await oneSatSPV.getChaintip();
-    if (!chainTip) return;
-    const blockHeight = chainTip.height + blockCount;
+    const currentHeight = await apiContext.services!.chaintracks.currentHeight();
+    const blockHeight = currentHeight + blockCount;
     setLockBlockHeight(blockHeight);
   };
 
@@ -353,17 +368,15 @@ export const AppsAndTools = () => {
     try {
       if (!identityAddress) return;
       if (!lockBsvAmount || !lockBlockHeight) throw new Error('Invalid lock amount or block height');
-      if (!lockPassword) throw new Error('Please enter a password');
       setIsProcessing(true);
-      const chainTip = await oneSatSPV.getChaintip();
-      if (chainTip?.height && chainTip.height >= lockBlockHeight) {
+      const currentHeight = await apiContext.services!.chaintracks.currentHeight();
+      if (currentHeight >= lockBlockHeight) {
         throw new Error('Invalid block height. Please choose a future block height.');
       }
       const sats = Math.round(lockBsvAmount * BSV_DECIMAL_CONVERSION);
-      const res = await bsvService.lockBsv(
-        [{ address: identityAddress, blockHeight: lockBlockHeight, sats }],
-        lockPassword,
-      );
+      const res = await lockBsv.execute(apiContext, {
+        requests: [{ until: lockBlockHeight, satoshis: sats }],
+      });
 
       if (!res?.txid) throw new Error(`${res?.error ?? 'An error occurred. Please try again.'}`);
 
@@ -473,13 +486,6 @@ export const AppsAndTools = () => {
         }}
       />
       <DateTimePicker theme={theme} onChange={handleBlockHeightChange} />
-      <Input
-        theme={theme}
-        placeholder={'Password'}
-        type="password"
-        value={lockPassword}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLockPassword(e.target.value)}
-      />
       <Button
         style={{ margin: '1rem' }}
         theme={theme}
@@ -509,9 +515,15 @@ export const AppsAndTools = () => {
       </HeaderText>
       {headerLockDetailsRow}
       {lockedUtxos
-        .sort((a, b) => Number(a.data.lock?.data.until) - Number(b.data.lock?.data.until))
+        .sort((a, b) => {
+          const aLock = a.data.lock?.data as unknown as LockData | undefined;
+          const bLock = b.data.lock?.data as unknown as LockData | undefined;
+          return Number(aLock?.until ?? 0) - Number(bLock?.until ?? 0);
+        })
         .map((u) => {
-          const blocksRemaining = Number(u.data.lock?.data.until) - currentBlockHeight;
+          const lockData = u.data.lock?.data as unknown as LockData | undefined;
+          const blocksRemaining = Number(lockData?.until ?? 0) - currentBlockHeight;
+          const satoshis = BigInt(u.output.satoshis || 0);
           return (
             <LockDetailsContainer key={u.outpoint.txid}>
               <LockDetailsText style={{ textAlign: 'left' }} theme={theme}>
@@ -521,9 +533,9 @@ export const AppsAndTools = () => {
                 {blocksRemaining < 0 ? '0' : blocksRemaining}
               </LockDetailsText>
               <LockDetailsText style={{ textAlign: 'right' }} theme={theme}>
-                {u.satoshis < 1000
-                  ? `${u.satoshis} ${u.satoshis > 1n ? 'sats' : 'sat'}`
-                  : `${Number(u.satoshis) / BSV_DECIMAL_CONVERSION} BSV`}
+                {satoshis < 1000n
+                  ? `${satoshis} ${satoshis > 1n ? 'sats' : 'sat'}`
+                  : `${Number(satoshis) / BSV_DECIMAL_CONVERSION} BSV`}
               </LockDetailsText>
             </LockDetailsContainer>
           );

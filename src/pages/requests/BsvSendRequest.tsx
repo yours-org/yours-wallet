@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { validate } from 'bitcoin-address-validation';
 import { Button } from '../../components/Button';
-import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
@@ -13,9 +12,9 @@ import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendBsv } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
-import { getErrorMessage, getTxFromRawTxFormat } from '../../utils/tools';
-import { IndexContext } from 'spv-store';
-import TxPreview from '../../components/TxPreview';
+import { getErrorMessage } from '../../utils/tools';
+import { sendBsv } from '@1sat/actions';
+import { getWalletBalance } from '../../utils/wallet';
 import { styled } from 'styled-components';
 
 const Wrapper = styled(ConfirmContent)`
@@ -34,26 +33,28 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const { request, requestWithinApp, popupId, onResponse } = props;
   const { theme } = useTheme();
   const { handleSelect, hideMenu } = useBottomMenu();
-  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
-  const { bsvService, chromeStorageService, keysService, oneSatSPV } = useServiceContext();
-  const { sendBsv, updateBsvBalance, getBsvBalance } = bsvService;
+  const { chromeStorageService, keysService, apiContext } = useServiceContext();
   const { bsvAddress } = keysService;
   const [hasSent, setHasSent] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [txData, setTxData] = useState<IndexContext>();
+  const [bsvBalance, setBsvBalance] = useState<number>(0);
+
+  const refreshBalance = async () => {
+    const satoshis = await getWalletBalance(apiContext.wallet);
+    setBsvBalance(satoshis / 100_000_000);
+  };
 
   const { account } = chromeStorageService.getCurrentAccountObject();
   if (!account) throw Error('No account found');
   const { settings } = account;
   const noApprovalLimit = settings.noApprovalLimit ?? 0;
-  const isPasswordRequired = chromeStorageService.isPasswordRequired();
 
   const requestSats = request.reduce((a: number, item: { satoshis: number }) => a + item.satoshis, 0);
   const bsvSendAmount = requestSats / BSV_DECIMAL_CONVERSION;
 
-  const processBsvSend = async (showPreview = false) => {
+  const processBsvSend = async () => {
     try {
       const validationFail = new Map<string, boolean>();
       validationFail.set('address', false);
@@ -102,13 +103,16 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         return;
       }
 
-      const sendRes = await sendBsv(request, passwordConfirm, noApprovalLimit, showPreview);
-      if (!sendRes.txid && sendRes.rawtx) {
-        const tx = getTxFromRawTxFormat(sendRes.rawtx, 'tx');
-        const parsedTx = await oneSatSPV.parseTx(tx);
-        setTxData(parsedTx);
-        return;
-      }
+      // Convert request to sendBsv format
+      const sendRequests = request.map((r) => ({
+        address: r.address,
+        paymail: r.paymail,
+        satoshis: r.satoshis,
+        script: r.script,
+        data: r.data,
+      }));
+
+      const sendRes = await sendBsv.execute(apiContext, { requests: sendRequests });
 
       if (!sendRes.txid || sendRes.error) {
         addSnackbar(getErrorMessage(sendRes.error), 'error');
@@ -134,11 +138,11 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     }
   };
 
+  // Load balance on mount
   useEffect(() => {
-    if (!request) return;
-    processBsvSend(true); // Show preview
+    refreshBalance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request]);
+  }, []);
 
   // This useEffect used to auto process requests when an approval limit is set
   useEffect(() => {
@@ -150,7 +154,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
         setIsProcessing(true);
         await processBsvSend();
         setIsProcessing(false);
-        await updateBsvBalance();
+        await refreshBalance();
       }, 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -164,7 +168,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   }, [requestWithinApp, handleSelect, hideMenu]);
 
   const resetSendState = () => {
-    setPasswordConfirm('');
     setSuccessTxId('');
     setIsProcessing(false);
   };
@@ -173,7 +176,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     if (!successTxId) return;
     if (!message && bsvAddress) {
       resetSendState();
-      updateBsvBalance();
+      refreshBalance();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bsvAddress, message, successTxId]);
@@ -184,11 +187,6 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
     await sleep(25);
 
     if (noApprovalLimit === undefined) throw Error('No approval limit must be a number');
-    if (!passwordConfirm && isPasswordRequired && bsvSendAmount > noApprovalLimit) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
 
     processBsvSend();
   };
@@ -214,18 +212,8 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
           <Text
             theme={theme}
             style={{ cursor: 'pointer', margin: '0.75rem 0' }}
-          >{`Available Balance: ${getBsvBalance()}`}</Text>
+          >{`Available Balance: ${bsvBalance} BSV`}</Text>
           <FormContainer noValidate onSubmit={(e) => handleSendBsv(e)}>
-            <Show when={isPasswordRequired}>
-              <Input
-                theme={theme}
-                placeholder="Enter Wallet Password"
-                type="password"
-                value={passwordConfirm}
-                onChange={(e) => setPasswordConfirm(e.target.value)}
-              />
-            </Show>
-            {txData && <TxPreview txData={txData} />}
             <Button
               theme={theme}
               type="primary"
