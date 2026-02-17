@@ -153,8 +153,9 @@ export class OrdinalService {
       await tx.sign();
 
       const response = await this.oneSatSPV.broadcast(tx);
-      if (response?.txid) {
-        return { txid: response.txid };
+      if (response.status === 'error') {
+        console.error('Broadcast failed:', response);
+        return { error: response.description || 'broadcast-failed' };
       }
 
       const txHex = tx.toHex();
@@ -168,7 +169,7 @@ export class OrdinalService {
         });
       }
 
-      return { error: 'broadcast-failed' };
+      return { txid: response.txid };
     } catch (error) {
       console.error('transferOrdinal failed:', error);
       return { error: JSON.stringify(error) };

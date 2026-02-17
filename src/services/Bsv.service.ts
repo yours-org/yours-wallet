@@ -149,8 +149,8 @@ export class BsvService {
 
       await tx.sign();
       const response = await this.oneSatSPV.broadcast(tx);
-      console.log(`Transaction broadcast response: ${response}`);
-      if (response.status == 'error') return { error: response.description };
+      console.log('Transaction broadcast response:', response);
+      if (response.status == 'error') return { error: response.description || 'broadcast-error' };
       const txHex = tx.toHex();
       const chromeObj = this.chromeStorageService.getCurrentAccountObject();
       if (!chromeObj.account) return { error: 'no-account' };
@@ -287,6 +287,10 @@ export class BsvService {
       if (showPreview) return { rawtx: tx.toHex() };
 
       const response = await this.oneSatSPV.broadcast(tx);
+      if (response.status == 'error') {
+        console.error('Broadcast failed:', response);
+        return { error: response.description || 'broadcast-error' };
+      }
 
       const txHex = tx.toHex();
       const chromeObj = this.chromeStorageService.getCurrentAccountObject();
@@ -298,8 +302,6 @@ export class BsvService {
           note: `P2P tx from ${theme.settings.walletName}`,
         });
       }
-
-      if (response.status == 'error') return { error: response.description };
       if (isBelowNoApprovalLimit) {
         const { noApprovalLimit } = chromeObj.account.settings;
         const key: keyof ChromeStorageObject = 'accounts';

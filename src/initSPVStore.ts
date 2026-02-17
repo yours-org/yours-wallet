@@ -23,6 +23,7 @@ import { ChromeStorageService } from './services/ChromeStorage.service';
 import { sendMessage } from './utils/chromeHelpers';
 import { theme } from './theme';
 import { MNEE_DECIMALS, MNEE_ICON_ID, MNEE_SYM, MNEE_TOKEN_ID } from './utils/constants';
+import { ArcBroadcastService } from './services/ArcBroadcast.service';
 import { MNEEIndexer } from './utils/mneeIndexer';
 
 export const getIndexers = (owners: Set<string>, network: NetWork) => {
@@ -109,6 +110,11 @@ export const initOneSatSPV = async (chromeStorageService: ChromeStorageService, 
   );
 
   if (!oneSatSPV) throw Error('SPV not initialized!');
+
+  // Override the broadcast service to use ARC directly.
+  // The default OneSatProvider broadcasts via ordinals.1sat.app which is unreliable (502s).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (oneSatSPV as any).services.broadcast = new ArcBroadcastService();
 
   await registerEventListeners(oneSatSPV, selectedAccount || '', startSync);
 

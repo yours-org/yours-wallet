@@ -91,6 +91,8 @@ export const getErrorMessage = (error: string | undefined) => {
       return 'Key type does not exist!';
 
     default:
+      // If the error is a descriptive string from ARC/broadcast, show it directly
+      if (error && error.length > 0) return error;
       return 'An unknown error has occurred! Try again.';
   }
 };
