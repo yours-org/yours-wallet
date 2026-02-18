@@ -1,7 +1,7 @@
 import { GetSignatures, SignatureResponse } from 'yours-wallet-provider';
-import { DEFAULT_SIGHASH_TYPE } from '../utils/constants';
+import { DEFAULT_SIGHASH_TYPE, FEE_PER_KB } from '../utils/constants';
 import { KeysService } from './Keys.service';
-import { Hash, P2PKH, PrivateKey, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
+import { Hash, P2PKH, PrivateKey, SatoshisPerKilobyte, Script, Transaction, TransactionSignature, Utils } from '@bsv/sdk';
 import { SPVStore, Txo } from 'spv-store';
 import { LockTemplate } from 'spv-store';
 export class ContractService {
@@ -136,7 +136,7 @@ export class ContractService {
         });
       }
 
-      await tx.fee();
+      await tx.fee(new SatoshisPerKilobyte(FEE_PER_KB));
       await tx.sign();
       const response = await this.oneSatSPV.broadcast(tx);
       if (response?.txid) {
