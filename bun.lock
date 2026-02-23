@@ -6,7 +6,7 @@
       "dependencies": {
         "@1sat/actions": "^0.0.7",
         "@1sat/client": "^0.0.6",
-        "@1sat/wallet-remote": "file:../1sat-sdk/packages/wallet-remote/1sat-wallet-remote-0.0.2.tgz",
+        "@1sat/wallet-remote": "^0.0.2",
         "@bsv/paymail": "^2.0.2",
         "@bsv/sdk": "^2.0.1",
         "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@2.0.5-idb-fix.2",
@@ -71,7 +71,7 @@
 
     "@1sat/wallet": ["@1sat/wallet@0.0.13", "", { "dependencies": { "@1sat/client": "^0.0.6", "@1sat/types": "^0.0.5", "@bopen-io/templates": "^1.1.8", "@msgpack/msgpack": "^3.1.3", "fflate": "^0.8.2" }, "peerDependencies": { "@bsv/sdk": "^2.0.1" } }, "sha512-ko4TKNbsc4zmWFVFz2sARJ9F7fSIkuaqWZn2U7FVKDS0lqcXYBeXOphWmcrjtYVsF3FL+c20tiBUtZ3TZwllKg=="],
 
-    "@1sat/wallet-remote": ["@1sat/wallet-remote@../1sat-sdk/packages/wallet-remote/1sat-wallet-remote-0.0.2.tgz", { "dependencies": { "@1sat/wallet": "^0.0.13" }, "peerDependencies": { "@1sat/client": "^0.0.6", "@bsv/sdk": "^2.0.1", "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@2.0.5-idb-fix.2" } }],
+    "@1sat/wallet-remote": ["@1sat/wallet-remote@0.0.2", "", { "dependencies": { "@1sat/wallet": "^0.0.13" }, "peerDependencies": { "@1sat/client": "^0.0.6", "@bsv/sdk": "^2.0.1", "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@2.0.5-idb-fix.2" } }, "sha512-+PPJCQlG1WttaLUBc9DmU4BzJtKNSwDYOxmwBTEHa5J3yImlR4cENqU1H83kmvm4Ww7auq7/yhf4WZ3g/5Sl2A=="],
 
     "@adobe/css-tools": ["@adobe/css-tools@4.4.4", "", {}, "sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg=="],
 
