@@ -42,7 +42,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
   const [bsvBalance, setBsvBalance] = useState<number>(0);
 
   const refreshBalance = async () => {
-    const satoshis = await getWalletBalance(apiContext.wallet);
+    const satoshis = await getWalletBalance();
     setBsvBalance(satoshis / 100_000_000);
   };
 

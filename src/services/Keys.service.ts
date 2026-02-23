@@ -15,8 +15,6 @@ import { ChromeStorageService } from './ChromeStorage.service';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction, Utils } from '@bsv/sdk';
-// TODO: OneSatWallet type no longer exists - need to determine correct wallet type for sweep functions
-// import type { OneSatWallet } from '@1sat/wallet-browser';
 import { WocUtxo } from './types/whatsOnChain.types';
 import axios from 'axios';
 

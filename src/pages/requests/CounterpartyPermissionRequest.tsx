@@ -103,8 +103,8 @@ export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionR
         requestID: request.requestID,
         granted: buildGranted(),
       });
-      addSnackbar('Permissions granted', 'success');
       onResponse();
+      window.close();
     } catch (error) {
       addSnackbar(error instanceof Error ? error.message : String(error), 'error');
       setIsProcessing(false);
@@ -118,8 +118,8 @@ export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionR
       requestID: request.requestID,
       granted: null,
     });
-    addSnackbar('Permissions denied', 'info');
     onResponse();
+    window.close();
   };
 
   const handleCancel = async () => {

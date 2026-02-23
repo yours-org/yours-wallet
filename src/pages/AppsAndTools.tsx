@@ -16,7 +16,7 @@ import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { lockBsv, unlockBsv } from '@1sat/actions';
-import { Outpoint, type ParseContext, type Txo } from '@1sat/wallet-browser';
+import { Outpoint, type ParseContext, type Txo } from '@1sat/wallet-remote';
 import { Script } from '@bsv/sdk';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 

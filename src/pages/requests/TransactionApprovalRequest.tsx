@@ -14,7 +14,7 @@ import { sleep } from '../../utils/sleep';
 import { styled } from 'styled-components';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
 import type { ApprovalContext, YoursApprovalType } from '../../yoursApi';
-import type { ParseContext } from '@1sat/wallet-browser';
+import type { ParseContext } from '@1sat/wallet-remote';
 
 const Wrapper = styled(ConfirmContent)`
   max-height: calc(100vh - 8rem);
@@ -153,9 +153,8 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
       approved: true,
     });
 
-    addSnackbar('Transaction approved!', 'success');
-    await sleep(1000);
     onResponse();
+    window.close();
   };
 
   const handleReject = async () => {

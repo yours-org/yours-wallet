@@ -15,6 +15,7 @@ export enum YoursEventName {
   USER_CONNECT_RESPONSE = 'userConnectResponse',
 
   // Internal UI requests (popup -> background)
+  GET_BALANCE = 'getBalance',
   GET_PUB_KEYS = 'getPubKeys',
   GET_LEGACY_ADDRESSES = 'getLegacyAddresses',
   GET_RECEIVE_ADDRESS = 'getReceiveAddress',

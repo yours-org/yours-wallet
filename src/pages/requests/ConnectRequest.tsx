@@ -113,6 +113,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
       decision: 'approved',
       pubKeys,
     });
+    window.close();
   };
 
   const handleDecline = async () => {
@@ -121,7 +122,7 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
       action: 'userConnectResponse',
       decision: 'declined',
     });
-    addSnackbar(`Declined`, 'error');
+    window.close();
   };
 
   return (

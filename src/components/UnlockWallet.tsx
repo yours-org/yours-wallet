@@ -57,11 +57,9 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
         });
         if (!response?.success) {
           console.error('Wallet unlock failed:', response?.error);
-          // Still proceed - the wallet may work locally even if remote sync failed
         }
       } catch (error) {
         console.error('Wallet unlock error:', error);
-        // Still proceed - the wallet may work locally
       }
 
       onUnlock();

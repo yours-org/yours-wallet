@@ -113,8 +113,8 @@ export const PermissionRequestPage = (props: PermissionRequestProps) => {
         requestID: request.requestID,
         granted: true,
       });
-      addSnackbar('Permission granted', 'success');
       onResponse();
+      window.close();
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       addSnackbar(errorMsg, 'error');
@@ -129,8 +129,8 @@ export const PermissionRequestPage = (props: PermissionRequestProps) => {
       requestID: request.requestID,
       granted: false,
     });
-    addSnackbar('Permission denied', 'info');
     onResponse();
+    window.close();
   };
 
   const handleCancel = async () => {

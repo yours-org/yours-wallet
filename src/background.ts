@@ -88,9 +88,6 @@ const initializeWallet = async (): Promise<WalletInterface | null> => {
   if (accountContext) {
     bindPermissionCallbacks(accountContext.wallet);
     console.log('[background] initializeWallet: bound permission callbacks');
-    console.log('[background] initializeWallet: remoteStorageConnected:', accountContext.remoteStorageConnected);
-    // Sync is started in initWallet, events are forwarded to popup there
-    // Remote storage retry happens naturally when service worker restarts
 
     // Check for pending restore data from Phase 1 of two-phase restore
     const hasPending = await WalletBackupService.hasPendingRestore();
@@ -119,12 +116,28 @@ const initializeWallet = async (): Promise<WalletInterface | null> => {
   return accountContext?.wallet ?? null;
 };
 
-// Start initialization
-chromeStorageService
+// Start initialization — clean up stale popup windows then initialize wallet.
+// ensureWallet() awaits this so CWI messages don't launch popups during init.
+const startupInitPromise = chromeStorageService
   .getAndSetStorage()
-  .then(() => initializeWallet())
+  .then(async () => {
+    // Close any orphaned extension popup windows from a previous session/reload.
+    const extOrigin = chrome.runtime.getURL('');
+    const allWindows = await chrome.windows.getAll({ populate: true });
+    for (const w of allWindows) {
+      if (w.type === 'popup' && w.id && w.tabs?.some((t) => t.url?.startsWith(extOrigin))) {
+        try {
+          await chrome.windows.remove(w.id);
+        } catch {
+          // Window already gone
+        }
+      }
+    }
+    await chrome.storage.local.remove('popupWindowId');
+
+    await initializeWallet();
+  })
   .catch((error) => {
-    // Log initialization errors - could be expected (locked wallet) or unexpected
     console.error('[background] Startup initialization failed:', error);
   });
 
@@ -135,6 +148,24 @@ chromeStorageService
 export const getWallet = (): WalletInterface | null => {
   console.log('[background] getWallet called, accountContext:', !!accountContext, 'wallet:', !!accountContext?.wallet);
   return accountContext?.wallet ?? null;
+};
+
+/**
+ * Ensure the wallet is available, prompting user to unlock if needed.
+ * Waits for startup initialization first so we don't launch a popup
+ * while the wallet is still auto-initializing from a persisted passKey.
+ */
+const ensureWallet = async (): Promise<WalletInterface> => {
+  await startupInitPromise;
+  if (accountContext?.wallet) {
+    return accountContext.wallet;
+  }
+  return new Promise((resolve, reject) => {
+    pendingWalletWaiters.push({ resolve, reject });
+    if (pendingWalletWaiters.length === 1) {
+      launchPopUp();
+    }
+  });
 };
 
 console.log('Yours Wallet Background Script Running!');
@@ -150,6 +181,12 @@ const pendingPermissionRequests = new Map<
     reject: (error: Error) => void;
   }
 >();
+
+// Pending wallet initialization waiters (for ensureWallet when service worker wakes without passKey)
+const pendingWalletWaiters: {
+  resolve: (wallet: WalletInterface) => void;
+  reject: (error: Error) => void;
+}[] = [];
 
 const pendingGroupedPermissionRequests = new Map<
   string,
@@ -317,7 +354,7 @@ if (isInServiceWorker) {
     }
   };
 
-  launchPopUp = () => {
+  const createNewPopup = () => {
     chrome.windows.create(
       {
         url: chrome.runtime.getURL('index.html'),
@@ -334,6 +371,32 @@ if (isInServiceWorker) {
         }
       },
     );
+  };
+
+  launchPopUp = () => {
+    // Fast path: module-level variable still has the popup ID
+    if (popupWindowId) {
+      chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
+        popupWindowId = undefined;
+        createNewPopup();
+      });
+      return;
+    }
+    // Module-level var is lost after service worker suspension; check storage
+    chrome.storage.local.get('popupWindowId', (result) => {
+      if (result.popupWindowId) {
+        chrome.windows.update(result.popupWindowId, { focused: true })
+          .then(() => {
+            popupWindowId = result.popupWindowId;
+          })
+          .catch(() => {
+            chrome.storage.local.remove('popupWindowId');
+            createNewPopup();
+          });
+      } else {
+        createNewPopup();
+      }
+    });
   };
 
   const verifyAccess = async (requestingOriginator: string): Promise<boolean> => {
@@ -386,14 +449,13 @@ if (isInServiceWorker) {
       'GROUPED_PERMISSION_RESPONSE',
       'COUNTERPARTY_PERMISSION_RESPONSE',
       // Internal UI requests (no external domain)
+      YoursEventName.GET_BALANCE,
       YoursEventName.GET_PUB_KEYS,
       YoursEventName.GET_LEGACY_ADDRESSES,
       YoursEventName.GET_RECEIVE_ADDRESS,
       YoursEventName.GET_SOCIAL_PROFILE,
       // Wallet unlock - reinitialize after user enters password
       'WALLET_UNLOCKED',
-      // Full sync with remote storage
-      'FULL_SYNC',
       // Master backup/restore
       'MASTER_BACKUP',
       'MASTER_RESTORE',
@@ -422,6 +484,9 @@ if (isInServiceWorker) {
             message as { requestID: string; granted: Partial<CounterpartyPermissions> | null; expiry?: number },
           );
         // Internal UI requests (no external domain, direct from popup)
+        case YoursEventName.GET_BALANCE:
+          processGetBalanceRequest(sendResponse);
+          return true;
         case YoursEventName.GET_PUB_KEYS:
           processGetPubKeysRequest(sendResponse);
           return true;
@@ -450,15 +515,23 @@ if (isInServiceWorker) {
             initializeWallet()
               .then((wallet) => {
                 sendResponse({ type: 'WALLET_UNLOCKED', success: !!wallet });
+                // Resolve any CWI handlers waiting for the wallet.
+                // Don't close the popup — the CWI flow may need it for a
+                // follow-up permission prompt (shown on /bsv-wallet route).
+                if (wallet && pendingWalletWaiters.length > 0) {
+                  for (const waiter of pendingWalletWaiters.splice(0)) {
+                    waiter.resolve(wallet);
+                  }
+                }
               })
               .catch((error: Error) => {
                 console.error('Failed to initialize wallet:', error);
                 sendResponse({ type: 'WALLET_UNLOCKED', success: false, error: error.message });
+                for (const waiter of pendingWalletWaiters.splice(0)) {
+                  waiter.reject(error);
+                }
               });
           });
-          return true;
-        case 'FULL_SYNC':
-          processFullSync(sendResponse);
           return true;
         case 'MASTER_BACKUP':
           processMasterBackup(sendResponse);
@@ -583,6 +656,7 @@ if (isInServiceWorker) {
     }
 
     chromeStorageService.remove('permissionRequest');
+    closePermissionPopup();
     return true;
   };
 
@@ -624,6 +698,7 @@ if (isInServiceWorker) {
     }
 
     chromeStorageService.remove('groupedPermissionRequest');
+    closePermissionPopup();
     return true;
   };
 
@@ -665,6 +740,7 @@ if (isInServiceWorker) {
     }
 
     chromeStorageService.remove('counterpartyPermissionRequest');
+    closePermissionPopup();
     return true;
   };
 
@@ -687,6 +763,33 @@ if (isInServiceWorker) {
   };
 
   // YOURS-SPECIFIC HANDLERS ********************************
+
+  const processGetBalanceRequest = (sendResponse: CallbackResponse) => {
+    if (!accountContext) {
+      sendResponse({
+        type: YoursEventName.GET_BALANCE,
+        success: false,
+        error: 'Wallet not initialized',
+      });
+      return;
+    }
+    accountContext.baseWallet
+      .balance()
+      .then((satoshis) => {
+        sendResponse({
+          type: YoursEventName.GET_BALANCE,
+          success: true,
+          data: satoshis,
+        });
+      })
+      .catch((error) => {
+        sendResponse({
+          type: YoursEventName.GET_BALANCE,
+          success: false,
+          error: error instanceof Error ? error.message : JSON.stringify(error),
+        });
+      });
+  };
 
   const processGetPubKeysRequest = (sendResponse: CallbackResponse) => {
     try {
@@ -771,67 +874,6 @@ if (isInServiceWorker) {
         type: YoursEventName.GET_SOCIAL_PROFILE,
         success: false,
         error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processFullSync = async (sendResponse: CallbackResponse) => {
-    try {
-      if (!accountContext?.fullSync) {
-        sendResponse({
-          type: 'FULL_SYNC',
-          success: false,
-          error: 'Remote sync not available',
-        });
-        return;
-      }
-
-      // Send sync start to show banner
-      chrome.runtime
-        .sendMessage({
-          action: YoursEventName.SYNC_STATUS_UPDATE,
-          data: { status: 'start', addressCount: 1 },
-        })
-        .catch(() => {});
-
-      const result = await accountContext.fullSync((stage, message) => {
-        // Map fullSync stages to sync status updates
-        if (stage === 'complete') {
-          chrome.runtime
-            .sendMessage({
-              action: YoursEventName.SYNC_STATUS_UPDATE,
-              data: { status: 'complete' },
-            })
-            .catch(() => {});
-        } else {
-          // For pushing/resetting/pulling, show progress with the message
-          chrome.runtime
-            .sendMessage({
-              action: YoursEventName.SYNC_STATUS_UPDATE,
-              data: { status: 'progress', pending: 1, done: 0, failed: 0, message },
-            })
-            .catch(() => {});
-        }
-      });
-
-      sendResponse({
-        type: 'FULL_SYNC',
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      // Send error status
-      chrome.runtime
-        .sendMessage({
-          action: YoursEventName.SYNC_STATUS_UPDATE,
-          data: { status: 'error', message: error instanceof Error ? error.message : String(error) },
-        })
-        .catch(() => {});
-
-      sendResponse({
-        type: 'FULL_SYNC',
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
       });
     }
   };
@@ -1009,7 +1051,8 @@ if (isInServiceWorker) {
 
     const forwardToManager = async () => {
       try {
-        await accountContext?.wallet.waitForAuthentication({}, domain);
+        const w = await ensureWallet();
+        await w.waitForAuthentication({}, domain);
       } catch (e) {
         console.warn('[background] waitForAuthentication grouped flow error:', e);
       }
@@ -1054,8 +1097,7 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.listOutputs(message.params, message.originator);
       sendResponse({
@@ -1075,8 +1117,7 @@ if (isInServiceWorker) {
 
   const processCWIGetNetwork = async (sendResponse: CallbackResponse) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.getNetwork({});
       sendResponse({
@@ -1096,8 +1137,7 @@ if (isInServiceWorker) {
 
   const processCWIGetHeight = async (sendResponse: CallbackResponse) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.getHeight({});
       sendResponse({
@@ -1117,8 +1157,7 @@ if (isInServiceWorker) {
 
   const processCWIGetHeaderForHeight = async (message: { params: GetHeaderArgs }, sendResponse: CallbackResponse) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.getHeaderForHeight(message.params);
       sendResponse({
@@ -1138,8 +1177,7 @@ if (isInServiceWorker) {
 
   const processCWIGetVersion = async (sendResponse: CallbackResponse) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.getVersion({});
       sendResponse({
@@ -1162,8 +1200,7 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.getPublicKey(message.params, message.originator);
       sendResponse({
@@ -1186,8 +1223,7 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.listActions(message.params, message.originator);
       sendResponse({
@@ -1210,8 +1246,7 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.verifySignature(message.params, message.originator);
       sendResponse({
@@ -1234,8 +1269,7 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.verifyHmac(message.params, message.originator);
       sendResponse({
@@ -1259,8 +1293,7 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       // WalletPermissionsManager will trigger callbacks if permission is needed
       const result = await w.createSignature(message.params, message.originator);
@@ -1284,8 +1317,7 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.encrypt(message.params, message.originator);
       sendResponse({
@@ -1308,8 +1340,7 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.decrypt(message.params, message.originator);
       sendResponse({
@@ -1340,8 +1371,7 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       console.log('[createAction] Starting with originator:', message.originator);
       console.log(
@@ -1385,8 +1415,7 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.signAction(message.params, message.originator);
       sendResponse({
@@ -1410,8 +1439,7 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const w = getWallet();
-      if (!w) throw Error('Wallet not initialized!');
+      const w = await ensureWallet();
 
       const result = await w.abortAction(message.params, message.originator);
       sendResponse({
@@ -1491,6 +1519,11 @@ if (isInServiceWorker) {
       }
       pendingCounterpartyPermissionRequests.clear();
       chromeStorageService.remove('counterpartyPermissionRequest');
+
+      // Reject any CWI handlers waiting for wallet unlock
+      for (const waiter of pendingWalletWaiters.splice(0)) {
+        waiter.reject(new Error('User dismissed the unlock request'));
+      }
 
       popupWindowId = undefined;
       chromeStorageService.remove('popupWindowId');

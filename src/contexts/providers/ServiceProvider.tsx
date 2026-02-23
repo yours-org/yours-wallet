@@ -6,7 +6,7 @@ import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import mnee from '@mnee/ts-sdk';
 import { createContext } from '@1sat/actions';
 import { fetchExchangeRate } from '../../utils/wallet';
-import { AddressSyncFetcher, createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
+import { AddressSyncFetcher, createChromeCWI, OneSatServices } from '@1sat/wallet-remote';
 import { initSyncContext } from '../../initSyncContext';
 import { NetWork } from 'yours-wallet-provider';
 

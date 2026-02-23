@@ -379,7 +379,7 @@ export const BsvWallet = () => {
   }, [satSendAmount, bsvBalance]);
 
   const getAndSetBsvBalance = async () => {
-    const satoshis = await getWalletBalance(apiContext.wallet);
+    const satoshis = await getWalletBalance();
     setBsvBalance(satoshis / 100_000_000);
     const rate = await fetchExchangeRate(apiContext.chain, apiContext.wocApiKey);
     setExchangeRate(rate);

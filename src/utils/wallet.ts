@@ -1,8 +1,6 @@
-import type { WalletInterface } from '@bsv/sdk';
 import { WOC_MAINNET_URL, WOC_TESTNET_URL, EXCHANGE_RATE_CACHE_TTL } from '@1sat/actions';
-
-// From @bsv/wallet-toolbox-mobile specOpWalletBalance
-const BALANCE_BASKET = '893b7646de0e1c9f741bd6e9169b76a8847ae34adef7bef1e6a285371206d2e8';
+import { sendMessageAsync } from './chromeHelpers';
+import { YoursEventName } from '../inject';
 
 let exchangeRateCache: { rate: number; timestamp: number } | null = null;
 
@@ -25,7 +23,12 @@ export async function fetchExchangeRate(chain: 'main' | 'test', wocApiKey?: stri
   }
 }
 
-export async function getWalletBalance(wallet: WalletInterface): Promise<number> {
-  const r = await wallet.listOutputs({ basket: BALANCE_BASKET });
-  return r.totalOutputs;
+export async function getWalletBalance(): Promise<number> {
+  const response = await sendMessageAsync<{ success: boolean; data?: number; error?: string }>({
+    action: YoursEventName.GET_BALANCE,
+  });
+  if (!response.success) {
+    throw new Error(response.error || 'Failed to get balance');
+  }
+  return response.data ?? 0;
 }

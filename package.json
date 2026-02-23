@@ -6,7 +6,7 @@
   "dependencies": {
     "@1sat/actions": "^0.0.7",
     "@1sat/client": "^0.0.6",
-    "@1sat/wallet-browser": "^0.0.10",
+    "@1sat/wallet-remote": "file:../1sat-sdk/packages/wallet-remote/1sat-wallet-remote-0.0.2.tgz",
     "@bsv/paymail": "^2.0.2",
     "@bsv/sdk": "^2.0.1",
     "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@2.0.5-idb-fix.2",

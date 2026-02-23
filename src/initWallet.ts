@@ -1,11 +1,10 @@
 import { NetWork } from 'yours-wallet-provider';
 import {
   AddressSyncProcessor,
-  createWebWallet,
-  type FullSyncResult,
-  type FullSyncStage,
-  type WebWalletConfig,
-} from '@1sat/wallet-browser';
+  createRemoteWallet,
+  type RemoteWalletConfig,
+  Wallet,
+} from '@1sat/wallet-remote';
 import { WalletPermissionsManager, type PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { decrypt } from './utils/crypto';
@@ -84,11 +83,8 @@ const decryptKeys = (chromeStorageService: ChromeStorageService): Keys => {
  */
 export interface AccountContext {
   wallet: WalletPermissionsManager;
+  baseWallet: Wallet;
   syncContext: SyncContext;
-  /** Whether remote storage backup is connected */
-  remoteStorageConnected: boolean;
-  /** Full sync with remote storage (push/pull) */
-  fullSync?: (onProgress?: (stage: FullSyncStage, message: string) => void) => Promise<FullSyncResult>;
   /** Call to stop sync and destroy wallet */
   close: () => Promise<void>;
 }
@@ -101,8 +97,8 @@ export interface InitWalletOptions {
 /**
  * Initialize the Wallet instance with all sync components.
  *
- * This creates a signing-capable Wallet using keys from chrome storage,
- * then wires up all sync infrastructure (SyncProcessor, Monitor).
+ * Uses remote storage as the sole storage backend — no local IndexedDB.
+ * The server handles transaction lifecycle (broadcasting, proof checking).
  *
  * Throws if account or passKey is missing (caller should ensure authentication first).
  * Call this after user authentication (unlock).
@@ -124,26 +120,16 @@ export const initWallet = async (
   const network = chromeStorageService.getNetwork();
   const chain: Chain = network === NetWork.Mainnet ? 'main' : 'test';
 
-  const deviceId = chromeStorageService.storage?.deviceId;
-  if (!deviceId) {
-    throw new Error('No deviceId found in storage - migration may not have run');
-  }
-
-  // 2. Create wallet using factory
-  const walletConfig: WebWalletConfig = {
+  // 2. Create wallet using remote-only factory
+  const walletConfig: RemoteWalletConfig = {
     privateKey: keys.identityWif,
     chain,
     feeModel: { model: 'sat/kb', value: FEE_PER_KB },
     remoteStorageUrl:
       chain === 'main' ? 'https://1sat.shruggr.cloud/1sat/wallet' : 'https://testnet.api.1sat.app/1sat/wallet',
-    storageIdentityKey: deviceId,
-    onTransactionBroadcasted: options?.onTransactionBroadcasted,
-    onTransactionProven: options?.onTransactionProven
-      ? (txid, _blockHeight) => options.onTransactionProven!(txid)
-      : undefined,
   };
 
-  const { wallet: baseWallet, monitor, destroy: destroyWallet, fullSync } = await createWebWallet(walletConfig);
+  const { wallet: baseWallet, destroy: destroyWallet } = await createRemoteWallet(walletConfig);
 
   // 3. Wrap with permissions manager for external app access control
   const wallet = new WalletPermissionsManager(baseWallet, ADMIN_ORIGINATOR, DEFAULT_PERMISSIONS_CONFIG);
@@ -196,17 +182,10 @@ export const initWallet = async (
     sendSyncStatus({ status: 'error', message: data.message });
   });
 
-  // 6. Start sync operations (don't await - let them run in background)
-  // Note: Monitor callbacks (onTransactionBroadcasted/onTransactionProven) are
-  // configured in walletConfig above. The factory handles remote sync first,
-  // then calls our callbacks.
+  // 6. Start address sync (don't await - let it run in background)
   console.log('[initWallet] Starting processor...');
   processor.start().catch((error: unknown) => {
     console.error('[initWallet] Failed to start processor:', error);
-  });
-  console.log('[initWallet] Starting monitor tasks...');
-  monitor.startTasks().catch((error: unknown) => {
-    console.error('[initWallet] Monitor tasks error:', error);
   });
   console.log('[initWallet] Returning context');
 
@@ -218,9 +197,8 @@ export const initWallet = async (
 
   return {
     wallet,
+    baseWallet,
     syncContext,
-    remoteStorageConnected: !!fullSync,
-    fullSync,
     close,
   };
 };
