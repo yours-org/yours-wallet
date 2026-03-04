@@ -10,6 +10,7 @@ import { FormContainer, HeaderText, Text } from './Reusable';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursIcon } from './YoursIcon';
 import { sendMessageAsync } from '../utils/chromeHelpers';
+import { deriveKey } from '../utils/keys';
 
 const Container = styled.div<WhiteLabelTheme & { $isMobile: boolean }>`
   display: flex;

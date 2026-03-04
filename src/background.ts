@@ -419,10 +419,9 @@ if (isInServiceWorker) {
   };
 
   const verifyAccess = async (requestingOriginator: string): Promise<boolean> => {
-    // Check if wallet is unlocked - must have passKey to authorize external requests
+    // Check if wallet is locked - locked wallets cannot authorize external requests
     const storage = (await chromeStorageService.getAndSetStorage()) as ChromeStorageObject;
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account?.passKey) {
+    if (storage.isLocked) {
       return false;
     }
 
