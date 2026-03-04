@@ -134,7 +134,10 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const lockWallet = useCallback(async () => {
     if (!isReady) return;
     setIsLocked(true);
-  }, [isReady]);
+    // Remove passKey from storage when locking
+    // User must re-enter password to unlock
+    await services?.chromeStorageService?.update({ passKey: undefined });
+  }, [isReady, services]);
 
   useEffect(() => {
     const checkLockState = async () => {

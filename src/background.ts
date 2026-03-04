@@ -160,6 +160,25 @@ const ensureWallet = async (): Promise<WalletInterface> => {
   if (accountContext?.wallet) {
     return accountContext.wallet;
   }
+
+  // Check if wallet can be initialized silently (unlocked state)
+  await chromeStorageService.getAndSetStorage();
+  const { account, lastActiveTime, passKey } = chromeStorageService.getCurrentAccountObject();
+  const currentTime = Date.now();
+  const isUnlocked = passKey && lastActiveTime && currentTime - Number(lastActiveTime) < INACTIVITY_LIMIT;
+
+  if (isUnlocked && account?.encryptedKeys) {
+    // Wallet is unlocked - initialize silently without popup
+    const wallet = await initializeWallet();
+    if (wallet) {
+      // Resolve any pending waiters
+      pendingWalletWaiters.forEach(({ resolve }) => resolve(wallet));
+      pendingWalletWaiters.length = 0;
+      return wallet;
+    }
+  }
+
+  // Wallet is locked or initialization failed - prompt user to unlock
   return new Promise((resolve, reject) => {
     pendingWalletWaiters.push({ resolve, reject });
     if (pendingWalletWaiters.length === 1) {
@@ -400,24 +419,23 @@ if (isInServiceWorker) {
   };
 
   const verifyAccess = async (requestingOriginator: string): Promise<boolean> => {
+    // Check if wallet is unlocked - must have passKey to authorize external requests
+    const storage = (await chromeStorageService.getAndSetStorage()) as ChromeStorageObject;
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account?.passKey) {
+      return false;
+    }
+
     // Extension popup always has access (uses chrome-extension://<id> format)
     const extensionOrigin = `chrome-extension://${chrome.runtime.id}`;
-    console.log('[verifyAccess] requestingOriginator:', requestingOriginator, 'extensionOrigin:', extensionOrigin);
     if (requestingOriginator === extensionOrigin) {
-      console.log('[verifyAccess] Authorized: extension popup');
       return true;
     }
 
-    const { accounts, selectedAccount } = (await chromeStorageService.getAndSetStorage()) as ChromeStorageObject;
-    console.log('[verifyAccess] accounts:', !!accounts, 'selectedAccount:', selectedAccount);
+    const { accounts, selectedAccount } = storage;
     if (!accounts || !selectedAccount) return false;
     const whitelist = accounts[selectedAccount].settings.whitelist;
-    console.log(
-      '[verifyAccess] whitelist:',
-      whitelist?.map((i: WhitelistedApp) => i.domain),
-    );
     if (!whitelist) return false;
-    // External sites use hostname as originator, check against whitelist
     return whitelist.map((i: WhitelistedApp) => i.domain).includes(requestingOriginator);
   };
 
@@ -515,13 +533,17 @@ if (isInServiceWorker) {
             initializeWallet()
               .then((wallet) => {
                 sendResponse({ type: 'WALLET_UNLOCKED', success: !!wallet });
-                // Resolve any CWI handlers waiting for the wallet.
-                // Don't close the popup — the CWI flow may need it for a
-                // follow-up permission prompt (shown on /bsv-wallet route).
+                // Resolve any CWI handlers waiting for the wallet
                 if (wallet && pendingWalletWaiters.length > 0) {
                   for (const waiter of pendingWalletWaiters.splice(0)) {
                     waiter.resolve(wallet);
                   }
+                }
+                // Close the unlock popup — if permission is needed, a new popup will open
+                if (popupWindowId) {
+                  removeWindow(popupWindowId);
+                  popupWindowId = undefined;
+                  chrome.storage.local.remove('popupWindowId');
                 }
               })
               .catch((error: Error) => {
@@ -546,7 +568,9 @@ if (isInServiceWorker) {
       return;
     }
 
-    authorizeRequest(message).then((isAuthorized) => {
+    ensureWallet().then(() => {
+      return authorizeRequest(message);
+    }).then((isAuthorized) => {
       // CWI waitForAuthentication
       if (message.action === CWIEventName.WAIT_FOR_AUTHENTICATION) {
         return processCWIWaitForAuthentication(message, sendResponse, isAuthorized);
@@ -613,6 +637,12 @@ if (isInServiceWorker) {
         default:
           break;
       }
+    }).catch((error: Error) => {
+      sendResponse({
+        type: message.action,
+        success: false,
+        error: error.message || 'Wallet unavailable',
+      });
     });
 
     return true;
@@ -1049,17 +1079,12 @@ if (isInServiceWorker) {
   ) => {
     const domain = message.originator;
 
-    const forwardToManager = async () => {
-      try {
-        const w = await ensureWallet();
-        await w.waitForAuthentication({}, domain);
-      } catch (e) {
-        console.warn('[background] waitForAuthentication grouped flow error:', e);
-      }
+    const respond = (success: boolean, error?: string) => {
       sendResponse({
         type: CWIEventName.WAIT_FOR_AUTHENTICATION,
-        success: true,
-        data: { authenticated: true },
+        success,
+        data: success ? { authenticated: true } : undefined,
+        error,
       });
     };
 
@@ -1074,19 +1099,17 @@ if (isInServiceWorker) {
       isAuthorized,
       () => {
         responseCallbackForConnectRequest = (decision: Decision) => {
-          if (decision === 'approved') {
-            forwardToManager();
-          } else {
-            sendResponse({
-              type: CWIEventName.WAIT_FOR_AUTHENTICATION,
-              success: false,
-              error: 'User declined the connection request',
-            });
-          }
+          respond(decision === 'approved', decision !== 'approved' ? 'User declined the connection request' : undefined);
         };
       },
       () => {
-        forwardToManager();
+        respond(true);
+        // Close the unlock popup — connect approval not needed
+        if (popupWindowId) {
+          removeWindow(popupWindowId);
+          popupWindowId = undefined;
+          chrome.storage.local.remove('popupWindowId');
+        }
       },
     );
   };

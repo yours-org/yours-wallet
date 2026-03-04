@@ -32,6 +32,9 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   // Listen for storage changes so popup can detect new permission requests while open
   useEffect(() => {
     const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes.connectRequest?.newValue) {
+        setConnectRequest(changes.connectRequest.newValue);
+      }
       if (changes.permissionRequest?.newValue) {
         setPermissionRequest(changes.permissionRequest.newValue);
       }
