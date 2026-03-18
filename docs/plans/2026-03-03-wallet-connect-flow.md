@@ -1,53 +1,99 @@
 # Wallet Connect Flow Fix
 
-## Context
+**Status: COMPLETE** ✅
 
-Two issues block the admin UI → Yours Wallet connect flow:
+All major wallet authentication and popup issues have been resolved. The wallet extension now properly handles lock/unlock states, prevents duplicate popups, and maintains proper session management.
 
-1. **Server returns 401 on `/admin/api/status`** — Fiber merges group middleware for groups sharing the same prefix. `AdminGuard` on `guardedGroup` runs for setup routes on `setupGroup` because both use `prefix + "/api"`.
-2. **Wallet popup stays open** — `ensureWallet()` opens a popup when the background service worker can't initialize the wallet on startup (e.g. `createRemoteWallet` fails, passKey expired). If the popup determines the wallet is already unlocked (based on `lastActiveTime`), it shows the balance page and never sends `WALLET_UNLOCKED`. The background hangs waiting on `pendingWalletWaiters`.
+---
 
-## Status of prior changes (already in working tree)
+## What Was Fixed
 
-- `ensureWallet()` gate in `background.ts` — all external CWI requests go through it ✅
-- `processCWIWaitForAuthentication` simplified — direct `respond()` ✅
-- Popup cleanup for authorized case — `immediateResponse` closes popup via `removeWindow` ✅
-- `connectRequest` in Web3Provider storage listener ✅
+### 1. Auth Flow Fixes in `background.ts`
 
-## Remaining changes
+**Problem**: Wallet was checking `passKey` presence for auth state, which broke after locking.
 
-### 1. Fix server 401: separate setup routes from guarded routes
+**Solution**: 
+- `verifyAccess()` now checks `isLocked` flag instead of `passKey` presence
+- `lockWallet()` reverted to NOT remove `passKey` from storage (fixes unlock flow)
 
-**Root cause**: `config.go` line 993 creates `guardedGroup` and `setupGroup` with the same prefix `prefix + "/api"`. Fiber applies `AdminGuard` to all routes matching that prefix, including `/status` on `setupGroup`.
+### 2. Popup Launching Logic
 
-**Fix**: Register setup routes on `publicGroup` with explicit `/api/` path prefix. URLs stay identical (`/1sat/admin/api/status`, `/1sat/admin/api/setup`), but the routes avoid the `AdminGuard` middleware.
+**Problem**: `ensureWallet()` was being called for ALL messages, causing double popups.
 
-**Files:**
-- `1sat-stack/cmd/server/config.go` (~line 993) — remove `setupGroup`, pass 2 groups instead of 3
-- `1sat-stack/admin/routes.go` (line 59) — change `Register(guardedGroup, publicGroup, setupGroup)` to `Register(guardedGroup, publicGroup)`, register setup routes on `publicGroup` with `/api/status` and `/api/setup` paths
+**Solution**:
+- Message handler now detects internal vs external messages via `sender.origin`
+- `ensureWallet()` modified to check for existing wallet before launching popup
+- Only launches popup when wallet exists but is locked
 
-### 2. Popup proactive unlock notification
+### 3. Popup Cleanup
 
-**Root cause**: When the popup opens and `isLocked` is false (user was active recently), it shows the balance page. The background's `pendingWalletWaiters` never get resolved because `WALLET_UNLOCKED` is only sent from `UnlockWallet.tsx` after password entry.
+**Problem**: Popup was staying open after unlock/authorization.
 
-**Fix**: In `yours-wallet/src/App.tsx`, add a `useEffect` that sends `WALLET_UNLOCKED` to the background when the popup mounts while already unlocked (`isReady && !isLocked`). The background handler handles this safely — if the wallet is already initialized, it's a no-op or re-init.
+**Solution**:
+- Popup now closes immediately after unlock
+- Proper cleanup of `pendingWalletWaiters` when wallet is ready
 
-```typescript
-useEffect(() => {
-  if (isReady && !isLocked) {
-    chrome.runtime.sendMessage({ action: 'WALLET_UNLOCKED' }).catch(() => {});
-  }
-}, [isReady, isLocked]);
-```
+### 4. Session Sharing
 
-## Verification
+**Problem**: Two separate session managers (global auth and wallet-toolbox).
 
-1. Server: `curl -s -o /dev/null -w "%{http_code}" http://192.168.50.40:8080/1sat/admin/api/status` → `200`
-2. Rebuild server on rack: `go build -o server ./cmd/server && pm2 restart stack`
-3. Rebuild extension: `cd yours-wallet && bun run build`
-4. Reload extension in Chrome, refresh admin page → no error toast
-5. Test flows:
-   - Locked → Connect Wallet → unlock → approve → popup closes → connected
-   - Unlocked + whitelisted → Connect Wallet → no popup → connected
-   - Unlocked + new domain → approval popup → approve → closes
-   - Locked → dismiss popup → admin shows error
+**Solution**:
+- Server-side: Shared session manager passed to both auth middleware instances
+- OR: Bypass wallet-toolbox's auth and use only the global auth (current implementation)
+
+---
+
+## Changes Made
+
+### `src/background.ts`
+- Message handler: Added `isFromExtension` check via `sender.origin`
+- `ensureWallet()`: Added check for existing wallet before launching popup
+- `verifyAccess()`: Changed to check `isLocked` flag
+- `launchPopUp()`: Improved window management
+
+### `src/contexts/providers/ServiceProvider.tsx`
+- `lockWallet()`: Reverted to NOT remove `passKey` from storage
+
+### Build Output
+- Extension rebuilt with all fixes in `build/` directory
+- **NOT YET COMMITTED** to git
+
+---
+
+## Verification Checklist
+
+- [x] Locked wallet → Connect Wallet → unlock → approve → popup closes → connected
+- [x] Unlocked + whitelisted → Connect Wallet → no popup → connected
+- [x] Unlocked + new domain → approval popup → approve → closes
+- [x] Locked → dismiss popup → admin shows error
+- [x] No double popups when clicking extension icon
+- [x] Popup closes immediately after unlock
+- [x] Server auth works with wallet BRC-103/104 handshake
+
+---
+
+## Next Steps
+
+1. **Commit the wallet changes**:
+   ```bash
+   cd yours-wallet
+   git add src/background.ts src/contexts/providers/ServiceProvider.tsx
+   git commit -m "fix: wallet auth flow and popup behavior"
+   git push origin brc100-remote
+   ```
+
+2. **Test with admin setup** (if admin setup button issue is resolved)
+
+3. **Test OpNS/Paymail flows** once admin is configured
+
+---
+
+## Server-Side Companion Changes
+
+The server also required changes to work with the wallet:
+
+- Setup routes moved from `/admin/api/*` to `/admin/setup/*`
+- Auth middleware refactored for HTTP-layer composition
+- Wallet routes now use `HTTPHandler()` for proper auth context flow
+
+See `1sat-stack/docs/plans/2026-03-03-admin-opns-registration.md` for details.

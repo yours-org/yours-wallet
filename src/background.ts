@@ -10,17 +10,28 @@ import {
 import { CWIEventName } from './cwi';
 import type {
   ListOutputsArgs,
+  RelinquishOutputArgs,
   ListActionsArgs,
   GetPublicKeyArgs,
   GetHeaderArgs,
+  CreateHmacArgs,
   CreateSignatureArgs,
   VerifySignatureArgs,
   VerifyHmacArgs,
   CreateActionArgs,
   SignActionArgs,
   AbortActionArgs,
+  InternalizeActionArgs,
   WalletEncryptArgs,
   WalletDecryptArgs,
+  RevealCounterpartyKeyLinkageArgs,
+  RevealSpecificKeyLinkageArgs,
+  AcquireCertificateArgs,
+  ListCertificatesArgs,
+  ProveCertificateArgs,
+  RelinquishCertificateArgs,
+  DiscoverByIdentityKeyArgs,
+  DiscoverByAttributesArgs,
   WalletInterface,
 } from '@bsv/sdk';
 import type {
@@ -178,7 +189,14 @@ const ensureWallet = async (): Promise<WalletInterface> => {
     }
   }
 
-  // Wallet is locked or initialization failed - prompt user to unlock
+  // Wallet is locked or no wallet exists - check if we should prompt
+  // Only launch popup if there's an existing wallet to unlock (encryptedKeys exists)
+  // If no wallet exists at all, don't launch popup - the default_popup will show create wallet UI
+  if (!account?.encryptedKeys) {
+    return Promise.reject(new Error('No wallet exists - create wallet first'));
+  }
+
+  // Wallet exists but is locked - prompt user to unlock
   return new Promise((resolve, reject) => {
     pendingWalletWaiters.push({ resolve, reject });
     if (pendingWalletWaiters.length === 1) {
@@ -286,15 +304,19 @@ const bindPermissionCallbacks = (manager: WalletPermissionsManager) => {
  * Returns a promise that resolves when user grants permission or rejects when denied.
  */
 const showPermissionPrompt = (request: PermissionRequest & { requestID: string }): Promise<void> => {
+  console.log('[background] showPermissionPrompt called, requestID:', request.requestID, 'type:', request.type);
   return new Promise((resolve, reject) => {
     pendingPermissionRequests.set(request.requestID, { request, resolve, reject });
     chromeStorageService.update({ permissionRequest: request }).then(() => {
+      console.log('[background] showPermissionPrompt: storage updated, popupWindowId:', popupWindowId);
       if (popupWindowId) {
         chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
+          console.log('[background] showPermissionPrompt: existing popup gone, creating new');
           popupWindowId = undefined;
           launchPopUp();
         });
       } else {
+        console.log('[background] showPermissionPrompt: no popup, launching new');
         launchPopUp();
       }
     });
@@ -374,6 +396,7 @@ if (isInServiceWorker) {
   };
 
   const createNewPopup = () => {
+    console.log('[background] createNewPopup called');
     chrome.windows.create(
       {
         url: chrome.runtime.getURL('index.html'),
@@ -393,28 +416,46 @@ if (isInServiceWorker) {
   };
 
   launchPopUp = () => {
-    // Fast path: module-level variable still has the popup ID
-    if (popupWindowId) {
-      chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
-        popupWindowId = undefined;
-        createNewPopup();
-      });
-      return;
-    }
-    // Module-level var is lost after service worker suspension; check storage
-    chrome.storage.local.get('popupWindowId', (result) => {
-      if (result.popupWindowId) {
-        chrome.windows.update(result.popupWindowId, { focused: true })
-          .then(() => {
-            popupWindowId = result.popupWindowId;
-          })
-          .catch(() => {
-            chrome.storage.local.remove('popupWindowId');
-            createNewPopup();
-          });
-      } else {
-        createNewPopup();
+    console.log('[background] launchPopUp called');
+    // Check if any popup window with our extension URL is already open
+    // This handles the case where Chrome's default_popup is already showing
+    chrome.windows.getAll({ populate: true }, (windows) => {
+      const existingPopup = windows.find(w => 
+        w.type === 'popup' && 
+        w.tabs?.some(tab => tab.url?.startsWith(chrome.runtime.getURL('')))
+      );
+      
+      if (existingPopup) {
+        // Focus existing popup instead of creating duplicate
+        chrome.windows.update(existingPopup.id!, { focused: true });
+        popupWindowId = existingPopup.id;
+        return;
       }
+
+      // Fast path: module-level variable still has the popup ID
+      if (popupWindowId) {
+        chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
+          popupWindowId = undefined;
+          createNewPopup();
+        });
+        return;
+      }
+      
+      // Module-level var is lost after service worker suspension; check storage
+      chrome.storage.local.get('popupWindowId', (result) => {
+        if (result.popupWindowId) {
+          chrome.windows.update(result.popupWindowId, { focused: true })
+            .then(() => {
+              popupWindowId = result.popupWindowId;
+            })
+            .catch(() => {
+              chrome.storage.local.remove('popupWindowId');
+              createNewPopup();
+            });
+        } else {
+          createNewPopup();
+        }
+      });
     });
   };
 
@@ -446,8 +487,11 @@ if (isInServiceWorker) {
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse: CallbackResponse) => {
-    console.log('[background] Received message:', message.action, 'originator:', message.originator);
+  chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
+    console.log('[background] Received message:', message.action, 'originator:', message.originator, 'from:', sender.origin);
+
+    // Check if message is from our own extension popup
+    const isFromExtension = sender.origin?.startsWith(`chrome-extension://${chrome.runtime.id}`);
 
     // Handle yours wallet events that should be broadcast
     if ([YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT].includes(message.action)) {
@@ -461,6 +505,8 @@ if (isInServiceWorker) {
       YoursEventName.SIGNED_OUT,
       // CWI auth check (no auth required - just checks status)
       CWIEventName.IS_AUTHENTICATED,
+      // CWI discovery (no auth required - substrate detection ping)
+      CWIEventName.GET_VERSION,
       // Permission responses from popup
       'PERMISSION_RESPONSE',
       'GROUPED_PERMISSION_RESPONSE',
@@ -489,6 +535,14 @@ if (isInServiceWorker) {
         // CWI auth check
         case CWIEventName.IS_AUTHENTICATED:
           return processCWIIsAuthenticated(message.originator, sendResponse);
+        // CWI discovery - substrate detection ping, no wallet needed
+        case CWIEventName.GET_VERSION:
+          sendResponse({
+            type: CWIEventName.GET_VERSION,
+            success: true,
+            data: { version: 'yours-wallet-1.0.0' },
+          });
+          return true;
         // Permission responses from popup UI
         case 'PERMISSION_RESPONSE':
           return processPermissionResponse(message as { requestID: string; granted: boolean; expiry?: number });
@@ -567,9 +621,28 @@ if (isInServiceWorker) {
       return;
     }
 
+    // If message is from our own extension popup, check wallet state without launching popup
+    // The popup handles its own UI (unlock/create wallet pages)
+    if (isFromExtension) {
+      const { account, passKey } = chromeStorageService.getCurrentAccountObject();
+      const isWalletAvailable = account?.encryptedKeys && passKey;
+      
+      if (!isWalletAvailable) {
+        sendResponse({
+          type: message.action,
+          success: false,
+          error: 'Wallet not available',
+        });
+        return true;
+      }
+      // Wallet is available, continue to authorize
+    }
+
     ensureWallet().then(() => {
+      console.log('[background] ensureWallet resolved for action:', message.action);
       return authorizeRequest(message);
     }).then((isAuthorized) => {
+      console.log('[background] authorizeRequest result for', message.action, ':', isAuthorized);
       // CWI waitForAuthentication
       if (message.action === CWIEventName.WAIT_FOR_AUTHENTICATION) {
         return processCWIWaitForAuthentication(message, sendResponse, isAuthorized);
@@ -614,6 +687,9 @@ if (isInServiceWorker) {
         case CWIEventName.VERIFY_HMAC:
           processCWIVerifyHmac(message, sendResponse);
           return true;
+        case CWIEventName.CREATE_HMAC:
+          processCWICreateHmac(message, sendResponse);
+          return true;
         case CWIEventName.CREATE_SIGNATURE:
           processCWICreateSignature(message, sendResponse);
           return true;
@@ -631,6 +707,36 @@ if (isInServiceWorker) {
           return true;
         case CWIEventName.ABORT_ACTION:
           processCWIAbortAction(message, sendResponse);
+          return true;
+        case CWIEventName.INTERNALIZE_ACTION:
+          processCWIInternalizeAction(message, sendResponse);
+          return true;
+        case CWIEventName.RELINQUISH_OUTPUT:
+          processCWIRelinquishOutput(message, sendResponse);
+          return true;
+        case CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE:
+          processCWIRevealCounterpartyKeyLinkage(message, sendResponse);
+          return true;
+        case CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE:
+          processCWIRevealSpecificKeyLinkage(message, sendResponse);
+          return true;
+        case CWIEventName.ACQUIRE_CERTIFICATE:
+          processCWIAcquireCertificate(message, sendResponse);
+          return true;
+        case CWIEventName.LIST_CERTIFICATES:
+          processCWIListCertificates(message, sendResponse);
+          return true;
+        case CWIEventName.PROVE_CERTIFICATE:
+          processCWIProveCertificate(message, sendResponse);
+          return true;
+        case CWIEventName.RELINQUISH_CERTIFICATE:
+          processCWIRelinquishCertificate(message, sendResponse);
+          return true;
+        case CWIEventName.DISCOVER_BY_IDENTITY_KEY:
+          processCWIDiscoverByIdentityKey(message, sendResponse);
+          return true;
+        case CWIEventName.DISCOVER_BY_ATTRIBUTES:
+          processCWIDiscoverByAttributes(message, sendResponse);
           return true;
 
         default:
@@ -1222,15 +1328,18 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
+      console.log('[background] processCWIGetPublicKey: entering, params:', JSON.stringify(message.params), 'originator:', message.originator);
       const w = await ensureWallet();
-
+      console.log('[background] processCWIGetPublicKey: ensureWallet resolved, calling w.getPublicKey...');
       const result = await w.getPublicKey(message.params, message.originator);
+      console.log('[background] processCWIGetPublicKey: getPublicKey returned successfully');
       sendResponse({
         type: CWIEventName.GET_PUBLIC_KEY,
         success: true,
         data: result,
       });
     } catch (error) {
+      console.error('[background] processCWIGetPublicKey: error:', error);
       sendResponse({
         type: CWIEventName.GET_PUBLIC_KEY,
         success: false,
@@ -1268,17 +1377,46 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
+      console.log('[background] processCWIVerifySignature: entering, originator:', message.originator);
       const w = await ensureWallet();
-
+      console.log('[background] processCWIVerifySignature: ensureWallet resolved, calling w.verifySignature...');
       const result = await w.verifySignature(message.params, message.originator);
+      console.log('[background] processCWIVerifySignature: success');
       sendResponse({
         type: CWIEventName.VERIFY_SIGNATURE,
         success: true,
         data: result,
       });
     } catch (error) {
+      console.error('[background] processCWIVerifySignature: error:', error);
       sendResponse({
         type: CWIEventName.VERIFY_SIGNATURE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWICreateHmac = async (
+    message: { params: CreateHmacArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    console.log('[background] processCWICreateHmac called, originator:', message.originator, 'params:', JSON.stringify(message.params));
+    try {
+      const w = await ensureWallet();
+      console.log('[background] processCWICreateHmac: wallet obtained, calling w.createHmac...');
+      const result = await w.createHmac(message.params, message.originator);
+      console.log('[background] processCWICreateHmac: success');
+      sendResponse({
+        type: CWIEventName.CREATE_HMAC,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error('[background] processCWICreateHmac: error:', error);
+      sendResponse({
+        type: CWIEventName.CREATE_HMAC,
         success: false,
         error: error instanceof Error ? error.message : JSON.stringify(error),
       });
@@ -1291,15 +1429,18 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
+      console.log('[background] processCWIVerifyHmac: entering, originator:', message.originator);
       const w = await ensureWallet();
-
+      console.log('[background] processCWIVerifyHmac: ensureWallet resolved, calling w.verifyHmac...');
       const result = await w.verifyHmac(message.params, message.originator);
+      console.log('[background] processCWIVerifyHmac: success');
       sendResponse({
         type: CWIEventName.VERIFY_HMAC,
         success: true,
         data: result,
       });
     } catch (error) {
+      console.error('[background] processCWIVerifyHmac: error:', error);
       sendResponse({
         type: CWIEventName.VERIFY_HMAC,
         success: false,
@@ -1315,16 +1456,18 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
+      console.log('[background] processCWICreateSignature: entering, originator:', message.originator);
       const w = await ensureWallet();
-
-      // WalletPermissionsManager will trigger callbacks if permission is needed
+      console.log('[background] processCWICreateSignature: ensureWallet resolved, calling w.createSignature...');
       const result = await w.createSignature(message.params, message.originator);
+      console.log('[background] processCWICreateSignature: success');
       sendResponse({
         type: CWIEventName.CREATE_SIGNATURE,
         success: true,
         data: result,
       });
     } catch (error) {
+      console.error('[background] processCWICreateSignature: error:', error);
       sendResponse({
         type: CWIEventName.CREATE_SIGNATURE,
         success: false,
@@ -1440,12 +1583,21 @@ if (isInServiceWorker) {
       const w = await ensureWallet();
 
       const result = await w.signAction(message.params, message.originator);
+      console.log('[signAction] Success:', JSON.stringify(result, null, 2));
       sendResponse({
         type: CWIEventName.SIGN_ACTION,
         success: true,
         data: result,
       });
     } catch (error) {
+      console.error('[signAction] Error:', error);
+      if (error && typeof error === 'object') {
+        const { sendWithResults, txid, code } = error as Record<string, unknown>;
+        if (sendWithResults) {
+          console.error('[signAction] sendWithResults:', JSON.stringify(sendWithResults, null, 2));
+          console.error('[signAction] txid:', txid, 'code:', code);
+        }
+      }
       sendResponse({
         type: CWIEventName.SIGN_ACTION,
         success: false,
@@ -1479,6 +1631,226 @@ if (isInServiceWorker) {
     return true;
   };
 
+  const processCWIInternalizeAction = async (
+    message: { params: InternalizeActionArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.internalizeAction(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.INTERNALIZE_ACTION,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.INTERNALIZE_ACTION,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIRelinquishOutput = async (
+    message: { params: RelinquishOutputArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.relinquishOutput(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.RELINQUISH_OUTPUT,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.RELINQUISH_OUTPUT,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIRevealCounterpartyKeyLinkage = async (
+    message: { params: RevealCounterpartyKeyLinkageArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.revealCounterpartyKeyLinkage(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIRevealSpecificKeyLinkage = async (
+    message: { params: RevealSpecificKeyLinkageArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.revealSpecificKeyLinkage(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIAcquireCertificate = async (
+    message: { params: AcquireCertificateArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.acquireCertificate(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.ACQUIRE_CERTIFICATE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.ACQUIRE_CERTIFICATE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIListCertificates = async (
+    message: { params: ListCertificatesArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.listCertificates(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.LIST_CERTIFICATES,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.LIST_CERTIFICATES,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIProveCertificate = async (
+    message: { params: ProveCertificateArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.proveCertificate(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.PROVE_CERTIFICATE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.PROVE_CERTIFICATE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIRelinquishCertificate = async (
+    message: { params: RelinquishCertificateArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.relinquishCertificate(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.RELINQUISH_CERTIFICATE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.RELINQUISH_CERTIFICATE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIDiscoverByIdentityKey = async (
+    message: { params: DiscoverByIdentityKeyArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.discoverByIdentityKey(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.DISCOVER_BY_IDENTITY_KEY,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.DISCOVER_BY_IDENTITY_KEY,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIDiscoverByAttributes = async (
+    message: { params: DiscoverByAttributesArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.discoverByAttributes(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.DISCOVER_BY_ATTRIBUTES,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.DISCOVER_BY_ATTRIBUTES,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
   // CONNECT RESPONSE ********************************
 
   const processConnectResponse = (response: { decision: Decision }) => {
@@ -1498,10 +1870,11 @@ if (isInServiceWorker) {
       console.error('Error in connect response callback:', error);
     } finally {
       responseCallbackForConnectRequest = null;
+      chromeStorageService.remove('connectRequest');
       chromeStorageService.getAndSetStorage().then((res) => {
         if (res?.popupWindowId) {
           removeWindow(res.popupWindowId);
-          chromeStorageService.remove(['connectRequest', 'popupWindowId']);
+          chromeStorageService.remove('popupWindowId');
         }
       });
     }

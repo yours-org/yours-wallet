@@ -8,7 +8,6 @@
 
 import { PublicKey, Utils, type WalletInterface } from '@bsv/sdk';
 import {
-  AddressSyncQueueIdb,
   OneSatServices,
   AddressManager,
   YOURS_PREFIX,
@@ -27,8 +26,6 @@ export interface SyncContextOptions {
   wallet: WalletInterface;
   /** Chain: 'main' or 'test' */
   chain: 'main' | 'test';
-  /** Account ID for IndexedDB namespace */
-  accountId: string;
   /** Maximum key index for address derivation (0-based, so 4 = 5 addresses) */
   maxKeyIndex: number;
 }
@@ -36,8 +33,6 @@ export interface SyncContextOptions {
 export interface SyncContext {
   /** 1Sat services for SSE and transaction fetching */
   services: OneSatServices;
-  /** Sync queue (IndexedDB-backed) */
-  syncQueue: AddressSyncQueueIdb;
   /** Address manager for looking up addresses */
   addressManager: AddressManager;
 }
@@ -92,13 +87,10 @@ async function deriveAddresses(
  * Initialize the sync context.
  *
  * Derives addresses using the wallet interface (with admin originator),
- * then creates OneSatServices, IndexedDbSyncQueue, and AddressManager.
- *
- * Both UI and service worker can call this independently - they
- * share the same IndexedDB database.
+ * then creates OneSatServices and AddressManager.
  */
 export async function initSyncContext(options: SyncContextOptions): Promise<SyncContext> {
-  const { wallet, chain, accountId, maxKeyIndex } = options;
+  const { wallet, chain, maxKeyIndex } = options;
 
   // Derive addresses with admin originator for permission checks
   const { derivations } = await deriveAddresses(wallet, maxKeyIndex);
@@ -109,12 +101,8 @@ export async function initSyncContext(options: SyncContextOptions): Promise<Sync
   // Create services (1Sat ecosystem)
   const services = new OneSatServices(chain);
 
-  // Create sync queue (IndexedDB)
-  const syncQueue = new AddressSyncQueueIdb(accountId);
-
   return {
     services,
-    syncQueue,
     addressManager,
   };
 }

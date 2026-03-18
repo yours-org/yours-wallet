@@ -1,10 +1,11 @@
 import { NetWork } from 'yours-wallet-provider';
 import {
-  AddressSyncProcessor,
   createRemoteWallet,
   type RemoteWalletConfig,
+  YOURS_PREFIX,
   Wallet,
 } from '@1sat/wallet-remote';
+import { syncAddresses, createContext as createActionContext } from '@1sat/actions';
 import { WalletPermissionsManager, type PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { decrypt } from './utils/crypto';
@@ -116,7 +117,6 @@ export const initWallet = async (
     throw new Error('No identity key found in decrypted keys');
   }
 
-  const { selectedAccount } = chromeStorageService.getCurrentAccountObject();
   const network = chromeStorageService.getNetwork();
   const chain: Chain = network === NetWork.Mainnet ? 'main' : 'test';
 
@@ -127,6 +127,7 @@ export const initWallet = async (
     feeModel: { model: 'sat/kb', value: FEE_PER_KB },
     remoteStorageUrl:
       chain === 'main' ? 'https://1sat.shruggr.cloud/1sat/wallet' : 'https://testnet.api.1sat.app/1sat/wallet',
+    localBackup: true,
   };
 
   const { wallet: baseWallet, destroy: destroyWallet } = await createRemoteWallet(walletConfig);
@@ -139,22 +140,12 @@ export const initWallet = async (
   const syncContext = await initSyncContext({
     wallet,
     chain,
-    accountId: selectedAccount || '',
     maxKeyIndex,
   });
 
-  const { services, syncQueue, addressManager } = syncContext;
+  // 5. Run address sync via syncAddresses action (fire-and-forget)
+  const actionCtx = createActionContext(baseWallet, { chain, services: syncContext.services });
 
-  // 5. Create AddressSyncProcessor (processes external payments from queue)
-  const processor = new AddressSyncProcessor({
-    wallet: baseWallet,
-    services,
-    syncQueue,
-    addressManager,
-    network: chain === 'main' ? 'mainnet' : 'testnet',
-  });
-
-  // Subscribe to processor events and forward to popup
   const sendSyncStatus = (data: { status: string; [key: string]: unknown }) => {
     chrome.runtime
       .sendMessage({
@@ -166,32 +157,29 @@ export const initWallet = async (
       });
   };
 
-  processor.on('process:start', () => {
-    sendSyncStatus({ status: 'start', addressCount: maxKeyIndex + 1 });
-  });
+  console.log('[initWallet] Starting address sync...');
+  sendSyncStatus({ status: 'start', addressCount: maxKeyIndex + 1 });
 
-  processor.on('process:progress', (data) => {
-    sendSyncStatus({ status: 'progress', ...data });
-  });
-
-  processor.on('process:complete', () => {
-    sendSyncStatus({ status: 'complete' });
-  });
-
-  processor.on('process:error', (data) => {
-    sendSyncStatus({ status: 'error', message: data.message });
-  });
-
-  // 6. Start address sync (don't await - let it run in background)
-  console.log('[initWallet] Starting processor...');
-  processor.start().catch((error: unknown) => {
-    console.error('[initWallet] Failed to start processor:', error);
-  });
-  console.log('[initWallet] Returning context');
+  syncAddresses
+    .execute(actionCtx, {
+      prefix: YOURS_PREFIX,
+      count: maxKeyIndex + 1,
+      onProgress: (progress) => {
+        sendSyncStatus({ status: 'progress', ...progress });
+      },
+    })
+    .then((result) => {
+      sendSyncStatus({ status: 'complete', ...result });
+      console.log('[initWallet] Address sync complete:', result);
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      sendSyncStatus({ status: 'error', message });
+      console.error('[initWallet] Address sync failed:', error);
+    });
 
   // Create close function
   const close = async () => {
-    processor.stop();
     await destroyWallet();
   };
 

@@ -1,13 +1,12 @@
-import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useState } from 'react';
 import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { KeysService } from '../../services/Keys.service';
 import { INACTIVITY_LIMIT, MNEE_API_TOKEN } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import mnee from '@mnee/ts-sdk';
-import { createContext } from '@1sat/actions';
+import { createContext, syncAddresses } from '@1sat/actions';
 import { fetchExchangeRate } from '../../utils/wallet';
-import { AddressSyncFetcher, createChromeCWI, OneSatServices } from '@1sat/wallet-remote';
-import { initSyncContext } from '../../initSyncContext';
+import { createChromeCWI, OneSatServices, YOURS_PREFIX } from '@1sat/wallet-remote';
 import { NetWork } from 'yours-wallet-provider';
 
 const initializeServices = async () => {
@@ -37,8 +36,6 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [services, setServices] = useState<Partial<ServiceContextProps>>({});
   const [isLocked, setIsLocked] = useState<boolean>(true); // Start locked until checkLockState runs
   const [isReady, setIsReady] = useState<boolean>(false);
-  const syncFetcherRef = useRef<AddressSyncFetcher | null>(null);
-
   useEffect(() => {
     if (services?.chromeStorageService) {
       const timestamp = Date.now();
@@ -82,54 +79,36 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Start SyncFetcher when wallet is unlocked (isLocked changes to false)
+  // Run syncAddresses when wallet is unlocked
   useEffect(() => {
-    if (!isReady || isLocked || !services?.chromeStorageService || !services?.apiContext) {
+    if (!isReady || isLocked || !services?.apiContext) {
       return;
     }
 
-    const startSync = async () => {
+    let cancelled = false;
+
+    const runSync = async () => {
       try {
-        const { selectedAccount } = services.chromeStorageService!.getCurrentAccountObject();
-        const network = services.chromeStorageService!.getNetwork();
-        const chain = network === NetWork.Mainnet ? 'main' : 'test';
-        // TODO: Load maxKeyIndex from chrome.storage, for now use 5 addresses
-        const maxKeyIndex = 4; // 0-4 = 5 addresses
-
-        const chromeCWI = createChromeCWI();
-        const syncContext = await initSyncContext({
-          wallet: chromeCWI,
-          chain,
-          accountId: selectedAccount || '',
-          maxKeyIndex,
+        const result = await syncAddresses.execute(services.apiContext!, {
+          prefix: YOURS_PREFIX,
+          count: 5,
         });
-
-        // Create and start address sync fetcher
-        const fetcher = new AddressSyncFetcher({
-          services: syncContext.services,
-          syncQueue: syncContext.syncQueue,
-          addressManager: syncContext.addressManager,
-        });
-        syncFetcherRef.current = fetcher;
-
-        // Get current block height and start fetching
-        const height = await syncContext.services.chaintracks.currentHeight();
-        fetcher.fetch(height).catch((err) => {
-          console.error('SyncFetcher error:', err);
-        });
+        if (!cancelled) {
+          console.log('[ServiceProvider] Address sync complete:', result);
+        }
       } catch (error) {
-        console.error('Error starting sync:', error);
+        if (!cancelled) {
+          console.error('[ServiceProvider] Address sync error:', error);
+        }
       }
     };
 
-    startSync();
+    runSync();
 
     return () => {
-      // Stop fetcher when wallet is locked or component unmounts
-      syncFetcherRef.current?.stop();
-      syncFetcherRef.current = null;
+      cancelled = true;
     };
-  }, [isReady, isLocked, services?.chromeStorageService, services?.apiContext]);
+  }, [isReady, isLocked, services?.apiContext]);
 
   const lockWallet = useCallback(async () => {
     if (!isReady) return;
