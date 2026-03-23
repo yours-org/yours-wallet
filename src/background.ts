@@ -420,11 +420,10 @@ if (isInServiceWorker) {
     // Check if any popup window with our extension URL is already open
     // This handles the case where Chrome's default_popup is already showing
     chrome.windows.getAll({ populate: true }, (windows) => {
-      const existingPopup = windows.find(w => 
-        w.type === 'popup' && 
-        w.tabs?.some(tab => tab.url?.startsWith(chrome.runtime.getURL('')))
+      const existingPopup = windows.find(
+        (w) => w.type === 'popup' && w.tabs?.some((tab) => tab.url?.startsWith(chrome.runtime.getURL(''))),
       );
-      
+
       if (existingPopup) {
         // Focus existing popup instead of creating duplicate
         chrome.windows.update(existingPopup.id!, { focused: true });
@@ -440,11 +439,12 @@ if (isInServiceWorker) {
         });
         return;
       }
-      
+
       // Module-level var is lost after service worker suspension; check storage
       chrome.storage.local.get('popupWindowId', (result) => {
         if (result.popupWindowId) {
-          chrome.windows.update(result.popupWindowId, { focused: true })
+          chrome.windows
+            .update(result.popupWindowId, { focused: true })
             .then(() => {
               popupWindowId = result.popupWindowId;
             })
@@ -488,7 +488,14 @@ if (isInServiceWorker) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
-    console.log('[background] Received message:', message.action, 'originator:', message.originator, 'from:', sender.origin);
+    console.log(
+      '[background] Received message:',
+      message.action,
+      'originator:',
+      message.originator,
+      'from:',
+      sender.origin,
+    );
 
     // Check if message is from our own extension popup
     const isFromExtension = sender.origin?.startsWith(`chrome-extension://${chrome.runtime.id}`);
@@ -639,7 +646,7 @@ if (isInServiceWorker) {
     if (isFromExtension) {
       const { account, passKey } = chromeStorageService.getCurrentAccountObject();
       const isWalletAvailable = account?.encryptedKeys && passKey;
-      
+
       if (!isWalletAvailable) {
         sendResponse({
           type: message.action,
@@ -651,118 +658,120 @@ if (isInServiceWorker) {
       // Wallet is available, continue to authorize
     }
 
-    ensureWallet().then(() => {
-      console.log('[background] ensureWallet resolved for action:', message.action);
-      return authorizeRequest(message);
-    }).then((isAuthorized) => {
-      console.log('[background] authorizeRequest result for', message.action, ':', isAuthorized);
-      // CWI waitForAuthentication
-      if (message.action === CWIEventName.WAIT_FOR_AUTHENTICATION) {
-        return processCWIWaitForAuthentication(message, sendResponse, isAuthorized);
-      }
+    ensureWallet()
+      .then(() => {
+        console.log('[background] ensureWallet resolved for action:', message.action);
+        return authorizeRequest(message);
+      })
+      .then((isAuthorized) => {
+        console.log('[background] authorizeRequest result for', message.action, ':', isAuthorized);
+        // CWI waitForAuthentication
+        if (message.action === CWIEventName.WAIT_FOR_AUTHENTICATION) {
+          return processCWIWaitForAuthentication(message, sendResponse, isAuthorized);
+        }
 
-      if (!isAuthorized) {
+        if (!isAuthorized) {
+          sendResponse({
+            type: message.action,
+            success: false,
+            error: 'Unauthorized!',
+          });
+          return;
+        }
+
+        switch (message.action) {
+          // CWI (BRC-100) handlers - direct passthrough to wallet
+          // WalletPermissionsManager handles permission prompts internally
+          case CWIEventName.LIST_OUTPUTS:
+            processCWIListOutputs(message, sendResponse);
+            return true;
+          case CWIEventName.GET_NETWORK:
+            processCWIGetNetwork(sendResponse);
+            return true;
+          case CWIEventName.GET_HEIGHT:
+            processCWIGetHeight(sendResponse);
+            return true;
+          case CWIEventName.GET_HEADER_FOR_HEIGHT:
+            processCWIGetHeaderForHeight(message, sendResponse);
+            return true;
+          case CWIEventName.GET_VERSION:
+            processCWIGetVersion(sendResponse);
+            return true;
+          case CWIEventName.GET_PUBLIC_KEY:
+            processCWIGetPublicKey(message, sendResponse);
+            return true;
+          case CWIEventName.LIST_ACTIONS:
+            processCWIListActions(message, sendResponse);
+            return true;
+          case CWIEventName.VERIFY_SIGNATURE:
+            processCWIVerifySignature(message, sendResponse);
+            return true;
+          case CWIEventName.VERIFY_HMAC:
+            processCWIVerifyHmac(message, sendResponse);
+            return true;
+          case CWIEventName.CREATE_HMAC:
+            processCWICreateHmac(message, sendResponse);
+            return true;
+          case CWIEventName.CREATE_SIGNATURE:
+            processCWICreateSignature(message, sendResponse);
+            return true;
+          case CWIEventName.ENCRYPT:
+            processCWIEncrypt(message, sendResponse);
+            return true;
+          case CWIEventName.DECRYPT:
+            processCWIDecrypt(message, sendResponse);
+            return true;
+          case CWIEventName.CREATE_ACTION:
+            processCWICreateAction(message, sendResponse);
+            return true;
+          case CWIEventName.SIGN_ACTION:
+            processCWISignAction(message, sendResponse);
+            return true;
+          case CWIEventName.ABORT_ACTION:
+            processCWIAbortAction(message, sendResponse);
+            return true;
+          case CWIEventName.INTERNALIZE_ACTION:
+            processCWIInternalizeAction(message, sendResponse);
+            return true;
+          case CWIEventName.RELINQUISH_OUTPUT:
+            processCWIRelinquishOutput(message, sendResponse);
+            return true;
+          case CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE:
+            processCWIRevealCounterpartyKeyLinkage(message, sendResponse);
+            return true;
+          case CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE:
+            processCWIRevealSpecificKeyLinkage(message, sendResponse);
+            return true;
+          case CWIEventName.ACQUIRE_CERTIFICATE:
+            processCWIAcquireCertificate(message, sendResponse);
+            return true;
+          case CWIEventName.LIST_CERTIFICATES:
+            processCWIListCertificates(message, sendResponse);
+            return true;
+          case CWIEventName.PROVE_CERTIFICATE:
+            processCWIProveCertificate(message, sendResponse);
+            return true;
+          case CWIEventName.RELINQUISH_CERTIFICATE:
+            processCWIRelinquishCertificate(message, sendResponse);
+            return true;
+          case CWIEventName.DISCOVER_BY_IDENTITY_KEY:
+            processCWIDiscoverByIdentityKey(message, sendResponse);
+            return true;
+          case CWIEventName.DISCOVER_BY_ATTRIBUTES:
+            processCWIDiscoverByAttributes(message, sendResponse);
+            return true;
+
+          default:
+            break;
+        }
+      })
+      .catch((error: Error) => {
         sendResponse({
           type: message.action,
           success: false,
-          error: 'Unauthorized!',
+          error: error.message || 'Wallet unavailable',
         });
-        return;
-      }
-
-      switch (message.action) {
-        // CWI (BRC-100) handlers - direct passthrough to wallet
-        // WalletPermissionsManager handles permission prompts internally
-        case CWIEventName.LIST_OUTPUTS:
-          processCWIListOutputs(message, sendResponse);
-          return true;
-        case CWIEventName.GET_NETWORK:
-          processCWIGetNetwork(sendResponse);
-          return true;
-        case CWIEventName.GET_HEIGHT:
-          processCWIGetHeight(sendResponse);
-          return true;
-        case CWIEventName.GET_HEADER_FOR_HEIGHT:
-          processCWIGetHeaderForHeight(message, sendResponse);
-          return true;
-        case CWIEventName.GET_VERSION:
-          processCWIGetVersion(sendResponse);
-          return true;
-        case CWIEventName.GET_PUBLIC_KEY:
-          processCWIGetPublicKey(message, sendResponse);
-          return true;
-        case CWIEventName.LIST_ACTIONS:
-          processCWIListActions(message, sendResponse);
-          return true;
-        case CWIEventName.VERIFY_SIGNATURE:
-          processCWIVerifySignature(message, sendResponse);
-          return true;
-        case CWIEventName.VERIFY_HMAC:
-          processCWIVerifyHmac(message, sendResponse);
-          return true;
-        case CWIEventName.CREATE_HMAC:
-          processCWICreateHmac(message, sendResponse);
-          return true;
-        case CWIEventName.CREATE_SIGNATURE:
-          processCWICreateSignature(message, sendResponse);
-          return true;
-        case CWIEventName.ENCRYPT:
-          processCWIEncrypt(message, sendResponse);
-          return true;
-        case CWIEventName.DECRYPT:
-          processCWIDecrypt(message, sendResponse);
-          return true;
-        case CWIEventName.CREATE_ACTION:
-          processCWICreateAction(message, sendResponse);
-          return true;
-        case CWIEventName.SIGN_ACTION:
-          processCWISignAction(message, sendResponse);
-          return true;
-        case CWIEventName.ABORT_ACTION:
-          processCWIAbortAction(message, sendResponse);
-          return true;
-        case CWIEventName.INTERNALIZE_ACTION:
-          processCWIInternalizeAction(message, sendResponse);
-          return true;
-        case CWIEventName.RELINQUISH_OUTPUT:
-          processCWIRelinquishOutput(message, sendResponse);
-          return true;
-        case CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE:
-          processCWIRevealCounterpartyKeyLinkage(message, sendResponse);
-          return true;
-        case CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE:
-          processCWIRevealSpecificKeyLinkage(message, sendResponse);
-          return true;
-        case CWIEventName.ACQUIRE_CERTIFICATE:
-          processCWIAcquireCertificate(message, sendResponse);
-          return true;
-        case CWIEventName.LIST_CERTIFICATES:
-          processCWIListCertificates(message, sendResponse);
-          return true;
-        case CWIEventName.PROVE_CERTIFICATE:
-          processCWIProveCertificate(message, sendResponse);
-          return true;
-        case CWIEventName.RELINQUISH_CERTIFICATE:
-          processCWIRelinquishCertificate(message, sendResponse);
-          return true;
-        case CWIEventName.DISCOVER_BY_IDENTITY_KEY:
-          processCWIDiscoverByIdentityKey(message, sendResponse);
-          return true;
-        case CWIEventName.DISCOVER_BY_ATTRIBUTES:
-          processCWIDiscoverByAttributes(message, sendResponse);
-          return true;
-
-
-        default:
-          break;
-      }
-    }).catch((error: Error) => {
-      sendResponse({
-        type: message.action,
-        success: false,
-        error: error.message || 'Wallet unavailable',
       });
-    });
 
     return true;
   });
@@ -1028,30 +1037,33 @@ if (isInServiceWorker) {
   // YOURS-SPECIFIC HANDLERS ********************************
 
   const processGetBalanceRequest = (sendResponse: CallbackResponse) => {
-    if (!accountContext) {
-      sendResponse({
-        type: YoursEventName.GET_BALANCE,
-        success: false,
-        error: 'Wallet not initialized',
-      });
-      return;
-    }
-    accountContext.baseWallet
-      .balance()
-      .then((satoshis) => {
-        sendResponse({
-          type: YoursEventName.GET_BALANCE,
-          success: true,
-          data: satoshis,
-        });
-      })
-      .catch((error) => {
+    // Wait for startup initialization to complete before checking accountContext
+    startupInitPromise.then(() => {
+      if (!accountContext) {
         sendResponse({
           type: YoursEventName.GET_BALANCE,
           success: false,
-          error: error instanceof Error ? error.message : JSON.stringify(error),
+          error: 'Wallet not initialized',
         });
-      });
+        return;
+      }
+      accountContext.baseWallet
+        .balance()
+        .then((satoshis) => {
+          sendResponse({
+            type: YoursEventName.GET_BALANCE,
+            success: true,
+            data: satoshis,
+          });
+        })
+        .catch((error) => {
+          sendResponse({
+            type: YoursEventName.GET_BALANCE,
+            success: false,
+            error: error instanceof Error ? error.message : JSON.stringify(error),
+          });
+        });
+    });
   };
 
   const processGetPubKeysRequest = (sendResponse: CallbackResponse) => {
@@ -1095,28 +1107,31 @@ if (isInServiceWorker) {
   };
 
   const processGetReceiveAddressRequest = (sendResponse: CallbackResponse) => {
-    try {
-      if (!accountContext) {
+    // Wait for startup initialization to complete before checking accountContext
+    startupInitPromise.then(() => {
+      try {
+        if (!accountContext) {
+          sendResponse({
+            type: YoursEventName.GET_RECEIVE_ADDRESS,
+            success: false,
+            error: 'Wallet not initialized',
+          });
+          return;
+        }
+        const address = accountContext.syncContext.addressManager.getPrimaryAddress();
+        sendResponse({
+          type: YoursEventName.GET_RECEIVE_ADDRESS,
+          success: true,
+          data: address,
+        });
+      } catch (error) {
         sendResponse({
           type: YoursEventName.GET_RECEIVE_ADDRESS,
           success: false,
-          error: 'Wallet not initialized',
+          error: error instanceof Error ? error.message : JSON.stringify(error),
         });
-        return;
       }
-      const address = accountContext.syncContext.addressManager.getPrimaryAddress();
-      sendResponse({
-        type: YoursEventName.GET_RECEIVE_ADDRESS,
-        success: true,
-        data: address,
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GET_RECEIVE_ADDRESS,
-        success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
-      });
-    }
+    });
   };
 
   const processGetSocialProfileRequest = (sendResponse: CallbackResponse) => {
@@ -1332,7 +1347,10 @@ if (isInServiceWorker) {
       isAuthorized,
       () => {
         responseCallbackForConnectRequest = (decision: Decision) => {
-          respond(decision === 'approved', decision !== 'approved' ? 'User declined the connection request' : undefined);
+          respond(
+            decision === 'approved',
+            decision !== 'approved' ? 'User declined the connection request' : undefined,
+          );
         };
       },
       () => {
@@ -1456,7 +1474,12 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      console.log('[background] processCWIGetPublicKey: entering, params:', JSON.stringify(message.params), 'originator:', message.originator);
+      console.log(
+        '[background] processCWIGetPublicKey: entering, params:',
+        JSON.stringify(message.params),
+        'originator:',
+        message.originator,
+      );
       const w = await ensureWallet();
       console.log('[background] processCWIGetPublicKey: ensureWallet resolved, calling w.getPublicKey...');
       const result = await w.getPublicKey(message.params, message.originator);
@@ -1530,7 +1553,12 @@ if (isInServiceWorker) {
     message: { params: CreateHmacArgs; originator?: string },
     sendResponse: CallbackResponse,
   ) => {
-    console.log('[background] processCWICreateHmac called, originator:', message.originator, 'params:', JSON.stringify(message.params));
+    console.log(
+      '[background] processCWICreateHmac called, originator:',
+      message.originator,
+      'params:',
+      JSON.stringify(message.params),
+    );
     try {
       const w = await ensureWallet();
       console.log('[background] processCWICreateHmac: wallet obtained, calling w.createHmac...');

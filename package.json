@@ -34,6 +34,7 @@
     "react-icons": "5.2.0",
     "react-router-dom": "^6.16.0",
     "satoshi-token": "^0.0.7",
+    "sigma-protocol": "^0.1.9",
     "stream-browserify": "^3.0.0",
     "styled-components": "^6.0.8",
     "url": "^0.11.3",
