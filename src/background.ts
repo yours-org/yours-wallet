@@ -595,16 +595,31 @@ if (isInServiceWorker) {
           // Reinitialize wallet after user unlocks with password
           chromeStorageService.getAndSetStorage().then(() => {
             initializeWallet()
-              .then((wallet) => {
+              .then(async (wallet) => {
+                // Mark wallet as unlocked in storage BEFORE resolving waiters,
+                // so verifyAccess() sees the unlocked state when authorizing requests
+                await chromeStorageService.update({ isLocked: false, lastActiveTime: Date.now() });
+
                 sendResponse({ type: 'WALLET_UNLOCKED', success: !!wallet });
+
+                const hadWaiters = pendingWalletWaiters.length > 0;
                 // Resolve any CWI handlers waiting for the wallet
-                if (wallet && pendingWalletWaiters.length > 0) {
+                if (wallet && hadWaiters) {
                   for (const waiter of pendingWalletWaiters.splice(0)) {
                     waiter.resolve(wallet);
                   }
                 }
-                // Close the unlock popup — if permission is needed, a new popup will open
-                if (popupWindowId) {
+                // Don't close the popup if there's a pending connect request in storage
+                // or if CWI handlers were waiting — the popup needs to transition
+                // from the unlock screen to the connect/permission screen.
+                const storage = await chromeStorageService.getAndSetStorage();
+                const hasPendingRequest =
+                  hadWaiters ||
+                  !!(storage as Record<string, unknown>)?.connectRequest ||
+                  !!(storage as Record<string, unknown>)?.permissionRequest ||
+                  !!(storage as Record<string, unknown>)?.groupedPermissionRequest ||
+                  !!(storage as Record<string, unknown>)?.counterpartyPermissionRequest;
+                if (!hasPendingRequest && popupWindowId) {
                   removeWindow(popupWindowId);
                   popupWindowId = undefined;
                   chrome.storage.local.remove('popupWindowId');

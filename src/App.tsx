@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { useContext, useEffect, useState } from 'react';
-import { MemoryRouter as Router, Route, Routes } from 'react-router-dom';
+import { MemoryRouter as Router, Route, Routes, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Show } from './components/Show';
 import { UnlockWallet } from './components/UnlockWallet';
@@ -88,6 +88,17 @@ export const App = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady]);
 
+  // Auto-navigate to /connect when a connectRequest arrives (e.g., after unlock)
+  const RequestRouter = () => {
+    const navigate = useNavigate();
+    useEffect(() => {
+      if (connectRequest) {
+        navigate('/connect');
+      }
+    }, [connectRequest, navigate]);
+    return null;
+  };
+
   const handleUnlock = async () => {
     setIsLocked(false);
     menuContext?.handleSelect('bsv');
@@ -112,6 +123,7 @@ export const App = () => {
                 <SyncingBlocks />
                 <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
                   <Router>
+                    <RequestRouter />
                     <Routes>
                       <Route path="/" element={<Start />} />
                       <Route path="/create-wallet" element={<CreateAccount onNavigateBack={() => null} newWallet />} />
