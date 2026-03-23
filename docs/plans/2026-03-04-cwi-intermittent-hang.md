@@ -17,11 +17,13 @@ CWI calls from dApp pages intermittently hang — no response, no error. The pag
 ## Observed Failure Points
 
 ### getPublicKey hang (first observed)
+
 - `cwi_getPublicKey` received, authorized
 - No further logs — handler never responded
 - After adding logging and rebuilding, this started working
 
 ### verifyHmac hang (second observed)
+
 - `cwi_verifyHmac` received, authorized
 - No further logs — handler never responded
 - This is during AuthFetch handshake (BRC-103/104), before any HTTP request goes out

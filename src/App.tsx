@@ -145,14 +145,14 @@ export const App = () => {
                             }
                             whenFalseContent={
                               <>
-<Show when={!!sendMNEERequest}>
+                                <Show when={!!sendMNEERequest}>
                                   <MNEESendRequest
                                     request={sendMNEERequest!}
                                     onResponse={() => clearRequest('sendMNEERequest')}
                                     popupId={popupId}
                                   />
                                 </Show>
-<Show when={!!groupedPermissionRequest}>
+                                <Show when={!!groupedPermissionRequest}>
                                   <GroupedPermissionRequestPage
                                     request={groupedPermissionRequest!}
                                     onResponse={() => clearRequest('groupedPermissionRequest')}

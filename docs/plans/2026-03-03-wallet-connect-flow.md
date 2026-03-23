@@ -12,7 +12,8 @@ All major wallet authentication and popup issues have been resolved. The wallet 
 
 **Problem**: Wallet was checking `passKey` presence for auth state, which broke after locking.
 
-**Solution**: 
+**Solution**:
+
 - `verifyAccess()` now checks `isLocked` flag instead of `passKey` presence
 - `lockWallet()` reverted to NOT remove `passKey` from storage (fixes unlock flow)
 
@@ -21,6 +22,7 @@ All major wallet authentication and popup issues have been resolved. The wallet 
 **Problem**: `ensureWallet()` was being called for ALL messages, causing double popups.
 
 **Solution**:
+
 - Message handler now detects internal vs external messages via `sender.origin`
 - `ensureWallet()` modified to check for existing wallet before launching popup
 - Only launches popup when wallet exists but is locked
@@ -30,6 +32,7 @@ All major wallet authentication and popup issues have been resolved. The wallet 
 **Problem**: Popup was staying open after unlock/authorization.
 
 **Solution**:
+
 - Popup now closes immediately after unlock
 - Proper cleanup of `pendingWalletWaiters` when wallet is ready
 
@@ -38,6 +41,7 @@ All major wallet authentication and popup issues have been resolved. The wallet 
 **Problem**: Two separate session managers (global auth and wallet-toolbox).
 
 **Solution**:
+
 - Server-side: Shared session manager passed to both auth middleware instances
 - OR: Bypass wallet-toolbox's auth and use only the global auth (current implementation)
 
@@ -46,15 +50,18 @@ All major wallet authentication and popup issues have been resolved. The wallet 
 ## Changes Made
 
 ### `src/background.ts`
+
 - Message handler: Added `isFromExtension` check via `sender.origin`
 - `ensureWallet()`: Added check for existing wallet before launching popup
 - `verifyAccess()`: Changed to check `isLocked` flag
 - `launchPopUp()`: Improved window management
 
 ### `src/contexts/providers/ServiceProvider.tsx`
+
 - `lockWallet()`: Reverted to NOT remove `passKey` from storage
 
 ### Build Output
+
 - Extension rebuilt with all fixes in `build/` directory
 - **NOT YET COMMITTED** to git
 
@@ -75,6 +82,7 @@ All major wallet authentication and popup issues have been resolved. The wallet 
 ## Next Steps
 
 1. **Commit the wallet changes**:
+
    ```bash
    cd yours-wallet
    git add src/background.ts src/contexts/providers/ServiceProvider.tsx
