@@ -12,11 +12,10 @@ import { useTheme } from '../hooks/useTheme';
 import { WhiteLabelTheme } from '../theme.types';
 import { BSV_DECIMAL_CONVERSION, YOURS_DEV_WALLET, featuredApps } from '../utils/constants';
 import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
-import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { lockBsv, unlockBsv } from '@1sat/actions';
-import { Outpoint, type ParseContext, type Txo } from '@1sat/wallet-remote';
+import { lockBsv, unlockBsv, sendBsv } from '@1sat/actions';
+import { Outpoint, type ParseContext, type Txo } from '@1sat/wallet-browser';
 import { Script } from '@bsv/sdk';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 
@@ -183,8 +182,6 @@ export const AppsAndTools = () => {
   const [page, setPage] = useState<AppsPage>(query === 'pending-locks' ? 'unlock' : 'main');
   const [otherIsSelected, setOtherIsSelected] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
-  const [satAmount, setSatAmount] = useState(0);
-  const [didSubmit, setDidSubmit] = useState(false);
   const [lockedUtxos, setLockedUtxos] = useState<Txo[]>([]);
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
   const [txData, setTxData] = useState<ParseContext>();
@@ -276,16 +273,25 @@ export const AppsAndTools = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identityAddress, page]);
 
-  useEffect(() => {
-    if (!satAmount) return;
-    setDidSubmit(true);
-  }, [satAmount]);
-
-  const handleSubmit = (amount: number) => {
+  const handleSubmit = async (amount: number) => {
     if (!amount || !exchangeRate) return;
 
-    const satAmount = Math.round((amount / exchangeRate) * BSV_DECIMAL_CONVERSION);
-    setSatAmount(satAmount);
+    const sats = Math.round((amount / exchangeRate) * BSV_DECIMAL_CONVERSION);
+    setIsProcessing(true);
+    try {
+      const result = await sendBsv.execute(apiContext, {
+        requests: [{ address: YOURS_DEV_WALLET, satoshis: sats }],
+      });
+      if (result.txid) {
+        setPage('sponsor-thanks');
+      } else {
+        addSnackbar(result.error || 'Transaction failed', 'error');
+      }
+    } catch (err) {
+      addSnackbar(err instanceof Error ? err.message : 'Transaction failed', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDecode = async () => {
@@ -766,23 +772,12 @@ export const AppsAndTools = () => {
       <Show when={!isProcessing && page === 'decode-broadcast'}>{decodeOrBroadcastPage}</Show>
       <Show when={!isProcessing && page === 'decode'}>{decode}</Show>
       <Show when={page === 'main'}>{main}</Show>
-      <Show when={page === 'sponsor' && !didSubmit}>{sponsorPage}</Show>
+      <Show when={page === 'sponsor'}>{sponsorPage}</Show>
       <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show>
       <Show when={!isProcessing && page === 'unlock'}>{unlockPage}</Show>
       <Show when={!isProcessing && page === 'lock-page'}>{lockPage}</Show>
       <Show when={page === 'discover-apps'}>{discoverAppsPage}</Show>
       <Show when={page === 'sweep-wif'}>{wifSweepPage}</Show>
-      <Show when={page === 'sponsor' && didSubmit}>
-        <BsvSendRequest
-          request={[{ address: YOURS_DEV_WALLET, satoshis: satAmount }]}
-          popupId={undefined}
-          onResponse={() => {
-            setDidSubmit(false);
-            setPage('sponsor-thanks');
-          }}
-          requestWithinApp
-        />
-      </Show>
     </Content>
   );
 };

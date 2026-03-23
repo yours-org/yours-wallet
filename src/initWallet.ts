@@ -1,10 +1,12 @@
 import { NetWork } from 'yours-wallet-provider';
 import {
-  createRemoteWallet,
-  type RemoteWalletConfig,
+  createWebWallet,
+  type WebWalletConfig,
   YOURS_PREFIX,
   Wallet,
-} from '@1sat/wallet-remote';
+  WalletStorageManager,
+  StorageClient,
+} from '@1sat/wallet-browser';
 import { syncAddresses, createContext as createActionContext } from '@1sat/actions';
 import { WalletPermissionsManager, type PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile';
 import { ChromeStorageService } from './services/ChromeStorage.service';
@@ -86,6 +88,9 @@ export interface AccountContext {
   wallet: WalletPermissionsManager;
   baseWallet: Wallet;
   syncContext: SyncContext;
+  storage: WalletStorageManager;
+  remoteStorage?: StorageClient;
+  migrateRemote: (url: string) => Promise<void>;
   /** Call to stop sync and destroy wallet */
   close: () => Promise<void>;
 }
@@ -120,17 +125,23 @@ export const initWallet = async (
   const network = chromeStorageService.getNetwork();
   const chain: Chain = network === NetWork.Mainnet ? 'main' : 'test';
 
-  // 2. Create wallet using remote-only factory
-  const walletConfig: RemoteWalletConfig = {
+  // 2. Create wallet using browser factory
+  const walletConfig: WebWalletConfig = {
     privateKey: keys.identityWif,
     chain,
     feeModel: { model: 'sat/kb', value: FEE_PER_KB },
-    remoteStorageUrl:
+    activeRemote:
       chain === 'main' ? 'https://1sat.shruggr.cloud/1sat/wallet' : 'https://testnet.api.1sat.app/1sat/wallet',
-    localBackup: true,
+    storageIdentityKey: 'yours-wallet',
   };
 
-  const { wallet: baseWallet, destroy: destroyWallet } = await createRemoteWallet(walletConfig);
+  const {
+    wallet: baseWallet,
+    destroy: destroyWallet,
+    storage,
+    remoteStorage,
+    migrateRemote,
+  } = await createWebWallet(walletConfig);
 
   // 3. Wrap with permissions manager for external app access control
   const wallet = new WalletPermissionsManager(baseWallet, ADMIN_ORIGINATOR, DEFAULT_PERMISSIONS_CONFIG);
@@ -187,6 +198,9 @@ export const initWallet = async (
     wallet,
     baseWallet,
     syncContext,
+    storage,
+    remoteStorage,
+    migrateRemote,
     close,
   };
 };

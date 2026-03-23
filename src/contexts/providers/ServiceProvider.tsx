@@ -6,7 +6,7 @@ import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import mnee from '@mnee/ts-sdk';
 import { createContext, syncAddresses } from '@1sat/actions';
 import { fetchExchangeRate } from '../../utils/wallet';
-import { createChromeCWI, OneSatServices, YOURS_PREFIX } from '@1sat/wallet-remote';
+import { createChromeCWI, OneSatServices, YOURS_PREFIX } from '@1sat/wallet-browser';
 import { NetWork } from 'yours-wallet-provider';
 
 const initializeServices = async () => {

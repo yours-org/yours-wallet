@@ -4,7 +4,7 @@
  */
 
 import type { WalletInterface } from '@bsv/sdk';
-import { createEventCWI, CWIEventName } from '@1sat/wallet-remote';
+import { createEventCWI, CWIEventName } from '@1sat/wallet-browser';
 
 // Re-export for backwards compatibility
 export { CWIEventName };

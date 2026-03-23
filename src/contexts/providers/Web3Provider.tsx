@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { SendBsv, SendMNEE, SignMessage } from 'yours-wallet-provider';
+import { SendMNEE } from 'yours-wallet-provider';
 import { RequestParams } from '../../inject';
 import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
@@ -14,9 +14,7 @@ import type { ApprovalContext } from '../../yoursApi';
 
 export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [connectRequest, setConnectRequest] = useState<RequestParams | undefined>(undefined);
-  const [sendBsvRequest, setSendBsvRequest] = useState<SendBsv[] | undefined>(undefined);
   const [sendMNEERequest, setSendMNEERequest] = useState<SendMNEE[] | undefined>(undefined);
-  const [signMessageRequest, setSignMessageRequest] = useState<SignMessage | undefined>(undefined);
   const [permissionRequest, setPermissionRequest] = useState<(PermissionRequest & { requestID: string }) | undefined>(
     undefined,
   );
@@ -70,14 +68,8 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       case 'connectRequest':
         setConnectRequest(undefined);
         break;
-      case 'sendBsvRequest':
-        setSendBsvRequest(undefined);
-        break;
       case 'sendMNEERequest':
         setSendMNEERequest(undefined);
-        break;
-      case 'signMessageRequest':
-        setSignMessageRequest(undefined);
         break;
       case 'transactionApprovalRequest':
         setTransactionApprovalRequest(undefined);
@@ -97,9 +89,7 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   const handleRequestStates = async (result: Partial<ChromeStorageObject>) => {
     const {
       connectRequest,
-      sendBsvRequest,
       sendMNEERequest,
-      signMessageRequest,
       permissionRequest,
       groupedPermissionRequest,
       counterpartyPermissionRequest,
@@ -108,9 +98,7 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     } = result;
 
     if (connectRequest) setConnectRequest(connectRequest);
-    if (sendBsvRequest) setSendBsvRequest(sendBsvRequest);
     if (sendMNEERequest) setSendMNEERequest(sendMNEERequest);
-    if (signMessageRequest) setSignMessageRequest(signMessageRequest);
     if (permissionRequest) setPermissionRequest(permissionRequest);
     if (groupedPermissionRequest) setGroupedPermissionRequest(groupedPermissionRequest);
     if (counterpartyPermissionRequest) setCounterpartyPermissionRequest(counterpartyPermissionRequest);
@@ -127,9 +115,7 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     <Web3RequestContext.Provider
       value={{
         connectRequest,
-        sendBsvRequest,
         sendMNEERequest,
-        signMessageRequest,
         permissionRequest,
         groupedPermissionRequest,
         counterpartyPermissionRequest,

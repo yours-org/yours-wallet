@@ -26,6 +26,7 @@ import { ImportAccount } from './onboarding/ImportAccount';
 import { AccountRow } from '../components/AccountRow';
 import { MasterBackupProgressEvent, streamDataToZip } from '../utils/masterExporter';
 import { useSnackbar } from '../hooks/useSnackbar';
+import { StorageStatus } from './StorageStatus';
 
 const Content = styled.div`
   display: flex;
@@ -113,7 +114,8 @@ export type SettingsPage =
   | 'social-profile'
   | 'export-keys-options'
   | 'export-keys-qr'
-  | 'preferences';
+  | 'preferences'
+  | 'storage';
 type DecisionType = 'sign-out' | 'export-master-backup' | 'export-keys' | 'export-keys-qr-code' | 'delete-account';
 
 export const Settings = () => {
@@ -468,6 +470,12 @@ export const Settings = () => {
         jsxElement={<ForwardButton color={theme.color.global.contrast} />}
       />
       <SettingsRow
+        name="Storage"
+        description="View storage status and manage remote sync"
+        onClick={() => setPage('storage')}
+        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
+      />
+      <SettingsRow
         name="Export Keys"
         description="Download keys or export as QR code"
         onClick={() => setPage('export-keys-options')}
@@ -774,6 +782,9 @@ export const Settings = () => {
         <Show when={page === 'connected-apps'}>{connectedAppsPage}</Show>
         <Show when={page === 'preferences'}>{preferencesPage}</Show>
         <Show when={page === 'social-profile'}>{socialProfilePage}</Show>
+        <Show when={page === 'storage'}>
+          <StorageStatus onBack={() => setPage('main')} />
+        </Show>
         <Show when={page === 'export-keys-options'}>{exportKeyOptionsPage}</Show>
         <Show when={page === 'export-keys-qr'}>{exportKeysAsQrCodePage}</Show>
       </Content>

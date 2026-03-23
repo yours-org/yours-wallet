@@ -23,7 +23,7 @@ self.addEventListener(CustomListenerName.YOURS_REQUEST, (e: Event) => {
   }
 
   // Use originator at message level (BRC-100 standard)
-  const originator = window.location.hostname;
+  const originator = window.location.host;
 
   chrome.runtime.sendMessage({ action: type, params, originator }, buildResponseCallback(messageId));
 });

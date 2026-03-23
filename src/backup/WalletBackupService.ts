@@ -6,7 +6,7 @@ import {
   type BackupManifest,
   type BackupProgressCallback,
   type Unzipped,
-} from '@1sat/wallet-remote';
+} from '@1sat/wallet-browser';
 import { encode } from '@msgpack/msgpack';
 import type { WalletStorageManager, sdk } from '@bsv/wallet-toolbox-mobile';
 import type { ChromeStorageService } from '../services/ChromeStorage.service';

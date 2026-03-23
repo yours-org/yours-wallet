@@ -522,6 +522,10 @@ if (isInServiceWorker) {
       // Master backup/restore
       'MASTER_BACKUP',
       'MASTER_RESTORE',
+      // Storage management (popup internal)
+      'STORAGE_GET_INFO',
+      'STORAGE_SYNC_BACKUPS',
+      'STORAGE_MIGRATE_REMOTE',
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -613,6 +617,15 @@ if (isInServiceWorker) {
           return true;
         case 'MASTER_RESTORE':
           processMasterRestore(message.fileData, message.password, sendResponse);
+          return true;
+        case 'STORAGE_GET_INFO':
+          processStorageGetInfo(sendResponse);
+          return true;
+        case 'STORAGE_SYNC_BACKUPS':
+          processStorageSyncBackups(sendResponse);
+          return true;
+        case 'STORAGE_MIGRATE_REMOTE':
+          processStorageMigrateRemote(message.url, sendResponse);
           return true;
         default:
           break;
@@ -739,6 +752,7 @@ if (isInServiceWorker) {
           processCWIDiscoverByAttributes(message, sendResponse);
           return true;
 
+
         default:
           break;
       }
@@ -752,6 +766,120 @@ if (isInServiceWorker) {
 
     return true;
   });
+
+  // STORAGE MANAGEMENT HANDLERS ********************************
+
+  const processStorageGetInfo = (sendResponse: CallbackResponse) => {
+    if (!accountContext) {
+      sendResponse({ type: 'STORAGE_GET_INFO', success: false, error: 'Wallet not initialized' });
+      return;
+    }
+    const { storage, remoteStorage } = accountContext;
+    (async () => {
+      try {
+        const stores = storage.getStores();
+        const settings = storage.getSettings();
+        const activeStore = stores.find((s) => s.isActive);
+        const backupStores = stores.filter((s) => s.isBackup);
+
+        let outputCount = 0;
+        let transactionCount = 0;
+        try {
+          outputCount = await storage.runAsStorageProvider(async (sp) => sp.countOutputs({ partial: {} }));
+          transactionCount = await storage.runAsStorageProvider(async (sp) => sp.countTransactions({ partial: {} }));
+        } catch {
+          // countOutputs/countTransactions may not be available on all providers
+        }
+
+        let syncStates: Array<{
+          storageIdentityKey: string;
+          storageName: string;
+          status: string;
+          when?: string;
+        }> = [];
+        try {
+          const states = await storage.runAsStorageProvider(async (sp) => sp.findSyncStates({}));
+          syncStates = states.map((s) => ({
+            storageIdentityKey: s.storageIdentityKey,
+            storageName: s.storageName,
+            status: s.status,
+            when: s.when?.toISOString(),
+          }));
+        } catch {
+          // findSyncStates may not be available
+        }
+
+        sendResponse({
+          type: 'STORAGE_GET_INFO',
+          success: true,
+          data: {
+            activeStore: activeStore
+              ? {
+                  storageIdentityKey: activeStore.storageIdentityKey,
+                  storageName: activeStore.storageName,
+                  endpointURL: activeStore.endpointURL,
+                  isEnabled: activeStore.isEnabled,
+                }
+              : null,
+            backupStores: backupStores.map((s) => ({
+              storageIdentityKey: s.storageIdentityKey,
+              storageName: s.storageName,
+              endpointURL: s.endpointURL,
+            })),
+            storageIdentityKey: settings.storageIdentityKey,
+            remoteUrl: remoteStorage?.endpointUrl,
+            outputCount,
+            transactionCount,
+            syncStates,
+          },
+        });
+      } catch (error) {
+        sendResponse({
+          type: 'STORAGE_GET_INFO',
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+  };
+
+  const processStorageSyncBackups = (sendResponse: CallbackResponse) => {
+    if (!accountContext) {
+      sendResponse({ type: 'STORAGE_SYNC_BACKUPS', success: false, error: 'Wallet not initialized' });
+      return;
+    }
+    accountContext.storage
+      .updateBackups()
+      .then((log) => {
+        sendResponse({ type: 'STORAGE_SYNC_BACKUPS', success: true, data: { log } });
+      })
+      .catch((error: unknown) => {
+        sendResponse({
+          type: 'STORAGE_SYNC_BACKUPS',
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  };
+
+  const processStorageMigrateRemote = (url: string, sendResponse: CallbackResponse) => {
+    if (!accountContext) {
+      sendResponse({ type: 'STORAGE_MIGRATE_REMOTE', success: false, error: 'Wallet not initialized' });
+      return;
+    }
+    accountContext
+      .migrateRemote(url)
+      .then(() => {
+        sendResponse({ type: 'STORAGE_MIGRATE_REMOTE', success: true });
+      })
+      .catch((error: unknown) => {
+        sendResponse({
+          type: 'STORAGE_MIGRATE_REMOTE',
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  };
 
   // PERMISSION RESPONSE HANDLER ********************************
 

@@ -15,9 +15,7 @@ import { ImportAccount } from './pages/onboarding/ImportAccount';
 import { RestoreAccount } from './pages/onboarding/RestoreAccount';
 import { Start } from './pages/onboarding/Start';
 import { OrdWallet } from './pages/OrdWallet';
-import { BsvSendRequest } from './pages/requests/BsvSendRequest';
 import { ConnectRequest } from './pages/requests/ConnectRequest';
-import { SignMessageRequest } from './pages/requests/SignMessageRequest';
 import { Settings } from './pages/Settings';
 import { WhiteLabelTheme } from './theme.types';
 import { WhitelistedApp } from './inject';
@@ -65,9 +63,7 @@ export const App = () => {
   const menuContext = useContext(BottomMenuContext);
   const {
     connectRequest,
-    sendBsvRequest,
     sendMNEERequest,
-    signMessageRequest,
     permissionRequest,
     groupedPermissionRequest,
     counterpartyPermissionRequest,
@@ -141,9 +137,7 @@ export const App = () => {
                         element={
                           <Show
                             when={
-                              !sendBsvRequest &&
                               !sendMNEERequest &&
-                              !signMessageRequest &&
                               !groupedPermissionRequest &&
                               !counterpartyPermissionRequest &&
                               !permissionRequest &&
@@ -151,28 +145,14 @@ export const App = () => {
                             }
                             whenFalseContent={
                               <>
-                                <Show when={!!sendBsvRequest}>
-                                  <BsvSendRequest
-                                    request={sendBsvRequest!}
-                                    onResponse={() => clearRequest('sendBsvRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!sendMNEERequest}>
+<Show when={!!sendMNEERequest}>
                                   <MNEESendRequest
                                     request={sendMNEERequest!}
                                     onResponse={() => clearRequest('sendMNEERequest')}
                                     popupId={popupId}
                                   />
                                 </Show>
-                                <Show when={!!signMessageRequest}>
-                                  <SignMessageRequest
-                                    request={signMessageRequest!}
-                                    onSignature={() => clearRequest('signMessageRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!groupedPermissionRequest}>
+<Show when={!!groupedPermissionRequest}>
                                   <GroupedPermissionRequestPage
                                     request={groupedPermissionRequest!}
                                     onResponse={() => clearRequest('groupedPermissionRequest')}

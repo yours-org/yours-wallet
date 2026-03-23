@@ -5,8 +5,6 @@ import {
   Ordinal,
   PubKeys,
   TaggedDerivationResponse,
-  SendBsv,
-  SignMessage,
   Broadcast,
   SocialProfile,
   SendMNEE,
@@ -73,9 +71,7 @@ export interface ChromeStorageObject {
   deviceId?: string;
   showWelcome?: boolean;
   connectRequest?: ConnectRequest;
-  sendBsvRequest?: SendBsv[];
   sendMNEERequest?: SendMNEE[];
-  signMessageRequest?: SignMessage;
   broadcastRequest?: Broadcast;
   // Permission requests from WalletPermissionsManager
   permissionRequest?: PermissionRequest & { requestID: string };
@@ -90,9 +86,7 @@ export type CurrentAccountObject = Omit<
   | 'accounts'
   | 'popupWindowId'
   | 'connectRequest'
-  | 'sendBsvRequest'
   | 'sendMNEERequest'
-  | 'signMessageRequest'
   | 'broadcastRequest'
   | 'permissionRequest'
   | 'transactionApprovalRequest'
