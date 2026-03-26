@@ -2,9 +2,9 @@ import { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { PrivateKey } from '@bsv/sdk';
-import { scanAddressUtxos, prepareSweepInputs, sweepBsv, sweepOrdinals, sweepBsv21 } from '@1sat/actions';
-import type { TokenBalance } from '@1sat/actions/dist/sweep/scan';
-import type { SweepInput } from '@1sat/actions/dist/sweep';
+import { prepareSweepInputs, sweepBsv, sweepOrdinals, sweepBsv21 } from '@1sat/actions';
+import { scanAddress, type ScannedAssets, type EnrichedOrdinal, type TokenBalance } from '../sweep/scanner';
+import type { IndexedOutput } from '@1sat/types';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { HeaderText, Warning } from '../components/Reusable';
@@ -216,10 +216,15 @@ export const SweepMigration = () => {
   const [legacyKeys, setLegacyKeys] = useState<Keys | null>(null);
 
   const [scanStatuses, setScanStatuses] = useState<AddressScanStatus[]>([]);
-  const [allFunding, setAllFunding] = useState<SweepInput[]>([]);
-  const [allOrdinals, setAllOrdinals] = useState<SweepInput[]>([]);
-  const [allBsv21, setAllBsv21] = useState<TokenBalance[]>([]);
-  const [totalFundingSats, setTotalFundingSats] = useState(0);
+  const [assets, setAssets] = useState<ScannedAssets>({
+    funding: [],
+    ordinals: [],
+    opnsNames: [],
+    bsv21Tokens: [],
+    bsv20Tokens: [],
+    locked: [],
+    totalBsv: 0,
+  });
 
   const [selection, setSelection] = useState<SweepSelection>({
     sweepBsv: false,
@@ -298,10 +303,12 @@ export const SweepMigration = () => {
 
     setScanStatuses(addresses.map((a) => ({ address: a.address, label: a.label, status: 'scanning' })));
 
-    const results: Awaited<ReturnType<typeof scanAddressUtxos>>[] = [];
+    const results: ScannedAssets[] = [];
     const promises = addresses.map(async (addr, i) => {
       try {
-        const result = await scanAddressUtxos(apiContext.services!, addr.address);
+        const result = await scanAddress(apiContext.services!, addr.address, (p) => {
+          setScanStatuses((prev) => prev.map((s, j) => (j === i ? { ...s, status: 'scanning', error: p.detail } : s)));
+        });
         results[i] = result;
         setScanStatuses((prev) => prev.map((s, j) => (j === i ? { ...s, status: 'done' } : s)));
       } catch (err) {
@@ -311,31 +318,28 @@ export const SweepMigration = () => {
 
     await Promise.all(promises);
 
-    const funding: SweepInput[] = [];
-    const ordinals: SweepInput[] = [];
-    const bsv21Map = new Map<string, TokenBalance>();
-    let fundingSats = 0;
-
+    // Merge results from all addresses
+    const merged: ScannedAssets = {
+      funding: [],
+      ordinals: [],
+      opnsNames: [],
+      bsv21Tokens: [],
+      bsv20Tokens: [],
+      locked: [],
+      totalBsv: 0,
+    };
     for (const r of results) {
       if (!r) continue;
-      funding.push(...r.funding);
-      ordinals.push(...r.ordinals);
-      fundingSats += r.totalFundingSats;
-      for (const t of r.bsv21Tokens) {
-        const existing = bsv21Map.get(t.tokenId);
-        if (existing) {
-          existing.inputs.push(...t.inputs);
-          existing.totalAmount = String(BigInt(existing.totalAmount) + BigInt(t.totalAmount));
-        } else {
-          bsv21Map.set(t.tokenId, { ...t });
-        }
-      }
+      merged.funding.push(...r.funding);
+      merged.ordinals.push(...r.ordinals);
+      merged.opnsNames.push(...r.opnsNames);
+      merged.bsv21Tokens.push(...r.bsv21Tokens);
+      merged.bsv20Tokens.push(...r.bsv20Tokens);
+      merged.locked.push(...r.locked);
+      merged.totalBsv += r.totalBsv;
     }
 
-    setAllFunding(funding);
-    setAllOrdinals(ordinals);
-    setAllBsv21(Array.from(bsv21Map.values()));
-    setTotalFundingSats(fundingSats);
+    setAssets(merged);
     setStep('review');
   }, [legacyKeys, apiContext.services]);
 
@@ -352,7 +356,7 @@ export const SweepMigration = () => {
       return { ...s, selectedOrdinals: next };
     });
   const selectAllOrdinals = () =>
-    setSelection((s) => ({ ...s, selectedOrdinals: new Set(allOrdinals.map((o) => o.outpoint)) }));
+    setSelection((s) => ({ ...s, selectedOrdinals: new Set(assets.ordinals.map((o) => o.outpoint)) }));
   const deselectAllOrdinals = () => setSelection((s) => ({ ...s, selectedOrdinals: new Set() }));
   const toggleBsv21 = (tokenId: string) =>
     setSelection((s) => {
@@ -364,15 +368,27 @@ export const SweepMigration = () => {
   const hasSelection =
     selection.sweepBsv || selection.selectedOrdinals.size > 0 || selection.selectedBsv21TokenIds.size > 0;
 
+  const hasAnyAssets =
+    assets.funding.length > 0 ||
+    assets.ordinals.length > 0 ||
+    assets.opnsNames.length > 0 ||
+    assets.bsv21Tokens.length > 0 ||
+    assets.bsv20Tokens.length > 0 ||
+    assets.locked.length > 0;
+
+  // Convert IndexedOutput to the shape prepareSweepInputs expects
+  const toSweepInputs = (outputs: IndexedOutput[]) =>
+    outputs.map((o) => ({ outpoint: o.outpoint, satoshis: o.satoshis ?? 0, lockingScript: '' }));
+
   const executeSweeps = async () => {
     if (!legacyKeys) return;
     setStep('sweeping');
     const results: SweepTxResult[] = [];
 
-    if (selection.sweepBsv && allFunding.length > 0) {
+    if (selection.sweepBsv && assets.funding.length > 0) {
       setCurrentSweepOp('Sweeping BSV...');
       try {
-        const inputs = await prepareSweepInputs(apiContext, allFunding);
+        const inputs = await prepareSweepInputs(apiContext, toSweepInputs(assets.funding));
         const resp = await sweepBsv.execute(apiContext, {
           inputs,
           wif: legacyKeys.walletWif,
@@ -380,7 +396,7 @@ export const SweepMigration = () => {
         });
         results.push({
           type: 'bsv',
-          label: `BSV (${totalFundingSats.toLocaleString()} sats)`,
+          label: `BSV (${assets.totalBsv.toLocaleString()} sats)`,
           txid: resp.txid,
           error: resp.error,
         });
@@ -392,8 +408,8 @@ export const SweepMigration = () => {
     if (selection.selectedOrdinals.size > 0) {
       setCurrentSweepOp('Sweeping Ordinals...');
       try {
-        const selectedInputs = allOrdinals.filter((o) => selection.selectedOrdinals.has(o.outpoint));
-        const inputs = await prepareSweepInputs(apiContext, selectedInputs);
+        const selectedOutputs = assets.ordinals.filter((o) => selection.selectedOrdinals.has(o.outpoint));
+        const inputs = await prepareSweepInputs(apiContext, toSweepInputs(selectedOutputs));
         const resp = await sweepOrdinals.execute(apiContext, { inputs, wif: legacyKeys.ordWif });
         results.push({
           type: 'ordinals',
@@ -406,14 +422,14 @@ export const SweepMigration = () => {
       }
     }
 
-    for (const token of allBsv21) {
+    for (const token of assets.bsv21Tokens) {
       if (!selection.selectedBsv21TokenIds.has(token.tokenId)) continue;
       const label = token.symbol || token.tokenId.slice(0, 8);
       setCurrentSweepOp(`Sweeping ${label}...`);
       try {
-        const inputs = await prepareSweepInputs(apiContext, token.inputs);
+        const inputs = await prepareSweepInputs(apiContext, toSweepInputs(token.outputs));
         const resp = await sweepBsv21.execute(apiContext, {
-          inputs: inputs.map((inp) => ({ ...inp, tokenId: token.tokenId, amount: token.totalAmount })),
+          inputs: inputs.map((inp) => ({ ...inp, tokenId: token.tokenId, amount: token.totalAmount.toString() })),
           wif: legacyKeys.ordWif,
         });
         results.push({ type: 'bsv21', label: `${label} (${token.totalAmount})`, txid: resp.txid, error: resp.error });
@@ -574,8 +590,6 @@ export const SweepMigration = () => {
 
   // Step: Review
   if (step === 'review') {
-    const hasAnyAssets = allFunding.length > 0 || allOrdinals.length > 0 || allBsv21.length > 0;
-
     return (
       <Content>
         <TopNav />
@@ -602,31 +616,31 @@ export const SweepMigration = () => {
 
             <ScrollableContainer>
               {/* BSV Funding */}
-              <Show when={allFunding.length > 0}>
+              <Show when={assets.funding.length > 0}>
                 <Card theme={theme}>
                   <CardHeader theme={theme}>
                     <CardIcon theme={theme}>
                       <FaCoins />
                     </CardIcon>
                     BSV Funding
-                    <Badge theme={theme}>{(totalFundingSats / 1e8).toFixed(8)} BSV</Badge>
+                    <Badge theme={theme}>{(assets.totalBsv / 1e8).toFixed(8)} BSV</Badge>
                   </CardHeader>
                   <AssetRow theme={theme}>
                     <Checkbox type="checkbox" checked={selection.sweepBsv} onChange={toggleBsv} />
-                    Sweep {totalFundingSats.toLocaleString()} sats ({allFunding.length} UTXOs)
+                    Sweep {assets.totalBsv.toLocaleString()} sats ({assets.funding.length} UTXOs)
                   </AssetRow>
                 </Card>
               </Show>
 
               {/* Ordinals */}
-              <Show when={allOrdinals.length > 0}>
+              <Show when={assets.ordinals.length > 0}>
                 <Card theme={theme}>
                   <CardHeader theme={theme}>
                     <CardIcon theme={theme}>
                       <FaImage />
                     </CardIcon>
                     Ordinals
-                    <Badge theme={theme}>{allOrdinals.length}</Badge>
+                    <Badge theme={theme}>{assets.ordinals.length}</Badge>
                   </CardHeader>
                   <SelectActions>
                     <SelectLink theme={theme} onClick={selectAllOrdinals}>
@@ -636,23 +650,51 @@ export const SweepMigration = () => {
                       Clear
                     </SelectLink>
                   </SelectActions>
-                  {allOrdinals.map((o) => (
+                  {assets.ordinals.map((o) => (
                     <AssetRow key={o.outpoint} theme={theme}>
                       <Checkbox
                         type="checkbox"
                         checked={selection.selectedOrdinals.has(o.outpoint)}
                         onChange={() => toggleOrdinal(o.outpoint)}
                       />
-                      <span style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
-                        {o.outpoint.slice(0, 8)}...{o.outpoint.slice(-6)}
+                      <span style={{ flex: 1 }}>
+                        {o.name || o.contentType || (
+                          <span style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                            {o.outpoint.slice(0, 8)}...{o.outpoint.slice(-6)}
+                          </span>
+                        )}
                       </span>
+                      {o.contentType && <Badge theme={theme}>{o.contentType.split('/').pop()}</Badge>}
+                    </AssetRow>
+                  ))}
+                </Card>
+              </Show>
+
+              {/* OPNS Names */}
+              <Show when={assets.opnsNames.length > 0}>
+                <Card theme={theme}>
+                  <CardHeader theme={theme}>
+                    <CardIcon theme={theme}>
+                      <FaImage />
+                    </CardIcon>
+                    OpNS Names
+                    <Badge theme={theme}>{assets.opnsNames.length}</Badge>
+                  </CardHeader>
+                  {assets.opnsNames.map((o) => (
+                    <AssetRow key={o.outpoint} theme={theme}>
+                      <Checkbox
+                        type="checkbox"
+                        checked={selection.selectedOrdinals.has(o.outpoint)}
+                        onChange={() => toggleOrdinal(o.outpoint)}
+                      />
+                      <span>{o.name || o.outpoint.slice(0, 12)}</span>
                     </AssetRow>
                   ))}
                 </Card>
               </Show>
 
               {/* BSV-21 Tokens */}
-              <Show when={allBsv21.length > 0}>
+              <Show when={assets.bsv21Tokens.length > 0}>
                 <Card theme={theme}>
                   <CardHeader theme={theme}>
                     <CardIcon theme={theme}>
@@ -660,25 +702,63 @@ export const SweepMigration = () => {
                     </CardIcon>
                     BSV-21 Tokens
                   </CardHeader>
-                  {allBsv21.map((t) => (
-                    <AssetRow key={t.tokenId} theme={theme}>
+                  {assets.bsv21Tokens.map((t) => (
+                    <AssetRow key={t.tokenId} theme={theme} style={{ opacity: t.isActive ? 1 : 0.5 }}>
                       <Checkbox
                         type="checkbox"
                         checked={selection.selectedBsv21TokenIds.has(t.tokenId)}
                         onChange={() => toggleBsv21(t.tokenId)}
+                        disabled={!t.isActive}
                       />
-                      <span style={{ flex: 1 }}>{t.symbol || t.tokenId.slice(0, 8)}</span>
+                      <span style={{ flex: 1 }}>
+                        {t.symbol || t.tokenId.slice(0, 8)}
+                        {!t.isActive && <span style={{ fontSize: '0.65rem', opacity: 0.6 }}> (inactive)</span>}
+                      </span>
                       <Badge theme={theme}>
-                        {t.totalAmount} ({t.inputs.length})
+                        {t.totalAmount.toString()} ({t.outputs.length})
                       </Badge>
                     </AssetRow>
                   ))}
                 </Card>
               </Show>
 
+              {/* Non-sweepable: BSV-20 */}
+              <Show when={assets.bsv20Tokens.length > 0}>
+                <Card theme={theme} style={{ opacity: 0.7 }}>
+                  <CardHeader theme={theme}>
+                    <CardIcon theme={theme} style={{ background: '#e53e3e15', color: '#e53e3e' }}>
+                      <FaExclamationTriangle />
+                    </CardIcon>
+                    BSV-20 Tokens
+                    <Badge theme={theme}>{assets.bsv20Tokens.length}</Badge>
+                  </CardHeader>
+                  <Subtitle theme={theme} style={{ textAlign: 'left', margin: 0, fontSize: '0.7rem' }}>
+                    Cannot be swept automatically. Export your legacy keys from Settings to access these with a
+                    compatible wallet.
+                  </Subtitle>
+                </Card>
+              </Show>
+
+              {/* Non-sweepable: Locked */}
+              <Show when={assets.locked.length > 0}>
+                <Card theme={theme} style={{ opacity: 0.7 }}>
+                  <CardHeader theme={theme}>
+                    <CardIcon theme={theme} style={{ background: '#e53e3e15', color: '#e53e3e' }}>
+                      <FaLock />
+                    </CardIcon>
+                    Locked Outputs
+                    <Badge theme={theme}>{assets.locked.length}</Badge>
+                  </CardHeader>
+                  <Subtitle theme={theme} style={{ textAlign: 'left', margin: 0, fontSize: '0.7rem' }}>
+                    These outputs are locked in smart contracts. Your legacy keys are preserved — you can sweep these
+                    after they unlock.
+                  </Subtitle>
+                </Card>
+              </Show>
+
               <Notice theme={theme}>
-                <strong>Non-sweepable assets</strong> (BSV-20, RUN, locked outputs) are not shown here. Your legacy keys
-                are always preserved — export them from Settings to access those assets with a compatible wallet.
+                Your legacy keys are always preserved. Return anytime via <strong>Tools → Migrate Legacy Assets</strong>
+                .
               </Notice>
             </ScrollableContainer>
 
