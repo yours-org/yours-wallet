@@ -79,6 +79,8 @@ export interface ChromeStorageObject {
   counterpartyPermissionRequest?: CounterpartyPermissionRequest;
   // Transaction approval request from YoursApi
   transactionApprovalRequest?: ApprovalContext;
+  // Sweep migration: true after user has been through the sweep flow at least once
+  sweepCompleted?: boolean;
 }
 
 export type CurrentAccountObject = Omit<

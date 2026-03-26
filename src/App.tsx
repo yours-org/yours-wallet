@@ -34,6 +34,7 @@ import { PermissionRequestPage } from './pages/requests/PermissionRequest';
 import { GroupedPermissionRequestPage } from './pages/requests/GroupedPermissionRequest';
 import { CounterpartyPermissionRequestPage } from './pages/requests/CounterpartyPermissionRequest';
 import { TransactionApprovalRequest } from './pages/requests/TransactionApprovalRequest';
+import { SweepMigration } from './pages/SweepMigration';
 
 const MainContainer = styled.div<WhiteLabelTheme & { $isMobile?: boolean }>`
   display: flex;
@@ -133,6 +134,7 @@ export const App = () => {
                       />
                       <Route path="/import-wallet" element={<ImportAccount onNavigateBack={() => null} newWallet />} />
                       <Route path="/master-restore" element={<MasterRestore />} />
+                      <Route path="/sweep" element={<SweepMigration />} />
                       <Route
                         path="/connect"
                         element={

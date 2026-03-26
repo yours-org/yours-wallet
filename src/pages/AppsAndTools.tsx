@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Button } from '../components/Button';
 import { ForwardButton as RightChevron } from '../components/ForwardButton';
@@ -174,7 +175,9 @@ type AppsPage =
 export const AppsAndTools = () => {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
-  const { query } = useBottomMenu();
+  const navigate = useNavigate();
+  const menuContext = useBottomMenu();
+  const { query } = menuContext;
   const { keysService, chromeStorageService, wallet, apiContext } = useServiceContext();
   const { bsvAddress, ordAddress, identityAddress, getWifBalance, sweepWif } = keysService;
   const exchangeRate = chromeStorageService.getCurrentAccountObject().exchangeRateCache?.rate ?? 0;
@@ -437,6 +440,15 @@ export const AppsAndTools = () => {
           jsxElement={<RightChevron color={theme.color.global.contrast} />}
         />
       </Show>
+      <AppsRow
+        name="Migrate Legacy Assets"
+        description="Sweep assets from your old keys to BRC-100"
+        onClick={() => {
+          menuContext?.clearSelection();
+          navigate('/sweep');
+        }}
+        jsxElement={<RightChevron color={theme.color.global.contrast} />}
+      />
       <AppsRow
         name="Sweep Private Key"
         description="Import funds from WIF private key"

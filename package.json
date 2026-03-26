@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@1sat/actions": "0.0.62",
+    "@1sat/actions": "0.0.64",
     "@1sat/client": "^0.0.16",
     "@1sat/wallet-browser": "0.0.22",
     "@bsv/sdk": "^2.0.6",

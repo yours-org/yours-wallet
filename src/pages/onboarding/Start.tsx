@@ -10,6 +10,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { WhiteLabelTheme } from '../../theme.types';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { YoursIcon } from '../../components/YoursIcon';
+import { decrypt } from '../../utils/crypto';
 
 const Content = styled.div`
   display: flex;
@@ -47,6 +48,19 @@ export const Start = () => {
   useEffect(() => {
     if (encryptedKeys) {
       setShowStart(false);
+      // Check if legacy keys exist and sweep hasn't been completed yet
+      const storage = chromeStorageService.getCurrentAccountObject();
+      if (!chromeStorageService.storage?.sweepCompleted && storage.passKey) {
+        try {
+          const keys = JSON.parse(decrypt(encryptedKeys, storage.passKey));
+          if (keys.walletWif || keys.ordWif) {
+            navigate('/sweep');
+            return;
+          }
+        } catch {
+          // Decryption failed — proceed to wallet normally
+        }
+      }
       navigate('/bsv-wallet');
       return;
     }

@@ -29,11 +29,16 @@ export const BottomMenuProvider = (props: BottomMenuProviderProps) => {
     setIsVisible(false);
   };
 
+  const clearSelection = () => {
+    setSelected(null);
+  };
+
   return (
     <BottomMenuContext.Provider
       value={{
         selected,
         handleSelect,
+        clearSelection,
         isVisible,
         showMenu,
         hideMenu,
