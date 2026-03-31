@@ -7,7 +7,6 @@
 //
 // To re-enable, port to use wallet.ingest() for each MNEE transaction.
 
-import axios from 'axios';
 // import { Indexer, Ingest, ParseMode, TxoStore } from 'spv-store';
 import { MNEE_API, MNEE_API_TOKEN } from './constants';
 
@@ -57,6 +56,11 @@ type TxResult = {
  * This can be used to manually sync MNEE transactions into the wallet.
  */
 export async function fetchMNEETransactions(owners: Set<string>): Promise<TxResult[]> {
-  const { data } = await axios.post<TxResult[]>(`${MNEE_API}/v1/sync?auth_token=${MNEE_API_TOKEN}`, [...owners]);
-  return data;
+  const response = await fetch(`${MNEE_API}/v1/sync?auth_token=${MNEE_API_TOKEN}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify([...owners]),
+  });
+  if (!response.ok) throw new Error(`MNEE sync failed: ${response.status}`);
+  return response.json() as Promise<TxResult[]>;
 }
