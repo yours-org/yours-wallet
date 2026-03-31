@@ -493,7 +493,14 @@ export const SweepMigration = () => {
           </Card>
 
           <Spacer $h="0.25rem" />
-          <Button theme={theme} type="primary" label="Start Migration" onClick={() => setStep('password')} />
+          <Button
+            theme={theme}
+            type="primary"
+            label="Start Migration"
+            onClick={() => {
+              chrome.tabs.create({ url: chrome.runtime.getURL('sweep-tab.html') });
+            }}
+          />
           <Button theme={theme} type="secondary-outline" label="I'll Do This Later" onClick={handleSkip} />
         </PageWrapper>
       </Content>

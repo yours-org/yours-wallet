@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { resolve } from 'path';
 
@@ -8,6 +9,7 @@ export default defineConfig({
   base: './',
   plugins: [
     react(),
+    tailwindcss(),
     nodePolyfills({
       include: ['buffer', 'process', 'util', 'stream', 'crypto', 'assert', 'url', 'path'],
       globals: {
@@ -18,7 +20,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      path: 'path-browserify',
+      'path': 'path-browserify',
     },
     preserveSymlinks: true,
   },
@@ -29,6 +31,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
+        'sweep-tab': resolve(__dirname, 'sweep-tab.html'),
       },
       output: {
         entryFileNames: 'assets/[name]-[hash].js',
