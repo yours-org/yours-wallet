@@ -11,7 +11,7 @@ global.Buffer = Buffer;
 global.process = process;
 window.Buffer = Buffer;
 
-const SERVICES_BASE_URL = 'https://1sat.shruggr.cloud';
+const SERVICES_BASE_URL = 'https://api.1sat.app';
 
 function SweepTab() {
   const [keys, setKeys] = useState<LegacyKeys | null>(null);

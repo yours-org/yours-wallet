@@ -131,7 +131,7 @@ export const initWallet = async (
     chain,
     feeModel: { model: 'sat/kb', value: FEE_PER_KB },
     activeRemote:
-      chain === 'main' ? 'https://1sat.shruggr.cloud/1sat/wallet' : 'https://testnet.api.1sat.app/1sat/wallet',
+      chain === 'main' ? 'https://api.1sat.app/1sat/wallet' : 'https://testnet.api.1sat.app/1sat/wallet',
     storageIdentityKey: 'yours-wallet',
   };
 
