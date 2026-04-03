@@ -20,7 +20,7 @@ import { TopNav } from '../components/TopNav';
 import { WhiteLabelTheme } from '../theme.types';
 import { getErrorMessage } from '../utils/tools';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
-import { truncate, getTagValue, getOutputName, hasTag } from '../utils/format';
+import { truncate, getTagValue, getOutputName, hasTag, resolveOriginOutpoint } from '../utils/format';
 
 type Addresses = Record<string, string>;
 
@@ -466,16 +466,16 @@ export const OrdWallet = () => {
 
   const renderTransfers = (outputs: WalletOutput[]) => {
     return outputs.map((output) => {
-      const originOutpoint = getTagValue(output.tags, 'origin');
+      const originOutpoint = resolveOriginOutpoint(output);
       const outpoint = output.outpoint;
       const name = getOutputName(output);
 
       return (
-        <OrdinalItem theme={theme} key={originOutpoint}>
+        <OrdinalItem theme={theme} key={originOutpoint ?? outpoint}>
           <Ordinal
             theme={theme}
             output={output}
-            url={`${getContentUrl(originOutpoint || '')}?outpoint=${outpoint}`}
+            url={`${getContentUrl(originOutpoint ?? outpoint)}?outpoint=${outpoint}`}
             isTransfer
             size="3rem"
           />
@@ -593,14 +593,14 @@ export const OrdWallet = () => {
         return contentType !== 'application/bsv-20';
       })
       .map((output) => {
-        const originOutpoint = getTagValue(output.tags, 'origin');
+        const originOutpoint = resolveOriginOutpoint(output);
         const outpoint = output.outpoint;
         return (
           <Ordinal
             theme={theme}
             output={output}
-            key={originOutpoint}
-            url={`${getContentUrl(originOutpoint || '')}?outpoint=${outpoint}`}
+            key={originOutpoint ?? outpoint}
+            url={`${getContentUrl(originOutpoint ?? outpoint)}?outpoint=${outpoint}`}
             selected={selectedOrdinals.some((selected) => selected.outpoint === outpoint)}
             onClick={() => toggleOrdinalSelection(output)}
           />

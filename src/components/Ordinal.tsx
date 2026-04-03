@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import type { WalletOutput } from '@bsv/sdk';
 import { WhiteLabelTheme, Theme } from '../theme.types';
@@ -113,8 +114,21 @@ export const Ordinal = (props: OrdinalProps) => {
   const { url, selected, isTransfer, size, output, theme, onClick } = props;
 
   const contentType = getTagValue(output.tags, 'type');
-  const textContent = output.customInstructions;
   const name = getOutputName(output);
+
+  // Fetch text/json content from ORDFS instead of using customInstructions
+  // (customInstructions now holds key derivation metadata, not inscription content)
+  const [fetchedText, setFetchedText] = useState<string | null>(null);
+  const needsTextFetch = contentType?.startsWith('text/') || contentType?.startsWith('application/json') || contentType?.startsWith('application/op-ns');
+  useEffect(() => {
+    if (!needsTextFetch || !url) return;
+    fetch(url)
+      .then((r) => r.text())
+      .then(setFetchedText)
+      .catch(() => setFetchedText(null));
+  }, [url, needsTextFetch]);
+
+  const textContent = fetchedText;
 
   const getJsonContent = (): Record<string, unknown> | undefined => {
     if (!contentType?.startsWith('application/json') || !textContent) return undefined;

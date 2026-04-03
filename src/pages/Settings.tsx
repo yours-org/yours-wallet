@@ -26,6 +26,7 @@ import { ImportAccount } from './onboarding/ImportAccount';
 import { AccountRow } from '../components/AccountRow';
 import { MasterBackupProgressEvent, streamDataToZip } from '../utils/masterExporter';
 import { useSnackbar } from '../hooks/useSnackbar';
+import { PermissionsManager } from './PermissionsManager';
 import { StorageStatus } from './StorageStatus';
 
 const Content = styled.div`
@@ -115,7 +116,8 @@ export type SettingsPage =
   | 'export-keys-options'
   | 'export-keys-qr'
   | 'preferences'
-  | 'storage';
+  | 'storage'
+  | 'permissions';
 type DecisionType = 'sign-out' | 'export-master-backup' | 'export-keys' | 'export-keys-qr-code' | 'delete-account';
 
 export const Settings = () => {
@@ -464,6 +466,12 @@ export const Settings = () => {
         jsxElement={<ForwardButton color={theme.color.global.contrast} />}
       />
       <SettingsRow
+        name="Permissions"
+        description="View and revoke dApp permissions"
+        onClick={() => setPage('permissions')}
+        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
+      />
+      <SettingsRow
         name="Preferences"
         description="Manage your wallet preferences"
         onClick={() => setPage('preferences')}
@@ -782,6 +790,9 @@ export const Settings = () => {
         <Show when={page === 'connected-apps'}>{connectedAppsPage}</Show>
         <Show when={page === 'preferences'}>{preferencesPage}</Show>
         <Show when={page === 'social-profile'}>{socialProfilePage}</Show>
+        <Show when={page === 'permissions'}>
+          <PermissionsManager onBack={() => setPage('main')} />
+        </Show>
         <Show when={page === 'storage'}>
           <StorageStatus onBack={() => setPage('main')} />
         </Show>

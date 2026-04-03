@@ -533,6 +533,11 @@ if (isInServiceWorker) {
       'STORAGE_GET_INFO',
       'STORAGE_SYNC_BACKUPS',
       'STORAGE_MIGRATE_REMOTE',
+      // Permissions management (popup internal)
+      'PERMISSIONS_LIST_ALL',
+      'PERMISSIONS_QUERY_SPENT',
+      'PERMISSIONS_REVOKE_ONE',
+      'PERMISSIONS_REVOKE_ALL',
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -648,6 +653,18 @@ if (isInServiceWorker) {
           return true;
         case 'STORAGE_MIGRATE_REMOTE':
           processStorageMigrateRemote(message.url, sendResponse);
+          return true;
+        case 'PERMISSIONS_LIST_ALL':
+          processPermissionsListAll(sendResponse);
+          return true;
+        case 'PERMISSIONS_QUERY_SPENT':
+          processPermissionsQuerySpent(message, sendResponse);
+          return true;
+        case 'PERMISSIONS_REVOKE_ONE':
+          processPermissionsRevokeOne(message, sendResponse);
+          return true;
+        case 'PERMISSIONS_REVOKE_ALL':
+          processPermissionsRevokeAll(message, sendResponse);
           return true;
         default:
           break;
@@ -903,6 +920,92 @@ if (isInServiceWorker) {
           error: error instanceof Error ? error.message : String(error),
         });
       });
+  };
+
+  // PERMISSIONS MANAGEMENT HANDLERS ********************************
+
+  // biome-ignore lint/suspicious/noExplicitAny: WPM token shapes vary by type
+  type PermissionToken = any & { type: string; originator: string };
+
+  const processPermissionsListAll = async (sendResponse: CallbackResponse) => {
+    try {
+      const wpm = await ensureWallet() as WalletPermissionsManager;
+
+      const [protocols, baskets, spending, certificates] = await Promise.all([
+        wpm.listProtocolPermissions({}),
+        wpm.listBasketAccess({}),
+        wpm.listSpendingAuthorizations({}),
+        wpm.listCertificateAccess({}),
+      ]);
+
+      // Tag each token with its type, pass everything else through as-is
+      const allTokens: PermissionToken[] = [
+        ...protocols.map((t: PermissionToken) => ({ ...t, type: 'protocol' })),
+        ...baskets.map((t: PermissionToken) => ({ ...t, type: 'basket' })),
+        ...spending.map((t: PermissionToken) => ({ ...t, type: 'spending' })),
+        ...certificates.map((t: PermissionToken) => ({ ...t, type: 'certificate' })),
+      ];
+
+      // Group by originator
+      const groupMap = new Map<string, PermissionToken[]>();
+      for (const token of allTokens) {
+        const key = token.originator ?? token.rawOriginator ?? '';
+        if (!groupMap.has(key)) groupMap.set(key, []);
+        groupMap.get(key)!.push(token);
+      }
+
+      const groups = Array.from(groupMap.entries()).map(([originator, permissions]) => ({
+        originator,
+        permissions,
+      }));
+
+      sendResponse({ type: 'PERMISSIONS_LIST_ALL', success: true, data: { groups } });
+    } catch (error) {
+      console.error('[PERMISSIONS_LIST_ALL] Error:', error);
+      sendResponse({ type: 'PERMISSIONS_LIST_ALL', success: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  };
+
+  const processPermissionsQuerySpent = async (
+    message: { token: PermissionToken },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const wpm = await ensureWallet() as WalletPermissionsManager;
+      const satoshisSpent = await wpm.querySpentSince(message.token);
+      sendResponse({ type: 'PERMISSIONS_QUERY_SPENT', success: true, data: { satoshisSpent } });
+    } catch (error) {
+      console.error('[PERMISSIONS_QUERY_SPENT] Error:', error);
+      sendResponse({ type: 'PERMISSIONS_QUERY_SPENT', success: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  };
+
+  const processPermissionsRevokeOne = async (
+    message: { token: PermissionToken },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const wpm = await ensureWallet() as WalletPermissionsManager;
+      await wpm.revokePermission(message.token);
+      sendResponse({ type: 'PERMISSIONS_REVOKE_ONE', success: true });
+    } catch (error) {
+      console.error('[PERMISSIONS_REVOKE_ONE] Error:', error);
+      sendResponse({ type: 'PERMISSIONS_REVOKE_ONE', success: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  };
+
+  const processPermissionsRevokeAll = async (
+    message: { originator: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const wpm = await ensureWallet() as WalletPermissionsManager;
+      const revoked = await wpm.revokeAllForOriginator(message.originator);
+      sendResponse({ type: 'PERMISSIONS_REVOKE_ALL', success: true, data: { revokedCount: revoked.length } });
+    } catch (error) {
+      console.error('[PERMISSIONS_REVOKE_ALL] Error:', error);
+      sendResponse({ type: 'PERMISSIONS_REVOKE_ALL', success: false, error: error instanceof Error ? error.message : String(error) });
+    }
   };
 
   // PERMISSION RESPONSE HANDLER ********************************
