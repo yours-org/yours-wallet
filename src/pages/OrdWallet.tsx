@@ -535,7 +535,7 @@ export const OrdWallet = () => {
       {/* Grid */}
       <div
         className="flex-1 overflow-y-auto px-4"
-        style={{ paddingBottom: selectedOrdinals.length > 0 ? '5.5rem' : '1rem' }}
+        style={{ paddingBottom: selectedOrdinals.length > 0 ? '8rem' : '5rem' }}
       >
         {isProcessing && ordinals.length === 0 ? (
           /* Skeleton loading state */

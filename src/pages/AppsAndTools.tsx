@@ -891,7 +891,7 @@ export const AppsAndTools = () => {
 
   return (
     <div
-      className="flex w-full flex-col items-center overflow-x-hidden overflow-y-auto"
+      className="flex w-full flex-col items-center overflow-x-hidden overflow-y-auto pb-20"
       style={{ height: 'calc(75%)', background: '#010101' }}
     >
       <TopNav />

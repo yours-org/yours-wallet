@@ -117,7 +117,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 16 }}
           transition={{ type: 'spring', stiffness: 320, damping: 35 }}
-          className="flex flex-col w-full h-full overflow-y-auto"
+          className="flex flex-col w-full h-full overflow-y-auto pb-20"
           style={{ backgroundColor: theme.color.global.walletBackground }}
         >
           {/* Header row */}
@@ -131,9 +131,9 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
                 onBack();
               }}
               className="flex items-center justify-center w-8 h-8 rounded-full outline-none border-none cursor-pointer flex-shrink-0 mr-3"
-              style={{ backgroundColor: theme.color.global.row }}
+              style={{ backgroundColor: theme.color.global.row, color: theme.color.global.gray }}
             >
-              <ArrowLeft size={16} style={{ color: theme.color.global.contrast }} />
+              <ArrowLeft size={16} />
             </motion.button>
             <span className="text-base font-bold" style={{ color: theme.color.global.contrast }}>
               Send {getTokenName(token.info)}

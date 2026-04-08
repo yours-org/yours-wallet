@@ -629,7 +629,7 @@ export const BsvWallet = () => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-6 px-4 overflow-y-auto"
+      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto"
       style={{ minHeight: 'calc(100% - 3.75rem)', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header row */}
@@ -937,7 +937,7 @@ export const BsvWallet = () => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-6 px-4 overflow-y-auto"
+      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto"
       style={{ minHeight: 'calc(100% - 3.75rem)', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header */}
@@ -1082,7 +1082,7 @@ export const BsvWallet = () => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-6 px-4 overflow-y-auto"
+      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto"
       style={{ minHeight: 'calc(100% - 3.75rem)', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header */}
@@ -1138,7 +1138,7 @@ export const BsvWallet = () => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-6 px-4 overflow-y-auto"
+      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto"
       style={{ minHeight: 'calc(100% - 3.75rem)', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header */}
@@ -1246,12 +1246,22 @@ export const BsvWallet = () => {
               )}
 
               {/* Amount input + unit toggle */}
-              <div className="relative w-full">
-                <Input
-                  theme={theme}
+              <div
+                className="flex items-center w-[85%] mx-auto rounded-xl border"
+                style={{
+                  backgroundColor: theme.color.global.row,
+                  borderColor: theme.color.global.gray + '40',
+                }}
+              >
+                <input
                   placeholder={recipient.amountType === 'bsv' ? 'Enter BSV Amount' : 'Enter USD Amount'}
                   type="number"
                   step="0.00000001"
+                  className="flex-1 bg-transparent h-9 px-4 text-sm outline-none border-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
+                  style={{
+                    color: theme.color.global.contrast,
+                    fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+                  }}
                   value={
                     recipient.satSendAmount !== null && recipient.satSendAmount !== undefined
                       ? recipient.satSendAmount / BSV_DECIMAL_CONVERSION
@@ -1276,14 +1286,17 @@ export const BsvWallet = () => {
                       }
                     }
                   }}
+                  onWheel={(e) => {
+                    (e.target as HTMLInputElement).blur();
+                    e.stopPropagation();
+                    setTimeout(() => (e.target as HTMLInputElement).focus(), 0);
+                  }}
                 />
-                {/* Unit toggle pill — sits inside input on the right */}
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.93 }}
                   type="button"
                   onClick={() => toggleRecipientAmountType(recipient.id)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-1 rounded-lg border-0 outline-none cursor-pointer"
+                  className="flex items-center gap-1 px-2.5 py-1.5 mr-1.5 rounded-lg border-0 outline-none cursor-pointer shrink-0"
                   style={{ background: `${theme.color.component.primaryButtonLeftGradient}18` }}
                 >
                   <span
