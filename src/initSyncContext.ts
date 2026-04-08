@@ -52,12 +52,7 @@ async function deriveAddresses(
   const derivations: AddressDerivation[] = [];
 
   for (let i = 0; i <= maxKeyIndex; i++) {
-    const base64Suffix = Utils.toBase64([
-      (i >>> 24) & 0xff,
-      (i >>> 16) & 0xff,
-      (i >>> 8) & 0xff,
-      i & 0xff,
-    ]);
+    const base64Suffix = Utils.toBase64([(i >>> 24) & 0xff, (i >>> 16) & 0xff, (i >>> 8) & 0xff, i & 0xff]);
     // keyID uses base64-encoded prefix and suffix joined with space
     const keyID = `${BASE64_PREFIX} ${base64Suffix}`;
 

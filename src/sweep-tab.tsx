@@ -66,7 +66,9 @@ function SweepTab() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#a1a1aa' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#a1a1aa' }}
+      >
         Loading...
       </div>
     );
@@ -74,7 +76,17 @@ function SweepTab() {
 
   if (error) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#ef4444', textAlign: 'center', padding: '2rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          color: '#ef4444',
+          textAlign: 'center',
+          padding: '2rem',
+        }}
+      >
         {error}
       </div>
     );

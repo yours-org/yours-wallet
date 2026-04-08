@@ -545,7 +545,12 @@ if (isInServiceWorker) {
         case YoursEventName.USER_CONNECT_RESPONSE:
           return processConnectResponse(message as { decision: Decision });
         case YoursEventName.SWITCH_ACCOUNT:
-          return switchAccount();
+          switchAccount().then(() => {
+            sendResponse({ type: YoursEventName.SWITCH_ACCOUNT, success: true });
+          }).catch((error) => {
+            sendResponse({ type: YoursEventName.SWITCH_ACCOUNT, success: false, error: String(error) });
+          });
+          return true;
         case YoursEventName.SIGNED_OUT:
           return signOut();
         // CWI auth check
@@ -929,7 +934,7 @@ if (isInServiceWorker) {
 
   const processPermissionsListAll = async (sendResponse: CallbackResponse) => {
     try {
-      const wpm = await ensureWallet() as WalletPermissionsManager;
+      const wpm = (await ensureWallet()) as WalletPermissionsManager;
 
       const [protocols, baskets, spending, certificates] = await Promise.all([
         wpm.listProtocolPermissions({}),
@@ -962,49 +967,56 @@ if (isInServiceWorker) {
       sendResponse({ type: 'PERMISSIONS_LIST_ALL', success: true, data: { groups } });
     } catch (error) {
       console.error('[PERMISSIONS_LIST_ALL] Error:', error);
-      sendResponse({ type: 'PERMISSIONS_LIST_ALL', success: false, error: error instanceof Error ? error.message : String(error) });
+      sendResponse({
+        type: 'PERMISSIONS_LIST_ALL',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
-  const processPermissionsQuerySpent = async (
-    message: { token: PermissionToken },
-    sendResponse: CallbackResponse,
-  ) => {
+  const processPermissionsQuerySpent = async (message: { token: PermissionToken }, sendResponse: CallbackResponse) => {
     try {
-      const wpm = await ensureWallet() as WalletPermissionsManager;
+      const wpm = (await ensureWallet()) as WalletPermissionsManager;
       const satoshisSpent = await wpm.querySpentSince(message.token);
       sendResponse({ type: 'PERMISSIONS_QUERY_SPENT', success: true, data: { satoshisSpent } });
     } catch (error) {
       console.error('[PERMISSIONS_QUERY_SPENT] Error:', error);
-      sendResponse({ type: 'PERMISSIONS_QUERY_SPENT', success: false, error: error instanceof Error ? error.message : String(error) });
+      sendResponse({
+        type: 'PERMISSIONS_QUERY_SPENT',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
-  const processPermissionsRevokeOne = async (
-    message: { token: PermissionToken },
-    sendResponse: CallbackResponse,
-  ) => {
+  const processPermissionsRevokeOne = async (message: { token: PermissionToken }, sendResponse: CallbackResponse) => {
     try {
-      const wpm = await ensureWallet() as WalletPermissionsManager;
+      const wpm = (await ensureWallet()) as WalletPermissionsManager;
       await wpm.revokePermission(message.token);
       sendResponse({ type: 'PERMISSIONS_REVOKE_ONE', success: true });
     } catch (error) {
       console.error('[PERMISSIONS_REVOKE_ONE] Error:', error);
-      sendResponse({ type: 'PERMISSIONS_REVOKE_ONE', success: false, error: error instanceof Error ? error.message : String(error) });
+      sendResponse({
+        type: 'PERMISSIONS_REVOKE_ONE',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
-  const processPermissionsRevokeAll = async (
-    message: { originator: string },
-    sendResponse: CallbackResponse,
-  ) => {
+  const processPermissionsRevokeAll = async (message: { originator: string }, sendResponse: CallbackResponse) => {
     try {
-      const wpm = await ensureWallet() as WalletPermissionsManager;
+      const wpm = (await ensureWallet()) as WalletPermissionsManager;
       const revoked = await wpm.revokeAllForOriginator(message.originator);
       sendResponse({ type: 'PERMISSIONS_REVOKE_ALL', success: true, data: { revokedCount: revoked.length } });
     } catch (error) {
       console.error('[PERMISSIONS_REVOKE_ALL] Error:', error);
-      sendResponse({ type: 'PERMISSIONS_REVOKE_ALL', success: false, error: error instanceof Error ? error.message : String(error) });
+      sendResponse({
+        type: 'PERMISSIONS_REVOKE_ALL',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 

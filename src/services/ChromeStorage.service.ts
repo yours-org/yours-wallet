@@ -4,7 +4,7 @@ declare const chrome: any;
 import { Utils } from '@bsv/sdk';
 import { NetWork } from 'yours-wallet-provider';
 import { YoursEventName } from '../inject';
-import { sendMessage } from '../utils/chromeHelpers';
+import { sendMessage, sendMessageAsync } from '../utils/chromeHelpers';
 import {
   CHROME_STORAGE_OBJECT_VERSION,
   FEE_PER_KB,
@@ -367,7 +367,7 @@ export class ChromeStorageService {
 
   switchAccount = async (identityAddress: string): Promise<void> => {
     await this.update({ selectedAccount: identityAddress });
-    sendMessage({ action: YoursEventName.SWITCH_ACCOUNT });
+    await sendMessageAsync({ action: YoursEventName.SWITCH_ACCOUNT });
   };
 
   /**

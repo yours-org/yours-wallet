@@ -202,18 +202,20 @@ export const TopNav = () => {
                     {account.name}
                   </DropDownAccountName>
                 </FlexContainer>
-                <FlexContainer>
-                  <DropdownAddressText theme={theme}>
-                    {truncate(account.addresses.bsvAddress, 3, 3)}
-                  </DropdownAddressText>
-                  <CopyIcon
-                    src={copyIcon}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCopyToClipboard(account.addresses.bsvAddress);
-                    }}
-                  />
-                </FlexContainer>
+                {account.primaryAddress && (
+                  <FlexContainer>
+                    <DropdownAddressText theme={theme}>
+                      {truncate(account.primaryAddress, 3, 3)}
+                    </DropdownAddressText>
+                    <CopyIcon
+                      src={copyIcon}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCopyToClipboard(account.primaryAddress!);
+                      }}
+                    />
+                  </FlexContainer>
+                )}
               </DropdownItem>
             ))}
             <DropdownItem key={'new-account'} theme={theme} onClick={() => handleSelect('settings', 'manage-accounts')}>

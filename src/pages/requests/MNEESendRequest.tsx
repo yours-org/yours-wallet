@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { validate } from 'bitcoin-address-validation';
 import { Button } from '../../components/Button';
-import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
@@ -10,13 +9,16 @@ import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { formatNumberWithCommasAndDecimals, truncate } from '../../utils/format';
-import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendMNEE } from 'yours-wallet-provider';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { getErrorMessage } from '../../utils/tools';
 import { MNEE_DECIMALS, MNEE_ICON_URL } from '../../utils/constants';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
+import { sendMnee, deriveDepositAddresses, getMneeBalance } from '@1sat/actions';
+
+const YOURS_PREFIX = 'yours';
+const YOURS_ADDRESS_COUNT = 5;
 
 const Icon = styled.img`
   width: 3.5rem;
@@ -34,130 +36,88 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
   const { request, popupId, onResponse } = props;
   const { theme } = useTheme();
   const { handleSelect, hideMenu } = useBottomMenu();
-  const [passwordConfirm, setPasswordConfirm] = useState('');
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, mneeService, keysService } = useServiceContext();
+  const { chromeStorageService, apiContext } = useServiceContext();
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const processMNEESend = async (password: string) => {
+  const processMNEESend = async () => {
     try {
-      const validationFail = new Map<string, boolean>();
-      validationFail.set('address', false);
-
+      // Validate addresses
       for (const req of request) {
         if (req.address && !validate(req.address)) {
-          validationFail.set('address', true);
-          break;
-        }
-        if (req.amount && !req.amount) {
-          validationFail.set('amount', true);
-          break;
-        }
-      }
-
-      let validationErrorMessage = '';
-      if (validationFail.get('address')) {
-        validationErrorMessage = 'Found an invalid receive address.';
-      }
-
-      if (validationFail.get('amount')) {
-        validationErrorMessage = 'Found an invalid amount.';
-      }
-
-      if (validationErrorMessage) {
-        addSnackbar(validationErrorMessage, 'error');
-        return;
-      }
-
-      const keys = await keysService.retrieveKeys(password);
-      if (!keys?.walletWif) {
-        addSnackbar('Invalid password!', 'error');
-        setIsProcessing(false);
-        return;
-      }
-      // Initiate the transfer with broadcast flag
-      const sendRes = await mneeService.transfer(request, keys.walletWif, { broadcast: true });
-
-      // Handle ticket-based response
-      if (sendRes.ticketId) {
-        addSnackbar('Transaction initiated. Processing...', 'info');
-
-        // Poll for transaction status
-        let finalStatus = null;
-        let attempts = 0;
-        const maxAttempts = 30; // 30 attempts with 2 second intervals = 60 seconds max
-
-        while (attempts < maxAttempts) {
-          await sleep(2000); // Wait 2 seconds between polls
-
-          try {
-            const status = await mneeService.getTxStatus(sendRes.ticketId);
-
-            if (status.status === 'SUCCESS' || status.status === 'MINED') {
-              finalStatus = status;
-              break;
-            } else if (status.status === 'FAILED') {
-              addSnackbar(`Transaction failed: ${status.errors || 'Unknown error'}`, 'error');
-              setIsProcessing(false);
-              return;
-            }
-            // If BROADCASTING, continue polling
-          } catch (pollError) {
-            console.error('Error polling transaction status:', pollError);
-          }
-
-          attempts++;
-        }
-
-        if (!finalStatus) {
-          addSnackbar('Transaction timeout. Please check your transaction history.', 'error');
-          setIsProcessing(false);
+          addSnackbar('Found an invalid receive address.', 'error');
           return;
         }
-
-        // Transaction successful
-        addSnackbar('Transaction Successful!', 'success');
-
-        // Fetch updated MNEE balance and update Chrome storage
-        const balanceRes = await mneeService.balance(keysService.bsvAddress);
-        if (balanceRes) {
-          const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
-          if (account && selectedAccount) {
-            const key: keyof ChromeStorageObject = 'accounts';
-            const update: Partial<ChromeStorageObject['accounts']> = {
-              [selectedAccount]: {
-                ...account,
-                mneeBalance: {
-                  amount: balanceRes.amount,
-                  decimalAmount: balanceRes.decimalAmount,
-                },
-              },
-            };
-            await chromeStorageService.updateNested(key, update);
-          }
+        if (!req.amount || req.amount <= 0) {
+          addSnackbar('Found an invalid amount.', 'error');
+          return;
         }
+      }
 
-        onResponse();
-
-        sendMessage({
-          action: 'sendMNEEResponse',
-          txid: finalStatus.tx_id,
-          rawtx: finalStatus.tx_hex,
-        });
-      } else if (sendRes.rawtx) {
-        // Legacy response with raw transaction (shouldn't happen with broadcast: true)
-        addSnackbar('Transaction created but not broadcast. Please try again.', 'info');
-        setIsProcessing(false);
+      if (!apiContext) {
+        addSnackbar('Wallet not ready.', 'error');
         return;
-      } else {
-        // No valid response
-        addSnackbar('Transfer failed. No valid response from server.', 'error');
+      }
+
+      // Derive addresses for signing
+      const derivationResult = await deriveDepositAddresses.execute(apiContext, {
+        prefix: YOURS_PREFIX,
+        startIndex: 0,
+        count: YOURS_ADDRESS_COUNT,
+      });
+
+      addSnackbar('Transaction initiated. Processing...', 'info');
+
+      // Send MNEE using BRC-100 signing (no WIF needed)
+      // The action handles building, signing, submitting, and polling for txid
+      const sendRes = await sendMnee.execute(apiContext, {
+        recipients: request.map((r) => ({ address: r.address, amount: r.amount })),
+        derivations: derivationResult.derivations,
+      });
+
+      if (sendRes.error) {
+        if (sendRes.error === 'timeout-waiting-for-txid') {
+          addSnackbar('Transaction timeout. Please check your transaction history.', 'error');
+        } else {
+          addSnackbar(`Transaction failed: ${sendRes.error}`, 'error');
+        }
         setIsProcessing(false);
         return;
       }
+
+      // Transaction successful
+      addSnackbar('Transaction Successful!', 'success');
+
+      // Fetch updated MNEE balance and update Chrome storage
+      const addresses = derivationResult.derivations.map((d) => d.address);
+      try {
+        const balanceRes = await getMneeBalance.execute(apiContext, { addresses });
+        const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+        if (account && selectedAccount) {
+          const key: keyof ChromeStorageObject = 'accounts';
+          const update: Partial<ChromeStorageObject['accounts']> = {
+            [selectedAccount]: {
+              ...account,
+              mneeBalance: {
+                amount: balanceRes.totalAtomic,
+                decimalAmount: balanceRes.totalDecimal,
+              },
+            },
+          };
+          await chromeStorageService.updateNested(key, update);
+        }
+      } catch {
+        // Balance update is best-effort
+      }
+
+      onResponse();
+
+      sendMessage({
+        action: 'sendMNEEResponse',
+        txid: sendRes.txid,
+      });
     } catch (error: unknown) {
-      console.log(error);
-      // Check for specific error messages
+      console.error(error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('status: 423')) {
         addSnackbar('The sending or receiving address may be frozen. Please contact support.', 'error');
@@ -178,15 +138,7 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
   const handleSendMNEE = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
-    await sleep(25);
-
-    if (!passwordConfirm) {
-      addSnackbar('You must enter a password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
-
-    processMNEESend(passwordConfirm);
+    processMNEESend();
   };
 
   const clearRequest = async () => {
@@ -214,13 +166,6 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
             {request.length === 1 ? `Send to: ${truncate(request[0].address, 5, 5)}` : 'Send to multiple recipients.'}
           </Text>
           <FormContainer noValidate onSubmit={(e) => handleSendMNEE(e)}>
-            <Input
-              theme={theme}
-              placeholder="Enter Wallet Password"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-            />
             <Text theme={theme} style={{ margin: '1rem' }}>
               Double check details before sending.
             </Text>

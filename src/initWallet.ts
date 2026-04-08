@@ -130,8 +130,7 @@ export const initWallet = async (
     privateKey: keys.identityWif,
     chain,
     feeModel: { model: 'sat/kb', value: FEE_PER_KB },
-    activeRemote:
-      chain === 'main' ? 'https://api.1sat.app/1sat/wallet' : 'https://testnet.api.1sat.app/1sat/wallet',
+    activeRemote: chain === 'main' ? 'https://api.1sat.app/1sat/wallet' : 'https://testnet.api.1sat.app/1sat/wallet',
     storageIdentityKey: 'yours-wallet',
   };
 
@@ -153,6 +152,15 @@ export const initWallet = async (
     chain,
     maxKeyIndex,
   });
+
+  // 4b. Persist the BRC-29 primary address so other accounts can display it in the UI
+  const primaryAddress = syncContext.addressManager.getPrimaryAddress();
+  if (primaryAddress) {
+    const identityAddress = keys.identityAddress;
+    chromeStorageService.updateNested('accounts', {
+      [identityAddress]: { primaryAddress },
+    });
+  }
 
   // 5. Run address sync via syncAddresses action (fire-and-forget)
   const actionCtx = createActionContext(baseWallet, { chain, services: syncContext.services });

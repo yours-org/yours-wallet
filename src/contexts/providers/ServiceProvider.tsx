@@ -1,9 +1,8 @@
 import { ReactNode, useCallback, useEffect, useState } from 'react';
 import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { KeysService } from '../../services/Keys.service';
-import { INACTIVITY_LIMIT, MNEE_API_TOKEN } from '../../utils/constants';
+import { INACTIVITY_LIMIT } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
-import mnee from '@mnee/ts-sdk';
 import { createContext, syncAddresses } from '@1sat/actions';
 import { fetchExchangeRate } from '../../utils/wallet';
 import { createChromeCWI, OneSatServices, YOURS_PREFIX } from '@1sat/wallet-browser';
@@ -15,8 +14,6 @@ const initializeServices = async () => {
 
   const keysService = new KeysService(chromeStorageService);
 
-  const mneeService = new mnee({ environment: 'production', apiKey: MNEE_API_TOKEN });
-
   // Create context using ChromeCWI (communicates with service worker via chrome.runtime.sendMessage)
   const chromeCWI = createChromeCWI();
   const network = chromeStorageService.getNetwork();
@@ -27,7 +24,6 @@ const initializeServices = async () => {
   return {
     chromeStorageService,
     keysService,
-    mneeService,
     apiContext,
   };
 };

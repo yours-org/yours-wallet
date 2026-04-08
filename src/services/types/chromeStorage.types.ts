@@ -39,6 +39,8 @@ export interface Account {
   derivationTags: TaggedDerivationResponse[];
   settings: Settings;
   addresses: Addresses;
+  /** BRC-29 primary receive address (index 0, "yours" prefix). Persisted on wallet init. */
+  primaryAddress?: string;
   balance: Balance;
   mneeBalance: MNEEBalance;
   pubKeys: PubKeys;

@@ -132,7 +132,7 @@ export class KeysService {
 
       const res = await fetch(`${WOC_BASE_URL}/address/${sweepWallet.address}/unspent`);
       if (!res.ok) throw new Error(`WoC request failed: ${res.status}`);
-      const utxos = await res.json() as WocUtxo[];
+      const utxos = (await res.json()) as WocUtxo[];
       if (utxos.length === 0) return;
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       // TODO: Re-enable when wallet type is available
@@ -168,7 +168,7 @@ export class KeysService {
       const privKey = PrivateKey.fromWif(wif);
       const res = await fetch(`${WOC_BASE_URL}/address/${privKey.toAddress()}/unspent`);
       if (!res.ok) throw new Error(`WoC request failed: ${res.status}`);
-      const utxos = await res.json() as WocUtxo[];
+      const utxos = (await res.json()) as WocUtxo[];
       if (utxos.length === 0) return 0;
       return utxos.reduce((acc, u) => acc + u.value, 0);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -187,7 +187,7 @@ export class KeysService {
 
       const res = await fetch(`${WOC_BASE_URL}/address/${privKey.toAddress()}/unspent`);
       if (!res.ok) throw new Error(`WoC request failed: ${res.status}`);
-      const utxos = await res.json() as WocUtxo[];
+      const utxos = (await res.json()) as WocUtxo[];
       if (utxos.length === 0) return;
       const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
       // TODO: Re-enable when wallet type is available

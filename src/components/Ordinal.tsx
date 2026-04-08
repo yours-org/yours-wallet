@@ -119,7 +119,10 @@ export const Ordinal = (props: OrdinalProps) => {
   // Fetch text/json content from ORDFS instead of using customInstructions
   // (customInstructions now holds key derivation metadata, not inscription content)
   const [fetchedText, setFetchedText] = useState<string | null>(null);
-  const needsTextFetch = contentType?.startsWith('text/') || contentType?.startsWith('application/json') || contentType?.startsWith('application/op-ns');
+  const needsTextFetch =
+    contentType?.startsWith('text/') ||
+    contentType?.startsWith('application/json') ||
+    contentType?.startsWith('application/op-ns');
   useEffect(() => {
     if (!needsTextFetch || !url) return;
     fetch(url)

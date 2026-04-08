@@ -155,9 +155,7 @@ export const hasTag = (tags: string[] | undefined, prefix: string): boolean => {
  * If it has a bare `origin` tag (no colon), the output itself IS the origin —
  * return the output's own outpoint.
  */
-export const resolveOriginOutpoint = (
-  output: { outpoint: string; tags?: string[] },
-): string | undefined => {
+export const resolveOriginOutpoint = (output: { outpoint: string; tags?: string[] }): string | undefined => {
   const tagged = getTagValue(output.tags, 'origin');
   if (tagged) return tagged;
   if (output.tags?.includes('origin')) return output.outpoint;

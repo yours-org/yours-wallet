@@ -208,7 +208,7 @@ const friendlyProtocolName = (name?: string): string => {
     '1sat-ordinals': 'Ordinals (key derivation)',
     'message signing': 'Message signing',
     'test encryption': 'Encryption',
-    'PERM_TOKEN_ENCRYPTION_PROTOCOL': 'Permission token encryption',
+    PERM_TOKEN_ENCRYPTION_PROTOCOL: 'Permission token encryption',
   };
   return map[name] ?? name;
 };
@@ -217,10 +217,10 @@ const friendlyProtocolName = (name?: string): string => {
 const friendlyBasketName = (name?: string): string => {
   if (!name) return 'Unknown data';
   const map: Record<string, string> = {
-    'default': 'Payment UTXOs',
-    'ordinals': 'Ordinals',
-    'bsv21': 'BSV-21 Tokens',
-    'locks': 'Locked BSV',
+    default: 'Payment UTXOs',
+    ordinals: 'Ordinals',
+    bsv21: 'BSV-21 Tokens',
+    locks: 'Locked BSV',
     'admin protocol-permission': 'Protocol permissions (admin)',
     'admin basket-access': 'Basket access (admin)',
     'admin spending-authorization': 'Spending authorizations (admin)',
@@ -244,13 +244,10 @@ const formatPermissionDetail = (perm: PermissionToken, spent?: number): string =
     case 'basket':
       return `Can access: ${friendlyBasketName(perm.basketName)}`;
     case 'spending': {
-      const limit = perm.authorizedAmount != null
-        ? `Up to ${formatSatoshis(perm.authorizedAmount)}`
-        : 'Unlimited spending';
+      const limit =
+        perm.authorizedAmount != null ? `Up to ${formatSatoshis(perm.authorizedAmount)}` : 'Unlimited spending';
       if (spent != null) {
-        const remaining = perm.authorizedAmount != null
-          ? Math.max(0, perm.authorizedAmount - spent)
-          : null;
+        const remaining = perm.authorizedAmount != null ? Math.max(0, perm.authorizedAmount - spent) : null;
         const remainingText = remaining != null ? ` · ${formatSatoshis(remaining)} remaining` : '';
         return `${limit} · ${formatSatoshis(spent)} spent this month${remainingText}`;
       }
@@ -404,7 +401,10 @@ export const PermissionsManager = ({ onBack }: PermissionsManagerProps) => {
         theme={theme}
         message={`Revoke all permissions for ${revokeAllTarget ? extractDomain(revokeAllTarget) : 'this app'}? It will need to request permissions again.`}
         showSpeedBump={showSpeedBump}
-        onCancel={() => { setShowSpeedBump(false); setRevokeAllTarget(null); }}
+        onCancel={() => {
+          setShowSpeedBump(false);
+          setRevokeAllTarget(null);
+        }}
         onConfirm={confirmRevokeAll}
       />
       <HeaderText theme={theme}>Permissions</HeaderText>
@@ -432,9 +432,7 @@ export const PermissionsManager = ({ onBack }: PermissionsManagerProps) => {
               const key = tokenKey(perm);
               return (
                 <PermissionRow key={key} theme={theme}>
-                  <TypeBadge $bg={typeColor(perm.type)}>
-                    {typeLabel(perm.type)}
-                  </TypeBadge>
+                  <TypeBadge $bg={typeColor(perm.type)}>{typeLabel(perm.type)}</TypeBadge>
                   <PermissionDetail theme={theme}>
                     {formatPermissionDetail(perm, spentAmounts.get(key))}
                   </PermissionDetail>

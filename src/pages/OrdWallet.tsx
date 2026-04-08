@@ -144,8 +144,8 @@ export const OrdWallet = () => {
   const [ordinals, setOrdinals] = useState<WalletOutput[]>([]);
   const [ordinalsBEEFs, setOrdinalsBEEFs] = useState<number[][]>([]);
   const [from, setFrom] = useState<string>();
-  const listedOrdinals = ordinals.filter((o) => hasTag(o.tags, 'list'));
-  const myOrdinals = ordinals.filter((o) => !hasTag(o.tags, 'list'));
+  const listedOrdinals = ordinals.filter((o) => o.tags?.includes('ordlock'));
+  const myOrdinals = ordinals.filter((o) => !o.tags?.includes('ordlock'));
   const [useSameAddress, setUseSameAddress] = useState(false);
   const [addresses, setAddresses] = useState<Addresses>({});
   const [addressErrors, setAddressErrors] = useState<Addresses>({});
@@ -646,7 +646,7 @@ export const OrdWallet = () => {
       <OrdButtonContainer theme={theme} $blur={selectedOrdinals.length > 0}>
         <Show when={!!selectedOrdinals.length}>
           <Show
-            when={selectedOrdinals.length === 1 && hasTag(selectedOrdinals[0].tags, 'list')}
+            when={selectedOrdinals.length === 1 && selectedOrdinals[0].tags?.includes('ordlock')}
             whenFalseContent={transferAndListButtons}
           >
             <Button

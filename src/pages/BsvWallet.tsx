@@ -61,7 +61,8 @@ import { Account, ChromeStorageObject } from '../services/types/chromeStorage.ty
 import { SendBsv21View } from '../components/SendBsv21View';
 import { FaucetButton } from '../components/FaucetButton';
 import { TxHistory } from '../components/TxHistory';
-import { MNEEFee } from '@mnee/ts-sdk';
+import { getMneeBalance, sendMnee, deriveDepositAddresses } from '@1sat/actions';
+import { MneeClient } from '@1sat/client';
 
 const MiddleContainer = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -220,7 +221,7 @@ export const BsvWallet = () => {
   const [pageState, setPageState] = useState<PageState>('main');
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, mneeService, apiContext } = useServiceContext();
+  const { chromeStorageService, apiContext } = useServiceContext();
   const { socialProfile } = useSocialProfile(chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
@@ -306,10 +307,10 @@ export const BsvWallet = () => {
   };
 
   const updateMneeBalance = async () => {
-    if (!mneeService || !receiveAddress) return;
-    const res = await mneeService.balance(receiveAddress);
-    if (res) {
-      setMneeBalance(res.decimalAmount);
+    if (!receiveAddress || !apiContext) return;
+    try {
+      const res = await getMneeBalance.execute(apiContext, { addresses: [receiveAddress] });
+      setMneeBalance(res.totalDecimal);
 
       // Update MNEE balance in Chrome storage
       const { account } = chromeStorageService.getCurrentAccountObject();
@@ -320,12 +321,14 @@ export const BsvWallet = () => {
         [identityAddress]: {
           ...account,
           mneeBalance: {
-            amount: res.amount,
-            decimalAmount: res.decimalAmount,
+            amount: res.totalAtomic,
+            decimalAmount: res.totalDecimal,
           },
         },
       };
       await chromeStorageService.updateNested(key, update);
+    } catch (error) {
+      console.error('Failed to update MNEE balance:', error);
     }
   };
 
@@ -405,9 +408,16 @@ export const BsvWallet = () => {
   useEffect(() => {
     loadLocks && loadLocks();
     getAndSetBsvBalance();
-    updateMneeBalance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch MNEE balance once receiveAddress is available
+  useEffect(() => {
+    if (receiveAddress) {
+      updateMneeBalance();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receiveAddress]);
 
   const refreshUtxos = async (showLoad = false) => {
     showLoad && setIsProcessing(true);
@@ -484,11 +494,50 @@ export const BsvWallet = () => {
     // TODO: MNEE requires direct key access for cosigning flow.
     // Need to implement message-based MNEE transfer in background.ts
     // For now, show a message that MNEE is temporarily unavailable
-    addSnackbar('MNEE transfers are temporarily unavailable during wallet upgrade.', 'info');
-    setIsProcessing(false);
-    return;
+    if (!apiContext) {
+      addSnackbar('Wallet not ready.', 'error');
+      setIsProcessing(false);
+      return;
+    }
 
-    /* MNEE transfer code disabled during refactor - requires service worker implementation
+    try {
+      const derivationResult = await deriveDepositAddresses.execute(apiContext, {
+        prefix: 'yours',
+        startIndex: 0,
+        count: 5,
+      });
+
+      addSnackbar('Transaction initiated. Processing...', 'info');
+
+      const res = await sendMnee.execute(apiContext, {
+        recipients: [{ address: mneeRecipient, amount: mneeReciepientAmount }],
+        derivations: derivationResult.derivations,
+      });
+
+      if (res.error) {
+        addSnackbar(`Transaction failed: ${res.error}`, 'error');
+        setIsProcessing(false);
+        return;
+      }
+
+      setMneeRecipient('');
+      setMneeRecipientAmount(null);
+      setTimeout(updateMneeBalance, 1000);
+      setPageState('main');
+      addSnackbar('Transaction Successful!', 'success');
+    } catch (error: unknown) {
+      console.error('MNEE transfer error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('status: 423')) {
+        addSnackbar('The sending or receiving address may be frozen. Please contact support.', 'error');
+      } else {
+        addSnackbar(getErrorMessage(errorMessage) || 'Transfer failed. Please try again.', 'error');
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+
+    /* Legacy MNEE transfer code removed — now using @1sat/actions sendMnee
     const keys = await keysService.retrieveKeys(passwordConfirm);
     if (!keys?.walletWif) {
       addSnackbar('Invalid password!', 'error');
@@ -689,14 +738,18 @@ export const BsvWallet = () => {
   };
 
   const handleSendAllMnee = async () => {
-    const config = await mneeService.config();
-    if (!config) {
+    if (!apiContext?.services?.mnee) {
       setMneeRecipientAmount(mneeBalance);
       return;
     }
-    const atomicBalance = mneeService.toAtomicAmount(mneeBalance);
-    const fee = config.fees.find((fee: MNEEFee) => atomicBalance >= fee.min && atomicBalance <= fee.max)?.fee || 0;
-    setMneeRecipientAmount((atomicBalance - fee) / 10 ** config.decimals);
+    try {
+      const config = await apiContext.services.mnee.getConfig();
+      const atomicBalance = MneeClient.toAtomicAmount(mneeBalance);
+      const fee = config.fees.find((f) => atomicBalance >= f.min && atomicBalance <= f.max)?.fee || 0;
+      setMneeRecipientAmount(MneeClient.fromAtomicAmount(atomicBalance - fee));
+    } catch {
+      setMneeRecipientAmount(mneeBalance);
+    }
   };
 
   const receive = (
