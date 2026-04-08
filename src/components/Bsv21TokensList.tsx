@@ -125,7 +125,7 @@ export const Bsv21TokensList = (props: Bsv21TokensListProps) => {
                 ref={provided.innerRef}
                 {...provided.droppableProps}
                 className="flex flex-col items-center overflow-y-auto overflow-x-hidden w-full"
-                style={{ height: 'calc(100% - 4rem)' }}
+                style={hideStatusLabels ? undefined : { height: 'calc(100% - 4rem)' }}
               >
                 {/* Confirmed section */}
                 <Show when={!hideStatusLabels && confirmedTokens.length > 0}>
