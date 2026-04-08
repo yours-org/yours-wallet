@@ -1,16 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ArrowLeft,
+  Lock,
+  Unlock,
+  Code,
+  KeyRound,
+  Heart,
+  Compass,
+  Github,
+  ExternalLink,
+  ChevronRight,
+  ArrowRightLeft,
+} from 'lucide-react';
 import { Button } from '../components/Button';
-import { ForwardButton as RightChevron } from '../components/ForwardButton';
 import { PageLoader } from '../components/PageLoader';
 import yoursLogo from '../assets/logos/icon.png';
-import { DateTimePicker, HeaderText, Text, Warning } from '../components/Reusable';
-import { SettingsRow as AppsRow } from '../components/SettingsRow';
+import { DateTimePicker, Warning } from '../components/Reusable';
 import { Show } from '../components/Show';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useTheme } from '../hooks/useTheme';
-import { WhiteLabelTheme } from '../theme.types';
 import { BSV_DECIMAL_CONVERSION, YOURS_DEV_WALLET, featuredApps } from '../utils/constants';
 import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { TopNav } from '../components/TopNav';
@@ -18,148 +28,16 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { lockBsv, unlockBsv, sendBsv } from '@1sat/actions';
 import { Outpoint, type ParseContext, type Txo } from '@1sat/wallet-browser';
 import { Script } from '@bsv/sdk';
-import { FaExternalLinkAlt } from 'react-icons/fa';
-
-// Helper type for lock data stored in Txo.data.lock.data
-interface LockData {
-  until: number;
-}
 import { Input } from '../components/Input';
 import TxPreview from '../components/TxPreview';
 import { TransactionFormat } from 'yours-wallet-provider';
 import { getTxFromRawTxFormat } from '../utils/tools';
 import { useSnackbar } from '../hooks/useSnackbar';
 
-const Content = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  height: calc(75%);
-  overflow-y: auto;
-  overflow-x: hidden;
-`;
-
-const PageWrapper = styled.div<{ $marginTop: string }>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-top: ${(props) => props.$marginTop};
-  width: 100%;
-`;
-
-const AmountsWrapper = styled.div`
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-`;
-
-const ButtonsWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 90%;
-`;
-
-const ScrollableContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 25rem;
-  overflow-y: auto;
-  overflow-x: hidden;
-  width: 100%;
-  padding: 1rem;
-  margin-top: 1rem;
-`;
-
-const DiscoverAppsRow = styled.div<WhiteLabelTheme>`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: ${({ theme }) => theme.color.global.row};
-  border-radius: 0.5rem;
-  padding: 0.5rem;
-  margin: 0.25rem;
-  width: 80%;
-  cursor: pointer;
-`;
-
-const ImageAndDomain = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const AppIcon = styled.img`
-  width: 3rem;
-  height: 3rem;
-  margin-right: 1rem;
-  border-radius: 0.5rem;
-`;
-
-const DiscoverAppsText = styled(Text)<WhiteLabelTheme>`
-  color: ${({ theme }) => theme.color.global.contrast};
-  margin: 0;
-  font-weight: 600;
-  text-align: left;
-`;
-
-const LockDetailsContainer = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem;
-  width: 80%;
-`;
-
-const LockDetailsText = styled(Text)<WhiteLabelTheme>`
-  margin: 0;
-  color: ${({ theme }) => theme.color.global.contrast};
-`;
-
-const LockDetailsHeaderText = styled(LockDetailsText)`
-  font-size: 0.85rem;
-  font-weight: 600;
-`;
-
-const Dropdown = styled.select<WhiteLabelTheme>`
-  width: 80%;
-  padding: 0.5rem;
-  margin-bottom: 1rem;
-  border-radius: 0.5rem;
-  color: ${({ theme }) => theme.color.global.contrast};
-  background-color: ${({ theme }) => theme.color.global.row};
-  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
-`;
-
-const TextArea = styled.textarea<WhiteLabelTheme>`
-  background-color: ${({ theme }) => theme.color.global.row};
-  border-radius: 0.5rem;
-  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
-  width: 80%;
-  height: 4rem;
-  font-size: 0.85rem;
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  padding: 1rem;
-  margin: 0.5rem;
-  outline: none;
-  color: ${({ theme }) => theme.color.global.contrast + '80'};
-  resize: none;
-
-  &::placeholder {
-    color: ${({ theme }) => theme.color.global.contrast + '80'};
-  }
-`;
-
-const SweepInfo = styled.div`
-  width: 80%;
-  padding: 1rem;
-  margin: 1rem 0;
-  border-radius: 0.5rem;
-  background-color: ${({ theme }) => theme.color.global.row};
-`;
+// Helper type for lock data stored in Txo.data.lock.data
+interface LockData {
+  until: number;
+}
 
 type AppsPage =
   | 'main'
@@ -171,6 +49,122 @@ type AppsPage =
   | 'decode-broadcast'
   | 'decode'
   | 'sweep-wif';
+
+// ── Animation variants ──────────────────────────────────────────────────────
+
+const pageVariants = {
+  initial: { opacity: 0, x: 16 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -16 },
+};
+
+const pageTransition = { duration: 0.18, ease: 'easeOut' };
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.04 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.2, ease: 'easeOut' } },
+};
+
+// ── Reusable primitives ─────────────────────────────────────────────────────
+
+const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+  <div className="px-1 pb-1.5 pt-4 first:pt-0">
+    <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#98A2B3' }}>
+      {children}
+    </span>
+  </div>
+);
+
+type MenuRowProps = {
+  icon: React.ReactNode;
+  title: string;
+  description?: string;
+  onClick?: () => void;
+  trailingIcon?: React.ReactNode;
+};
+
+const MenuRow = ({ icon, title, description, onClick, trailingIcon }: MenuRowProps) => (
+  <motion.button
+    variants={itemVariants}
+    whileTap={{ scale: 0.985 }}
+    onClick={onClick}
+    className="flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-left transition-colors duration-150 bg-[#17191E] hover:bg-[#1f2128]"
+  >
+    <span style={{ color: '#A1FF8B' }} className="shrink-0">
+      {icon}
+    </span>
+    <span className="flex min-w-0 flex-1 flex-col">
+      <span className="text-sm font-semibold" style={{ color: '#FFFFFF' }}>
+        {title}
+      </span>
+      {description && (
+        <span className="truncate text-xs leading-snug" style={{ color: '#98A2B3' }}>
+          {description}
+        </span>
+      )}
+    </span>
+    {trailingIcon ?? <ChevronRight size={16} style={{ color: '#98A2B3' }} className="shrink-0" />}
+  </motion.button>
+);
+
+const RowGroup = ({ children }: { children: React.ReactNode }) => (
+  <div className="flex w-full flex-col gap-0.5">{children}</div>
+);
+
+const BackHeader = ({ title, onBack }: { title: string; onBack: () => void }) => (
+  <div className="flex w-full items-center gap-3 pb-4">
+    <motion.button
+      whileTap={{ scale: 0.9 }}
+      onClick={onBack}
+      className="flex h-8 w-8 items-center justify-center rounded-lg"
+      style={{ background: '#17191E' }}
+    >
+      <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
+    </motion.button>
+    <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
+      {title}
+    </span>
+  </div>
+);
+
+const FormatPill = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
+  <motion.button
+    whileTap={{ scale: 0.95 }}
+    onClick={onClick}
+    className="relative rounded-full px-4 py-1.5 text-xs font-semibold transition-colors"
+    style={{
+      background: active ? 'linear-gradient(135deg, #A1FF8B, #34D399)' : '#17191E',
+      color: active ? '#010101' : '#98A2B3',
+    }}
+  >
+    {label}
+  </motion.button>
+);
+
+const AmountChip = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
+  <motion.button
+    whileTap={{ scale: 0.93 }}
+    onClick={onClick}
+    className="rounded-full px-4 py-2 text-sm font-semibold transition-all"
+    style={{
+      background: active ? 'linear-gradient(135deg, #A1FF8B, #34D399)' : '#17191E',
+      color: active ? '#010101' : '#FFFFFF',
+      border: active ? 'none' : '1px solid #98A2B326',
+    }}
+  >
+    {label}
+  </motion.button>
+);
+
+// ── Main component ──────────────────────────────────────────────────────────
 
 export const AppsAndTools = () => {
   const { theme } = useTheme();
@@ -400,340 +394,458 @@ export const AppsAndTools = () => {
     }
   };
 
-  const main = (
-    <>
-      <Show when={theme.settings.walletName === 'Yours'}>
-        <AppsRow
-          name="Support Yours"
-          description="Fund Yours Wallet's open source developers"
-          onClick={() => setPage('sponsor')}
-          jsxElement={<RightChevron color={theme.color.global.contrast} />}
-        />
-      </Show>
-      <AppsRow
-        name="Decode/Broadcast"
-        description="Decode and broadcast raw transactions"
-        onClick={() => setPage('decode-broadcast')}
-        jsxElement={<RightChevron color={theme.color.global.contrast} />}
-      />
-      <Show when={theme.settings.services.locks}>
-        <AppsRow
-          name="Lock BSV"
-          description="Lock your coins for a set period of time"
-          onClick={() => setPage('lock-page')}
-          jsxElement={<RightChevron color={theme.color.global.contrast} />}
-        />
-      </Show>
-      <Show when={theme.settings.services.locks}>
-        <AppsRow
-          name="Pending Locks"
-          description="View the pending coins you've locked"
-          onClick={() => setPage('unlock')}
-          jsxElement={<RightChevron color={theme.color.global.contrast} />}
-        />
-      </Show>
-      <Show when={theme.settings.services.apps}>
-        <AppsRow
-          name="Discover Apps"
-          description={`Meet the apps using ${theme.settings.walletName} Wallet`}
-          onClick={() => setPage('discover-apps')}
-          jsxElement={<RightChevron color={theme.color.global.contrast} />}
-        />
-      </Show>
-      <AppsRow
-        name="Migrate Legacy Assets"
-        description="Sweep assets from your old keys to BRC-100"
-        onClick={() => {
-          menuContext?.clearSelection();
-          navigate('/sweep');
-        }}
-        jsxElement={<RightChevron color={theme.color.global.contrast} />}
-      />
-      <AppsRow
-        name="Sweep Private Key"
-        description="Import funds from WIF private key"
-        onClick={() => setPage('sweep-wif')}
-        jsxElement={<RightChevron color={theme.color.global.contrast} />}
-      />
-      <AppsRow
-        name="Contribute or integrate"
-        description="All the tools you need to get involved"
-        onClick={() => window.open(theme.settings.repo, '_blank')}
-        jsxElement={
-          <FaExternalLinkAlt color={theme.color.global.contrast} size={'1rem'} style={{ margin: '0.5rem' }} />
-        }
-      />
-    </>
-  );
+  // ── Sub-pages ─────────────────────────────────────────────────────────────
 
-  const headerLockDetailsRow = (
-    <LockDetailsContainer>
-      <LockDetailsHeaderText style={{ textAlign: 'left' }} theme={theme}>
-        TxId
-      </LockDetailsHeaderText>
-      <LockDetailsHeaderText style={{ textAlign: 'right' }} theme={theme}>
-        Blocks Left
-      </LockDetailsHeaderText>
-      <LockDetailsHeaderText style={{ textAlign: 'right' }} theme={theme}>
-        Amount
-      </LockDetailsHeaderText>
-    </LockDetailsContainer>
+  const main = (
+    <motion.div
+      key="main"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex w-full flex-col"
+    >
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="flex w-full flex-col gap-1"
+      >
+        {/* Tools section */}
+        <SectionLabel>Tools</SectionLabel>
+        <RowGroup>
+          <Show when={theme.settings.services.locks}>
+            <MenuRow
+              icon={<Lock size={18} />}
+              title="Lock BSV"
+              description="Lock your coins for a set period of time"
+              onClick={() => setPage('lock-page')}
+            />
+          </Show>
+          <Show when={theme.settings.services.locks}>
+            <MenuRow
+              icon={<Unlock size={18} />}
+              title="Pending Locks"
+              description="View the pending coins you've locked"
+              onClick={() => setPage('unlock')}
+            />
+          </Show>
+          <MenuRow
+            icon={<Code size={18} />}
+            title="Decode / Broadcast"
+            description="Decode and broadcast raw transactions"
+            onClick={() => setPage('decode-broadcast')}
+          />
+          <MenuRow
+            icon={<ArrowRightLeft size={18} />}
+            title="Migrate Legacy Assets"
+            description="Sweep assets from your old keys to BRC-100"
+            onClick={() => {
+              menuContext?.clearSelection();
+              navigate('/sweep');
+            }}
+          />
+          <MenuRow
+            icon={<KeyRound size={18} />}
+            title="Sweep Private Key"
+            description="Import funds from WIF private key"
+            onClick={() => setPage('sweep-wif')}
+          />
+        </RowGroup>
+
+        {/* Apps section */}
+        <Show when={theme.settings.services.apps}>
+          <>
+            <SectionLabel>Apps</SectionLabel>
+            <RowGroup>
+              <MenuRow
+                icon={<Compass size={18} />}
+                title="Discover Apps"
+                description={`Meet the apps using ${theme.settings.walletName} Wallet`}
+                onClick={() => setPage('discover-apps')}
+              />
+            </RowGroup>
+          </>
+        </Show>
+
+        {/* Support section */}
+        <SectionLabel>Support</SectionLabel>
+        <RowGroup>
+          <Show when={theme.settings.walletName === 'Yours'}>
+            <MenuRow
+              icon={<Heart size={18} />}
+              title="Support Yours"
+              description="Fund Yours Wallet's open source developers"
+              onClick={() => setPage('sponsor')}
+            />
+          </Show>
+          <MenuRow
+            icon={<Github size={18} />}
+            title="Contribute or Integrate"
+            description="All the tools you need to get involved"
+            onClick={() => window.open(theme.settings.repo, '_blank')}
+            trailingIcon={<ExternalLink size={14} style={{ color: '#98A2B3' }} className="shrink-0" />}
+          />
+        </RowGroup>
+      </motion.div>
+    </motion.div>
   );
 
   const lockPage = (
-    <PageWrapper $marginTop={'0'}>
-      <HeaderText style={{ marginBottom: '1rem' }} theme={theme}>
-        Lock BSV
-      </HeaderText>
-      <Text theme={theme} style={{ marginBottom: '1rem' }}>
+    <motion.div
+      key="lock-page"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex w-full flex-col"
+    >
+      <BackHeader title="Lock BSV" onBack={() => setPage('main')} />
+      <p className="mb-4 text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
         Lock your BSV for a set period of time. This will prevent you from spending them until the lock expires.
-      </Text>
-      <Input
-        theme={theme}
-        placeholder={'Enter BSV Amount'}
-        type="number"
-        min="0.00000001"
-        value={lockBsvAmount !== null && lockBsvAmount !== undefined ? lockBsvAmount : ''}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-          const inputValue = e.target.value;
-          if (inputValue === '') {
-            setLockBsvAmount(null);
-          } else {
-            setLockBsvAmount(parseFloat(inputValue));
-          }
-        }}
-      />
-      <DateTimePicker theme={theme} onChange={handleBlockHeightChange} />
-      <Button
-        style={{ margin: '1rem' }}
-        theme={theme}
-        type="primary"
-        label={
-          isProcessing
-            ? 'Locking...'
-            : `${lockBlockHeight ? `Lock until block ${formatNumberWithCommasAndDecimals(lockBlockHeight, 0)}` : 'Lock'}`
-        }
-        onClick={handleLockBsv}
-        disabled={isProcessing}
-      />
-      <Button
-        style={{ margin: '1rem' }}
-        theme={theme}
-        type="secondary"
-        label={'Go back'}
-        onClick={() => setPage('main')}
-      />
-    </PageWrapper>
-  );
-
-  const unlockPage = (
-    <PageWrapper $marginTop={'0'}>
-      <HeaderText style={{ marginBottom: '1rem' }} theme={theme}>
-        Pending Locks
-      </HeaderText>
-      {headerLockDetailsRow}
-      {lockedUtxos
-        .sort((a, b) => {
-          const aLock = a.data.lock?.data as unknown as LockData | undefined;
-          const bLock = b.data.lock?.data as unknown as LockData | undefined;
-          return Number(aLock?.until ?? 0) - Number(bLock?.until ?? 0);
-        })
-        .map((u) => {
-          const lockData = u.data.lock?.data as unknown as LockData | undefined;
-          const blocksRemaining = Number(lockData?.until ?? 0) - currentBlockHeight;
-          const satoshis = BigInt(u.output.satoshis || 0);
-          return (
-            <LockDetailsContainer key={u.outpoint.txid}>
-              <LockDetailsText style={{ textAlign: 'left' }} theme={theme}>
-                {truncate(u.outpoint.txid, 4, 4)}
-              </LockDetailsText>
-              <LockDetailsText style={{ textAlign: 'center' }} theme={theme}>
-                {blocksRemaining < 0 ? '0' : blocksRemaining}
-              </LockDetailsText>
-              <LockDetailsText style={{ textAlign: 'right' }} theme={theme}>
-                {satoshis < 1000n
-                  ? `${satoshis} ${satoshis > 1n ? 'sats' : 'sat'}`
-                  : `${Number(satoshis) / BSV_DECIMAL_CONVERSION} BSV`}
-              </LockDetailsText>
-            </LockDetailsContainer>
-          );
-        })}
-
-      <Button style={{ margin: '1rem' }} theme={theme} type="primary" label={'Unlock Funds'} onClick={handleUnlock} />
-      <Button
-        style={{ margin: '1rem' }}
-        theme={theme}
-        type="secondary"
-        label={'Go back'}
-        onClick={() => setPage('main')}
-      />
-    </PageWrapper>
-  );
-
-  const discoverAppsPage = (
-    <PageWrapper $marginTop={featuredApps.length === 0 ? '10rem' : '0'}>
-      <Show when={featuredApps.length > 0} whenFalseContent={<Text theme={theme}>No apps</Text>}>
-        <Text theme={theme} style={{ marginBottom: 0 }}>
-          If your app has integrated Yours Wallet but is not listed,{' '}
-          <a
-            href={theme.settings.repo}
-            rel="noreferrer"
-            target="_blank"
-            style={{
-              color: theme.color.global.contrast,
-            }}
-          >
-            let us know!
-          </a>
-        </Text>
-        <ScrollableContainer>
-          {featuredApps.map((app, idx) => {
-            return (
-              <DiscoverAppsRow key={app.name + idx} theme={theme} onClick={() => window.open(app.link, '_blank')}>
-                <ImageAndDomain>
-                  <AppIcon src={app.icon} />
-                  <DiscoverAppsText theme={theme}>{app.name}</DiscoverAppsText>
-                </ImageAndDomain>
-                <FaExternalLinkAlt color={theme.color.global.contrast} size={'1rem'} style={{ margin: '0.5rem' }} />
-              </DiscoverAppsRow>
-            );
-          })}
-          <Button
-            style={{ marginTop: '2rem' }}
-            theme={theme}
-            type="secondary"
-            label={'Go back'}
-            onClick={() => setPage('main')}
-          />
-        </ScrollableContainer>
-      </Show>
-    </PageWrapper>
-  );
-
-  const generateButtons = (amounts: string[]) => {
-    return amounts.map((amt, idx) => {
-      return (
-        <Button
-          key={`${amt}_${idx}`}
-          theme={theme}
-          type="secondary-outline"
-          label={amt === 'Other' ? amt : `$${amt}`}
-          onClick={() => {
-            if (amt === 'Other') {
-              setOtherIsSelected(true);
-            } else {
-              handleSubmit(Number(amt));
-            }
-          }}
-        />
-      );
-    });
-  };
-
-  const sponsorPage = (
-    <PageWrapper $marginTop={'0'}>
-      <img src={yoursLogo} alt="Wallet Logo" style={{ width: '3rem', height: '3rem', margin: '0.5rem' }} />
-      <HeaderText theme={theme}>Support Project</HeaderText>
-      <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
-        Yours is an open-source initiative, consider supporting its continued development.
-      </Text>
-      <Show
-        when={otherIsSelected}
-        whenFalseContent={
-          <AmountsWrapper>{generateButtons(['25', '50', '100', '250', '500', 'Other'])}</AmountsWrapper>
-        }
-      >
+      </p>
+      <div className="flex flex-col gap-3">
         <Input
           theme={theme}
-          placeholder={'Enter USD Amount'}
+          placeholder="Enter BSV Amount"
           type="number"
-          step="1"
-          value={selectedAmount !== null && selectedAmount !== undefined ? selectedAmount : ''}
+          min="0.00000001"
+          value={lockBsvAmount !== null && lockBsvAmount !== undefined ? lockBsvAmount : ''}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
             const inputValue = e.target.value;
             if (inputValue === '') {
-              setSelectedAmount(null);
+              setLockBsvAmount(null);
             } else {
-              setSelectedAmount(Number(inputValue));
+              setLockBsvAmount(parseFloat(inputValue));
             }
           }}
         />
-        <ButtonsWrapper>
-          <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setOtherIsSelected(false)} />
-          <Button theme={theme} type="primary" label="Submit" onClick={() => handleSubmit(Number(selectedAmount))} />
-        </ButtonsWrapper>
+        <DateTimePicker theme={theme} onChange={handleBlockHeightChange} />
+        <Button
+          theme={theme}
+          type="primary"
+          label={
+            isProcessing
+              ? 'Locking...'
+              : `${lockBlockHeight ? `Lock until block ${formatNumberWithCommasAndDecimals(lockBlockHeight, 0)}` : 'Lock'}`
+          }
+          onClick={handleLockBsv}
+          disabled={isProcessing}
+        />
+      </div>
+    </motion.div>
+  );
+
+  const unlockPage = (
+    <motion.div
+      key="unlock"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex w-full flex-col"
+    >
+      <BackHeader title="Pending Locks" onBack={() => setPage('main')} />
+
+      {/* Table header */}
+      <div
+        className="mb-1 grid grid-cols-3 rounded-lg px-4 py-2 text-[10px] font-semibold uppercase tracking-wider"
+        style={{ color: '#98A2B3', background: '#17191E' }}
+      >
+        <span className="text-left">TxID</span>
+        <span className="text-center">Blocks Left</span>
+        <span className="text-right">Amount</span>
+      </div>
+
+      <div className="flex flex-col gap-1 overflow-y-auto" style={{ maxHeight: '260px' }}>
+        {lockedUtxos
+          .sort((a, b) => {
+            const aLock = a.data.lock?.data as unknown as LockData | undefined;
+            const bLock = b.data.lock?.data as unknown as LockData | undefined;
+            return Number(aLock?.until ?? 0) - Number(bLock?.until ?? 0);
+          })
+          .map((u) => {
+            const lockData = u.data.lock?.data as unknown as LockData | undefined;
+            const blocksRemaining = Number(lockData?.until ?? 0) - currentBlockHeight;
+            const satoshis = BigInt(u.output.satoshis || 0);
+            return (
+              <div
+                key={u.outpoint.txid}
+                className="grid grid-cols-3 rounded-xl px-4 py-3 text-sm"
+                style={{ background: '#17191E', color: '#FFFFFF' }}
+              >
+                <span className="text-left font-mono text-xs" style={{ color: '#98A2B3' }}>
+                  {truncate(u.outpoint.txid, 4, 4)}
+                </span>
+                <span className="text-center text-xs font-semibold" style={{ color: '#A1FF8B' }}>
+                  {blocksRemaining < 0 ? '0' : blocksRemaining}
+                </span>
+                <span className="text-right text-xs">
+                  {satoshis < 1000n
+                    ? `${satoshis} ${satoshis > 1n ? 'sats' : 'sat'}`
+                    : `${Number(satoshis) / BSV_DECIMAL_CONVERSION} BSV`}
+                </span>
+              </div>
+            );
+          })}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2">
+        <Button theme={theme} type="primary" label="Unlock Funds" onClick={handleUnlock} />
+      </div>
+    </motion.div>
+  );
+
+  const discoverAppsPage = (
+    <motion.div
+      key="discover-apps"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex w-full flex-col"
+    >
+      <BackHeader title="Discover Apps" onBack={() => setPage('main')} />
+      <Show
+        when={featuredApps.length > 0}
+        whenFalseContent={
+          <div className="flex flex-col items-center justify-center py-16">
+            <Compass size={40} style={{ color: '#98A2B3' }} className="mb-3" />
+            <span className="text-sm" style={{ color: '#98A2B3' }}>
+              No apps listed yet
+            </span>
+          </div>
+        }
+      >
+        <>
+          <p className="mb-3 text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
+            If your app has integrated {theme.settings.walletName} Wallet but is not listed,{' '}
+            <a
+              href={theme.settings.repo}
+              rel="noreferrer"
+              target="_blank"
+              className="font-medium underline underline-offset-2"
+              style={{ color: '#A1FF8B' }}
+            >
+              let us know!
+            </a>
+          </p>
+          <div className="flex flex-col gap-1 overflow-y-auto" style={{ maxHeight: '340px' }}>
+            {featuredApps.map((app, idx) => (
+              <motion.button
+                key={app.name + idx}
+                whileTap={{ scale: 0.985 }}
+                onClick={() => window.open(app.link, '_blank')}
+                className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left transition-colors duration-150 bg-[#17191E] hover:bg-[#1f2128]"
+              >
+                <div className="flex items-center gap-3">
+                  <img src={app.icon} alt={app.name} className="h-10 w-10 rounded-lg object-cover" />
+                  <span className="text-sm font-semibold" style={{ color: '#FFFFFF' }}>
+                    {app.name}
+                  </span>
+                </div>
+                <ExternalLink size={14} style={{ color: '#98A2B3' }} />
+              </motion.button>
+            ))}
+          </div>
+        </>
       </Show>
-      <Text theme={theme} style={{ width: '95%', margin: '2rem 0 1rem 0' }}>
-        Give Monthly through Yours Wallet's transparent Open Collective (formerly Panda Wallet).
-      </Text>
+    </motion.div>
+  );
+
+  const sponsorPage = (
+    <motion.div
+      key="sponsor"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex w-full flex-col items-center"
+    >
+      <BackHeader title="Support Project" onBack={() => setPage('main')} />
+      <img src={yoursLogo} alt="Wallet Logo" className="mb-3 h-12 w-12 rounded-xl" />
+      <p className="mb-4 text-center text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
+        Yours is an open-source initiative. Consider supporting its continued development.
+      </p>
+
+      <Show
+        when={otherIsSelected}
+        whenFalseContent={
+          <div className="flex w-full flex-wrap justify-center gap-2 pb-2">
+            {['25', '50', '100', '250', '500', 'Other'].map((amt) => (
+              <AmountChip
+                key={amt}
+                label={amt === 'Other' ? 'Other' : `$${amt}`}
+                active={selectedAmount === Number(amt)}
+                onClick={() => {
+                  if (amt === 'Other') {
+                    setOtherIsSelected(true);
+                  } else {
+                    handleSubmit(Number(amt));
+                  }
+                }}
+              />
+            ))}
+          </div>
+        }
+      >
+        <div className="flex w-full flex-col gap-2">
+          <Input
+            theme={theme}
+            placeholder="Enter USD Amount"
+            type="number"
+            step="1"
+            value={selectedAmount !== null && selectedAmount !== undefined ? selectedAmount : ''}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              const inputValue = e.target.value;
+              if (inputValue === '') {
+                setSelectedAmount(null);
+              } else {
+                setSelectedAmount(Number(inputValue));
+              }
+            }}
+          />
+          <div className="flex gap-2">
+            <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setOtherIsSelected(false)} />
+            <Button theme={theme} type="primary" label="Submit" onClick={() => handleSubmit(Number(selectedAmount))} />
+          </div>
+        </div>
+      </Show>
+
+      <div
+        className="my-4 w-full rounded-xl p-4 text-xs leading-relaxed"
+        style={{ background: '#17191E', color: '#98A2B3' }}
+      >
+        Give monthly through Yours Wallet's transparent Open Collective (formerly Panda Wallet).
+      </div>
       <Button
         theme={theme}
         type="primary"
         label="View Open Collective"
         onClick={() => window.open('https://opencollective.com/yours-wallet', '_blank')}
       />
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
-    </PageWrapper>
+    </motion.div>
   );
 
   const thankYouSponsorPage = (
-    <PageWrapper $marginTop={'8rem'}>
-      <HeaderText theme={theme}>🙏 Thank You</HeaderText>
-      <Text theme={theme} style={{ width: '95%', margin: '0.5rem 0 1rem 0' }}>
+    <motion.div
+      key="sponsor-thanks"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex w-full flex-col items-center justify-center py-12"
+    >
+      <motion.div
+        initial={{ scale: 0.5, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+        className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl"
+        style={{ background: 'linear-gradient(135deg, #A1FF8B, #34D399)' }}
+      >
+        <Heart size={28} style={{ color: '#010101' }} fill="#010101" />
+      </motion.div>
+      <h2 className="mb-2 text-xl font-bold" style={{ color: '#FFFFFF' }}>
+        Thank You
+      </h2>
+      <p className="mb-6 text-center text-sm" style={{ color: '#98A2B3' }}>
         Your contribution has been received.
-      </Text>
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
-    </PageWrapper>
+      </p>
+      <Button theme={theme} type="primary" label="Done" onClick={() => setPage('main')} />
+    </motion.div>
   );
 
   const decodeOrBroadcastPage = (
-    <PageWrapper $marginTop={'0'}>
-      <HeaderText theme={theme}>Decode/Broadcast</HeaderText>
-      <Text theme={theme}>Decode or broadcast a raw transaction in various formats</Text>
+    <motion.div
+      key="decode-broadcast"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex w-full flex-col"
+    >
+      <BackHeader title="Decode / Broadcast" onBack={() => setPage('main')} />
+      <p className="mb-3 text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
+        Decode or broadcast a raw transaction in various formats.
+      </p>
 
-      <Dropdown
-        theme={theme}
-        onChange={(e) =>
-          setTransactionFormat(e.target.value === 'hex' ? 'tx' : e.target.value === 'beef' ? 'beef' : 'ef')
-        }
-      >
-        <option value="hex">Raw Hex</option>
-        <option value="beef">BEEF</option>
-        <option value="extended">Extended Format</option>
-      </Dropdown>
+      {/* Format selector pills */}
+      <div className="mb-3 flex gap-2">
+        {[
+          { label: 'Hex', value: 'tx' as TransactionFormat },
+          { label: 'BEEF', value: 'beef' as TransactionFormat },
+          { label: 'Extended', value: 'ef' as TransactionFormat },
+        ].map((f) => (
+          <FormatPill
+            key={f.label}
+            label={f.label}
+            active={transactionFormat === f.value}
+            onClick={() => setTransactionFormat(f.value)}
+          />
+        ))}
+      </div>
 
-      <TextArea theme={theme} placeholder="Paste your raw transaction" onChange={(e) => setRawTx(e.target.value)} />
+      {/* Textarea */}
+      <textarea
+        placeholder="Paste your raw transaction"
+        onChange={(e) => setRawTx(e.target.value)}
+        className="mb-3 w-full resize-none rounded-xl px-4 py-3 text-xs outline-none"
+        rows={5}
+        style={{
+          background: '#17191E',
+          color: '#FFFFFF80',
+          border: '1px solid #98A2B326',
+          fontFamily: 'monospace',
+        }}
+      />
 
-      <ButtonsWrapper>
+      <div className="flex gap-2">
         <Button theme={theme} type="secondary-outline" label="Decode" onClick={handleDecode} />
         <Button theme={theme} type="primary" label="Broadcast" onClick={handleBroadcast} />
-      </ButtonsWrapper>
-      <Button
-        style={{ margin: '1rem' }}
-        theme={theme}
-        type="secondary"
-        label={'Go back'}
-        onClick={() => setPage('main')}
-      />
-    </PageWrapper>
+      </div>
+    </motion.div>
   );
 
   const wifSweepPage = (
-    <PageWrapper $marginTop={'0'}>
-      <HeaderText theme={theme}>Sweep Private Key</HeaderText>
-      <Text theme={theme}>Enter a private key in WIF format to sweep all funds to your wallet.</Text>
+    <motion.div
+      key="sweep-wif"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex w-full flex-col"
+    >
+      <BackHeader title="Sweep Private Key" onBack={handleResetSweep} />
+      <p className="mb-3 text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
+        Enter a private key in WIF format to sweep all funds to your wallet.
+      </p>
       <Input theme={theme} placeholder="Enter WIF private key" value={wifKey} onChange={handleWifChange} />
 
       {sweepBalance > 0 && (
-        <SweepInfo theme={theme}>
-          <Text theme={theme}>Available to sweep:</Text>
-          <Text style={{ fontWeight: 700 }} theme={theme}>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="my-3 flex items-center justify-between rounded-xl px-4 py-3"
+          style={{ background: '#17191E' }}
+        >
+          <span className="text-xs" style={{ color: '#98A2B3' }}>
+            Available to sweep
+          </span>
+          <span className="text-sm font-bold" style={{ color: '#A1FF8B' }}>
             {sweepBalance / BSV_DECIMAL_CONVERSION} BSV
-          </Text>
-        </SweepInfo>
+          </span>
+        </motion.div>
       )}
 
-      <ButtonsWrapper>
+      <div className="flex gap-2">
         <Button
           theme={theme}
           type="secondary-outline"
@@ -748,13 +860,22 @@ export const AppsAndTools = () => {
           onClick={sweepFunds}
           disabled={isSweeping || sweepBalance === 0}
         />
-      </ButtonsWrapper>
+      </div>
       <Warning theme={theme}>This will only sweep funds. 1Sat Ordinals could be lost!</Warning>
-    </PageWrapper>
+    </motion.div>
   );
 
-  const decode = !!txData && (
-    <>
+  const decodePage = !!txData && (
+    <motion.div
+      key="decode"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex w-full flex-col gap-3"
+    >
+      <BackHeader title="Decoded Transaction" onBack={() => setPage('decode-broadcast')} />
       <TxPreview txData={txData} />
       <Button
         theme={theme}
@@ -763,17 +884,24 @@ export const AppsAndTools = () => {
         onClick={handleBroadcast}
       />
       <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setPage('decode-broadcast')} />
-    </>
+    </motion.div>
   );
 
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
-    <Content>
+    <div
+      className="flex w-full flex-col items-center overflow-x-hidden overflow-y-auto"
+      style={{ height: 'calc(75%)', background: '#010101' }}
+    >
       <TopNav />
+
+      {/* Processing loaders */}
       <Show when={isProcessing && page === 'unlock'}>
-        <PageLoader theme={theme} message={'Gathering info...'} />
+        <PageLoader theme={theme} message="Gathering info..." />
       </Show>
       <Show when={isProcessing && page === 'lock-page'}>
-        <PageLoader theme={theme} message={'Locking...'} />
+        <PageLoader theme={theme} message="Locking..." />
       </Show>
       <Show when={(isProcessing && page === 'decode-broadcast') || (isProcessing && page === 'decode')}>
         <PageLoader
@@ -781,15 +909,21 @@ export const AppsAndTools = () => {
           message={isBroadcasting ? 'Broadcasting transaction...' : 'Decoding transaction...'}
         />
       </Show>
-      <Show when={!isProcessing && page === 'decode-broadcast'}>{decodeOrBroadcastPage}</Show>
-      <Show when={!isProcessing && page === 'decode'}>{decode}</Show>
-      <Show when={page === 'main'}>{main}</Show>
-      <Show when={page === 'sponsor'}>{sponsorPage}</Show>
-      <Show when={page === 'sponsor-thanks'}>{thankYouSponsorPage}</Show>
-      <Show when={!isProcessing && page === 'unlock'}>{unlockPage}</Show>
-      <Show when={!isProcessing && page === 'lock-page'}>{lockPage}</Show>
-      <Show when={page === 'discover-apps'}>{discoverAppsPage}</Show>
-      <Show when={page === 'sweep-wif'}>{wifSweepPage}</Show>
-    </Content>
+
+      {/* Page content */}
+      <div className="w-full px-4 pb-6">
+        <AnimatePresence mode="wait">
+          {page === 'main' && main}
+          {page === 'lock-page' && !isProcessing && lockPage}
+          {page === 'unlock' && !isProcessing && unlockPage}
+          {page === 'discover-apps' && discoverAppsPage}
+          {page === 'sponsor' && sponsorPage}
+          {page === 'sponsor-thanks' && thankYouSponsorPage}
+          {page === 'decode-broadcast' && !isProcessing && decodeOrBroadcastPage}
+          {page === 'decode' && !isProcessing && decodePage}
+          {page === 'sweep-wif' && wifSweepPage}
+        </AnimatePresence>
+      </div>
+    </div>
   );
 };

@@ -1,12 +1,30 @@
 import { useEffect, useState } from 'react';
-import styled from 'styled-components';
-import x from '../assets/x.svg';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Users,
+  UserCircle,
+  Globe,
+  Shield,
+  Key,
+  Lock,
+  LogOut,
+  RefreshCw,
+  Database,
+  Gauge,
+  KeyRound,
+  Zap,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Download,
+  QrCode as QrCodeIcon,
+  HardDrive,
+  Pencil,
+  Plus,
+} from 'lucide-react';
 import { Button } from '../components/Button';
-import { ForwardButton } from '../components/ForwardButton';
 import { Input } from '../components/Input';
 import { QrCode } from '../components/QrCode';
-import { Text } from '../components/Reusable';
-import { SettingsRow } from '../components/SettingsRow';
 import { Show } from '../components/Show';
 import { SpeedBump } from '../components/SpeedBump';
 import { ToggleSwitch } from '../components/ToggleSwitch';
@@ -16,92 +34,18 @@ import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { WhitelistedApp, YoursEventName } from '../inject';
-import { WhiteLabelTheme } from '../theme.types';
 import { sendMessage } from '../utils/chromeHelpers';
 import { FEE_PER_KB } from '../utils/constants';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { CreateAccount } from './onboarding/CreateAccount';
 import { RestoreAccount } from './onboarding/RestoreAccount';
 import { ImportAccount } from './onboarding/ImportAccount';
-import { AccountRow } from '../components/AccountRow';
 import { MasterBackupProgressEvent, streamDataToZip } from '../utils/masterExporter';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { PermissionsManager } from './PermissionsManager';
 import { StorageStatus } from './StorageStatus';
-
-const Content = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  height: calc(75%);
-  overflow-y: auto;
-  overflow-x: hidden;
-`;
-
-const ConnectedAppRow = styled.div<WhiteLabelTheme>`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: ${({ theme }) => theme.color.global.row};
-  border-radius: 0.5rem;
-  padding: 0.5rem;
-  margin: 0.25rem;
-  width: 80%;
-`;
-
-const SettingsText = styled(Text)<WhiteLabelTheme>`
-  color: ${({ theme }) => theme.color.global.contrast};
-  margin: 0;
-  font-weight: 600;
-  text-align: left;
-`;
-
-const XIcon = styled.img`
-  width: 1.25rem;
-  height: 1.25rem;
-  cursor: pointer;
-`;
-
-const AppIcon = styled.img`
-  width: 3rem;
-  height: 3rem;
-  margin-right: 1rem;
-  border-radius: 0.5rem;
-`;
-
-const ImageAndDomain = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const ScrollableContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 25rem;
-  overflow-y: auto;
-  overflow-x: hidden;
-  width: 100%;
-  padding: 1rem;
-`;
-
-const ExportKeysAsQrCodeContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 1rem;
-`;
-
-const PageWrapper = styled.div<{ $marginTop: string }>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-top: ${(props) => props.$marginTop};
-  width: 100%;
-`;
+import activeCircle from '../assets/active-circle.png';
+import ProgressBar from '@ramonak/react-progress-bar';
 
 export type SettingsPage =
   | 'main'
@@ -118,7 +62,114 @@ export type SettingsPage =
   | 'preferences'
   | 'storage'
   | 'permissions';
+
 type DecisionType = 'sign-out' | 'export-master-backup' | 'export-keys' | 'export-keys-qr-code' | 'delete-account';
+
+// --- Animation variants ---
+const pageVariants = {
+  initial: { opacity: 0, x: 16 },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.22, ease: 'easeOut' } },
+  exit: { opacity: 0, x: -16, transition: { duration: 0.15, ease: 'easeIn' } },
+};
+
+const stagger = {
+  animate: { transition: { staggerChildren: 0.055 } },
+};
+
+const rowVariant = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.2, ease: 'easeOut' } },
+};
+
+// --- Sub-components ---
+
+type SettingRowProps = {
+  icon: React.ReactNode;
+  label: string;
+  description?: string;
+  right?: React.ReactNode;
+  onClick?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
+  danger?: boolean;
+};
+
+const SettingRow = ({ icon, label, description, right, onClick, isFirst, isLast, danger }: SettingRowProps) => {
+  return (
+    <motion.div
+      variants={rowVariant}
+      whileTap={onClick ? { scale: 0.985 } : undefined}
+      onClick={onClick}
+      className={`flex items-center justify-between px-4 py-3 bg-[#17191E] ${onClick ? 'cursor-pointer hover:bg-[#1f2128]' : ''} ${isFirst ? 'rounded-t-xl' : ''} ${isLast ? 'rounded-b-xl' : ''} transition-colors duration-150`}
+    >
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: danger ? 'rgba(239,68,68,0.15)' : 'rgba(161,255,139,0.1)' }}
+        >
+          <span style={{ color: danger ? '#ef4444' : '#A1FF8B' }}>{icon}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold leading-tight truncate" style={{ color: danger ? '#ef4444' : '#FFFFFF' }}>
+            {label}
+          </p>
+          {description && (
+            <p className="text-xs mt-0.5 leading-tight" style={{ color: '#98A2B3' }}>
+              {description}
+            </p>
+          )}
+        </div>
+      </div>
+      {right !== undefined ? (
+        <div className="flex-shrink-0 ml-3">{right}</div>
+      ) : onClick ? (
+        <ChevronRight size={16} color="#98A2B3" className="flex-shrink-0 ml-2" />
+      ) : null}
+    </motion.div>
+  );
+};
+
+const Divider = () => <div className="h-px mx-4" style={{ backgroundColor: 'rgba(152,162,179,0.1)' }} />;
+
+type SectionProps = {
+  title: string;
+  children: React.ReactNode;
+};
+
+const Section = ({ title, children }: SectionProps) => (
+  <motion.div variants={rowVariant} className="w-full mb-4">
+    <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: '#98A2B3' }}>
+      {title}
+    </p>
+    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(152,162,179,0.12)' }}>
+      {children}
+    </div>
+  </motion.div>
+);
+
+type SubPageHeaderProps = {
+  title: string;
+  onBack: () => void;
+};
+
+const SubPageHeader = ({ title, onBack }: SubPageHeaderProps) => (
+  <div className="flex items-center gap-3 mb-5 w-full">
+    <motion.button
+      whileHover={{ scale: 1.08 }}
+      whileTap={{ scale: 0.92 }}
+      onClick={onBack}
+      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+      style={{ backgroundColor: '#17191E', border: '1px solid rgba(152,162,179,0.15)' }}
+    >
+      <ChevronLeft size={18} color="#FFFFFF" />
+    </motion.button>
+    <h2 className="text-base font-bold" style={{ color: '#FFFFFF' }}>
+      {title}
+    </h2>
+  </div>
+);
+
+// --- Main Component ---
 
 export const Settings = () => {
   const { theme } = useTheme();
@@ -148,7 +199,6 @@ export const Settings = () => {
   useEffect(() => {
     const getWhitelist = async (): Promise<WhitelistedApp[]> => {
       try {
-        // Refresh cache from chrome storage before reading
         await chromeStorageService.getAndSetStorage();
         const { account } = chromeStorageService.getCurrentAccountObject();
         if (!account) return [];
@@ -451,300 +501,585 @@ export const Settings = () => {
     }
   };
 
-  const main = (
-    <>
-      <SettingsRow
-        name="Manage Accounts"
-        description="Manage your accounts"
-        onClick={() => setPage('manage-accounts')}
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-      />
-      <SettingsRow
-        name="Connected Apps"
-        description="Manage the apps you are connected to"
-        onClick={() => setPage('connected-apps')}
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-      />
-      <SettingsRow
-        name="Permissions"
-        description="View and revoke dApp permissions"
-        onClick={() => setPage('permissions')}
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-      />
-      <SettingsRow
-        name="Preferences"
-        description="Manage your wallet preferences"
-        onClick={() => setPage('preferences')}
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-      />
-      <SettingsRow
-        name="Storage"
-        description="View storage status and manage remote sync"
-        onClick={() => setPage('storage')}
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-      />
-      <SettingsRow
-        name="Export Keys"
-        description="Download keys or export as QR code"
-        onClick={() => setPage('export-keys-options')}
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-      />
-      <SettingsRow name="Re-Sync UTXOs" description="Re-sync your wallets spendable coins" onClick={resyncUTXOs} />
-      <SettingsRow name="Lock Wallet" description="Immediately lock the wallet" onClick={handleLockWallet} />
-      <Text
-        style={{
-          margin: '1rem 0',
-          textAlign: 'left',
-          color: theme.color.global.contrast,
-          fontSize: '1rem',
-          fontWeight: 700,
-        }}
-        theme={theme}
-      >
-        Danger Zone
-      </Text>
-      <SettingsRow
-        style={{
-          backgroundColor: theme.color.component.warningButton + '40',
-          border: '1px solid ' + theme.color.component.warningButton,
-        }}
-        name="Sign Out"
-        description={`Sign out of ${theme.settings.walletName} Wallet completely`}
-        onClick={handleSignOutIntent}
-      />
-    </>
+  // --- Page renders ---
+
+  const mainPage = (
+    <motion.div
+      key="main"
+      variants={stagger}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-20"
+    >
+      {/* Account section */}
+      <Section title="Account">
+        <SettingRow
+          icon={<Users size={16} />}
+          label="Manage Accounts"
+          description="Create, restore, or edit accounts"
+          onClick={() => setPage('manage-accounts')}
+          isFirst
+        />
+        <Divider />
+        <SettingRow
+          icon={<Globe size={16} />}
+          label="Connected Apps"
+          description="Manage connected dApps"
+          onClick={() => setPage('connected-apps')}
+        />
+        <Divider />
+        <SettingRow
+          icon={<Shield size={16} />}
+          label="Permissions"
+          description="View and revoke dApp permissions"
+          onClick={() => setPage('permissions')}
+          isLast
+        />
+      </Section>
+
+      {/* Security section */}
+      <Section title="Security">
+        <SettingRow
+          icon={<Key size={16} />}
+          label="Export Keys"
+          description="Backup seed, download JSON, or QR code"
+          onClick={() => setPage('export-keys-options')}
+          isFirst
+          isLast
+        />
+      </Section>
+
+      {/* Preferences section */}
+      <Section title="Preferences">
+        <SettingRow
+          icon={<UserCircle size={16} />}
+          label="Social Profile"
+          description="Display name and avatar"
+          onClick={() => setPage('preferences')}
+          isFirst
+        />
+        <Divider />
+        <SettingRow
+          icon={<Database size={16} />}
+          label="Storage"
+          description="View storage status and remote sync"
+          onClick={() => setPage('storage')}
+          isLast
+        />
+      </Section>
+
+      {/* Advanced section */}
+      <Section title="Advanced">
+        <SettingRow
+          icon={<RefreshCw size={16} />}
+          label="Re-Sync UTXOs"
+          description="Re-sync your wallet's spendable coins"
+          onClick={resyncUTXOs}
+          isFirst
+        />
+        <Divider />
+        <SettingRow
+          icon={<Lock size={16} />}
+          label="Lock Wallet"
+          description="Immediately lock the wallet"
+          onClick={handleLockWallet}
+          isLast
+        />
+      </Section>
+
+      {/* Danger Zone */}
+      <Section title="Danger Zone">
+        <SettingRow
+          icon={<LogOut size={16} />}
+          label="Sign Out"
+          description={`Sign out of ${theme.settings.walletName} Wallet completely`}
+          onClick={handleSignOutIntent}
+          isFirst
+          isLast
+          danger
+        />
+      </Section>
+    </motion.div>
   );
 
   const manageAccountsPage = (
-    <>
-      <SettingsRow
-        name="Create Account"
-        description="Create a new account"
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-        onClick={() => setPage('create-account')}
-      />
-      <SettingsRow
-        name="Restore/Import"
-        description="Import or restore an existing account"
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-        onClick={() => setPage('restore-account')}
-      />
-      <SettingsRow
-        name="Edit Account"
-        description="Edit an existing account"
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-        onClick={() => setPage('account-list')}
-      />
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
-    </>
+    <motion.div
+      key="manage-accounts"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-4"
+    >
+      <SubPageHeader title="Manage Accounts" onBack={() => setPage('main')} />
+      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full">
+        <Section title="Actions">
+          <SettingRow
+            icon={<Plus size={16} />}
+            label="Create Account"
+            description="Create a new account"
+            onClick={() => setPage('create-account')}
+            isFirst
+          />
+          <Divider />
+          <SettingRow
+            icon={<Download size={16} />}
+            label="Restore / Import"
+            description="Import or restore an existing account"
+            onClick={() => setPage('restore-account')}
+          />
+          <Divider />
+          <SettingRow
+            icon={<Pencil size={16} />}
+            label="Edit Account"
+            description="Edit an existing account"
+            onClick={() => setPage('account-list')}
+            isLast
+          />
+        </Section>
+      </motion.div>
+    </motion.div>
   );
 
   const connectedAppsPage = (
-    <PageWrapper $marginTop={connectedApps.length === 0 ? '10rem' : '-1rem'}>
-      <Show when={connectedApps.length > 0} whenFalseContent={<Text theme={theme}>No apps connected</Text>}>
-        <ScrollableContainer>
-          {connectedApps.map((app, idx) => {
-            return (
-              <ConnectedAppRow key={app.domain + idx} theme={theme}>
-                <ImageAndDomain>
-                  <AppIcon src={app.icon} />
-                  <SettingsText theme={theme}>{app.domain}</SettingsText>
-                </ImageAndDomain>
-                <XIcon src={x} onClick={() => handleRemoveDomain(app.domain)} />
-              </ConnectedAppRow>
-            );
-          })}
-        </ScrollableContainer>
-      </Show>
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
-    </PageWrapper>
+    <motion.div
+      key="connected-apps"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-4"
+    >
+      <SubPageHeader title="Connected Apps" onBack={() => setPage('main')} />
+      {connectedApps.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center py-12 gap-3"
+        >
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(161,255,139,0.1)' }}
+          >
+            <Globe size={22} color="#A1FF8B" />
+          </div>
+          <p className="text-sm" style={{ color: '#98A2B3' }}>
+            No apps connected
+          </p>
+        </motion.div>
+      ) : (
+        <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-2">
+          {connectedApps.map((app, idx) => (
+            <motion.div
+              key={app.domain + idx}
+              variants={rowVariant}
+              className="flex items-center justify-between px-4 py-3 rounded-xl"
+              style={{
+                backgroundColor: '#17191E',
+                border: '1px solid rgba(152,162,179,0.12)',
+              }}
+            >
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                {app.icon ? (
+                  <img src={app.icon} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" alt={app.domain} />
+                ) : (
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: 'rgba(161,255,139,0.1)' }}
+                  >
+                    <Globe size={16} color="#A1FF8B" />
+                  </div>
+                )}
+                <p className="text-sm font-semibold truncate" style={{ color: '#FFFFFF' }}>
+                  {app.domain}
+                </p>
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.12 }}
+                whileTap={{ scale: 0.88 }}
+                onClick={() => handleRemoveDomain(app.domain)}
+                className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ml-3"
+                style={{ backgroundColor: 'rgba(239,68,68,0.12)' }}
+              >
+                <X size={14} color="#ef4444" />
+              </motion.button>
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
+    </motion.div>
   );
 
   const exportKeysAsQrCodePage = (
-    <>
-      <Show when={shouldVisibleExportedKeys} whenFalseContent={<Text theme={theme}>Timed out. Please try again</Text>}>
-        <ExportKeysAsQrCodeContainer>
-          <QrCode address={exportKeysQrData} />
-        </ExportKeysAsQrCodeContainer>
-      </Show>
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
-    </>
+    <motion.div
+      key="export-keys-qr"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-4"
+    >
+      <SubPageHeader title="Keys as QR Code" onBack={() => setPage('main')} />
+      {shouldVisibleExportedKeys ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <div
+            className="p-4 rounded-2xl"
+            style={{
+              backgroundColor: '#17191E',
+              border: '1px solid rgba(152,162,179,0.15)',
+            }}
+          >
+            <QrCode address={exportKeysQrData} />
+          </div>
+          <p className="text-xs text-center" style={{ color: '#98A2B3' }}>
+            This QR code will disappear in 10 seconds.
+          </p>
+        </motion.div>
+      ) : (
+        <div className="flex flex-col items-center gap-4 py-8">
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(239,68,68,0.12)' }}
+          >
+            <QrCodeIcon size={22} color="#ef4444" />
+          </div>
+          <p className="text-sm" style={{ color: '#98A2B3' }}>
+            Timed out. Please try again.
+          </p>
+        </div>
+      )}
+    </motion.div>
   );
 
   const exportKeyOptionsPage = (
-    <>
-      <SettingsRow
-        name="Master Backup"
-        description="Download all wallet data for all accounts. Use this to restore your wallet on another device."
-        onClick={masterBackupEventText ? () => null : handleMasterBackupIntent}
-        masterBackupText={masterBackupEventText}
-        masterBackupProgress={masterBackupProgress}
-      />
-      <Show when={!masterBackupEventText}>
-        <SettingsRow
-          name="Download Keys"
-          description="Download your seed, private, and public keys for current account"
-          onClick={handleExportKeysIntent}
-        />
-        <SettingsRow
-          name="Export Keys as QR code"
-          description="Display private keys for current account as QR code for mobile import"
-          onClick={handleExportKeysAsQrCodeIntent}
-        />
-      </Show>
-      <Button
-        theme={theme}
-        style={{
-          color: masterBackupEventText ? theme.color.component.snackbarError : undefined,
-          width: masterBackupEventText ? '80%' : undefined,
-        }}
-        type="secondary"
-        label={masterBackupEventText ? 'DO NOT CLOSE WALLET OR CHANGE TABS DURING THIS PROCESS!' : 'Go back'}
-        onClick={() => (masterBackupEventText ? null : setPage('main'))}
-      />
-    </>
+    <motion.div
+      key="export-keys-options"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-4"
+    >
+      <SubPageHeader title="Export Keys" onBack={() => setPage('main')} />
+      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full">
+        <Section title="Backup Options">
+          <motion.div variants={rowVariant}>
+            {masterBackupEventText ? (
+              <div className="px-4 py-3" style={{ backgroundColor: '#17191E' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: 'rgba(161,255,139,0.1)' }}
+                  >
+                    <HardDrive size={16} color="#A1FF8B" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: '#FFFFFF' }}>
+                      Master Backup
+                    </p>
+                    <p className="text-xs" style={{ color: '#98A2B3' }}>
+                      {masterBackupEventText}
+                    </p>
+                  </div>
+                </div>
+                {masterBackupProgress > 0 && (
+                  <ProgressBar
+                    completed={masterBackupProgress}
+                    bgColor={theme.color.component.progressBar}
+                    baseBgColor={theme.color.component.progressBarTrack}
+                    height="8px"
+                  />
+                )}
+                <p className="text-xs mt-2 font-semibold" style={{ color: '#ef4444' }}>
+                  DO NOT CLOSE WALLET OR CHANGE TABS DURING THIS PROCESS!
+                </p>
+              </div>
+            ) : (
+              <SettingRow
+                icon={<HardDrive size={16} />}
+                label="Master Backup"
+                description="Download all wallet data for all accounts"
+                onClick={handleMasterBackupIntent}
+                isFirst
+              />
+            )}
+          </motion.div>
+          <Show when={!masterBackupEventText}>
+            <Divider />
+            <SettingRow
+              icon={<Download size={16} />}
+              label="Download Keys"
+              description="Download seed, private, and public keys as JSON"
+              onClick={handleExportKeysIntent}
+            />
+            <Divider />
+            <SettingRow
+              icon={<QrCodeIcon size={16} />}
+              label="Export as QR Code"
+              description="Display private keys as QR code for mobile import"
+              onClick={handleExportKeysAsQrCodeIntent}
+              isLast
+            />
+          </Show>
+          {masterBackupEventText && <div className="rounded-b-xl overflow-hidden" />}
+        </Section>
+      </motion.div>
+    </motion.div>
   );
 
   const preferencesPage = (
-    <>
-      <SettingsRow
-        name="Social Profile"
-        description="Set your display name and avatar"
-        onClick={() => setPage('social-profile')}
-        jsxElement={<ForwardButton color={theme.color.global.contrast} />}
-      />
-      <SettingsRow
-        name="Require Password"
-        description="Require a password for sending assets?"
-        jsxElement={
-          <ToggleSwitch
-            theme={theme}
-            on={isPasswordRequired}
-            onChange={() => handleUpdatePasswordRequirement(!isPasswordRequired)}
+    <motion.div
+      key="preferences"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-4"
+    >
+      <SubPageHeader title="Preferences" onBack={() => setPage('main')} />
+      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full">
+        <Section title="Profile">
+          <SettingRow
+            icon={<UserCircle size={16} />}
+            label="Social Profile"
+            description="Set your display name and avatar"
+            onClick={() => setPage('social-profile')}
+            isFirst
+            isLast
           />
-        }
-      />
-      <SettingsRow
-        name="Auto Approve Limit"
-        description="Transactions at or below this BSV amount will be auto approved."
-        jsxElement={
-          <Input
-            theme={theme}
-            placeholder={String(noApprovalLimit)}
-            type="number"
-            onChange={(e) => handleUpdateApprovalLimit(Number(e.target.value))}
-            value={noApprovalLimit}
-            style={{ width: '5rem', margin: 0 }}
+        </Section>
+        <Section title="Security">
+          <SettingRow
+            icon={<KeyRound size={16} />}
+            label="Require Password"
+            description="Require a password for sending assets"
+            right={
+              <ToggleSwitch
+                theme={theme}
+                on={isPasswordRequired}
+                onChange={() => handleUpdatePasswordRequirement(!isPasswordRequired)}
+              />
+            }
+            isFirst
+            isLast
           />
-        }
-      />
-      <SettingsRow
-        name="Custom Fee Rate"
-        description="Set a custom fee rate for transactions (default is 100 sat/kb)"
-        jsxElement={
-          <Input
-            theme={theme}
-            placeholder={String(customFeeRate)}
-            type="number"
-            onChange={(e) => handleUpdateCustomFeeRate(Number(e.target.value))}
-            value={customFeeRate}
-            style={{ width: '5rem', margin: 0 }}
+        </Section>
+        <Section title="Transaction Limits">
+          <SettingRow
+            icon={<Zap size={16} />}
+            label="Auto-Approve Limit"
+            description="Transactions at or below this BSV amount will be auto-approved"
+            right={
+              <Input
+                theme={theme}
+                placeholder={String(noApprovalLimit)}
+                type="number"
+                onChange={(e) => handleUpdateApprovalLimit(Number(e.target.value))}
+                value={noApprovalLimit}
+                style={{ width: '5rem', margin: 0 }}
+              />
+            }
+            isFirst
           />
-        }
-      />
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('main')} />
-    </>
+          <Divider />
+          <SettingRow
+            icon={<Gauge size={16} />}
+            label="Custom Fee Rate"
+            description="Default: 100 sat/kb"
+            right={
+              <Input
+                theme={theme}
+                placeholder={String(customFeeRate)}
+                type="number"
+                onChange={(e) => handleUpdateCustomFeeRate(Number(e.target.value))}
+                value={customFeeRate}
+                style={{ width: '5rem', margin: 0 }}
+              />
+            }
+            isLast
+          />
+        </Section>
+      </motion.div>
+    </motion.div>
   );
 
   const socialProfilePage = (
-    <PageWrapper $marginTop="5rem">
-      <SettingsText theme={theme}>Display Name</SettingsText>
-      <Input
-        theme={theme}
-        placeholder="Display Name"
-        type="text"
-        onChange={(e) => setEnteredSocialDisplayName(e.target.value)}
-        value={enteredSocialDisplayName}
-      />
-      <SettingsText theme={theme}>Avatar</SettingsText>
-      <Input
-        theme={theme}
-        placeholder="Avatar Url"
-        type="text"
-        onChange={(e) => setEnteredSocialAvatar(e.target.value)}
-        value={enteredSocialAvatar}
-      />
-      <Button
-        theme={theme}
-        type="primary"
-        label="Save"
-        style={{ marginTop: '1rem' }}
-        onClick={handleSocialProfileSave}
-      />
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('preferences')} />
-    </PageWrapper>
+    <motion.div
+      key="social-profile"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-4"
+    >
+      <SubPageHeader title="Social Profile" onBack={() => setPage('preferences')} />
+
+      {/* Avatar preview */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.05 }}
+        className="flex flex-col items-center mb-6"
+      >
+        <div
+          className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center"
+          style={{
+            background: enteredSocialAvatar ? undefined : 'linear-gradient(135deg, #A1FF8B, #34D399)',
+            border: '2px solid rgba(161,255,139,0.3)',
+          }}
+        >
+          {enteredSocialAvatar ? (
+            <img src={enteredSocialAvatar} className="w-full h-full object-cover" alt="Avatar" />
+          ) : (
+            <UserCircle size={32} color="#010101" />
+          )}
+        </div>
+        <p className="text-sm font-semibold mt-2" style={{ color: '#FFFFFF' }}>
+          {enteredSocialDisplayName || 'Your Name'}
+        </p>
+      </motion.div>
+
+      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-4">
+        <motion.div variants={rowVariant}>
+          <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#98A2B3' }}>
+            Display Name
+          </label>
+          <Input
+            theme={theme}
+            placeholder="Display Name"
+            type="text"
+            onChange={(e) => setEnteredSocialDisplayName(e.target.value)}
+            value={enteredSocialDisplayName}
+          />
+        </motion.div>
+        <motion.div variants={rowVariant}>
+          <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#98A2B3' }}>
+            Avatar URL
+          </label>
+          <Input
+            theme={theme}
+            placeholder="https://..."
+            type="text"
+            onChange={(e) => setEnteredSocialAvatar(e.target.value)}
+            value={enteredSocialAvatar}
+          />
+        </motion.div>
+        <motion.div variants={rowVariant}>
+          <Button
+            theme={theme}
+            type="primary"
+            label="Save"
+            style={{ marginTop: '0.5rem' }}
+            onClick={handleSocialProfileSave}
+          />
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 
   const accountList = (
-    <>
-      {chromeStorageService.getAllAccounts().map((account) => {
-        return (
-          <AccountRow
+    <motion.div
+      key="account-list"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-4"
+    >
+      <SubPageHeader title="Edit Account" onBack={() => setPage('manage-accounts')} />
+      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-2">
+        {chromeStorageService.getAllAccounts().map((account) => (
+          <motion.div
             key={account.addresses.identityAddress}
-            name={account.name}
-            icon={account.icon}
-            jsxElement={<ForwardButton color={theme.color.global.contrast} />}
+            variants={rowVariant}
+            whileTap={{ scale: 0.99 }}
             onClick={() => {
               setSelectedAccountIdentityAddress(account.addresses.identityAddress);
               setEnteredAccountName(account.name);
               setEnteredAccountIcon(account.icon);
               setPage('edit-account');
             }}
-          />
-        );
-      })}
-      <Button theme={theme} type="secondary" label={'Go back'} onClick={() => setPage('manage-accounts')} />
-    </>
+            className="flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors duration-150 bg-[#17191E] hover:bg-[#1f2128]"
+            style={{
+              border: '1px solid rgba(152,162,179,0.12)',
+            }}
+          >
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <img
+                src={account.icon || activeCircle}
+                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                alt={account.name}
+              />
+              <p className="text-sm font-semibold truncate" style={{ color: '#FFFFFF' }}>
+                {account.name}
+              </p>
+            </div>
+            <ChevronRight size={16} color="#98A2B3" className="flex-shrink-0 ml-2" />
+          </motion.div>
+        ))}
+      </motion.div>
+    </motion.div>
   );
 
   const editAccount = (
-    <>
-      <PageWrapper $marginTop="5rem">
-        <SettingsText theme={theme}>Label</SettingsText>
-        <Input
-          theme={theme}
-          placeholder="Account Label"
-          type="text"
-          onChange={(e) => setEnteredAccountName(e.target.value)}
-          value={enteredAccountName}
-        />
-        <SettingsText theme={theme}>Icon</SettingsText>
-        <Input
-          theme={theme}
-          placeholder="Account Icon"
-          type="text"
-          onChange={(e) => setEnteredAccountIcon(e.target.value)}
-          value={enteredAccountIcon}
-        />
-        <Button
-          theme={theme}
-          type="primary"
-          label="Save"
-          style={{ marginTop: '1rem' }}
-          onClick={handleAccountEditSave}
-        />
-        <Button theme={theme} type="warn" label="Delete" onClick={handleDeleteAccountIntent} />
-        <Button
-          theme={theme}
-          type="secondary"
-          label={'Go back'}
-          onClick={() => {
-            setSelectedAccountIdentityAddress(undefined);
-            setPage('account-list');
-          }}
-        />
-      </PageWrapper>
-    </>
+    <motion.div
+      key="edit-account"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-4"
+    >
+      <SubPageHeader
+        title="Edit Account"
+        onBack={() => {
+          setSelectedAccountIdentityAddress(undefined);
+          setPage('account-list');
+        }}
+      />
+
+      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-4">
+        <motion.div variants={rowVariant}>
+          <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#98A2B3' }}>
+            Account Label
+          </label>
+          <Input
+            theme={theme}
+            placeholder="Account Label"
+            type="text"
+            onChange={(e) => setEnteredAccountName(e.target.value)}
+            value={enteredAccountName}
+          />
+        </motion.div>
+        <motion.div variants={rowVariant}>
+          <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#98A2B3' }}>
+            Icon URL
+          </label>
+          <Input
+            theme={theme}
+            placeholder="https://..."
+            type="text"
+            onChange={(e) => setEnteredAccountIcon(e.target.value)}
+            value={enteredAccountIcon}
+          />
+        </motion.div>
+        <motion.div variants={rowVariant} className="flex flex-col gap-2">
+          <Button
+            theme={theme}
+            type="primary"
+            label="Save"
+            style={{ marginTop: '0.25rem' }}
+            onClick={handleAccountEditSave}
+          />
+          <Button theme={theme} type="warn" label="Delete Account" onClick={handleDeleteAccountIntent} />
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 
   return (
@@ -766,39 +1101,109 @@ export const Settings = () => {
         />
       }
     >
-      <Content>
+      <div
+        className="flex flex-col items-center w-full overflow-x-hidden"
+        style={{
+          backgroundColor: '#010101',
+          minHeight: '100%',
+          height: 'calc(75%)',
+          overflowY: 'auto',
+        }}
+      >
         <TopNav />
-        <Show when={page === 'main'}>{main}</Show>
-        <Show when={page === 'manage-accounts'}>{manageAccountsPage}</Show>
-        <Show when={page === 'create-account'}>
-          <PageWrapper $marginTop="3rem">
-            <CreateAccount onNavigateBack={() => setPage('manage-accounts')} />
-          </PageWrapper>
-        </Show>
-        <Show when={page === 'restore-account'}>
-          <PageWrapper $marginTop="1rem">
-            <RestoreAccount onNavigateBack={(page: SettingsPage) => setPage(page)} />
-          </PageWrapper>
-        </Show>
-        <Show when={page === 'import-wif'}>
-          <PageWrapper $marginTop="1rem">
-            <ImportAccount onNavigateBack={() => setPage('restore-account')} />
-          </PageWrapper>
-        </Show>
-        <Show when={page === 'account-list'}>{accountList}</Show>
-        <Show when={page === 'edit-account'}>{editAccount}</Show>
-        <Show when={page === 'connected-apps'}>{connectedAppsPage}</Show>
-        <Show when={page === 'preferences'}>{preferencesPage}</Show>
-        <Show when={page === 'social-profile'}>{socialProfilePage}</Show>
-        <Show when={page === 'permissions'}>
-          <PermissionsManager onBack={() => setPage('main')} />
-        </Show>
-        <Show when={page === 'storage'}>
-          <StorageStatus onBack={() => setPage('main')} />
-        </Show>
-        <Show when={page === 'export-keys-options'}>{exportKeyOptionsPage}</Show>
-        <Show when={page === 'export-keys-qr'}>{exportKeysAsQrCodePage}</Show>
-      </Content>
+
+        {/* Page spacer for fixed TopNav */}
+        <div className="h-14 w-full flex-shrink-0" />
+
+        {/* Page transitions */}
+        <AnimatePresence mode="wait">
+          {page === 'main' && mainPage}
+
+          {page === 'manage-accounts' && manageAccountsPage}
+
+          {page === 'create-account' && (
+            <motion.div
+              key="create-account"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="w-full px-4 pb-4 pt-3"
+            >
+              <SubPageHeader title="Create Account" onBack={() => setPage('manage-accounts')} />
+              <CreateAccount onNavigateBack={() => setPage('manage-accounts')} />
+            </motion.div>
+          )}
+
+          {page === 'restore-account' && (
+            <motion.div
+              key="restore-account"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="w-full px-4 pb-4 pt-1"
+            >
+              <SubPageHeader title="Restore / Import" onBack={() => setPage('manage-accounts')} />
+              <RestoreAccount onNavigateBack={(p: SettingsPage) => setPage(p)} />
+            </motion.div>
+          )}
+
+          {page === 'import-wif' && (
+            <motion.div
+              key="import-wif"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="w-full px-4 pb-4 pt-1"
+            >
+              <SubPageHeader title="Import Key" onBack={() => setPage('restore-account')} />
+              <ImportAccount onNavigateBack={() => setPage('restore-account')} />
+            </motion.div>
+          )}
+
+          {page === 'account-list' && accountList}
+
+          {page === 'edit-account' && editAccount}
+
+          {page === 'connected-apps' && connectedAppsPage}
+
+          {page === 'preferences' && preferencesPage}
+
+          {page === 'social-profile' && socialProfilePage}
+
+          {page === 'permissions' && (
+            <motion.div
+              key="permissions"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="w-full"
+            >
+              <PermissionsManager onBack={() => setPage('main')} />
+            </motion.div>
+          )}
+
+          {page === 'storage' && (
+            <motion.div
+              key="storage"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="w-full"
+            >
+              <StorageStatus onBack={() => setPage('main')} />
+            </motion.div>
+          )}
+
+          {page === 'export-keys-options' && exportKeyOptionsPage}
+
+          {page === 'export-keys-qr' && exportKeysAsQrCodePage}
+        </AnimatePresence>
+      </div>
     </Show>
   );
 };

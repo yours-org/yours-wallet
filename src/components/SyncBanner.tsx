@@ -1,32 +1,9 @@
 import { useEffect, useState } from 'react';
-import styled from 'styled-components';
 import { useSyncTracker } from '../hooks/useSyncTracker';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useSnackbar } from '../hooks/useSnackbar';
-import { WhiteLabelTheme } from '../theme.types';
 import { formatNumberWithCommasAndDecimals } from '../utils/format';
 import { Show } from './Show';
-
-const Banner = styled.div<WhiteLabelTheme & { $isSyncing: boolean }>`
-  position: fixed;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  top: 0;
-  width: 100%;
-  min-height: 3.25rem;
-  font-size: 0.9rem;
-  font-weight: 700;
-  background-color: ${({ theme, $isSyncing }) =>
-    $isSyncing ? theme.color.component.queueBannerSyncing : theme.color.component.queueBannerSynced};
-  color: ${({ theme, $isSyncing }) =>
-    $isSyncing ? theme.color.component.queueBannerSyncingText : theme.color.component.queueBannerSyncedText};
-  padding: 1rem 0.5rem;
-  text-align: center;
-  z-index: 1000;
-  cursor: progress;
-`;
 
 export const SyncBanner = () => {
   const { keysService } = useServiceContext();
@@ -58,7 +35,17 @@ export const SyncBanner = () => {
   return (
     <Show when={!!keysService?.bsvAddress && (isInitializing || showSyncBanner)}>
       {theme && (
-        <Banner theme={theme} $isSyncing={isSyncing}>
+        <div
+          className="fixed flex flex-col justify-center items-center top-0 w-full min-h-[3.25rem] text-[0.9rem] font-bold px-2 py-4 text-center z-[1000] cursor-progress"
+          style={{
+            backgroundColor: isSyncing
+              ? theme.color.component.queueBannerSyncing
+              : theme.color.component.queueBannerSynced,
+            color: isSyncing
+              ? theme.color.component.queueBannerSyncingText
+              : theme.color.component.queueBannerSyncedText,
+          }}
+        >
           <Show when={isSyncing}>
             {isInitializing
               ? 'Sync Process Initializing...'
@@ -72,7 +59,7 @@ export const SyncBanner = () => {
                 : 'You may safely close the wallet during this process.'}
             </span>
           </Show>
-        </Banner>
+        </div>
       )}
     </Show>
   );

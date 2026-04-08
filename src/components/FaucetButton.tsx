@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button } from './Button';
+import { motion } from 'framer-motion';
+import { Droplets, Loader2 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { requestTestnetCoins } from '../api/faucet';
 import { useSnackbar } from '../hooks/useSnackbar';
@@ -20,12 +21,9 @@ export function FaucetButton({ address, isTestnet, onConfirmation }: FaucetButto
 
   const handleGetCoins = async () => {
     if (!isTestnet) return;
-
     setIsLoading(true);
-
     try {
       const response = await requestTestnetCoins(address);
-
       if (response.code === 0) {
         const tx = Transaction.fromHex(response.raw);
         const res = await wallet.ingestTransaction(tx, 'faucet');
@@ -50,13 +48,32 @@ export function FaucetButton({ address, isTestnet, onConfirmation }: FaucetButto
 
   if (!isTestnet) return null;
 
+  const outlineLeft = theme.color.component.secondaryOutlineButtonGradientLeft;
+  const outlineRight = theme.color.component.secondaryOutlineButtonGradientRight;
+
   return (
-    <Button
-      theme={theme}
-      type="secondary-outline"
-      label={isLoading ? 'Requesting...' : 'Get Testnet Coins'}
-      onClick={handleGetCoins}
-      disabled={isLoading}
-    />
+    <div className="flex justify-center w-full mt-1">
+      <div
+        className="p-px rounded-full"
+        style={{ background: `linear-gradient(135deg, ${outlineLeft}, ${outlineRight})` }}
+      >
+        <motion.button
+          onClick={handleGetCoins}
+          disabled={isLoading}
+          className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed border-none cursor-pointer"
+          style={{
+            backgroundColor: theme.color.global.walletBackground,
+            color: theme.color.global.gray,
+            fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+          }}
+          whileHover={!isLoading ? { scale: 1.03 } : undefined}
+          whileTap={!isLoading ? { scale: 0.97 } : undefined}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+        >
+          {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Droplets className="w-3 h-3" />}
+          {isLoading ? 'Requesting...' : 'Get Testnet Coins'}
+        </motion.button>
+      </div>
+    </div>
   );
 }

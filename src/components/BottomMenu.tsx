@@ -1,49 +1,9 @@
-import { styled } from 'styled-components';
-import { WhiteLabelTheme, Theme } from '../theme.types';
+import { Theme } from '../theme.types';
 import { MenuItems } from '../contexts/BottomMenuContext';
-import { Badge, Text } from './Reusable';
 import { Show } from './Show';
 import { NetWork } from 'yours-wallet-provider';
-import { FaCog, FaCoins, FaList, FaTools } from 'react-icons/fa';
-import { ComponentType } from 'react';
-
-const Container = styled.div<WhiteLabelTheme>`
-  display: flex;
-  align-items: center;
-  justify-content: space-evenly;
-  width: 100%;
-  height: 3.75rem;
-  position: absolute;
-  bottom: 0;
-  background: ${({ theme }) => theme.color.component.bottomMenuBackground};
-  color: ${({ theme }) => theme.color.component.bottomMenuText + '80'};
-  z-index: 100;
-`;
-
-const MenuContainer = styled.div<WhiteLabelTheme>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 3.75rem;
-  bottom: 0;
-  z-index: 100;
-  position: relative;
-`;
-
-const ContentWrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-`;
-
-const StyledText = styled(Text)<{ $opacity: number }>`
-  color: ${({ theme }) => theme.color.component.bottomMenuText};
-  opacity: ${(props) => props.$opacity};
-`;
+import { Wallet, Layers, Wrench, Settings, LucideIcon } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export type BottomMenuProps = {
   selected: MenuItems | null;
@@ -54,33 +14,63 @@ export type BottomMenuProps = {
 
 export type MenuProps = {
   badge?: string;
-  icon: ComponentType<{ size?: string; opacity?: number; color?: string }>;
-  iconSize?: string;
+  icon: LucideIcon;
   label: string;
-  onClick: (e: React.MouseEvent<HTMLImageElement>) => void;
-  opacity: number;
+  onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
+  isSelected: boolean;
   theme: Theme;
 };
 
 const Menu = (props: MenuProps) => {
-  const { theme, label, onClick, opacity, icon: IconComponent, iconSize = '1rem', badge } = props;
+  const { theme, label, onClick, isSelected, icon: IconComponent, badge } = props;
+
+  const activeColor = theme.color.component.primaryButtonLeftGradient || '#A1FF8B';
+  const inactiveColor = theme.color.component.bottomMenuText + '80';
 
   return (
-    <MenuContainer>
-      <ContentWrapper>
-        <div onClick={onClick} style={{ opacity, cursor: 'pointer' }}>
-          <IconComponent opacity={opacity} size={iconSize} color={theme.color.component.bottomMenuText} />
-        </div>
-        <StyledText style={{ margin: 0, fontSize: '0.65rem' }} theme={theme} $opacity={opacity}>
+    <div
+      className="flex flex-col items-center justify-center flex-1 relative cursor-pointer py-2 select-none"
+      onClick={onClick}
+    >
+      {/* Active indicator dot */}
+      {isSelected && (
+        <motion.div
+          layoutId="tab-indicator"
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
+          style={{
+            background: `linear-gradient(90deg, ${activeColor}, ${theme.color.component.primaryButtonRightGradient || '#34D399'})`,
+          }}
+          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+        />
+      )}
+
+      <motion.div
+        animate={{
+          scale: isSelected ? 1 : 0.95,
+          opacity: isSelected ? 1 : 0.65,
+        }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
+        className="flex flex-col items-center gap-1"
+      >
+        <IconComponent size={20} color={isSelected ? activeColor : inactiveColor} strokeWidth={isSelected ? 2 : 1.5} />
+        <span
+          className="text-[10px] font-medium tracking-wide"
+          style={{ color: isSelected ? activeColor : inactiveColor }}
+        >
           {label}
-        </StyledText>
-        <Show when={!!badge}>
-          <Badge theme={theme} style={{ position: 'absolute' }}>
-            {badge}
-          </Badge>
-        </Show>
-      </ContentWrapper>
-    </MenuContainer>
+        </span>
+      </motion.div>
+
+      {/* Badge */}
+      {badge && (
+        <span
+          className="absolute top-1 right-2 text-[8px] font-bold px-1 py-0.5 rounded-full leading-none"
+          style={{ backgroundColor: '#bf4f74', color: '#fff' }}
+        >
+          {badge}
+        </span>
+      )}
+    </div>
   );
 };
 
@@ -88,40 +78,48 @@ export default Menu;
 
 export const BottomMenu = (props: BottomMenuProps) => {
   const { selected, handleSelect, theme } = props;
+  const active = selected ?? 'bsv';
 
   return (
-    <Container theme={theme}>
+    <div
+      className="flex items-center w-full absolute bottom-0 z-[100]"
+      style={{
+        height: '3.75rem',
+        backgroundColor: theme.color.component.bottomMenuBackground,
+        borderTop: `1px solid ${theme.color.global.gray}18`,
+      }}
+    >
       <Menu
         label="Coins"
         theme={theme}
-        icon={FaCoins}
+        icon={Wallet}
         onClick={() => handleSelect('bsv')}
-        opacity={selected === 'bsv' ? 1 : 0.6}
+        isSelected={active === 'bsv'}
       />
       <Show when={theme.settings.services.ordinals}>
         <Menu
-          label={'Ordinals'}
+          label="Ordinals"
           theme={theme}
-          icon={FaList}
+          icon={Layers}
           onClick={() => handleSelect('ords')}
-          opacity={selected === 'ords' ? 1 : 0.6}
+          isSelected={active === 'ords'}
         />
       </Show>
       <Menu
         label="Tools"
         theme={theme}
-        icon={FaTools}
+        icon={Wrench}
         onClick={() => handleSelect('tools')}
-        opacity={selected === 'tools' ? 1 : 0.6}
+        isSelected={active === 'tools'}
       />
       <Menu
         label="Settings"
         theme={theme}
-        icon={FaCog}
+        icon={Settings}
         onClick={() => handleSelect('settings')}
-        opacity={selected === 'settings' ? 1 : 0.6}
-        badge={props.network === 'testnet' ? 'testnet' : undefined}
+        isSelected={active === 'settings'}
+        badge={props.network === 'testnet' ? 'test' : undefined}
       />
-    </Container>
+    </div>
   );
 };

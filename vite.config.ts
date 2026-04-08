@@ -28,6 +28,7 @@ export default defineConfig({
   build: {
     outDir: 'build',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 3000,
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
@@ -37,6 +38,13 @@ export default defineConfig({
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
+      onwarn(warning, warn) {
+        if (warning.code === 'MODULE_LEVEL_DIRECTIVE') return;
+        if (warning.message?.includes('externalized for browser')) return;
+        if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+        if (warning.message?.includes('while both modules are dependencies of each other')) return;
+        warn(warning);
       },
     },
     sourcemap: true,

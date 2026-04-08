@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import styled from 'styled-components';
-import { Button } from '../components/Button';
-import { HeaderText, Text } from '../components/Reusable';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown, Shield, X } from 'lucide-react';
+import { PageLoader } from '../components/PageLoader';
 import { Show } from '../components/Show';
 import { SpeedBump } from '../components/SpeedBump';
 import { useTheme } from '../hooks/useTheme';
 import { useSnackbar } from '../hooks/useSnackbar';
-import { WhiteLabelTheme } from '../theme.types';
 
 /** Permission token as returned by WPM — passed through as-is from background */
 interface PermissionToken {
@@ -15,22 +14,16 @@ interface PermissionToken {
   originator: string;
   rawOriginator?: string;
   type: 'protocol' | 'basket' | 'spending' | 'certificate';
-  // Protocol
   protocol?: string;
   securityLevel?: number;
   counterparty?: string;
-  // Basket
   basketName?: string;
-  // Spending
   authorizedAmount?: number;
-  // Certificate
   certType?: string;
   certFields?: string[];
   verifier?: string;
-  // Common
   expiry?: number;
   privileged?: boolean;
-  // Full token data (opaque — passed back for revocation)
   [key: string]: unknown;
 }
 
@@ -39,124 +32,8 @@ interface OriginatorGroup {
   permissions: PermissionToken[];
 }
 
-const PageContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  padding: 0.5rem 0;
-`;
-
-const OriginatorSection = styled.div<WhiteLabelTheme>`
-  width: 90%;
-  border-bottom: 1px solid ${({ theme }) => theme.color.global.gray + '30'};
-  margin-bottom: 0.25rem;
-`;
-
-const OriginatorHeader = styled.div<WhiteLabelTheme>`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem 0.25rem;
-  cursor: pointer;
-`;
-
-const OriginatorName = styled.span<WhiteLabelTheme>`
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: ${({ theme }) => theme.color.global.contrast};
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 140px;
-`;
-
-const CountBadge = styled.span<WhiteLabelTheme>`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 0.625rem;
-  background-color: ${({ theme }) => theme.color.global.gray + '40'};
-  color: ${({ theme }) => theme.color.global.contrast};
-  font-size: 0.65rem;
-  font-weight: 600;
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  padding: 0 0.3rem;
-  margin-left: 0.35rem;
-`;
-
-const RevokeAllBtn = styled.button<WhiteLabelTheme>`
-  background: ${({ theme }) => theme.color.component.snackbarError + '20'};
-  color: ${({ theme }) => theme.color.component.snackbarError};
-  border: 1px solid ${({ theme }) => theme.color.component.snackbarError + '60'};
-  border-radius: 0.25rem;
-  font-size: 0.65rem;
-  font-weight: 600;
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  padding: 0.2rem 0.5rem;
-  cursor: pointer;
-  margin-left: auto;
-`;
-
-const PermissionRow = styled.div<WhiteLabelTheme>`
-  display: flex;
-  align-items: center;
-  padding: 0.4rem 0.5rem;
-  border-top: 1px solid ${({ theme }) => theme.color.global.gray + '15'};
-`;
-
-const TypeBadge = styled.span<{ $bg: string }>`
-  display: inline-block;
-  padding: 0.1rem 0.35rem;
-  border-radius: 0.2rem;
-  font-size: 0.6rem;
-  font-weight: 600;
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  color: white;
-  background-color: ${(props) => props.$bg};
-  margin-right: 0.4rem;
-  flex-shrink: 0;
-`;
-
-const PermissionDetail = styled.span<WhiteLabelTheme>`
-  font-size: 0.75rem;
-  color: ${({ theme }) => theme.color.global.contrast};
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const RevokeBtn = styled.button<WhiteLabelTheme>`
-  background: none;
-  border: none;
-  color: ${({ theme }) => theme.color.component.snackbarError};
-  font-size: 0.85rem;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 0 0.25rem;
-  flex-shrink: 0;
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-`;
-
-const LeftGroup = styled.div`
-  display: flex;
-  align-items: center;
-  flex: 0 1 auto;
-  min-width: 0;
-`;
-
 const extractDomain = (originator: string): string => {
   try {
-    // Handle chrome-extension:// origins
     if (originator.startsWith('chrome-extension://')) {
       return 'This wallet (internal)';
     }
@@ -201,7 +78,6 @@ const typeColor = (type: PermissionToken['type']): string => {
   }
 };
 
-/** Human-readable protocol names for known protocols */
 const friendlyProtocolName = (name?: string): string => {
   if (!name) return 'Unknown protocol';
   const map: Record<string, string> = {
@@ -213,7 +89,6 @@ const friendlyProtocolName = (name?: string): string => {
   return map[name] ?? name;
 };
 
-/** Human-readable basket names */
 const friendlyBasketName = (name?: string): string => {
   if (!name) return 'Unknown data';
   const map: Record<string, string> = {
@@ -276,6 +151,9 @@ export const PermissionsManager = ({ onBack }: PermissionsManagerProps) => {
   const [spentAmounts, setSpentAmounts] = useState<Map<string, number>>(new Map());
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const [revokeAllTarget, setRevokeAllTarget] = useState<string | null>(null);
+
+  const contrast = theme.color.global.contrast;
+  const gray = theme.color.global.gray;
 
   const fetchPermissions = useCallback(async () => {
     try {
@@ -389,14 +267,14 @@ export const PermissionsManager = ({ onBack }: PermissionsManagerProps) => {
 
   if (loading) {
     return (
-      <PageContainer>
-        <Text theme={theme}>Loading permissions...</Text>
-      </PageContainer>
+      <div className="flex flex-col items-center w-full py-2">
+        <PageLoader theme={theme} message="Loading permissions..." />
+      </div>
     );
   }
 
   return (
-    <PageContainer>
+    <div className="flex flex-col items-center w-full py-2 px-3">
       <SpeedBump
         theme={theme}
         message={`Revoke all permissions for ${revokeAllTarget ? extractDomain(revokeAllTarget) : 'this app'}? It will need to request permissions again.`}
@@ -407,46 +285,112 @@ export const PermissionsManager = ({ onBack }: PermissionsManagerProps) => {
         }}
         onConfirm={confirmRevokeAll}
       />
-      <HeaderText theme={theme}>Permissions</HeaderText>
 
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-4">
+        <Shield size={18} style={{ color: '#A1FF8B' }} />
+        <h2 className="text-lg font-bold" style={{ color: contrast }}>
+          Permissions
+        </h2>
+      </div>
+
+      {/* Empty state */}
       <Show when={groups.length === 0}>
-        <Text theme={theme} style={{ marginTop: '2rem' }}>
+        <p className="text-sm mt-8 text-center" style={{ color: gray }}>
           No permissions granted
-        </Text>
+        </p>
       </Show>
 
-      {groups.map((group) => (
-        <OriginatorSection key={group.originator} theme={theme}>
-          <OriginatorHeader theme={theme} onClick={() => handleToggleOriginator(group.originator)}>
-            <LeftGroup>
-              <OriginatorName theme={theme}>{extractDomain(group.originator)}</OriginatorName>
-              <CountBadge theme={theme}>{group.permissions.length}</CountBadge>
-            </LeftGroup>
-            <RevokeAllBtn theme={theme} onClick={(e) => promptRevokeAll(e, group.originator)}>
-              Revoke All
-            </RevokeAllBtn>
-          </OriginatorHeader>
+      {/* Permission groups */}
+      <div className="w-full flex flex-col gap-2">
+        {groups.map((group) => {
+          const isExpanded = expandedOriginator === group.originator;
+          return (
+            <div
+              key={group.originator}
+              className="rounded-xl overflow-hidden"
+              style={{ border: `1px solid ${gray}15`, backgroundColor: '#17191E' }}
+            >
+              {/* Originator header */}
+              <motion.button
+                whileTap={{ scale: 0.99 }}
+                onClick={() => handleToggleOriginator(group.originator)}
+                className="flex items-center justify-between w-full px-3 py-2.5 cursor-pointer border-0 outline-none text-left bg-transparent"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="text-sm font-semibold truncate max-w-[140px]" style={{ color: contrast }}>
+                    {extractDomain(group.originator)}
+                  </span>
+                  <span
+                    className="inline-flex items-center justify-center min-w-[1.25rem] h-5 rounded-full px-1.5 text-[10px] font-semibold"
+                    style={{ backgroundColor: gray + '30', color: contrast }}
+                  >
+                    {group.permissions.length}
+                  </span>
+                </div>
 
-          <Show when={expandedOriginator === group.originator}>
-            {group.permissions.map((perm) => {
-              const key = tokenKey(perm);
-              return (
-                <PermissionRow key={key} theme={theme}>
-                  <TypeBadge $bg={typeColor(perm.type)}>{typeLabel(perm.type)}</TypeBadge>
-                  <PermissionDetail theme={theme}>
-                    {formatPermissionDetail(perm, spentAmounts.get(key))}
-                  </PermissionDetail>
-                  <RevokeBtn theme={theme} onClick={() => handleRevokeOne(perm)} disabled={revoking.has(key)}>
-                    ✕
-                  </RevokeBtn>
-                </PermissionRow>
-              );
-            })}
-          </Show>
-        </OriginatorSection>
-      ))}
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={(e) => promptRevokeAll(e, group.originator)}
+                    className="px-2 py-0.5 rounded text-[10px] font-semibold border cursor-pointer"
+                    style={{
+                      background: 'rgba(239,68,68,0.1)',
+                      color: '#ef4444',
+                      borderColor: 'rgba(239,68,68,0.3)',
+                    }}
+                  >
+                    Revoke All
+                  </button>
+                  <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                    <ChevronDown size={14} color={gray} />
+                  </motion.div>
+                </div>
+              </motion.button>
 
-      <Button theme={theme} type="secondary" label="Go back" onClick={onBack} style={{ marginTop: '0.5rem' }} />
-    </PageContainer>
+              {/* Expanded permissions */}
+              <AnimatePresence>
+                {isExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    className="overflow-hidden"
+                  >
+                    {group.permissions.map((perm) => {
+                      const key = tokenKey(perm);
+                      return (
+                        <div
+                          key={key}
+                          className="flex items-center px-3 py-2"
+                          style={{ borderTop: `1px solid ${gray}12` }}
+                        >
+                          <span
+                            className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold text-white mr-2 shrink-0"
+                            style={{ backgroundColor: typeColor(perm.type) }}
+                          >
+                            {typeLabel(perm.type)}
+                          </span>
+                          <span className="text-xs flex-1 truncate" style={{ color: contrast }}>
+                            {formatPermissionDetail(perm, spentAmounts.get(key))}
+                          </span>
+                          <button
+                            onClick={() => handleRevokeOne(perm)}
+                            disabled={revoking.has(key)}
+                            className="shrink-0 p-1 rounded-md cursor-pointer border-0 bg-transparent disabled:opacity-40 disabled:cursor-not-allowed hover:bg-red-500/10 transition-colors"
+                          >
+                            <X size={14} color="#ef4444" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 };

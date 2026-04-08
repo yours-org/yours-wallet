@@ -1,72 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { styled } from 'styled-components';
-import { Button } from '../../components/Button';
-import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
+import { motion } from 'framer-motion';
+import { Users, Loader2 } from 'lucide-react';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { WhiteLabelTheme } from '../../theme.types';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import type {
   CounterpartyPermissionRequest as CounterpartyPermissionRequestType,
   CounterpartyPermissions,
 } from '@bsv/wallet-toolbox-mobile';
-
-const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  max-height: 16rem;
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: ${({ theme }) => theme.color.global.row + '80'};
-  margin: 0.5rem;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-`;
-
-const DetailRow = styled.div`
-  display: flex;
-  flex-direction: row;
-  width: 100%;
-  margin: 0.25rem 0;
-`;
-
-const DetailLabel = styled(Text)`
-  font-size: 0.75rem;
-  font-weight: 600;
-  min-width: 5rem;
-  margin: 0;
-`;
-
-const DetailValue = styled(Text)`
-  font-size: 0.75rem;
-  word-break: break-all;
-  margin: 0;
-`;
-
-const PermissionRow = styled.label`
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 0.5rem;
-  width: 100%;
-  margin: 0.25rem 0;
-  cursor: pointer;
-`;
-
-const PermissionLabel = styled(Text)`
-  font-size: 0.75rem;
-  margin: 0;
-`;
-
-const PermissionDesc = styled(Text)`
-  font-size: 0.7rem;
-  opacity: 0.7;
-  margin: 0;
-`;
 
 export type CounterpartyPermissionRequestProps = {
   request: CounterpartyPermissionRequestType;
@@ -138,45 +81,134 @@ export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionR
     request.counterpartyLabel ?? `${request.counterparty.slice(0, 8)}...${request.counterparty.slice(-8)}`;
 
   return (
-    <ConfirmContent>
-      <HeaderText theme={theme}>Counterparty Permission</HeaderText>
-      <Text theme={theme} style={{ margin: '0.5rem 0', textAlign: 'center', fontSize: '0.8rem' }}>
-        <strong>{request.originator}</strong> wants to interact with counterparty:
-      </Text>
+    <motion.div
+      className="flex flex-col w-full px-4 pt-5 pb-4"
+      initial={{ opacity: 0, y: 20, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', damping: 24, stiffness: 260 }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-4">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(161,255,139,0.12)' }}
+        >
+          <Users size={18} style={{ color: '#A1FF8B' }} />
+        </div>
+        <div>
+          <h1 className="text-base font-bold leading-tight" style={{ color: theme.color.global.contrast }}>
+            Counterparty Permission
+          </h1>
+          <p className="text-xs mt-0.5" style={{ color: theme.color.global.gray }}>
+            <span className="font-semibold" style={{ color: theme.color.global.contrast }}>
+              {request.originator}
+            </span>{' '}
+            wants to interact with a counterparty
+          </p>
+        </div>
+      </div>
 
-      <RequestDetailsContainer theme={theme}>
-        <DetailRow>
-          <DetailLabel theme={theme}>Counterparty:</DetailLabel>
-          <DetailValue theme={theme}>{counterpartyDisplay}</DetailValue>
-        </DetailRow>
+      {/* Details card */}
+      <motion.div
+        className="w-full rounded-2xl px-4 py-3 mb-4"
+        style={{
+          background: theme.color.global.row,
+          border: '1px solid rgba(255,255,255,0.06)',
+          maxHeight: '16rem',
+          overflowY: 'auto',
+        }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08 }}
+      >
+        {/* Counterparty row */}
+        <div className="flex flex-row py-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <span className="text-xs font-semibold w-24 flex-shrink-0" style={{ color: theme.color.global.gray }}>
+            Counterparty
+          </span>
+          <span className="text-xs break-all font-mono" style={{ color: theme.color.global.contrast }}>
+            {counterpartyDisplay}
+          </span>
+        </div>
 
+        {/* Purpose */}
         <Show when={!!permissions.description}>
-          <DetailRow>
-            <DetailLabel theme={theme}>Purpose:</DetailLabel>
-            <DetailValue theme={theme}>{permissions.description}</DetailValue>
-          </DetailRow>
+          <div className="flex flex-row py-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span className="text-xs font-semibold w-24 flex-shrink-0" style={{ color: theme.color.global.gray }}>
+              Purpose
+            </span>
+            <span className="text-xs break-all" style={{ color: theme.color.global.contrast }}>
+              {permissions.description}
+            </span>
+          </div>
         </Show>
 
-        <Text theme={theme} style={{ fontSize: '0.8rem', fontWeight: 700, margin: '0.5rem 0 0.25rem 0' }}>
+        {/* Protocols section */}
+        <p className="text-xs font-bold uppercase tracking-wider pt-3 pb-1" style={{ color: theme.color.global.gray }}>
           Protocols
-        </Text>
+        </p>
         {permissions.protocols.map((p, i) => (
-          <PermissionRow key={`proto-${i}`}>
-            <input type="checkbox" checked={protocolChecked[i]} onChange={() => toggleProtocol(i)} />
-            <div>
-              <PermissionLabel theme={theme}>
+          <label
+            key={`proto-${i}`}
+            className="flex items-start gap-3 py-2 cursor-pointer"
+            style={{ borderBottom: i < permissions.protocols.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
+          >
+            <input
+              type="checkbox"
+              checked={protocolChecked[i]}
+              onChange={() => toggleProtocol(i)}
+              className="mt-0.5 accent-green-400"
+            />
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-medium" style={{ color: theme.color.global.contrast }}>
                 {p.protocolID[1]} (level {p.protocolID[0]})
-              </PermissionLabel>
-              <PermissionDesc theme={theme}>{p.description}</PermissionDesc>
+              </span>
+              {p.description && (
+                <span className="text-xs mt-0.5 opacity-60" style={{ color: theme.color.global.contrast }}>
+                  {p.description}
+                </span>
+              )}
             </div>
-          </PermissionRow>
+          </label>
         ))}
-      </RequestDetailsContainer>
+      </motion.div>
 
-      <FormContainer>
-        <Button theme={theme} type="primary" label="Allow Selected" onClick={handleGrant} disabled={isProcessing} />
-        <Button theme={theme} type="secondary" label="Deny All" onClick={handleDeny} disabled={isProcessing} />
-      </FormContainer>
-    </ConfirmContent>
+      {/* Actions */}
+      <div className="flex flex-col gap-3 mt-auto">
+        <motion.button
+          className="w-full py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+          style={{
+            background: 'linear-gradient(135deg, #A1FF8B 0%, #34D399 100%)',
+            color: '#010101',
+            opacity: isProcessing ? 0.6 : 1,
+          }}
+          disabled={isProcessing}
+          onClick={handleGrant}
+          whileHover={{ scale: isProcessing ? 1 : 1.02 }}
+          whileTap={{ scale: isProcessing ? 1 : 0.97 }}
+          transition={{ type: 'spring', damping: 20, stiffness: 400 }}
+        >
+          {isProcessing && <Loader2 size={14} className="animate-spin" />}
+          Allow Selected
+        </motion.button>
+
+        <motion.button
+          className="w-full py-3.5 rounded-xl font-semibold text-sm"
+          style={{
+            background: 'transparent',
+            color: theme.color.global.gray,
+            border: '1px solid rgba(255,255,255,0.1)',
+            opacity: isProcessing ? 0.5 : 1,
+          }}
+          disabled={isProcessing}
+          onClick={handleDeny}
+          whileHover={{ scale: isProcessing ? 1 : 1.02 }}
+          whileTap={{ scale: isProcessing ? 1 : 0.97 }}
+          transition={{ type: 'spring', damping: 20, stiffness: 400 }}
+        >
+          Deny All
+        </motion.button>
+      </div>
+    </motion.div>
   );
 };

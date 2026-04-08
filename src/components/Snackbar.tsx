@@ -1,50 +1,7 @@
-import styled, { keyframes } from 'styled-components';
-import { Text } from './Reusable';
 import { SnackbarType } from '../contexts/SnackbarContext';
-import { WhiteLabelTheme, Theme } from '../theme.types';
-import { FaCheckCircle, FaExclamation, FaInfoCircle } from 'react-icons/fa';
-import { Show } from './Show';
-
-type SnackBarColorTheme = WhiteLabelTheme & { color: string };
-
-const slideIn = keyframes`
-  from {
-    bottom: -15px;
-    opacity: 0;
-  }
-  to {
-    bottom: 0;
-    opacity: 1;
-  }
-`;
-
-// Animation for fading out
-const fadeOut = keyframes`
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-`;
-
-export const SnackBarContainer = styled.div<SnackBarColorTheme & { duration: number }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 90%;
-  position: absolute;
-  bottom: 0;
-  margin: 1rem;
-  border-radius: 0.5rem;
-  background-color: ${({ color }) => color};
-  color: ${({ theme }) => theme.color.global.contrast};
-  z-index: 9999;
-  animation:
-    ${slideIn} 0.25s ease-out,
-    ${fadeOut} 0.25s ease-out ${({ duration }) => `${duration}s`};
-  animation-fill-mode: forwards;
-`;
+import { Theme } from '../theme.types';
+import { motion } from 'framer-motion';
+import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
 
 export type SnackbarProps = {
   /** The message that should be displayed on the snackbar */
@@ -55,49 +12,56 @@ export type SnackbarProps = {
   duration?: number;
 };
 
+const getSnackbarConfig = (type: SnackbarType | null, theme: Theme) => {
+  switch (type) {
+    case 'error':
+      return {
+        bg: theme.color.component.snackbarError,
+        textColor: theme.color.component.snackbarErrorText,
+        Icon: AlertCircle,
+      };
+    case 'info':
+      return {
+        bg: theme.color.component.snackbarWarning,
+        textColor: theme.color.component.snackbarWarningText,
+        Icon: Info,
+      };
+    case 'success':
+    default:
+      return {
+        bg: theme.color.component.snackbarSuccess,
+        textColor: theme.color.component.snackbarSuccessText,
+        Icon: CheckCircle2,
+      };
+  }
+};
+
 export const Snackbar = (props: SnackbarProps) => {
   const { message, type, theme, duration = 2.5 } = props;
+  const { bg, textColor, Icon } = getSnackbarConfig(type, theme);
+
   return (
-    <SnackBarContainer
-      theme={theme}
-      duration={duration}
-      color={
-        type === 'error'
-          ? theme.color.component.snackbarError
-          : type === 'info'
-            ? theme.color.component.snackbarWarning
-            : theme.color.component.snackbarSuccess
-      }
+    <motion.div
+      initial={{ y: 20, opacity: 0, scale: 0.96 }}
+      animate={{ y: 0, opacity: 1, scale: 1 }}
+      exit={{ y: 12, opacity: 0, scale: 0.95 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+      className="flex items-center gap-2.5 w-[90%] absolute bottom-0 mb-4 mx-auto left-0 right-0 rounded-xl px-4 py-3 z-[9999]"
+      style={{ backgroundColor: bg }}
     >
-      <Show when={type === 'error'}>
-        <FaExclamation color={theme.color.component.snackbarErrorText} size={'1.25rem'} style={{ margin: '0.5rem' }} />
-      </Show>
-      <Show when={type === 'info'}>
-        <FaInfoCircle color={theme.color.component.snackbarWarningText} size={'1.25rem'} style={{ margin: '0.5rem' }} />
-      </Show>
-      <Show when={type === 'success'}>
-        <FaCheckCircle
-          color={theme.color.component.snackbarSuccessText}
-          size={'1.25rem'}
-          style={{ margin: '0.5rem' }}
-        />
-      </Show>
-      <Text
-        theme={theme}
-        style={{
-          margin: '1rem 0 1rem .25rem',
-          color:
-            type === 'error'
-              ? theme.color.component.snackbarErrorText
-              : type === 'info'
-                ? theme.color.component.snackbarWarningText
-                : theme.color.component.snackbarSuccessText,
-          wordWrap: 'break-word',
-          textAlign: 'left',
-        }}
-      >
+      <Icon size={18} style={{ color: textColor, flexShrink: 0 }} />
+      <span className="text-sm font-medium leading-snug flex-1" style={{ color: textColor, wordBreak: 'break-word' }}>
         {message}
-      </Text>
-    </SnackBarContainer>
+      </span>
+
+      {/* Auto-dismiss progress bar */}
+      <motion.div
+        className="absolute bottom-0 left-0 h-0.5 rounded-b-xl"
+        style={{ backgroundColor: textColor + '60', originX: 0 }}
+        initial={{ scaleX: 1 }}
+        animate={{ scaleX: 0 }}
+        transition={{ duration, ease: 'linear' }}
+      />
+    </motion.div>
   );
 };

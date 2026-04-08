@@ -1,91 +1,8 @@
-import styled from 'styled-components';
-import { WhiteLabelTheme, Theme } from '../theme.types';
-import { Show } from './Show';
+import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
+import { Theme } from '../theme.types';
 
 export type ButtonStyles = 'primary' | 'secondary' | 'secondary-outline' | 'warn';
-
-const Container = styled.div`
-  display: flex;
-  justify-content: center;
-  width: 100%;
-`;
-
-const Primary = styled.button<WhiteLabelTheme>`
-  width: 87%;
-  height: 2.25rem;
-  background: linear-gradient(
-    45deg,
-    ${({ theme }) => theme.color.component.primaryButtonLeftGradient},
-    ${({ theme }) => theme.color.component.primaryButtonRightGradient}
-  );
-  color: ${({ theme }) => theme.color.component.primaryButtonText};
-  border: none;
-  border-radius: 0.25rem;
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  font-size: 0.85rem;
-  font-weight: 700;
-  margin: 0.5rem;
-  cursor: pointer;
-  transition: 0.3s ease-in-out;
-  transform: scale(1);
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-    background: ${({ theme }) => theme.color.component.primaryButtonRightGradient + '40'};
-  }
-
-  &:hover {
-    transform: scale(1.02);
-  }
-`;
-
-const GradientBorderWrapper = styled.div<WhiteLabelTheme>`
-  display: flex;
-  align-items: center;
-  padding: 1px; /* border thickness */
-  background: linear-gradient(
-    45deg,
-    ${({ theme }) => theme.color.component.secondaryOutlineButtonGradientLeft},
-    ${({ theme }) => theme.color.component.secondaryOutlineButtonGradientRight}
-  );
-  border-radius: 0.25rem;
-  width: 87%;
-  margin: 0.25rem;
-`;
-
-const SecondaryOutline = styled(Primary)<{ $isOutline?: boolean }>`
-  width: 100%;
-  height: 2.25rem;
-  background: ${({ theme }) => theme.color.global.walletBackground};
-  border: none;
-  color: ${(props) => (props.$isOutline ? props.theme.color.global.contrast : props.theme.color.global.gray)};
-  transition: none;
-  transform: none;
-  margin: 0;
-
-  &:disabled {
-    opacity: 1;
-    background: ${({ theme }) => theme.color.global.walletBackground};
-  }
-
-  &:hover {
-    transform: none;
-  }
-`;
-
-const Secondary = styled(SecondaryOutline)`
-  margin: 0.5rem 0 0 0;
-`;
-
-const Warn = styled(Primary)<WhiteLabelTheme>`
-  background: ${({ theme }) => theme.color.component.warningButton};
-  color: ${({ theme }) => theme.color.component.warningButtonText};
-
-  &:disabled {
-    background: ${({ theme }) => theme.color.component.warningButton + '40'};
-  }
-`;
 
 export type ButtonProps = {
   label: string;
@@ -95,53 +12,106 @@ export type ButtonProps = {
   disabled?: boolean;
   isSubmit?: boolean;
   style?: React.CSSProperties;
+  loading?: boolean;
 };
 
+const springTransition = { type: 'spring', stiffness: 400, damping: 25 };
+
 export const Button = (props: ButtonProps) => {
-  const { label, type, onClick, disabled, theme, isSubmit, style } = props;
-  return (
-    <Container>
-      <Show when={type === 'primary'}>
-        <Primary
-          theme={theme}
-          disabled={disabled}
-          onClick={onClick}
-          type={isSubmit ? 'submit' : 'button'}
-          style={style}
+  const { label, type, onClick, disabled, theme, isSubmit, style, loading } = props;
+  const isDisabled = disabled || loading;
+
+  const gradientLeft = theme.color.component.primaryButtonLeftGradient;
+  const gradientRight = theme.color.component.primaryButtonRightGradient;
+  const outlineLeft = theme.color.component.secondaryOutlineButtonGradientLeft;
+  const outlineRight = theme.color.component.secondaryOutlineButtonGradientRight;
+
+  const baseClass =
+    'relative inline-flex items-center justify-center w-full font-bold text-sm rounded-xl h-9 px-4 outline-none select-none cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none';
+
+  const getStyle = (): React.CSSProperties => {
+    const base: React.CSSProperties = { fontFamily: "'Inter', Arial, Helvetica, sans-serif" };
+    switch (type) {
+      case 'primary':
+        return {
+          ...base,
+          background: `linear-gradient(135deg, ${gradientLeft}, ${gradientRight})`,
+          color: theme.color.component.primaryButtonText,
+          ...style,
+        };
+      case 'secondary':
+        return { ...base, background: 'transparent', color: theme.color.global.gray, marginTop: '0.5rem', ...style };
+      case 'secondary-outline':
+        return {
+          ...base,
+          background: theme.color.global.walletBackground,
+          color: theme.color.global.contrast,
+          margin: 0,
+          ...style,
+        };
+      case 'warn':
+        return {
+          ...base,
+          background: theme.color.component.warningButton,
+          color: theme.color.component.warningButtonText,
+          ...style,
+        };
+      default:
+        return { ...base, ...style };
+    }
+  };
+
+  const buttonContent = loading ? (
+    <span className="flex items-center gap-2">
+      <Loader2 className="w-4 h-4 animate-spin" />
+      {label}
+    </span>
+  ) : (
+    label
+  );
+
+  // For secondary-outline: scale the entire gradient wrapper so the border isn't clipped
+  if (type === 'secondary-outline') {
+    return (
+      <div className="flex justify-center w-full">
+        <motion.div
+          whileHover={!isDisabled ? { scale: 1.02 } : undefined}
+          whileTap={!isDisabled ? { scale: 0.98 } : undefined}
+          transition={springTransition}
+          className="flex items-center w-[87%] my-1 p-px rounded-xl"
+          style={{ background: `linear-gradient(135deg, ${outlineLeft}, ${outlineRight})` }}
         >
-          {label}
-        </Primary>
-      </Show>
-      <Show when={type === 'secondary-outline'}>
-        <GradientBorderWrapper theme={theme}>
-          <SecondaryOutline
-            theme={theme}
-            disabled={disabled}
-            onClick={onClick}
+          <button
             type={isSubmit ? 'submit' : 'button'}
-            style={style}
-            $isOutline
+            disabled={isDisabled}
+            onClick={onClick}
+            className={baseClass}
+            style={getStyle()}
           >
-            {label}
-          </SecondaryOutline>
-        </GradientBorderWrapper>
-      </Show>
-      <Show when={type === 'secondary'}>
-        <Secondary
-          theme={theme}
-          disabled={disabled}
-          onClick={onClick}
+            {buttonContent}
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // For all other variants: scale the button directly
+  return (
+    <div className="flex justify-center w-full">
+      <div className="w-[87%] my-1">
+        <motion.button
           type={isSubmit ? 'submit' : 'button'}
-          style={style}
+          disabled={isDisabled}
+          onClick={onClick}
+          className={baseClass}
+          style={getStyle()}
+          whileHover={!isDisabled ? { scale: 1.02 } : undefined}
+          whileTap={!isDisabled ? { scale: 0.98 } : undefined}
+          transition={springTransition}
         >
-          {label}
-        </Secondary>
-      </Show>
-      <Show when={type === 'warn'}>
-        <Warn theme={theme} disabled={disabled} onClick={onClick} type={isSubmit ? 'submit' : 'button'} style={style}>
-          {label}
-        </Warn>
-      </Show>
-    </Container>
+          {buttonContent}
+        </motion.button>
+      </div>
+    </div>
   );
 };

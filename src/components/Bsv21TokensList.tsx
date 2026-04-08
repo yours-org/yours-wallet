@@ -1,46 +1,18 @@
-import { styled } from 'styled-components';
-import { Text } from './Reusable';
-import { Show } from './Show';
-import { Theme } from '../theme.types';
-import { SubHeaderText } from './Reusable';
-import { AssetRow } from './AssetRow';
-import { showAmount } from '../utils/format';
-import { useServiceContext } from '../hooks/useServiceContext';
-import { truncate } from '../utils/format';
-import { BSV_DECIMAL_CONVERSION, GENERIC_TOKEN_ICON } from '../utils/constants';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Coins } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
-import { ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { DragDropContext, Draggable, Droppable, DropResult } from 'react-beautiful-dnd';
 import { ONESAT_MAINNET_CONTENT_URL, type Bsv21Balance } from '@1sat/actions';
+import { useServiceContext } from '../hooks/useServiceContext';
+import { ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { Theme } from '../theme.types';
+import { BSV_DECIMAL_CONVERSION, GENERIC_TOKEN_ICON } from '../utils/constants';
+import { showAmount, truncate } from '../utils/format';
 import { fetchExchangeRate } from '../utils/wallet';
+import { AssetRow } from './AssetRow';
+import { Show } from './Show';
 
 const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
-
-const NoInscriptionWrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-top: 8rem;
-  width: 100%;
-`;
-
-const TokenList = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  overflow-y: auto;
-  overflow-x: hidden;
-  width: 100%;
-  height: calc(100% - 4rem);
-`;
-
-const TokenHeader = styled.div`
-  display: flex;
-  align-items: center;
-  width: 100%;
-  margin-left: 1rem;
-`;
 
 type PriceData = {
   id: string;
@@ -92,9 +64,8 @@ export const Bsv21TokensList = (props: Bsv21TokensListProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle drag end event
   const handleOnDragEnd = async (result: DropResult) => {
-    if (!result.destination) return; // dropped outside the list
+    if (!result.destination) return;
 
     const reorderedTokens = Array.from(tokens);
     const [removed] = reorderedTokens.splice(result.source.index, 1);
@@ -117,120 +88,135 @@ export const Bsv21TokensList = (props: Bsv21TokensListProps) => {
       },
     };
 
-    await chromeStorageService.updateNested(key, update); // Save the new order
+    await chromeStorageService.updateNested(key, update);
   };
+
+  const confirmedTokens = tokens.filter((t) => t.all.confirmed > 0n);
+  const pendingTokens = tokensProp.filter((d) => d.all.pending > 0n);
 
   return (
     <>
       <Show
         when={tokens.length > 0 || hideStatusLabels}
         whenFalseContent={
-          <NoInscriptionWrapper>
-            <Text
-              theme={theme}
-              style={{
-                color: theme.color.global.gray,
-                fontSize: '1rem',
-                marginTop: '4rem',
-              }}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center mt-32 w-full gap-3"
+          >
+            <div
+              className="flex items-center justify-center w-12 h-12 rounded-full"
+              style={{ backgroundColor: theme.color.global.row }}
             >
+              <Coins size={20} style={{ color: theme.color.global.gray }} />
+            </div>
+            <p className="text-sm text-center" style={{ color: theme.color.global.gray }}>
               {theme.settings.services.bsv21
                 ? "You don't have any tokens"
                 : 'Wallet configuration does not support tokens!'}
-            </Text>
-          </NoInscriptionWrapper>
+            </p>
+          </motion.div>
         }
       >
         <DragDropContext onDragEnd={handleOnDragEnd}>
           <Droppable droppableId="bsv21-list">
             {(provided) => (
-              <TokenList ref={provided.innerRef} {...provided.droppableProps}>
-                <>
-                  <Show when={!hideStatusLabels}>
-                    <TokenHeader>
-                      <SubHeaderText
-                        style={{ margin: '0.5rem 0 0 1rem', color: theme.color.global.gray }}
-                        theme={theme}
-                      >
-                        Confirmed
-                      </SubHeaderText>
-                    </TokenHeader>
-                  </Show>
-                  <div style={{ width: '100%' }}>
-                    {tokens
-                      .filter((t) => t.all.confirmed > 0n)
-                      .map(
-                        (t, index) =>
-                          t.id && (
-                            <Draggable key={t.id} draggableId={t.id} index={index}>
-                              {(provided) => (
-                                <div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  style={{
-                                    ...provided.draggableProps.style,
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    width: '100%',
-                                  }}
-                                  onClick={() => onTokenClick(t)}
-                                >
-                                  <AssetRow
-                                    animate
-                                    balance={Number(showAmount(t.all.confirmed, t.dec))}
-                                    showPointer={true}
-                                    icon={t.icon ? getContentUrl(t.icon) : GENERIC_TOKEN_ICON}
-                                    ticker={truncate(getTokenName(t), 10, 0)}
-                                    usdBalance={
-                                      (priceData.find((p) => p.id === t.id)?.satPrice ?? 0) *
-                                      (exchangeRate / BSV_DECIMAL_CONVERSION) *
-                                      Number(showAmount(t.all.confirmed, t.dec))
-                                    }
-                                  />
-                                </div>
-                              )}
-                            </Draggable>
-                          ),
-                      )}
+              <div
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                className="flex flex-col items-center overflow-y-auto overflow-x-hidden w-full"
+                style={{ height: 'calc(100% - 4rem)' }}
+              >
+                {/* Confirmed section */}
+                <Show when={!hideStatusLabels && confirmedTokens.length > 0}>
+                  <div className="w-full px-5 pt-3 pb-1">
+                    <span
+                      className="text-[10px] font-semibold uppercase tracking-wider"
+                      style={{ color: theme.color.global.gray }}
+                    >
+                      Confirmed
+                    </span>
                   </div>
-                  <Show when={tokensProp.filter((d) => d.all.pending > 0n).length > 0}>
-                    <Show when={!hideStatusLabels}>
-                      <TokenHeader style={{ marginTop: '2rem' }}>
-                        <SubHeaderText style={{ marginLeft: '1rem', color: theme.color.global.gray }} theme={theme}>
-                          Pending
-                        </SubHeaderText>
-                      </TokenHeader>
-                    </Show>
-                    <div style={{ width: '100%' }}>
-                      {tokensProp
-                        .filter((d) => d.all.pending > 0n)
-                        .map((b) => {
-                          return (
-                            <div
-                              style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
-                              onClick={() => onTokenClick(b)}
-                            >
-                              <AssetRow
-                                animate
-                                balance={Number(showAmount(b.all.pending, b.dec))}
-                                showPointer={true}
-                                icon={b.icon ? getContentUrl(b.icon) : GENERIC_TOKEN_ICON}
-                                ticker={getTokenName(b)}
-                                usdBalance={
-                                  (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
-                                  (exchangeRate / BSV_DECIMAL_CONVERSION) *
-                                  Number(showAmount(b.all.confirmed, b.dec))
-                                }
-                              />
-                            </div>
-                          );
-                        })}
+                </Show>
+
+                <div className="w-full">
+                  <AnimatePresence initial={false}>
+                    {confirmedTokens.map(
+                      (t, index) =>
+                        t.id && (
+                          <Draggable key={t.id} draggableId={t.id} index={index}>
+                            {(provided) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                style={{
+                                  ...provided.draggableProps.style,
+                                  display: 'flex',
+                                  justifyContent: 'center',
+                                  width: '100%',
+                                }}
+                                onClick={() => onTokenClick(t)}
+                              >
+                                <AssetRow
+                                  animate
+                                  balance={Number(showAmount(t.all.confirmed, t.dec))}
+                                  showPointer={true}
+                                  icon={t.icon ? getContentUrl(t.icon) : GENERIC_TOKEN_ICON}
+                                  ticker={truncate(getTokenName(t), 10, 0)}
+                                  usdBalance={
+                                    (priceData.find((p) => p.id === t.id)?.satPrice ?? 0) *
+                                    (exchangeRate / BSV_DECIMAL_CONVERSION) *
+                                    Number(showAmount(t.all.confirmed, t.dec))
+                                  }
+                                />
+                              </div>
+                            )}
+                          </Draggable>
+                        ),
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* Pending section */}
+                <Show when={pendingTokens.length > 0}>
+                  <Show when={!hideStatusLabels}>
+                    <div className="w-full px-5 pt-4 pb-1">
+                      <span
+                        className="text-[10px] font-semibold uppercase tracking-wider"
+                        style={{ color: theme.color.global.gray }}
+                      >
+                        Pending
+                      </span>
                     </div>
                   </Show>
-                  {provided.placeholder}
-                </>
-              </TokenList>
+
+                  <div className="w-full">
+                    {pendingTokens.map((b) => (
+                      <div
+                        key={b.id}
+                        style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
+                        onClick={() => onTokenClick(b)}
+                      >
+                        <AssetRow
+                          animate
+                          balance={Number(showAmount(b.all.pending, b.dec))}
+                          showPointer={true}
+                          icon={b.icon ? getContentUrl(b.icon) : GENERIC_TOKEN_ICON}
+                          ticker={getTokenName(b)}
+                          usdBalance={
+                            (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
+                            (exchangeRate / BSV_DECIMAL_CONVERSION) *
+                            Number(showAmount(b.all.confirmed, b.dec))
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </Show>
+
+                {provided.placeholder}
+              </div>
             )}
           </Droppable>
         </DragDropContext>

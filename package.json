@@ -45,7 +45,6 @@
     "sigma-protocol": "^0.1.9",
     "sonner": "^2.0.7",
     "stream-browserify": "^3.0.0",
-    "styled-components": "^6.0.8",
     "tailwind-merge": "^3.5.0",
     "url": "^0.11.3",
     "util": "^0.12.5",

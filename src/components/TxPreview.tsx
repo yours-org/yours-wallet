@@ -1,15 +1,12 @@
-import styled from 'styled-components';
 import { useTheme } from '../hooks/useTheme';
-import { WhiteLabelTheme } from '../theme.types';
 import { KNOWN_BURN_ADDRESSES } from '../utils/constants';
 import { convertAtomicValueToReadableTokenValue, formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { Show } from './Show';
 import lockImage from '../assets/lock.svg';
-import { FaFire } from 'react-icons/fa';
+import { Flame } from 'lucide-react';
 import type { ParseContext, Txo } from '@1sat/wallet-browser';
 import { useServiceContext } from '../hooks/useServiceContext';
 
-// Helper types for indexed data
 interface Origin {
   outpoint?: string;
   nonce?: number;
@@ -25,68 +22,11 @@ interface Bsv21Data {
   icon?: string;
 }
 
-const Container = styled.div`
-  display: flex;
-  flex-direction: column;
-  width: 90%;
-`;
-
-const SectionHeader = styled.h3<WhiteLabelTheme>`
-  color: ${({ theme }) => theme.color.global.contrast};
-  font-weight: 900;
-  margin-bottom: 0.5rem;
-  font-size: 1.25rem;
-`;
-
-const Row = styled.div<WhiteLabelTheme & { $toSign: boolean }>`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  background-color: ${({ theme }) => theme.color.global.row};
-  border: ${({ theme, $toSign }) => ($toSign ? `1px solid ${theme.color.component.snackbarSuccess}` : 'none')};
-  border-radius: 0.25rem;
-`;
-
-const Index = styled.div<WhiteLabelTheme>`
-  font-weight: bold;
-  color: ${({ theme }) => theme.color.global.gray};
-  margin-right: 0.5rem;
-`;
-
-const RowData = styled.div<WhiteLabelTheme>`
-  color: ${({ theme }) => theme.color.global.contrast};
-`;
-
-const NftImage = styled.img<{ $isCircle: boolean }>`
-  width: ${({ $isCircle }) => ($isCircle ? '2rem' : '2.75rem')};
-  height: ${({ $isCircle }) => ($isCircle ? '2rem' : '2.75rem')};
-  border-radius: ${({ $isCircle }) => ($isCircle ? '50%' : '0.25rem')};
-  margin: 0 0.25rem 0 0.5rem;
-`;
-
-const AmountImageWrapper = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const IndexOwnerWrapper = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const Label = styled.div<WhiteLabelTheme>`
-  color: ${({ theme }) => theme.color.global.contrast};
-  text-align: right;
-`;
-
 type TxPreviewProps = {
   txData: ParseContext;
   inputsToSign?: number[];
 };
 
-// Helper to extract data from Txo
 const getOrigin = (txo: Txo): Origin | undefined => txo.data.origin?.data as Origin | undefined;
 const getBsv21 = (txo: Txo): Bsv21Data | undefined => txo.data.bsv21?.data as Bsv21Data | undefined;
 const getLock = (txo: Txo): { until: number } | undefined => txo.data.lock?.data as { until: number } | undefined;
@@ -99,6 +39,12 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
   const labelMaxLength = 20;
   const baseUrl = wallet.services.baseUrl;
 
+  const contrast = theme.color.global.contrast;
+  const gray = theme.color.global.gray;
+  const row = theme.color.global.row;
+  const successColor = theme.color.component.snackbarSuccess;
+  const errorColor = theme.color.component.snackbarError;
+
   const renderNftOrTokenImage = (txo: Txo) => {
     const origin = getOrigin(txo);
     const bsv21 = getBsv21(txo);
@@ -109,21 +55,36 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
     const isLock = !!lock;
 
     if (inscriptionWithOutpoint && origin?.outpoint) {
-      return <NftImage $isCircle={false} src={`${baseUrl}/content/${origin.outpoint}`} alt="NFT" />;
+      return (
+        <img
+          src={`${baseUrl}/content/${origin.outpoint}`}
+          alt="NFT"
+          className="mx-1 ml-2"
+          style={{ width: '2.75rem', height: '2.75rem', borderRadius: '0.25rem' }}
+        />
+      );
     }
 
     if (bsv21WithIcon) {
       return (
-        <NftImage
-          $isCircle
+        <img
           src={bsv21.icon?.startsWith('https://') ? bsv21.icon : `${baseUrl}/content/${bsv21.icon}`}
           alt="Token"
+          className="mx-1 ml-2"
+          style={{ width: '2rem', height: '2rem', borderRadius: '50%' }}
         />
       );
     }
 
     if (isLock) {
-      return <NftImage $isCircle src={lockImage} alt="Lock" />;
+      return (
+        <img
+          src={lockImage}
+          alt="Lock"
+          className="mx-1 ml-2"
+          style={{ width: '2rem', height: '2rem', borderRadius: '50%' }}
+        />
+      );
     }
     return null;
   };
@@ -135,61 +96,75 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
     const bsv21 = getBsv21(txo);
     const satoshis = getSatoshis(txo);
     const mapName = origin?.map?.name as string | undefined;
+    const toSign = isInput && !!inputsToSign?.includes(index);
 
     return (
-      <Row $toSign={isInput && !!inputsToSign?.includes(index)} key={index} theme={theme}>
-        <IndexOwnerWrapper>
-          <Index theme={theme}>#{index}</Index>
-          <RowData theme={theme}>{txo.owner ? truncate(txo.owner, 6, 6) : 'Script/Contract'}</RowData>
-          {isInput && !!inputsToSign?.includes(index) && (
-            <RowData style={{ marginLeft: '0.5rem' }} theme={theme}>
+      <div
+        key={index}
+        className="flex justify-between items-center p-3 mb-2 rounded"
+        style={{
+          backgroundColor: row,
+          border: toSign ? `1px solid ${successColor}` : 'none',
+        }}
+      >
+        <div className="flex items-center">
+          <span className="font-bold mr-2" style={{ color: gray }}>
+            #{index}
+          </span>
+          <span style={{ color: contrast }}>{txo.owner ? truncate(txo.owner, 6, 6) : 'Script/Contract'}</span>
+          {toSign && (
+            <span className="ml-2" style={{ color: contrast }}>
               ✍️
-            </RowData>
+            </span>
           )}
           {!isInput && !!txo.owner && KNOWN_BURN_ADDRESSES.includes(txo.owner) && (
-            <FaFire color={theme.color.component.snackbarError} size={'1rem'} style={{ marginLeft: '0.5rem' }} />
+            <Flame size={16} color={errorColor} className="ml-2" />
           )}
-        </IndexOwnerWrapper>
+        </div>
 
-        <AmountImageWrapper>
-          <RowData theme={theme}>
+        <div className="flex items-center">
+          <span style={{ color: contrast }}>
             <Show
               when={!!bsv21}
               whenFalseContent={
                 <Show
                   when={!!mapName}
                   whenFalseContent={
-                    <Label theme={theme}>
+                    <span className="text-right" style={{ color: contrast }}>
                       {formatNumberWithCommasAndDecimals(satoshis, 0)} {satoshis > 1 ? 'sats' : 'sat'}
-                    </Label>
+                    </span>
                   }
                 >
-                  <Label theme={theme}>{mapName && truncate(mapName, labelMaxLength, 0)}</Label>
+                  <span className="text-right" style={{ color: contrast }}>
+                    {mapName && truncate(mapName, labelMaxLength, 0)}
+                  </span>
                 </Show>
               }
             >
-              <Label theme={theme}>
+              <span className="text-right" style={{ color: contrast }}>
                 {convertAtomicValueToReadableTokenValue(Number(bsv21?.amt || 0), Number(bsv21?.dec || 0))}{' '}
                 {truncate(bsv21?.sym ?? 'Unknown FT', labelMaxLength, 0)}
-              </Label>
+              </span>
             </Show>
-          </RowData>
+          </span>
           {renderNftOrTokenImage(txo)}
-        </AmountImageWrapper>
-      </Row>
+        </div>
+      </div>
     );
   };
 
   return (
-    <Container>
-      <SectionHeader theme={theme} style={{ marginTop: '0.5rem' }}>
+    <div className="flex flex-col w-[90%]">
+      <h3 className="font-black mb-2 text-xl mt-2" style={{ color: contrast }}>
         Inputs
-      </SectionHeader>
+      </h3>
       {txData.spends.map((txo: Txo, index: number) => renderTxoRow(txo, index, true))}
 
-      <SectionHeader theme={theme}>Outputs</SectionHeader>
+      <h3 className="font-black mb-2 text-xl" style={{ color: contrast }}>
+        Outputs
+      </h3>
       {txData.txos.map((txo: Txo, index: number) => renderTxoRow(txo, index, false))}
-    </Container>
+    </div>
   );
 };
 

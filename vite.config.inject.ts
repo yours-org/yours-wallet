@@ -20,6 +20,7 @@ export default defineConfig({
     },
     preserveSymlinks: true,
   },
+  logLevel: 'error',
   build: {
     outDir: 'build',
     emptyOutDir: false,
@@ -32,6 +33,11 @@ export default defineConfig({
     rollupOptions: {
       output: {
         extend: true,
+      },
+      onwarn(warning, warn) {
+        if (warning.message?.includes('externalized for browser')) return;
+        if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+        warn(warning);
       },
     },
     sourcemap: true,

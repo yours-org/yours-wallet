@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { useContext, useEffect, useState } from 'react';
 import { MemoryRouter as Router, Route, Routes, useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
 import { Show } from './components/Show';
 import { UnlockWallet } from './components/UnlockWallet';
 import { BottomMenuContext } from './contexts/BottomMenuContext';
@@ -17,7 +16,6 @@ import { Start } from './pages/onboarding/Start';
 import { OrdWallet } from './pages/OrdWallet';
 import { ConnectRequest } from './pages/requests/ConnectRequest';
 import { Settings } from './pages/Settings';
-import { WhiteLabelTheme } from './theme.types';
 import { WhitelistedApp } from './inject';
 import { PageLoader } from './components/PageLoader';
 import { useServiceContext } from './hooks/useServiceContext';
@@ -35,27 +33,6 @@ import { GroupedPermissionRequestPage } from './pages/requests/GroupedPermission
 import { CounterpartyPermissionRequestPage } from './pages/requests/CounterpartyPermissionRequest';
 import { TransactionApprovalRequest } from './pages/requests/TransactionApprovalRequest';
 import { SweepMigration } from './pages/SweepMigration';
-
-const MainContainer = styled.div<WhiteLabelTheme & { $isMobile?: boolean }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: ${({ $isMobile }) => ($isMobile ? '100vw' : '24.5rem')};
-  height: ${({ $isMobile }) => ($isMobile ? '100vh' : '33.75rem')};
-  position: relative;
-  padding: 0;
-  background-color: ${({ theme }) => theme.color.global.walletBackground};
-`;
-
-const Container = styled.div<WhiteLabelTheme>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  background-color: ${({ theme }) => theme.color.global.walletBackground};
-  position: relative;
-`;
 
 export const App = () => {
   const { isMobile } = useViewport();
@@ -75,6 +52,8 @@ export const App = () => {
   } = useWeb3RequestContext();
   const [whitelistedApps, setWhitelistedApps] = useState<WhitelistedApp[]>([]);
 
+  const walletBg = theme.color.global.walletBackground;
+
   useEffect(() => {
     if (isReady) {
       const { account } = chromeStorageService.getCurrentAccountObject();
@@ -89,7 +68,6 @@ export const App = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady]);
 
-  // Auto-navigate to /connect when a connectRequest arrives (e.g., after unlock)
   const RequestRouter = () => {
     const navigate = useNavigate();
     useEffect(() => {
@@ -107,18 +85,35 @@ export const App = () => {
 
   if (!isReady) {
     return (
-      <MainContainer $isMobile={isMobile} theme={theme}>
+      <div
+        className="flex items-center justify-center relative p-0"
+        style={{
+          width: isMobile ? '100vw' : '24.5rem',
+          height: isMobile ? '100vh' : '33.75rem',
+          backgroundColor: walletBg,
+        }}
+      >
         <PageLoader message="Loading..." theme={theme} />
-      </MainContainer>
+      </div>
     );
   }
 
   return (
-    <MainContainer $isMobile={isMobile} theme={theme}>
+    <div
+      className="flex items-center justify-center relative p-0"
+      style={{
+        width: isMobile ? '100vw' : '24.5rem',
+        height: isMobile ? '100vh' : '33.75rem',
+        backgroundColor: walletBg,
+      }}
+    >
       <BlockHeightProvider>
         <SyncProvider>
           <BottomMenuProvider network={chromeStorageService.getNetwork()}>
-            <Container theme={theme}>
+            <div
+              className="flex items-center justify-center w-full h-full relative"
+              style={{ backgroundColor: walletBg }}
+            >
               <SnackbarProvider>
                 <SyncBanner />
                 <SyncingBlocks />
@@ -208,10 +203,10 @@ export const App = () => {
                   </Router>
                 </Show>
               </SnackbarProvider>
-            </Container>
+            </div>
           </BottomMenuProvider>
         </SyncProvider>
       </BlockHeightProvider>
-    </MainContainer>
+    </div>
   );
 };

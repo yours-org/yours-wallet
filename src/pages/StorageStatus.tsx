@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import styled from 'styled-components';
+import { motion } from 'framer-motion';
+import { Database, RefreshCw } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
-import { HeaderText, Text } from '../components/Reusable';
 import { Show } from '../components/Show';
+import { PageLoader } from '../components/PageLoader';
 import { useTheme } from '../hooks/useTheme';
 import { useSnackbar } from '../hooks/useSnackbar';
-import { WhiteLabelTheme } from '../theme.types';
 
 interface StoreInfo {
   storageIdentityKey: string;
@@ -32,91 +32,6 @@ interface StorageInfo {
   syncStates: SyncStateInfo[];
 }
 
-const Section = styled.div<WhiteLabelTheme>`
-  background-color: ${({ theme }) => theme.color.global.row};
-  border-radius: 0.5rem;
-  padding: 1rem;
-  margin: 0.5rem 0;
-  width: 85%;
-`;
-
-const SectionTitle = styled(HeaderText)`
-  font-size: 1rem;
-  text-align: left;
-  margin: 0 0 0.5rem 0;
-`;
-
-const Label = styled(Text)`
-  font-size: 0.7rem;
-  color: ${({ theme }) => theme.color.global.gray};
-  margin: 0;
-  text-align: left;
-  width: 100%;
-`;
-
-const Value = styled(Text)`
-  font-size: 0.85rem;
-  margin: 0 0 0.5rem 0;
-  text-align: left;
-  width: 100%;
-  word-break: break-all;
-`;
-
-const Row = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-`;
-
-const StatValue = styled(Text)`
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin: 0;
-  text-align: center;
-  width: auto;
-`;
-
-const StatLabel = styled(Text)`
-  font-size: 0.7rem;
-  color: ${({ theme }) => theme.color.global.gray};
-  margin: 0;
-  text-align: center;
-  width: auto;
-`;
-
-const StatBox = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 1;
-`;
-
-const StatusBadge = styled.span<{ $color: string }>`
-  display: inline-block;
-  padding: 0.15rem 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: white;
-  background-color: ${(props) => props.$color};
-`;
-
-const PageContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  padding: 0.5rem 0;
-`;
-
-const MigrateRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-`;
-
 export interface StorageStatusProps {
   onBack: () => void;
 }
@@ -129,6 +44,9 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
   const [syncing, setSyncing] = useState(false);
   const [migrating, setMigrating] = useState(false);
   const [newRemoteUrl, setNewRemoteUrl] = useState('');
+
+  const contrast = theme.color.global.contrast;
+  const gray = theme.color.global.gray;
 
   const fetchStorageInfo = async () => {
     try {
@@ -196,99 +114,149 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
       case 'error':
         return theme.color.component.snackbarError;
       default:
-        return theme.color.global.gray;
+        return gray;
     }
   };
 
   if (loading) {
     return (
-      <PageContainer>
-        <Text theme={theme}>Loading storage info...</Text>
-      </PageContainer>
+      <div className="flex flex-col items-center w-full py-2">
+        <PageLoader theme={theme} message="Loading storage info..." />
+      </div>
     );
   }
 
-  return (
-    <PageContainer>
-      <Show when={!!info}>
-        <Section theme={theme}>
-          <SectionTitle theme={theme}>Active Storage</SectionTitle>
-          <Label theme={theme}>Location</Label>
-          <Value theme={theme}>{info?.remoteUrl || info?.activeStore?.endpointURL || 'Local'}</Value>
-          <Label theme={theme}>Storage Identity Key</Label>
-          <Value theme={theme}>{info?.activeStore?.storageIdentityKey || info?.storageIdentityKey || '-'}</Value>
-          <Row>
-            <StatBox>
-              <StatValue theme={theme}>{info?.outputCount?.toLocaleString() ?? '-'}</StatValue>
-              <StatLabel theme={theme}>Outputs</StatLabel>
-            </StatBox>
-            <StatBox>
-              <StatValue theme={theme}>{info?.transactionCount?.toLocaleString() ?? '-'}</StatValue>
-              <StatLabel theme={theme}>Transactions</StatLabel>
-            </StatBox>
-          </Row>
-        </Section>
+  // Suppress unused onBack — parent (Settings) provides SubPageHeader
+  void onBack;
 
+  return (
+    <div className="flex flex-col items-center w-full py-2 px-3">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-4">
+        <Database size={18} style={{ color: '#A1FF8B' }} />
+        <h2 className="text-lg font-bold" style={{ color: contrast }}>
+          Storage
+        </h2>
+      </div>
+
+      <Show when={!!info}>
+        {/* Active Storage */}
+        <div className="w-full rounded-xl p-4 mb-3 bg-[#17191E]" style={{ border: `1px solid ${gray}15` }}>
+          <h3 className="text-sm font-semibold mb-3" style={{ color: contrast }}>
+            Active Storage
+          </h3>
+          <div className="mb-2">
+            <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: gray }}>
+              Location
+            </p>
+            <p className="text-xs break-all mt-0.5" style={{ color: contrast }}>
+              {info?.remoteUrl || info?.activeStore?.endpointURL || 'Local'}
+            </p>
+          </div>
+          <div className="mb-3">
+            <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: gray }}>
+              Storage Identity Key
+            </p>
+            <p className="text-xs break-all mt-0.5 font-mono" style={{ color: contrast }}>
+              {info?.activeStore?.storageIdentityKey || info?.storageIdentityKey || '-'}
+            </p>
+          </div>
+          <div className="flex">
+            <div className="flex-1 text-center">
+              <p className="text-lg font-bold" style={{ color: contrast }}>
+                {info?.outputCount?.toLocaleString() ?? '-'}
+              </p>
+              <p className="text-[10px]" style={{ color: gray }}>
+                Outputs
+              </p>
+            </div>
+            <div className="flex-1 text-center">
+              <p className="text-lg font-bold" style={{ color: contrast }}>
+                {info?.transactionCount?.toLocaleString() ?? '-'}
+              </p>
+              <p className="text-[10px]" style={{ color: gray }}>
+                Transactions
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Backups */}
         <Show when={(info?.backupStores?.length ?? 0) > 0 || (info?.syncStates?.length ?? 0) > 0}>
-          <Section theme={theme}>
-            <SectionTitle theme={theme}>Backups</SectionTitle>
+          <div className="w-full rounded-xl p-4 mb-3 bg-[#17191E]" style={{ border: `1px solid ${gray}15` }}>
+            <h3 className="text-sm font-semibold mb-3" style={{ color: contrast }}>
+              Backups
+            </h3>
             {info?.syncStates?.map((state) => (
-              <div key={state.storageIdentityKey} style={{ marginBottom: '0.5rem' }}>
-                <Row>
-                  <Value theme={theme} style={{ margin: 0, flex: 1 }}>
+              <div key={state.storageIdentityKey} className="mb-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs" style={{ color: contrast }}>
                     {state.storageName}
-                  </Value>
-                  <StatusBadge $color={statusColor(state.status)}>{state.status}</StatusBadge>
-                </Row>
+                  </span>
+                  <span
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded text-white"
+                    style={{ backgroundColor: statusColor(state.status) }}
+                  >
+                    {state.status}
+                  </span>
+                </div>
                 <Show when={!!state.when}>
-                  <Label theme={theme}>Last synced: {state.when ? new Date(state.when).toLocaleString() : '-'}</Label>
+                  <p className="text-[10px] mt-0.5" style={{ color: gray }}>
+                    Last synced: {state.when ? new Date(state.when).toLocaleString() : '-'}
+                  </p>
                 </Show>
               </div>
             ))}
             {info?.backupStores
               ?.filter((bs) => !info.syncStates?.some((ss) => ss.storageIdentityKey === bs.storageIdentityKey))
               .map((store) => (
-                <div key={store.storageIdentityKey} style={{ marginBottom: '0.5rem' }}>
-                  <Value theme={theme} style={{ margin: 0 }}>
+                <div key={store.storageIdentityKey} className="mb-2">
+                  <p className="text-xs" style={{ color: contrast }}>
                     {store.storageName}
-                  </Value>
-                  <Label theme={theme}>{store.endpointURL || 'Local'}</Label>
+                  </p>
+                  <p className="text-[10px]" style={{ color: gray }}>
+                    {store.endpointURL || 'Local'}
+                  </p>
                 </div>
               ))}
-            <Button
-              theme={theme}
-              type="secondary-outline"
-              label={syncing ? 'Syncing...' : 'Sync Now'}
-              onClick={syncing ? () => {} : handleSyncBackups}
-              style={{ marginTop: '0.5rem', width: '100%' }}
-            />
-          </Section>
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              onClick={syncing ? undefined : handleSyncBackups}
+              disabled={syncing}
+              className="flex items-center justify-center gap-2 w-full mt-2 py-2 rounded-xl text-xs font-semibold border-0 outline-none cursor-pointer disabled:opacity-50 bg-[#17191E] hover:bg-[#1f2128] transition-colors"
+              style={{ color: contrast, border: `1px solid ${gray}20` }}
+            >
+              <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? 'Syncing...' : 'Sync Now'}
+            </motion.button>
+          </div>
         </Show>
 
-        <Section theme={theme}>
-          <SectionTitle theme={theme}>Change Remote</SectionTitle>
-          <Label theme={theme}>Migrate wallet data to a new remote storage server</Label>
-          <MigrateRow>
-            <Input
-              theme={theme}
-              placeholder="https://example.com/wallet"
-              type="text"
-              onChange={(e) => setNewRemoteUrl(e.target.value)}
-              value={newRemoteUrl}
-              style={{ flex: 1, margin: '0.5rem 0' }}
-            />
-          </MigrateRow>
-          <Button
+        {/* Change Remote */}
+        <div className="w-full rounded-xl p-4 mb-3 bg-[#17191E]" style={{ border: `1px solid ${gray}15` }}>
+          <h3 className="text-sm font-semibold mb-1" style={{ color: contrast }}>
+            Change Remote
+          </h3>
+          <p className="text-[10px] mb-3" style={{ color: gray }}>
+            Migrate wallet data to a new remote storage server
+          </p>
+          <Input
             theme={theme}
-            type="primary"
-            label={migrating ? 'Migrating...' : 'Migrate'}
-            onClick={migrating ? () => {} : handleMigrate}
-            style={{ width: '100%' }}
+            placeholder="https://example.com/wallet"
+            type="text"
+            onChange={(e) => setNewRemoteUrl(e.target.value)}
+            value={newRemoteUrl}
           />
-        </Section>
+          <div className="mt-2">
+            <Button
+              theme={theme}
+              type="primary"
+              label={migrating ? 'Migrating...' : 'Migrate'}
+              onClick={migrating ? () => {} : handleMigrate}
+            />
+          </div>
+        </div>
       </Show>
-
-      <Button theme={theme} type="secondary" label="Go back" onClick={onBack} style={{ marginTop: '0.5rem' }} />
-    </PageContainer>
+    </div>
   );
 };

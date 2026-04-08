@@ -1,8 +1,20 @@
-import { styled } from 'styled-components';
-import { Theme, WhiteLabelTheme } from '../theme.types';
-import { useServiceContext } from '../hooks/useServiceContext';
+import { motion } from 'framer-motion';
+import {
+  ArrowDownLeft,
+  ArrowLeftRight,
+  ArrowUpRight,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  Tag as TagIcon,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { HeaderText, Text } from './Reusable';
+import { NetWork } from 'yours-wallet-provider';
+import bsvCoin from '../assets/bsv-coin.svg';
+import lock from '../assets/lock.svg';
+import { useServiceContext } from '../hooks/useServiceContext';
+import { Theme } from '../theme.types';
 import {
   BSV_DECIMAL_CONVERSION,
   GENERIC_NFT_ICON,
@@ -12,7 +24,10 @@ import {
   URL_WHATSONCHAIN,
   URL_WHATSONCHAIN_TESTNET,
 } from '../utils/constants';
-import { FaTimes, FaChevronDown, FaChevronUp, FaLink, FaTag } from 'react-icons/fa'; // Import FaTag
+import { formatNumberWithCommasAndDecimals } from '../utils/format';
+import { Button } from './Button';
+import { Show } from './Show';
+
 // TODO: TxLog type needs to be implemented in 1sat-wallet-toolbox
 // import { TxLog } from 'spv-store';
 type TxLog = {
@@ -21,122 +36,39 @@ type TxLog = {
   date: Date;
   summary: Record<string, { amount: number; icon?: string }>;
 };
-import { Button } from './Button';
-import bsvCoin from '../assets/bsv-coin.svg';
-import lock from '../assets/lock.svg';
-import { Show } from './Show';
-import { NetWork } from 'yours-wallet-provider';
-import { formatNumberWithCommasAndDecimals } from '../utils/format';
 
-const Container = styled.div<WhiteLabelTheme>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  height: 100vh;
-  overflow-y: auto;
-  background-color: ${({ theme }) => theme.color.global.walletBackground};
-  z-index: 1000;
-  position: absolute;
-`;
-
-const HistoryRow = styled.div<WhiteLabelTheme>`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: ${({ theme }) => theme.color.global.row};
-  width: 95%;
-  padding: 0.5rem 1rem;
-  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
-  border-radius: 0.5rem;
-  transition: transform 0.3s ease-in-out;
-
-  &:hover {
-    transform: scale(1.02);
-  }
-`;
-
-const Icon = styled.img<{ $isNFT?: boolean }>`
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: ${({ $isNFT }) => ($isNFT ? '0.25rem' : '50%')};
-`;
-
-const TickerWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-`;
-
-const ButtonsWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 40%;
-  margin: 1rem 0;
-`;
-
-const TickerTextWrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  margin-left: 1rem;
-`;
-
-const ContentWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-
-const BackWrapper = styled.div`
-  position: absolute;
-  top: 3rem;
-  left: 2rem;
-`;
-
-const RowWrapper = styled.div`
-  width: 95%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: 0.15rem 0;
-`;
-
-const BoundedContent = styled.div`
-  display: flex;
-  gap: 0.5rem;
-  justify-content: space-between;
-  width: 100%;
-`;
-
-const IconNameWrapper = styled.div`
-  display: flex;
-  gap: 0.5rem;
-`;
-
-const IconContent = styled.div`
-  display: flex;
-  gap: 0.5rem;
-  position: relative;
-  width: 2.5rem;
-`;
-
-const ListIconWrapper = styled.div<WhiteLabelTheme>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background-color: ${({ theme }) => theme.color.global.contrast};
-  width: 2.25rem;
-  height: 2.25rem;
-`;
-
-type Tag = 'bsv21' | 'origin' | 'list' | 'lock' | 'fund';
+type TxTag = 'bsv21' | 'origin' | 'list' | 'lock' | 'fund';
 
 export type TxHistoryProps = {
   theme: Theme;
   onBack: () => void;
+};
+
+const groupByDate = (items: TxLog[]): { label: string; items: TxLog[] }[] => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const thisWeek = new Date(today.getTime() - 6 * 86400000);
+
+  const groups: Record<string, TxLog[]> = {
+    Today: [],
+    Yesterday: [],
+    'This Week': [],
+    Earlier: [],
+  };
+
+  for (const item of items) {
+    const d = new Date(item.date);
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (day >= today) groups['Today'].push(item);
+    else if (day >= yesterday) groups['Yesterday'].push(item);
+    else if (day >= thisWeek) groups['This Week'].push(item);
+    else groups['Earlier'].push(item);
+  }
+
+  return Object.entries(groups)
+    .filter(([, list]) => list.length > 0)
+    .map(([label, list]) => ({ label, items: list }));
 };
 
 export const TxHistory = (props: TxHistoryProps) => {
@@ -148,7 +80,7 @@ export const TxHistory = (props: TxHistoryProps) => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const isTestnet = chromeStorageService.getNetwork() === NetWork.Testnet;
 
-  const tagPriorityOrder: Tag[] = ['list', 'bsv21', 'origin', 'lock', 'fund']; // The order of these tags will determine the order of the icons and which is prioritized
+  const tagPriorityOrder: TxTag[] = ['list', 'bsv21', 'origin', 'lock', 'fund'];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -214,30 +146,37 @@ export const TxHistory = (props: TxHistoryProps) => {
     window.open(url, '_blank');
   };
 
-  const getIconForSummary = (tag: Tag, icon?: string) => {
+  const getIconForSummary = (tag: TxTag, icon?: string) => {
     switch (tag) {
       case 'fund':
-        return <Icon src={bsvCoin} alt="Fund Icon" />;
+        return <img src={bsvCoin} alt="Fund Icon" className="w-9 h-9" />;
       case 'lock':
-        return <Icon src={lock} alt="Lock Icon" />;
+        return <img src={lock} alt="Lock Icon" className="w-9 h-9" />;
       case 'list':
         return (
-          <ListIconWrapper theme={theme}>
-            <FaTag style={{ width: '1rem', height: '1rem', color: theme.color.global.neutral }} />
-          </ListIconWrapper>
+          <div
+            className="flex items-center justify-center w-9 h-9 rounded-full"
+            style={{ backgroundColor: theme.color.global.contrast }}
+          >
+            <TagIcon size={14} style={{ color: theme.color.global.row }} />
+          </div>
         );
       default:
         return icon ? (
-          <Icon src={`${apiContext.services?.baseUrl}/content/${icon}`} alt="Summary Icon" $isNFT={tag === 'origin'} />
-        ) : tag === ('origin' as Tag) ? (
-          <Icon src={GENERIC_NFT_ICON} alt="Generic NFT Icon" />
+          <img
+            src={`${apiContext.services?.baseUrl}/content/${icon}`}
+            alt="Summary Icon"
+            className={`w-9 h-9 object-cover ${tag === 'origin' ? 'rounded' : 'rounded-full'}`}
+          />
+        ) : tag === ('origin' as TxTag) ? (
+          <img src={GENERIC_NFT_ICON} alt="Generic NFT Icon" className="w-9 h-9 rounded" />
         ) : (
-          <Icon src={GENERIC_TOKEN_ICON} alt="Generic Token Icon" />
+          <img src={GENERIC_TOKEN_ICON} alt="Generic Token Icon" className="w-9 h-9 rounded-full" />
         );
     }
   };
 
-  const sortEntriesByPriority = (entries: [Tag, { id?: string; icon?: string; amount?: number }][]) => {
+  const sortEntriesByPriority = (entries: [TxTag, { id?: string; icon?: string; amount?: number }][]) => {
     return entries.sort((a, b) => {
       const aPriority = tagPriorityOrder.indexOf(a[0]);
       const bPriority = tagPriorityOrder.indexOf(b[0]);
@@ -254,7 +193,7 @@ export const TxHistory = (props: TxHistoryProps) => {
     });
   };
 
-  const getHeaderText = (tag: Tag, tokenName?: string) => {
+  const getHeaderText = (tag: TxTag, tokenName?: string) => {
     switch (tag) {
       case 'bsv21':
         return tokenName || 'Token';
@@ -271,7 +210,7 @@ export const TxHistory = (props: TxHistoryProps) => {
     }
   };
 
-  const getDescriptionText = (tag: Tag, amount: number) => {
+  const getDescriptionText = (tag: TxTag, amount: number) => {
     switch (tag) {
       case 'list':
         return amount === -1 ? 'Listed for sale' : amount === 0 ? 'Cancelled listing' : 'Purchased listing';
@@ -282,7 +221,7 @@ export const TxHistory = (props: TxHistoryProps) => {
     }
   };
 
-  const getAmountText = (tag: Tag, amount: number) => {
+  const getAmountText = (tag: TxTag, amount: number) => {
     switch (tag) {
       case 'fund':
         return amount / BSV_DECIMAL_CONVERSION;
@@ -302,140 +241,216 @@ export const TxHistory = (props: TxHistoryProps) => {
     );
   };
 
+  const getDirectionIcon = (amount: number) => {
+    if (amount > 0)
+      return <ArrowDownLeft size={10} style={{ color: theme.color.component.primaryButtonLeftGradient }} />;
+    if (amount < 0) return <ArrowUpRight size={10} style={{ color: theme.color.global.gray }} />;
+    return <ArrowLeftRight size={10} style={{ color: theme.color.global.gray }} />;
+  };
+
+  const grouped = useMemo(() => groupByDate(paginatedData || []), [paginatedData]);
+
   return (
-    <Container theme={theme}>
-      <BackWrapper>
-        <FaTimes size={'1.5rem'} color={theme.color.global.contrast} cursor="pointer" onClick={onBack} />
-      </BackWrapper>
-      <Text style={{ marginTop: '3rem', fontSize: '1.25rem', fontWeight: 700 }} theme={theme}>
-        Recent Activity
-      </Text>
-      {(paginatedData || []).length > 0 ? (
-        paginatedData?.map((t) => {
-          const summaryEntries = sortEntriesByPriority(
-            Object.entries(t.summary || {}).filter(([key]) => tagPriorityOrder.includes(key as Tag)) as [
-              Tag,
-              { id?: string; icon?: string; amount?: number },
-            ][],
-          );
-          const uniqueId = `${t.txid}-${t.idx}`;
-          const isExpanded = expandedRows.has(uniqueId);
-          return (
-            <RowWrapper key={uniqueId}>
-              <HistoryRow
-                theme={theme}
-                onClick={summaryEntries.length > 1 ? () => toggleRowExpansion(uniqueId) : undefined}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: summaryEntries.length > 1 ? 'pointer' : 'default',
-                  color: theme.color.global.gray,
-                }}
-              >
-                <TickerWrapper style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {summaryEntries.slice(0, isExpanded ? summaryEntries.length : 1).map(([key, value], idx) => (
-                    <BoundedContent key={idx}>
-                      <IconNameWrapper>
-                        <IconContent>
-                          {isExpanded
-                            ? getIconForSummary(key, value.icon)
-                            : summaryEntries.slice(0, 3).map(([key, value], iconIdx) => (
-                                <div
-                                  key={iconIdx}
+    <motion.div
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 20, opacity: 0 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 35 }}
+      className="flex flex-col items-center w-full h-screen overflow-y-auto absolute z-[1000]"
+      style={{ backgroundColor: theme.color.global.walletBackground }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between w-full px-5 pt-12 pb-4">
+        <span className="text-lg font-bold" style={{ color: theme.color.global.contrast }}>
+          Recent Activity
+        </span>
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.92 }}
+          onClick={onBack}
+          className="flex items-center justify-center w-8 h-8 rounded-full outline-none border-none cursor-pointer"
+          style={{ backgroundColor: theme.color.global.row }}
+        >
+          <X size={16} style={{ color: theme.color.global.contrast }} />
+        </motion.button>
+      </div>
+
+      {/* Transaction list */}
+      <div className="flex flex-col w-full px-3 gap-1 pb-4">
+        {(paginatedData || []).length > 0 ? (
+          <>
+            {grouped.map(({ label, items }) => (
+              <div key={label} className="w-full mb-1">
+                {/* Date group label */}
+                <div className="px-2 pb-1 pt-2">
+                  <span
+                    className="text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ color: theme.color.global.gray }}
+                  >
+                    {label}
+                  </span>
+                </div>
+
+                {/* Rows */}
+                <div className="flex flex-col gap-1">
+                  {items.map((t) => {
+                    const summaryEntries = sortEntriesByPriority(
+                      Object.entries(t.summary || {}).filter(([key]) => tagPriorityOrder.includes(key as TxTag)) as [
+                        TxTag,
+                        { id?: string; icon?: string; amount?: number },
+                      ][],
+                    );
+                    const uniqueId = `${t.txid}-${t.idx}`;
+                    const isExpanded = expandedRows.has(uniqueId);
+                    const isMulti = summaryEntries.length > 1;
+
+                    return (
+                      <motion.div
+                        key={uniqueId}
+                        layout
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                        onClick={isMulti ? () => toggleRowExpansion(uniqueId) : undefined}
+                        className={`w-full rounded-xl px-3 py-2.5 transition-colors duration-150 bg-[#17191E] ${isMulti ? 'cursor-pointer hover:bg-[#1f2128]' : ''}`}
+                        style={{
+                          border: `1px solid ${theme.color.global.gray}14`,
+                          cursor: isMulti ? 'pointer' : 'default',
+                        }}
+                      >
+                        <div className="flex flex-col gap-2">
+                          {summaryEntries.slice(0, isExpanded ? summaryEntries.length : 1).map(([key, value], idx) => (
+                            <div key={idx} className="flex items-center justify-between">
+                              {/* Left: stacked icons or single icon + text */}
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="relative flex-shrink-0" style={{ width: '2.25rem', height: '2.25rem' }}>
+                                  {isExpanded
+                                    ? getIconForSummary(key, value.icon)
+                                    : summaryEntries.slice(0, 3).map(([k, v], iconIdx) => (
+                                        <div
+                                          key={iconIdx}
+                                          className="absolute"
+                                          style={{
+                                            left: `${iconIdx * 0.65}rem`,
+                                            zIndex: 3 - iconIdx,
+                                          }}
+                                        >
+                                          {getIconForSummary(k, v.icon)}
+                                        </div>
+                                      ))}
+                                </div>
+                                <div className="flex flex-col items-start min-w-0">
+                                  <div className="flex items-center gap-1">
+                                    {getDirectionIcon(value.amount ?? 0)}
+                                    <span
+                                      className="text-sm font-semibold leading-tight"
+                                      style={{ color: theme.color.global.contrast }}
+                                    >
+                                      {getHeaderText(key, value.id)}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs mt-0.5" style={{ color: theme.color.global.gray }}>
+                                    {getDescriptionText(key, value.amount ?? 0)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Right: amount + link + expand */}
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span
+                                  className="text-xs font-bold text-right"
                                   style={{
-                                    position: 'absolute',
-                                    left: `${iconIdx * 0.75}rem`,
-                                    zIndex: 3 - iconIdx,
+                                    color: value?.amount
+                                      ? value.amount >= 1
+                                        ? theme.color.component.primaryButtonLeftGradient
+                                        : key === 'origin' && value.amount === -1
+                                          ? 'transparent'
+                                          : theme.color.global.contrast
+                                      : 'transparent',
                                   }}
                                 >
-                                  {getIconForSummary(key, value.icon)}
-                                </div>
-                              ))}
-                        </IconContent>
-                        <TickerTextWrapper>
-                          <HeaderText style={{ fontSize: '0.85rem', marginTop: 0, fontWeight: 700 }} theme={theme}>
-                            {getHeaderText(key, value.id)}
-                          </HeaderText>
-                          <Text
-                            theme={theme}
-                            style={{
-                              color: theme.color.global.gray,
-                              fontSize: '0.75rem',
-                              margin: 0,
-                              textAlign: 'left',
-                              width: '100%',
-                            }}
-                          >
-                            {getDescriptionText(key, value.amount ?? 0)}
-                          </Text>
-                        </TickerTextWrapper>
-                      </IconNameWrapper>
-                      <ContentWrapper>
-                        <HeaderText
-                          style={{
-                            fontSize: '0.75rem',
-                            fontWeight: 900,
-                            margin: 0,
-                            color: value?.amount
-                              ? value.amount >= 1
-                                ? theme.color.component.primaryButtonLeftGradient
-                                : key === 'origin' && value.amount === -1 // If an NFT is sent
-                                  ? 'transparent'
-                                  : theme.color.global.contrast
-                              : 'transparent',
-                            textAlign: 'right',
-                          }}
-                          theme={theme}
-                        >
-                          {value.amount && value.amount > 0 ? '+' : ''}
-                          {value.id === MNEE_SYM
-                            ? formatMNEEAmount(value.amount ?? 0)
-                            : getAmountText(key, value.amount ?? 0)}
-                        </HeaderText>
-                        <Show when={idx === 0}>
-                          <FaLink
-                            onClick={() => handleOpenLink(t.txid)}
-                            style={{ cursor: 'pointer', color: theme.color.component.primaryButtonLeftGradient }}
-                            title="See transaction in Whatsonchain"
-                          />
-                        </Show>
-                        {idx === 0 && summaryEntries.length > 1 ? (
-                          isExpanded ? (
-                            <FaChevronUp />
-                          ) : (
-                            <FaChevronDown />
-                          )
-                        ) : (
-                          <span style={{ display: 'inline-block', width: '12px', height: '16px' }} />
-                        )}
-                      </ContentWrapper>
-                    </BoundedContent>
-                  ))}
-                </TickerWrapper>
-              </HistoryRow>
-            </RowWrapper>
-          );
-        })
-      ) : (
-        <Text theme={theme}>No transaction records found.</Text>
-      )}
-      <ButtonsWrapper>
-        <Button
-          theme={theme}
-          type="secondary"
-          label="Previous"
-          style={{ marginTop: '0.5rem' }}
-          disabled={currentPage === 1}
-          onClick={handlePreviousPage}
-        />
-        <Button
-          theme={theme}
-          type="secondary"
-          label="Next"
-          onClick={handleNextPage}
-          disabled={currentPage * itemsPerPage >= (data?.length ?? 0)}
-        />
-      </ButtonsWrapper>
-    </Container>
+                                  {value.amount && value.amount > 0 ? '+' : ''}
+                                  {value.id === MNEE_SYM
+                                    ? formatMNEEAmount(value.amount ?? 0)
+                                    : getAmountText(key, value.amount ?? 0)}
+                                </span>
+
+                                <Show when={idx === 0}>
+                                  <motion.button
+                                    whileHover={{ scale: 1.15 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenLink(t.txid);
+                                    }}
+                                    className="outline-none border-none bg-transparent cursor-pointer p-0.5 flex-shrink-0"
+                                    title="See transaction in Whatsonchain"
+                                  >
+                                    <ExternalLink
+                                      size={12}
+                                      style={{ color: theme.color.component.primaryButtonLeftGradient }}
+                                    />
+                                  </motion.button>
+                                </Show>
+
+                                {idx === 0 && isMulti ? (
+                                  isExpanded ? (
+                                    <ChevronUp size={12} style={{ color: theme.color.global.gray }} />
+                                  ) : (
+                                    <ChevronDown size={12} style={{ color: theme.color.global.gray }} />
+                                  )
+                                ) : (
+                                  <span className="inline-block w-3 h-4" />
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between w-[87%] mx-auto mt-3 gap-3">
+              <div className="flex-1">
+                <Button
+                  theme={theme}
+                  type="secondary"
+                  label="Previous"
+                  disabled={currentPage === 1}
+                  onClick={handlePreviousPage}
+                />
+              </div>
+              <div className="flex-1">
+                <Button
+                  theme={theme}
+                  type="secondary"
+                  label="Next"
+                  onClick={handleNextPage}
+                  disabled={currentPage * itemsPerPage >= (data?.length ?? 0)}
+                />
+              </div>
+            </div>
+          </>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center mt-20 gap-3"
+          >
+            <div
+              className="flex items-center justify-center w-14 h-14 rounded-full"
+              style={{ backgroundColor: theme.color.global.row }}
+            >
+              <ArrowLeftRight size={22} style={{ color: theme.color.global.gray }} />
+            </div>
+            <p className="text-sm" style={{ color: theme.color.global.gray }}>
+              No transactions yet
+            </p>
+          </motion.div>
+        )}
+      </div>
+    </motion.div>
   );
 };

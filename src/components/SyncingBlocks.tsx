@@ -2,35 +2,7 @@ import { useBlockHeightTracker } from '../hooks/useBlockHeightTracker';
 import { Show } from './Show';
 import ProgressBar from '@ramonak/react-progress-bar';
 import { useTheme } from '../hooks/useTheme';
-import { styled } from 'styled-components';
-import { WhiteLabelTheme } from '../theme.types';
 import { YoursIcon } from './YoursIcon';
-
-const Container = styled.div<WhiteLabelTheme>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  background-color: ${({ theme }) => theme.color.global.walletBackground};
-  z-index: 1000;
-  position: absolute;
-`;
-
-const Title = styled.h1<WhiteLabelTheme>`
-  text-align: center;
-  width: 100%;
-  color: ${({ theme }) => theme.color.global.contrast};
-  margin: 0 0 1rem 0;
-`;
-
-const Description = styled.p<WhiteLabelTheme>`
-  text-align: center;
-  width: 80%;
-  margin: -0.5rem 0 1rem 0;
-  color: ${({ theme }) => theme.color.global.gray};
-`;
 
 export const SyncingBlocks = () => {
   const { theme } = useTheme();
@@ -39,10 +11,17 @@ export const SyncingBlocks = () => {
   return (
     <Show when={showSyncPage}>
       {percentCompleted !== 100 && (
-        <Container theme={theme}>
+        <div
+          className="flex flex-col items-center justify-center w-full h-full z-[1000] absolute"
+          style={{ backgroundColor: theme.color.global.walletBackground }}
+        >
           <YoursIcon width="4rem" />
-          <Title theme={theme}>Syncing Blocks...</Title>
-          <Description theme={theme}>Yours SPV Wallet will be ready to use once this process is complete.</Description>
+          <h1 className="text-center w-full mt-0 mb-4" style={{ color: theme.color.global.contrast }}>
+            Syncing Blocks...
+          </h1>
+          <p className="text-center w-4/5 -mt-2 mb-4" style={{ color: theme.color.global.gray }}>
+            Yours SPV Wallet will be ready to use once this process is complete.
+          </p>
           <ProgressBar
             completed={percentCompleted}
             bgColor={theme.color.component.progressBar}
@@ -50,7 +29,7 @@ export const SyncingBlocks = () => {
             height="16px"
             width="80vw"
           />
-        </Container>
+        </div>
       )}
     </Show>
   );

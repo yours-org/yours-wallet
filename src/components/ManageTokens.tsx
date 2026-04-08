@@ -1,78 +1,16 @@
-import { styled } from 'styled-components';
-import { Theme, WhiteLabelTheme } from '../theme.types';
 import type { Bsv21Balance } from '@1sat/actions';
-import { useServiceContext } from '../hooks/useServiceContext';
-import { truncate } from '../utils/format';
-import { useEffect, useState } from 'react';
-import { ToggleSwitch } from './ToggleSwitch';
-import { HeaderText, Text } from './Reusable';
-import { ChromeStorageObject } from '../services/types/chromeStorage.types';
-import { GENERIC_TOKEN_ICON } from '../utils/constants';
-import { FaTimes } from 'react-icons/fa';
 import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Search, Star, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useServiceContext } from '../hooks/useServiceContext';
+import { Theme } from '../theme.types';
+import { GENERIC_TOKEN_ICON } from '../utils/constants';
+import { truncate } from '../utils/format';
+import { ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { ToggleSwitch } from './ToggleSwitch';
 
 const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
-
-const Container = styled.div<WhiteLabelTheme>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  height: 100vh;
-  overflow-y: auto;
-  background-color: ${({ theme }) => theme.color.global.walletBackground};
-  z-index: 1000;
-  position: absolute;
-`;
-
-const FavoriteRow = styled.div<WhiteLabelTheme>`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 95%;
-  padding: 0.35rem 1.25rem 0.35rem 0.25rem;
-  border-bottom: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
-`;
-
-const Icon = styled.img`
-  width: 2.25rem;
-  height: 2.25rem;
-  margin-left: 1rem;
-  border-radius: 50%;
-`;
-
-const TickerWrapper = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const TickerTextWrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  margin-left: 1rem;
-`;
-
-const BackWrapper = styled.div`
-  position: absolute;
-  top: 3rem;
-  left: 2rem;
-`;
-
-const SearchInput = styled.input<WhiteLabelTheme>`
-  width: 90%;
-  padding: 0.5rem;
-  margin: 1rem 0;
-  border: 1px solid ${({ theme }) => theme.color.global.gray};
-  border-radius: 0.5rem;
-  font-size: 0.85rem;
-  color: ${({ theme }) => theme.color.global.contrast};
-  background-color: ${({ theme }) => theme.color.global.neutral};
-
-  &:focus {
-    outline: none;
-  }
-`;
 
 export type ManageTokensProps = {
   tokens: Bsv21Balance[];
@@ -82,7 +20,7 @@ export type ManageTokensProps = {
 
 export const ManageTokens = (props: ManageTokensProps) => {
   const { tokens: tokensProp, theme, onBack } = props;
-  const { chromeStorageService, keysService } = useServiceContext();
+  const { chromeStorageService } = useServiceContext();
   const [favoriteTokens, setFavoriteTokens] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -120,58 +58,130 @@ export const ManageTokens = (props: ManageTokensProps) => {
         getTokenName(b).toLowerCase().includes(searchQuery.toLowerCase()) ||
         (b?.id && b.id.toLowerCase().includes(searchQuery.toLowerCase())),
     )
-    // Sort by sym alphabetically
     .sort((a, b) => {
       const aLabel = a.sym ?? '';
       const bLabel = b.sym ?? '';
-
       return aLabel.toLowerCase().localeCompare(bLabel.toLowerCase());
     });
 
   return (
-    <Container theme={theme}>
-      <BackWrapper>
-        <FaTimes size={'1.5rem'} color={theme.color.global.contrast} cursor="pointer" onClick={onBack} />
-      </BackWrapper>
-      <Text style={{ marginTop: '3rem', fontSize: '1.25rem', fontWeight: 700 }} theme={theme}>
-        Manage Token List
-      </Text>
-      <SearchInput
-        theme={theme}
-        type="text"
-        placeholder="Search by token name or ID..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-      />
-      {filteredTokens.length > 0 ? (
-        filteredTokens.map((t) => (
-          <FavoriteRow theme={theme} key={t.id}>
-            <TickerWrapper>
-              <Icon src={t.icon ? getContentUrl(t.icon) : GENERIC_TOKEN_ICON} />
-              <TickerTextWrapper>
-                <HeaderText style={{ fontSize: '0.85rem', marginTop: 0 }} theme={theme}>
-                  {getTokenName(t)}
-                </HeaderText>
-                <Text
-                  theme={theme}
-                  style={{ color: theme.color.global.gray, fontSize: '0.75rem', margin: 0, textAlign: 'left' }}
+    <motion.div
+      initial={{ y: '100%', opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: '100%', opacity: 0 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 35 }}
+      className="flex flex-col items-center w-full h-screen overflow-y-auto absolute z-[1000]"
+      style={{ backgroundColor: theme.color.global.walletBackground }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between w-full px-5 pt-12 pb-4">
+        <span className="text-lg font-bold" style={{ color: theme.color.global.contrast }}>
+          Manage Token List
+        </span>
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.92 }}
+          onClick={onBack}
+          className="flex items-center justify-center w-8 h-8 rounded-full outline-none border-none cursor-pointer"
+          style={{ backgroundColor: theme.color.global.row }}
+        >
+          <X size={16} style={{ color: theme.color.global.contrast }} />
+        </motion.button>
+      </div>
+
+      {/* Search */}
+      <div className="relative w-[92%] mb-3">
+        <Search
+          size={14}
+          className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+          style={{ color: theme.color.global.gray }}
+        />
+        <input
+          type="text"
+          placeholder="Search by name or ID..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full h-9 pl-8 pr-4 rounded-xl text-sm outline-none border transition-all duration-200"
+          style={{
+            backgroundColor: theme.color.global.row,
+            borderColor: theme.color.global.gray + '40',
+            color: theme.color.global.contrast,
+          }}
+        />
+      </div>
+
+      {/* Token rows */}
+      <div className="flex flex-col w-full px-3 gap-1">
+        <AnimatePresence initial={false}>
+          {filteredTokens.length > 0 ? (
+            filteredTokens.map((t, i) => {
+              const isFav = !!(t?.id && favoriteTokens.includes(t.id));
+              return (
+                <motion.div
+                  key={t.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ delay: i * 0.03, type: 'spring', stiffness: 400, damping: 35 }}
+                  className="flex items-center justify-between w-full px-3 py-2.5 rounded-xl"
+                  style={{
+                    backgroundColor: theme.color.global.row,
+                    border: `1px solid ${theme.color.global.gray}14`,
+                  }}
                 >
-                  {t?.id && truncate(t.id, 5, 5)}
-                </Text>
-              </TickerTextWrapper>
-            </TickerWrapper>
-            <ToggleSwitch
-              on={(t?.id && favoriteTokens.includes(t.id)) || false}
-              theme={theme}
-              onChange={() => t?.id && handleToggleFavorite(t.id)}
-            />
-          </FavoriteRow>
-        ))
-      ) : (
-        <Text theme={theme} style={{ marginTop: '1rem', color: theme.color.global.gray }}>
-          No tokens found
-        </Text>
-      )}
-    </Container>
+                  {/* Left: icon + name */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img
+                      src={t.icon ? getContentUrl(t.icon) : GENERIC_TOKEN_ICON}
+                      alt={getTokenName(t)}
+                      className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                    />
+                    <div className="flex flex-col items-start min-w-0">
+                      <span
+                        className="text-sm font-semibold leading-tight"
+                        style={{ color: theme.color.global.contrast }}
+                      >
+                        {getTokenName(t)}
+                      </span>
+                      <span className="text-xs mt-0.5" style={{ color: theme.color.global.gray }}>
+                        {t?.id ? truncate(t.id, 5, 5) : ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right: toggle */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <motion.button
+                      whileTap={{ scale: 0.85 }}
+                      onClick={() => t?.id && handleToggleFavorite(t.id)}
+                      className="outline-none border-none bg-transparent cursor-pointer p-1"
+                    >
+                      <Star
+                        size={16}
+                        fill={isFav ? theme.color.component.primaryButtonLeftGradient : 'none'}
+                        style={{
+                          color: isFav ? theme.color.component.primaryButtonLeftGradient : theme.color.global.gray,
+                          transition: 'color 0.2s, fill 0.2s',
+                        }}
+                      />
+                    </motion.button>
+                    <ToggleSwitch on={isFav} theme={theme} onChange={() => t?.id && handleToggleFavorite(t.id)} />
+                  </div>
+                </motion.div>
+              );
+            })
+          ) : (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center text-sm mt-8"
+              style={{ color: theme.color.global.gray }}
+            >
+              No tokens found
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
   );
 };

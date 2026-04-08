@@ -1,30 +1,6 @@
-import styled from 'styled-components';
-import { WhiteLabelTheme, Theme } from '../theme.types';
-import { Text } from './Reusable';
+import { Theme } from '../theme.types';
 import { IconButton } from './IconButton';
 import copyIcon from '../assets/copy.svg';
-
-const Container = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  margin: 0 0;
-  margin-top: 0.4rem;
-  padding: 0 0;
-`;
-
-const TokenId = styled(Text)<WhiteLabelTheme>`
-  font-size: 0.85rem;
-  max-width: 16rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin: 0 0;
-  width: fit-content;
-  color: ${({ theme }) => theme.color.global.gray};
-  cursor: pointer;
-`;
 
 export type BSV21IdProps = {
   theme: Theme;
@@ -44,12 +20,17 @@ export const BSV21Id = (props: BSV21IdProps) => {
     navigator.clipboard.writeText(id);
     onCopyTokenId();
   };
+
   return (
-    <Container onClick={copy}>
-      <IconButton icon={copyIcon} onClick={(e) => copy(e)}></IconButton>
-      <TokenId theme={theme} title={id}>
+    <div className="flex items-center justify-center w-full mt-[0.4rem]" onClick={copy}>
+      <IconButton icon={copyIcon} onClick={(e) => copy(e)} />
+      <span
+        className="text-[0.85rem] max-w-[16rem] whitespace-nowrap overflow-hidden text-ellipsis w-fit cursor-pointer"
+        style={{ color: theme.color.global.gray }}
+        title={id}
+      >
         {showId(id)}
-      </TokenId>
-    </Container>
+      </span>
+    </div>
   );
 };

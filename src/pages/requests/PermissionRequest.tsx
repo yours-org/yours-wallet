@@ -1,54 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { styled } from 'styled-components';
-import { Button } from '../../components/Button';
-import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
+import { motion } from 'framer-motion';
+import { Shield, AlertTriangle, Loader2 } from 'lucide-react';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { WhiteLabelTheme } from '../../theme.types';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import type { PermissionRequest as PermissionRequestType } from '@bsv/wallet-toolbox-mobile';
-
-const RequestDetailsContainer = styled.div<WhiteLabelTheme>`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  max-height: 12rem;
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: ${({ theme }) => theme.color.global.row + '80'};
-  margin: 0.5rem;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-`;
-
-const DetailRow = styled.div`
-  display: flex;
-  flex-direction: row;
-  width: 100%;
-  margin: 0.25rem 0;
-`;
-
-const DetailLabel = styled(Text)`
-  font-size: 0.75rem;
-  font-weight: 600;
-  min-width: 5rem;
-  margin: 0;
-`;
-
-const DetailValue = styled(Text)`
-  font-size: 0.75rem;
-  word-break: break-all;
-  margin: 0;
-`;
-
-const WarningText = styled(Text)`
-  color: ${({ theme }) => theme.color.global.warning || '#f5a623'};
-  font-size: 0.75rem;
-  margin: 0.5rem 0;
-`;
 
 export type PermissionRequestProps = {
   request: PermissionRequestType & { requestID: string };
@@ -144,86 +102,217 @@ export const PermissionRequestPage = (props: PermissionRequestProps) => {
   };
 
   return (
-    <ConfirmContent>
-      <HeaderText theme={theme}>{getPermissionTitle(request.type)}</HeaderText>
-      <Text theme={theme} style={{ margin: '0.75rem 0', textAlign: 'center' }}>
-        {getPermissionDescription(request)}
-      </Text>
+    <motion.div
+      className="flex flex-col w-full px-4 pt-5 pb-4"
+      initial={{ opacity: 0, y: 20, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', damping: 24, stiffness: 260 }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-4">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(161,255,139,0.12)' }}
+        >
+          <Shield size={18} style={{ color: '#A1FF8B' }} />
+        </div>
+        <div>
+          <h1 className="text-base font-bold leading-tight" style={{ color: theme.color.global.contrast }}>
+            {getPermissionTitle(request.type)}
+          </h1>
+          <p className="text-xs mt-0.5" style={{ color: theme.color.global.gray }}>
+            {getPermissionDescription(request)}
+          </p>
+        </div>
+      </div>
 
-      <RequestDetailsContainer theme={theme}>
-        <DetailRow>
-          <DetailLabel theme={theme}>Origin:</DetailLabel>
-          <DetailValue theme={theme}>{request.displayOriginator || request.originator}</DetailValue>
-        </DetailRow>
+      {/* Details card */}
+      <motion.div
+        className="w-full rounded-2xl px-4 py-3 mb-4"
+        style={{
+          background: theme.color.global.row,
+          border: '1px solid rgba(255,255,255,0.06)',
+          maxHeight: '12rem',
+          overflowY: 'auto',
+        }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08 }}
+      >
+        {/* Origin row — always shown */}
+        <div className="flex flex-row py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <span className="text-xs font-semibold w-20 flex-shrink-0" style={{ color: theme.color.global.gray }}>
+            Origin
+          </span>
+          <span className="text-xs break-all" style={{ color: theme.color.global.contrast }}>
+            {request.displayOriginator || request.originator}
+          </span>
+        </div>
 
+        {/* Protocol fields */}
         <Show when={request.type === 'protocol' && !!request.protocolID}>
-          <DetailRow>
-            <DetailLabel theme={theme}>Protocol:</DetailLabel>
-            <DetailValue theme={theme}>{request.protocolID?.[1]}</DetailValue>
-          </DetailRow>
-          <DetailRow>
-            <DetailLabel theme={theme}>Security:</DetailLabel>
-            <DetailValue theme={theme}>Level {request.protocolID?.[0]}</DetailValue>
-          </DetailRow>
+          <div className="flex flex-row py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span className="text-xs font-semibold w-20 flex-shrink-0" style={{ color: theme.color.global.gray }}>
+              Protocol
+            </span>
+            <span className="text-xs break-all" style={{ color: theme.color.global.contrast }}>
+              {request.protocolID?.[1]}
+            </span>
+          </div>
+          <div
+            className="flex flex-row py-2"
+            style={{ borderBottom: request.counterparty ? '1px solid rgba(255,255,255,0.06)' : 'none' }}
+          >
+            <span className="text-xs font-semibold w-20 flex-shrink-0" style={{ color: theme.color.global.gray }}>
+              Security
+            </span>
+            <span className="text-xs" style={{ color: theme.color.global.contrast }}>
+              Level {request.protocolID?.[0]}
+            </span>
+          </div>
           <Show when={!!request.counterparty}>
-            <DetailRow>
-              <DetailLabel theme={theme}>Counterparty:</DetailLabel>
-              <DetailValue theme={theme}>{request.counterparty}</DetailValue>
-            </DetailRow>
+            <div className="flex flex-row py-2">
+              <span className="text-xs font-semibold w-20 flex-shrink-0" style={{ color: theme.color.global.gray }}>
+                Counterparty
+              </span>
+              <span className="text-xs break-all" style={{ color: theme.color.global.contrast }}>
+                {request.counterparty}
+              </span>
+            </div>
           </Show>
         </Show>
 
+        {/* Basket fields */}
         <Show when={request.type === 'basket' && !!request.basket}>
-          <DetailRow>
-            <DetailLabel theme={theme}>Basket:</DetailLabel>
-            <DetailValue theme={theme}>{request.basket}</DetailValue>
-          </DetailRow>
+          <div className="flex flex-row py-2">
+            <span className="text-xs font-semibold w-20 flex-shrink-0" style={{ color: theme.color.global.gray }}>
+              Basket
+            </span>
+            <span className="text-xs break-all" style={{ color: theme.color.global.contrast }}>
+              {request.basket}
+            </span>
+          </div>
         </Show>
 
+        {/* Certificate fields */}
         <Show when={request.type === 'certificate' && !!request.certificate}>
-          <DetailRow>
-            <DetailLabel theme={theme}>Cert Type:</DetailLabel>
-            <DetailValue theme={theme}>{request.certificate?.certType}</DetailValue>
-          </DetailRow>
-          <DetailRow>
-            <DetailLabel theme={theme}>Fields:</DetailLabel>
-            <DetailValue theme={theme}>{request.certificate?.fields.join(', ')}</DetailValue>
-          </DetailRow>
+          <div className="flex flex-row py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span className="text-xs font-semibold w-20 flex-shrink-0" style={{ color: theme.color.global.gray }}>
+              Cert Type
+            </span>
+            <span className="text-xs break-all" style={{ color: theme.color.global.contrast }}>
+              {request.certificate?.certType}
+            </span>
+          </div>
+          <div className="flex flex-row py-2">
+            <span className="text-xs font-semibold w-20 flex-shrink-0" style={{ color: theme.color.global.gray }}>
+              Fields
+            </span>
+            <span className="text-xs break-all" style={{ color: theme.color.global.contrast }}>
+              {request.certificate?.fields.join(', ')}
+            </span>
+          </div>
         </Show>
 
+        {/* Spending fields */}
         <Show when={request.type === 'spending' && !!request.spending}>
-          <DetailRow>
-            <DetailLabel theme={theme}>Amount:</DetailLabel>
-            <DetailValue theme={theme}>{formatSatoshis(request.spending?.satoshis || 0)}</DetailValue>
-          </DetailRow>
+          <div
+            className="flex flex-row py-2"
+            style={{ borderBottom: request.spending?.lineItems?.length ? '1px solid rgba(255,255,255,0.06)' : 'none' }}
+          >
+            <span className="text-xs font-semibold w-20 flex-shrink-0" style={{ color: theme.color.global.gray }}>
+              Amount
+            </span>
+            <span className="text-xs font-semibold" style={{ color: '#A1FF8B' }}>
+              {formatSatoshis(request.spending?.satoshis || 0)}
+            </span>
+          </div>
           <Show when={!!request.spending?.lineItems?.length}>
             {request.spending?.lineItems?.map((item, i) => (
-              <DetailRow key={i}>
-                <DetailLabel theme={theme}>{item.type}:</DetailLabel>
-                <DetailValue theme={theme}>
+              <div
+                key={i}
+                className="flex flex-row py-2"
+                style={{
+                  borderBottom:
+                    i < (request.spending?.lineItems?.length ?? 0) - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                }}
+              >
+                <span className="text-xs font-semibold w-20 flex-shrink-0" style={{ color: theme.color.global.gray }}>
+                  {item.type}
+                </span>
+                <span className="text-xs break-all" style={{ color: theme.color.global.contrast }}>
                   {item.description} ({formatSatoshis(item.satoshis)})
-                </DetailValue>
-              </DetailRow>
+                </span>
+              </div>
             ))}
           </Show>
         </Show>
 
+        {/* Reason */}
         <Show when={!!request.reason}>
-          <DetailRow>
-            <DetailLabel theme={theme}>Reason:</DetailLabel>
-            <DetailValue theme={theme}>{request.reason}</DetailValue>
-          </DetailRow>
+          <div className="flex flex-row py-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <span className="text-xs font-semibold w-20 flex-shrink-0" style={{ color: theme.color.global.gray }}>
+              Reason
+            </span>
+            <span className="text-xs break-all" style={{ color: theme.color.global.contrast }}>
+              {request.reason}
+            </span>
+          </div>
         </Show>
-      </RequestDetailsContainer>
+      </motion.div>
 
+      {/* Privileged warning */}
       <Show when={!!request.privileged}>
-        <WarningText theme={theme}>This is a privileged operation</WarningText>
+        <motion.div
+          className="flex items-start gap-2 rounded-xl px-3 py-2.5 mb-4"
+          style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.15)' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.12 }}
+        >
+          <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" style={{ color: '#f5a623' }} />
+          <p className="text-xs leading-relaxed" style={{ color: '#f5a623' }}>
+            This is a privileged operation
+          </p>
+        </motion.div>
       </Show>
 
-      <FormContainer>
-        <Button theme={theme} type="primary" label="Allow" onClick={handleGrant} disabled={isProcessing} />
-        <Button theme={theme} type="secondary" label="Deny" onClick={handleDeny} disabled={isProcessing} />
-      </FormContainer>
-    </ConfirmContent>
+      {/* Actions */}
+      <div className="flex flex-col gap-3 mt-auto">
+        <motion.button
+          className="w-full py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+          style={{
+            background: 'linear-gradient(135deg, #A1FF8B 0%, #34D399 100%)',
+            color: '#010101',
+            opacity: isProcessing ? 0.6 : 1,
+          }}
+          disabled={isProcessing}
+          onClick={handleGrant}
+          whileHover={{ scale: isProcessing ? 1 : 1.02 }}
+          whileTap={{ scale: isProcessing ? 1 : 0.97 }}
+          transition={{ type: 'spring', damping: 20, stiffness: 400 }}
+        >
+          {isProcessing && <Loader2 size={14} className="animate-spin" />}
+          Allow
+        </motion.button>
+
+        <motion.button
+          className="w-full py-3.5 rounded-xl font-semibold text-sm"
+          style={{
+            background: 'transparent',
+            color: theme.color.global.gray,
+            border: '1px solid rgba(255,255,255,0.1)',
+            opacity: isProcessing ? 0.5 : 1,
+          }}
+          disabled={isProcessing}
+          onClick={handleDeny}
+          whileHover={{ scale: isProcessing ? 1 : 1.02 }}
+          whileTap={{ scale: isProcessing ? 1 : 0.97 }}
+          transition={{ type: 'spring', damping: 20, stiffness: 400 }}
+        >
+          Deny
+        </motion.button>
+      </div>
+    </motion.div>
   );
 };

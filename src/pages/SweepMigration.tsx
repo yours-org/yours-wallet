@@ -1,13 +1,12 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
 import { PrivateKey } from '@bsv/sdk';
 import { prepareSweepInputs, sweepBsv, sweepOrdinals, sweepBsv21 } from '@1sat/actions';
 import { scanAddress, type ScannedAssets, type EnrichedOrdinal, type TokenBalance } from '../sweep/scanner';
 import type { IndexedOutput } from '@1sat/types';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
-import { HeaderText, Warning } from '../components/Reusable';
+import { Warning } from '../components/Reusable';
 import { PageLoader } from '../components/PageLoader';
 import { Show } from '../components/Show';
 import { TopNav } from '../components/TopNav';
@@ -15,193 +14,48 @@ import { YoursIcon } from '../components/YoursIcon';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { BottomMenuContext } from '../contexts/BottomMenuContext';
-import { WhiteLabelTheme } from '../theme.types';
 import { decrypt } from '../utils/crypto';
 import type { Keys } from '../utils/keys';
 import type { SweepStep, SweepSelection, SweepTxResult, AddressScanStatus } from '../sweep/types';
-import { FaArrowRight, FaCheck, FaCoins, FaExclamationTriangle, FaImage, FaLock, FaTimes } from 'react-icons/fa';
-
-// --- Styled Components ---
-
-const Content = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  height: calc(75%);
-  overflow-y: auto;
-  overflow-x: hidden;
-`;
-
-const PageWrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 90%;
-  padding: 0.5rem 0;
-`;
-
-const Subtitle = styled.p<WhiteLabelTheme>`
-  font-size: 0.8rem;
-  color: ${({ theme }) => theme.color.global.contrast + 'aa'};
-  text-align: center;
-  margin: 0.25rem 0 1rem;
-  line-height: 1.5;
-`;
-
-const Card = styled.div<WhiteLabelTheme>`
-  width: 100%;
-  border: 1px solid ${({ theme }) => theme.color.global.contrast + '15'};
-  border-radius: 0.75rem;
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-  background: ${({ theme }) => theme.color.global.contrast + '05'};
-`;
-
-const CardHeader = styled.div<WhiteLabelTheme>`
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: ${({ theme }) => theme.color.global.contrast};
-`;
-
-const CardIcon = styled.div<WhiteLabelTheme>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.5rem;
-  background: ${({ theme }) => theme.color.global.primaryTheme + '15'};
-  color: ${({ theme }) => theme.color.global.primaryTheme};
-  font-size: 0.9rem;
-  flex-shrink: 0;
-`;
-
-const ScrollableContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-height: 22rem;
-  overflow-y: auto;
-  padding: 0.25rem 0;
-`;
-
-const AssetRow = styled.label<WhiteLabelTheme>`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.5rem;
-  font-size: 0.8rem;
-  color: ${({ theme }) => theme.color.global.contrast};
-  cursor: pointer;
-  border-radius: 0.375rem;
-  &:hover {
-    background: ${({ theme }) => theme.color.global.contrast + '08'};
-  }
-`;
-
-const Badge = styled.span<WhiteLabelTheme>`
-  font-size: 0.65rem;
-  font-weight: 600;
-  padding: 0.15rem 0.5rem;
-  border-radius: 1rem;
-  background: ${({ theme }) => theme.color.global.primaryTheme + '18'};
-  color: ${({ theme }) => theme.color.global.primaryTheme};
-  margin-left: auto;
-`;
-
-const ProgressRow = styled.div<WhiteLabelTheme & { $done?: boolean; $error?: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem 0.75rem;
-  margin-bottom: 0.4rem;
-  border-radius: 0.5rem;
-  font-size: 0.8rem;
-  background: ${({ theme, $done, $error }) =>
-    $error ? '#e53e3e10' : $done ? theme.color.global.primaryTheme + '10' : theme.color.global.contrast + '05'};
-  color: ${({ theme, $done, $error }) =>
-    $error ? '#e53e3e' : $done ? theme.color.global.primaryTheme : theme.color.global.contrast};
-`;
-
-const StatusIcon = styled.div<{ $color: string }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.4rem;
-  height: 1.4rem;
-  border-radius: 50%;
-  background: ${({ $color }) => $color + '20'};
-  color: ${({ $color }) => $color};
-  font-size: 0.65rem;
-  flex-shrink: 0;
-`;
-
-const ResultCard = styled.div<WhiteLabelTheme & { $success?: boolean }>`
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  border-radius: 0.5rem;
-  background: ${({ theme, $success }) => ($success ? theme.color.global.primaryTheme + '08' : '#e53e3e08')};
-  border-left: 3px solid ${({ theme, $success }) => ($success ? theme.color.global.primaryTheme : '#e53e3e')};
-`;
-
-const TxLink = styled.a<WhiteLabelTheme>`
-  font-size: 0.7rem;
-  color: ${({ theme }) => theme.color.global.primaryTheme};
-  word-break: break-all;
-  text-decoration: none;
-  &:hover {
-    text-decoration: underline;
-  }
-`;
-
-const Notice = styled.div<WhiteLabelTheme>`
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  background: ${({ theme }) => theme.color.global.primaryTheme + '08'};
-  border-left: 3px solid ${({ theme }) => theme.color.global.primaryTheme + '40'};
-  font-size: 0.75rem;
-  color: ${({ theme }) => theme.color.global.contrast + '90'};
-  line-height: 1.5;
-`;
-
-const SelectActions = styled.div`
-  display: flex;
-  gap: 0.75rem;
-  margin-bottom: 0.25rem;
-`;
-
-const SelectLink = styled.span<WhiteLabelTheme>`
-  font-size: 0.7rem;
-  color: ${({ theme }) => theme.color.global.primaryTheme};
-  cursor: pointer;
-  &:hover {
-    text-decoration: underline;
-  }
-`;
-
-const Checkbox = styled.input`
-  width: 1rem;
-  height: 1rem;
-  accent-color: currentColor;
-  flex-shrink: 0;
-`;
-
-const Spacer = styled.div<{ $h?: string }>`
-  height: ${({ $h }) => $h || '0.5rem'};
-`;
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Shield,
+  Lock,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  ArrowRight,
+  ExternalLink,
+  Loader2,
+  Coins,
+  Image,
+  Check,
+  X,
+  ChevronRight,
+} from 'lucide-react';
 
 const EXPLORER_BASE = 'https://bananablocks.com/tx/';
 
-// --- Component ---
+const STEPS: SweepStep[] = ['intro', 'password', 'scanning', 'review', 'sweeping', 'results'];
+const STEP_LABELS: Record<string, string> = {
+  intro: 'Intro',
+  password: 'Verify',
+  scanning: 'Scan',
+  review: 'Review',
+  sweeping: 'Sweep',
+  results: 'Done',
+};
+
+// Framer variants
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0 },
+};
+
+const staggerContainer = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07 } },
+};
 
 export const SweepMigration = () => {
   const { theme } = useTheme();
@@ -452,360 +306,729 @@ export const SweepMigration = () => {
     navigate('/bsv-wallet');
   };
 
+  // ===================== SHARED LAYOUT =====================
+
+  const accent = theme.color.global.primaryTheme;
+  const contrast = theme.color.global.contrast;
+  const gray = '#98A2B3';
+  const rowBg = '#17191E';
+  const errorColor = '#F87171';
+
+  const currentStepIndex = STEPS.indexOf(step);
+
+  // Step progress bar (shared)
+  const StepProgress = () => (
+    <div className="flex items-center gap-1 w-full mb-6">
+      {STEPS.map((s, i) => {
+        const isActive = i === currentStepIndex;
+        const isDone = i < currentStepIndex;
+        return (
+          <div key={s} className="flex-1 flex flex-col items-center gap-1">
+            <div
+              className="h-1 w-full rounded-full transition-all duration-500"
+              style={{
+                background: isDone
+                  ? `linear-gradient(90deg, #A1FF8B, #34D399)`
+                  : isActive
+                    ? accent + '70'
+                    : contrast + '15',
+              }}
+            />
+            <span
+              className="text-[9px] font-medium tracking-wide"
+              style={{
+                color: isDone || isActive ? accent : gray,
+                opacity: isDone || isActive ? 1 : 0.5,
+              }}
+            >
+              {STEP_LABELS[s]}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   // ===================== RENDER =====================
 
   // Step: Intro
   if (step === 'intro') {
     return (
-      <Content>
+      <div className="min-h-screen flex flex-col" style={{ background: '#010101' }}>
         <TopNav />
-        <PageWrapper>
-          <YoursIcon width="3rem" />
-          <Spacer $h="0.5rem" />
-          <HeaderText theme={theme}>Migrate to BRC-100</HeaderText>
-          <Subtitle theme={theme}>
-            Your wallet has been upgraded. Sweep assets from your legacy addresses into your new BRC-100 wallet.
-          </Subtitle>
+        <div className="flex-1 flex flex-col items-center px-5 py-6 max-w-lg mx-auto w-full">
+          <StepProgress />
 
-          <Card theme={theme}>
-            <CardHeader theme={theme}>
-              <CardIcon theme={theme}>
-                <FaLock />
-              </CardIcon>
-              Keys are safe
-            </CardHeader>
-            <Subtitle theme={theme} style={{ textAlign: 'left', margin: 0 }}>
-              Your old keys will always be preserved, even after sweeping.
-            </Subtitle>
-          </Card>
+          <motion.div
+            className="flex flex-col items-center w-full"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
+          >
+            {/* Icon */}
+            <motion.div variants={fadeUp} className="mb-4">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                style={{ background: `linear-gradient(135deg, #A1FF8B20, #34D39920)`, border: `1px solid ${accent}30` }}
+              >
+                <YoursIcon width="2.5rem" />
+              </div>
+            </motion.div>
 
-          <Card theme={theme}>
-            <CardHeader theme={theme}>
-              <CardIcon theme={theme}>
-                <FaExclamationTriangle />
-              </CardIcon>
-              Some assets need manual handling
-            </CardHeader>
-            <Subtitle theme={theme} style={{ textAlign: 'left', margin: 0 }}>
-              BSV-20, RUN tokens, and time-locked outputs can't be swept automatically. You'll be guided through your
-              options.
-            </Subtitle>
-          </Card>
+            {/* Title */}
+            <motion.h1 variants={fadeUp} className="text-2xl font-bold mb-2 text-center" style={{ color: contrast }}>
+              Migrate to BRC-100
+            </motion.h1>
+            <motion.p variants={fadeUp} className="text-sm text-center mb-6 leading-relaxed" style={{ color: gray }}>
+              Your wallet has been upgraded. Sweep assets from your legacy addresses into your new BRC-100 wallet.
+            </motion.p>
 
-          <Spacer $h="0.25rem" />
-          <Button
-            theme={theme}
-            type="primary"
-            label="Start Migration"
-            onClick={() => {
-              chrome.tabs.create({ url: chrome.runtime.getURL('sweep-tab.html') });
-            }}
-          />
-          <Button theme={theme} type="secondary-outline" label="I'll Do This Later" onClick={handleSkip} />
-        </PageWrapper>
-      </Content>
+            {/* Info cards */}
+            <motion.div
+              variants={fadeUp}
+              className="w-full rounded-2xl p-4 mb-3 flex gap-3 items-start"
+              style={{ background: rowBg, border: `1px solid ${contrast}10` }}
+            >
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: `${accent}15` }}
+              >
+                <Shield size={16} style={{ color: accent }} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold mb-1" style={{ color: contrast }}>
+                  Your keys are safe
+                </p>
+                <p className="text-xs leading-relaxed" style={{ color: gray }}>
+                  Your old keys will always be preserved, even after sweeping.
+                </p>
+              </div>
+            </motion.div>
+
+            <motion.div
+              variants={fadeUp}
+              className="w-full rounded-2xl p-4 mb-6 flex gap-3 items-start"
+              style={{ background: rowBg, border: `1px solid ${contrast}10` }}
+            >
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: '#F59E0B15' }}
+              >
+                <AlertTriangle size={16} style={{ color: '#F59E0B' }} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold mb-1" style={{ color: contrast }}>
+                  Some assets need manual handling
+                </p>
+                <p className="text-xs leading-relaxed" style={{ color: gray }}>
+                  BSV-20, RUN tokens, and time-locked outputs can't be swept automatically. You'll be guided through
+                  your options.
+                </p>
+              </div>
+            </motion.div>
+
+            {/* Actions */}
+            <motion.div variants={fadeUp} className="w-full flex flex-col gap-3">
+              <Button
+                theme={theme}
+                type="primary"
+                label="Start Migration"
+                onClick={() => {
+                  chrome.tabs.create({ url: chrome.runtime.getURL('sweep-tab.html') });
+                }}
+              />
+              <Button theme={theme} type="secondary-outline" label="I'll Do This Later" onClick={handleSkip} />
+            </motion.div>
+          </motion.div>
+        </div>
+      </div>
     );
   }
 
   // Step: Password
   if (step === 'password') {
     return (
-      <Content>
+      <div className="min-h-screen flex flex-col" style={{ background: '#010101' }}>
         <TopNav />
-        <PageWrapper>
-          <CardIcon
-            theme={theme}
-            style={{ width: '3rem', height: '3rem', fontSize: '1.3rem', marginBottom: '0.75rem' }}
+        <div className="flex-1 flex flex-col items-center px-5 py-6 max-w-lg mx-auto w-full">
+          <StepProgress />
+
+          <motion.div
+            className="flex flex-col items-center w-full"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
           >
-            <FaLock />
-          </CardIcon>
-          <HeaderText theme={theme}>Verify Password</HeaderText>
-          <Subtitle theme={theme}>Enter your wallet password to decrypt your legacy keys.</Subtitle>
-          <form onSubmit={handlePasswordSubmit} style={{ width: '100%' }}>
-            <Input
-              theme={theme}
-              placeholder="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <Show when={!!passwordError}>
-              <Warning theme={theme} style={{ margin: '0.5rem 0' }}>
-                {passwordError}
-              </Warning>
-            </Show>
-            <Spacer $h="0.5rem" />
-            <Button
-              theme={theme}
-              type="primary"
-              label={isProcessing ? 'Decrypting...' : 'Continue'}
-              disabled={isProcessing || !password}
-              isSubmit
-            />
-          </form>
-          <Button theme={theme} type="secondary-outline" label="Back" onClick={() => setStep('intro')} />
-        </PageWrapper>
-      </Content>
+            {/* Icon */}
+            <motion.div variants={fadeUp} className="mb-5">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                style={{ background: `${accent}15`, border: `1px solid ${accent}30` }}
+              >
+                <Lock size={28} style={{ color: accent }} />
+              </div>
+            </motion.div>
+
+            <motion.h1 variants={fadeUp} className="text-2xl font-bold mb-2 text-center" style={{ color: contrast }}>
+              Verify Password
+            </motion.h1>
+            <motion.p variants={fadeUp} className="text-sm text-center mb-6" style={{ color: gray }}>
+              Enter your wallet password to decrypt your legacy keys.
+            </motion.p>
+
+            <motion.form variants={fadeUp} onSubmit={handlePasswordSubmit} className="w-full flex flex-col gap-3">
+              <Input
+                theme={theme}
+                placeholder="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <Show when={!!passwordError}>
+                <Warning theme={theme} style={{ margin: '0' }}>
+                  {passwordError}
+                </Warning>
+              </Show>
+              <Button
+                theme={theme}
+                type="primary"
+                label={isProcessing ? 'Decrypting...' : 'Continue'}
+                disabled={isProcessing || !password}
+                isSubmit
+              />
+            </motion.form>
+
+            <motion.div variants={fadeUp} className="w-full mt-2">
+              <Button theme={theme} type="secondary-outline" label="Back" onClick={() => setStep('intro')} />
+            </motion.div>
+          </motion.div>
+        </div>
+      </div>
     );
   }
 
   // Step: Scanning
   if (step === 'scanning') {
     const doneCount = scanStatuses.filter((s) => s.status === 'done').length;
+    const allDone = scanStatuses.length > 0 && doneCount === scanStatuses.length;
+
     return (
-      <Content>
+      <div className="min-h-screen flex flex-col" style={{ background: '#010101' }}>
         <TopNav />
-        <PageWrapper>
-          <HeaderText theme={theme}>Scanning Addresses</HeaderText>
-          <Subtitle theme={theme}>
-            Looking for assets on {scanStatuses.length} legacy address{scanStatuses.length !== 1 ? 'es' : ''}...
-          </Subtitle>
-          {scanStatuses.map((s) => (
-            <ProgressRow key={s.address} theme={theme} $done={s.status === 'done'} $error={s.status === 'error'}>
-              <StatusIcon
-                $color={
-                  s.status === 'done'
-                    ? theme.color.global.primaryTheme
-                    : s.status === 'error'
-                      ? '#e53e3e'
-                      : theme.color.global.contrast + '60'
-                }
-              >
-                {s.status === 'done' && <FaCheck />}
-                {s.status === 'error' && <FaTimes />}
-                {s.status === 'scanning' && <span className="spinner">...</span>}
-              </StatusIcon>
-              <span>
-                <strong>{s.label}</strong>
-                <span style={{ opacity: 0.6, marginLeft: '0.4rem', fontSize: '0.7rem' }}>
-                  {s.address.slice(0, 6)}...{s.address.slice(-4)}
+        <div className="flex-1 flex flex-col items-center px-5 py-6 max-w-lg mx-auto w-full">
+          <StepProgress />
+
+          <motion.div
+            className="flex flex-col items-center w-full"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.h1 variants={fadeUp} className="text-2xl font-bold mb-2 text-center" style={{ color: contrast }}>
+              Scanning Addresses
+            </motion.h1>
+            <motion.p variants={fadeUp} className="text-sm text-center mb-6" style={{ color: gray }}>
+              Looking for assets on {scanStatuses.length} legacy address{scanStatuses.length !== 1 ? 'es' : ''}...
+            </motion.p>
+
+            <motion.div variants={staggerContainer} className="w-full flex flex-col gap-2 mb-6">
+              {scanStatuses.map((s, i) => {
+                const isDone = s.status === 'done';
+                const isError = s.status === 'error';
+                const isScanning = s.status === 'scanning';
+
+                return (
+                  <motion.div
+                    key={s.address}
+                    variants={fadeUp}
+                    className="flex items-center gap-3 rounded-xl px-4 py-3"
+                    style={{
+                      background: isError ? `${errorColor}10` : isDone ? `${accent}10` : rowBg,
+                      border: `1px solid ${isError ? errorColor : isDone ? accent : contrast}15`,
+                    }}
+                  >
+                    {/* Status indicator */}
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{
+                        background: isError ? `${errorColor}20` : isDone ? `${accent}20` : `${gray}15`,
+                      }}
+                    >
+                      {isDone && <Check size={13} style={{ color: accent }} />}
+                      {isError && <X size={13} style={{ color: errorColor }} />}
+                      {isScanning && (
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        >
+                          <Loader2 size={13} style={{ color: gray }} />
+                        </motion.div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <span
+                        className="text-sm font-semibold"
+                        style={{ color: isError ? errorColor : isDone ? accent : contrast }}
+                      >
+                        {s.label}
+                      </span>
+                      <span className="text-xs ml-2 font-mono" style={{ color: gray }}>
+                        {s.address.slice(0, 6)}...{s.address.slice(-4)}
+                      </span>
+                    </div>
+
+                    <span
+                      className="text-xs font-medium"
+                      style={{ color: isError ? errorColor : isDone ? accent : gray }}
+                    >
+                      {isDone ? 'Done' : isError ? 'Error' : 'Scanning'}
+                    </span>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+
+            <Show when={scanStatuses.length === 0}>
+              <PageLoader message="Preparing scan..." theme={theme} />
+            </Show>
+
+            <Show when={scanStatuses.length > 0 && !allDone}>
+              <div className="w-full rounded-2xl p-4 flex items-center gap-3" style={{ background: rowBg }}>
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}>
+                  <Loader2 size={18} style={{ color: accent }} />
+                </motion.div>
+                <span className="text-sm" style={{ color: gray }}>
+                  {doneCount}/{scanStatuses.length} addresses scanned
                 </span>
-              </span>
-            </ProgressRow>
-          ))}
-          <Show when={scanStatuses.length === 0}>
-            <PageLoader message="Preparing scan..." theme={theme} />
-          </Show>
-          <Show when={scanStatuses.length > 0 && doneCount < scanStatuses.length}>
-            <Spacer $h="1rem" />
-            <PageLoader message={`${doneCount}/${scanStatuses.length} complete`} theme={theme} />
-          </Show>
-        </PageWrapper>
-      </Content>
+                {/* progress bar */}
+                <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: `${contrast}10` }}>
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: `linear-gradient(90deg, #A1FF8B, #34D399)` }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(doneCount / Math.max(scanStatuses.length, 1)) * 100}%` }}
+                    transition={{ duration: 0.4 }}
+                  />
+                </div>
+              </div>
+            </Show>
+          </motion.div>
+        </div>
+      </div>
     );
   }
 
   // Step: Review
   if (step === 'review') {
     return (
-      <Content>
+      <div className="min-h-screen flex flex-col" style={{ background: '#010101' }}>
         <TopNav />
-        <PageWrapper>
+        <div className="flex-1 flex flex-col items-center px-5 py-6 max-w-lg mx-auto w-full">
+          <StepProgress />
+
           <Show when={!hasAnyAssets}>
-            <CardIcon
-              theme={theme}
-              style={{ width: '3rem', height: '3rem', fontSize: '1.3rem', marginBottom: '0.75rem' }}
+            <motion.div
+              className="flex flex-col items-center w-full"
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
             >
-              <FaCheck />
-            </CardIcon>
-            <HeaderText theme={theme}>All Clear</HeaderText>
-            <Subtitle theme={theme}>
-              No assets found on your legacy addresses. Your keys are preserved — you can scan again from Tools.
-            </Subtitle>
-            <Button theme={theme} type="primary" label="Done" onClick={handleDone} />
+              <motion.div variants={fadeUp} className="mb-5">
+                <div
+                  className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                  style={{ background: `${accent}15`, border: `1px solid ${accent}30` }}
+                >
+                  <CheckCircle size={28} style={{ color: accent }} />
+                </div>
+              </motion.div>
+              <motion.h1 variants={fadeUp} className="text-2xl font-bold mb-2 text-center" style={{ color: contrast }}>
+                All Clear
+              </motion.h1>
+              <motion.p variants={fadeUp} className="text-sm text-center mb-6" style={{ color: gray }}>
+                No assets found on your legacy addresses. Your keys are preserved — you can scan again from Tools.
+              </motion.p>
+              <motion.div variants={fadeUp} className="w-full">
+                <Button theme={theme} type="primary" label="Done" onClick={handleDone} />
+              </motion.div>
+            </motion.div>
           </Show>
 
           <Show when={hasAnyAssets}>
-            <HeaderText theme={theme} style={{ fontSize: '1.1rem' }}>
-              Select Assets to Sweep
-            </HeaderText>
-            <Subtitle theme={theme}>Choose which assets to move to your BRC-100 wallet.</Subtitle>
+            <motion.div
+              className="flex flex-col items-center w-full"
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+            >
+              <motion.h1 variants={fadeUp} className="text-xl font-bold mb-1 text-center" style={{ color: contrast }}>
+                Select Assets to Sweep
+              </motion.h1>
+              <motion.p variants={fadeUp} className="text-sm text-center mb-4" style={{ color: gray }}>
+                Choose which assets to move to your BRC-100 wallet.
+              </motion.p>
 
-            <ScrollableContainer>
-              {/* BSV Funding */}
-              <Show when={assets.funding.length > 0}>
-                <Card theme={theme}>
-                  <CardHeader theme={theme}>
-                    <CardIcon theme={theme}>
-                      <FaCoins />
-                    </CardIcon>
-                    BSV Funding
-                    <Badge theme={theme}>{(assets.totalBsv / 1e8).toFixed(8)} BSV</Badge>
-                  </CardHeader>
-                  <AssetRow theme={theme}>
-                    <Checkbox type="checkbox" checked={selection.sweepBsv} onChange={toggleBsv} />
-                    Sweep {assets.totalBsv.toLocaleString()} sats ({assets.funding.length} UTXOs)
-                  </AssetRow>
-                </Card>
-              </Show>
-
-              {/* Ordinals */}
-              <Show when={assets.ordinals.length > 0}>
-                <Card theme={theme}>
-                  <CardHeader theme={theme}>
-                    <CardIcon theme={theme}>
-                      <FaImage />
-                    </CardIcon>
-                    Ordinals
-                    <Badge theme={theme}>{assets.ordinals.length}</Badge>
-                  </CardHeader>
-                  <SelectActions>
-                    <SelectLink theme={theme} onClick={selectAllOrdinals}>
-                      Select all
-                    </SelectLink>
-                    <SelectLink theme={theme} onClick={deselectAllOrdinals}>
-                      Clear
-                    </SelectLink>
-                  </SelectActions>
-                  {assets.ordinals.map((o) => (
-                    <AssetRow key={o.outpoint} theme={theme}>
-                      <Checkbox
+              {/* Scrollable asset sections */}
+              <motion.div
+                variants={fadeUp}
+                className="w-full flex flex-col gap-3 overflow-y-auto mb-4"
+                style={{ maxHeight: '22rem' }}
+              >
+                {/* BSV Funding */}
+                <Show when={assets.funding.length > 0}>
+                  <div className="rounded-2xl p-4" style={{ background: rowBg, border: `1px solid ${contrast}10` }}>
+                    {/* Card header */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center"
+                        style={{ background: `${accent}15` }}
+                      >
+                        <Coins size={14} style={{ color: accent }} />
+                      </div>
+                      <span className="text-sm font-semibold" style={{ color: contrast }}>
+                        BSV Funding
+                      </span>
+                      <span
+                        className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: `${accent}18`, color: accent }}
+                      >
+                        {(assets.totalBsv / 1e8).toFixed(8)} BSV
+                      </span>
+                    </div>
+                    {/* Row */}
+                    <label className="flex items-center gap-3 cursor-pointer rounded-xl px-3 py-2 transition-colors hover:bg-white/5">
+                      <input
                         type="checkbox"
-                        checked={selection.selectedOrdinals.has(o.outpoint)}
-                        onChange={() => toggleOrdinal(o.outpoint)}
+                        checked={selection.sweepBsv}
+                        onChange={toggleBsv}
+                        className="w-4 h-4 rounded flex-shrink-0"
+                        style={{ accentColor: accent }}
                       />
-                      <span style={{ flex: 1 }}>
-                        {o.name || o.contentType || (
-                          <span style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
-                            {o.outpoint.slice(0, 8)}...{o.outpoint.slice(-6)}
+                      <span className="text-sm" style={{ color: contrast }}>
+                        Sweep {assets.totalBsv.toLocaleString()} sats ({assets.funding.length} UTXOs)
+                      </span>
+                    </label>
+                  </div>
+                </Show>
+
+                {/* Ordinals */}
+                <Show when={assets.ordinals.length > 0}>
+                  <div className="rounded-2xl p-4" style={{ background: rowBg, border: `1px solid ${contrast}10` }}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center"
+                        style={{ background: `${accent}15` }}
+                      >
+                        <Image size={14} style={{ color: accent }} />
+                      </div>
+                      <span className="text-sm font-semibold" style={{ color: contrast }}>
+                        Ordinals
+                      </span>
+                      <span
+                        className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: `${accent}18`, color: accent }}
+                      >
+                        {assets.ordinals.length}
+                      </span>
+                    </div>
+                    {/* Select/clear */}
+                    <div className="flex gap-4 mb-2 px-1">
+                      <button
+                        type="button"
+                        onClick={selectAllOrdinals}
+                        className="text-xs font-medium hover:underline"
+                        style={{ color: accent }}
+                      >
+                        Select all
+                      </button>
+                      <button
+                        type="button"
+                        onClick={deselectAllOrdinals}
+                        className="text-xs font-medium hover:underline"
+                        style={{ color: gray }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    {assets.ordinals.map((o) => (
+                      <label
+                        key={o.outpoint}
+                        className="flex items-center gap-3 cursor-pointer rounded-xl px-3 py-2 transition-colors hover:bg-white/5"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selection.selectedOrdinals.has(o.outpoint)}
+                          onChange={() => toggleOrdinal(o.outpoint)}
+                          className="w-4 h-4 rounded flex-shrink-0"
+                          style={{ accentColor: accent }}
+                        />
+                        <span className="text-sm flex-1 truncate" style={{ color: contrast }}>
+                          {o.name || o.contentType || (
+                            <span className="font-mono text-xs">
+                              {o.outpoint.slice(0, 8)}...{o.outpoint.slice(-6)}
+                            </span>
+                          )}
+                        </span>
+                        {o.contentType && (
+                          <span
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: `${accent}18`, color: accent }}
+                          >
+                            {o.contentType.split('/').pop()}
                           </span>
                         )}
+                      </label>
+                    ))}
+                  </div>
+                </Show>
+
+                {/* OpNS Names */}
+                <Show when={assets.opnsNames.length > 0}>
+                  <div className="rounded-2xl p-4" style={{ background: rowBg, border: `1px solid ${contrast}10` }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center"
+                        style={{ background: `${accent}15` }}
+                      >
+                        <Image size={14} style={{ color: accent }} />
+                      </div>
+                      <span className="text-sm font-semibold" style={{ color: contrast }}>
+                        OpNS Names
                       </span>
-                      {o.contentType && <Badge theme={theme}>{o.contentType.split('/').pop()}</Badge>}
-                    </AssetRow>
-                  ))}
-                </Card>
-              </Show>
-
-              {/* OPNS Names */}
-              <Show when={assets.opnsNames.length > 0}>
-                <Card theme={theme}>
-                  <CardHeader theme={theme}>
-                    <CardIcon theme={theme}>
-                      <FaImage />
-                    </CardIcon>
-                    OpNS Names
-                    <Badge theme={theme}>{assets.opnsNames.length}</Badge>
-                  </CardHeader>
-                  {assets.opnsNames.map((o) => (
-                    <AssetRow key={o.outpoint} theme={theme}>
-                      <Checkbox
-                        type="checkbox"
-                        checked={selection.selectedOrdinals.has(o.outpoint)}
-                        onChange={() => toggleOrdinal(o.outpoint)}
-                      />
-                      <span>{o.name || o.outpoint.slice(0, 12)}</span>
-                    </AssetRow>
-                  ))}
-                </Card>
-              </Show>
-
-              {/* BSV-21 Tokens */}
-              <Show when={assets.bsv21Tokens.length > 0}>
-                <Card theme={theme}>
-                  <CardHeader theme={theme}>
-                    <CardIcon theme={theme}>
-                      <FaCoins />
-                    </CardIcon>
-                    BSV-21 Tokens
-                  </CardHeader>
-                  {assets.bsv21Tokens.map((t) => (
-                    <AssetRow key={t.tokenId} theme={theme} style={{ opacity: t.isActive ? 1 : 0.5 }}>
-                      <Checkbox
-                        type="checkbox"
-                        checked={selection.selectedBsv21TokenIds.has(t.tokenId)}
-                        onChange={() => toggleBsv21(t.tokenId)}
-                        disabled={!t.isActive}
-                      />
-                      <span style={{ flex: 1 }}>
-                        {t.symbol || t.tokenId.slice(0, 8)}
-                        {!t.isActive && <span style={{ fontSize: '0.65rem', opacity: 0.6 }}> (inactive)</span>}
+                      <span
+                        className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: `${accent}18`, color: accent }}
+                      >
+                        {assets.opnsNames.length}
                       </span>
-                      <Badge theme={theme}>
-                        {t.totalAmount.toString()} ({t.outputs.length})
-                      </Badge>
-                    </AssetRow>
-                  ))}
-                </Card>
-              </Show>
+                    </div>
+                    {assets.opnsNames.map((o) => (
+                      <label
+                        key={o.outpoint}
+                        className="flex items-center gap-3 cursor-pointer rounded-xl px-3 py-2 transition-colors hover:bg-white/5"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selection.selectedOrdinals.has(o.outpoint)}
+                          onChange={() => toggleOrdinal(o.outpoint)}
+                          className="w-4 h-4 rounded flex-shrink-0"
+                          style={{ accentColor: accent }}
+                        />
+                        <span className="text-sm" style={{ color: contrast }}>
+                          {o.name || o.outpoint.slice(0, 12)}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </Show>
 
-              {/* Non-sweepable: BSV-20 */}
-              <Show when={assets.bsv20Tokens.length > 0}>
-                <Card theme={theme} style={{ opacity: 0.7 }}>
-                  <CardHeader theme={theme}>
-                    <CardIcon theme={theme} style={{ background: '#e53e3e15', color: '#e53e3e' }}>
-                      <FaExclamationTriangle />
-                    </CardIcon>
-                    BSV-20 Tokens
-                    <Badge theme={theme}>{assets.bsv20Tokens.length}</Badge>
-                  </CardHeader>
-                  <Subtitle theme={theme} style={{ textAlign: 'left', margin: 0, fontSize: '0.7rem' }}>
-                    Cannot be swept automatically. Export your legacy keys from Settings to access these with a
-                    compatible wallet.
-                  </Subtitle>
-                </Card>
-              </Show>
+                {/* BSV-21 Tokens */}
+                <Show when={assets.bsv21Tokens.length > 0}>
+                  <div className="rounded-2xl p-4" style={{ background: rowBg, border: `1px solid ${contrast}10` }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center"
+                        style={{ background: `${accent}15` }}
+                      >
+                        <Coins size={14} style={{ color: accent }} />
+                      </div>
+                      <span className="text-sm font-semibold" style={{ color: contrast }}>
+                        BSV-21 Tokens
+                      </span>
+                    </div>
+                    {assets.bsv21Tokens.map((t) => (
+                      <label
+                        key={t.tokenId}
+                        className="flex items-center gap-3 cursor-pointer rounded-xl px-3 py-2 transition-colors hover:bg-white/5"
+                        style={{ opacity: t.isActive ? 1 : 0.45 }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selection.selectedBsv21TokenIds.has(t.tokenId)}
+                          onChange={() => toggleBsv21(t.tokenId)}
+                          disabled={!t.isActive}
+                          className="w-4 h-4 rounded flex-shrink-0"
+                          style={{ accentColor: accent }}
+                        />
+                        <span className="text-sm flex-1" style={{ color: contrast }}>
+                          {t.symbol || t.tokenId.slice(0, 8)}
+                          {!t.isActive && (
+                            <span className="text-[10px] ml-1.5" style={{ color: gray }}>
+                              inactive
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: `${accent}18`, color: accent }}
+                        >
+                          {t.totalAmount.toString()} ({t.outputs.length})
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </Show>
 
-              {/* Non-sweepable: Locked */}
-              <Show when={assets.locked.length > 0}>
-                <Card theme={theme} style={{ opacity: 0.7 }}>
-                  <CardHeader theme={theme}>
-                    <CardIcon theme={theme} style={{ background: '#e53e3e15', color: '#e53e3e' }}>
-                      <FaLock />
-                    </CardIcon>
-                    Locked Outputs
-                    <Badge theme={theme}>{assets.locked.length}</Badge>
-                  </CardHeader>
-                  <Subtitle theme={theme} style={{ textAlign: 'left', margin: 0, fontSize: '0.7rem' }}>
-                    These outputs are locked in smart contracts. Your legacy keys are preserved — you can sweep these
-                    after they unlock.
-                  </Subtitle>
-                </Card>
-              </Show>
+                {/* Non-sweepable: BSV-20 */}
+                <Show when={assets.bsv20Tokens.length > 0}>
+                  <div
+                    className="rounded-2xl p-4 opacity-60"
+                    style={{ background: rowBg, border: `1px solid ${errorColor}20` }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center"
+                        style={{ background: '#F87171' + '15' }}
+                      >
+                        <AlertTriangle size={14} style={{ color: errorColor }} />
+                      </div>
+                      <span className="text-sm font-semibold" style={{ color: contrast }}>
+                        BSV-20 Tokens
+                      </span>
+                      <span
+                        className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: `${errorColor}15`, color: errorColor }}
+                      >
+                        {assets.bsv20Tokens.length}
+                      </span>
+                    </div>
+                    <p className="text-xs leading-relaxed px-1" style={{ color: gray }}>
+                      Cannot be swept automatically. Export your legacy keys from Settings to access these with a
+                      compatible wallet.
+                    </p>
+                  </div>
+                </Show>
 
-              <Notice theme={theme}>
-                Your legacy keys are always preserved. Return anytime via <strong>Tools → Migrate Legacy Assets</strong>
-                .
-              </Notice>
-            </ScrollableContainer>
+                {/* Non-sweepable: Locked */}
+                <Show when={assets.locked.length > 0}>
+                  <div
+                    className="rounded-2xl p-4 opacity-60"
+                    style={{ background: rowBg, border: `1px solid ${errorColor}20` }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center"
+                        style={{ background: `${errorColor}15` }}
+                      >
+                        <Lock size={14} style={{ color: errorColor }} />
+                      </div>
+                      <span className="text-sm font-semibold" style={{ color: contrast }}>
+                        Locked Outputs
+                      </span>
+                      <span
+                        className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: `${errorColor}15`, color: errorColor }}
+                      >
+                        {assets.locked.length}
+                      </span>
+                    </div>
+                    <p className="text-xs leading-relaxed px-1" style={{ color: gray }}>
+                      These outputs are locked in smart contracts. Your legacy keys are preserved — you can sweep these
+                      after they unlock.
+                    </p>
+                  </div>
+                </Show>
 
-            <Spacer $h="0.5rem" />
-            <Button
-              theme={theme}
-              type="primary"
-              label={hasSelection ? 'Sweep Selected' : 'Select assets above'}
-              onClick={executeSweeps}
-              disabled={!hasSelection}
-            />
-            <Button theme={theme} type="secondary-outline" label="Skip for Now" onClick={handleSkip} />
+                {/* Preserved-keys notice */}
+                <div
+                  className="rounded-2xl p-3 flex gap-2 items-start"
+                  style={{ background: `${accent}08`, borderLeft: `3px solid ${accent}40` }}
+                >
+                  <Shield size={13} style={{ color: accent, marginTop: 2, flexShrink: 0 }} />
+                  <p className="text-xs leading-relaxed" style={{ color: contrast + 'aa' }}>
+                    Your legacy keys are always preserved. Return anytime via{' '}
+                    <strong>Tools → Migrate Legacy Assets</strong>.
+                  </p>
+                </div>
+              </motion.div>
+
+              {/* CTA */}
+              <div className="w-full flex flex-col gap-2">
+                <Button
+                  theme={theme}
+                  type="primary"
+                  label={hasSelection ? 'Sweep Selected' : 'Select assets above'}
+                  onClick={executeSweeps}
+                  disabled={!hasSelection}
+                />
+                <Button theme={theme} type="secondary-outline" label="Skip for Now" onClick={handleSkip} />
+              </div>
+            </motion.div>
           </Show>
-        </PageWrapper>
-      </Content>
+        </div>
+      </div>
     );
   }
 
   // Step: Sweeping
   if (step === 'sweeping') {
     return (
-      <Content>
+      <div className="min-h-screen flex flex-col" style={{ background: '#010101' }}>
         <TopNav />
-        <PageWrapper>
-          <HeaderText theme={theme}>Sweeping Assets</HeaderText>
-          <Warning theme={theme} style={{ margin: '0.5rem 0 1rem', fontSize: '0.75rem' }}>
-            Do not close the wallet during this process
-          </Warning>
-          <PageLoader message={currentSweepOp || 'Processing...'} theme={theme} />
-          <Spacer $h="0.5rem" />
-          {sweepResults.map((r, i) => (
-            <ProgressRow key={i} theme={theme} $done={!!r.txid} $error={!!r.error && !r.txid}>
-              <StatusIcon $color={r.txid ? theme.color.global.primaryTheme : '#e53e3e'}>
-                {r.txid ? <FaCheck /> : <FaTimes />}
-              </StatusIcon>
-              {r.label}
-            </ProgressRow>
-          ))}
-        </PageWrapper>
-      </Content>
+        <div className="flex-1 flex flex-col items-center px-5 py-6 max-w-lg mx-auto w-full">
+          <StepProgress />
+
+          <motion.div
+            className="flex flex-col items-center w-full"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.h1 variants={fadeUp} className="text-2xl font-bold mb-2 text-center" style={{ color: contrast }}>
+              Sweeping Assets
+            </motion.h1>
+
+            {/* Warning banner */}
+            <motion.div
+              variants={fadeUp}
+              className="w-full rounded-2xl px-4 py-3 mb-6 flex items-center gap-3"
+              style={{ background: '#F59E0B10', border: '1px solid #F59E0B30' }}
+            >
+              <AlertTriangle size={15} style={{ color: '#F59E0B', flexShrink: 0 }} />
+              <span className="text-xs" style={{ color: '#F59E0B' }}>
+                Do not close the wallet during this process
+              </span>
+            </motion.div>
+
+            {/* Current op */}
+            <motion.div variants={fadeUp} className="mb-6">
+              <PageLoader message={currentSweepOp || 'Processing...'} theme={theme} />
+            </motion.div>
+
+            {/* Completed so far */}
+            <motion.div variants={staggerContainer} className="w-full flex flex-col gap-2">
+              {sweepResults.map((r, i) => {
+                const ok = !!r.txid;
+                return (
+                  <motion.div
+                    key={i}
+                    variants={fadeUp}
+                    className="flex items-center gap-3 rounded-xl px-4 py-3"
+                    style={{
+                      background: ok ? `${accent}10` : `${errorColor}10`,
+                      border: `1px solid ${ok ? accent : errorColor}20`,
+                    }}
+                  >
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: ok ? `${accent}20` : `${errorColor}20` }}
+                    >
+                      {ok ? (
+                        <Check size={13} style={{ color: accent }} />
+                      ) : (
+                        <X size={13} style={{ color: errorColor }} />
+                      )}
+                    </div>
+                    <span className="text-sm" style={{ color: ok ? accent : errorColor }}>
+                      {r.label}
+                    </span>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          </motion.div>
+        </div>
+      </div>
     );
   }
 
@@ -813,57 +1036,121 @@ export const SweepMigration = () => {
   if (step === 'results') {
     const successes = sweepResults.filter((r) => r.txid);
     const failures = sweepResults.filter((r) => r.error && !r.txid);
+    const allGood = failures.length === 0;
 
     return (
-      <Content>
+      <div className="min-h-screen flex flex-col" style={{ background: '#010101' }}>
         <TopNav />
-        <PageWrapper>
-          <CardIcon
-            theme={theme}
-            style={{
-              width: '3rem',
-              height: '3rem',
-              fontSize: '1.3rem',
-              marginBottom: '0.75rem',
-              background: failures.length > 0 ? '#e53e3e15' : undefined,
-              color: failures.length > 0 ? '#e53e3e' : undefined,
-            }}
+        <div className="flex-1 flex flex-col items-center px-5 py-6 max-w-lg mx-auto w-full">
+          <StepProgress />
+
+          <motion.div
+            className="flex flex-col items-center w-full"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
           >
-            {failures.length > 0 ? <FaExclamationTriangle /> : <FaCheck />}
-          </CardIcon>
-          <HeaderText theme={theme}>{failures.length > 0 ? 'Partially Complete' : 'Migration Complete'}</HeaderText>
-          <Subtitle theme={theme}>
-            {successes.length} swept{failures.length > 0 ? `, ${failures.length} failed` : ''}
-          </Subtitle>
+            {/* Result icon */}
+            <motion.div
+              variants={fadeUp}
+              className="mb-5"
+              animate={allGood ? { scale: [0.8, 1.1, 1] } : {}}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                style={{
+                  background: allGood ? `${accent}15` : `${errorColor}15`,
+                  border: `1px solid ${allGood ? accent : errorColor}30`,
+                }}
+              >
+                {allGood ? (
+                  <CheckCircle size={28} style={{ color: accent }} />
+                ) : (
+                  <AlertTriangle size={28} style={{ color: errorColor }} />
+                )}
+              </div>
+            </motion.div>
 
-          <ScrollableContainer>
-            {sweepResults.map((r, i) => (
-              <ResultCard key={i} theme={theme} $success={!!r.txid}>
-                <StatusIcon $color={r.txid ? theme.color.global.primaryTheme : '#e53e3e'}>
-                  {r.txid ? <FaCheck /> : <FaTimes />}
-                </StatusIcon>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 500 }}>{r.label}</div>
-                  {r.txid && (
-                    <TxLink theme={theme} href={`${EXPLORER_BASE}${r.txid}`} target="_blank" rel="noreferrer">
-                      {r.txid.slice(0, 16)}...
-                      <FaArrowRight style={{ fontSize: '0.55rem', marginLeft: '0.25rem' }} />
-                    </TxLink>
-                  )}
-                  {r.error && !r.txid && <span style={{ fontSize: '0.7rem', color: '#e53e3e' }}>{r.error}</span>}
-                </div>
-              </ResultCard>
-            ))}
+            <motion.h1 variants={fadeUp} className="text-2xl font-bold mb-2 text-center" style={{ color: contrast }}>
+              {allGood ? 'Migration Complete' : 'Partially Complete'}
+            </motion.h1>
+            <motion.p variants={fadeUp} className="text-sm text-center mb-5" style={{ color: gray }}>
+              {successes.length} swept{failures.length > 0 ? `, ${failures.length} failed` : ' successfully'}
+            </motion.p>
 
-            <Notice theme={theme}>
-              Your legacy keys are preserved. Return anytime via <strong>Tools → Migrate Legacy Assets</strong>.
-            </Notice>
-          </ScrollableContainer>
+            {/* Result cards */}
+            <motion.div
+              variants={staggerContainer}
+              className="w-full flex flex-col gap-2 overflow-y-auto mb-4"
+              style={{ maxHeight: '18rem' }}
+            >
+              {sweepResults.map((r, i) => {
+                const ok = !!r.txid;
+                return (
+                  <motion.div
+                    key={i}
+                    variants={fadeUp}
+                    className="flex items-start gap-3 rounded-2xl px-4 py-3"
+                    style={{
+                      background: ok ? `${accent}08` : `${errorColor}08`,
+                      borderLeft: `3px solid ${ok ? accent : errorColor}`,
+                    }}
+                  >
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                      style={{ background: ok ? `${accent}20` : `${errorColor}20` }}
+                    >
+                      {ok ? (
+                        <Check size={12} style={{ color: accent }} />
+                      ) : (
+                        <X size={12} style={{ color: errorColor }} />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium" style={{ color: contrast }}>
+                        {r.label}
+                      </p>
+                      {r.txid && (
+                        <a
+                          href={`${EXPLORER_BASE}${r.txid}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-1 mt-0.5 hover:underline"
+                          style={{ color: accent }}
+                        >
+                          <span className="text-xs font-mono">{r.txid.slice(0, 16)}...</span>
+                          <ExternalLink size={10} />
+                        </a>
+                      )}
+                      {r.error && !r.txid && (
+                        <p className="text-xs mt-0.5" style={{ color: errorColor }}>
+                          {r.error}
+                        </p>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
 
-          <Spacer $h="0.5rem" />
-          <Button theme={theme} type="primary" label="Done" onClick={handleDone} />
-        </PageWrapper>
-      </Content>
+              {/* Preserved-keys notice */}
+              <div
+                className="rounded-2xl p-3 flex gap-2 items-start"
+                style={{ background: `${accent}08`, borderLeft: `3px solid ${accent}40` }}
+              >
+                <Shield size={13} style={{ color: accent, marginTop: 2, flexShrink: 0 }} />
+                <p className="text-xs leading-relaxed" style={{ color: contrast + 'aa' }}>
+                  Your legacy keys are preserved. Return anytime via <strong>Tools → Migrate Legacy Assets</strong>.
+                </p>
+              </div>
+            </motion.div>
+
+            <motion.div variants={fadeUp} className="w-full">
+              <Button theme={theme} type="primary" label="Done" onClick={handleDone} />
+            </motion.div>
+          </motion.div>
+        </div>
+      </div>
     );
   }
 

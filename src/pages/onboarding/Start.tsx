@@ -1,32 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
+import { motion } from 'framer-motion';
 import gihubIcon from '../../assets/github.svg';
-import { Button } from '../../components/Button';
-import { GithubIcon, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useTheme } from '../../hooks/useTheme';
-import { WhiteLabelTheme } from '../../theme.types';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { YoursIcon } from '../../components/YoursIcon';
 import { decrypt } from '../../utils/crypto';
 
-const Content = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-`;
-
-const TitleText = styled.h1<WhiteLabelTheme>`
-  font-size: 2rem;
-  color: ${({ theme }) => theme.color.global.contrast};
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  font-weight: 700;
-  margin: 0.25rem 0;
-  text-align: center;
-`;
+const fadeUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (delay = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: 'easeOut', delay },
+  }),
+};
 
 export const Start = () => {
   const { theme } = useTheme();
@@ -39,7 +29,6 @@ export const Start = () => {
 
   useEffect(() => {
     hideMenu();
-
     return () => {
       showMenu();
     };
@@ -48,7 +37,6 @@ export const Start = () => {
   useEffect(() => {
     if (encryptedKeys) {
       setShowStart(false);
-      // Check if legacy keys exist and sweep hasn't been completed yet
       const storage = chromeStorageService.getCurrentAccountObject();
       if (!chromeStorageService.storage?.sweepCompleted && storage.passKey) {
         try {
@@ -64,32 +52,112 @@ export const Start = () => {
       navigate('/bsv-wallet');
       return;
     }
-
     setShowStart(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [encryptedKeys]);
 
+  const accentColor = theme.color.component.primaryButtonLeftGradient;
+  const accentRight = theme.color.component.primaryButtonRightGradient;
+  const contrast = theme.color.global.contrast;
+  const gray = theme.color.global.gray;
+  const bg = theme.color.global.walletBackground;
+
   return (
     <Show when={showStart}>
-      <Content>
-        <YoursIcon width="4rem" />
-        <TitleText theme={theme}>{`${theme.settings.walletName} Wallet`}</TitleText>
-        <Text theme={theme} style={{ margin: '0.25rem 0 1rem 0' }}>
-          An open source project.
-        </Text>
-        <Button theme={theme} type="primary" label="Create New Wallet" onClick={() => navigate('/create-wallet')} />
-        <Button
-          theme={theme}
-          type="secondary-outline"
-          label="Restore Wallet"
-          onClick={() => navigate('/restore-wallet')}
-        />
-        <GithubIcon
-          style={{ marginTop: '1rem' }}
-          src={gihubIcon}
-          onClick={() => window.open(theme.settings.repo, '_blank')}
-        />
-      </Content>
+      <div
+        className="flex flex-col items-center justify-between w-full h-full min-h-[33.75rem] px-6 py-8"
+        style={{ backgroundColor: bg }}
+      >
+        {/* Top section — logo + branding */}
+        <div className="flex flex-col items-center gap-3 mt-6">
+          <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={0}>
+            <YoursIcon width="5rem" animated />
+          </motion.div>
+
+          <motion.h1
+            variants={fadeUp}
+            initial="hidden"
+            animate="visible"
+            custom={0.1}
+            className="text-3xl font-bold tracking-tight text-center"
+            style={{ color: contrast }}
+          >
+            {theme.settings.walletName} Wallet
+          </motion.h1>
+
+          <motion.p
+            variants={fadeUp}
+            initial="hidden"
+            animate="visible"
+            custom={0.18}
+            className="text-xs tracking-wide uppercase"
+            style={{ color: gray }}
+          >
+            An open source project
+          </motion.p>
+        </div>
+
+        {/* Bottom section — actions */}
+        <div className="flex flex-col items-center gap-3 w-full mb-2">
+          {/* Primary: Create */}
+          <motion.button
+            variants={fadeUp}
+            initial="hidden"
+            animate="visible"
+            custom={0.28}
+            whileHover={{ scale: 1.025 }}
+            whileTap={{ scale: 0.975 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+            onClick={() => navigate('/create-wallet')}
+            className="w-full rounded-xl h-11 text-sm font-bold tracking-wide"
+            style={{
+              background: `linear-gradient(135deg, ${accentColor}, ${accentRight})`,
+              color: theme.color.component.primaryButtonText,
+            }}
+          >
+            Create New Wallet
+          </motion.button>
+
+          {/* Secondary-outline: Restore */}
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            animate="visible"
+            custom={0.36}
+            className="w-full p-px rounded-xl"
+            style={{
+              background: `linear-gradient(135deg, ${theme.color.component.secondaryOutlineButtonGradientLeft}, ${theme.color.component.secondaryOutlineButtonGradientRight})`,
+            }}
+          >
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+              onClick={() => navigate('/restore-wallet')}
+              className="w-full rounded-xl h-11 text-sm font-bold tracking-wide"
+              style={{ backgroundColor: bg, color: contrast }}
+            >
+              Restore Wallet
+            </motion.button>
+          </motion.div>
+
+          {/* GitHub link */}
+          <motion.button
+            variants={fadeUp}
+            initial="hidden"
+            animate="visible"
+            custom={0.44}
+            whileHover={{ opacity: 0.7 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => window.open(theme.settings.repo, '_blank')}
+            className="mt-2 opacity-40 hover:opacity-70 transition-opacity"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            aria-label="View on GitHub"
+          >
+            <img src={gihubIcon} alt="GitHub" style={{ width: '1.4rem', height: '1.4rem' }} />
+          </motion.button>
+        </div>
+      </div>
     </Show>
   );
 };

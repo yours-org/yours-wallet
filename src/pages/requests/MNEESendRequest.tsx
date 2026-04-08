@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import styled from 'styled-components';
+import { motion } from 'framer-motion';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import { validate } from 'bitcoin-address-validation';
-import { Button } from '../../components/Button';
 import { PageLoader } from '../../components/PageLoader';
-import { ConfirmContent, FormContainer, HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
@@ -19,12 +18,6 @@ import { sendMnee, deriveDepositAddresses, getMneeBalance } from '@1sat/actions'
 
 const YOURS_PREFIX = 'yours';
 const YOURS_ADDRESS_COUNT = 5;
-
-const Icon = styled.img`
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: 50%;
-`;
 
 export type MNEESendRequestProps = {
   request: SendMNEE[];
@@ -42,7 +35,6 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
 
   const processMNEESend = async () => {
     try {
-      // Validate addresses
       for (const req of request) {
         if (req.address && !validate(req.address)) {
           addSnackbar('Found an invalid receive address.', 'error');
@@ -59,7 +51,6 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
         return;
       }
 
-      // Derive addresses for signing
       const derivationResult = await deriveDepositAddresses.execute(apiContext, {
         prefix: YOURS_PREFIX,
         startIndex: 0,
@@ -68,8 +59,6 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
 
       addSnackbar('Transaction initiated. Processing...', 'info');
 
-      // Send MNEE using BRC-100 signing (no WIF needed)
-      // The action handles building, signing, submitting, and polling for txid
       const sendRes = await sendMnee.execute(apiContext, {
         recipients: request.map((r) => ({ address: r.address, amount: r.amount })),
         derivations: derivationResult.derivations,
@@ -85,10 +74,8 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
         return;
       }
 
-      // Transaction successful
       addSnackbar('Transaction Successful!', 'success');
 
-      // Fetch updated MNEE balance and update Chrome storage
       const addresses = derivationResult.derivations.map((d) => d.address);
       try {
         const balanceRes = await getMneeBalance.execute(apiContext, { addresses });
@@ -158,27 +145,130 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
       <Show when={isProcessing}>
         <PageLoader theme={theme} message="Sending MNEE..." />
       </Show>
+
       <Show when={!isProcessing && !!request}>
-        <ConfirmContent>
-          <Icon src={MNEE_ICON_URL} />
-          <HeaderText theme={theme}>Approve Request</HeaderText>
-          <Text theme={theme} style={{ cursor: 'pointer', margin: '0.75rem 0', color: theme.color.global.gray }}>
-            {request.length === 1 ? `Send to: ${truncate(request[0].address, 5, 5)}` : 'Send to multiple recipients.'}
-          </Text>
-          <FormContainer noValidate onSubmit={(e) => handleSendMNEE(e)}>
-            <Text theme={theme} style={{ margin: '1rem' }}>
-              Double check details before sending.
-            </Text>
-            <Button
-              theme={theme}
-              type="primary"
-              label={`Approve ${formatNumberWithCommasAndDecimals(totalAmount, MNEE_DECIMALS)} MNEE`}
+        <motion.div
+          className="flex flex-col items-center w-full px-4 pt-6 pb-4"
+          initial={{ opacity: 0, y: 20, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: 'spring', damping: 24, stiffness: 260 }}
+        >
+          {/* MNEE icon */}
+          <motion.img
+            src={MNEE_ICON_URL}
+            alt="MNEE"
+            className="w-16 h-16 rounded-full mb-4"
+            style={{ border: '2px solid rgba(255,255,255,0.08)' }}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.05, type: 'spring', damping: 20, stiffness: 300 }}
+          />
+
+          {/* Title */}
+          <h1 className="text-lg font-bold mb-1" style={{ color: theme.color.global.contrast }}>
+            Send MNEE
+          </h1>
+
+          {/* Amount */}
+          <p className="text-3xl font-bold mb-1" style={{ color: '#A1FF8B' }}>
+            {formatNumberWithCommasAndDecimals(totalAmount, MNEE_DECIMALS)}
+          </p>
+          <p className="text-sm mb-5" style={{ color: theme.color.global.gray }}>
+            MNEE
+          </p>
+
+          {/* Recipient info */}
+          <motion.div
+            className="w-full rounded-2xl px-4 py-3 mb-4"
+            style={{ background: theme.color.global.row, border: '1px solid rgba(255,255,255,0.06)' }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            {request.length === 1 ? (
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-semibold" style={{ color: theme.color.global.gray }}>
+                  Recipient
+                </span>
+                <span className="text-xs font-mono" style={{ color: theme.color.global.contrast }}>
+                  {truncate(request[0].address, 8, 8)}
+                </span>
+              </div>
+            ) : (
+              <>
+                <p className="text-xs font-semibold mb-2" style={{ color: theme.color.global.gray }}>
+                  {request.length} Recipients
+                </p>
+                {request.map((r, i) => (
+                  <div
+                    key={i}
+                    className="flex justify-between items-center py-1.5"
+                    style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
+                  >
+                    <span className="text-xs font-mono" style={{ color: theme.color.global.contrast }}>
+                      {truncate(r.address, 6, 6)}
+                    </span>
+                    <span className="text-xs font-semibold" style={{ color: '#A1FF8B' }}>
+                      {formatNumberWithCommasAndDecimals(r.amount, MNEE_DECIMALS)} MNEE
+                    </span>
+                  </div>
+                ))}
+              </>
+            )}
+          </motion.div>
+
+          {/* Warning */}
+          <motion.div
+            className="w-full flex items-start gap-2 rounded-xl px-3 py-2.5 mb-5"
+            style={{ background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.15)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.14 }}
+          >
+            <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" style={{ color: '#f5a623' }} />
+            <p className="text-xs leading-relaxed" style={{ color: '#f5a623' }}>
+              Double check all details before sending. This action cannot be undone.
+            </p>
+          </motion.div>
+
+          {/* Actions */}
+          <form noValidate onSubmit={(e) => handleSendMNEE(e)} className="w-full flex flex-col gap-3">
+            <motion.button
+              type="submit"
+              className="w-full py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+              style={{
+                background: 'linear-gradient(135deg, #A1FF8B 0%, #34D399 100%)',
+                color: '#010101',
+                opacity: isProcessing ? 0.6 : 1,
+              }}
               disabled={isProcessing}
-              isSubmit
-            />
-            <Button theme={theme} type="secondary" label="Cancel" onClick={clearRequest} disabled={isProcessing} />
-          </FormContainer>
-        </ConfirmContent>
+              whileHover={{ scale: isProcessing ? 1 : 1.02 }}
+              whileTap={{ scale: isProcessing ? 1 : 0.97 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 400 }}
+            >
+              {isProcessing && <Loader2 size={14} className="animate-spin" />}
+              Approve {formatNumberWithCommasAndDecimals(totalAmount, MNEE_DECIMALS)} MNEE
+            </motion.button>
+
+            <motion.button
+              type="button"
+              className="w-full py-3.5 rounded-xl font-semibold text-sm"
+              style={{
+                background: 'transparent',
+                color: theme.color.global.gray,
+                border: '1px solid rgba(255,255,255,0.1)',
+                opacity: isProcessing ? 0.5 : 1,
+              }}
+              disabled={isProcessing}
+              onClick={clearRequest}
+              whileHover={{ scale: isProcessing ? 1 : 1.02 }}
+              whileTap={{ scale: isProcessing ? 1 : 0.97 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 400 }}
+            >
+              Cancel
+            </motion.button>
+          </form>
+        </motion.div>
       </Show>
     </>
   );
