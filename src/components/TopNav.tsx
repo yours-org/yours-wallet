@@ -204,9 +204,7 @@ export const TopNav = () => {
                 </FlexContainer>
                 {account.primaryAddress && (
                   <FlexContainer>
-                    <DropdownAddressText theme={theme}>
-                      {truncate(account.primaryAddress, 3, 3)}
-                    </DropdownAddressText>
+                    <DropdownAddressText theme={theme}>{truncate(account.primaryAddress, 3, 3)}</DropdownAddressText>
                     <CopyIcon
                       src={copyIcon}
                       onClick={(e) => {

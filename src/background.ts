@@ -545,11 +545,13 @@ if (isInServiceWorker) {
         case YoursEventName.USER_CONNECT_RESPONSE:
           return processConnectResponse(message as { decision: Decision });
         case YoursEventName.SWITCH_ACCOUNT:
-          switchAccount().then(() => {
-            sendResponse({ type: YoursEventName.SWITCH_ACCOUNT, success: true });
-          }).catch((error) => {
-            sendResponse({ type: YoursEventName.SWITCH_ACCOUNT, success: false, error: String(error) });
-          });
+          switchAccount()
+            .then(() => {
+              sendResponse({ type: YoursEventName.SWITCH_ACCOUNT, success: true });
+            })
+            .catch((error) => {
+              sendResponse({ type: YoursEventName.SWITCH_ACCOUNT, success: false, error: String(error) });
+            });
           return true;
         case YoursEventName.SIGNED_OUT:
           return signOut();
