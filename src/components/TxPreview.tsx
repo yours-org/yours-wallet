@@ -5,6 +5,7 @@ import { Show } from './Show';
 import lockImage from '../assets/lock.svg';
 import { Flame } from 'lucide-react';
 import type { ParseContext, Txo } from '@1sat/wallet-browser';
+import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 import { useServiceContext } from '../hooks/useServiceContext';
 
 interface Origin {
@@ -35,9 +36,9 @@ const getSatoshis = (txo: Txo): number => Number(txo.output.satoshis || 0);
 const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
   console.log('txData', txData);
   const { theme } = useTheme();
-  const { wallet } = useServiceContext();
+  const { apiContext } = useServiceContext();
   const labelMaxLength = 20;
-  const baseUrl = wallet.services.baseUrl;
+  const baseUrl = apiContext?.services?.baseUrl ?? ONESAT_MAINNET_CONTENT_URL;
 
   const contrast = theme.color.global.contrast;
   const gray = theme.color.global.gray;
@@ -154,7 +155,7 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
   };
 
   return (
-    <div className="flex flex-col w-[90%]">
+    <div className="flex flex-col w-full">
       <h3 className="font-black mb-2 text-xl mt-2" style={{ color: contrast }}>
         Inputs
       </h3>

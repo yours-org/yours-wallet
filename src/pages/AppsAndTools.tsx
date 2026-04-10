@@ -31,7 +31,7 @@ import { Script } from '@bsv/sdk';
 import { Input } from '../components/Input';
 import TxPreview from '../components/TxPreview';
 import { TransactionFormat } from 'yours-wallet-provider';
-import { getTxFromRawTxFormat } from '../utils/tools';
+import { getTxFromRawTxFormat, parseRawTransaction } from '../utils/tools';
 import { useSnackbar } from '../hooks/useSnackbar';
 
 // Helper type for lock data stored in Txo.data.lock.data
@@ -46,8 +46,8 @@ type AppsPage =
   | 'discover-apps'
   | 'unlock'
   | 'lock-page'
-  | 'decode-broadcast'
-  | 'decode'
+  | 'tx-decoder'
+  | 'decoded-tx'
   | 'sweep-wif';
 
 // ── Animation variants ──────────────────────────────────────────────────────
@@ -185,7 +185,6 @@ export const AppsAndTools = () => {
   const [rawTx, setRawTx] = useState<string | number[]>('');
   const [transactionFormat, setTransactionFormat] = useState<TransactionFormat>('tx');
   const [satsOut, setSatsOut] = useState(0);
-  const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [lockBlockHeight, setLockBlockHeight] = useState(0);
   const [lockBsvAmount, setLockBsvAmount] = useState<number | null>(null);
 
@@ -295,18 +294,20 @@ export const AppsAndTools = () => {
     setIsProcessing(true);
     try {
       const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
-      const data = await wallet!.parseTransaction(tx);
+      const data = await parseRawTransaction(tx, apiContext);
       setTxData(data);
+
+      // Calculate net sats leaving the user's addresses (for display purposes)
+      const userAddresses = [bsvAddress, ordAddress, identityAddress];
       let userSatsOut = data.spends.reduce((acc, spend) => {
-        if (spend.owner && [bsvAddress, ordAddress, identityAddress].includes(spend.owner)) {
+        if (spend.owner && userAddresses.includes(spend.owner)) {
           return acc + BigInt(spend.output.satoshis || 0);
         }
         return acc;
       }, 0n);
 
-      // how much did the user get back from the tx
       userSatsOut = data.txos.reduce((acc, txo) => {
-        if (txo.owner && [bsvAddress, ordAddress, identityAddress].includes(txo.owner)) {
+        if (txo.owner && userAddresses.includes(txo.owner)) {
           return acc - BigInt(txo.output.satoshis || 0);
         }
         return acc;
@@ -314,29 +315,10 @@ export const AppsAndTools = () => {
 
       setSatsOut(Number(userSatsOut));
       setIsProcessing(false);
-      setPage('decode');
+      setPage('decoded-tx');
     } catch (error) {
       console.error('Decode error:', error);
       addSnackbar('An error occurred while decoding the transaction', 'error');
-      setIsProcessing(false);
-    }
-  };
-
-  const handleBroadcast = async () => {
-    if (!rawTx || !transactionFormat) return;
-    try {
-      setIsBroadcasting(true);
-      setIsProcessing(true);
-      const tx = getTxFromRawTxFormat(rawTx, transactionFormat);
-      await wallet!.broadcast(tx, 'manual');
-      addSnackbar('Transaction broadcasted successfully', 'success');
-      setPage('decode-broadcast');
-    } catch (error) {
-      console.log(error);
-      addSnackbar('An error occurred while broadcasting the transaction', 'error');
-      setPage('decode-broadcast');
-    } finally {
-      setIsBroadcasting(false);
       setIsProcessing(false);
     }
   };
@@ -433,9 +415,9 @@ export const AppsAndTools = () => {
           </Show>
           <MenuRow
             icon={<Code size={18} />}
-            title="Decode / Broadcast"
-            description="Decode and broadcast raw transactions"
-            onClick={() => setPage('decode-broadcast')}
+            title="TX Decoder"
+            description="Decode raw transactions for inspection"
+            onClick={() => setPage('tx-decoder')}
           />
           <MenuRow
             icon={<ArrowRightLeft size={18} />}
@@ -761,9 +743,9 @@ export const AppsAndTools = () => {
     </motion.div>
   );
 
-  const decodeOrBroadcastPage = (
+  const txDecoderPage = (
     <motion.div
-      key="decode-broadcast"
+      key="tx-decoder"
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -771,9 +753,9 @@ export const AppsAndTools = () => {
       transition={pageTransition}
       className="flex w-full flex-col"
     >
-      <BackHeader title="Decode / Broadcast" onBack={() => setPage('main')} />
+      <BackHeader title="TX Decoder" onBack={() => setPage('main')} />
       <p className="mb-3 text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
-        Decode or broadcast a raw transaction in various formats.
+        Paste a raw transaction to decode and inspect its inputs and outputs.
       </p>
 
       {/* Format selector pills */}
@@ -806,10 +788,7 @@ export const AppsAndTools = () => {
         }}
       />
 
-      <div className="flex gap-2">
-        <Button theme={theme} type="secondary-outline" label="Decode" onClick={handleDecode} />
-        <Button theme={theme} type="primary" label="Broadcast" onClick={handleBroadcast} />
-      </div>
+      <Button theme={theme} type="primary" label="Decode" onClick={handleDecode} />
     </motion.div>
   );
 
@@ -865,9 +844,9 @@ export const AppsAndTools = () => {
     </motion.div>
   );
 
-  const decodePage = !!txData && (
+  const decodedTxPage = !!txData && (
     <motion.div
-      key="decode"
+      key="decoded-tx"
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -875,15 +854,14 @@ export const AppsAndTools = () => {
       transition={pageTransition}
       className="flex w-full flex-col gap-3"
     >
-      <BackHeader title="Decoded Transaction" onBack={() => setPage('decode-broadcast')} />
+      <BackHeader title="Decoded Transaction" onBack={() => setPage('tx-decoder')} />
       <TxPreview txData={txData} />
-      <Button
-        theme={theme}
-        type="primary"
-        label={`Broadcast - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
-        onClick={handleBroadcast}
-      />
-      <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setPage('decode-broadcast')} />
+      <Show when={satsOut > 0}>
+        <p className="text-center text-xs" style={{ color: '#98A2B3' }}>
+          Net outflow from your addresses: {satsOut / BSV_DECIMAL_CONVERSION} BSV
+        </p>
+      </Show>
+      <Button theme={theme} type="secondary-outline" label="Done" onClick={() => setPage('tx-decoder')} />
     </motion.div>
   );
 
@@ -903,11 +881,8 @@ export const AppsAndTools = () => {
       <Show when={isProcessing && page === 'lock-page'}>
         <PageLoader theme={theme} message="Locking..." />
       </Show>
-      <Show when={(isProcessing && page === 'decode-broadcast') || (isProcessing && page === 'decode')}>
-        <PageLoader
-          theme={theme}
-          message={isBroadcasting ? 'Broadcasting transaction...' : 'Decoding transaction...'}
-        />
+      <Show when={(isProcessing && page === 'tx-decoder') || (isProcessing && page === 'decoded-tx')}>
+        <PageLoader theme={theme} message="Decoding transaction..." />
       </Show>
 
       {/* Page content */}
@@ -919,8 +894,8 @@ export const AppsAndTools = () => {
           {page === 'discover-apps' && discoverAppsPage}
           {page === 'sponsor' && sponsorPage}
           {page === 'sponsor-thanks' && thankYouSponsorPage}
-          {page === 'decode-broadcast' && !isProcessing && decodeOrBroadcastPage}
-          {page === 'decode' && !isProcessing && decodePage}
+          {page === 'tx-decoder' && !isProcessing && txDecoderPage}
+          {page === 'decoded-tx' && !isProcessing && decodedTxPage}
           {page === 'sweep-wif' && wifSweepPage}
         </AnimatePresence>
       </div>

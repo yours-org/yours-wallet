@@ -67,23 +67,27 @@ export const DateTimePicker = ({
   style?: React.CSSProperties;
   className?: string;
 } & React.InputHTMLAttributes<HTMLInputElement>) =>
-  React.createElement('input', {
-    type: 'datetime-local',
-    className,
-    style: {
-      backgroundColor: theme.color.global.row,
-      borderRadius: '0.75rem',
-      border: `1px solid ${theme.color.global.gray}50`,
-      width: '80%',
-      height: 'auto',
-      fontSize: '0.85rem',
-      fontFamily: "'Inter', Arial, Helvetica, sans-serif",
-      padding: '0.5rem 1rem',
-      margin: '0.5rem',
-      outline: 'none',
-      color: theme.color.global.contrast,
-      WebkitAppearance: 'none' as never,
-      ...style,
-    },
-    ...props,
-  });
+  React.createElement(
+    'div',
+    { className: 'flex justify-center w-full' },
+    React.createElement('input', {
+      type: 'datetime-local',
+      className,
+      style: {
+        backgroundColor: theme.color.global.row,
+        borderRadius: '0.75rem',
+        border: `1px solid ${theme.color.global.gray}40`,
+        width: '85%',
+        height: '2.25rem',
+        fontSize: '0.875rem',
+        fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+        padding: '0.75rem 1rem',
+        margin: '0.25rem',
+        outline: 'none',
+        color: theme.color.global.contrast,
+        WebkitAppearance: 'none' as never,
+        ...style,
+      },
+      ...props,
+    }),
+  );
