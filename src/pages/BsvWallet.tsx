@@ -1349,7 +1349,15 @@ export const BsvWallet = () => {
   );
 
   if (token) {
-    return <SendBsv21View token={token} onBack={() => setToken(null)} />;
+    return (
+      <SendBsv21View
+        token={token}
+        onBack={() => {
+          setToken(null);
+          getAndSetAccountAndBsv21s();
+        }}
+      />
+    );
   }
 
   if (showWelcome) {

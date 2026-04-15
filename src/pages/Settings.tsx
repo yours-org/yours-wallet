@@ -1128,9 +1128,8 @@ export const Settings = () => {
               initial="initial"
               animate="animate"
               exit="exit"
-              className="w-full px-4 pb-4 pt-3"
+              className="w-full pb-4 pt-3"
             >
-              <SubPageHeader title="Create Account" onBack={() => setPage('manage-accounts')} />
               <CreateAccount onNavigateBack={() => setPage('manage-accounts')} />
             </motion.div>
           )}
@@ -1142,9 +1141,8 @@ export const Settings = () => {
               initial="initial"
               animate="animate"
               exit="exit"
-              className="w-full px-4 pb-4 pt-1"
+              className="w-full pb-4 pt-1"
             >
-              <SubPageHeader title="Restore / Import" onBack={() => setPage('manage-accounts')} />
               <RestoreAccount onNavigateBack={(p: SettingsPage) => setPage(p)} />
             </motion.div>
           )}
@@ -1156,9 +1154,8 @@ export const Settings = () => {
               initial="initial"
               animate="animate"
               exit="exit"
-              className="w-full px-4 pb-4 pt-1"
+              className="w-full pb-4 pt-1"
             >
-              <SubPageHeader title="Import Key" onBack={() => setPage('restore-account')} />
               <ImportAccount onNavigateBack={() => setPage('restore-account')} />
             </motion.div>
           )}

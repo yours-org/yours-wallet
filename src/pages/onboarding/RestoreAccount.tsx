@@ -201,20 +201,28 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
     },
   ];
 
-  const selectImportWallet = (
-    <div className="flex flex-col items-center w-full">
+  const PageHeader = ({ title, onClick }: { title: string; onClick: () => void }) => (
+    <div className="flex w-full items-center gap-3 px-4 pb-4">
       <motion.button
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.92 }}
-        onClick={() => (newWallet ? navigate('/') : onNavigateBack('manage-accounts'))}
-        className="self-start ml-3 mb-3 flex items-center justify-center w-8 h-8 rounded-full border-0 outline-none cursor-pointer"
-        style={{ background: '#17191E', color: gray }}
+        whileTap={{ scale: 0.9 }}
+        onClick={onClick}
+        className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+        style={{ background: '#17191E' }}
       >
-        <ArrowLeft size={16} />
+        <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
       </motion.button>
-      <h2 className="text-xl font-bold mb-1 text-center" style={{ color: contrast }}>
-        Restore a Wallet
-      </h2>
+      <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
+        {title}
+      </span>
+    </div>
+  );
+
+  const selectImportWallet = (
+    <div className="flex flex-col items-center w-full pb-20">
+      <PageHeader
+        title="Restore a Wallet"
+        onClick={() => (newWallet ? navigate('/') : onNavigateBack('manage-accounts'))}
+      />
       <p className="text-xs mb-4 text-center px-4" style={{ color: gray }}>
         Select the wallet you'd like to restore from
       </p>
@@ -242,19 +250,8 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   );
 
   const enterSeedStep = (
-    <div className="flex flex-col items-center w-full">
-      <motion.button
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.92 }}
-        onClick={() => setStep(1)}
-        className="self-start ml-3 mb-3 flex items-center justify-center w-8 h-8 rounded-full border-0 outline-none cursor-pointer"
-        style={{ background: '#17191E', color: gray }}
-      >
-        <ArrowLeft size={16} />
-      </motion.button>
-      <h2 className="text-xl font-bold mb-1 text-center" style={{ color: contrast }}>
-        {getRestoreTitle()}
-      </h2>
+    <div className="flex flex-col items-center w-full pb-20">
+      <PageHeader title={getRestoreTitle()} onClick={() => setStep(1)} />
       <p className="text-xs mb-4 text-center px-4" style={{ color: gray }}>
         {getRestoreDescription()}
       </p>
@@ -336,19 +333,8 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   );
 
   const passwordStep = (
-    <div className="flex flex-col items-center w-full">
-      <motion.button
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.92 }}
-        onClick={() => setStep(2)}
-        className="self-start ml-3 mb-3 flex items-center justify-center w-8 h-8 rounded-full border-0 outline-none cursor-pointer"
-        style={{ background: '#17191E', color: gray }}
-      >
-        <ArrowLeft size={16} />
-      </motion.button>
-      <h2 className="text-xl font-bold mb-1 text-center" style={{ color: contrast }}>
-        {newWallet ? 'Create password' : 'Import Account'}
-      </h2>
+    <div className="flex flex-col items-center w-full pb-20">
+      <PageHeader title={newWallet ? 'Create Password' : 'Import Account'} onClick={() => setStep(2)} />
       <p className="text-xs mb-4 text-center" style={{ color: gray }}>
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
       </p>

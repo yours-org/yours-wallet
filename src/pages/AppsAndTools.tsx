@@ -26,16 +26,17 @@ import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { lockBsv, unlockBsv, sendBsv } from '@1sat/actions';
-import { Outpoint, type ParseContext, type Txo } from '@1sat/wallet-browser';
-import { Script } from '@bsv/sdk';
+import { type ParseContext } from '@1sat/wallet-browser';
 import { Input } from '../components/Input';
 import TxPreview from '../components/TxPreview';
 import { TransactionFormat } from 'yours-wallet-provider';
 import { getTxFromRawTxFormat, parseRawTransaction } from '../utils/tools';
 import { useSnackbar } from '../hooks/useSnackbar';
 
-// Helper type for lock data stored in Txo.data.lock.data
-interface LockData {
+// Helper type for lock entries displayed in Pending Locks
+interface LockedOutput {
+  outpoint: string;
+  satoshis: number;
   until: number;
 }
 
@@ -172,14 +173,14 @@ export const AppsAndTools = () => {
   const navigate = useNavigate();
   const menuContext = useBottomMenu();
   const { query } = menuContext;
-  const { keysService, chromeStorageService, wallet, apiContext } = useServiceContext();
+  const { keysService, chromeStorageService, apiContext } = useServiceContext();
   const { bsvAddress, ordAddress, identityAddress, getWifBalance, sweepWif } = keysService;
   const exchangeRate = chromeStorageService.getCurrentAccountObject().exchangeRateCache?.rate ?? 0;
   const [isProcessing, setIsProcessing] = useState(false);
   const [page, setPage] = useState<AppsPage>(query === 'pending-locks' ? 'unlock' : 'main');
   const [otherIsSelected, setOtherIsSelected] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
-  const [lockedUtxos, setLockedUtxos] = useState<Txo[]>([]);
+  const [lockedUtxos, setLockedUtxos] = useState<LockedOutput[]>([]);
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
   const [txData, setTxData] = useState<ParseContext>();
   const [rawTx, setRawTx] = useState<string | number[]>('');
@@ -244,30 +245,42 @@ export const AppsAndTools = () => {
 
   const getLockData = async () => {
     setIsProcessing(true);
-    const height = await apiContext.services!.chaintracks.currentHeight();
-    setCurrentBlockHeight(height);
+    try {
+      const height = await apiContext.services!.chaintracks.currentHeight();
+      setCurrentBlockHeight(height);
 
-    const result = await wallet!.listOutputs({ basket: 'lock', limit: 10000 });
-    const txos: Txo[] = [];
-    for (const o of result.outputs) {
-      const outpoint = new Outpoint(o.outpoint);
-      const output = {
-        lockingScript: Script.fromHex(o.lockingScript || ''),
-        satoshis: o.satoshis,
-      };
-      const txo = await wallet!.parseOutput(output, outpoint);
-      txos.push(txo);
+      const result = await apiContext.wallet.listOutputs({
+        basket: 'lock',
+        includeTags: true,
+        limit: 10000,
+      });
+
+      const locks: LockedOutput[] = [];
+      for (const o of result.outputs) {
+        const untilTag = o.tags?.find((t: string) => t.startsWith('until:'));
+        if (!untilTag) continue;
+        const until = Number.parseInt(untilTag.slice(6), 10);
+        locks.push({
+          outpoint: o.outpoint,
+          satoshis: o.satoshis,
+          until,
+        });
+      }
+      setLockedUtxos(locks);
+    } catch (error) {
+      console.error('Error loading lock data:', error);
+      addSnackbar('Failed to load lock data', 'error');
+    } finally {
+      setIsProcessing(false);
     }
-    setLockedUtxos(txos);
-    setIsProcessing(false);
   };
 
   useEffect(() => {
-    if (page === 'unlock' && identityAddress) {
+    if (page === 'unlock') {
       getLockData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identityAddress, page]);
+  }, [page]);
 
   const handleSubmit = async (amount: number) => {
     if (!amount || !exchangeRate) return;
@@ -351,8 +364,10 @@ export const AppsAndTools = () => {
 
   const handleLockBsv = async () => {
     try {
-      if (!identityAddress) return;
-      if (!lockBsvAmount || !lockBlockHeight) throw new Error('Invalid lock amount or block height');
+      if (!lockBsvAmount || !lockBlockHeight) {
+        addSnackbar('Please enter an amount and select a lock date.', 'info');
+        return;
+      }
       setIsProcessing(true);
       const currentHeight = await apiContext.services!.chaintracks.currentHeight();
       if (currentHeight >= lockBlockHeight) {
@@ -370,7 +385,7 @@ export const AppsAndTools = () => {
       setLockBsvAmount(null);
     } catch (error) {
       console.error('Lock error:', error);
-      addSnackbar(`${error ?? 'An error has occurred!'}`, 'error');
+      addSnackbar(error instanceof Error ? error.message : 'An error has occurred!', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -544,31 +559,26 @@ export const AppsAndTools = () => {
 
       <div className="flex flex-col gap-1 overflow-y-auto" style={{ maxHeight: '260px' }}>
         {lockedUtxos
-          .sort((a, b) => {
-            const aLock = a.data.lock?.data as unknown as LockData | undefined;
-            const bLock = b.data.lock?.data as unknown as LockData | undefined;
-            return Number(aLock?.until ?? 0) - Number(bLock?.until ?? 0);
-          })
+          .sort((a, b) => a.until - b.until)
           .map((u) => {
-            const lockData = u.data.lock?.data as unknown as LockData | undefined;
-            const blocksRemaining = Number(lockData?.until ?? 0) - currentBlockHeight;
-            const satoshis = BigInt(u.output.satoshis || 0);
+            const txid = u.outpoint.split('.')[0];
+            const blocksRemaining = u.until - currentBlockHeight;
             return (
               <div
-                key={u.outpoint.txid}
+                key={u.outpoint}
                 className="grid grid-cols-3 rounded-xl px-4 py-3 text-sm"
                 style={{ background: '#17191E', color: '#FFFFFF' }}
               >
                 <span className="text-left font-mono text-xs" style={{ color: '#98A2B3' }}>
-                  {truncate(u.outpoint.txid, 4, 4)}
+                  {truncate(txid, 4, 4)}
                 </span>
                 <span className="text-center text-xs font-semibold" style={{ color: '#A1FF8B' }}>
                   {blocksRemaining < 0 ? '0' : blocksRemaining}
                 </span>
                 <span className="text-right text-xs">
-                  {satoshis < 1000n
-                    ? `${satoshis} ${satoshis > 1n ? 'sats' : 'sat'}`
-                    : `${Number(satoshis) / BSV_DECIMAL_CONVERSION} BSV`}
+                  {u.satoshis < 1000
+                    ? `${u.satoshis} ${u.satoshis > 1 ? 'sats' : 'sat'}`
+                    : `${u.satoshis / BSV_DECIMAL_CONVERSION} BSV`}
                 </span>
               </div>
             );

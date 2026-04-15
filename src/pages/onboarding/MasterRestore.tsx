@@ -104,16 +104,20 @@ export const MasterRestore = () => {
       when={!loading}
       whenFalseContent={<PageLoader theme={theme} message={loaderMessage} showProgressBar barProgress={progress} />}
     >
-      <div className="flex flex-col items-center w-full px-2 pt-4 pb-4">
-        <motion.button
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.92 }}
-          onClick={handleBack}
-          className="self-start ml-1 mb-3 flex items-center justify-center w-8 h-8 rounded-full border-0 outline-none cursor-pointer"
-          style={{ background: '#17191E', color: gray }}
-        >
-          <ArrowLeft size={16} />
-        </motion.button>
+      <div className="flex flex-col items-center w-full px-2 pt-4 pb-20">
+        <div className="flex w-full items-center gap-3 px-2 pb-4">
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={handleBack}
+            className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+            style={{ background: '#17191E' }}
+          >
+            <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
+          </motion.button>
+          <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
+            Restore from Backup
+          </span>
+        </div>
         <motion.div
           initial={{ opacity: 0, scale: 0.85 }}
           animate={{ opacity: 1, scale: 1 }}

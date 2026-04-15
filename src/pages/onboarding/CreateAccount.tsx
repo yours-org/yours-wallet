@@ -127,21 +127,28 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
     </div>
   );
 
-  const BackArrow = ({ onClick }: { onClick: () => void }) => (
-    <motion.button
-      whileHover={{ scale: 1.08 }}
-      whileTap={{ scale: 0.92 }}
-      onClick={onClick}
-      className="self-start ml-3 mb-3 flex items-center justify-center w-8 h-8 rounded-full border-0 outline-none cursor-pointer"
-      style={{ background: '#17191E', color: gray }}
-    >
-      <ArrowLeft size={16} />
-    </motion.button>
+  const PageHeader = ({ title, onClick }: { title: string; onClick: () => void }) => (
+    <div className="flex w-full items-center gap-3 px-4 pb-4">
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        onClick={onClick}
+        className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+        style={{ background: '#17191E' }}
+      >
+        <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
+      </motion.button>
+      <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
+        {title}
+      </span>
+    </div>
   );
 
   const passwordStep = (
-    <div className="flex flex-col items-center w-full">
-      <BackArrow onClick={() => (newWallet ? navigate('/') : onNavigateBack())} />
+    <div className="flex flex-col items-center w-full pb-20">
+      <PageHeader
+        title={newWallet ? 'Create Account' : 'New Account'}
+        onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
+      />
       <StepIndicator />
       <h2 className="text-xl font-bold mb-1 text-center" style={{ color: contrast }}>
         {newWallet ? 'Create password' : 'New Account'}
