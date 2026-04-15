@@ -174,7 +174,14 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
         Input assets directly from your WIF private keys or import a 1Sat JSON Wallet.
       </p>
 
-      <form noValidate onSubmit={(e) => { e.preventDefault(); setStep(2); }} className="flex flex-col items-center w-full">
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          setStep(2);
+        }}
+        className="flex flex-col items-center w-full"
+      >
         <Input
           theme={theme}
           placeholder="Pay WIF private key"

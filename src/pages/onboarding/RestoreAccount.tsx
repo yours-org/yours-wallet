@@ -259,7 +259,14 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
         {getRestoreDescription()}
       </p>
 
-      <form noValidate onSubmit={(e) => { e.preventDefault(); setStep(3); }} className="flex flex-col items-center w-full">
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          setStep(3);
+        }}
+        className="flex flex-col items-center w-full"
+      >
         <div className="w-[87%] mb-2">
           <textarea
             placeholder="Enter secret recovery words"
