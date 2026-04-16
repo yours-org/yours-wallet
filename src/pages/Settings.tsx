@@ -3,19 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
   UserCircle,
-  Globe,
   Shield,
   Key,
   Lock,
   LogOut,
-  RefreshCw,
   Database,
   Gauge,
   KeyRound,
   Zap,
   ChevronLeft,
   ChevronRight,
-  X,
   Download,
   QrCode as QrCodeIcon,
   HardDrive,
@@ -33,7 +30,7 @@ import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { WhitelistedApp, YoursEventName } from '../inject';
+import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
 import { FEE_PER_KB } from '../utils/constants';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
@@ -55,7 +52,6 @@ export type SettingsPage =
   | 'import-wif'
   | 'account-list'
   | 'edit-account'
-  | 'connected-apps'
   | 'social-profile'
   | 'export-keys-options'
   | 'export-keys-qr'
@@ -177,8 +173,12 @@ export const Settings = () => {
   const { query, handleSelect } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { chromeStorageService, keysService, lockWallet, wallet } = useServiceContext();
-  const [page, setPage] = useState<SettingsPage>(query === 'manage-accounts' ? 'manage-accounts' : 'main');
-  const [connectedApps, setConnectedApps] = useState<WhitelistedApp[]>([]);
+  const [page, setPage] = useState<SettingsPage>(() => {
+    if (query === 'manage-accounts') return 'manage-accounts';
+    if (query === 'create-account') return 'create-account';
+    if (query === 'restore-account') return 'restore-account';
+    return 'main';
+  });
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const { socialProfile, storeSocialProfile } = useSocialProfile(chromeStorageService);
@@ -196,42 +196,13 @@ export const Settings = () => {
   const [customFeeRate, setCustomFeeRate] = useState(currentAccount.account?.settings.customFeeRate ?? FEE_PER_KB);
   const [selectedAccountIdentityAddress, setSelectedAccountIdentityAddress] = useState<string | undefined>();
 
+  // React to query deep-links (e.g. clicking "+ Add New Account" in the TopNav
+  // wallet switcher while already on the Settings page).
   useEffect(() => {
-    const getWhitelist = async (): Promise<WhitelistedApp[]> => {
-      try {
-        await chromeStorageService.getAndSetStorage();
-        const { account } = chromeStorageService.getCurrentAccountObject();
-        if (!account) return [];
-        const { whitelist } = account.settings;
-        setConnectedApps(whitelist ?? []);
-        return whitelist ?? [];
-      } catch (error) {
-        console.error(error);
-        return [];
-      }
-    };
-
-    getWhitelist();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleRemoveDomain = async (domain: string) => {
-    const newList = connectedApps.filter((app) => app.domain !== domain);
-    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
-    if (!account || !selectedAccount) return;
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [selectedAccount]: {
-        ...account,
-        settings: {
-          ...account.settings,
-          whitelist: newList,
-        },
-      },
-    };
-    await chromeStorageService.updateNested(key, update);
-    setConnectedApps(newList);
-  };
+    if (query === 'manage-accounts') setPage('manage-accounts');
+    else if (query === 'create-account') setPage('create-account');
+    else if (query === 'restore-account') setPage('restore-account');
+  }, [query]);
 
   const handleDeleteAccountIntent = () => {
     setDecisionType('delete-account');
@@ -373,7 +344,7 @@ export const Settings = () => {
 
   const signOut = async () => {
     await chromeStorageService.clear();
-    wallet?.close();
+    wallet?.close?.();
     setDecisionType(undefined);
     sendMessage({
       action: YoursEventName.SIGNED_OUT,
@@ -483,24 +454,6 @@ export const Settings = () => {
     handleSelect('bsv');
   };
 
-  const resyncUTXOs = async () => {
-    addSnackbar('Syncing with cloud...', 'info');
-    try {
-      const response = await chrome.runtime.sendMessage({ action: 'FULL_SYNC' });
-      if (response.success) {
-        const { pushed, pulled } = response.data;
-        addSnackbar(
-          `Sync complete: ↑${pushed.inserts}/${pushed.updates} ↓${pulled.inserts}/${pulled.updates}`,
-          'success',
-        );
-      } else {
-        addSnackbar(response.error || 'Sync failed', 'error');
-      }
-    } catch (error) {
-      addSnackbar('Sync failed: ' + (error instanceof Error ? error.message : String(error)), 'error');
-    }
-  };
-
   // --- Page renders ---
 
   const mainPage = (
@@ -523,16 +476,9 @@ export const Settings = () => {
         />
         <Divider />
         <SettingRow
-          icon={<Globe size={16} />}
-          label="Connected Apps"
-          description="Manage connected dApps"
-          onClick={() => setPage('connected-apps')}
-        />
-        <Divider />
-        <SettingRow
           icon={<Shield size={16} />}
           label="Permissions"
-          description="View and revoke dApp permissions"
+          description="Review and revoke connected apps and permissions"
           onClick={() => setPage('permissions')}
           isLast
         />
@@ -572,18 +518,11 @@ export const Settings = () => {
       {/* Advanced section */}
       <Section title="Advanced">
         <SettingRow
-          icon={<RefreshCw size={16} />}
-          label="Re-Sync UTXOs"
-          description="Re-sync your wallet's spendable coins"
-          onClick={resyncUTXOs}
-          isFirst
-        />
-        <Divider />
-        <SettingRow
           icon={<Lock size={16} />}
           label="Lock Wallet"
           description="Immediately lock the wallet"
           onClick={handleLockWallet}
+          isFirst
           isLast
         />
       </Section>
@@ -639,75 +578,6 @@ export const Settings = () => {
           />
         </Section>
       </motion.div>
-    </motion.div>
-  );
-
-  const connectedAppsPage = (
-    <motion.div
-      key="connected-apps"
-      variants={pageVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className="w-full px-4 pb-4"
-    >
-      <SubPageHeader title="Connected Apps" onBack={() => setPage('main')} />
-      {connectedApps.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center justify-center py-12 gap-3"
-        >
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: 'rgba(161,255,139,0.1)' }}
-          >
-            <Globe size={22} color="#A1FF8B" />
-          </div>
-          <p className="text-sm" style={{ color: '#98A2B3' }}>
-            No apps connected
-          </p>
-        </motion.div>
-      ) : (
-        <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-2">
-          {connectedApps.map((app, idx) => (
-            <motion.div
-              key={app.domain + idx}
-              variants={rowVariant}
-              className="flex items-center justify-between px-4 py-3 rounded-xl"
-              style={{
-                backgroundColor: '#17191E',
-                border: '1px solid rgba(152,162,179,0.12)',
-              }}
-            >
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                {app.icon ? (
-                  <img src={app.icon} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" alt={app.domain} />
-                ) : (
-                  <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: 'rgba(161,255,139,0.1)' }}
-                  >
-                    <Globe size={16} color="#A1FF8B" />
-                  </div>
-                )}
-                <p className="text-sm font-semibold truncate" style={{ color: '#FFFFFF' }}>
-                  {app.domain}
-                </p>
-              </div>
-              <motion.button
-                whileHover={{ scale: 1.12 }}
-                whileTap={{ scale: 0.88 }}
-                onClick={() => handleRemoveDomain(app.domain)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ml-3"
-                style={{ backgroundColor: 'rgba(239,68,68,0.12)' }}
-              >
-                <X size={14} color="#ef4444" />
-              </motion.button>
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
     </motion.div>
   );
 
@@ -1128,7 +998,7 @@ export const Settings = () => {
               initial="initial"
               animate="animate"
               exit="exit"
-              className="w-full pb-4 pt-3"
+              className="w-full pb-4"
             >
               <CreateAccount onNavigateBack={() => setPage('manage-accounts')} />
             </motion.div>
@@ -1141,7 +1011,7 @@ export const Settings = () => {
               initial="initial"
               animate="animate"
               exit="exit"
-              className="w-full pb-4 pt-1"
+              className="w-full pb-4"
             >
               <RestoreAccount onNavigateBack={(p: SettingsPage) => setPage(p)} />
             </motion.div>
@@ -1154,7 +1024,7 @@ export const Settings = () => {
               initial="initial"
               animate="animate"
               exit="exit"
-              className="w-full pb-4 pt-1"
+              className="w-full pb-4"
             >
               <ImportAccount onNavigateBack={() => setPage('restore-account')} />
             </motion.div>
@@ -1163,8 +1033,6 @@ export const Settings = () => {
           {page === 'account-list' && accountList}
 
           {page === 'edit-account' && editAccount}
-
-          {page === 'connected-apps' && connectedAppsPage}
 
           {page === 'preferences' && preferencesPage}
 
@@ -1177,8 +1045,9 @@ export const Settings = () => {
               initial="initial"
               animate="animate"
               exit="exit"
-              className="w-full"
+              className="w-full px-4 pb-4"
             >
+              <SubPageHeader title="Permissions" onBack={() => setPage('main')} />
               <PermissionsManager onBack={() => setPage('main')} />
             </motion.div>
           )}
@@ -1190,8 +1059,9 @@ export const Settings = () => {
               initial="initial"
               animate="animate"
               exit="exit"
-              className="w-full"
+              className="w-full px-4 pb-4"
             >
+              <SubPageHeader title="Storage" onBack={() => setPage('main')} />
               <StorageStatus onBack={() => setPage('main')} />
             </motion.div>
           )}

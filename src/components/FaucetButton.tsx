@@ -26,7 +26,7 @@ export function FaucetButton({ address, isTestnet, onConfirmation }: FaucetButto
       const response = await requestTestnetCoins(address);
       if (response.code === 0) {
         const tx = Transaction.fromHex(response.raw);
-        const res = await wallet.ingestTransaction(tx, 'faucet');
+        const res = await wallet?.ingestTransaction?.(tx, 'faucet');
         if (res?.parseContext?.txid) {
           onConfirmation();
         } else {

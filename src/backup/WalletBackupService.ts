@@ -10,7 +10,8 @@ import {
 import { encode } from '@msgpack/msgpack';
 import type { WalletStorageManager, sdk } from '@bsv/wallet-toolbox-mobile';
 import type { ChromeStorageService } from '../services/ChromeStorage.service';
-import type { Account, Theme } from '../services/types/chromeStorage.types';
+import type { Account } from '../services/types/chromeStorage.types';
+import type { Theme } from '../theme.types';
 import { decrypt, deriveKey } from '../utils/crypto';
 
 type Chain = 'main' | 'test';
@@ -63,7 +64,7 @@ interface BackupChromeStorage {
  * Check if a SyncChunk has any data.
  */
 function chunkHasData(chunk: SyncChunk): boolean {
-  return (
+  return Boolean(
     (chunk.provenTxs && chunk.provenTxs.length > 0) ||
     (chunk.provenTxReqs && chunk.provenTxReqs.length > 0) ||
     (chunk.outputBaskets && chunk.outputBaskets.length > 0) ||
@@ -75,7 +76,7 @@ function chunkHasData(chunk: SyncChunk): boolean {
     (chunk.outputs && chunk.outputs.length > 0) ||
     (chunk.outputTagMaps && chunk.outputTagMaps.length > 0) ||
     (chunk.certificates && chunk.certificates.length > 0) ||
-    (chunk.certificateFields && chunk.certificateFields.length > 0)
+    (chunk.certificateFields && chunk.certificateFields.length > 0),
   );
 }
 
@@ -253,7 +254,10 @@ export class WalletBackupService {
 
     onProgress({ stage: 'complete', message: 'Backup complete!' });
 
-    return new Blob(zipChunks, { type: 'application/zip' });
+    // Cast to BlobPart[] — Uint8Array<ArrayBufferLike> isn't assignable to BlobPart[]
+    // in lib.dom.d.ts because it could theoretically wrap SharedArrayBuffer, but at
+    // runtime these are regular Uint8Arrays produced by fflate.
+    return new Blob(zipChunks as unknown as BlobPart[], { type: 'application/zip' });
   }
 
   /**

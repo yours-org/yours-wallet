@@ -24,13 +24,13 @@ export const ToggleSwitch = (props: ToggleSwitchProps) => {
     <label className="flex items-center gap-2.5 cursor-pointer">
       <input checked={on} type="checkbox" onChange={handleChange} className="sr-only" />
       <div
-        className="relative w-8 h-4 rounded-full p-1 transition-colors duration-300"
+        className="relative w-10 h-5 rounded-full transition-colors duration-300"
         style={{ background: on ? trackOn : trackOff }}
       >
         <motion.div
-          className="absolute top-1/2 w-5 h-5 rounded-full bg-white"
+          className="absolute top-1/2 w-4 h-4 rounded-full bg-white shadow-sm"
           style={{ y: '-50%' }}
-          animate={{ x: on ? '1rem' : '0.125rem' }}
+          animate={{ x: on ? '1.25rem' : '0.125rem' }}
           transition={{ type: 'spring', stiffness: 500, damping: 35 }}
         />
       </div>

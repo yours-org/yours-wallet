@@ -59,7 +59,7 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
 
   useEffect(() => {
     (async () => {
-      if (!request.signableTransactionBEEF || !wallet) return;
+      if (!request.signableTransactionBEEF || !wallet?.parseTransaction) return;
       setIsLoading(true);
       try {
         const tx = Transaction.fromAtomicBEEF(request.signableTransactionBEEF);

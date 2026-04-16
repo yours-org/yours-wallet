@@ -1,5 +1,5 @@
 import validate from 'bitcoin-address-validation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
@@ -9,9 +9,10 @@ import { sleep } from '../utils/sleep';
 import { getErrorMessage } from '../utils/tools';
 import { Input } from './Input';
 import { Show } from './Show';
+import { CoinHistory } from './CoinHistory';
 import { ONESAT_MAINNET_CONTENT_URL, sendBsv21, type Bsv21Balance } from '@1sat/actions';
-import { motion } from 'framer-motion';
-import { ArrowLeft, ShoppingCart, Send, Copy, Check } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowLeft, ShoppingCart, Send, Copy, Check, Plus, Trash2 } from 'lucide-react';
 
 export interface Token {
   isConfirmed: boolean;
@@ -20,18 +21,36 @@ export interface Token {
 
 export type SendBsv21ViewProps = {
   token: Token;
-  onBack: () => void;
+  /**
+   * Called when the user exits the view. If the exit was triggered by a
+   * successful send, `sentAtomic` is the total atomic token amount sent so
+   * the parent can optimistically adjust its cached balance. Omitted on a
+   * manual back press.
+   */
+  onBack: (sentAtomic?: bigint) => void | Promise<void>;
 };
+
+type Bsv21Recipient = {
+  id: string;
+  address: string;
+  amountInput: string;
+};
+
+const newRecipient = (): Bsv21Recipient => ({
+  id: crypto.randomUUID(),
+  address: '',
+  amountInput: '',
+});
 
 export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
   const { apiContext } = useServiceContext();
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
   const getTokenName = (b: { sym?: string }): string => b.sym || 'Null';
-  const [amountInput, setAmountInput] = useState('');
+  const [recipients, setRecipients] = useState<Bsv21Recipient[]>([newRecipient()]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [receiveAddress, setReceiveAddress] = useState('');
   const [successTxId, setSuccessTxId] = useState('');
+  const sentAtomicRef = useRef<bigint>(0n);
   const [copied, setCopied] = useState(false);
   const baseUrl = ONESAT_MAINNET_CONTENT_URL;
 
@@ -40,35 +59,45 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
 
   useEffect(() => {
     if (!successTxId) return;
+    // Reset local form state first, then exit. Parent does an optimistic balance
+    // update based on `sentAtomicRef.current` so the transition is instant.
     resetSendState();
-    onBack();
+    void onBack(sentAtomicRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId]);
 
-  const getAtomicAmount = (): bigint | null => {
-    if (!amountInput || amountInput === '.' || amountInput === '0.') return null;
+  const toAtomic = (input: string): bigint | null => {
+    if (!input || input === '.' || input === '0.') return null;
     try {
-      return BigInt(normalize(amountInput, token.info.dec));
+      return BigInt(normalize(input, token.info.dec));
     } catch {
       return null;
     }
   };
 
-  const handleAmountChange = (value: string) => {
-    if (value === '') {
-      setAmountInput('');
-      return;
+  const addRecipient = () => setRecipients((prev) => [...prev, newRecipient()]);
+  const removeRecipient = (id: string) =>
+    setRecipients((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
+
+  const updateRecipient = (id: string, field: 'address' | 'amountInput', value: string) => {
+    if (field === 'amountInput') {
+      if (value !== '' && !/^\d*\.?\d*$/.test(value)) return;
+      const dec = token.info.dec;
+      const parts = value.split('.');
+      if (parts.length === 2 && dec > 0 && parts[1].length > dec) return;
+      if (parts.length === 2 && dec === 0) return;
     }
-    if (!/^\d*\.?\d*$/.test(value)) return;
-    const dec = token.info.dec;
-    const parts = value.split('.');
-    if (parts.length === 2 && dec > 0 && parts[1].length > dec) return;
-    if (parts.length === 2 && dec === 0) return;
-    setAmountInput(value);
+    setRecipients((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
   };
 
-  const handleSetMax = () => {
-    setAmountInput(maxDisplay);
+  /** Fill the given recipient with (max available - amounts already assigned to others). */
+  const handleSetMax = (id: string) => {
+    const assignedElsewhere = recipients.reduce(
+      (acc, r) => (r.id === id ? acc : acc + (toAtomic(r.amountInput) ?? 0n)),
+      0n,
+    );
+    const available = maxAmount > assignedElsewhere ? maxAmount - assignedElsewhere : 0n;
+    updateRecipient(id, 'amountInput', showAmount(available, token.info.dec));
   };
 
   const handleCopyId = () => {
@@ -80,10 +109,9 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
   };
 
   const resetSendState = () => {
-    setReceiveAddress('');
+    setRecipients([newRecipient()]);
     setSuccessTxId('');
     setIsProcessing(false);
-    setAmountInput('');
   };
 
   const handleSendBSV21 = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -91,21 +119,29 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
     setIsProcessing(true);
 
     await sleep(25);
-    if (!validate(receiveAddress)) {
-      addSnackbar('You must enter a valid 1Sat Ordinal address.', 'info');
-      setIsProcessing(false);
-      return;
+
+    // Validate each recipient and build the action input
+    const sendRecipients: { address: string; amount: bigint }[] = [];
+    let total = 0n;
+
+    for (const r of recipients) {
+      if (!validate(r.address)) {
+        addSnackbar('All recipients must have a valid 1Sat Ordinal address.', 'info');
+        setIsProcessing(false);
+        return;
+      }
+      const atomic = toAtomic(r.amountInput);
+      if (atomic === null || atomic <= 0n) {
+        addSnackbar('All recipients must have a valid amount.', 'info');
+        setIsProcessing(false);
+        return;
+      }
+      sendRecipients.push({ address: r.address, amount: atomic });
+      total += atomic;
     }
 
-    const atomicAmount = getAtomicAmount();
-    if (token === null || atomicAmount === null || atomicAmount <= 0n) {
-      addSnackbar('Please enter a valid amount.', 'info');
-      setIsProcessing(false);
-      return;
-    }
-
-    if (atomicAmount > maxAmount) {
-      addSnackbar('Amount exceeds available balance.', 'error');
+    if (total > maxAmount) {
+      addSnackbar('Total amount exceeds available balance.', 'error');
       setIsProcessing(false);
       return;
     }
@@ -120,7 +156,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
     try {
       sendRes = await sendBsv21.execute(apiContext, {
         tokenId: token.info.id,
-        recipients: [{ address: receiveAddress, amount: atomicAmount }],
+        recipients: sendRecipients,
       });
     } catch (error) {
       console.error('[SendBsv21View] sendBsv21.execute threw:', error);
@@ -136,6 +172,9 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
       return;
     }
 
+    // Stash the total sent so the parent can optimistically decrement its
+    // cached token balance without waiting on the overlay to catch up.
+    sentAtomicRef.current = total;
     setSuccessTxId(sendRes.txid);
     addSnackbar('Tokens Sent!', 'success');
   };
@@ -147,6 +186,9 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
   const accentRight = theme.color.component.primaryButtonRightGradient;
   const tokenName = getTokenName(token.info);
 
+  const anyRecipientEmpty = recipients.some((r) => !r.address || !r.amountInput);
+  const submitDisabled = isProcessing || anyRecipientEmpty;
+
   return (
     <Show when={token !== null}>
       {token ? (
@@ -155,19 +197,19 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 16 }}
           transition={{ type: 'spring', stiffness: 320, damping: 35 }}
-          className="flex flex-col w-full h-full overflow-y-auto pb-20"
-          style={{ backgroundColor: theme.color.global.walletBackground }}
+          className="flex flex-col w-full pt-14 pb-20 overflow-y-auto overflow-x-hidden self-start"
+          style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
         >
           {/* Header */}
-          <div className="flex items-center px-4 pt-10 pb-4">
+          <div className="flex items-center gap-3 px-4 mb-5">
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={() => {
                 resetSendState();
                 onBack();
               }}
-              className="flex items-center justify-center w-8 h-8 rounded-lg outline-none border-none cursor-pointer flex-shrink-0 mr-3"
-              style={{ backgroundColor: row }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 outline-none border-none cursor-pointer"
+              style={{ backgroundColor: '#17191E' }}
             >
               <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
             </motion.button>
@@ -176,43 +218,38 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
             </span>
           </div>
 
-          {/* Token hero card */}
-          <div className="mx-4 mb-4 rounded-2xl overflow-hidden" style={{ backgroundColor: row }}>
-            {/* Top section: icon + name + balance */}
-            <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+          {/* Balance chip — matches the BSV / MNEE send views */}
+          <div className="flex flex-col items-center w-full mb-5 gap-1.5">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{ background: row }}>
               <Show when={!!token.info.icon && token.info.icon.length > 0}>
                 <img
                   src={`${baseUrl}/${token.info.icon}`}
                   alt={tokenName}
-                  className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-                  style={{ border: `2px solid ${accent}30` }}
+                  className="w-4 h-4 rounded-full object-cover flex-shrink-0"
                 />
               </Show>
-              <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-base font-bold truncate" style={{ color: contrast }}>
-                  {tokenName}
-                </span>
-                <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className="text-lg font-bold" style={{ color: contrast }}>
-                    {maxDisplay}
-                  </span>
-                  <span className="text-xs" style={{ color: gray }}>
-                    available
-                  </span>
-                </div>
-              </div>
+              <span className="text-xs" style={{ color: gray }}>
+                Balance
+              </span>
+              <span className="text-sm font-semibold font-mono" style={{ color: contrast }}>
+                {maxDisplay}
+              </span>
+              <span className="text-xs font-semibold" style={{ color: accent }}>
+                {tokenName}
+              </span>
             </div>
 
-            {/* Token ID row */}
+            {/* Token ID copy chip */}
             <Show when={!!token.info.id}>
               <motion.button
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={handleCopyId}
-                className="flex items-center gap-2 w-full px-4 py-2.5 border-0 outline-none cursor-pointer"
-                style={{ background: `${gray}0a`, borderTop: `1px solid ${gray}15` }}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full border-0 outline-none cursor-pointer"
+                style={{ background: `${gray}12` }}
+                title="Copy token ID"
               >
-                {copied ? <Check size={12} style={{ color: accent }} /> : <Copy size={12} style={{ color: gray }} />}
-                <span className="text-xs font-mono" style={{ color: gray }}>
+                {copied ? <Check size={10} style={{ color: accent }} /> : <Copy size={10} style={{ color: gray }} />}
+                <span className="text-[10px] font-mono" style={{ color: gray }}>
                   {truncate(token.info.id, 8, 6)}
                 </span>
               </motion.button>
@@ -221,55 +258,100 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
 
           {/* Send form */}
           <form noValidate onSubmit={(e) => handleSendBSV21(e)} className="flex flex-col w-full px-4 gap-3">
-            {/* Address field */}
-            <div>
-              <label
-                className="block text-[10px] font-semibold uppercase tracking-wider mb-1.5 px-1"
-                style={{ color: gray }}
-              >
-                Recipient Address
-              </label>
-              <Input
-                theme={theme}
-                name="address"
-                placeholder="Enter address..."
-                type="text"
-                onChange={(e) => setReceiveAddress(e.target.value)}
-                value={receiveAddress}
-                style={{ width: '100%', margin: 0 }}
-              />
-            </div>
-
-            {/* Amount field */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5 px-1">
-                <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: gray }}>
-                  Amount
-                </label>
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleSetMax}
-                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border-none outline-none cursor-pointer"
-                  style={{ background: `${accent}20`, color: accent }}
+            {/* Recipient cards */}
+            <AnimatePresence>
+              {recipients.map((recipient, idx) => (
+                <motion.div
+                  key={recipient.id}
+                  initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                  transition={{ duration: 0.22, ease: 'easeOut' }}
+                  className="w-full rounded-2xl p-4 flex flex-col gap-3"
+                  style={{ background: row }}
                 >
-                  MAX
-                </motion.button>
-              </div>
-              <Input
-                name="amt"
-                theme={theme}
-                placeholder="0"
-                type="text"
-                inputMode="decimal"
-                value={amountInput}
-                onChange={(e) => handleAmountChange(e.target.value)}
-                style={{ width: '100%', margin: 0 }}
-              />
-            </div>
+                  {/* Card header */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: gray }}>
+                      {recipients.length > 1 ? `Recipient ${idx + 1}` : 'Recipient'}
+                    </span>
+                    {recipients.length > 1 && (
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        type="button"
+                        onClick={() => removeRecipient(recipient.id)}
+                        className="flex items-center justify-center w-6 h-6 rounded-full border-0 outline-none cursor-pointer"
+                        style={{ background: '#ff444415', color: '#ff4444' }}
+                      >
+                        <Trash2 size={12} />
+                      </motion.button>
+                    )}
+                  </div>
 
-            {/* Action buttons — same size, side by side */}
+                  {/* Address input */}
+                  <Input
+                    theme={theme}
+                    placeholder="Enter address..."
+                    type="text"
+                    onChange={(e) => updateRecipient(recipient.id, 'address', e.target.value)}
+                    value={recipient.address}
+                    style={{ width: '100%', margin: 0 }}
+                  />
+
+                  {/* Amount + MAX */}
+                  <div
+                    className="flex items-center w-full rounded-xl border"
+                    style={{ backgroundColor: row, borderColor: gray + '40' }}
+                  >
+                    <input
+                      placeholder="0"
+                      type="text"
+                      inputMode="decimal"
+                      className="flex-1 bg-transparent h-9 px-4 text-sm outline-none border-none"
+                      style={{
+                        color: contrast,
+                        fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+                      }}
+                      value={recipient.amountInput}
+                      onChange={(e) => updateRecipient(recipient.id, 'amountInput', e.target.value)}
+                    />
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.93 }}
+                      onClick={() => handleSetMax(recipient.id)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 mr-1.5 rounded-lg border-0 outline-none cursor-pointer shrink-0"
+                      style={{ background: `${accent}18` }}
+                      title="Fill with remaining available amount"
+                    >
+                      <span className="text-[11px] font-bold" style={{ color: accent }}>
+                        MAX
+                      </span>
+                    </motion.button>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {/* Add recipient */}
+            <motion.button
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              type="button"
+              onClick={addRecipient}
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border-0 outline-none cursor-pointer"
+              style={{
+                background: `${accent}10`,
+                border: `1px dashed ${accent}40`,
+              }}
+            >
+              <Plus size={14} style={{ color: accent }} />
+              <span className="text-sm font-semibold" style={{ color: accent }}>
+                Add Recipient
+              </span>
+            </motion.button>
+
+            {/* Action buttons */}
             <div className="flex gap-2 mt-1">
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -287,21 +369,35 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
                 Trade
               </motion.button>
               <motion.button
-                whileHover={!isProcessing && amountInput && receiveAddress ? { scale: 1.02 } : undefined}
-                whileTap={!isProcessing && amountInput && receiveAddress ? { scale: 0.98 } : undefined}
+                whileHover={!submitDisabled ? { scale: 1.02 } : undefined}
+                whileTap={!submitDisabled ? { scale: 0.98 } : undefined}
                 type="submit"
-                disabled={isProcessing || !amountInput || !receiveAddress}
+                disabled={submitDisabled}
                 className="flex items-center justify-center gap-2 flex-1 h-11 rounded-xl text-sm font-bold outline-none border-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
                   background: `linear-gradient(135deg, ${accent}, ${accentRight})`,
-                  color: '#FFFFFF',
+                  color: theme.color.component.primaryButtonText,
                 }}
               >
                 <Send size={14} />
-                {isProcessing ? 'Sending...' : `Send`}
+                {isProcessing ? 'Sending...' : 'Send'}
               </motion.button>
             </div>
           </form>
+
+          <Show when={!!token.info.id}>
+            <div className="w-full px-4">
+              <CoinHistory
+                filter={{
+                  type: 'bsv21',
+                  tokenId: token.info.id!,
+                  decimals: token.info.dec,
+                  symbol: token.info.sym,
+                }}
+                refreshKey={successTxId}
+              />
+            </div>
+          </Show>
         </motion.div>
       ) : (
         <></>

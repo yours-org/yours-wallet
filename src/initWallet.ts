@@ -10,6 +10,7 @@ import {
 import { syncAddresses, createContext as createActionContext } from '@1sat/actions';
 import { WalletPermissionsManager, type PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile';
 import { ChromeStorageService } from './services/ChromeStorage.service';
+import type { Account } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
 import { FEE_PER_KB } from './utils/constants';
@@ -153,12 +154,14 @@ export const initWallet = async (
     maxKeyIndex,
   });
 
-  // 4b. Persist the BRC-29 primary address so other accounts can display it in the UI
+  // 4b. Persist the BRC-29 primary address so other accounts can display it in the UI.
+  // updateNested does a deepMerge under the hood, so a partial { primaryAddress } patch
+  // is safe even though TS sees it as missing required Account fields.
   const primaryAddress = syncContext.addressManager.getPrimaryAddress();
   if (primaryAddress) {
     const identityAddress = keys.identityAddress;
     chromeStorageService.updateNested('accounts', {
-      [identityAddress]: { primaryAddress },
+      [identityAddress]: { primaryAddress } as unknown as Account,
     });
   }
 

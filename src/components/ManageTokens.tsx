@@ -1,7 +1,7 @@
 import type { Bsv21Balance } from '@1sat/actions';
 import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, Star, X } from 'lucide-react';
+import { ArrowLeft, Search, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { Theme } from '../theme.types';
@@ -70,23 +70,22 @@ export const ManageTokens = (props: ManageTokensProps) => {
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: '100%', opacity: 0 }}
       transition={{ type: 'spring', stiffness: 320, damping: 35 }}
-      className="flex flex-col items-center w-full h-screen overflow-y-auto absolute z-[1000]"
-      style={{ backgroundColor: theme.color.global.walletBackground }}
+      className="flex flex-col items-center w-full pt-14 pb-20 overflow-y-auto overflow-x-hidden self-start"
+      style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between w-full px-5 pt-12 pb-4">
-        <span className="text-lg font-bold" style={{ color: theme.color.global.contrast }}>
+      <div className="flex items-center gap-3 w-full px-4 mb-5">
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={onBack}
+          className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 outline-none border-none cursor-pointer"
+          style={{ backgroundColor: '#17191E' }}
+        >
+          <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
+        </motion.button>
+        <span className="text-base font-bold" style={{ color: theme.color.global.contrast }}>
           Manage Token List
         </span>
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.92 }}
-          onClick={onBack}
-          className="flex items-center justify-center w-8 h-8 rounded-full outline-none border-none cursor-pointer"
-          style={{ backgroundColor: theme.color.global.row }}
-        >
-          <X size={16} style={{ color: theme.color.global.contrast }} />
-        </motion.button>
       </div>
 
       {/* Search */}

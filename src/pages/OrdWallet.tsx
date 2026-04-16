@@ -1,6 +1,6 @@
 import validate from 'bitcoin-address-validation';
 import { useCallback, useEffect, useState } from 'react';
-import { Beef, type WalletOutput } from '@bsv/sdk';
+import { Beef, type BEEF, type WalletOutput } from '@bsv/sdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Check, ImageOff, Send, Tag, X } from 'lucide-react';
 import { Ordinal } from '../components/Ordinal';
@@ -9,9 +9,7 @@ import { Show } from '../components/Show';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { cancelListing, getOrdinals, listOrdinal, ONESAT_MAINNET_CONTENT_URL, transferOrdinals } from '@1sat/actions';
-
-const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
+import { cancelListing, getOrdinals, listOrdinal, transferOrdinals } from '@1sat/actions';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { sleep } from '../utils/sleep';
 import { TopNav } from '../components/TopNav';
@@ -171,13 +169,17 @@ export const OrdWallet = () => {
   const { theme } = useTheme();
   const [pageState, setPageState] = useState<PageState>('main');
   const { apiContext } = useServiceContext();
+
+  /** Build an ORDFS content URL via the 1sat client. Pass the outpoint through
+   *  in its native `txid.vout` form. */
+  const getContentUrl = (outpoint: string) => apiContext.services!.ordfs.getContentUrl(outpoint);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedOrdinals, setSelectedOrdinals] = useState<WalletOutput[]>([]);
   const [bsvListAmount, setBsvListAmount] = useState<number | null>();
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const [ordinals, setOrdinals] = useState<WalletOutput[]>([]);
-  const [ordinalsBEEFs, setOrdinalsBEEFs] = useState<number[][]>([]);
+  const [ordinalsBEEFs, setOrdinalsBEEFs] = useState<BEEF[]>([]);
   const [from, setFrom] = useState<string>();
   const listedOrdinals = ordinals.filter((o) => o.tags?.includes('ordlock'));
   const myOrdinals = ordinals.filter((o) => !o.tags?.includes('ordlock'));

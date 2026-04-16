@@ -31,7 +31,7 @@ export const TopNav = () => {
   };
 
   const handleSwitchAccount = async (identityAddress: string) => {
-    wallet?.close();
+    wallet?.close?.();
     await chromeStorageService.switchAccount(identityAddress);
     setDropdownVisible(false);
     navigate('/bsv-wallet?reload=true');
@@ -155,7 +155,7 @@ export const TopNav = () => {
               <motion.div
                 whileHover={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
                 className="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
-                onClick={() => handleSelect('settings', 'manage-accounts')}
+                onClick={() => handleSelect('settings', 'create-account')}
               >
                 <span className="text-sm font-semibold" style={{ color: theme.color.global.gray }}>
                   + Add New Account

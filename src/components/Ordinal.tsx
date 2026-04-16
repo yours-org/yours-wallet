@@ -128,17 +128,20 @@ export const Ordinal = (props: OrdinalProps) => {
 
       case contentType?.startsWith('image/'):
         return (
-          <div
-            style={{
-              ...wrapperBase(size),
-              backgroundImage: `url(${url})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              ...border,
-            }}
-            onClick={onClick}
-          />
+          <div style={{ ...wrapperBase(size), overflow: 'hidden', ...border }} onClick={onClick}>
+            <img
+              src={url}
+              alt={name}
+              loading="lazy"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+                borderRadius: 'inherit',
+              }}
+            />
+          </div>
         );
 
       case contentType?.startsWith('text/'):
@@ -223,6 +226,19 @@ export const Ordinal = (props: OrdinalProps) => {
         );
     }
   };
+
+  // When rendered inside a full-size card (e.g. OrdCard passes size="100%"), skip
+  // the legacy FlexWrapper that constrains content to 33% width — fill the parent
+  // instead so images and text occupy the entire card.
+  const fillParent = size === '100%' || isTransfer;
+
+  if (fillParent) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {renderContent()}
+      </div>
+    );
+  }
 
   return (
     <FlexWrapper>

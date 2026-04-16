@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Shield, X } from 'lucide-react';
+import { ChevronDown, Globe, Shield, X } from 'lucide-react';
 import { PageLoader } from '../components/PageLoader';
 import { Show } from '../components/Show';
 import { SpeedBump } from '../components/SpeedBump';
 import { useTheme } from '../hooks/useTheme';
 import { useSnackbar } from '../hooks/useSnackbar';
+import { useServiceContext } from '../hooks/useServiceContext';
+import type { WhitelistedApp } from '../inject';
+import type { ChromeStorageObject } from '../services/types/chromeStorage.types';
 
 /** Permission token as returned by WPM — passed through as-is from background */
 interface PermissionToken {
@@ -32,6 +35,18 @@ interface OriginatorGroup {
   permissions: PermissionToken[];
 }
 
+/** A domain unified from both whitelist + BRC-100 permission origins. */
+interface UnifiedEntry {
+  /** Display key (also used as originator for BRC-100 calls) */
+  domain: string;
+  /** Icon URL from the whitelist, if any */
+  icon?: string;
+  /** True if this domain is in the local Yours whitelist */
+  connected: boolean;
+  /** BRC-100 permission tokens for this originator (may be empty) */
+  permissions: PermissionToken[];
+}
+
 const extractDomain = (originator: string): string => {
   try {
     if (originator.startsWith('chrome-extension://')) {
@@ -44,9 +59,7 @@ const extractDomain = (originator: string): string => {
   }
 };
 
-const tokenKey = (token: PermissionToken): string => {
-  return `${token.txid}.${token.outputIndex}`;
-};
+const tokenKey = (token: PermissionToken): string => `${token.txid}.${token.outputIndex}`;
 
 const typeLabel = (type: PermissionToken['type']): string => {
   switch (type) {
@@ -141,51 +154,93 @@ export interface PermissionsManagerProps {
   onBack: () => void;
 }
 
-export const PermissionsManager = ({ onBack }: PermissionsManagerProps) => {
+// onBack is consumed by the parent (Settings) header — kept for API stability
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const PermissionsManager = ({ onBack: _onBack }: PermissionsManagerProps) => {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
+  const { chromeStorageService } = useServiceContext();
+
   const [groups, setGroups] = useState<OriginatorGroup[]>([]);
+  const [whitelist, setWhitelist] = useState<WhitelistedApp[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedOriginator, setExpandedOriginator] = useState<string | null>(null);
+  const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
   const [revoking, setRevoking] = useState<Set<string>>(new Set());
   const [spentAmounts, setSpentAmounts] = useState<Map<string, number>>(new Map());
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const [revokeAllTarget, setRevokeAllTarget] = useState<string | null>(null);
+  const [fullyRevokingDomain, setFullyRevokingDomain] = useState<string | null>(null);
 
   const contrast = theme.color.global.contrast;
   const gray = theme.color.global.gray;
 
-  const fetchPermissions = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
+      // Permissions from service worker
       const response = await chrome.runtime.sendMessage({ action: 'PERMISSIONS_LIST_ALL' });
       if (response.success) {
         setGroups(response.data?.groups ?? []);
       } else {
         addSnackbar(response.error || 'Failed to load permissions', 'error');
       }
+
+      // Whitelist from chrome storage
+      await chromeStorageService.getAndSetStorage();
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      setWhitelist(account?.settings?.whitelist ?? []);
     } catch (error) {
-      addSnackbar('Failed to load permissions: ' + (error instanceof Error ? error.message : String(error)), 'error');
+      addSnackbar('Failed to load: ' + (error instanceof Error ? error.message : String(error)), 'error');
     } finally {
       setLoading(false);
     }
-  }, [addSnackbar]);
+  }, [addSnackbar, chromeStorageService]);
 
   useEffect(() => {
-    fetchPermissions();
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleToggleOriginator = async (originator: string) => {
-    if (expandedOriginator === originator) {
-      setExpandedOriginator(null);
+  // Merge whitelist + permission origins into a single list, keyed by display domain
+  const entries: UnifiedEntry[] = useMemo(() => {
+    const map = new Map<string, UnifiedEntry>();
+
+    for (const app of whitelist) {
+      map.set(app.domain, {
+        domain: app.domain,
+        icon: app.icon,
+        connected: true,
+        permissions: [],
+      });
+    }
+
+    for (const group of groups) {
+      const domain = group.originator;
+      const existing = map.get(domain);
+      if (existing) {
+        existing.permissions = group.permissions;
+      } else {
+        map.set(domain, {
+          domain,
+          connected: false,
+          permissions: group.permissions,
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.domain.localeCompare(b.domain));
+  }, [whitelist, groups]);
+
+  const handleToggleExpand = async (domain: string) => {
+    if (expandedDomain === domain) {
+      setExpandedDomain(null);
       return;
     }
-    setExpandedOriginator(originator);
+    setExpandedDomain(domain);
 
-    const group = groups.find((g) => g.originator === originator);
-    if (!group) return;
-
-    const spendingTokens = group.permissions.filter((p) => p.type === 'spending');
+    // Fetch spent amounts for any spending tokens under this domain
+    const entry = entries.find((e) => e.domain === domain);
+    if (!entry) return;
+    const spendingTokens = entry.permissions.filter((p) => p.type === 'spending');
     for (const token of spendingTokens) {
       const key = tokenKey(token);
       if (spentAmounts.has(key)) continue;
@@ -213,13 +268,11 @@ export const PermissionsManager = ({ onBack }: PermissionsManagerProps) => {
       });
       if (response.success) {
         setGroups((prev) =>
-          prev
-            .map((g) =>
-              g.originator === token.originator
-                ? { ...g, permissions: g.permissions.filter((p) => tokenKey(p) !== key) }
-                : g,
-            )
-            .filter((g) => g.permissions.length > 0),
+          prev.map((g) =>
+            g.originator === token.originator
+              ? { ...g, permissions: g.permissions.filter((p) => tokenKey(p) !== key) }
+              : g,
+          ),
         );
         addSnackbar('Permission revoked', 'success');
       } else {
@@ -236,32 +289,62 @@ export const PermissionsManager = ({ onBack }: PermissionsManagerProps) => {
     }
   };
 
-  const promptRevokeAll = (e: React.MouseEvent, originator: string) => {
-    e.stopPropagation();
-    setRevokeAllTarget(originator);
+  const removeWhitelistEntry = async (domain: string) => {
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) return;
+    const newList = (account.settings?.whitelist ?? []).filter((a) => a.domain !== domain);
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [selectedAccount]: {
+        ...account,
+        settings: { ...account.settings, whitelist: newList },
+      },
+    };
+    await chromeStorageService.updateNested(key, update);
+    setWhitelist(newList);
+  };
+
+  const promptRevokeAll = (domain: string) => {
+    setRevokeAllTarget(domain);
     setShowSpeedBump(true);
   };
 
   const confirmRevokeAll = async () => {
-    const originator = revokeAllTarget;
+    const domain = revokeAllTarget;
     setShowSpeedBump(false);
     setRevokeAllTarget(null);
-    if (!originator) return;
+    if (!domain) return;
 
+    setFullyRevokingDomain(domain);
     try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'PERMISSIONS_REVOKE_ALL',
-        originator,
-      });
-      if (response.success) {
-        setGroups((prev) => prev.filter((g) => g.originator !== originator));
-        if (expandedOriginator === originator) setExpandedOriginator(null);
-        addSnackbar(`Revoked ${response.data?.revokedCount ?? 'all'} permissions`, 'success');
-      } else {
-        addSnackbar(response.error || 'Revoke all failed', 'error');
+      const entry = entries.find((e) => e.domain === domain);
+      const hasPermissions = (entry?.permissions.length ?? 0) > 0;
+
+      // 1. Revoke BRC-100 permission tokens (on-chain, affects all wallets with same identity)
+      if (hasPermissions) {
+        const response = await chrome.runtime.sendMessage({
+          action: 'PERMISSIONS_REVOKE_ALL',
+          originator: domain,
+        });
+        if (response.success) {
+          setGroups((prev) => prev.filter((g) => g.originator !== domain));
+        } else {
+          addSnackbar(response.error || 'Revoke failed', 'error');
+          return;
+        }
       }
+
+      // 2. Remove from local whitelist (this wallet only)
+      if (entry?.connected) {
+        await removeWhitelistEntry(domain);
+      }
+
+      if (expandedDomain === domain) setExpandedDomain(null);
+      addSnackbar(`Revoked access for ${extractDomain(domain)}`, 'success');
     } catch (error) {
-      addSnackbar('Revoke all failed: ' + (error instanceof Error ? error.message : String(error)), 'error');
+      addSnackbar('Revoke failed: ' + (error instanceof Error ? error.message : String(error)), 'error');
+    } finally {
+      setFullyRevokingDomain(null);
     }
   };
 
@@ -277,7 +360,7 @@ export const PermissionsManager = ({ onBack }: PermissionsManagerProps) => {
     <div className="flex flex-col items-center w-full py-2 px-3">
       <SpeedBump
         theme={theme}
-        message={`Revoke all permissions for ${revokeAllTarget ? extractDomain(revokeAllTarget) : 'this app'}? It will need to request permissions again.`}
+        message={`Revoke all access for ${revokeAllTarget ? extractDomain(revokeAllTarget) : 'this app'}? This removes the connection from this wallet and revokes any on-chain permission tokens.`}
         showSpeedBump={showSpeedBump}
         onCancel={() => {
           setShowSpeedBump(false);
@@ -286,68 +369,90 @@ export const PermissionsManager = ({ onBack }: PermissionsManagerProps) => {
         onConfirm={confirmRevokeAll}
       />
 
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-4">
-        <Shield size={18} style={{ color: '#A1FF8B' }} />
-        <h2 className="text-lg font-bold" style={{ color: contrast }}>
-          Permissions
-        </h2>
-      </div>
-
       {/* Empty state */}
-      <Show when={groups.length === 0}>
-        <p className="text-sm mt-8 text-center" style={{ color: gray }}>
-          No permissions granted
-        </p>
+      <Show when={entries.length === 0}>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center py-12 gap-3 w-full"
+        >
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(161,255,139,0.1)' }}
+          >
+            <Shield size={22} color="#A1FF8B" />
+          </div>
+          <p className="text-sm" style={{ color: gray }}>
+            No apps connected
+          </p>
+        </motion.div>
       </Show>
 
-      {/* Permission groups */}
+      {/* Unified domain cards */}
       <div className="w-full flex flex-col gap-2">
-        {groups.map((group) => {
-          const isExpanded = expandedOriginator === group.originator;
+        {entries.map((entry) => {
+          const isExpanded = expandedDomain === entry.domain;
+          const permissionCount = entry.permissions.length;
+          const displayDomain = extractDomain(entry.domain);
+          const isFullyRevoking = fullyRevokingDomain === entry.domain;
+
           return (
             <div
-              key={group.originator}
+              key={entry.domain}
               className="rounded-xl overflow-hidden"
               style={{ border: `1px solid ${gray}15`, backgroundColor: '#17191E' }}
             >
-              {/* Originator header */}
+              {/* Header row */}
               <motion.button
                 whileTap={{ scale: 0.99 }}
-                onClick={() => handleToggleOriginator(group.originator)}
+                onClick={() => handleToggleExpand(entry.domain)}
                 className="flex items-center justify-between w-full px-3 py-2.5 cursor-pointer border-0 outline-none text-left bg-transparent"
               >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="text-sm font-semibold truncate max-w-[140px]" style={{ color: contrast }}>
-                    {extractDomain(group.originator)}
-                  </span>
-                  <span
-                    className="inline-flex items-center justify-center min-w-[1.25rem] h-5 rounded-full px-1.5 text-[10px] font-semibold"
-                    style={{ backgroundColor: gray + '30', color: contrast }}
-                  >
-                    {group.permissions.length}
-                  </span>
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  {entry.icon ? (
+                    <img
+                      src={entry.icon}
+                      alt={displayDomain}
+                      className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: 'rgba(161,255,139,0.1)' }}
+                    >
+                      <Globe size={14} color="#A1FF8B" />
+                    </div>
+                  )}
+
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-sm font-semibold truncate" style={{ color: contrast }}>
+                      {displayDomain}
+                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {entry.connected && (
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider"
+                          style={{ backgroundColor: 'rgba(161,255,139,0.12)', color: '#A1FF8B' }}
+                        >
+                          <span className="w-1 h-1 rounded-full" style={{ backgroundColor: '#A1FF8B' }} />
+                          Connected
+                        </span>
+                      )}
+                      {permissionCount > 0 && (
+                        <span className="text-[10px]" style={{ color: gray }}>
+                          {permissionCount} permission{permissionCount === 1 ? '' : 's'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={(e) => promptRevokeAll(e, group.originator)}
-                    className="px-2 py-0.5 rounded text-[10px] font-semibold border cursor-pointer"
-                    style={{
-                      background: 'rgba(239,68,68,0.1)',
-                      color: '#ef4444',
-                      borderColor: 'rgba(239,68,68,0.3)',
-                    }}
-                  >
-                    Revoke All
-                  </button>
-                  <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                    <ChevronDown size={14} color={gray} />
-                  </motion.div>
-                </div>
+                <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                  <ChevronDown size={14} color={gray} />
+                </motion.div>
               </motion.button>
 
-              {/* Expanded permissions */}
+              {/* Expanded content */}
               <AnimatePresence>
                 {isExpanded && (
                   <motion.div
@@ -357,21 +462,25 @@ export const PermissionsManager = ({ onBack }: PermissionsManagerProps) => {
                     transition={{ duration: 0.2, ease: 'easeInOut' }}
                     className="overflow-hidden"
                   >
-                    {group.permissions.map((perm) => {
+                    {/* Individual permission rows */}
+                    {entry.permissions.map((perm) => {
                       const key = tokenKey(perm);
                       return (
                         <div
                           key={key}
-                          className="flex items-center px-3 py-2"
+                          className="flex items-start gap-2 px-3 py-2"
                           style={{ borderTop: `1px solid ${gray}12` }}
                         >
                           <span
-                            className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold text-white mr-2 shrink-0"
+                            className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold text-white shrink-0 mt-0.5"
                             style={{ backgroundColor: typeColor(perm.type) }}
                           >
                             {typeLabel(perm.type)}
                           </span>
-                          <span className="text-xs flex-1 truncate" style={{ color: contrast }}>
+                          <span
+                            className="text-xs flex-1 leading-snug break-words"
+                            style={{ color: contrast, minWidth: 0 }}
+                          >
                             {formatPermissionDetail(perm, spentAmounts.get(key))}
                           </span>
                           <button
@@ -384,6 +493,33 @@ export const PermissionsManager = ({ onBack }: PermissionsManagerProps) => {
                         </div>
                       );
                     })}
+
+                    {/* No permissions hint */}
+                    {entry.permissions.length === 0 && (
+                      <div
+                        className="px-3 py-2.5 text-[11px]"
+                        style={{ borderTop: `1px solid ${gray}12`, color: gray }}
+                      >
+                        No granular permissions granted yet.
+                      </div>
+                    )}
+
+                    {/* Revoke All — nested inside the dropdown */}
+                    <div className="px-3 py-2.5" style={{ borderTop: `1px solid ${gray}12` }}>
+                      <button
+                        onClick={() => promptRevokeAll(entry.domain)}
+                        disabled={isFullyRevoking}
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{
+                          background: 'rgba(239,68,68,0.08)',
+                          color: '#ef4444',
+                          borderColor: 'rgba(239,68,68,0.3)',
+                        }}
+                      >
+                        <X size={12} />
+                        {isFullyRevoking ? 'Revoking...' : 'Revoke All Access'}
+                      </button>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>

@@ -45,7 +45,7 @@ export const restoreMasterFromZip = async (
 
     progress({ message: 'Restore complete!' });
 
-    return response.manifest;
+    return response.data;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     progress({ message: `Restore failed: ${message}` });

@@ -70,7 +70,10 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
     initServices();
     return () => {
-      localStorage.removeItem('walletImporting'); // See SyncBanner.tsx
+      // Legacy cleanup — `walletImporting` was used by the old SyncBanner to show
+      // an "Initializing..." state. Banner is gone, but clearing stale values in
+      // long-time-user browsers is harmless.
+      localStorage.removeItem('walletImporting');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   List,
-  History,
   ArrowDownToLine,
   ArrowUpFromLine,
   ArrowLeft,
@@ -13,6 +12,7 @@ import {
   Plus,
   ArrowUpDown,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import bsvCoin from '../assets/bsv-coin.svg';
 import { Button } from '../components/Button';
@@ -28,6 +28,7 @@ import { useSocialProfile } from '../hooks/useSocialProfile';
 import { useTheme } from '../hooks/useTheme';
 import {
   BSV_DECIMAL_CONVERSION,
+  GENERIC_TOKEN_ICON,
   HOSTED_YOURS_IMAGE,
   MNEE_ICON_URL,
   MNEE_MOBILE_REFERRAL_LINK,
@@ -49,7 +50,7 @@ import {
   type LockData,
 } from '@1sat/actions';
 import { getWalletBalance, fetchExchangeRate } from '../utils/wallet';
-import { sendMessage, sendMessageAsync } from '../utils/chromeHelpers';
+import { sendMessageAsync } from '../utils/chromeHelpers';
 import { YoursEventName } from '../inject';
 import { useSyncTracker } from '../hooks/useSyncTracker';
 import { getErrorMessage, isValidEmail } from '../utils/tools';
@@ -58,14 +59,15 @@ import { Bsv21TokensList } from '../components/Bsv21TokensList';
 import { ManageTokens } from '../components/ManageTokens';
 import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { SendBsv21View } from '../components/SendBsv21View';
+import { AssetPicker, type PickableAsset } from '../components/AssetPicker';
+import { CoinHistory } from '../components/CoinHistory';
 import { FaucetButton } from '../components/FaucetButton';
-import { TxHistory } from '../components/TxHistory';
-import { getMneeBalance, sendMnee, deriveDepositAddresses } from '@1sat/actions';
+import { getMneeBalance, sendMnee, deriveDepositAddresses, ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 import { MneeClient } from '@1sat/client';
 
 // CopyAddressed feedback state hook — used in receive view
 
-type PageState = 'main' | 'receive' | 'send' | 'sendMNEE' | 'getMNEE';
+type PageState = 'main' | 'receive' | 'send' | 'sendMNEE' | 'getMNEE' | 'asset-picker';
 type AmountType = 'bsv' | 'usd';
 
 export type Recipient = {
@@ -104,17 +106,43 @@ export const BsvWallet = () => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [bsv21s, setBsv21s] = useState<Bsv21Balance[]>([]);
   const [manageFavorites, setManageFavorites] = useState(false);
-  const [historyTx, setHistoryTx] = useState(false);
   const [account, setAccount] = useState<Account>();
   const [token, setToken] = useState<{ isConfirmed: boolean; info: Bsv21Balance } | null>(null);
   const services = theme.settings.services;
   const [filteredTokens, setFilteredTokens] = useState<Bsv21Balance[]>([]);
   const [randomKey, setRandomKey] = useState(Math.random());
   const isTestnet = chromeStorageService.getNetwork() === 'testnet' ? true : false;
+  // Bump to force a refresh of the per-coin CoinHistory list (e.g. after a successful send)
+  const [bsvHistoryRefreshKey, setBsvHistoryRefreshKey] = useState(0);
+  const [mneeHistoryRefreshKey, setMneeHistoryRefreshKey] = useState(0);
   const [mneeBalance, setMneeBalance] = useState(0);
-  const [mneeRecipient, setMneeRecipient] = useState('');
-  const [mneeReciepientAmount, setMneeRecipientAmount] = useState<number | null>(null);
   const [copiedAddress, setCopiedAddress] = useState(false);
+
+  // MNEE supports multi-recipient at the action level, so the UI mirrors BSV's pattern
+  type MneeRecipient = { id: string; address: string; amount: number | null };
+  const [mneeRecipients, setMneeRecipients] = useState<MneeRecipient[]>([
+    { id: crypto.randomUUID(), address: '', amount: null },
+  ]);
+
+  const addMneeRecipient = () => {
+    setMneeRecipients((prev) => [...prev, { id: crypto.randomUUID(), address: '', amount: null }]);
+  };
+
+  const removeMneeRecipient = (id: string) => {
+    if (mneeRecipients.length > 1) {
+      setMneeRecipients((prev) => prev.filter((r) => r.id !== id));
+    }
+  };
+
+  const updateMneeRecipient = (id: string, field: 'address' | 'amount', value: string | number | null) => {
+    setMneeRecipients((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  };
+
+  const resetMneeRecipients = () => {
+    setMneeRecipients([{ id: crypto.randomUUID(), address: '', amount: null }]);
+  };
+
+  const mneeTotal = mneeRecipients.reduce((acc, r) => acc + (r.amount ?? 0), 0);
 
   const [recipients, setRecipients] = useState<Recipient[]>([
     { id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' },
@@ -292,9 +320,8 @@ export const BsvWallet = () => {
     showLoad && setIsProcessing(true);
     await getAndSetBsvBalance();
     loadLocks && loadLocks();
-
-    sendMessage({ action: YoursEventName.SYNC_UTXOS });
-
+    // Note: BRC-100 on-chain sync is driven by the service worker
+    // (Monitor + syncAddresses). The UI only needs to re-read current state.
     showLoad && setIsProcessing(false);
   };
 
@@ -345,26 +372,27 @@ export const BsvWallet = () => {
     e.preventDefault();
     setIsProcessing(true);
     await sleep(25);
-    if (!mneeRecipient || !mneeReciepientAmount) {
-      addSnackbar('Enter a recipient and amount!', 'info');
-      return;
+
+    // Validate all recipients
+    for (const r of mneeRecipients) {
+      if (!r.address || r.amount === null || r.amount === undefined) {
+        addSnackbar('All recipients must have an address and amount!', 'info');
+        setIsProcessing(false);
+        return;
+      }
+      if (r.amount <= 0.00001) {
+        addSnackbar('Minimum send amount is 0.00001 MNEE per recipient!', 'error');
+        setIsProcessing(false);
+        return;
+      }
     }
 
-    if (mneeReciepientAmount > mneeBalance) {
+    if (mneeTotal > mneeBalance) {
       addSnackbar('Insufficient MNEE balance!', 'error');
       setIsProcessing(false);
       return;
     }
 
-    if (mneeReciepientAmount <= 0.00001) {
-      addSnackbar('Minimum send amount is 0.00001 MNEE!', 'error');
-      setIsProcessing(false);
-      return;
-    }
-
-    // TODO: MNEE requires direct key access for cosigning flow.
-    // Need to implement message-based MNEE transfer in background.ts
-    // For now, show a message that MNEE is temporarily unavailable
     if (!apiContext) {
       addSnackbar('Wallet not ready.', 'error');
       setIsProcessing(false);
@@ -381,7 +409,7 @@ export const BsvWallet = () => {
       addSnackbar('Transaction initiated. Processing...', 'info');
 
       const res = await sendMnee.execute(apiContext, {
-        recipients: [{ address: mneeRecipient, amount: mneeReciepientAmount }],
+        recipients: mneeRecipients.map((r) => ({ address: r.address, amount: r.amount as number })),
         derivations: derivationResult.derivations,
       });
 
@@ -391,9 +419,12 @@ export const BsvWallet = () => {
         return;
       }
 
-      setMneeRecipient('');
-      setMneeRecipientAmount(null);
-      setTimeout(updateMneeBalance, 1000);
+      resetMneeRecipients();
+      // Optimistic: subtract what we just sent from the displayed balance
+      // instead of waiting on the MNEE backend to reflect the update.
+      setMneeBalance((prev) => Math.max(0, prev - mneeTotal));
+      updateMneeBalance().catch((err) => console.error('[handleSendMNEE] reconcile refresh failed:', err));
+      setMneeHistoryRefreshKey((k) => k + 1);
       setPageState('main');
       addSnackbar('Transaction Successful!', 'success');
     } catch (error: unknown) {
@@ -546,11 +577,19 @@ export const BsvWallet = () => {
       return;
     }
 
+    // Optimistic balance update — we already know the send succeeded, so
+    // immediately subtract the outgoing satoshis from the displayed balance.
+    // Then kick off an async refresh in the background to reconcile with the
+    // authoritative source once it catches up.
+    const totalSatsOut = isSendAllBsv
+      ? Math.round(bsvBalance * BSV_DECIMAL_CONVERSION)
+      : sendRecipients.reduce((acc, r) => acc + (r.satoshis ?? 0), 0);
+    setBsvBalance((prev) => Math.max(0, prev - totalSatsOut / BSV_DECIMAL_CONVERSION));
+    refreshUtxos().catch((err) => console.error('[handleSendBsv] reconcile refresh failed:', err));
     resetSendState();
+    setBsvHistoryRefreshKey((k) => k + 1);
     setPageState('main');
-    setTimeout(() => refreshUtxos(), 1000);
     addSnackbar('Transaction Successful!', 'success');
-    setIsProcessing(false);
   };
 
   const fillInputWithAllBsv = () => {
@@ -584,7 +623,7 @@ export const BsvWallet = () => {
   };
 
   const getMneeLabel = () => {
-    return mneeReciepientAmount ? `Send ${mneeReciepientAmount.toFixed(5)} MNEE` : 'Enter Send Details';
+    return mneeTotal > 0 ? `Send ${mneeTotal.toFixed(5)} MNEE` : 'Enter Send Details';
   };
 
   const handleDismissWelcome = async () => {
@@ -608,18 +647,22 @@ export const BsvWallet = () => {
     refreshUtxos();
   };
 
-  const handleSendAllMnee = async () => {
+  /** Fill the given MNEE recipient with (balance - already-assigned - fee). */
+  const handleFillMaxMnee = async (id: string) => {
+    const assignedElsewhere = mneeRecipients.reduce((acc, r) => (r.id === id ? acc : acc + (r.amount ?? 0)), 0);
+    const available = Math.max(0, mneeBalance - assignedElsewhere);
+
     if (!apiContext?.services?.mnee) {
-      setMneeRecipientAmount(mneeBalance);
+      updateMneeRecipient(id, 'amount', available);
       return;
     }
     try {
       const config = await apiContext.services.mnee.getConfig();
-      const atomicBalance = MneeClient.toAtomicAmount(mneeBalance);
-      const fee = config.fees.find((f) => atomicBalance >= f.min && atomicBalance <= f.max)?.fee || 0;
-      setMneeRecipientAmount(MneeClient.fromAtomicAmount(atomicBalance - fee));
+      const atomicAvailable = MneeClient.toAtomicAmount(available);
+      const fee = config.fees.find((f) => atomicAvailable >= f.min && atomicAvailable <= f.max)?.fee || 0;
+      updateMneeRecipient(id, 'amount', MneeClient.fromAtomicAmount(Math.max(0, atomicAvailable - fee)));
     } catch {
-      setMneeRecipientAmount(mneeBalance);
+      updateMneeRecipient(id, 'amount', available);
     }
   };
 
@@ -629,22 +672,21 @@ export const BsvWallet = () => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto"
-      style={{ minHeight: 'calc(100% - 3.75rem)', backgroundColor: theme.color.global.walletBackground }}
+      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto overflow-x-hidden self-start"
+      style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header row */}
-      <div className="flex items-center w-full mb-5 mt-2">
+      <div className="flex items-center gap-3 w-full mb-5">
         <motion.button
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.92 }}
+          whileTap={{ scale: 0.9 }}
           onClick={() => {
             setPageState('main');
             getAndSetBsvBalance();
           }}
-          className="flex items-center justify-center w-8 h-8 rounded-full border-0 outline-none cursor-pointer mr-3"
-          style={{ background: theme.color.global.row, color: theme.color.global.gray }}
+          className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+          style={{ background: '#17191E' }}
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
         </motion.button>
         <h2 className="text-base font-bold tracking-tight flex-1" style={{ color: theme.color.global.contrast }}>
           Receive Assets
@@ -756,14 +798,30 @@ export const BsvWallet = () => {
           transition={{ duration: 0.35, ease: 'easeOut' }}
           className="flex flex-col items-center mt-2"
         >
-          <h1
-            title="Sync Transactions"
-            onClick={() => {}}
-            className="text-4xl font-bold tracking-tight cursor-pointer select-none"
-            style={{ color: theme.color.global.contrast, letterSpacing: '-0.02em' }}
-          >
-            {formatUSD(bsvBalance * exchangeRate)}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1
+              title={isSyncing ? 'Syncing…' : 'Balance'}
+              className="text-4xl font-bold tracking-tight select-none"
+              style={{ color: theme.color.global.contrast, letterSpacing: '-0.02em' }}
+            >
+              {formatUSD(bsvBalance * exchangeRate)}
+            </h1>
+            <AnimatePresence>
+              {isSyncing && (
+                <motion.div
+                  key="sync-spinner"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                  title="Syncing wallet…"
+                  className="flex items-center justify-center"
+                >
+                  <Loader2 size={18} className="animate-spin" style={{ color: theme.color.global.gray }} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           <div className="flex items-center gap-1.5 mt-1">
             <img src={bsvCoin} className="w-3.5 h-3.5 opacity-70" alt="BSV" />
             <span className="text-sm font-mono" style={{ color: theme.color.global.gray }}>
@@ -796,7 +854,7 @@ export const BsvWallet = () => {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.96 }}
             transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-            onClick={() => setPageState('send')}
+            onClick={() => setPageState('asset-picker')}
             className="flex flex-1 items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-sm border-0 outline-none cursor-pointer"
             style={{
               background: `linear-gradient(135deg, ${theme.color.component.primaryButtonLeftGradient}, ${theme.color.component.primaryButtonRightGradient})`,
@@ -842,7 +900,8 @@ export const BsvWallet = () => {
             icon={bsvCoin}
             ticker="BSV"
             usdBalance={bsvBalance * exchangeRate}
-            showPointer={false}
+            showPointer={true}
+            onClick={() => setPageState('send')}
           />
           <Show when={services.mnee && !isTestnet}>
             <AssetRow
@@ -892,13 +951,13 @@ export const BsvWallet = () => {
           </motion.div>
         </Show>
 
-        {/* ── Quick links (Manage Tokens / Recent Activity) ── */}
-        <motion.div
-          variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
-          transition={{ duration: 0.3, ease: 'easeOut' }}
-          className="w-full mt-4 px-4 flex flex-col gap-2"
-        >
-          <Show when={services.bsv21}>
+        {/* ── Quick links (Manage Tokens) ── */}
+        <Show when={services.bsv21}>
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className="w-full mt-4 px-4 flex flex-col gap-2"
+          >
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={() => setManageFavorites(!manageFavorites)}
@@ -910,25 +969,65 @@ export const BsvWallet = () => {
                 Manage Tokens List
               </span>
             </motion.button>
-          </Show>
-
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setHistoryTx(!historyTx)}
-            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border text-left cursor-pointer outline-none transition-colors duration-150 bg-[#17191E] hover:bg-[#1f2128]"
-            style={listItemStyle}
-          >
-            <History size={16} color={theme.color.global.gray} />
-            <span className="text-sm font-semibold" style={{ color: theme.color.global.gray }}>
-              Recent Activity
-            </span>
-          </motion.button>
-        </motion.div>
+          </motion.div>
+        </Show>
 
         {/* Bottom breathing room */}
         <div className="h-4" />
       </motion.div>
     </MainContent>
+  );
+
+  // ── Asset picker (opened by the top-level Send button) ──────────────────────
+  const pickableAssets: PickableAsset[] = [
+    {
+      kind: 'bsv',
+      ticker: 'BSV',
+      icon: bsvCoin,
+      balance: bsvBalance,
+      usdBalance: bsvBalance * exchangeRate,
+    },
+    ...(services.mnee && !isTestnet
+      ? [
+          {
+            kind: 'mnee' as const,
+            ticker: 'MNEE' as const,
+            icon: MNEE_ICON_URL,
+            balance: mneeBalance,
+            usdBalance: mneeBalance,
+          },
+        ]
+      : []),
+    ...(services.bsv21
+      ? bsv21s
+          .filter((t) => t.all.confirmed > 0n)
+          .map(
+            (t) =>
+              ({
+                kind: 'bsv21' as const,
+                token: t,
+                icon: t.icon ? `${ONESAT_MAINNET_CONTENT_URL}/${t.icon}` : GENERIC_TOKEN_ICON,
+              }) as PickableAsset,
+          )
+      : []),
+  ];
+
+  const handleAssetSelected = (asset: PickableAsset) => {
+    switch (asset.kind) {
+      case 'bsv':
+        setPageState('send');
+        return;
+      case 'mnee':
+        setPageState('sendMNEE');
+        return;
+      case 'bsv21':
+        handleTokenClick(asset.token);
+        return;
+    }
+  };
+
+  const assetPickerView = (
+    <AssetPicker assets={pickableAssets} onBack={() => setPageState('main')} onSelect={handleAssetSelected} />
   );
 
   const sendMNEE = (
@@ -937,23 +1036,21 @@ export const BsvWallet = () => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto"
-      style={{ minHeight: 'calc(100% - 3.75rem)', backgroundColor: theme.color.global.walletBackground }}
+      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto overflow-x-hidden self-start"
+      style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header */}
-      <div className="flex items-center w-full mb-5 mt-2">
+      <div className="flex items-center gap-3 w-full mb-5">
         <motion.button
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.92 }}
+          whileTap={{ scale: 0.9 }}
           onClick={() => {
             setPageState('main');
-            setMneeRecipient('');
-            setMneeRecipientAmount(null);
+            resetMneeRecipients();
           }}
-          className="flex items-center justify-center w-8 h-8 rounded-full border-0 outline-none cursor-pointer mr-3"
-          style={{ background: theme.color.global.row, color: theme.color.global.gray }}
+          className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+          style={{ background: '#17191E' }}
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
         </motion.button>
         <div className="flex items-center gap-2 flex-1">
           <img src={MNEE_ICON_URL} className="w-6 h-6 rounded-full" alt="MNEE" />
@@ -963,15 +1060,12 @@ export const BsvWallet = () => {
         </div>
       </div>
 
-      {/* Balance chip */}
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.97 }}
-        onClick={handleSendAllMnee}
-        className="flex items-center gap-2 px-4 py-2 rounded-full border-0 outline-none cursor-pointer mb-5"
+      {/* Balance chip (display-only; per-recipient MAX is inside each card) */}
+      <div
+        className="flex items-center gap-2 px-4 py-2 rounded-full mb-5"
         style={{ background: theme.color.global.row }}
-        title="Tap to fill max amount"
       >
+        <img src={MNEE_ICON_URL} alt="MNEE" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
         <span className="text-xs" style={{ color: theme.color.global.gray }}>
           Balance
         </span>
@@ -981,64 +1075,118 @@ export const BsvWallet = () => {
         <span className="text-xs font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
           MNEE
         </span>
-        <span
-          className="text-[10px] ml-1 px-1.5 py-0.5 rounded"
-          style={{
-            background: `${theme.color.component.primaryButtonLeftGradient}20`,
-            color: theme.color.component.primaryButtonLeftGradient,
-          }}
-        >
-          MAX
-        </span>
-      </motion.button>
+      </div>
 
       {/* Form */}
       <form noValidate onSubmit={(e) => handleSendMNEE(e)} className="flex flex-col items-center w-full gap-3">
-        {/* Address input card */}
-        <div className="w-full rounded-2xl p-4" style={{ background: theme.color.global.row }}>
-          <p
-            className="text-[10px] font-semibold uppercase tracking-widest mb-2"
-            style={{ color: theme.color.global.gray }}
-          >
-            Recipient Address
-          </p>
-          <div className="relative w-full">
-            <Input
-              theme={theme}
-              placeholder="Enter Address"
-              type="text"
-              onChange={(e) => setMneeRecipient(e.target.value)}
-              value={mneeRecipient}
-            />
-          </div>
-        </div>
+        {/* Recipient cards */}
+        <AnimatePresence>
+          {mneeRecipients.map((recipient, idx) => (
+            <motion.div
+              key={recipient.id}
+              initial={{ opacity: 0, y: 12, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.96 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="w-full rounded-2xl p-4 flex flex-col gap-3"
+              style={{ background: theme.color.global.row }}
+            >
+              {/* Card header */}
+              <div className="flex items-center justify-between">
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-widest"
+                  style={{ color: theme.color.global.gray }}
+                >
+                  {mneeRecipients.length > 1 ? `Recipient ${idx + 1}` : 'Recipient'}
+                </span>
+                {mneeRecipients.length > 1 && (
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    type="button"
+                    onClick={() => removeMneeRecipient(recipient.id)}
+                    className="flex items-center justify-center w-6 h-6 rounded-full border-0 outline-none cursor-pointer"
+                    style={{ background: '#ff444415', color: '#ff4444' }}
+                  >
+                    <Trash2 size={12} />
+                  </motion.button>
+                )}
+              </div>
 
-        {/* Amount input card */}
-        <div className="w-full rounded-2xl p-4" style={{ background: theme.color.global.row }}>
-          <p
-            className="text-[10px] font-semibold uppercase tracking-widest mb-2"
-            style={{ color: theme.color.global.gray }}
-          >
-            Amount (MNEE)
-          </p>
-          <div className="relative w-full">
-            <Input
-              theme={theme}
-              placeholder="Enter MNEE Amount"
-              type="number"
-              step="0.00001"
-              value={mneeReciepientAmount !== null && mneeReciepientAmount !== undefined ? mneeReciepientAmount : ''}
-              onChange={(e) => {
-                const inputValue = e.target.value;
-                if (inputValue === '') {
-                  setMneeRecipientAmount(null);
-                } else {
-                  setMneeRecipientAmount(Number(inputValue));
-                }
-              }}
-            />
-          </div>
-        </div>
+              {/* Address input */}
+              <Input
+                theme={theme}
+                placeholder="Enter Address"
+                type="text"
+                onChange={(e) => updateMneeRecipient(recipient.id, 'address', e.target.value)}
+                value={recipient.address}
+              />
+
+              {/* Amount input + MAX */}
+              <div
+                className="flex items-center w-[85%] mx-auto rounded-xl border"
+                style={{
+                  backgroundColor: theme.color.global.row,
+                  borderColor: theme.color.global.gray + '40',
+                }}
+              >
+                <input
+                  placeholder="Enter MNEE Amount"
+                  type="number"
+                  step="0.00001"
+                  className="flex-1 bg-transparent h-9 px-4 text-sm outline-none border-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
+                  style={{
+                    color: theme.color.global.contrast,
+                    fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+                  }}
+                  value={recipient.amount !== null && recipient.amount !== undefined ? recipient.amount : ''}
+                  onChange={(e) => {
+                    const inputValue = e.target.value;
+                    updateMneeRecipient(recipient.id, 'amount', inputValue === '' ? null : Number(inputValue));
+                  }}
+                  onWheel={(e) => {
+                    (e.target as HTMLInputElement).blur();
+                    e.stopPropagation();
+                    setTimeout(() => (e.target as HTMLInputElement).focus(), 0);
+                  }}
+                />
+                <motion.button
+                  whileTap={{ scale: 0.93 }}
+                  type="button"
+                  onClick={() => handleFillMaxMnee(recipient.id)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 mr-1.5 rounded-lg border-0 outline-none cursor-pointer shrink-0"
+                  style={{ background: `${theme.color.component.primaryButtonLeftGradient}18` }}
+                  title="Fill with available MNEE (minus fee)"
+                >
+                  <span
+                    className="text-[11px] font-bold"
+                    style={{ color: theme.color.component.primaryButtonLeftGradient }}
+                  >
+                    MAX
+                  </span>
+                </motion.button>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        {/* Add recipient */}
+        <motion.button
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.98 }}
+          type="button"
+          onClick={addMneeRecipient}
+          className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border-0 outline-none cursor-pointer"
+          style={{
+            background: `${theme.color.component.primaryButtonLeftGradient}10`,
+            border: `1px dashed ${theme.color.component.primaryButtonLeftGradient}40`,
+          }}
+        >
+          <Plus size={14} style={{ color: theme.color.component.primaryButtonLeftGradient }} />
+          <span className="text-sm font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
+            Add Recipient
+          </span>
+        </motion.button>
 
         {/* Send button */}
         <Button
@@ -1047,9 +1195,8 @@ export const BsvWallet = () => {
           label={getMneeLabel()}
           disabled={
             isProcessing ||
-            mneeReciepientAmount === null ||
-            mneeReciepientAmount === undefined ||
-            mneeReciepientAmount <= 0
+            mneeTotal <= 0 ||
+            mneeRecipients.some((r) => !r.address || r.amount === null || r.amount === undefined || r.amount <= 0)
           }
           isSubmit
         />
@@ -1073,6 +1220,11 @@ export const BsvWallet = () => {
         </div>
         <ExternalLink size={14} style={{ color: '#ffb800' }} />
       </motion.button>
+
+      <CoinHistory
+        filter={{ type: 'mnee', addresses: receiveAddress ? [receiveAddress] : [] }}
+        refreshKey={mneeHistoryRefreshKey}
+      />
     </motion.div>
   );
 
@@ -1082,8 +1234,8 @@ export const BsvWallet = () => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto"
-      style={{ minHeight: 'calc(100% - 3.75rem)', backgroundColor: theme.color.global.walletBackground }}
+      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto overflow-x-hidden self-start"
+      style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header */}
       <div className="flex items-center w-full mb-5 mt-2">
@@ -1138,23 +1290,22 @@ export const BsvWallet = () => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto"
-      style={{ minHeight: 'calc(100% - 3.75rem)', backgroundColor: theme.color.global.walletBackground }}
+      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto overflow-x-hidden self-start"
+      style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header */}
-      <div className="flex items-center w-full mb-5 mt-2">
+      <div className="flex items-center gap-3 w-full mb-5">
         <motion.button
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.92 }}
+          whileTap={{ scale: 0.9 }}
           onClick={() => {
             setPageState('main');
             resetRecipients();
             resetSendState();
           }}
-          className="flex items-center justify-center w-8 h-8 rounded-full border-0 outline-none cursor-pointer mr-3"
-          style={{ background: theme.color.global.row, color: theme.color.global.gray }}
+          className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+          style={{ background: '#17191E' }}
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
         </motion.button>
         <div className="flex items-center gap-2 flex-1">
           <img src={bsvCoin} className="w-5 h-5" alt="BSV" />
@@ -1173,6 +1324,7 @@ export const BsvWallet = () => {
         style={{ background: theme.color.global.row }}
         title="Tap to fill max balance"
       >
+        <img src={bsvCoin} alt="BSV" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
         <span className="text-xs" style={{ color: theme.color.global.gray }}>
           Balance
         </span>
@@ -1345,20 +1497,12 @@ export const BsvWallet = () => {
           isSubmit
         />
       </form>
+
+      <div className="w-full px-4">
+        <CoinHistory filter={{ type: 'bsv' }} refreshKey={bsvHistoryRefreshKey} />
+      </div>
     </motion.div>
   );
-
-  if (token) {
-    return (
-      <SendBsv21View
-        token={token}
-        onBack={() => {
-          setToken(null);
-          getAndSetAccountAndBsv21s();
-        }}
-      />
-    );
-  }
 
   if (showWelcome) {
     return <UpgradeNotification onDismiss={handleDismissWelcome} />;
@@ -1366,6 +1510,7 @@ export const BsvWallet = () => {
 
   return (
     <>
+      <TopNav />
       <Show when={manageFavorites}>
         <ManageTokens
           onBack={() => {
@@ -1377,17 +1522,41 @@ export const BsvWallet = () => {
           theme={theme}
         />
       </Show>
-      <Show when={historyTx}>
-        <TxHistory
-          onBack={() => {
-            setHistoryTx(false);
-            getAndSetAccountAndBsv21s();
-            setRandomKey(Math.random());
-          }}
-          theme={theme}
-        />
+      <Show when={!!token}>
+        {token && (
+          <SendBsv21View
+            token={token}
+            onBack={(sentAtomic) => {
+              // Optimistic update: if the exit was triggered by a successful send,
+              // immediately decrement our cached token balance for this tokenId.
+              // We already know the send succeeded — no need to wait on the
+              // overlay service to catch up.
+              if (sentAtomic && sentAtomic > 0n && token?.info.id) {
+                const tokenId = token.info.id;
+                setBsv21s((prev) =>
+                  prev.map((t) =>
+                    t.id === tokenId
+                      ? {
+                          ...t,
+                          all: {
+                            ...t.all,
+                            confirmed: t.all.confirmed > sentAtomic ? t.all.confirmed - sentAtomic : 0n,
+                          },
+                        }
+                      : t,
+                  ),
+                );
+              }
+              setToken(null);
+              // Kick off background reconciliation with the authoritative source —
+              // fire-and-forget, doesn't block the UI transition.
+              Promise.all([getAndSetAccountAndBsv21s(), getAndSetBsvBalance()]).catch((err) =>
+                console.error('[SendBsv21View] reconcile refresh failed:', err),
+              );
+            }}
+          />
+        )}
       </Show>
-      <TopNav />
       <Show when={isProcessing && pageState === 'main'}>
         <PageLoader theme={theme} message="Loading wallet..." />
       </Show>
@@ -1397,8 +1566,9 @@ export const BsvWallet = () => {
       <Show when={isProcessing && pageState === 'sendMNEE'}>
         <PageLoader theme={theme} message="Sending MNEE..." />
       </Show>
-      <Show when={!isProcessing && pageState === 'main'}>{main}</Show>
+      <Show when={!isProcessing && pageState === 'main' && !token && !manageFavorites}>{main}</Show>
       <Show when={!isProcessing && pageState === 'receive'}>{receive}</Show>
+      <Show when={!isProcessing && pageState === 'asset-picker'}>{assetPickerView}</Show>
       <Show when={!isProcessing && pageState === 'send'}>{send}</Show>
       <Show when={!isProcessing && pageState === 'sendMNEE'}>{sendMNEE}</Show>
       <Show when={!isProcessing && pageState === 'getMNEE'}>{getMnee}</Show>

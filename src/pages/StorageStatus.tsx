@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Database, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Show } from '../components/Show';
@@ -130,15 +130,7 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
   void onBack;
 
   return (
-    <div className="flex flex-col items-center w-full py-2 px-3">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-4">
-        <Database size={18} style={{ color: '#A1FF8B' }} />
-        <h2 className="text-lg font-bold" style={{ color: contrast }}>
-          Storage
-        </h2>
-      </div>
-
+    <div className="flex flex-col items-center w-full py-2">
       <Show when={!!info}>
         {/* Active Storage */}
         <div className="w-full rounded-xl p-4 mb-3 bg-[#17191E]" style={{ border: `1px solid ${gray}15` }}>

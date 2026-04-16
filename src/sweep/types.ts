@@ -1,5 +1,11 @@
-export type { ScanResult, TokenBalance } from '@1sat/actions/dist/sweep/scan';
-export type { SweepInput, SweepBsvResponse, SweepOrdinalsResponse, SweepBsv21Response } from '@1sat/actions/dist/sweep';
+export type {
+  ScanResult,
+  TokenBalance,
+  SweepInput,
+  SweepBsvResponse,
+  SweepOrdinalsResponse,
+  SweepBsv21Response,
+} from '@1sat/actions';
 
 export type SweepStep = 'intro' | 'password' | 'scanning' | 'review' | 'sweeping' | 'results';
 

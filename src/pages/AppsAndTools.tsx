@@ -17,7 +17,7 @@ import {
 import { Button } from '../components/Button';
 import { PageLoader } from '../components/PageLoader';
 import yoursLogo from '../assets/logos/icon.png';
-import { DateTimePicker, Warning } from '../components/Reusable';
+import { DateTimePicker } from '../components/Reusable';
 import { Show } from '../components/Show';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useTheme } from '../hooks/useTheme';
@@ -32,6 +32,7 @@ import TxPreview from '../components/TxPreview';
 import { TransactionFormat } from 'yours-wallet-provider';
 import { getTxFromRawTxFormat, parseRawTransaction } from '../utils/tools';
 import { useSnackbar } from '../hooks/useSnackbar';
+import { fetchExchangeRate } from '../utils/wallet';
 
 // Helper type for lock entries displayed in Pending Locks
 interface LockedOutput {
@@ -174,8 +175,7 @@ export const AppsAndTools = () => {
   const menuContext = useBottomMenu();
   const { query } = menuContext;
   const { keysService, chromeStorageService, apiContext } = useServiceContext();
-  const { bsvAddress, ordAddress, identityAddress, getWifBalance, sweepWif } = keysService;
-  const exchangeRate = chromeStorageService.getCurrentAccountObject().exchangeRateCache?.rate ?? 0;
+  const { bsvAddress, ordAddress, identityAddress } = keysService;
   const [isProcessing, setIsProcessing] = useState(false);
   const [page, setPage] = useState<AppsPage>(query === 'pending-locks' ? 'unlock' : 'main');
   const [otherIsSelected, setOtherIsSelected] = useState(false);
@@ -190,56 +190,22 @@ export const AppsAndTools = () => {
   const [lockBsvAmount, setLockBsvAmount] = useState<number | null>(null);
 
   const [wifKey, setWifKey] = useState('');
-  const [sweepBalance, setSweepBalance] = useState(0);
-  const [isSweeping, setIsSweeping] = useState(false);
-
-  const checkWIFBalance = async (wif: string) => {
-    const balance = await getWifBalance(wif);
-    if (balance === undefined) {
-      addSnackbar('Error checking balance. Please ensure the WIF key is valid.', 'error');
-      return;
-    }
-    if (balance === 0) {
-      addSnackbar('No balance found for this WIF key', 'info');
-      setSweepBalance(balance);
-      return;
-    }
-
-    addSnackbar(`Balance found: ${balance / BSV_DECIMAL_CONVERSION} BSV`, 'success');
-    setSweepBalance(balance);
-  };
-
-  const sweepFunds = async () => {
-    try {
-      if (!wifKey) return;
-      setIsSweeping(true);
-      const res = await sweepWif(wifKey);
-      if (res?.txid) {
-        addSnackbar('Successfully swept funds to your wallet', 'success');
-        handleResetSweep();
-        return;
-      } else {
-        addSnackbar('Error sweeping funds. Please try again.', 'error');
-      }
-    } catch (error) {
-      addSnackbar('Error sweeping funds. Please try again.', 'error');
-      console.error('Sweep error:', error);
-    } finally {
-      setIsSweeping(false);
-    }
-  };
-
-  const handleWifChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const wif = e.target.value;
-    if (!wif) return;
-    checkWIFBalance(wif);
-    setWifKey(e.target.value);
-  };
 
   const handleResetSweep = () => {
     setWifKey('');
-    setSweepBalance(0);
-    setIsSweeping(false);
+    setPage('main');
+  };
+
+  const handleStartSweep = () => {
+    if (!wifKey.trim()) {
+      addSnackbar('Please enter a WIF private key.', 'info');
+      return;
+    }
+    // Store the WIF temporarily, then open the sweep tab which reads and clears it
+    chrome.storage.local.set({ sweepExternalWif: wifKey.trim() }, () => {
+      chrome.tabs.create({ url: chrome.runtime.getURL('sweep-tab.html') });
+    });
+    setWifKey('');
     setPage('main');
   };
 
@@ -283,11 +249,15 @@ export const AppsAndTools = () => {
   }, [page]);
 
   const handleSubmit = async (amount: number) => {
-    if (!amount || !exchangeRate) return;
-
-    const sats = Math.round((amount / exchangeRate) * BSV_DECIMAL_CONVERSION);
+    if (!amount) return;
     setIsProcessing(true);
     try {
+      const rate = await fetchExchangeRate(apiContext.chain, apiContext.wocApiKey);
+      if (!rate) {
+        addSnackbar('Could not fetch BSV exchange rate. Please try again.', 'error');
+        return;
+      }
+      const sats = Math.round((amount / rate) * BSV_DECIMAL_CONVERSION);
       const result = await sendBsv.execute(apiContext, {
         requests: [{ address: YOURS_DEV_WALLET, satoshis: sats }],
       });
@@ -437,7 +407,7 @@ export const AppsAndTools = () => {
           <MenuRow
             icon={<ArrowRightLeft size={18} />}
             title="Migrate Legacy Assets"
-            description="Sweep assets from your old keys to BRC-100"
+            description="Opens the migration tool to move old assets to BRC-100"
             onClick={() => {
               menuContext?.clearSelection();
               navigate('/sweep');
@@ -446,13 +416,13 @@ export const AppsAndTools = () => {
           <MenuRow
             icon={<KeyRound size={18} />}
             title="Sweep Private Key"
-            description="Import funds from WIF private key"
+            description="Scan and sweep assets from an external WIF key"
             onClick={() => setPage('sweep-wif')}
           />
         </RowGroup>
 
-        {/* Apps section */}
-        <Show when={theme.settings.services.apps}>
+        {/* Apps section — temporarily hidden, may return in a different form */}
+        {/* <Show when={theme.settings.services.apps}>
           <>
             <SectionLabel>Apps</SectionLabel>
             <RowGroup>
@@ -464,7 +434,7 @@ export const AppsAndTools = () => {
               />
             </RowGroup>
           </>
-        </Show>
+        </Show> */}
 
         {/* Support section */}
         <SectionLabel>Support</SectionLabel>
@@ -657,13 +627,15 @@ export const AppsAndTools = () => {
       animate="animate"
       exit="exit"
       transition={pageTransition}
-      className="flex w-full flex-col items-center"
+      className="flex w-full flex-col"
     >
       <BackHeader title="Support Project" onBack={() => setPage('main')} />
-      <img src={yoursLogo} alt="Wallet Logo" className="mb-3 h-12 w-12 rounded-xl" />
-      <p className="mb-4 text-center text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
-        Yours is an open-source initiative. Consider supporting its continued development.
-      </p>
+      <div className="flex flex-col items-center">
+        <img src={yoursLogo} alt="Wallet Logo" className="mb-3 h-12 w-12 rounded-xl" />
+        <p className="mb-4 text-center text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
+          Yours is an open-source initiative. Consider supporting its continued development.
+        </p>
+      </div>
 
       <Show
         when={otherIsSelected}
@@ -814,43 +786,25 @@ export const AppsAndTools = () => {
     >
       <BackHeader title="Sweep Private Key" onBack={handleResetSweep} />
       <p className="mb-3 text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
-        Enter a private key in WIF format to sweep all funds to your wallet.
+        Enter a WIF private key to scan for assets. This will open the sweep tool in a new tab where you can review and
+        transfer any funds or ordinals found.
       </p>
-      <Input theme={theme} placeholder="Enter WIF private key" value={wifKey} onChange={handleWifChange} />
-
-      {sweepBalance > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="my-3 flex items-center justify-between rounded-xl px-4 py-3"
-          style={{ background: '#17191E' }}
-        >
-          <span className="text-xs" style={{ color: '#98A2B3' }}>
-            Available to sweep
-          </span>
-          <span className="text-sm font-bold" style={{ color: '#A1FF8B' }}>
-            {sweepBalance / BSV_DECIMAL_CONVERSION} BSV
-          </span>
-        </motion.div>
-      )}
-
-      <div className="flex gap-2">
-        <Button
-          theme={theme}
-          type="secondary-outline"
-          label="Cancel"
-          onClick={handleResetSweep}
-          disabled={isSweeping}
-        />
+      <Input
+        theme={theme}
+        placeholder="Enter WIF private key"
+        type="text"
+        value={wifKey}
+        onChange={(e) => setWifKey(e.target.value)}
+      />
+      <div className="mt-3">
         <Button
           theme={theme}
           type="primary"
-          label={isSweeping ? 'Sweeping...' : 'Sweep Funds'}
-          onClick={sweepFunds}
-          disabled={isSweeping || sweepBalance === 0}
+          label="Open Sweep Tool"
+          onClick={handleStartSweep}
+          disabled={!wifKey.trim()}
         />
       </div>
-      <Warning theme={theme}>This will only sweep funds. 1Sat Ordinals could be lost!</Warning>
     </motion.div>
   );
 

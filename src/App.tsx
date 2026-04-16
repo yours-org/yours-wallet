@@ -20,7 +20,6 @@ import { WhitelistedApp } from './inject';
 import { PageLoader } from './components/PageLoader';
 import { useServiceContext } from './hooks/useServiceContext';
 import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
-import { SyncBanner } from './components/SyncBanner';
 import { SyncingBlocks } from './components/SyncingBlocks';
 import { MasterRestore } from './pages/onboarding/MasterRestore';
 import { BlockHeightProvider } from './contexts/providers/BlockHeightProvider';
@@ -115,7 +114,6 @@ export const App = () => {
               style={{ backgroundColor: walletBg }}
             >
               <SnackbarProvider>
-                <SyncBanner />
                 <SyncingBlocks />
                 <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
                   <Router>

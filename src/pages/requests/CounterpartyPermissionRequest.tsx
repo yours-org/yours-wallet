@@ -161,7 +161,7 @@ export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionR
             />
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-medium" style={{ color: theme.color.global.contrast }}>
-                {p.protocolID[1]} (level {p.protocolID[0]})
+                {p.protocolID?.[1]} (level {p.protocolID?.[0]})
               </span>
               {p.description && (
                 <span className="text-xs mt-0.5 opacity-60" style={{ color: theme.color.global.contrast }}>

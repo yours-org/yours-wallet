@@ -24,6 +24,17 @@ function SweepTab() {
 
     chrome.storage.local.get(null, (storage) => {
       try {
+        // Check for an externally-provided WIF (e.g. from Sweep Private Key in Tools)
+        const externalWif = storage.sweepExternalWif as string | undefined;
+        if (externalWif) {
+          // Clear it immediately so it doesn't persist
+          chrome.storage.local.remove('sweepExternalWif');
+          setKeys({ payPk: externalWif, ordPk: externalWif });
+          setLoading(false);
+          return;
+        }
+
+        // Otherwise, load legacy keys from the current account
         const { accounts, selectedAccount, passKey, isLocked } = storage;
 
         if (isLocked || !passKey) {

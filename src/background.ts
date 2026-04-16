@@ -106,10 +106,13 @@ const initializeWallet = async (): Promise<WalletInterface | null> => {
     if (hasPending) {
       console.log('[background] initializeWallet: Found pending restore data, importing...');
       try {
-        const walletAny = accountContext.wallet as unknown as {
-          underlying: { _storage: unknown };
-        };
-        const storage = walletAny.underlying?._storage;
+        // Use the WalletStorageManager directly from AccountContext. Cast through
+        // `unknown` because WalletBackupService imports WalletStorageManager from
+        // `@bsv/wallet-toolbox-mobile` while AccountContext uses `@bsv/wallet-toolbox`
+        // (same runtime shape, different nested type identities).
+        const storage = accountContext.storage as unknown as Parameters<
+          typeof WalletBackupService.importPendingWalletData
+        >[0];
         if (storage) {
           await WalletBackupService.importPendingWalletData(storage, (event) => {
             console.log('[background] PendingRestore:', event.message);
@@ -817,7 +820,17 @@ if (isInServiceWorker) {
 
   // STORAGE MANAGEMENT HANDLERS ********************************
 
-  const processStorageGetInfo = (sendResponse: CallbackResponse) => {
+  const processStorageGetInfo = async (sendResponse: CallbackResponse) => {
+    try {
+      await ensureWallet();
+    } catch (err) {
+      sendResponse({
+        type: 'STORAGE_GET_INFO',
+        success: false,
+        error: err instanceof Error ? err.message : 'Wallet not available',
+      });
+      return;
+    }
     if (!accountContext) {
       sendResponse({ type: 'STORAGE_GET_INFO', success: false, error: 'Wallet not initialized' });
       return;
@@ -846,7 +859,7 @@ if (isInServiceWorker) {
           when?: string;
         }> = [];
         try {
-          const states = await storage.runAsStorageProvider(async (sp) => sp.findSyncStates({}));
+          const states = await storage.runAsStorageProvider(async (sp) => sp.findSyncStates({ partial: {} }));
           syncStates = states.map((s) => ({
             storageIdentityKey: s.storageIdentityKey,
             storageName: s.storageName,
@@ -891,7 +904,17 @@ if (isInServiceWorker) {
     })();
   };
 
-  const processStorageSyncBackups = (sendResponse: CallbackResponse) => {
+  const processStorageSyncBackups = async (sendResponse: CallbackResponse) => {
+    try {
+      await ensureWallet();
+    } catch (err) {
+      sendResponse({
+        type: 'STORAGE_SYNC_BACKUPS',
+        success: false,
+        error: err instanceof Error ? err.message : 'Wallet not available',
+      });
+      return;
+    }
     if (!accountContext) {
       sendResponse({ type: 'STORAGE_SYNC_BACKUPS', success: false, error: 'Wallet not initialized' });
       return;
@@ -910,7 +933,17 @@ if (isInServiceWorker) {
       });
   };
 
-  const processStorageMigrateRemote = (url: string, sendResponse: CallbackResponse) => {
+  const processStorageMigrateRemote = async (url: string, sendResponse: CallbackResponse) => {
+    try {
+      await ensureWallet();
+    } catch (err) {
+      sendResponse({
+        type: 'STORAGE_MIGRATE_REMOTE',
+        success: false,
+        error: err instanceof Error ? err.message : 'Wallet not available',
+      });
+      return;
+    }
     if (!accountContext) {
       sendResponse({ type: 'STORAGE_MIGRATE_REMOTE', success: false, error: 'Wallet not initialized' });
       return;
@@ -1168,34 +1201,41 @@ if (isInServiceWorker) {
 
   // YOURS-SPECIFIC HANDLERS ********************************
 
-  const processGetBalanceRequest = (sendResponse: CallbackResponse) => {
-    // Wait for startup initialization to complete before checking accountContext
-    startupInitPromise.then(() => {
-      if (!accountContext) {
+  const processGetBalanceRequest = async (sendResponse: CallbackResponse) => {
+    try {
+      await ensureWallet();
+    } catch (err) {
+      sendResponse({
+        type: YoursEventName.GET_BALANCE,
+        success: false,
+        error: err instanceof Error ? err.message : 'Wallet not available',
+      });
+      return;
+    }
+    if (!accountContext) {
+      sendResponse({
+        type: YoursEventName.GET_BALANCE,
+        success: false,
+        error: 'Wallet not initialized',
+      });
+      return;
+    }
+    accountContext.baseWallet
+      .balance()
+      .then((satoshis) => {
+        sendResponse({
+          type: YoursEventName.GET_BALANCE,
+          success: true,
+          data: satoshis,
+        });
+      })
+      .catch((error) => {
         sendResponse({
           type: YoursEventName.GET_BALANCE,
           success: false,
-          error: 'Wallet not initialized',
+          error: error instanceof Error ? error.message : JSON.stringify(error),
         });
-        return;
-      }
-      accountContext.baseWallet
-        .balance()
-        .then((satoshis) => {
-          sendResponse({
-            type: YoursEventName.GET_BALANCE,
-            success: true,
-            data: satoshis,
-          });
-        })
-        .catch((error) => {
-          sendResponse({
-            type: YoursEventName.GET_BALANCE,
-            success: false,
-            error: error instanceof Error ? error.message : JSON.stringify(error),
-          });
-        });
-    });
+      });
   };
 
   const processGetPubKeysRequest = (sendResponse: CallbackResponse) => {
@@ -1292,6 +1332,20 @@ if (isInServiceWorker) {
 
   const processMasterBackup = async (sendResponse: CallbackResponse) => {
     try {
+      // Service worker may have slept — ensure the wallet is (re)initialized before
+      // accessing accountContext. ensureWallet() silently re-initializes if the wallet
+      // is unlocked, or launches the unlock popup if it isn't.
+      try {
+        await ensureWallet();
+      } catch (err) {
+        sendResponse({
+          type: 'MASTER_BACKUP',
+          success: false,
+          error: err instanceof Error ? err.message : 'Wallet not available',
+        });
+        return;
+      }
+
       if (!accountContext) {
         sendResponse({
           type: 'MASTER_BACKUP',
@@ -1306,12 +1360,11 @@ if (isInServiceWorker) {
       const { account } = chromeStorageService.getCurrentAccountObject();
       const identityKey = account?.pubKeys?.identityPubKey || '';
 
-      // Get the storage manager from the wallet
-      // WalletPermissionsManager wraps the underlying Wallet, which has _storage
-      const walletAny = accountContext.wallet as unknown as {
-        underlying: { _storage: unknown };
-      };
-      const storage = walletAny.underlying?._storage;
+      // Use the WalletStorageManager directly from AccountContext.
+      // Cast through `unknown` because WalletBackupService imports its WalletStorageManager
+      // type from `@bsv/wallet-toolbox-mobile` while AccountContext uses `@bsv/wallet-toolbox`.
+      // They're the same shape at runtime but TypeScript sees two distinct types.
+      const storage = accountContext.storage as unknown as Parameters<typeof WalletBackupService.exportToFile>[0];
       if (!storage) {
         sendResponse({
           type: 'MASTER_BACKUP',
@@ -1379,10 +1432,11 @@ if (isInServiceWorker) {
       const wallet = await initializeWallet();
       console.log('[MasterRestore] Wallet initialized:', !!wallet);
 
+      // Manifest travels in `data` since ResponseEventDetail only defines {type, success, data, error}.
       sendResponse({
         type: 'MASTER_RESTORE',
         success: true,
-        manifest,
+        data: manifest,
       });
     } catch (error) {
       console.error('[MasterRestore] Error:', error);

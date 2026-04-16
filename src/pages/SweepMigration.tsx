@@ -10,7 +10,6 @@ import { Warning } from '../components/Reusable';
 import { PageLoader } from '../components/PageLoader';
 import { Show } from '../components/Show';
 import { TopNav } from '../components/TopNav';
-import { YoursIcon } from '../components/YoursIcon';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { BottomMenuContext } from '../contexts/BottomMenuContext';
@@ -230,9 +229,10 @@ export const SweepMigration = () => {
     assets.bsv20Tokens.length > 0 ||
     assets.locked.length > 0;
 
-  // Convert IndexedOutput to the shape prepareSweepInputs expects
-  const toSweepInputs = (outputs: IndexedOutput[]) =>
-    outputs.map((o) => ({ outpoint: o.outpoint, satoshis: o.satoshis ?? 0, lockingScript: '' }));
+  // Convert IndexedOutput to the shape prepareSweepInputs expects.
+  // `score` is required by IndexedOutput but unused for sweep preparation, so 0 is fine.
+  const toSweepInputs = (outputs: IndexedOutput[]): IndexedOutput[] =>
+    outputs.map((o) => ({ outpoint: o.outpoint, satoshis: o.satoshis ?? 0, score: 0 }));
 
   const executeSweeps = async () => {
     if (!legacyKeys) return;
@@ -243,9 +243,10 @@ export const SweepMigration = () => {
       setCurrentSweepOp('Sweeping BSV...');
       try {
         const inputs = await prepareSweepInputs(apiContext, toSweepInputs(assets.funding));
+        const payKey = PrivateKey.fromWif(legacyKeys.walletWif);
         const resp = await sweepBsv.execute(apiContext, {
           inputs,
-          wif: legacyKeys.walletWif,
+          keys: inputs.map(() => payKey),
           amount: selection.bsvAmount,
         });
         results.push({
@@ -264,7 +265,8 @@ export const SweepMigration = () => {
       try {
         const selectedOutputs = assets.ordinals.filter((o) => selection.selectedOrdinals.has(o.outpoint));
         const inputs = await prepareSweepInputs(apiContext, toSweepInputs(selectedOutputs));
-        const resp = await sweepOrdinals.execute(apiContext, { inputs, wif: legacyKeys.ordWif });
+        const ordKey = PrivateKey.fromWif(legacyKeys.ordWif);
+        const resp = await sweepOrdinals.execute(apiContext, { inputs, keys: inputs.map(() => ordKey) });
         results.push({
           type: 'ordinals',
           label: `Ordinals (${selection.selectedOrdinals.size})`,
@@ -282,9 +284,10 @@ export const SweepMigration = () => {
       setCurrentSweepOp(`Sweeping ${label}...`);
       try {
         const inputs = await prepareSweepInputs(apiContext, toSweepInputs(token.outputs));
+        const tokenKey = PrivateKey.fromWif(legacyKeys.ordWif);
         const resp = await sweepBsv21.execute(apiContext, {
           inputs: inputs.map((inp) => ({ ...inp, tokenId: token.tokenId, amount: token.totalAmount.toString() })),
-          wif: legacyKeys.ordWif,
+          keys: inputs.map(() => tokenKey),
         });
         results.push({ type: 'bsv21', label: `${label} (${token.totalAmount})`, txid: resp.txid, error: resp.error });
       } catch (err) {
@@ -308,7 +311,7 @@ export const SweepMigration = () => {
 
   // ===================== SHARED LAYOUT =====================
 
-  const accent = theme.color.global.primaryTheme;
+  const accent = theme.color.component.primaryButtonLeftGradient;
   const contrast = theme.color.global.contrast;
   const gray = '#98A2B3';
   const rowBg = '#17191E';
@@ -365,16 +368,6 @@ export const SweepMigration = () => {
             initial="hidden"
             animate="show"
           >
-            {/* Icon */}
-            <motion.div variants={fadeUp} className="mb-4">
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                style={{ background: `linear-gradient(135deg, #A1FF8B20, #34D39920)`, border: `1px solid ${accent}30` }}
-              >
-                <YoursIcon width="2.5rem" />
-              </div>
-            </motion.div>
-
             {/* Title */}
             <motion.h1 variants={fadeUp} className="text-2xl font-bold mb-2 text-center" style={{ color: contrast }}>
               Migrate to BRC-100
