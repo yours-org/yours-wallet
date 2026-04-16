@@ -4,16 +4,16 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@1sat/actions": "0.0.92",
-    "@1sat/client": "0.0.20",
-    "@1sat/connect": "0.0.29",
-    "@1sat/sweep-ui": "0.0.27",
-    "@1sat/templates": "0.0.7",
-    "@1sat/types": "0.0.16",
-    "@1sat/utils": "0.0.13",
-    "@1sat/wallet-browser": "0.0.28",
-    "@bsv/sdk": "^2.0.6",
-    "@bsv/wallet-toolbox-mobile": "2.1.20",
+    "@1sat/actions": "0.0.94",
+    "@1sat/client": "0.0.21",
+    "@1sat/connect": "0.0.31",
+    "@1sat/sweep-ui": "0.0.29",
+    "@1sat/templates": "0.0.8",
+    "@1sat/types": "0.0.17",
+    "@1sat/utils": "0.0.14",
+    "@1sat/wallet-browser": "0.0.33",
+    "@bsv/sdk": "^2.0.13",
+    "@bsv/wallet-toolbox-mobile": "^2.1.21",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@mnee/ts-sdk": "^1.0.1",
     "@ramonak/react-progress-bar": "^5.2.0",
@@ -71,13 +71,11 @@
     "husky": "^9.1.6",
     "prettier": "3.8.3",
     "process": "^0.11.10",
+    "source-map": "^0.7.6",
     "tailwindcss": "^4.2.1",
     "tsx": "^4.21.0",
     "typescript": "^5.5.4",
     "vite": "^7.3.0",
     "vite-plugin-node-polyfills": "^0.24.0"
-  },
-  "overrides": {
-    "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@2.1.8-spending-fix.1"
   }
 }

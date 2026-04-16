@@ -6,9 +6,11 @@ import {
   Wallet,
   WalletStorageManager,
   StorageClient,
+  LocalWalletPermissionsManager,
+  IndexedDbPermissionStore,
 } from '@1sat/wallet-browser';
 import { syncAddresses, createContext as createActionContext } from '@1sat/actions';
-import { WalletPermissionsManager, type PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile';
+import type { PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import type { Account } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
@@ -86,7 +88,7 @@ const decryptKeys = (chromeStorageService: ChromeStorageService): Keys => {
  * All components share the same lifecycle (account-specific).
  */
 export interface AccountContext {
-  wallet: WalletPermissionsManager;
+  wallet: LocalWalletPermissionsManager;
   baseWallet: Wallet;
   syncContext: SyncContext;
   storage: WalletStorageManager;
@@ -143,8 +145,14 @@ export const initWallet = async (
     migrateRemote,
   } = await createWebWallet(walletConfig);
 
-  // 3. Wrap with permissions manager for external app access control
-  const wallet = new WalletPermissionsManager(baseWallet, ADMIN_ORIGINATOR, DEFAULT_PERMISSIONS_CONFIG);
+  // 3. Wrap with permissions manager for external app access control.
+  // Grants persist in IndexedDB (off-chain) via LocalWalletPermissionsManager.
+  const wallet = new LocalWalletPermissionsManager(
+    baseWallet,
+    ADMIN_ORIGINATOR,
+    DEFAULT_PERMISSIONS_CONFIG,
+    { store: new IndexedDbPermissionStore({ scope: 'yours-wallet' }) },
+  );
 
   // 4. Initialize sync context (derives addresses, creates services, queue, addressManager)
   const maxKeyIndex = 4; // 0-4 = 5 addresses
