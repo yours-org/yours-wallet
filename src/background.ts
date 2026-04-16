@@ -40,8 +40,8 @@ import type {
   GroupedPermissions,
   CounterpartyPermissionRequest,
   CounterpartyPermissions,
-  WalletPermissionsManager,
 } from '@bsv/wallet-toolbox-mobile';
+import type { LocalWalletPermissionsManager } from '@1sat/wallet-browser';
 import { removeWindow } from './utils/chromeHelpers';
 import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
@@ -261,7 +261,7 @@ let launchPopUp: () => void = () => {
  * Bind permission callbacks to the WalletPermissionsManager.
  * These callbacks are triggered when an external app needs permission.
  */
-const bindPermissionCallbacks = (manager: WalletPermissionsManager) => {
+const bindPermissionCallbacks = (manager: LocalWalletPermissionsManager) => {
   // Protocol permission (signing, encrypting, HMAC, etc.)
   manager.bindCallback('onProtocolPermissionRequested', async (request: PermissionRequest & { requestID: string }) => {
     console.log('Protocol permission requested:', request);
@@ -969,7 +969,7 @@ if (isInServiceWorker) {
 
   const processPermissionsListAll = async (sendResponse: CallbackResponse) => {
     try {
-      const wpm = (await ensureWallet()) as WalletPermissionsManager;
+      const wpm = (await ensureWallet()) as LocalWalletPermissionsManager;
 
       const [protocols, baskets, spending, certificates] = await Promise.all([
         wpm.listProtocolPermissions({}),
@@ -1012,7 +1012,7 @@ if (isInServiceWorker) {
 
   const processPermissionsQuerySpent = async (message: { token: PermissionToken }, sendResponse: CallbackResponse) => {
     try {
-      const wpm = (await ensureWallet()) as WalletPermissionsManager;
+      const wpm = (await ensureWallet()) as LocalWalletPermissionsManager;
       const satoshisSpent = await wpm.querySpentSince(message.token);
       sendResponse({ type: 'PERMISSIONS_QUERY_SPENT', success: true, data: { satoshisSpent } });
     } catch (error) {
@@ -1027,7 +1027,7 @@ if (isInServiceWorker) {
 
   const processPermissionsRevokeOne = async (message: { token: PermissionToken }, sendResponse: CallbackResponse) => {
     try {
-      const wpm = (await ensureWallet()) as WalletPermissionsManager;
+      const wpm = (await ensureWallet()) as LocalWalletPermissionsManager;
       await wpm.revokePermission(message.token);
       sendResponse({ type: 'PERMISSIONS_REVOKE_ONE', success: true });
     } catch (error) {
@@ -1042,7 +1042,7 @@ if (isInServiceWorker) {
 
   const processPermissionsRevokeAll = async (message: { originator: string }, sendResponse: CallbackResponse) => {
     try {
-      const wpm = (await ensureWallet()) as WalletPermissionsManager;
+      const wpm = (await ensureWallet()) as LocalWalletPermissionsManager;
       const revoked = await wpm.revokeAllForOriginator(message.originator);
       sendResponse({ type: 'PERMISSIONS_REVOKE_ALL', success: true, data: { revokedCount: revoked.length } });
     } catch (error) {
