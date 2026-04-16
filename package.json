@@ -76,5 +76,8 @@
     "tailwindcss": "^4.2.1",
     "vite": "^7.3.0",
     "vite-plugin-node-polyfills": "^0.24.0"
+  },
+  "overrides": {
+    "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@2.1.7-spending-fix.1"
   }
 }
