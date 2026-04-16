@@ -147,12 +147,9 @@ export const initWallet = async (
 
   // 3. Wrap with permissions manager for external app access control.
   // Grants persist in IndexedDB (off-chain) via LocalWalletPermissionsManager.
-  const wallet = new LocalWalletPermissionsManager(
-    baseWallet,
-    ADMIN_ORIGINATOR,
-    DEFAULT_PERMISSIONS_CONFIG,
-    { store: new IndexedDbPermissionStore({ scope: 'yours-wallet' }) },
-  );
+  const wallet = new LocalWalletPermissionsManager(baseWallet, ADMIN_ORIGINATOR, DEFAULT_PERMISSIONS_CONFIG, {
+    store: new IndexedDbPermissionStore({ scope: 'yours-wallet' }),
+  });
 
   // 4. Initialize sync context (derives addresses, creates services, queue, addressManager)
   const maxKeyIndex = 4; // 0-4 = 5 addresses
