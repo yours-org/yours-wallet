@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@1sat/actions": "0.0.88",
+    "@1sat/actions": "0.0.89",
     "@1sat/client": "0.0.20",
     "@1sat/connect": "0.0.29",
     "@1sat/sweep-ui": "0.0.24",

@@ -5,10 +5,10 @@
     "": {
       "name": "yours-wallet",
       "dependencies": {
-        "@1sat/actions": "0.0.85",
+        "@1sat/actions": "0.0.89",
         "@1sat/client": "0.0.20",
         "@1sat/connect": "0.0.29",
-        "@1sat/sweep-ui": "0.0.21",
+        "@1sat/sweep-ui": "0.0.24",
         "@1sat/templates": "0.0.7",
         "@1sat/types": "0.0.16",
         "@1sat/utils": "0.0.13",
@@ -78,13 +78,13 @@
     "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@2.1.8-spending-fix.1",
   },
   "packages": {
-    "@1sat/actions": ["@1sat/actions@0.0.85", "", { "dependencies": { "@1sat/client": "0.0.20", "@1sat/templates": "0.0.7", "@1sat/types": "0.0.16", "@1sat/utils": "0.0.13", "@1sat/wallet": "0.0.40" }, "peerDependencies": { "@bsv/sdk": "^2.0.6" } }, "sha512-9oHmWohi0RhXWnaYKpEpDsNhz1qSOdNWTNck/Sa8rs4uvTylrjVonvlEaEChPB9J7fg1DaxoztVck2lS1LsWjA=="],
+    "@1sat/actions": ["@1sat/actions@0.0.89", "", { "dependencies": { "@1sat/client": "0.0.20", "@1sat/templates": "0.0.7", "@1sat/types": "0.0.16", "@1sat/utils": "0.0.13", "@1sat/wallet": "0.0.40" }, "peerDependencies": { "@bsv/sdk": "^2.0.6" } }, "sha512-aXekFeinEdSo+qfA7OiIAgcksruMPKr9KiPcz0ema8y24ncZhTe6aMMH7NfnrmYw0VO3j4GEh70C2DiqzqPy4g=="],
 
     "@1sat/client": ["@1sat/client@0.0.20", "", { "dependencies": { "@1sat/types": "0.0.14", "@bsv/wallet-toolbox": "^2.1.8" }, "peerDependencies": { "@bsv/sdk": "^2.0.6" } }, "sha512-g06IjDKj4ZDYlOTa2/tNP8VncRD6l/qu0mqkSQ88CGxY+XKzYrKe2wlF9V7Kiua3xPDApg+780o+OSeNc2sD9A=="],
 
     "@1sat/connect": ["@1sat/connect@0.0.29", "", { "dependencies": { "@1sat/wallet": "0.0.40", "@sigma-auth/better-auth-plugin": "^0.0.84", "better-auth": "^1.5.4", "eventemitter3": "^5.0.1" }, "peerDependencies": { "@bsv/sdk": "^2.0.6" } }, "sha512-AuM+DRDgTSzeIMIbfuTB069J9a0j095XN2wl0R3fpac8UVAnSpYM/KhwNeyUVljfVvSDDN1mB/Q4cqNxZ25tpg=="],
 
-    "@1sat/sweep-ui": ["@1sat/sweep-ui@0.0.21", "", { "dependencies": { "@1sat/actions": "0.0.85", "@1sat/client": "0.0.20", "@1sat/connect": "0.0.29", "@1sat/types": "0.0.16", "@1sat/utils": "0.0.13", "bitcoin-backup": "^0.0.11", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^0.577.0", "sonner": "^2.0.7", "tailwind-merge": "^3.5.0" }, "peerDependencies": { "@bsv/sdk": "^2.0.6", "react": "^18.0.0 || ^19.0.0" } }, "sha512-A++K5OJBXvKugzXdPnxX5OCI3FzmFnHfCJdpMISkQpcwLRdNZVLMRmtIrposDplKO33ge33dkL5EIM7Gb3zqOg=="],
+    "@1sat/sweep-ui": ["@1sat/sweep-ui@0.0.24", "", { "dependencies": { "@1sat/actions": "0.0.88", "@1sat/client": "0.0.20", "@1sat/connect": "0.0.29", "@1sat/types": "0.0.16", "@1sat/utils": "0.0.13", "bitcoin-backup": "^0.0.11", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^0.577.0", "sonner": "^2.0.7", "tailwind-merge": "^3.5.0" }, "peerDependencies": { "@bsv/sdk": "^2.0.6", "react": "^18.0.0 || ^19.0.0" } }, "sha512-FaQRVorKB9v2qgchwkDZ7ceuuueAgkYrFJ9OjGaccoUNdpZUV1AUL5lSlpajbRq0cwxU/Dho6XjYO/fAdQ0naA=="],
 
     "@1sat/templates": ["@1sat/templates@0.0.7", "", { "dependencies": { "@1sat/types": "0.0.16" }, "peerDependencies": { "@bsv/sdk": "^2.0.6" } }, "sha512-Mrnx5IDFVw6/3bitFxkQerXcIjLtZWMN/gL2k2NSYRvo6+702QMwMhRB8ZfW8Z8S1gYQGoJ+BvKF0WGvODcMMw=="],
 
@@ -1137,6 +1137,8 @@
     "zod": ["zod@4.3.6", "", {}, "sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg=="],
 
     "@1sat/client/@1sat/types": ["@1sat/types@0.0.14", "", { "peerDependencies": { "@bsv/sdk": "^2.0.6" } }, "sha512-sFsdzZ5FPPEWF6OBdfTDY+fmq42t86qd34CqyRGTZQLXPKKQTWk3wH6oKXcI19QhsNG0ulsinQNvPOos51bdrw=="],
+
+    "@1sat/sweep-ui/@1sat/actions": ["@1sat/actions@0.0.88", "", { "dependencies": { "@1sat/client": "0.0.20", "@1sat/templates": "0.0.7", "@1sat/types": "0.0.16", "@1sat/utils": "0.0.13", "@1sat/wallet": "0.0.40" }, "peerDependencies": { "@bsv/sdk": "^2.0.6" } }, "sha512-myyQVek09jFirBHRQIIFA/H/gJS82qxlJNf+Z2xWJ83k6reItt+xjyIUopxcWkyubuup58ymFUSl1v0h4rcZjg=="],
 
     "@1sat/utils/@1sat/types": ["@1sat/types@0.0.15", "", { "peerDependencies": { "@bsv/sdk": "^2.0.6" } }, "sha512-1aFGQvMxI8IWiH9/d3jP3vVcFvXk1nn6j3L7jtwdVNmYw/yHVa87jEV+MGOS8QHofMOf/2dci+QFQ/r0vGLE3A=="],
 
