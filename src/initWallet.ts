@@ -10,7 +10,6 @@ import {
   IndexedDbPermissionStore,
 } from '@1sat/wallet-browser';
 import { syncAddresses, createContext as createActionContext } from '@1sat/actions';
-import type { PermissionsManagerConfig } from '@bsv/wallet-toolbox-mobile';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import type { Account } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
@@ -24,46 +23,6 @@ type Chain = 'main' | 'test';
 // Admin originator for the extension (bypasses all permission checks)
 // Uses chrome-extension://<id> format to match what ChromeCWI sends
 const ADMIN_ORIGINATOR = `chrome-extension://${chrome.runtime.id}`;
-
-// Default permissions config for yours-wallet
-// Extension UI (admin) bypasses all checks, but we still enable checks for external apps
-const DEFAULT_PERMISSIONS_CONFIG: PermissionsManagerConfig = {
-  // Protocol permissions - require for external apps
-  seekProtocolPermissionsForSigning: true,
-  seekProtocolPermissionsForEncrypting: true,
-  seekProtocolPermissionsForHMAC: true,
-  seekPermissionsForKeyLinkageRevelation: true,
-  seekPermissionsForPublicKeyRevelation: false, // Public keys aren't sensitive
-  seekPermissionsForIdentityKeyRevelation: true,
-  seekPermissionsForIdentityResolution: true,
-
-  // Basket permissions - skip for internal ops, require for external
-  seekBasketInsertionPermissions: true,
-  seekBasketRemovalPermissions: true,
-  seekBasketListingPermissions: false, // Listing isn't sensitive
-
-  // Label permissions
-  seekPermissionWhenApplyingActionLabels: false,
-  seekPermissionWhenListingActionsByLabel: false,
-
-  // Certificate permissions
-  seekCertificateDisclosurePermissions: true,
-  seekCertificateAcquisitionPermissions: true,
-  seekCertificateRelinquishmentPermissions: true,
-  seekCertificateListingPermissions: false,
-
-  // Metadata encryption - keep wallet data private
-  encryptWalletMetadata: true,
-
-  // Spending permissions - always require for external apps
-  seekSpendingPermissions: true,
-
-  // Grouped permissions (BRC-73)
-  seekGroupedPermission: true,
-
-  // Distinguish privileged operations
-  differentiatePrivilegedOperations: true,
-};
 
 /**
  * Decrypt keys from chrome storage using the stored passKey.
@@ -147,9 +106,12 @@ export const initWallet = async (
 
   // 3. Wrap with permissions manager for external app access control.
   // Grants persist in IndexedDB (off-chain) via LocalWalletPermissionsManager.
-  const wallet = new LocalWalletPermissionsManager(baseWallet, ADMIN_ORIGINATOR, DEFAULT_PERMISSIONS_CONFIG, {
-    store: new IndexedDbPermissionStore({ scope: 'yours-wallet' }),
-  });
+  const wallet = new LocalWalletPermissionsManager(
+    baseWallet,
+    ADMIN_ORIGINATOR,
+    {},
+    { store: new IndexedDbPermissionStore({ scope: 'yours-wallet' }) },
+  );
 
   // 4. Initialize sync context (derives addresses, creates services, queue, addressManager)
   const maxKeyIndex = 4; // 0-4 = 5 addresses
