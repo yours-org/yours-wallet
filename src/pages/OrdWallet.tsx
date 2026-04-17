@@ -15,7 +15,7 @@ import { sleep } from '../utils/sleep';
 import { TopNav } from '../components/TopNav';
 import { getErrorMessage } from '../utils/tools';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
-import { truncate, getTagValue, getOutputName, hasTag, resolveOriginOutpoint } from '../utils/format';
+import { getTagValue, getOutputName, hasTag, resolveOriginOutpoint } from '../utils/format';
 
 type Addresses = Record<string, string>;
 type PageState = 'main' | 'transfer' | 'list' | 'cancel';
@@ -690,6 +690,13 @@ export const OrdWallet = () => {
   // RENDER — Transfer Flow
   // ═══════════════════════════════════════════════════════════════════════════
 
+  const isSingleTransfer = selectedOrdinals.length === 1;
+  const singleTransferOrdinal = selectedOrdinals[0];
+  const singleTransferOutpoint = singleTransferOrdinal?.outpoint;
+  const singleTransferOriginOutpoint = singleTransferOrdinal ? resolveOriginOutpoint(singleTransferOrdinal) : undefined;
+  const singleTransferName = singleTransferOrdinal ? getOutputName(singleTransferOrdinal) : '';
+  const singleTransferError = singleTransferOutpoint ? addressErrors[singleTransferOutpoint] : undefined;
+
   const transferView = (
     <motion.div
       key="transfer"
@@ -701,7 +708,7 @@ export const OrdWallet = () => {
       style={{ height: '100%' }}
     >
       <FlowHeader
-        title="Transfer Ordinals"
+        title={isSingleTransfer ? 'Transfer Ordinal' : `Transfer ${selectedOrdinals.length} Ordinals`}
         onBack={() => {
           setPageState('main');
           resetSendState();
@@ -709,111 +716,171 @@ export const OrdWallet = () => {
       />
 
       <form noValidate onSubmit={handleMultiTransferOrdinal} className="flex flex-col flex-1 overflow-hidden">
-        {/* "Use same address" toggle — only when multiple selected */}
-        <Show when={selectedOrdinals.length > 1}>
-          <div
-            className="mx-4 mb-3 flex items-center justify-between px-3 py-2.5 rounded-xl"
-            style={{ background: '#17191E', border: '1px solid rgba(255,255,255,0.06)' }}
-          >
-            <span className="text-sm" style={{ color: '#98A2B3' }}>
-              Use same address for all
-            </span>
-            <motion.button
-              type="button"
-              onClick={toggleUseSameAddress}
-              whileTap={{ scale: 0.9 }}
-              className="relative w-10 h-5 rounded-full transition-colors"
-              style={{ background: useSameAddress ? '#A1FF8B' : '#2a2d33' }}
+        {/* SINGLE-ORDINAL VIEW — spacious preview + labeled address input */}
+        <Show when={isSingleTransfer && !!singleTransferOrdinal}>
+          <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-4">
+            {/* Ordinal preview */}
+            <div
+              className="flex items-center gap-4 p-4 rounded-2xl"
+              style={{ background: '#17191E', border: '1px solid rgba(255,255,255,0.06)' }}
             >
-              <motion.div
-                animate={{ x: useSameAddress ? 20 : 2 }}
-                transition={{ type: 'spring', damping: 22, stiffness: 300 }}
-                className="absolute top-0.5 w-4 h-4 rounded-full"
-                style={{ background: useSameAddress ? '#010101' : '#98A2B3' }}
-              />
-            </motion.button>
-          </div>
-        </Show>
-
-        {/* Common address input */}
-        <Show when={useSameAddress && selectedOrdinals.length > 1}>
-          <div className="px-4 mb-3">
-            <input
-              placeholder="Shared receiver address"
-              type="text"
-              onChange={(e) => handleCommonAddressChange(e.target.value)}
-              value={commonAddress}
-              className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-colors"
-              style={{
-                background: '#17191E',
-                border: `1px solid ${addressErrors[selectedOrdinals[0]?.outpoint] ? '#ef4444' : 'rgba(255,255,255,0.08)'}`,
-                color: '#FFFFFF',
-              }}
-            />
-            {addressErrors[selectedOrdinals[0]?.outpoint] && (
-              <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
-                {addressErrors[selectedOrdinals[0]?.outpoint]}
-              </p>
-            )}
-          </div>
-        </Show>
-
-        {/* Per-ordinal cards */}
-        <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-2.5 pb-4">
-          {selectedOrdinals.map((output) => {
-            const originOutpoint = resolveOriginOutpoint(output);
-            const outpoint = output.outpoint;
-            const name = getOutputName(output);
-
-            return (
-              <div
-                key={originOutpoint ?? outpoint}
-                className="flex items-start gap-3 p-3 rounded-xl"
-                style={{ background: '#17191E', border: '1px solid rgba(255,255,255,0.06)' }}
-              >
-                {/* Thumbnail */}
-                <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden">
-                  <Ordinal
-                    theme={theme}
-                    output={output}
-                    url={`${getContentUrl(originOutpoint ?? outpoint)}?outpoint=${outpoint}`}
-                    isTransfer
-                    size="3rem"
-                  />
-                </div>
-
-                {/* Name + address input */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-white mb-1.5 truncate">{truncate(name, 18, 0)}</p>
-                  <Show when={!useSameAddress}>
-                    <>
-                      <input
-                        placeholder="Receiver address"
-                        type="text"
-                        onChange={(e) => handleAddressChange(outpoint, e.target.value)}
-                        value={addresses[outpoint] || ''}
-                        className="w-full px-2.5 py-2 rounded-lg text-xs outline-none transition-colors"
-                        style={{
-                          background: '#0f1012',
-                          border: `1px solid ${addressErrors[outpoint] ? '#ef4444' : 'rgba(255,255,255,0.08)'}`,
-                          color: '#FFFFFF',
-                        }}
-                      />
-                      {addressErrors[outpoint] && (
-                        <p className="text-[0.65rem] mt-1" style={{ color: '#ef4444' }}>
-                          {addressErrors[outpoint]}
-                        </p>
-                      )}
-                    </>
-                  </Show>
-                </div>
+              <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
+                <Ordinal
+                  theme={theme}
+                  output={singleTransferOrdinal}
+                  url={`${getContentUrl(singleTransferOriginOutpoint ?? singleTransferOutpoint ?? '')}?outpoint=${singleTransferOutpoint}`}
+                  isTransfer
+                  size="4rem"
+                />
               </div>
-            );
-          })}
-        </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs" style={{ color: '#98A2B3' }}>
+                  Transferring
+                </p>
+                <p className="text-sm font-semibold text-white truncate">{singleTransferName}</p>
+              </div>
+            </div>
 
-        {/* Transfer button */}
-        <div className="px-4 pb-5 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            {/* Address input */}
+            <div>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: '#98A2B3' }}>
+                Send to
+              </label>
+              <input
+                placeholder="Recipient address"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(e) => singleTransferOutpoint && handleAddressChange(singleTransferOutpoint, e.target.value)}
+                value={(singleTransferOutpoint && addresses[singleTransferOutpoint]) || ''}
+                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-colors"
+                style={{
+                  background: '#17191E',
+                  border: `1px solid ${singleTransferError ? '#ef4444' : 'rgba(255,255,255,0.08)'}`,
+                  color: '#FFFFFF',
+                }}
+              />
+              <Show when={!!singleTransferError}>
+                <p className="text-xs mt-1.5" style={{ color: '#ef4444' }}>
+                  {singleTransferError}
+                </p>
+              </Show>
+            </div>
+          </div>
+        </Show>
+
+        {/* MULTI-ORDINAL VIEW — shared-address toggle + per-ordinal cards */}
+        <Show when={!isSingleTransfer}>
+          <>
+            {/* "Use same address" toggle */}
+            <div
+              className="mx-4 mb-3 flex items-center justify-between px-3 py-2.5 rounded-xl"
+              style={{ background: '#17191E', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <span className="text-sm" style={{ color: '#98A2B3' }}>
+                Use same address for all
+              </span>
+              <motion.button
+                type="button"
+                onClick={toggleUseSameAddress}
+                whileTap={{ scale: 0.9 }}
+                className="relative w-10 h-5 rounded-full transition-colors"
+                style={{ background: useSameAddress ? '#A1FF8B' : '#2a2d33' }}
+              >
+                <motion.div
+                  animate={{ x: useSameAddress ? 20 : 2 }}
+                  transition={{ type: 'spring', damping: 22, stiffness: 300 }}
+                  className="absolute top-0.5 w-4 h-4 rounded-full"
+                  style={{ background: useSameAddress ? '#010101' : '#98A2B3' }}
+                />
+              </motion.button>
+            </div>
+
+            {/* Common address input */}
+            <Show when={useSameAddress}>
+              <div className="px-4 mb-3">
+                <input
+                  placeholder="Shared recipient address"
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(e) => handleCommonAddressChange(e.target.value)}
+                  value={commonAddress}
+                  className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-colors"
+                  style={{
+                    background: '#17191E',
+                    border: `1px solid ${addressErrors[selectedOrdinals[0]?.outpoint] ? '#ef4444' : 'rgba(255,255,255,0.08)'}`,
+                    color: '#FFFFFF',
+                  }}
+                />
+                {addressErrors[selectedOrdinals[0]?.outpoint] && (
+                  <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
+                    {addressErrors[selectedOrdinals[0]?.outpoint]}
+                  </p>
+                )}
+              </div>
+            </Show>
+
+            {/* Per-ordinal cards */}
+            <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-2.5 pb-4">
+              {selectedOrdinals.map((output) => {
+                const originOutpoint = resolveOriginOutpoint(output);
+                const outpoint = output.outpoint;
+                const name = getOutputName(output);
+
+                return (
+                  <div
+                    key={originOutpoint ?? outpoint}
+                    className="flex items-start gap-3 p-3 rounded-xl"
+                    style={{ background: '#17191E', border: '1px solid rgba(255,255,255,0.06)' }}
+                  >
+                    {/* Thumbnail */}
+                    <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden">
+                      <Ordinal
+                        theme={theme}
+                        output={output}
+                        url={`${getContentUrl(originOutpoint ?? outpoint)}?outpoint=${outpoint}`}
+                        isTransfer
+                        size="3rem"
+                      />
+                    </div>
+
+                    {/* Name + address input */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-white mb-1.5 truncate">{name}</p>
+                      <Show when={!useSameAddress}>
+                        <>
+                          <input
+                            placeholder="Recipient address"
+                            type="text"
+                            autoComplete="off"
+                            spellCheck={false}
+                            onChange={(e) => handleAddressChange(outpoint, e.target.value)}
+                            value={addresses[outpoint] || ''}
+                            className="w-full px-2.5 py-2 rounded-lg text-xs outline-none transition-colors"
+                            style={{
+                              background: '#0f1012',
+                              border: `1px solid ${addressErrors[outpoint] ? '#ef4444' : 'rgba(255,255,255,0.08)'}`,
+                              color: '#FFFFFF',
+                            }}
+                          />
+                          {addressErrors[outpoint] && (
+                            <p className="text-[0.65rem] mt-1" style={{ color: '#ef4444' }}>
+                              {addressErrors[outpoint]}
+                            </p>
+                          )}
+                        </>
+                      </Show>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        </Show>
+
+        {/* Sticky submit — pb clears the absolute BottomMenu (3.75rem) plus breathing room */}
+        <div className="px-4 pt-2 pb-20" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <motion.button
             type="submit"
             disabled={isProcessing}
@@ -825,7 +892,7 @@ export const OrdWallet = () => {
             }}
           >
             <Send size={15} />
-            Transfer Now
+            {isSingleTransfer ? 'Transfer Now' : `Transfer ${selectedOrdinals.length}`}
           </motion.button>
         </div>
       </form>
@@ -858,35 +925,36 @@ export const OrdWallet = () => {
         }}
       />
 
-      <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-4">
-        {/* Ordinal preview */}
-        <div
-          className="flex items-center gap-4 p-4 rounded-2xl"
-          style={{ background: '#17191E', border: '1px solid rgba(255,255,255,0.06)' }}
-        >
-          <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
-            <Ordinal
-              theme={theme}
-              output={selectedOrdinals[0]}
-              url={`${getContentUrl(listOriginOutpoint || '')}?outpoint=${selectedOrdinals[0]?.outpoint}`}
-              selected
-              isTransfer
-              size="4rem"
-            />
+      <form noValidate onSubmit={handleListOrdinal} className="flex flex-col flex-1 overflow-hidden">
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-4">
+          {/* Ordinal preview */}
+          <div
+            className="flex items-center gap-4 p-4 rounded-2xl"
+            style={{ background: '#17191E', border: '1px solid rgba(255,255,255,0.06)' }}
+          >
+            <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
+              <Ordinal
+                theme={theme}
+                output={selectedOrdinals[0]}
+                url={`${getContentUrl(listOriginOutpoint || '')}?outpoint=${selectedOrdinals[0]?.outpoint}`}
+                selected
+                isTransfer
+                size="4rem"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs" style={{ color: '#98A2B3' }}>
+                Listing
+              </p>
+              <p className="text-sm font-semibold text-white truncate">{listName}</p>
+              <p className="text-xs mt-0.5" style={{ color: '#98A2B3' }}>
+                Global orderbook
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs" style={{ color: '#98A2B3' }}>
-              Listing
-            </p>
-            <p className="text-sm font-semibold text-white">{listName}</p>
-            <p className="text-xs mt-0.5" style={{ color: '#98A2B3' }}>
-              Global orderbook
-            </p>
-          </div>
-        </div>
 
-        {/* Price input */}
-        <form noValidate onSubmit={handleListOrdinal} className="flex flex-col gap-3">
+          {/* Price input */}
           <div>
             <label className="text-xs font-medium mb-1.5 block" style={{ color: '#98A2B3' }}>
               Price
@@ -920,7 +988,10 @@ export const OrdWallet = () => {
               </span>
             </div>
           </div>
+        </div>
 
+        {/* Sticky submit — pb clears the absolute BottomMenu (3.75rem) plus breathing room */}
+        <div className="px-4 pt-2 pb-20" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <motion.button
             type="submit"
             disabled={isProcessing}
@@ -934,8 +1005,8 @@ export const OrdWallet = () => {
             <Tag size={15} />
             List Now
           </motion.button>
-        </form>
-      </div>
+        </div>
+      </form>
     </motion.div>
   );
 
@@ -963,37 +1034,43 @@ export const OrdWallet = () => {
         }}
       />
 
-      <div className="flex-1 px-4 flex flex-col gap-4">
-        {/* Ordinal preview */}
-        <div
-          className="flex items-center gap-4 p-4 rounded-2xl"
-          style={{ background: '#17191E', border: '1px solid rgba(255,255,255,0.06)' }}
-        >
-          <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
-            <Ordinal
-              theme={theme}
-              output={selectedOrdinals[0]}
-              url={`${getContentUrl(cancelOriginOutpoint || '')}?outpoint=${selectedOrdinals[0]?.outpoint}`}
-              selected
-              isTransfer
-              size="4rem"
-            />
-          </div>
-          <div>
-            <p className="text-xs mb-0.5" style={{ color: '#98A2B3' }}>
-              Listed ordinal
-            </p>
-            <p className="text-sm font-semibold text-white">
-              {selectedOrdinals[0] ? getOutputName(selectedOrdinals[0], 'Ordinal') : 'Ordinal'}
-            </p>
-            <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
-              This will cancel your listing
-            </p>
+      <form noValidate onSubmit={handleCancelListing} className="flex flex-col flex-1 overflow-hidden">
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-4">
+          {/* Ordinal preview */}
+          <div
+            className="flex items-center gap-4 p-4 rounded-2xl"
+            style={{ background: '#17191E', border: '1px solid rgba(255,255,255,0.06)' }}
+          >
+            <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
+              <Ordinal
+                theme={theme}
+                output={selectedOrdinals[0]}
+                url={`${getContentUrl(cancelOriginOutpoint || '')}?outpoint=${selectedOrdinals[0]?.outpoint}`}
+                selected
+                isTransfer
+                size="4rem"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs mb-0.5" style={{ color: '#98A2B3' }}>
+                Listed ordinal
+              </p>
+              <p className="text-sm font-semibold text-white truncate">
+                {selectedOrdinals[0] ? getOutputName(selectedOrdinals[0], 'Ordinal') : 'Ordinal'}
+              </p>
+              <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
+                This will cancel your listing
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Confirm / Cancel */}
-        <form noValidate onSubmit={handleCancelListing} className="flex flex-col gap-2.5">
+        {/* Sticky footer — pb clears the absolute BottomMenu (3.75rem) plus breathing room */}
+        <div
+          className="px-4 pt-2 pb-20 flex flex-col gap-2.5"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+        >
           <motion.button
             type="submit"
             disabled={isProcessing}
@@ -1024,10 +1101,10 @@ export const OrdWallet = () => {
               border: '1px solid rgba(255,255,255,0.06)',
             }}
           >
-            Cancel
+            Keep Listing
           </motion.button>
-        </form>
-      </div>
+        </div>
+      </form>
     </motion.div>
   );
 

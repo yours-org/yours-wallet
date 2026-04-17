@@ -3,6 +3,7 @@ import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, ExternalLink, Loader2 } fr
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NetWork } from 'yours-wallet-provider';
 import { useServiceContext } from '../hooks/useServiceContext';
+import { useIntersectionObserver } from '../hooks/useIntersectObserver';
 import { useTheme } from '../hooks/useTheme';
 import { URL_WHATSONCHAIN, URL_WHATSONCHAIN_TESTNET } from '../utils/constants';
 import { fetchBsv21History, fetchBsvHistory, fetchMneeHistory, type CoinTxSummary } from '../utils/coinHistory';
@@ -32,7 +33,7 @@ const filterKey = (filter: CoinHistoryFilter): string => {
   }
 };
 
-export const CoinHistory = ({ filter, pageSize = 15, refreshKey }: CoinHistoryProps) => {
+export const CoinHistory = ({ filter, pageSize = 25, refreshKey }: CoinHistoryProps) => {
   const { apiContext, chromeStorageService } = useServiceContext();
   const { theme } = useTheme();
   const [items, setItems] = useState<CoinTxSummary[]>([]);
@@ -41,6 +42,9 @@ export const CoinHistory = ({ filter, pageSize = 15, refreshKey }: CoinHistoryPr
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const offsetRef = useRef(0);
+  const { isIntersecting, elementRef: sentinelRef } = useIntersectionObserver({
+    rootMargin: '120px',
+  });
 
   const isTestnet = chromeStorageService.getNetwork() === NetWork.Testnet;
   const wocBaseUrl = isTestnet ? URL_WHATSONCHAIN_TESTNET : URL_WHATSONCHAIN;
@@ -101,7 +105,7 @@ export const CoinHistory = ({ filter, pageSize = 15, refreshKey }: CoinHistoryPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterKey(filter), refreshKey]);
 
-  const handleLoadMore = async () => {
+  const handleLoadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
@@ -114,7 +118,14 @@ export const CoinHistory = ({ filter, pageSize = 15, refreshKey }: CoinHistoryPr
     } finally {
       setLoadingMore(false);
     }
-  };
+  }, [fetchPage, hasMore, loadingMore, pageSize]);
+
+  // Auto-fetch the next page whenever the sentinel scrolls into view.
+  useEffect(() => {
+    if (isIntersecting && !loading && !loadingMore && hasMore && !error) {
+      handleLoadMore();
+    }
+  }, [isIntersecting, loading, loadingMore, hasMore, error, handleLoadMore]);
 
   const openOnWoC = (txid: string) => window.open(`${wocBaseUrl}${txid}`, '_blank');
 
@@ -210,18 +221,13 @@ export const CoinHistory = ({ filter, pageSize = 15, refreshKey }: CoinHistoryPr
           ))}
         </div>
 
-        {/* Load more */}
+        {/* Infinite-scroll sentinel + loading indicator */}
         <Show when={hasMore}>
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            className="mt-3 w-full py-2.5 rounded-xl text-xs font-semibold border-0 outline-none cursor-pointer disabled:opacity-50"
-            style={{ background: `${accent}12`, color: accent }}
-          >
-            {loadingMore ? 'Loading…' : 'Show more'}
-          </motion.button>
+          <div ref={sentinelRef} className="flex items-center justify-center py-4">
+            <Show when={loadingMore}>
+              <Loader2 size={14} className="animate-spin" style={{ color: gray }} />
+            </Show>
+          </div>
         </Show>
       </Show>
     </div>

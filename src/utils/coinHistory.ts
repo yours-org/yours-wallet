@@ -76,16 +76,30 @@ const directionFromAction = (action: WalletAction): CoinTxDirection => {
 // ─── BSV ─────────────────────────────────────────────────────────────────────
 
 export const fetchBsvHistory = async (ctx: OneSatContext, opts: FetchHistoryOpts = {}): Promise<CoinTxSummary[]> => {
+  // listActions returns rows in DB insertion order (oldest-first) and gives no
+  // built-in way to ask for "newest first". So we probe to learn the total count,
+  // then fetch the NEWEST `limit` actions by computing the right DB offset.
+  // `opts.offset` here means "offset into the newest-first display order".
+  const wantLimit = opts.limit ?? 50;
+  const skipFromNewest = opts.offset ?? 0;
+
+  const probe = await ctx.wallet.listActions({ labels: [], limit: 1, offset: 0 });
+  const total = probe.totalActions;
+  const remaining = total - skipFromNewest;
+  if (remaining <= 0) return [];
+
+  const dbLimit = Math.min(wantLimit, remaining);
+  const dbOffset = remaining - dbLimit;
+
   const result = await ctx.wallet.listActions({
     labels: [],
     includeLabels: true,
     includeOutputs: true,
-    limit: opts.limit ?? 50,
-    offset: opts.offset ?? 0,
+    limit: dbLimit,
+    offset: dbOffset,
   });
 
-  // listActions returns rows in DB insertion order (oldest-first). Reverse so the
-  // most recent transactions appear first.
+  // We fetched the newest page; reverse so newest appears first within it.
   return result.actions
     .slice()
     .reverse()
@@ -195,19 +209,35 @@ export const fetchBsv21History = async (
   symbol: string | undefined,
   opts: FetchHistoryOpts = {},
 ): Promise<CoinTxSummary[]> => {
-  const result = await ctx.wallet.listActions({
+  // Same probe + offset trick as fetchBsvHistory — listActions has no built-in
+  // newest-first ordering, so we compute the right offset to fetch the latest
+  // page of actions for this tokenId.
+  const wantLimit = opts.limit ?? 50;
+  const skipFromNewest = opts.offset ?? 0;
+  const probeArgs = {
     labels: [`bsv21:${tokenId}`],
-    labelQueryMode: 'all',
+    labelQueryMode: 'all' as const,
+  };
+  const probe = await ctx.wallet.listActions({ ...probeArgs, limit: 1, offset: 0 });
+  const total = probe.totalActions;
+  const remaining = total - skipFromNewest;
+  if (remaining <= 0) return [];
+
+  const dbLimit = Math.min(wantLimit, remaining);
+  const dbOffset = remaining - dbLimit;
+
+  const result = await ctx.wallet.listActions({
+    ...probeArgs,
     includeLabels: true,
     includeOutputs: true,
     includeInputs: true,
-    limit: opts.limit ?? 50,
-    offset: opts.offset ?? 0,
+    limit: dbLimit,
+    offset: dbOffset,
   });
 
   const sym = symbol || 'Token';
 
-  // Reverse insertion order so newest is first.
+  // We fetched the newest page; reverse so newest appears first within it.
   return result.actions
     .slice()
     .reverse()
