@@ -23,12 +23,12 @@ import type { ApprovalContext } from '../../yoursApi';
 export type Dispatch<T> = (value: T) => void;
 
 export type Settings = {
-  noApprovalLimit: number;
   whitelist: WhitelistedApp[];
-  isPasswordRequired: boolean;
   socialProfile: SocialProfile;
   favoriteTokens: string[];
   customFeeRate: number;
+  /** Auto-lock timeout in minutes. Defaults to 10. */
+  lockTimeout?: number;
 };
 
 export interface Account {
@@ -65,7 +65,7 @@ export interface ChromeStorageObject {
   exchangeRateCache: ExchangeRateCache;
   lastActiveTime: number;
   popupWindowId: number;
-  passKey: string;
+  passKey?: string;
   salt: string;
   isLocked: boolean;
   colorTheme: Theme;
@@ -100,7 +100,6 @@ type AppState = {
   addresses: Addresses;
   balance: Balance;
   isLocked: boolean;
-  isPasswordRequired: boolean;
   network: NetWork;
   ordinals: Ordinal[];
   pubKeys: PubKeys;
@@ -112,7 +111,6 @@ export type DeprecatedStorage = {
   encryptedKeys: string;
   exchangeRateCache: ExchangeRateCache;
   socialProfile: SocialProfile;
-  noApprovalLimit: number;
   lastActiveTime: number;
   passKey: string;
   network: NetWork;

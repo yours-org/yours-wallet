@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
@@ -9,8 +9,6 @@ import {
   LogOut,
   Database,
   Gauge,
-  KeyRound,
-  Zap,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -24,7 +22,6 @@ import { Input } from '../components/Input';
 import { QrCode } from '../components/QrCode';
 import { Show } from '../components/Show';
 import { SpeedBump } from '../components/SpeedBump';
-import { ToggleSwitch } from '../components/ToggleSwitch';
 import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSocialProfile } from '../hooks/useSocialProfile';
@@ -55,7 +52,6 @@ export type SettingsPage =
   | 'social-profile'
   | 'export-keys-options'
   | 'export-keys-qr'
-  | 'preferences'
   | 'storage'
   | 'permissions';
 
@@ -188,12 +184,11 @@ export const Settings = () => {
   const [enteredAccountName, setEnteredAccountName] = useState('');
   const [enteredAccountIcon, setEnteredAccountIcon] = useState('');
   const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(socialProfile?.avatar);
-  const [isPasswordRequired, setIsPasswordRequired] = useState(chromeStorageService.isPasswordRequired());
   const [masterBackupProgress, setMasterBackupProgress] = useState(0);
   const [masterBackupEventText, setMasterBackupEventText] = useState('');
   const currentAccount = chromeStorageService.getCurrentAccountObject();
-  const [noApprovalLimit, setNoApprovalLimit] = useState(currentAccount.account?.settings.noApprovalLimit ?? 0);
   const [customFeeRate, setCustomFeeRate] = useState(currentAccount.account?.settings.customFeeRate ?? FEE_PER_KB);
+  const [lockTimeout, setLockTimeout] = useState(currentAccount.account?.settings.lockTimeout ?? 10);
   const [selectedAccountIdentityAddress, setSelectedAccountIdentityAddress] = useState<string | undefined>();
 
   // React to query deep-links (e.g. clicking "+ Add New Account" in the TopNav
@@ -384,61 +379,50 @@ export const Settings = () => {
     }
   };
 
-  const handleUpdatePasswordRequirement = async (isRequired: boolean) => {
-    setIsPasswordRequired(isRequired);
-    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
-    if (!account || !selectedAccount) throw new Error('No account found');
-    const accountSettings = account.settings;
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [selectedAccount]: {
-        ...account,
-        settings: {
-          ...accountSettings,
-          isPasswordRequired: isRequired,
-        },
-      },
-    };
-    await chromeStorageService.updateNested(key, update);
-  };
+  const MAX_LOCK_TIMEOUT_MINUTES = 1440; // 24 hours
 
-  const handleUpdateApprovalLimit = async (amount: number) => {
-    setNoApprovalLimit(amount);
-    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
-    if (!account || !selectedAccount) throw new Error('No account found');
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [selectedAccount]: {
-        ...account,
-        settings: {
-          ...account.settings,
-          noApprovalLimit: amount,
-        },
-      },
-    };
-    await chromeStorageService.updateNested(key, update);
-  };
-
-  const handleUpdateCustomFeeRate = async (rate: number) => {
-    if (rate < 1) {
-      addSnackbar('Fee rate must be at least 1 sat/byte', 'error');
+  const commitCustomFeeRate = useCallback(async () => {
+    const rate = customFeeRate;
+    if (!rate || rate < 1) {
+      setCustomFeeRate(currentAccount.account?.settings.customFeeRate ?? FEE_PER_KB);
+      if (rate !== undefined && rate < 1) addSnackbar('Fee rate must be at least 1 sat/kb', 'error');
       return;
     }
-    setCustomFeeRate(rate);
     const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
-    if (!account || !selectedAccount) throw new Error('No account found');
+    if (!account || !selectedAccount) return;
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
       [selectedAccount]: {
         ...account,
-        settings: {
-          ...account.settings,
-          customFeeRate: rate,
-        },
+        settings: { ...account.settings, customFeeRate: rate },
       },
     };
     await chromeStorageService.updateNested(key, update);
-  };
+    chrome.runtime.sendMessage({ action: 'UPDATE_FEE_RATE', feeRate: rate }).catch(() => {});
+  }, [customFeeRate, chromeStorageService, currentAccount, addSnackbar]);
+
+  const commitLockTimeout = useCallback(async () => {
+    let minutes = lockTimeout;
+    if (!minutes || minutes < 1) {
+      minutes = 10;
+      setLockTimeout(minutes);
+      if (lockTimeout !== undefined && lockTimeout < 1) addSnackbar('Lock timeout must be at least 1 minute', 'error');
+    }
+    if (minutes > MAX_LOCK_TIMEOUT_MINUTES) {
+      minutes = MAX_LOCK_TIMEOUT_MINUTES;
+      setLockTimeout(minutes);
+    }
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) return;
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [selectedAccount]: {
+        ...account,
+        settings: { ...account.settings, lockTimeout: minutes },
+      },
+    };
+    await chromeStorageService.updateNested(key, update);
+  }, [lockTimeout, chromeStorageService, addSnackbar]);
 
   const handleMasterBackup = async () => {
     await streamDataToZip(chromeStorageService, (e: MasterBackupProgressEvent) => {
@@ -502,16 +486,42 @@ export const Settings = () => {
           icon={<UserCircle size={16} />}
           label="Social Profile"
           description="Display name and avatar"
-          onClick={() => setPage('preferences')}
+          onClick={() => setPage('social-profile')}
           isFirst
         />
         <Divider />
         <SettingRow
-          icon={<Database size={16} />}
-          label="Storage"
-          description="View storage status and remote sync"
-          onClick={() => setPage('storage')}
-          isLast
+          icon={<Gauge size={16} />}
+          label="Custom Fee Rate"
+          description="Default: 100 sat/kb"
+          right={
+            <Input
+              theme={theme}
+              placeholder="100"
+              type="number"
+              onChange={(e) => setCustomFeeRate(Number(e.target.value))}
+              onBlur={() => commitCustomFeeRate()}
+              value={customFeeRate}
+              style={{ width: '5rem', margin: 0 }}
+            />
+          }
+        />
+        <Divider />
+        <SettingRow
+          icon={<Lock size={16} />}
+          label="Auto-Lock (min)"
+          description="Lock wallet after inactivity"
+          right={
+            <Input
+              theme={theme}
+              placeholder="10"
+              type="number"
+              onChange={(e) => setLockTimeout(Number(e.target.value))}
+              onBlur={() => commitLockTimeout()}
+              value={lockTimeout}
+              style={{ width: '5rem', margin: 0 }}
+            />
+          }
         />
       </Section>
 
@@ -523,6 +533,14 @@ export const Settings = () => {
           description="Immediately lock the wallet"
           onClick={handleLockWallet}
           isFirst
+          isLast
+        />
+        <Divider />
+        <SettingRow
+          icon={<Database size={16} />}
+          label="Storage"
+          description="View storage status and remote sync"
+          onClick={() => setPage('storage')}
           isLast
         />
       </Section>
@@ -702,82 +720,6 @@ export const Settings = () => {
     </motion.div>
   );
 
-  const preferencesPage = (
-    <motion.div
-      key="preferences"
-      variants={pageVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className="w-full px-4 pb-4"
-    >
-      <SubPageHeader title="Preferences" onBack={() => setPage('main')} />
-      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full">
-        <Section title="Profile">
-          <SettingRow
-            icon={<UserCircle size={16} />}
-            label="Social Profile"
-            description="Set your display name and avatar"
-            onClick={() => setPage('social-profile')}
-            isFirst
-            isLast
-          />
-        </Section>
-        <Section title="Security">
-          <SettingRow
-            icon={<KeyRound size={16} />}
-            label="Require Password"
-            description="Require a password for sending assets"
-            right={
-              <ToggleSwitch
-                theme={theme}
-                on={isPasswordRequired}
-                onChange={() => handleUpdatePasswordRequirement(!isPasswordRequired)}
-              />
-            }
-            isFirst
-            isLast
-          />
-        </Section>
-        <Section title="Transaction Limits">
-          <SettingRow
-            icon={<Zap size={16} />}
-            label="Auto-Approve Limit"
-            description="Transactions at or below this BSV amount will be auto-approved"
-            right={
-              <Input
-                theme={theme}
-                placeholder={String(noApprovalLimit)}
-                type="number"
-                onChange={(e) => handleUpdateApprovalLimit(Number(e.target.value))}
-                value={noApprovalLimit}
-                style={{ width: '5rem', margin: 0 }}
-              />
-            }
-            isFirst
-          />
-          <Divider />
-          <SettingRow
-            icon={<Gauge size={16} />}
-            label="Custom Fee Rate"
-            description="Default: 100 sat/kb"
-            right={
-              <Input
-                theme={theme}
-                placeholder={String(customFeeRate)}
-                type="number"
-                onChange={(e) => handleUpdateCustomFeeRate(Number(e.target.value))}
-                value={customFeeRate}
-                style={{ width: '5rem', margin: 0 }}
-              />
-            }
-            isLast
-          />
-        </Section>
-      </motion.div>
-    </motion.div>
-  );
-
   const socialProfilePage = (
     <motion.div
       key="social-profile"
@@ -787,7 +729,7 @@ export const Settings = () => {
       exit="exit"
       className="w-full px-4 pb-4"
     >
-      <SubPageHeader title="Social Profile" onBack={() => setPage('preferences')} />
+      <SubPageHeader title="Social Profile" onBack={() => setPage('main')} />
 
       {/* Avatar preview */}
       <motion.div
@@ -1033,8 +975,6 @@ export const Settings = () => {
           {page === 'account-list' && accountList}
 
           {page === 'edit-account' && editAccount}
-
-          {page === 'preferences' && preferencesPage}
 
           {page === 'social-profile' && socialProfilePage}
 

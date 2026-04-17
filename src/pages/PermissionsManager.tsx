@@ -357,7 +357,7 @@ export const PermissionsManager = ({ onBack: _onBack }: PermissionsManagerProps)
   }
 
   return (
-    <div className="flex flex-col items-center w-full py-2 px-3">
+    <div className="flex flex-col items-center w-full py-2 px-3 pb-20">
       <SpeedBump
         theme={theme}
         message={`Revoke all access for ${revokeAllTarget ? extractDomain(revokeAllTarget) : 'this app'}? This removes the connection from this wallet and revokes any on-chain permission tokens.`}

@@ -98,9 +98,7 @@ export const DEFAULT_ACCOUNT = {
   addresses: { bsvAddress: '', ordAddress: '', identityAddress: '' },
   pubKeys: { bsvPubKey: '', ordPubKey: '', identityPubKey: '' },
   settings: {
-    noApprovalLimit: 0,
     whitelist: [],
-    isPasswordRequired: true,
     socialProfile: { avatar: HOSTED_YOURS_IMAGE, displayName: 'Anonymous' },
     favoriteTokens: [],
     customFeeRate: FEE_PER_KB,

@@ -101,7 +101,7 @@ export const SweepMigration = () => {
     setIsProcessing(true);
     setPasswordError('');
 
-    const isVerified = chromeStorageService.verifyPassword(password);
+    const isVerified = await chromeStorageService.verifyPassword(password);
     if (!isVerified) {
       setPasswordError('Incorrect password');
       setIsProcessing(false);

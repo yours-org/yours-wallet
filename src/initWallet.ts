@@ -14,7 +14,6 @@ import { ChromeStorageService } from './services/ChromeStorage.service';
 import type { Account } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
-import { FEE_PER_KB } from './utils/constants';
 import { initSyncContext, type SyncContext } from './initSyncContext';
 
 // Type alias for chain
@@ -91,7 +90,7 @@ export const initWallet = async (
   const walletConfig: WebWalletConfig = {
     privateKey: keys.identityWif,
     chain,
-    feeModel: { model: 'sat/kb', value: FEE_PER_KB },
+    feeModel: { model: 'sat/kb', value: chromeStorageService.getCustomFeeRate() },
     activeRemote: chain === 'main' ? 'https://api.1sat.app/1sat/wallet' : 'https://testnet.api.1sat.app/1sat/wallet',
     storageIdentityKey: 'yours-wallet',
   };

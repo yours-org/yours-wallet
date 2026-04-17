@@ -149,7 +149,18 @@ const startupInitPromise = chromeStorageService
     }
     await chrome.storage.local.remove('popupWindowId');
 
-    await initializeWallet();
+    // Only initialize wallet if it's within the active session window.
+    // If locked (inactive or manual lock), keys stay encrypted until the user unlocks.
+    await chromeStorageService.getAndSetStorage();
+    const { account, lastActiveTime, passKey } = chromeStorageService.getCurrentAccountObject();
+    const isUnlocked =
+      passKey && account?.encryptedKeys && lastActiveTime && Date.now() - Number(lastActiveTime) < getInactivityLimit();
+
+    if (isUnlocked) {
+      await initializeWallet();
+    } else {
+      console.log('[background] Wallet is locked on startup — skipping key decryption');
+    }
   })
   .catch((error) => {
     console.error('[background] Startup initialization failed:', error);
@@ -175,31 +186,16 @@ const ensureWallet = async (): Promise<WalletInterface> => {
     return accountContext.wallet;
   }
 
-  // Check if wallet can be initialized silently (unlocked state)
+  // No accountContext — passKey is cleared on lock, so the user must enter their password.
+  // Check if a wallet exists to unlock (encryptedKeys must be present).
   await chromeStorageService.getAndSetStorage();
-  const { account, lastActiveTime, passKey } = chromeStorageService.getCurrentAccountObject();
-  const currentTime = Date.now();
-  const isUnlocked = passKey && lastActiveTime && currentTime - Number(lastActiveTime) < INACTIVITY_LIMIT;
+  const { account } = chromeStorageService.getCurrentAccountObject();
 
-  if (isUnlocked && account?.encryptedKeys) {
-    // Wallet is unlocked - initialize silently without popup
-    const wallet = await initializeWallet();
-    if (wallet) {
-      // Resolve any pending waiters
-      pendingWalletWaiters.forEach(({ resolve }) => resolve(wallet));
-      pendingWalletWaiters.length = 0;
-      return wallet;
-    }
-  }
-
-  // Wallet is locked or no wallet exists - check if we should prompt
-  // Only launch popup if there's an existing wallet to unlock (encryptedKeys exists)
-  // If no wallet exists at all, don't launch popup - the default_popup will show create wallet UI
   if (!account?.encryptedKeys) {
     return Promise.reject(new Error('No wallet exists - create wallet first'));
   }
 
-  // Wallet exists but is locked - prompt user to unlock
+  // Wallet exists but is locked — prompt user to unlock via popup
   return new Promise((resolve, reject) => {
     pendingWalletWaiters.push({ resolve, reject });
     if (pendingWalletWaiters.length === 1) {
@@ -250,7 +246,28 @@ const pendingCounterpartyPermissionRequests = new Map<
 let responseCallbackForConnectRequest: ((decision: Decision) => void) | null = null;
 let popupWindowId: number | undefined;
 
-const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
+/** Read the user's configured lock timeout (defaults to 10 minutes). */
+const getInactivityLimit = () => chromeStorageService.getLockTimeout();
+
+// Periodic inactivity check — destroys decrypted keys when session expires.
+// This runs even when the popup is closed, ensuring keys don't linger in the service worker.
+chrome.alarms.create('inactivity-lock', { periodInMinutes: 1 });
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== 'inactivity-lock' || !accountContext) return;
+  await chromeStorageService.getAndSetStorage();
+  const { lastActiveTime } = chromeStorageService.getCurrentAccountObject();
+  if (!lastActiveTime || Date.now() - Number(lastActiveTime) >= getInactivityLimit()) {
+    console.log('[background] Inactivity detected — destroying wallet context and clearing passKey');
+    try {
+      await accountContext.close();
+    } catch (err) {
+      console.error('[background] Error closing wallet on inactivity:', err);
+    }
+    accountContext = null;
+    await chromeStorageService.clearPassKey();
+    await chromeStorageService.update({ isLocked: true });
+  }
+});
 
 // Forward declaration for launchPopUp (defined inside isInServiceWorker block)
 let launchPopUp: () => void = () => {
@@ -527,7 +544,8 @@ if (isInServiceWorker) {
       YoursEventName.GET_LEGACY_ADDRESSES,
       YoursEventName.GET_RECEIVE_ADDRESS,
       YoursEventName.GET_SOCIAL_PROFILE,
-      // Wallet unlock - reinitialize after user enters password
+      // Wallet lock/unlock
+      'WALLET_LOCKED',
       'WALLET_UNLOCKED',
       // Master backup/restore
       'MASTER_BACKUP',
@@ -541,6 +559,8 @@ if (isInServiceWorker) {
       'PERMISSIONS_QUERY_SPENT',
       'PERMISSIONS_REVOKE_ONE',
       'PERMISSIONS_REVOKE_ALL',
+      // Settings (popup internal)
+      'UPDATE_FEE_RATE',
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -596,6 +616,22 @@ if (isInServiceWorker) {
         case YoursEventName.GET_SOCIAL_PROFILE:
           processGetSocialProfileRequest(sendResponse);
           return true;
+        case 'WALLET_LOCKED': {
+          // Destroy accountContext and clear passKey so keys cannot be decrypted without password
+          const ctx = accountContext;
+          accountContext = null; // Clear reference immediately to block new callers
+          chromeStorageService.clearPassKey().catch(() => {});
+          if (ctx) {
+            ctx
+              .close()
+              .then(() => console.log('[background] Wallet locked — keys and passKey cleared'))
+              .catch((err) => console.error('[background] Error closing wallet on lock:', err))
+              .finally(() => sendResponse({ type: 'WALLET_LOCKED', success: true }));
+          } else {
+            sendResponse({ type: 'WALLET_LOCKED', success: true });
+          }
+          return true;
+        }
         case 'WALLET_UNLOCKED':
           // If wallet context already exists and has pending requests, skip reinitialization
           // to preserve active CWI operations (e.g., createAction waiting for permission)
@@ -664,6 +700,25 @@ if (isInServiceWorker) {
         case 'STORAGE_MIGRATE_REMOTE':
           processStorageMigrateRemote(message.url, sendResponse);
           return true;
+        case 'UPDATE_FEE_RATE': {
+          const rate = message.feeRate;
+          if (typeof rate === 'number' && rate >= 1 && accountContext) {
+            // Access the internal storage provider to update fee model at runtime.
+            // This reaches into WalletStorageManager internals — if the SDK changes
+            // its structure, the guard below will catch it and log a warning.
+            const active = (accountContext.storage as any)._active;
+            if (active?.storage?.feeModel) {
+              active.storage.feeModel = { model: 'sat/kb', value: rate };
+            } else {
+              console.warn(
+                '[background] UPDATE_FEE_RATE: could not resolve storage._active.storage.feeModel —',
+                'fee rate will apply on next wallet initialization',
+              );
+            }
+          }
+          sendResponse({ success: true });
+          return true;
+        }
         case 'PERMISSIONS_LIST_ALL':
           processPermissionsListAll(sendResponse);
           return true;
@@ -1481,7 +1536,7 @@ if (isInServiceWorker) {
 
     return (
       !result.isLocked &&
-      currentTime - Number(lastActiveTime) < INACTIVITY_LIMIT &&
+      currentTime - Number(lastActiveTime) < getInactivityLimit() &&
       (!domain || result.account.settings.whitelist?.map((i: { domain: string }) => i.domain).includes(domain))
     );
   };

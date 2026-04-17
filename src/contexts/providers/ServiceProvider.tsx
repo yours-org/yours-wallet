@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { KeysService } from '../../services/Keys.service';
 import { INACTIVITY_LIMIT } from '../../utils/constants';
@@ -32,11 +32,18 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [services, setServices] = useState<Partial<ServiceContextProps>>({});
   const [isLocked, setIsLocked] = useState<boolean>(true); // Start locked until checkLockState runs
   const [isReady, setIsReady] = useState<boolean>(false);
+  const prevIsLockedRef = useRef<boolean | null>(null);
   useEffect(() => {
     if (services?.chromeStorageService) {
       const timestamp = Date.now();
       const twentyMinutesAgo = timestamp - 20 * 60 * 1000;
       services.chromeStorageService.update({ lastActiveTime: isLocked ? twentyMinutesAgo : timestamp, isLocked });
+      // Notify background to destroy decrypted keys only on actual lock transitions,
+      // not on initial render (where isLocked starts as true before checkLockState runs)
+      if (isLocked && prevIsLockedRef.current === false) {
+        chrome.runtime.sendMessage({ action: 'WALLET_LOCKED' }).catch(() => {});
+      }
+      prevIsLockedRef.current = isLocked;
     }
   }, [isLocked, services?.chromeStorageService]);
 
@@ -51,7 +58,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
         // If no encrypted keys exist, user needs onboarding - not the unlock screen
         if (!account?.encryptedKeys) {
           setIsLocked(false);
-        } else if (lastActiveTime && Date.now() - lastActiveTime <= INACTIVITY_LIMIT) {
+        } else if (lastActiveTime && Date.now() - lastActiveTime <= chromeStorageService.getLockTimeout()) {
           // Has keys but was recently active - unlock
           setIsLocked(false);
         }
@@ -129,7 +136,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
           return;
         }
 
-        if (currentTime - lastActiveTime > INACTIVITY_LIMIT) {
+        if (currentTime - lastActiveTime > (services?.chromeStorageService?.getLockTimeout() ?? INACTIVITY_LIMIT)) {
           lockWallet();
         } else {
           setIsLocked(false);

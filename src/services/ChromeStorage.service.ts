@@ -9,6 +9,7 @@ import {
   CHROME_STORAGE_OBJECT_VERSION,
   FEE_PER_KB,
   HOSTED_YOURS_IMAGE,
+  INACTIVITY_LIMIT,
   MAINNET_ADDRESS_PREFIX,
   TESTNET_ADDRESS_PREFIX,
 } from '../utils/constants';
@@ -80,7 +81,6 @@ export class ChromeStorageService {
       exchangeRateCache,
       lastActiveTime,
       network,
-      noApprovalLimit,
       passKey,
       popupWindowId,
       salt,
@@ -96,9 +96,7 @@ export class ChromeStorageService {
           encryptedKeys, // See Keys type
           derivationTags: derivationTags ?? [],
           settings: {
-            noApprovalLimit: noApprovalLimit ?? 0,
             whitelist: whitelist ?? [],
-            isPasswordRequired: appState.isPasswordRequired,
             socialProfile: {
               displayName: socialProfile?.displayName ?? 'Anonymous',
               avatar: socialProfile?.avatar ?? HOSTED_YOURS_IMAGE,
@@ -148,7 +146,6 @@ export class ChromeStorageService {
       'derivationTags',
       'encryptedKeys',
       'socialProfile',
-      'noApprovalLimit',
       'network',
       'paymentUtxos',
       'whitelist',
@@ -205,7 +202,6 @@ export class ChromeStorageService {
         ordinals: [],
         balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
         network: NetWork.Mainnet,
-        isPasswordRequired: true,
         addresses: {
           bsvAddress: keys.walletAddress || '',
           ordAddress: keys.ordAddress || '',
@@ -336,19 +332,14 @@ export class ChromeStorageService {
     return accounts[selectedAccount]?.settings?.customFeeRate ?? FEE_PER_KB;
   };
 
-  isPasswordRequired = (): boolean => {
-    if (this.storage === null || this.storage === undefined) {
-      return true;
-    }
+  /** Returns the auto-lock timeout in milliseconds. Defaults to INACTIVITY_LIMIT (10 minutes). Capped at 24 hours. */
+  getLockTimeout = (): number => {
+    if (!this.storage) return INACTIVITY_LIMIT;
     const { accounts, selectedAccount } = this.storage as ChromeStorageObject;
-    if (!accounts || !selectedAccount) {
-      return true;
-    }
-    const account = accounts[selectedAccount];
-    if (account.settings.isPasswordRequired === undefined) {
-      return true;
-    }
-    return account.settings.isPasswordRequired;
+    if (!accounts || !selectedAccount) return INACTIVITY_LIMIT;
+    const minutes = accounts[selectedAccount]?.settings?.lockTimeout;
+    if (!minutes || minutes < 1) return INACTIVITY_LIMIT;
+    return Math.min(minutes, 1440) * 60 * 1000;
   };
 
   getAllAccounts = (): Account[] => {
@@ -371,18 +362,33 @@ export class ChromeStorageService {
   };
 
   /**
-   * Verify a password against the stored passKey.
-   * Used for unlocking the wallet.
+   * Verify a password by deriving the passKey and attempting to decrypt stored keys.
+   * On success, re-stores the passKey so the wallet can initialize.
+   * On failure, passKey remains absent — keys stay inaccessible.
    */
-  verifyPassword = (password: string): boolean => {
-    if (!this.isPasswordRequired()) return true;
-    const { salt, passKey } = this.getCurrentAccountObject();
-    if (!salt || !passKey) return false;
+  verifyPassword = async (password: string): Promise<boolean> => {
+    const { salt, account } = this.getCurrentAccountObject();
+    if (!salt || !account?.encryptedKeys) return false;
     try {
       const derivedKey = deriveKey(password, salt);
-      return derivedKey === passKey;
-    } catch (error) {
+      // Attempt decryption — throws if password is wrong
+      const decrypted = decrypt(account.encryptedKeys, derivedKey);
+      JSON.parse(decrypted); // Verify it's valid JSON
+      // Password correct — restore passKey so initializeWallet can use it
+      await this.update({ passKey: derivedKey });
+      return true;
+    } catch {
       return false;
+    }
+  };
+
+  /**
+   * Clear the passKey from storage so keys cannot be decrypted without re-entering the password.
+   */
+  clearPassKey = async (): Promise<void> => {
+    await this.remove(['passKey']);
+    if (this.storage) {
+      (this.storage as Record<string, unknown>).passKey = undefined;
     }
   };
 }

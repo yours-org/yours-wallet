@@ -28,7 +28,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    const isVerified = chromeStorageService.verifyPassword(password);
+    const isVerified = await chromeStorageService.verifyPassword(password);
     if (isVerified) {
       setVerificationFailed(false);
       const timestamp = Date.now();

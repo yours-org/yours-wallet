@@ -226,13 +226,12 @@ export class KeysService {
     return keys;
   };
 
-  retrieveKeys = async (password?: string, isBelowNoApprovalLimit?: boolean): Promise<Keys | Partial<Keys>> => {
+  retrieveKeys = async (password?: string): Promise<Keys | Partial<Keys>> => {
     const accountObj = this.chromeStorageService.getCurrentAccountObject();
     const { account, passKey } = accountObj;
     if (!account) throw new Error('No account found!');
     if (!account.network) throw new Error('No network found!');
     const { encryptedKeys } = account;
-    const { isPasswordRequired } = account.settings;
     try {
       if (!encryptedKeys || !passKey) throw new Error('No keys found!');
       const d = decrypt(encryptedKeys, passKey);
@@ -261,33 +260,24 @@ export class KeysService {
         this.identityPubKey = keys.identityPubKey;
       }
 
-      if (!isPasswordRequired || isBelowNoApprovalLimit || password) {
-        const isVerified = isBelowNoApprovalLimit || !isPasswordRequired || (await this.verifyPassword(password ?? ''));
-        if (isVerified) {
-          return Object.assign({}, keys, {
-            ordAddress: ordAddr,
-            walletAddress: walletAddr,
-          });
-        } else throw new Error('Unauthorized!');
-      } else {
-        return {
-          ordAddress: ordAddr,
-          walletAddress: walletAddr,
-          walletPubKey: keys.walletPubKey,
-          ordPubKey: keys.ordPubKey,
-        };
+      // If a password was provided (e.g. key export), verify it first
+      if (password) {
+        const isVerified = await this.verifyPassword(password);
+        if (!isVerified) throw new Error('Unauthorized!');
       }
+
+      return Object.assign({}, keys, {
+        ordAddress: ordAddr,
+        walletAddress: walletAddr,
+      });
     } catch (error) {
       console.error('Error in retrieveKeys:', error);
       throw new Error('Failed to retrieve keys');
     }
   };
 
-  retrievePrivateKeyMap = async (
-    password?: string,
-    isBelowNoApprovalLimit?: boolean,
-  ): Promise<Map<string, PrivateKey>> => {
-    const keys = await this.retrieveKeys(password, isBelowNoApprovalLimit);
+  retrievePrivateKeyMap = async (password?: string): Promise<Map<string, PrivateKey>> => {
+    const keys = await this.retrieveKeys(password);
     const pkMap = new Map<string, PrivateKey>();
     if (keys.walletAddress && keys.walletWif) pkMap.set(keys.walletAddress, PrivateKey.fromWif(keys.walletWif));
     if (keys.ordAddress && keys.ordWif) pkMap.set(keys.ordAddress, PrivateKey.fromWif(keys.ordWif));
@@ -296,15 +286,6 @@ export class KeysService {
   };
 
   verifyPassword = async (password: string): Promise<boolean> => {
-    const isRequired = this.chromeStorageService.isPasswordRequired();
-    if (!isRequired) return true;
-    const { salt, passKey } = this.chromeStorageService.getCurrentAccountObject();
-    if (!salt || !passKey) return false;
-    try {
-      const derivedKey = deriveKey(password, salt);
-      return derivedKey === passKey;
-    } catch (error) {
-      return false;
-    }
+    return this.chromeStorageService.verifyPassword(password);
   };
 }
