@@ -11,6 +11,7 @@ import {
 import type { OneSatContext } from '@1sat/actions';
 import type { ChromeStorageService } from '../services/ChromeStorage.service';
 import type { ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { HOSTED_YOURS_IMAGE } from '../utils/constants';
 
 /**
  * Resolve a 1sat:// protocol URI to a renderable HTTPS URL.
@@ -71,10 +72,20 @@ const DEFAULT_PROFILE: IdentityProfile = {
 };
 
 export const useIdentity = (apiContext: OneSatContext, chromeStorageService?: ChromeStorageService) => {
+  // Seed initial profile from chrome storage cache so the avatar URL is
+  // available on the very first render — avoids the image "pop-in" effect.
+  const cachedProfile = (() => {
+    if (!chromeStorageService) return DEFAULT_PROFILE;
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    const sp = account?.settings?.socialProfile;
+    if (!sp?.avatar || sp.avatar === HOSTED_YOURS_IMAGE) return DEFAULT_PROFILE;
+    return { name: sp.displayName || '', image: sp.avatar, description: '' };
+  })();
+
   const [state, setState] = useState<IdentityState>({
     bapId: null,
-    isPublished: false,
-    profile: DEFAULT_PROFILE,
+    isPublished: !!cachedProfile.image,
+    profile: cachedProfile,
     loading: true,
     error: null,
   });

@@ -43,12 +43,7 @@ import type {
 } from '@bsv/wallet-toolbox-mobile';
 import type { LocalWalletPermissionsManager } from '@1sat/wallet-browser';
 import { removeWindow } from './utils/chromeHelpers';
-import {
-  Account,
-  ChromeStorageObject,
-  ConnectRequest,
-  StorageConfig,
-} from './services/types/chromeStorage.types';
+import { Account, ChromeStorageObject, ConnectRequest, StorageConfig } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { initWallet, type AccountContext } from './initWallet';
 import { DEFAULT_STORAGE_REMOTE, HOSTED_YOURS_IMAGE } from './utils/constants';
@@ -59,6 +54,9 @@ const isInServiceWorker = self?.document === undefined;
 
 // Account context - null if locked or not initialized
 let accountContext: AccountContext | null = null;
+// Set while wallet is reinitializing (e.g. account switch) to prevent
+// ensureWallet from launching a popup during the transition.
+let reinitPromise: Promise<WalletInterface | null> | null = null;
 
 /**
  * Send a balance update notification to the popup.
@@ -187,6 +185,18 @@ export const getWallet = (): WalletInterface | null => {
  */
 const ensureWallet = async (): Promise<WalletInterface> => {
   await startupInitPromise;
+  if (accountContext?.wallet) {
+    return accountContext.wallet;
+  }
+
+  // If wallet is currently reinitializing (e.g. account switch), wait for that
+  // instead of launching a popup.
+  if (reinitPromise) {
+    const wallet = await reinitPromise;
+    if (wallet) return wallet;
+  }
+
+  // Still no context — check again after reinit may have completed
   if (accountContext?.wallet) {
     return accountContext.wallet;
   }
@@ -403,21 +413,29 @@ if (isInServiceWorker) {
 
   const switchAccount = async () => {
     console.log('[background] switchAccount: starting');
-    try {
-      // Close existing wallet before switching
-      if (accountContext) {
-        console.log('[background] switchAccount: closing existing wallet');
-        await accountContext.close();
-        accountContext = null;
+    const doSwitch = async () => {
+      try {
+        // Close existing wallet before switching
+        if (accountContext) {
+          console.log('[background] switchAccount: closing existing wallet');
+          await accountContext.close();
+          accountContext = null;
+        }
+        chromeStorageService = new ChromeStorageService();
+        await chromeStorageService.getAndSetStorage();
+        console.log('[background] switchAccount: storage loaded, initializing wallet');
+        await initializeWallet();
+        console.log('[background] switchAccount: wallet initialized successfully');
+        return accountContext?.wallet ?? null;
+      } catch (error) {
+        console.error('[background] switchAccount: failed to initialize wallet:', error);
+        return null;
+      } finally {
+        reinitPromise = null;
       }
-      chromeStorageService = new ChromeStorageService();
-      await chromeStorageService.getAndSetStorage();
-      console.log('[background] switchAccount: storage loaded, initializing wallet');
-      await initializeWallet();
-      console.log('[background] switchAccount: wallet initialized successfully');
-    } catch (error) {
-      console.error('[background] switchAccount: failed to initialize wallet:', error);
-    }
+    };
+    reinitPromise = doSwitch();
+    await reinitPromise;
   };
 
   const createNewPopup = () => {
@@ -1019,9 +1037,7 @@ if (isInServiceWorker) {
    * works — the URL gets captured into remotes[] as the implicit→explicit
    * materialization step.
    */
-  const updateStorageConfig = async (
-    patch: (current: StorageConfig) => StorageConfig,
-  ): Promise<StorageConfig> => {
+  const updateStorageConfig = async (patch: (current: StorageConfig) => StorageConfig): Promise<StorageConfig> => {
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (!account) throw new Error('No account loaded');
     const identityAddress = account.addresses.identityAddress;
@@ -1036,10 +1052,7 @@ if (isInServiceWorker) {
     return next;
   };
 
-  const processStorageSetActiveStorage = async (
-    target: 'local' | string,
-    sendResponse: CallbackResponse,
-  ) => {
+  const processStorageSetActiveStorage = async (target: 'local' | string, sendResponse: CallbackResponse) => {
     try {
       await ensureWallet();
     } catch (err) {
@@ -1066,9 +1079,7 @@ if (isInServiceWorker) {
         }
         // Ensure the URL is in the remotes list so it survives restart.
         const remotes = current.remotes ?? [];
-        const withTarget = remotes.includes(target)
-          ? remotes
-          : [...remotes, target];
+        const withTarget = remotes.includes(target) ? remotes : [...remotes, target];
         return { activeRemote: target, remotes: withTarget };
       });
       sendResponse({
@@ -1085,10 +1096,7 @@ if (isInServiceWorker) {
     }
   };
 
-  const processStorageAddRemote = async (
-    url: string,
-    sendResponse: CallbackResponse,
-  ) => {
+  const processStorageAddRemote = async (url: string, sendResponse: CallbackResponse) => {
     try {
       await ensureWallet();
     } catch (err) {
@@ -1136,10 +1144,7 @@ if (isInServiceWorker) {
    * remote stays connected for this session and will simply not be
    * reconnected on next unlock. Refuses if the URL is the current active.
    */
-  const processStorageRemoveRemote = async (
-    url: string,
-    sendResponse: CallbackResponse,
-  ) => {
+  const processStorageRemoveRemote = async (url: string, sendResponse: CallbackResponse) => {
     if (!accountContext) {
       sendResponse({
         type: 'STORAGE_REMOVE_REMOTE',
@@ -1151,9 +1156,7 @@ if (isInServiceWorker) {
     try {
       const nextConfig = await updateStorageConfig((current) => {
         if (current.activeRemote === url) {
-          throw new Error(
-            'Cannot remove the active remote — switch active to local or another remote first.',
-          );
+          throw new Error('Cannot remove the active remote — switch active to local or another remote first.');
         }
         const remotes = (current.remotes ?? []).filter((r) => r !== url);
         return { ...current, remotes };

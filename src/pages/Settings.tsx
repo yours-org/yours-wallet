@@ -1184,8 +1184,7 @@ export const Settings = () => {
                 exit="exit"
                 className="w-full px-4 pb-4"
               >
-                <SubPageHeader title="Remote Backup" onBack={() => setPage('export-keys-options')} />
-                <StorageStatus onBack={() => setPage('main')} />
+                <StorageStatus onBack={() => setPage('export-keys-options')} />
               </motion.div>
             )}
 

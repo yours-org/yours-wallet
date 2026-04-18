@@ -1,5 +1,5 @@
 import { validate } from 'bitcoin-address-validation';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   List,
@@ -91,6 +91,24 @@ export const BsvWallet = () => {
   const { addSnackbar } = useSnackbar();
   const { chromeStorageService, apiContext } = useServiceContext();
   const { profile: identityProfile } = useIdentity(apiContext, chromeStorageService);
+  const avatarUrl = useMemo(() => {
+    if (!identityProfile.image || !apiContext.services) return '';
+    return resolveImageUrl(identityProfile.image, apiContext);
+  }, [identityProfile.image, apiContext]);
+  const [avatarReady, setAvatarReady] = useState(false);
+
+  // Pre-load the avatar image so it's decoded before we render it.
+  useEffect(() => {
+    if (!avatarUrl) {
+      setAvatarReady(false);
+      return;
+    }
+    const img = new Image();
+    img.src = avatarUrl;
+    img.onload = () => setAvatarReady(true);
+    img.onerror = () => setAvatarReady(false);
+  }, [avatarUrl]);
+
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -768,14 +786,14 @@ export const BsvWallet = () => {
         style={{ minHeight: '100%' }}
       >
         {/* ── Profile avatar ── */}
-        <Show when={!!identityProfile.image}>
+        <Show when={avatarReady}>
           <motion.div
             variants={{ hidden: { opacity: 0, y: -12 }, visible: { opacity: 1, y: 0 } }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
           >
             <motion.img
               whileHover={{ scale: 1.06 }}
-              src={resolveImageUrl(identityProfile.image, apiContext)}
+              src={avatarUrl}
               className="w-12 h-12 rounded-full object-cover"
               style={{ outline: `2px solid ${theme.color.component.primaryButtonLeftGradient}40` }}
               alt="Profile"

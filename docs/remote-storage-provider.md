@@ -52,42 +52,42 @@ Returns the current account status, usage, and available tiers for the authentic
       "id": "free",
       "name": "Free",
       "storageLimitBytes": 1073741824,
-      "pricePerMonthSats": 0,
+      "priceInSats": 0,
       "description": "1 GB included with every wallet"
     },
     {
       "id": "pro",
       "name": "Pro",
       "storageLimitBytes": 10737418240,
-      "pricePerMonthSats": 5000,
+      "priceInSats": 5000,
       "description": "10 GB for power users"
     }
   ],
+  "paymentAddress": "1YourBSVPaymentAddressHere",
   "paymentDue": false,
   "paymentAmount": null,
-  "paymentAddress": null,
   "lastPayment": null
 }
 ```
 
 **Field reference:**
 
-| Field                       | Type           | Description                                           |
-| --------------------------- | -------------- | ----------------------------------------------------- |
-| `provider`                  | string         | Your provider display name                            |
-| `usedBytes`                 | number         | Current storage used in bytes                         |
-| `totalBytes`                | number         | Total storage quota in bytes. Use `-1` for unlimited. |
-| `tier`                      | string         | Current tier ID for this user                         |
-| `tiers`                     | array          | All available tiers with pricing                      |
-| `tiers[].id`                | string         | Unique tier identifier                                |
-| `tiers[].name`              | string         | Display name                                          |
-| `tiers[].storageLimitBytes` | number         | Storage limit in bytes. `-1` for unlimited.           |
-| `tiers[].pricePerMonthSats` | number         | Monthly cost in satoshis. `0` for free.               |
-| `tiers[].description`       | string         | Short description shown in the upgrade UI             |
-| `paymentDue`                | boolean        | Whether a payment is required before the next sync    |
-| `paymentAmount`             | number \| null | Amount due in satoshis                                |
-| `paymentAddress`            | string \| null | BSV address to send payment to                        |
-| `lastPayment`               | string \| null | ISO 8601 timestamp of last payment received           |
+| Field                       | Type           | Description                                                                                                                                                                         |
+| --------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `provider`                  | string         | Your provider display name                                                                                                                                                          |
+| `usedBytes`                 | number         | Current storage used in bytes                                                                                                                                                       |
+| `totalBytes`                | number         | Total storage quota in bytes. Use `-1` for unlimited.                                                                                                                               |
+| `tier`                      | string         | Current tier ID for this user                                                                                                                                                       |
+| `tiers`                     | array          | All available tiers with pricing                                                                                                                                                    |
+| `tiers[].id`                | string         | Unique tier identifier                                                                                                                                                              |
+| `tiers[].name`              | string         | Display name                                                                                                                                                                        |
+| `tiers[].storageLimitBytes` | number         | Storage limit in bytes. `-1` for unlimited.                                                                                                                                         |
+| `tiers[].priceInSats`       | number         | Monthly cost in satoshis. `0` for free. Server sets this value and uses it to validate payment transactions. The wallet converts to USD for display using the cached exchange rate. |
+| `tiers[].description`       | string         | Short description shown in the upgrade UI                                                                                                                                           |
+| `paymentAddress`            | string         | BSV address where the wallet sends tier upgrade payments. Always required — the wallet uses this to know where to pay.                                                              |
+| `paymentDue`                | boolean        | Whether a payment is required before the next sync                                                                                                                                  |
+| `paymentAmount`             | number \| null | Amount due in satoshis (when `paymentDue` is true)                                                                                                                                  |
+| `lastPayment`               | string \| null | ISO 8601 timestamp of last payment received                                                                                                                                         |
 
 ### `POST /pay`
 

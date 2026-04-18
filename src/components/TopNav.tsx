@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Copy, Github, Check } from 'lucide-react';
+import { ChevronDown, Copy, Github, Check, Loader2 } from 'lucide-react';
 import logo from '../assets/logos/horizontal-logo.png';
 import { useTheme } from '../hooks/useTheme';
 import activeCircle from '../assets/active-circle.png';
@@ -18,6 +18,7 @@ export const TopNav = () => {
   const { addSnackbar } = useSnackbar();
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const toggleRef = useRef<HTMLDivElement | null>(null);
   const accountObj = chromeStorageService.getCurrentAccountObject();
@@ -31,8 +32,11 @@ export const TopNav = () => {
   };
 
   const handleSwitchAccount = async (identityAddress: string) => {
+    if (switchingTo) return;
+    setSwitchingTo(identityAddress);
     wallet?.close?.();
     await chromeStorageService.switchAccount(identityAddress);
+    setSwitchingTo(null);
     setDropdownVisible(false);
     navigate('/bsv-wallet?reload=true');
   };
@@ -112,41 +116,53 @@ export const TopNav = () => {
                 boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
               }}
             >
-              {chromeStorageService.getAllAccounts().map((account) => (
-                <motion.div
-                  key={account.addresses.identityAddress}
-                  whileHover={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
-                  className="flex items-center justify-between px-3 py-2.5 cursor-pointer transition-colors"
-                  onClick={() => handleSwitchAccount(account.addresses.identityAddress)}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <img src={account.icon} className="w-6 h-6 rounded-full object-cover" alt={account.name} />
-                    <span className="text-sm font-semibold" style={{ color: theme.color.global.contrast }}>
-                      {account.name}
-                    </span>
-                  </div>
-                  {account.primaryAddress && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-mono" style={{ color: theme.color.global.gray }}>
-                        {truncate(account.primaryAddress, 3, 3)}
+              {chromeStorageService.getAllAccounts().map((account) => {
+                const isSwitching = switchingTo === account.addresses.identityAddress;
+                return (
+                  <motion.div
+                    key={account.addresses.identityAddress}
+                    whileHover={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+                    className="flex items-center justify-between px-3 py-2.5 cursor-pointer transition-colors"
+                    style={{ opacity: switchingTo && !isSwitching ? 0.4 : 1 }}
+                    onClick={() => handleSwitchAccount(account.addresses.identityAddress)}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      {isSwitching ? (
+                        <Loader2
+                          size={16}
+                          className="animate-spin w-6 h-6"
+                          style={{ color: theme.color.component.primaryButtonLeftGradient }}
+                        />
+                      ) : (
+                        <img src={account.icon} className="w-6 h-6 rounded-full object-cover" alt={account.name} />
+                      )}
+                      <span className="text-sm font-semibold" style={{ color: theme.color.global.contrast }}>
+                        {account.name}
                       </span>
-                      <button
-                        className="p-1 rounded-md transition-colors hover:bg-white/10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopyToClipboard(account.primaryAddress!);
-                        }}
-                      >
-                        {copiedAddress === account.primaryAddress ? (
-                          <Check size={12} color="#A1FF8B" />
-                        ) : (
-                          <Copy size={12} color={theme.color.global.gray} />
-                        )}
-                      </button>
                     </div>
-                  )}
-                </motion.div>
-              ))}
+                    {account.primaryAddress && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-mono" style={{ color: theme.color.global.gray }}>
+                          {truncate(account.primaryAddress, 3, 3)}
+                        </span>
+                        <button
+                          className="p-1 rounded-md transition-colors hover:bg-white/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyToClipboard(account.primaryAddress!);
+                          }}
+                        >
+                          {copiedAddress === account.primaryAddress ? (
+                            <Check size={12} color="#A1FF8B" />
+                          ) : (
+                            <Copy size={12} color={theme.color.global.gray} />
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
 
               {/* Divider */}
               <div className="mx-3 h-px" style={{ backgroundColor: theme.color.global.gray + '25' }} />

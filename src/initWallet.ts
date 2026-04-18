@@ -10,10 +10,7 @@ import {
 } from '@1sat/wallet-browser';
 import { syncAddresses, createContext as createActionContext } from '@1sat/actions';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import type {
-  Account,
-  StorageConfig,
-} from './services/types/chromeStorage.types';
+import type { Account, StorageConfig } from './services/types/chromeStorage.types';
 import { DEFAULT_STORAGE_REMOTE } from './utils/constants';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
@@ -75,9 +72,7 @@ const resolveStorageConfig = (
   const { activeRemote, remotes = [] } = storageConfig;
   // `remotes[]` holds every configured remote including the active; filter
   // the active out before passing to the factory so it doesn't double-connect.
-  const backups = activeRemote
-    ? remotes.filter((url) => url !== activeRemote)
-    : remotes;
+  const backups = activeRemote ? remotes.filter((url) => url !== activeRemote) : remotes;
   return { activeRemote, backups };
 };
 
@@ -89,11 +84,8 @@ const resolveStorageConfig = (
  * of the same account on the same remote so `WalletStorageManager` can
  * correctly identify which local store is authoritative.
  */
-const ensureStorageIdentityKey = async (
-  chromeStorageService: ChromeStorageService,
-): Promise<string> => {
-  const existing = chromeStorageService.getCurrentAccountObject()
-    .storageIdentityKey;
+const ensureStorageIdentityKey = async (chromeStorageService: ChromeStorageService): Promise<string> => {
+  const existing = chromeStorageService.getCurrentAccountObject().storageIdentityKey;
   if (existing) return existing;
   const bytes = crypto.getRandomValues(new Uint8Array(8));
   const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
