@@ -24,12 +24,11 @@ import { Show } from '../components/Show';
 import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSnackbar } from '../hooks/useSnackbar';
-import { useSocialProfile } from '../hooks/useSocialProfile';
+import { useIdentity } from '../hooks/useIdentity';
 import { useTheme } from '../hooks/useTheme';
 import {
   BSV_DECIMAL_CONVERSION,
   GENERIC_TOKEN_ICON,
-  HOSTED_YOURS_IMAGE,
   MNEE_ICON_URL,
   MNEE_MOBILE_REFERRAL_LINK,
 } from '../utils/constants';
@@ -61,7 +60,6 @@ import { Account, ChromeStorageObject } from '../services/types/chromeStorage.ty
 import { SendBsv21View } from '../components/SendBsv21View';
 import { AssetPicker, type PickableAsset } from '../components/AssetPicker';
 import { CoinHistory } from '../components/CoinHistory';
-import { FaucetButton } from '../components/FaucetButton';
 import { getMneeBalance, sendMnee, deriveDepositAddresses, ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 import { MneeClient } from '@1sat/client';
 
@@ -92,7 +90,7 @@ export const BsvWallet = () => {
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const { addSnackbar } = useSnackbar();
   const { chromeStorageService, apiContext } = useServiceContext();
-  const { socialProfile } = useSocialProfile(chromeStorageService);
+  const { profile: identityProfile } = useIdentity(apiContext, chromeStorageService);
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -111,7 +109,6 @@ export const BsvWallet = () => {
   const services = theme.settings.services;
   const [filteredTokens, setFilteredTokens] = useState<Bsv21Balance[]>([]);
   const [randomKey, setRandomKey] = useState(Math.random());
-  const isTestnet = chromeStorageService.getNetwork() === 'testnet' ? true : false;
   // Bump to force a refresh of the per-coin CoinHistory list (e.g. after a successful send)
   const [bsvHistoryRefreshKey, setBsvHistoryRefreshKey] = useState(0);
   const [mneeHistoryRefreshKey, setMneeHistoryRefreshKey] = useState(0);
@@ -642,11 +639,6 @@ export const BsvWallet = () => {
     });
   };
 
-  const handleTestNetFaucetConfirmation = () => {
-    addSnackbar('Testnet coins sent! It may take one block confirmation for them to appear in your wallet.', 'success');
-    refreshUtxos();
-  };
-
   /** Fill the given MNEE recipient with (balance - already-assigned - fee). */
   const handleFillMaxMnee = async (id: string) => {
     const assignedElsewhere = mneeRecipients.reduce((acc, r) => (r.id === id ? acc : acc + (r.amount ?? 0)), 0);
@@ -776,27 +768,26 @@ export const BsvWallet = () => {
         style={{ minHeight: '100%' }}
       >
         {/* ── Profile avatar ── */}
-        <motion.div
-          variants={{ hidden: { opacity: 0, y: -12 }, visible: { opacity: 1, y: 0 } }}
-          transition={{ duration: 0.3, ease: 'easeOut' }}
-          className="mt-4"
-        >
-          <Show when={socialProfile.avatar !== HOSTED_YOURS_IMAGE}>
+        <Show when={!!identityProfile.image}>
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: -12 }, visible: { opacity: 1, y: 0 } }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+          >
             <motion.img
               whileHover={{ scale: 1.06 }}
-              src={socialProfile.avatar}
-              className="w-14 h-14 rounded-full object-cover mb-2"
+              src={identityProfile.image}
+              className="w-12 h-12 rounded-full object-cover"
               style={{ outline: `2px solid ${theme.color.component.primaryButtonLeftGradient}40` }}
               alt="Profile"
             />
-          </Show>
-        </motion.div>
+          </motion.div>
+        </Show>
 
         {/* ── USD balance ── */}
         <motion.div
           variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
           transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="flex flex-col items-center mt-2"
+          className="flex flex-col items-center mt-1"
         >
           <div className="flex items-center gap-2">
             <h1
@@ -866,18 +857,6 @@ export const BsvWallet = () => {
           </motion.button>
         </motion.div>
 
-        {/* ── Faucet button (testnet only) ── */}
-        <motion.div
-          variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
-          className="w-full flex justify-center mt-2"
-        >
-          <FaucetButton
-            onConfirmation={handleTestNetFaucetConfirmation}
-            address={receiveAddress}
-            isTestnet={isTestnet}
-          />
-        </motion.div>
-
         {/* ── Assets section ── */}
         <motion.div
           variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
@@ -903,7 +882,7 @@ export const BsvWallet = () => {
             showPointer={true}
             onClick={() => setPageState('send')}
           />
-          <Show when={services.mnee && !isTestnet}>
+          <Show when={services.mnee}>
             <AssetRow
               balance={mneeBalance}
               icon={MNEE_ICON_URL}
@@ -987,7 +966,7 @@ export const BsvWallet = () => {
       balance: bsvBalance,
       usdBalance: bsvBalance * exchangeRate,
     },
-    ...(services.mnee && !isTestnet
+    ...(services.mnee
       ? [
           {
             kind: 'mnee' as const,

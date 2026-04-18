@@ -20,7 +20,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { SupportedWalletImports } from '../../services/types/keys.types';
-import { NetWork } from 'yours-wallet-provider';
 import { SettingsPage } from '../Settings';
 import { YoursIcon } from '../../components/YoursIcon';
 import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
@@ -82,7 +81,6 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
       const keys = await keysService.generateSeedAndStoreEncrypted(
         password,
         newWallet,
-        NetWork.Mainnet,
         seedWords,
         walletDerivation,
         ordDerivation,

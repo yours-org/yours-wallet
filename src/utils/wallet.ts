@@ -1,14 +1,14 @@
-import { WOC_MAINNET_URL, WOC_TESTNET_URL, EXCHANGE_RATE_CACHE_TTL } from '@1sat/actions';
+import { WOC_MAINNET_URL, EXCHANGE_RATE_CACHE_TTL } from '@1sat/actions';
 import { sendMessageAsync } from './chromeHelpers';
 import { YoursEventName } from '../inject';
 
 let exchangeRateCache: { rate: number; timestamp: number } | null = null;
 
-export async function fetchExchangeRate(chain: 'main' | 'test', wocApiKey?: string): Promise<number> {
+export async function fetchExchangeRate(chain: string, wocApiKey?: string): Promise<number> {
   if (exchangeRateCache && Date.now() - exchangeRateCache.timestamp < EXCHANGE_RATE_CACHE_TTL) {
     return exchangeRateCache.rate;
   }
-  const baseUrl = chain === 'main' ? WOC_MAINNET_URL : WOC_TESTNET_URL;
+  const baseUrl = WOC_MAINNET_URL;
   const headers: Record<string, string> = {};
   if (wocApiKey) headers['woc-api-key'] = wocApiKey;
   try {

@@ -1,17 +1,13 @@
 import { NetWork } from 'yours-wallet-provider';
 
 export const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv/main';
-export const WOC_TESTNET_BASE_URL = 'https://api.whatsonchain.com/v1/bsv/test';
 export const URL_WHATSONCHAIN = 'https://whatsonchain.com/tx/';
-export const URL_WHATSONCHAIN_TESTNET = 'https://test.whatsonchain.com/tx/';
 
 export const GP_BASE_URL = 'https://ordinals.gorillapool.io';
 export const JUNGLE_BUS_URL = 'https://junglebus.gorillapool.io';
-export const GP_TESTNET_BASE_URL = 'https://testnet.ordinals.gorillapool.io';
 export const GORILLA_POOL_ARC_URL = 'https://arc.gorillapool.io/v1';
 
 export const MAINNET_ADDRESS_PREFIX = 0x00;
-export const TESTNET_ADDRESS_PREFIX = 0x6f;
 export const BSV_DECIMAL_CONVERSION = 100000000;
 export const FEE_PER_KB = 100;
 export const MAX_BYTES_PER_TX = 50000000; // 50MB;

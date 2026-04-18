@@ -1,7 +1,6 @@
 import { Theme } from '../theme.types';
 import { MenuItems } from '../contexts/BottomMenuContext';
 import { Show } from './Show';
-import { NetWork } from 'yours-wallet-provider';
 import { Wallet, Layers, Wrench, Settings, LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -9,7 +8,6 @@ export type BottomMenuProps = {
   selected: MenuItems | null;
   handleSelect: (item: MenuItems) => void;
   theme: Theme;
-  network: NetWork;
 };
 
 export type MenuProps = {
@@ -118,7 +116,6 @@ export const BottomMenu = (props: BottomMenuProps) => {
         icon={Settings}
         onClick={() => handleSelect('settings')}
         isSelected={active === 'settings'}
-        badge={props.network === 'testnet' ? 'test' : undefined}
       />
     </div>
   );

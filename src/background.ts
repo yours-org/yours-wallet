@@ -716,7 +716,7 @@ if (isInServiceWorker) {
               );
             }
           }
-          sendResponse({ success: true });
+          sendResponse({ type: 'UPDATE_FEE_RATE', success: true });
           return true;
         }
         case 'PERMISSIONS_LIST_ALL':
@@ -1410,8 +1410,7 @@ if (isInServiceWorker) {
         return;
       }
 
-      const network = chromeStorageService.getNetwork();
-      const chain = network === 'mainnet' ? 'main' : 'test';
+      const chain = 'main' as const;
       const { account } = chromeStorageService.getCurrentAccountObject();
       const identityKey = account?.pubKeys?.identityPubKey || '';
 
@@ -1432,7 +1431,7 @@ if (isInServiceWorker) {
       const blob = await WalletBackupService.exportToFile(
         storage,
         chromeStorageService,
-        chain as 'main' | 'test',
+        chain,
         identityKey,
         (event) => {
           console.log('[MasterBackup]', event.message);

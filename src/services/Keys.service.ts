@@ -4,7 +4,6 @@ import {
   DEFAULT_TWETCH_WALLET_PATH,
   DEFAULT_ACCOUNT,
   MAINNET_ADDRESS_PREFIX,
-  TESTNET_ADDRESS_PREFIX,
   SWEEP_PATH,
   WOC_BASE_URL,
   CHROME_STORAGE_OBJECT_VERSION,
@@ -37,13 +36,7 @@ export class KeysService {
     this.identityPubKey = '';
   }
 
-  private storeEncryptedKeys = async (
-    passKey: string,
-    salt: string,
-    keys: Keys,
-    encryptedKeys: string,
-    network: NetWork,
-  ) => {
+  private storeEncryptedKeys = async (passKey: string, salt: string, keys: Keys, encryptedKeys: string) => {
     const currentChromeObj = await this.chromeStorageService.getAndSetStorage();
     const totalAccounts = this.chromeStorageService.getAllAccounts().length;
     const accountNumber = currentChromeObj?.accountNumber ? currentChromeObj.accountNumber + 1 : totalAccounts + 1;
@@ -60,7 +53,7 @@ export class KeysService {
     const update: Partial<ChromeStorageObject['accounts']> = {
       [keys.identityAddress]: {
         ...DEFAULT_ACCOUNT,
-        network,
+        network: NetWork.Mainnet,
         name: `Account ${accountNumber}`,
         addresses: {
           bsvAddress: keys.walletAddress,
@@ -97,7 +90,6 @@ export class KeysService {
   generateSeedAndStoreEncrypted = async (
     password: string,
     isNewWallet: boolean,
-    network: NetWork = NetWork.Mainnet,
     mnemonic?: string,
     walletDerivation: string | null = null,
     ordDerivation: string | null = null,
@@ -114,12 +106,12 @@ export class KeysService {
         break;
     }
 
-    const keys = getKeys(network, mnemonic, walletDerivation, ordDerivation, identityDerivation);
+    const keys = getKeys(mnemonic, walletDerivation, ordDerivation, identityDerivation);
     if (mnemonic) {
       this.sweepLegacy(keys);
     }
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
-    await this.storeEncryptedKeys(passKey, salt, keys, encryptedKeys, network);
+    await this.storeEncryptedKeys(passKey, salt, keys, encryptedKeys);
     return keys;
   };
 
@@ -222,7 +214,7 @@ export class KeysService {
     const { passKey, salt } = await this.getPassKeyAndSalt(password, isNewWallet);
     const keys = getKeysFromWifs(wifs);
     const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
-    await this.storeEncryptedKeys(passKey, salt, keys as Keys, encryptedKeys, NetWork.Mainnet);
+    await this.storeEncryptedKeys(passKey, salt, keys as Keys, encryptedKeys);
     return keys;
   };
 
@@ -230,7 +222,6 @@ export class KeysService {
     const accountObj = this.chromeStorageService.getCurrentAccountObject();
     const { account, passKey } = accountObj;
     if (!account) throw new Error('No account found!');
-    if (!account.network) throw new Error('No network found!');
     const { encryptedKeys } = account;
     try {
       if (!encryptedKeys || !passKey) throw new Error('No keys found!');
@@ -238,11 +229,11 @@ export class KeysService {
       const keys: Keys = JSON.parse(d);
 
       const walletAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.walletAddress).data as number[], [
-        account.network === NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+        MAINNET_ADDRESS_PREFIX,
       ]);
 
       const ordAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.ordAddress).data as number[], [
-        account.network === NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+        MAINNET_ADDRESS_PREFIX,
       ]);
 
       this.bsvAddress = walletAddr;
@@ -253,7 +244,7 @@ export class KeysService {
       // identity address not available with wif or 1sat import
       if (keys.identityAddress) {
         const identityAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.identityAddress).data as number[], [
-          account.network === NetWork.Mainnet ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+          MAINNET_ADDRESS_PREFIX,
         ]);
 
         this.identityAddress = identityAddr;

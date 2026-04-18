@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@1sat/actions": "0.0.95",
+    "@1sat/actions": "0.0.96",
     "@1sat/client": "0.0.21",
     "@1sat/connect": "0.0.32",
-    "@1sat/sweep-ui": "0.0.30",
+    "@1sat/sweep-ui": "0.0.31",
     "@1sat/templates": "0.0.8",
     "@1sat/types": "0.0.17",
     "@1sat/utils": "0.0.14",

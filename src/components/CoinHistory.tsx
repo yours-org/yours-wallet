@@ -1,11 +1,10 @@
 import { motion } from 'framer-motion';
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, ExternalLink, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { NetWork } from 'yours-wallet-provider';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
 import { useTheme } from '../hooks/useTheme';
-import { URL_WHATSONCHAIN, URL_WHATSONCHAIN_TESTNET } from '../utils/constants';
+import { URL_WHATSONCHAIN } from '../utils/constants';
 import { fetchBsv21History, fetchBsvHistory, fetchMneeHistory, type CoinTxSummary } from '../utils/coinHistory';
 import { truncate } from '../utils/format';
 import { Show } from './Show';
@@ -46,8 +45,7 @@ export const CoinHistory = ({ filter, pageSize = 25, refreshKey }: CoinHistoryPr
     rootMargin: '120px',
   });
 
-  const isTestnet = chromeStorageService.getNetwork() === NetWork.Testnet;
-  const wocBaseUrl = isTestnet ? URL_WHATSONCHAIN_TESTNET : URL_WHATSONCHAIN;
+  const wocBaseUrl = URL_WHATSONCHAIN;
 
   const contrast = theme.color.global.contrast;
   const gray = theme.color.global.gray;

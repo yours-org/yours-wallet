@@ -1,4 +1,3 @@
-import { NetWork } from 'yours-wallet-provider';
 import {
   createWebWallet,
   type WebWalletConfig,
@@ -15,9 +14,6 @@ import type { Account } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
 import { initSyncContext, type SyncContext } from './initSyncContext';
-
-// Type alias for chain
-type Chain = 'main' | 'test';
 
 // Admin originator for the extension (bypasses all permission checks)
 // Uses chrome-extension://<id> format to match what ChromeCWI sends
@@ -83,15 +79,14 @@ export const initWallet = async (
     throw new Error('No identity key found in decrypted keys');
   }
 
-  const network = chromeStorageService.getNetwork();
-  const chain: Chain = network === NetWork.Mainnet ? 'main' : 'test';
+  const chain = 'main' as const;
 
   // 2. Create wallet using browser factory
   const walletConfig: WebWalletConfig = {
     privateKey: keys.identityWif,
     chain,
     feeModel: { model: 'sat/kb', value: chromeStorageService.getCustomFeeRate() },
-    activeRemote: chain === 'main' ? 'https://api.1sat.app/1sat/wallet' : 'https://testnet.api.1sat.app/1sat/wallet',
+    activeRemote: 'https://api.1sat.app/1sat/wallet',
     storageIdentityKey: 'yours-wallet',
   };
 

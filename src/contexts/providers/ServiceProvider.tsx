@@ -6,7 +6,6 @@ import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import { createContext, syncAddresses } from '@1sat/actions';
 import { fetchExchangeRate } from '../../utils/wallet';
 import { createChromeCWI, OneSatServices, YOURS_PREFIX } from '@1sat/wallet-browser';
-import { NetWork } from 'yours-wallet-provider';
 
 const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();
@@ -16,8 +15,7 @@ const initializeServices = async () => {
 
   // Create context using ChromeCWI (communicates with service worker via chrome.runtime.sendMessage)
   const chromeCWI = createChromeCWI();
-  const network = chromeStorageService.getNetwork();
-  const chain = network === NetWork.Mainnet ? 'main' : 'test';
+  const chain = 'main' as const;
   const services = new OneSatServices(chain);
   const apiContext = createContext(chromeCWI, { chain, services });
 

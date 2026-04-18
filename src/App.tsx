@@ -108,7 +108,7 @@ export const App = () => {
     >
       <BlockHeightProvider>
         <SyncProvider>
-          <BottomMenuProvider network={chromeStorageService.getNetwork()}>
+          <BottomMenuProvider>
             <div
               className="flex items-center justify-center w-full h-full relative"
               style={{ backgroundColor: walletBg }}

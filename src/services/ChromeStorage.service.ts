@@ -11,7 +11,6 @@ import {
   HOSTED_YOURS_IMAGE,
   INACTIVITY_LIMIT,
   MAINNET_ADDRESS_PREFIX,
-  TESTNET_ADDRESS_PREFIX,
 } from '../utils/constants';
 import { decrypt, deriveKey } from '../utils/crypto';
 import { Keys } from '../utils/keys';
@@ -154,25 +153,25 @@ export class ChromeStorageService {
   };
 
   private retrieveKeysFromOldStorage(storage: Partial<DeprecatedStorage>): Partial<Keys> | undefined {
-    const { encryptedKeys, passKey, network } = storage;
+    const { encryptedKeys, passKey } = storage;
     try {
       if (!encryptedKeys || !passKey) return;
       const d = decrypt(encryptedKeys, passKey);
       const keys: Keys = JSON.parse(d);
 
       const walletAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.walletAddress).data as number[], [
-        network === NetWork.Mainnet || !network ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+        MAINNET_ADDRESS_PREFIX,
       ]);
 
       const ordAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.ordAddress).data as number[], [
-        network === NetWork.Mainnet || !network ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+        MAINNET_ADDRESS_PREFIX,
       ]);
 
       let identityAddr = '';
       let identityPubKey = '';
       if (keys.identityAddress) {
         identityAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.identityAddress).data as number[], [
-          network === NetWork.Mainnet || !network ? MAINNET_ADDRESS_PREFIX : TESTNET_ADDRESS_PREFIX,
+          MAINNET_ADDRESS_PREFIX,
         ]);
 
         identityPubKey = keys.identityPubKey;

@@ -1,16 +1,14 @@
 import { ReactNode, useState } from 'react';
-import { NetWork } from 'yours-wallet-provider';
 import { BottomMenu } from '../../components/BottomMenu';
 import { useTheme } from '../../hooks/useTheme';
 import { BottomMenuContext, MenuItems } from '../BottomMenuContext';
 
 interface BottomMenuProviderProps {
-  network: NetWork;
   children: ReactNode;
 }
 
 export const BottomMenuProvider = (props: BottomMenuProviderProps) => {
-  const { children, network } = props;
+  const { children } = props;
   const { theme } = useTheme();
   const [selected, setSelected] = useState<MenuItems | null>(null);
   const [query, setQuery] = useState('');
@@ -45,7 +43,7 @@ export const BottomMenuProvider = (props: BottomMenuProviderProps) => {
         query,
       }}
     >
-      {isVisible && <BottomMenu theme={theme} network={network} handleSelect={handleSelect} selected={selected} />}
+      {isVisible && <BottomMenu theme={theme} handleSelect={handleSelect} selected={selected} />}
       {children}
     </BottomMenuContext.Provider>
   );

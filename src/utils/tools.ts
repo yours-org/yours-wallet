@@ -1,4 +1,4 @@
-import { LockRequest, NetWork, SendBsv, TransactionFormat } from 'yours-wallet-provider';
+import { LockRequest, SendBsv, TransactionFormat } from 'yours-wallet-provider';
 import { Script, Transaction, Utils } from '@bsv/sdk';
 import {
   Bsv21Indexer,
@@ -16,29 +16,12 @@ import {
   type Txo,
 } from '@1sat/wallet-browser';
 import type { OneSatContext } from '@1sat/actions';
-import { LOCKUP_PREFIX, LOCKUP_SUFFIX, MAINNET_ADDRESS_PREFIX, TESTNET_ADDRESS_PREFIX } from './constants';
+import { LOCKUP_PREFIX, LOCKUP_SUFFIX } from './constants';
 
 export const getCurrentUtcTimestamp = (): number => {
   const currentDate = new Date();
   const utcTimestamp = currentDate.getTime();
   return Math.floor(utcTimestamp);
-};
-
-export const isAddressOnRightNetwork = (network: NetWork, address: string) => {
-  switch (network) {
-    case NetWork.Mainnet:
-      return address.startsWith('1');
-    case NetWork.Testnet:
-      return !address.startsWith('1');
-  }
-};
-
-export const convertAddressToTestnet = (address: string) => {
-  return Utils.toBase58Check(Utils.fromBase58Check(address).data as number[], [TESTNET_ADDRESS_PREFIX]);
-};
-
-export const convertAddressToMainnet = (address: string) => {
-  return Utils.toBase58Check(Utils.fromBase58Check(address).data as number[], [MAINNET_ADDRESS_PREFIX]);
 };
 
 export const isValidEmail = (email: string) => {
@@ -67,7 +50,7 @@ export const getTxFromRawTxFormat = (rawTx: string | number[], format: Transacti
 export const parseRawTransaction = async (tx: Transaction, apiContext: OneSatContext): Promise<ParseContext> => {
   const services = apiContext.services;
   if (!services) throw new Error('services unavailable');
-  const network: 'mainnet' | 'testnet' = apiContext.chain === 'main' ? 'mainnet' : 'testnet';
+  const network = 'mainnet' as const;
 
   // Hydrate source transactions (needed so inputs can be decoded into spends)
   for (const input of tx.inputs) {

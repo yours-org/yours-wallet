@@ -10,8 +10,6 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
-import { ToggleSwitch } from '../../components/ToggleSwitch';
-import { NetWork } from 'yours-wallet-provider';
 import { useNavigate } from 'react-router-dom';
 import { YoursIcon } from '../../components/YoursIcon';
 import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
@@ -33,7 +31,6 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
   const { theme } = useTheme();
   const navigate = useNavigate();
   const { addSnackbar } = useSnackbar();
-  const [network, setNetwork] = useState<NetWork>(NetWork.Mainnet);
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [step, setStep] = useState(1);
@@ -69,7 +66,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
 
       await sleep(50);
 
-      const keys = await keysService.generateSeedAndStoreEncrypted(password, newWallet, network);
+      const keys = await keysService.generateSeedAndStoreEncrypted(password, newWallet);
 
       if (!keys?.mnemonic) {
         addSnackbar('An error occurred while creating the wallet!', 'error');
@@ -188,18 +185,6 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
         </Show>
-
-        {/* Network toggle */}
-        <div className="flex items-center w-[87%] mt-3 mb-5 gap-3">
-          <ToggleSwitch
-            theme={theme}
-            on={network === NetWork.Testnet}
-            onChange={() => setNetwork(network === NetWork.Mainnet ? NetWork.Testnet : NetWork.Mainnet)}
-          />
-          <span className="text-xs text-left" style={{ color: gray }}>
-            {network === NetWork.Testnet ? 'Turn off for mainnet account' : 'Turn on for testnet account'}
-          </span>
-        </div>
 
         <Button
           theme={theme}

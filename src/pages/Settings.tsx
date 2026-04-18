@@ -16,6 +16,11 @@ import {
   HardDrive,
   Pencil,
   Plus,
+  Fingerprint,
+  Loader2,
+  Copy,
+  Check,
+  Camera,
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -24,13 +29,14 @@ import { Show } from '../components/Show';
 import { SpeedBump } from '../components/SpeedBump';
 import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
-import { useSocialProfile } from '../hooks/useSocialProfile';
+import { useIdentity } from '../hooks/useIdentity';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
 import { FEE_PER_KB } from '../utils/constants';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { AvatarPicker } from '../components/AvatarPicker';
 import { CreateAccount } from './onboarding/CreateAccount';
 import { RestoreAccount } from './onboarding/RestoreAccount';
 import { ImportAccount } from './onboarding/ImportAccount';
@@ -49,13 +55,20 @@ export type SettingsPage =
   | 'import-wif'
   | 'account-list'
   | 'edit-account'
-  | 'social-profile'
+  | 'identity'
   | 'export-keys-options'
   | 'export-keys-qr'
   | 'storage'
   | 'permissions';
 
-type DecisionType = 'sign-out' | 'export-master-backup' | 'export-keys' | 'export-keys-qr-code' | 'delete-account';
+type DecisionType =
+  | 'sign-out'
+  | 'export-master-backup'
+  | 'export-keys'
+  | 'export-keys-qr-code'
+  | 'delete-account'
+  | 'inscribe-avatar'
+  | 'save-profile';
 
 // --- Animation variants ---
 const pageVariants = {
@@ -168,7 +181,7 @@ export const Settings = () => {
   const { addSnackbar } = useSnackbar();
   const { query, handleSelect } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
-  const { chromeStorageService, keysService, lockWallet, wallet } = useServiceContext();
+  const { chromeStorageService, keysService, lockWallet, wallet, apiContext } = useServiceContext();
   const [page, setPage] = useState<SettingsPage>(() => {
     if (query === 'manage-accounts') return 'manage-accounts';
     if (query === 'create-account') return 'create-account';
@@ -177,13 +190,21 @@ export const Settings = () => {
   });
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
-  const { socialProfile, storeSocialProfile } = useSocialProfile(chromeStorageService);
+  const identity = useIdentity(apiContext, chromeStorageService);
   const [exportKeysQrData, setExportKeysAsQrData] = useState('');
   const [shouldVisibleExportedKeys, setShouldVisibleExportedKeys] = useState(false);
-  const [enteredSocialDisplayName, setEnteredSocialDisplayName] = useState(socialProfile.displayName);
+  const [enteredName, setEnteredName] = useState(identity.profile.name);
+  const [enteredImage, setEnteredImage] = useState(identity.profile.image);
+  const [enteredDescription, setEnteredDescription] = useState(identity.profile.description);
   const [enteredAccountName, setEnteredAccountName] = useState('');
   const [enteredAccountIcon, setEnteredAccountIcon] = useState('');
-  const [enteredSocialAvatar, setEnteredSocialAvatar] = useState(socialProfile?.avatar);
+  const [copiedBapId, setCopiedBapId] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [pendingAvatar, setPendingAvatar] = useState<{ base64: string; mimeType: string; byteSize: number } | null>(
+    null,
+  );
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [masterBackupProgress, setMasterBackupProgress] = useState(0);
   const [masterBackupEventText, setMasterBackupEventText] = useState('');
   const currentAccount = chromeStorageService.getCurrentAccountObject();
@@ -235,12 +256,75 @@ export const Settings = () => {
     setShowSpeedBump(true);
   };
 
-  const handleSocialProfileSave = () => {
-    storeSocialProfile({
-      displayName: enteredSocialDisplayName,
-      avatar: enteredSocialAvatar,
+  const handleAvatarUpload = async (file: File) => {
+    setShowAvatarPicker(false);
+    // Show local preview immediately
+    setAvatarPreview(URL.createObjectURL(file));
+    // Prepare the image (resize) and show cost confirmation
+    try {
+      const prepared = await identity.prepareAvatar(file);
+      setPendingAvatar(prepared);
+      const estimatedSats = prepared.byteSize + 200;
+      setDecisionType('inscribe-avatar');
+      setSpeedBumpMessage(
+        `Inscribing your avatar will cost approximately ${estimatedSats.toLocaleString()} sats. Proceed?`,
+      );
+      setShowSpeedBump(true);
+    } catch {
+      addSnackbar('Failed to process image', 'error');
+      setAvatarPreview(null);
+    }
+  };
+
+  const handleAvatarSelectExisting = (url: string) => {
+    setShowAvatarPicker(false);
+    setEnteredImage(url);
+    setAvatarPreview(null);
+  };
+
+  const handleConfirmAvatarInscribe = async () => {
+    if (!pendingAvatar) return;
+    setAvatarUploading(true);
+    const res = await identity.inscribeAvatar(pendingAvatar.base64, pendingAvatar.mimeType);
+    setAvatarUploading(false);
+    setPendingAvatar(null);
+    if (res.error) {
+      addSnackbar(res.error, 'error');
+      setAvatarPreview(null);
+    } else if (res.url) {
+      setEnteredImage(res.url);
+      addSnackbar('Avatar inscribed on-chain', 'success');
+    }
+  };
+
+  const handleSaveProfileIntent = () => {
+    setDecisionType('save-profile');
+    setSpeedBumpMessage(
+      identity.isPublished
+        ? 'Updating your profile will broadcast a transaction. A small fee will be deducted from your wallet.'
+        : 'This will create your on-chain identity and save your profile. A small fee will be deducted from your wallet.',
+    );
+    setShowSpeedBump(true);
+  };
+
+  const handleSaveProfile = async () => {
+    const res = await identity.saveProfile({
+      name: enteredName,
+      image: enteredImage,
+      description: enteredDescription,
     });
-    setPage('main');
+    if (res.error) {
+      addSnackbar(res.error, 'error');
+    } else {
+      addSnackbar('Profile saved on-chain', 'success');
+    }
+  };
+
+  const handleCopyBapId = () => {
+    if (!identity.bapId) return;
+    navigator.clipboard.writeText(identity.bapId);
+    setCopiedBapId(true);
+    setTimeout(() => setCopiedBapId(false), 2000);
   };
 
   const handleAccountEditSave = async () => {
@@ -286,10 +370,12 @@ export const Settings = () => {
   };
 
   useEffect(() => {
-    if (!socialProfile) return;
-    setEnteredSocialDisplayName(socialProfile.displayName);
-    setEnteredSocialAvatar(socialProfile.avatar);
-  }, [socialProfile]);
+    if (identity.loading || identity.error) return;
+    setEnteredName(identity.profile.name);
+    setEnteredImage(identity.profile.image);
+    setEnteredDescription(identity.profile.description);
+    setAvatarPreview(null);
+  }, [identity.loading, identity.error, identity.profile]);
 
   const exportKeys = async (password: string) => {
     const keys = await keysService.retrieveKeys(password);
@@ -349,6 +435,10 @@ export const Settings = () => {
 
   const handleCancel = () => {
     setShowSpeedBump(false);
+    if (decisionType === 'inscribe-avatar') {
+      setAvatarPreview(null);
+      setPendingAvatar(null);
+    }
   };
 
   const handleSpeedBumpConfirm = async (password?: string) => {
@@ -374,6 +464,16 @@ export const Settings = () => {
     }
     if (decisionType === 'export-keys-qr-code' && password) {
       exportKeysAsQrCode(password);
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+    }
+    if (decisionType === 'inscribe-avatar') {
+      handleConfirmAvatarInscribe();
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+    }
+    if (decisionType === 'save-profile') {
+      handleSaveProfile();
       setDecisionType(undefined);
       setShowSpeedBump(false);
     }
@@ -472,7 +572,7 @@ export const Settings = () => {
       <Section title="Security">
         <SettingRow
           icon={<Key size={16} />}
-          label="Export Keys"
+          label="Wallet Backup"
           description="Backup seed, download JSON, or QR code"
           onClick={() => setPage('export-keys-options')}
           isFirst
@@ -483,10 +583,10 @@ export const Settings = () => {
       {/* Preferences section */}
       <Section title="Preferences">
         <SettingRow
-          icon={<UserCircle size={16} />}
-          label="Social Profile"
-          description="Display name and avatar"
-          onClick={() => setPage('social-profile')}
+          icon={<Fingerprint size={16} />}
+          label="Identity"
+          description="On-chain BAP identity and profile"
+          onClick={() => setPage('identity')}
           isFirst
         />
         <Divider />
@@ -525,8 +625,8 @@ export const Settings = () => {
         />
       </Section>
 
-      {/* Advanced section */}
-      <Section title="Advanced">
+      {/* Danger Zone */}
+      <Section title="Danger Zone">
         <SettingRow
           icon={<Lock size={16} />}
           label="Lock Wallet"
@@ -536,17 +636,6 @@ export const Settings = () => {
           isLast
         />
         <Divider />
-        <SettingRow
-          icon={<Database size={16} />}
-          label="Storage"
-          description="View storage status and remote sync"
-          onClick={() => setPage('storage')}
-          isLast
-        />
-      </Section>
-
-      {/* Danger Zone */}
-      <Section title="Danger Zone">
         <SettingRow
           icon={<LogOut size={16} />}
           label="Sign Out"
@@ -653,9 +742,41 @@ export const Settings = () => {
       exit="exit"
       className="w-full px-4 pb-4"
     >
-      <SubPageHeader title="Export Keys" onBack={() => setPage('main')} />
-      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full">
-        <Section title="Backup Options">
+      <SubPageHeader title="Wallet Backup" onBack={() => setPage('main')} />
+      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-4">
+        {/* Remote Backup — featured card */}
+        <motion.div variants={rowVariant}>
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setPage('storage')}
+            className="w-full rounded-xl p-4 text-left border-0 outline-none cursor-pointer"
+            style={{
+              background: 'linear-gradient(135deg, rgba(161,255,139,0.08), rgba(52,211,153,0.04))',
+              border: '1px solid rgba(161,255,139,0.15)',
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(161,255,139,0.12)' }}
+              >
+                <Database size={18} color="#A1FF8B" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold" style={{ color: '#FFFFFF' }}>
+                  Remote Backup
+                </p>
+                <p className="text-[10px] mt-0.5" style={{ color: '#98A2B3' }}>
+                  Your wallet is automatically backed up. Manage storage, upgrade, or change providers.
+                </p>
+              </div>
+              <ChevronRight size={16} style={{ color: '#98A2B3' }} />
+            </div>
+          </motion.button>
+        </motion.div>
+
+        {/* Manual backup options */}
+        <Section title="Manual Backup">
           <motion.div variants={rowVariant}>
             {masterBackupEventText ? (
               <div className="px-4 py-3" style={{ backgroundColor: '#17191E' }}>
@@ -720,77 +841,138 @@ export const Settings = () => {
     </motion.div>
   );
 
-  const socialProfilePage = (
+  const avatarSrc = avatarPreview || enteredImage;
+
+  const identityPage = (
     <motion.div
-      key="social-profile"
+      key="identity"
       variants={pageVariants}
       initial="initial"
       animate="animate"
       exit="exit"
       className="w-full px-4 pb-4"
     >
-      <SubPageHeader title="Social Profile" onBack={() => setPage('main')} />
+      <SubPageHeader title="Identity" onBack={() => setPage('main')} />
 
-      {/* Avatar preview */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.05 }}
-        className="flex flex-col items-center mb-6"
-      >
-        <div
-          className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center"
-          style={{
-            background: enteredSocialAvatar ? undefined : 'linear-gradient(135deg, #A1FF8B, #34D399)',
-            border: '2px solid rgba(161,255,139,0.3)',
-          }}
-        >
-          {enteredSocialAvatar ? (
-            <img src={enteredSocialAvatar} className="w-full h-full object-cover" alt="Avatar" />
-          ) : (
-            <UserCircle size={32} color="#010101" />
-          )}
+      {identity.loading && !identity.bapId ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 size={24} className="animate-spin" style={{ color: '#98A2B3' }} />
         </div>
-        <p className="text-sm font-semibold mt-2" style={{ color: '#FFFFFF' }}>
-          {enteredSocialDisplayName || 'Your Name'}
-        </p>
-      </motion.div>
+      ) : (
+        <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-3">
+          {/* Intro text for first-time users */}
+          {!identity.isPublished && (
+            <motion.p
+              variants={rowVariant}
+              className="text-xs text-center"
+              style={{ color: '#98A2B3', lineHeight: 1.5 }}
+            >
+              Set up your on-chain identity so apps and other users can recognize you. Your profile is stored
+              permanently on the blockchain.
+            </motion.p>
+          )}
 
-      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-4">
-        <motion.div variants={rowVariant}>
-          <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#98A2B3' }}>
-            Display Name
-          </label>
-          <Input
-            theme={theme}
-            placeholder="Display Name"
-            type="text"
-            onChange={(e) => setEnteredSocialDisplayName(e.target.value)}
-            value={enteredSocialDisplayName}
-          />
+          {/* Avatar — tap to pick */}
+          <motion.div variants={rowVariant} className="flex flex-col items-center">
+            <button
+              onClick={() => setShowAvatarPicker(true)}
+              className="relative cursor-pointer group"
+              disabled={avatarUploading}
+            >
+              <div
+                className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center"
+                style={{
+                  background: avatarSrc ? undefined : 'linear-gradient(135deg, #A1FF8B, #34D399)',
+                  border: '2px solid rgba(161,255,139,0.3)',
+                }}
+              >
+                {avatarSrc ? (
+                  <img src={avatarSrc} className="w-full h-full object-cover" alt="Avatar" />
+                ) : (
+                  <UserCircle size={36} color="#010101" />
+                )}
+                {avatarUploading && (
+                  <div className="absolute inset-0 rounded-full flex items-center justify-center bg-black/60">
+                    <Loader2 size={20} className="animate-spin" style={{ color: '#fff' }} />
+                  </div>
+                )}
+              </div>
+              <div
+                className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full flex items-center justify-center"
+                style={{ background: '#1D2939', border: '2px solid #010101' }}
+              >
+                <Camera size={12} style={{ color: '#D0D5DD' }} />
+              </div>
+            </button>
+            <p className="text-[10px] mt-1.5" style={{ color: '#667085' }}>
+              Tap to change
+            </p>
+          </motion.div>
+
+          {/* Name */}
+          <motion.div variants={rowVariant} className="w-full">
+            <Input
+              theme={theme}
+              placeholder="Your name"
+              type="text"
+              onChange={(e) => setEnteredName(e.target.value)}
+              value={enteredName}
+            />
+          </motion.div>
+
+          {/* Bio */}
+          <motion.div variants={rowVariant} className="w-full">
+            <Input
+              theme={theme}
+              placeholder="A short bio..."
+              type="text"
+              onChange={(e) => setEnteredDescription(e.target.value)}
+              value={enteredDescription}
+            />
+          </motion.div>
+
+          {identity.error && (
+            <p className="text-xs text-center" style={{ color: '#F97066' }}>
+              {identity.error}
+            </p>
+          )}
+
+          {/* Save */}
+          <motion.div variants={rowVariant} className="w-full pb-6">
+            <Button
+              theme={theme}
+              type="primary"
+              label={identity.isPublished ? 'Update Profile' : 'Create Identity'}
+              onClick={handleSaveProfile}
+              loading={identity.loading}
+              disabled={avatarUploading}
+            />
+            <p className="text-[10px] text-center mt-1.5" style={{ color: '#667085' }}>
+              This will broadcast a small transaction
+            </p>
+          </motion.div>
+
+          {/* BAP ID — small footer for published identities */}
+          {identity.bapId && identity.isPublished && (
+            <motion.div variants={rowVariant} className="flex items-center justify-center gap-1.5 pt-1">
+              <Fingerprint size={10} style={{ color: '#475467' }} />
+              <span
+                className="text-[10px] font-mono cursor-pointer"
+                style={{ color: '#475467' }}
+                onClick={handleCopyBapId}
+                title="Copy BAP ID"
+              >
+                {identity.bapId.slice(0, 10)}...{identity.bapId.slice(-6)}
+              </span>
+              {copiedBapId ? (
+                <Check size={10} style={{ color: '#34D399' }} />
+              ) : (
+                <Copy size={10} style={{ color: '#475467' }} />
+              )}
+            </motion.div>
+          )}
         </motion.div>
-        <motion.div variants={rowVariant}>
-          <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#98A2B3' }}>
-            Avatar URL
-          </label>
-          <Input
-            theme={theme}
-            placeholder="https://..."
-            type="text"
-            onChange={(e) => setEnteredSocialAvatar(e.target.value)}
-            value={enteredSocialAvatar}
-          />
-        </motion.div>
-        <motion.div variants={rowVariant}>
-          <Button
-            theme={theme}
-            type="primary"
-            label="Save"
-            style={{ marginTop: '0.5rem' }}
-            onClick={handleSocialProfileSave}
-          />
-        </motion.div>
-      </motion.div>
+      )}
     </motion.div>
   );
 
@@ -895,122 +1077,133 @@ export const Settings = () => {
   );
 
   return (
-    <Show
-      when={!showSpeedBump}
-      whenFalseContent={
-        <SpeedBump
-          theme={theme}
-          message={speedBumpMessage}
-          onCancel={handleCancel}
-          onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
-          showSpeedBump={showSpeedBump}
-          withPassword={
-            decisionType === 'delete-account' ||
-            decisionType === 'export-keys' ||
-            decisionType === 'export-keys-qr-code' ||
-            decisionType === 'export-master-backup'
-          }
-        />
-      }
-    >
-      <div
-        className="flex flex-col items-center w-full overflow-x-hidden"
-        style={{
-          backgroundColor: '#010101',
-          minHeight: '100%',
-          height: 'calc(75%)',
-          overflowY: 'auto',
-        }}
+    <>
+      <Show
+        when={!showSpeedBump}
+        whenFalseContent={
+          <SpeedBump
+            theme={theme}
+            message={speedBumpMessage}
+            onCancel={handleCancel}
+            onConfirm={(password?: string) => handleSpeedBumpConfirm(password)}
+            showSpeedBump={showSpeedBump}
+            withPassword={
+              decisionType === 'delete-account' ||
+              decisionType === 'export-keys' ||
+              decisionType === 'export-keys-qr-code' ||
+              decisionType === 'export-master-backup'
+            }
+          />
+        }
       >
-        <TopNav />
+        <div
+          className="flex flex-col items-center w-full overflow-x-hidden"
+          style={{
+            backgroundColor: '#010101',
+            minHeight: '100%',
+            height: 'calc(75%)',
+            overflowY: 'auto',
+          }}
+        >
+          <TopNav />
 
-        {/* Page spacer for fixed TopNav */}
-        <div className="h-14 w-full flex-shrink-0" />
+          {/* Page spacer for fixed TopNav */}
+          <div className="h-14 w-full flex-shrink-0" />
 
-        {/* Page transitions */}
-        <AnimatePresence mode="wait">
-          {page === 'main' && mainPage}
+          {/* Page transitions */}
+          <AnimatePresence mode="wait">
+            {page === 'main' && mainPage}
 
-          {page === 'manage-accounts' && manageAccountsPage}
+            {page === 'manage-accounts' && manageAccountsPage}
 
-          {page === 'create-account' && (
-            <motion.div
-              key="create-account"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="w-full pb-4"
-            >
-              <CreateAccount onNavigateBack={() => setPage('manage-accounts')} />
-            </motion.div>
-          )}
+            {page === 'create-account' && (
+              <motion.div
+                key="create-account"
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="w-full pb-4"
+              >
+                <CreateAccount onNavigateBack={() => setPage('manage-accounts')} />
+              </motion.div>
+            )}
 
-          {page === 'restore-account' && (
-            <motion.div
-              key="restore-account"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="w-full pb-4"
-            >
-              <RestoreAccount onNavigateBack={(p: SettingsPage) => setPage(p)} />
-            </motion.div>
-          )}
+            {page === 'restore-account' && (
+              <motion.div
+                key="restore-account"
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="w-full pb-4"
+              >
+                <RestoreAccount onNavigateBack={(p: SettingsPage) => setPage(p)} />
+              </motion.div>
+            )}
 
-          {page === 'import-wif' && (
-            <motion.div
-              key="import-wif"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="w-full pb-4"
-            >
-              <ImportAccount onNavigateBack={() => setPage('restore-account')} />
-            </motion.div>
-          )}
+            {page === 'import-wif' && (
+              <motion.div
+                key="import-wif"
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="w-full pb-4"
+              >
+                <ImportAccount onNavigateBack={() => setPage('restore-account')} />
+              </motion.div>
+            )}
 
-          {page === 'account-list' && accountList}
+            {page === 'account-list' && accountList}
 
-          {page === 'edit-account' && editAccount}
+            {page === 'edit-account' && editAccount}
 
-          {page === 'social-profile' && socialProfilePage}
+            {page === 'identity' && identityPage}
 
-          {page === 'permissions' && (
-            <motion.div
-              key="permissions"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="w-full px-4 pb-4"
-            >
-              <SubPageHeader title="Permissions" onBack={() => setPage('main')} />
-              <PermissionsManager onBack={() => setPage('main')} />
-            </motion.div>
-          )}
+            {page === 'permissions' && (
+              <motion.div
+                key="permissions"
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="w-full px-4 pb-4"
+              >
+                <SubPageHeader title="Permissions" onBack={() => setPage('main')} />
+                <PermissionsManager onBack={() => setPage('main')} />
+              </motion.div>
+            )}
 
-          {page === 'storage' && (
-            <motion.div
-              key="storage"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="w-full px-4 pb-4"
-            >
-              <SubPageHeader title="Storage" onBack={() => setPage('main')} />
-              <StorageStatus onBack={() => setPage('main')} />
-            </motion.div>
-          )}
+            {page === 'storage' && (
+              <motion.div
+                key="storage"
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="w-full px-4 pb-4"
+              >
+                <SubPageHeader title="Remote Backup" onBack={() => setPage('export-keys-options')} />
+                <StorageStatus onBack={() => setPage('main')} />
+              </motion.div>
+            )}
 
-          {page === 'export-keys-options' && exportKeyOptionsPage}
+            {page === 'export-keys-options' && exportKeyOptionsPage}
 
-          {page === 'export-keys-qr' && exportKeysAsQrCodePage}
-        </AnimatePresence>
-      </div>
-    </Show>
+            {page === 'export-keys-qr' && exportKeysAsQrCodePage}
+          </AnimatePresence>
+        </div>
+      </Show>
+      {showAvatarPicker && (
+        <AvatarPicker
+          theme={theme}
+          apiContext={apiContext}
+          onUploadNew={handleAvatarUpload}
+          onSelectExisting={handleAvatarSelectExisting}
+          onClose={() => setShowAvatarPicker(false)}
+        />
+      )}
+    </>
   );
 };

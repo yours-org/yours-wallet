@@ -1,18 +1,17 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 1,
   "workspaces": {
     "": {
       "name": "yours-wallet",
       "dependencies": {
-        "@1sat/actions": "0.0.95",
-        "@1sat/client": "0.0.21",
-        "@1sat/connect": "0.0.32",
-        "@1sat/sweep-ui": "0.0.30",
-        "@1sat/templates": "0.0.8",
-        "@1sat/types": "0.0.17",
-        "@1sat/utils": "0.0.14",
-        "@1sat/wallet-browser": "0.0.34",
+        "@1sat/actions": "^0.0.96",
+        "@1sat/client": "^0.0.21",
+        "@1sat/connect": "^0.0.32",
+        "@1sat/sweep-ui": "^0.0.31",
+        "@1sat/templates": "^0.0.8",
+        "@1sat/types": "^0.0.17",
+        "@1sat/utils": "^0.0.14",
+        "@1sat/wallet-browser": "^0.0.34",
         "@bsv/sdk": "^2.0.13",
         "@bsv/wallet-toolbox-mobile": "^2.1.21",
         "@fortawesome/react-fontawesome": "^0.2.2",
@@ -76,13 +75,13 @@
     },
   },
   "packages": {
-    "@1sat/actions": ["@1sat/actions@0.0.95", "", { "dependencies": { "@1sat/client": "0.0.21", "@1sat/templates": "0.0.8", "@1sat/types": "0.0.17", "@1sat/utils": "0.0.14", "@1sat/wallet": "0.0.44" }, "peerDependencies": { "@bsv/sdk": "^2.0.13" } }, "sha512-C3wovM7Q5BbueXfEgH7qRVcjU3/1hjV2v9NzHxpV53E5+JomVKlBZlMgkfoXnKA6/bFj5mMQ5bZC1810PBgQtA=="],
+    "@1sat/actions": ["@1sat/actions@0.0.96", "", { "dependencies": { "@1sat/client": "0.0.21", "@1sat/templates": "0.0.8", "@1sat/types": "0.0.17", "@1sat/utils": "0.0.14", "@1sat/wallet": "0.0.44" }, "peerDependencies": { "@bsv/sdk": "^2.0.13" } }, "sha512-jd9B8ozYGx0SJmhOOdERsHCFFwO8gz6V3qpnVp8u02/pM2rOnzZoXWAXCgImUz47pcjo8bMuobpWqA2vjIurtQ=="],
 
     "@1sat/client": ["@1sat/client@0.0.21", "", { "dependencies": { "@1sat/types": "0.0.17", "@bsv/wallet-toolbox": "^2.1.21" }, "peerDependencies": { "@bsv/sdk": "^2.0.13" } }, "sha512-1LbWb+9/lfLq5cjEPu+Tk07b2Z6r2jso4HUSfy7JUUFwfepGJMqO3B02laqLSLZ9jwTb8o9rMIQqaC6shMBOig=="],
 
     "@1sat/connect": ["@1sat/connect@0.0.32", "", { "dependencies": { "@1sat/wallet": "0.0.44", "@sigma-auth/better-auth-plugin": "^0.0.84", "better-auth": "^1.5.4", "eventemitter3": "^5.0.1" }, "peerDependencies": { "@bsv/sdk": "^2.0.13" } }, "sha512-zCyz9a8UuOp9keA3e1WtpwMxSHyCGBXIiB7ejR7FX35XNI4KgwzywCYTVvfFD1kiGMNRCAz+97Fj50OJeo5PZw=="],
 
-    "@1sat/sweep-ui": ["@1sat/sweep-ui@0.0.30", "", { "dependencies": { "@1sat/actions": "0.0.95", "@1sat/client": "0.0.21", "@1sat/connect": "0.0.32", "@1sat/types": "0.0.17", "@1sat/utils": "0.0.14", "bitcoin-backup": "^0.0.11", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^0.577.0", "sonner": "^2.0.7", "tailwind-merge": "^3.5.0" }, "peerDependencies": { "@bsv/sdk": "^2.0.13", "react": "^18.0.0 || ^19.0.0" } }, "sha512-YTkbb+wCWayPVaop7ifuZ9leyfcB8LBUfcmKXggyHN+MyLFXbWMAjSOO9l6zRchRkP1T79EG0/oQTs651U/6rQ=="],
+    "@1sat/sweep-ui": ["@1sat/sweep-ui@0.0.31", "", { "dependencies": { "@1sat/actions": "0.0.96", "@1sat/client": "0.0.21", "@1sat/connect": "0.0.32", "@1sat/types": "0.0.17", "@1sat/utils": "0.0.14", "bitcoin-backup": "^0.0.11", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^0.577.0", "sonner": "^2.0.7", "tailwind-merge": "^3.5.0" }, "peerDependencies": { "@bsv/sdk": "^2.0.13", "react": "^18.0.0 || ^19.0.0" } }, "sha512-y7PXFE7RSPKHu+4FHPM1zjI5s9W48OZjyg1uffHSChBjHpvO7gPlG1tkH+TtiLOdEYCySZ/xVTpWCyFv39j87Q=="],
 
     "@1sat/templates": ["@1sat/templates@0.0.8", "", { "dependencies": { "@1sat/types": "0.0.17" }, "peerDependencies": { "@bsv/sdk": "^2.0.13" } }, "sha512-CcsKxxgBniodr2pZGgtnNLNol7jdjGL+CCG4LbnkUgrlZ7XP5Jc8JNVEUGxoUz+pTRq3aIEpnxosEq7Nz+MMhA=="],
 
