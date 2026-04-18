@@ -71,7 +71,7 @@ function formatTierPrice(sats: number, exchangeRate: number): string {
   if (sats === 0) return 'Free';
   if (!exchangeRate || exchangeRate <= 0) return `${sats.toLocaleString()} sats/mo`;
   const usd = ((sats / 100_000_000) * exchangeRate).toFixed(2);
-  return `$${usd}/mo (${sats.toLocaleString()} sats)`;
+  return `$${usd}/mo`;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
