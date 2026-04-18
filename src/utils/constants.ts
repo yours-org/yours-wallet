@@ -89,6 +89,13 @@ export const featuredApps = [
   },
 ];
 
+/**
+ * Default storage provider URL. Ships as a pre-configured remote on every
+ * new account and serves as the implicit active for accounts that predate
+ * per-account storage configuration.
+ */
+export const DEFAULT_STORAGE_REMOTE = 'https://api.1sat.app/1sat/wallet';
+
 export const DEFAULT_ACCOUNT = {
   network: NetWork.Mainnet,
   addresses: { bsvAddress: '', ordAddress: '', identityAddress: '' },
@@ -107,4 +114,10 @@ export const DEFAULT_ACCOUNT = {
   name: 'Account 1',
   ordinals: [],
   paymentUtxos: [],
+  // Eager default: new accounts start with local active + api.1sat.app as a
+  // configured backup remote. Existing accounts (no storageConfig present)
+  // fall back to remote-active at initWallet time to preserve behavior.
+  storageConfig: {
+    remotes: [DEFAULT_STORAGE_REMOTE],
+  },
 };

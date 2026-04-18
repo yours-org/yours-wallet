@@ -10,7 +10,11 @@ import {
 } from '@1sat/wallet-browser';
 import { syncAddresses, createContext as createActionContext } from '@1sat/actions';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import type { Account } from './services/types/chromeStorage.types';
+import type {
+  Account,
+  StorageConfig,
+} from './services/types/chromeStorage.types';
+import { DEFAULT_STORAGE_REMOTE } from './utils/constants';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
 import { initSyncContext, type SyncContext } from './initSyncContext';
@@ -47,10 +51,56 @@ export interface AccountContext {
   syncContext: SyncContext;
   storage: WalletStorageManager;
   remoteStorage?: StorageClient;
-  migrateRemote: (url: string) => Promise<void>;
+  setActiveStorage: (target: 'local' | string) => Promise<void>;
+  addRemote: (url: string) => Promise<void>;
   /** Call to stop sync and destroy wallet */
   close: () => Promise<void>;
 }
+
+/**
+ * Resolve a per-account storage config into the flat fields the SDK factory
+ * expects. Accounts predating per-account storage config (`storageConfig`
+ * undefined) get the hardcoded remote-active behavior so their unlock path
+ * is unchanged.
+ */
+const resolveStorageConfig = (
+  storageConfig: StorageConfig | undefined,
+): { activeRemote?: string; backups?: string[] } => {
+  if (!storageConfig) {
+    // Implicit default for pre-existing accounts: remote-active against the
+    // shipped provider, no extra backups. Identical to the prior hardcoded
+    // behavior.
+    return { activeRemote: DEFAULT_STORAGE_REMOTE };
+  }
+  const { activeRemote, remotes = [] } = storageConfig;
+  // `remotes[]` holds every configured remote including the active; filter
+  // the active out before passing to the factory so it doesn't double-connect.
+  const backups = activeRemote
+    ? remotes.filter((url) => url !== activeRemote)
+    : remotes;
+  return { activeRemote, backups };
+};
+
+/**
+ * Read the per-install storageIdentityKey from chrome storage, generating
+ * and persisting a new random value on first use. Shared across all
+ * accounts on this install — the identity is a property of the local
+ * IndexedDB, not of any individual account. Distinct from other installs
+ * of the same account on the same remote so `WalletStorageManager` can
+ * correctly identify which local store is authoritative.
+ */
+const ensureStorageIdentityKey = async (
+  chromeStorageService: ChromeStorageService,
+): Promise<string> => {
+  const existing = chromeStorageService.getCurrentAccountObject()
+    .storageIdentityKey;
+  if (existing) return existing;
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const key = `yours-${hex}`;
+  await chromeStorageService.update({ storageIdentityKey: key });
+  return key;
+};
 
 export interface InitWalletOptions {
   onTransactionBroadcasted?: (txid: string) => void;
@@ -81,13 +131,21 @@ export const initWallet = async (
 
   const chain = 'main' as const;
 
-  // 2. Create wallet using browser factory
+  // 2. Create wallet using browser factory. Storage topology comes from the
+  // current account's persisted storageConfig (or implicit default for
+  // pre-existing accounts that have none yet). storageIdentityKey is
+  // per-install and lazily materialized.
+  const { account } = chromeStorageService.getCurrentAccountObject();
+  const { activeRemote, backups } = resolveStorageConfig(account?.storageConfig);
+  const storageIdentityKey = await ensureStorageIdentityKey(chromeStorageService);
+
   const walletConfig: WebWalletConfig = {
     privateKey: keys.identityWif,
     chain,
     feeModel: { model: 'sat/kb', value: chromeStorageService.getCustomFeeRate() },
-    activeRemote: 'https://api.1sat.app/1sat/wallet',
-    storageIdentityKey: 'yours-wallet',
+    activeRemote,
+    backups,
+    storageIdentityKey,
   };
 
   const {
@@ -95,7 +153,8 @@ export const initWallet = async (
     destroy: destroyWallet,
     storage,
     remoteStorage,
-    migrateRemote,
+    setActiveStorage,
+    addRemote,
   } = await createWebWallet(walletConfig);
 
   // 3. Wrap with permissions manager for external app access control.
@@ -172,7 +231,8 @@ export const initWallet = async (
     syncContext,
     storage,
     remoteStorage,
-    migrateRemote,
+    setActiveStorage,
+    addRemote,
     close,
   };
 };
