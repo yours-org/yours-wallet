@@ -43,10 +43,15 @@ import type {
 } from '@bsv/wallet-toolbox-mobile';
 import type { LocalWalletPermissionsManager } from '@1sat/wallet-browser';
 import { removeWindow } from './utils/chromeHelpers';
-import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
+import {
+  Account,
+  ChromeStorageObject,
+  ConnectRequest,
+  StorageConfig,
+} from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { initWallet, type AccountContext } from './initWallet';
-import { HOSTED_YOURS_IMAGE } from './utils/constants';
+import { DEFAULT_STORAGE_REMOTE, HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
 
 let chromeStorageService = new ChromeStorageService();
@@ -553,7 +558,9 @@ if (isInServiceWorker) {
       // Storage management (popup internal)
       'STORAGE_GET_INFO',
       'STORAGE_SYNC_BACKUPS',
-      'STORAGE_MIGRATE_REMOTE',
+      'STORAGE_SET_ACTIVE_STORAGE',
+      'STORAGE_ADD_REMOTE',
+      'STORAGE_REMOVE_REMOTE',
       // Permissions management (popup internal)
       'PERMISSIONS_LIST_ALL',
       'PERMISSIONS_QUERY_SPENT',
@@ -697,8 +704,14 @@ if (isInServiceWorker) {
         case 'STORAGE_SYNC_BACKUPS':
           processStorageSyncBackups(sendResponse);
           return true;
-        case 'STORAGE_MIGRATE_REMOTE':
-          processStorageMigrateRemote(message.url, sendResponse);
+        case 'STORAGE_SET_ACTIVE_STORAGE':
+          processStorageSetActiveStorage(message.target, sendResponse);
+          return true;
+        case 'STORAGE_ADD_REMOTE':
+          processStorageAddRemote(message.url, sendResponse);
+          return true;
+        case 'STORAGE_REMOVE_REMOTE':
+          processStorageRemoveRemote(message.url, sendResponse);
           return true;
         case 'UPDATE_FEE_RATE': {
           const rate = message.feeRate;
@@ -897,6 +910,13 @@ if (isInServiceWorker) {
         const settings = storage.getSettings();
         const activeStore = stores.find((s) => s.isActive);
         const backupStores = stores.filter((s) => s.isBackup);
+        // Surface the persisted per-account config so the UI can render
+        // from the same source of truth used at init time.
+        const { account } = chromeStorageService.getCurrentAccountObject();
+        const storageConfig: StorageConfig = account?.storageConfig ?? {
+          activeRemote: DEFAULT_STORAGE_REMOTE,
+          remotes: [DEFAULT_STORAGE_REMOTE],
+        };
 
         let outputCount = 0;
         let transactionCount = 0;
@@ -947,6 +967,7 @@ if (isInServiceWorker) {
             outputCount,
             transactionCount,
             syncStates,
+            storageConfig,
           },
         });
       } catch (error) {
@@ -988,33 +1009,167 @@ if (isInServiceWorker) {
       });
   };
 
-  const processStorageMigrateRemote = async (url: string, sendResponse: CallbackResponse) => {
+  /**
+   * Read the current account's storageConfig (or the implicit-default shape
+   * for accounts that predate it), apply a patch, and persist the result
+   * back to the same account.
+   *
+   * We resolve absent storageConfig into a concrete shape on first write so
+   * that "remove api.1sat.app" after a "switch to local" on a legacy account
+   * works — the URL gets captured into remotes[] as the implicit→explicit
+   * materialization step.
+   */
+  const updateStorageConfig = async (
+    patch: (current: StorageConfig) => StorageConfig,
+  ): Promise<StorageConfig> => {
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) throw new Error('No account loaded');
+    const identityAddress = account.addresses.identityAddress;
+    const existing: StorageConfig = account.storageConfig ?? {
+      activeRemote: DEFAULT_STORAGE_REMOTE,
+      remotes: [DEFAULT_STORAGE_REMOTE],
+    };
+    const next = patch(existing);
+    await chromeStorageService.updateNested('accounts', {
+      [identityAddress]: { storageConfig: next } as unknown as Account,
+    });
+    return next;
+  };
+
+  const processStorageSetActiveStorage = async (
+    target: 'local' | string,
+    sendResponse: CallbackResponse,
+  ) => {
     try {
       await ensureWallet();
     } catch (err) {
       sendResponse({
-        type: 'STORAGE_MIGRATE_REMOTE',
+        type: 'STORAGE_SET_ACTIVE_STORAGE',
         success: false,
         error: err instanceof Error ? err.message : 'Wallet not available',
       });
       return;
     }
     if (!accountContext) {
-      sendResponse({ type: 'STORAGE_MIGRATE_REMOTE', success: false, error: 'Wallet not initialized' });
+      sendResponse({
+        type: 'STORAGE_SET_ACTIVE_STORAGE',
+        success: false,
+        error: 'Wallet not initialized',
+      });
       return;
     }
-    accountContext
-      .migrateRemote(url)
-      .then(() => {
-        sendResponse({ type: 'STORAGE_MIGRATE_REMOTE', success: true });
-      })
-      .catch((error: unknown) => {
-        sendResponse({
-          type: 'STORAGE_MIGRATE_REMOTE',
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
+    try {
+      await accountContext.setActiveStorage(target);
+      const nextConfig = await updateStorageConfig((current) => {
+        if (target === 'local') {
+          return { activeRemote: undefined, remotes: current.remotes ?? [] };
+        }
+        // Ensure the URL is in the remotes list so it survives restart.
+        const remotes = current.remotes ?? [];
+        const withTarget = remotes.includes(target)
+          ? remotes
+          : [...remotes, target];
+        return { activeRemote: target, remotes: withTarget };
       });
+      sendResponse({
+        type: 'STORAGE_SET_ACTIVE_STORAGE',
+        success: true,
+        data: { storageConfig: nextConfig },
+      });
+    } catch (error) {
+      sendResponse({
+        type: 'STORAGE_SET_ACTIVE_STORAGE',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const processStorageAddRemote = async (
+    url: string,
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      await ensureWallet();
+    } catch (err) {
+      sendResponse({
+        type: 'STORAGE_ADD_REMOTE',
+        success: false,
+        error: err instanceof Error ? err.message : 'Wallet not available',
+      });
+      return;
+    }
+    if (!accountContext) {
+      sendResponse({
+        type: 'STORAGE_ADD_REMOTE',
+        success: false,
+        error: 'Wallet not initialized',
+      });
+      return;
+    }
+    try {
+      await accountContext.addRemote(url);
+      const nextConfig = await updateStorageConfig((current) => {
+        const remotes = current.remotes ?? [];
+        return {
+          ...current,
+          remotes: remotes.includes(url) ? remotes : [...remotes, url],
+        };
+      });
+      sendResponse({
+        type: 'STORAGE_ADD_REMOTE',
+        success: true,
+        data: { storageConfig: nextConfig },
+      });
+    } catch (error) {
+      sendResponse({
+        type: 'STORAGE_ADD_REMOTE',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  /**
+   * Remove a remote from the configured list. Pure config persistence —
+   * the SDK does not support detaching a live connection, so the removed
+   * remote stays connected for this session and will simply not be
+   * reconnected on next unlock. Refuses if the URL is the current active.
+   */
+  const processStorageRemoveRemote = async (
+    url: string,
+    sendResponse: CallbackResponse,
+  ) => {
+    if (!accountContext) {
+      sendResponse({
+        type: 'STORAGE_REMOVE_REMOTE',
+        success: false,
+        error: 'Wallet not initialized',
+      });
+      return;
+    }
+    try {
+      const nextConfig = await updateStorageConfig((current) => {
+        if (current.activeRemote === url) {
+          throw new Error(
+            'Cannot remove the active remote — switch active to local or another remote first.',
+          );
+        }
+        const remotes = (current.remotes ?? []).filter((r) => r !== url);
+        return { ...current, remotes };
+      });
+      sendResponse({
+        type: 'STORAGE_REMOVE_REMOTE',
+        success: true,
+        data: { storageConfig: nextConfig },
+      });
+    } catch (error) {
+      sendResponse({
+        type: 'STORAGE_REMOVE_REMOTE',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   };
 
   // PERMISSIONS MANAGEMENT HANDLERS ********************************

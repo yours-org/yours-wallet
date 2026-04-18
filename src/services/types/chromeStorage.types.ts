@@ -31,6 +31,25 @@ export type Settings = {
   lockTimeout?: number;
 };
 
+/**
+ * Per-account storage configuration.
+ *
+ * `activeRemote` is a pointer: when set, it names which URL in `remotes[]`
+ * is the active store; when undefined, local storage is active.
+ *
+ * `remotes[]` is the full list of configured remote URLs. A URL being active
+ * does not remove it from this list — add/remove and set-active are separate
+ * operations.
+ *
+ * Absence of this field means "implicit default" — treated as remote-active
+ * against the hardcoded provider URL so existing accounts keep their prior
+ * behavior until the user explicitly configures storage.
+ */
+export type StorageConfig = {
+  activeRemote?: string;
+  remotes?: string[];
+};
+
 export interface Account {
   name: string;
   icon: string;
@@ -44,6 +63,7 @@ export interface Account {
   balance: Balance;
   mneeBalance: MNEEBalance;
   pubKeys: PubKeys;
+  storageConfig?: StorageConfig;
 }
 
 export type ExchangeRateCache = {
@@ -71,6 +91,14 @@ export interface ChromeStorageObject {
   colorTheme: Theme;
   version?: number;
   deviceId?: string;
+  /**
+   * Per-install random identifier used as the local IndexedDB's
+   * `storageIdentityKey`. Distinguishes this install's local store from
+   * other installs of the same account on the shared remote, so
+   * `WalletStorageManager` can correctly identify which local is the
+   * authoritative active store. Generated on first unlock.
+   */
+  storageIdentityKey?: string;
   showWelcome?: boolean;
   connectRequest?: ConnectRequest;
   sendMNEERequest?: SendMNEE[];
