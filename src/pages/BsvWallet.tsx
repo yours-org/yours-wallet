@@ -24,7 +24,7 @@ import { Show } from '../components/Show';
 import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSnackbar } from '../hooks/useSnackbar';
-import { useIdentity } from '../hooks/useIdentity';
+import { useIdentity, resolveImageUrl } from '../hooks/useIdentity';
 import { useTheme } from '../hooks/useTheme';
 import {
   BSV_DECIMAL_CONVERSION,
@@ -775,7 +775,7 @@ export const BsvWallet = () => {
           >
             <motion.img
               whileHover={{ scale: 1.06 }}
-              src={identityProfile.image}
+              src={resolveImageUrl(identityProfile.image, apiContext)}
               className="w-12 h-12 rounded-full object-cover"
               style={{ outline: `2px solid ${theme.color.component.primaryButtonLeftGradient}40` }}
               alt="Profile"

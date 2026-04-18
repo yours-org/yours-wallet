@@ -29,7 +29,7 @@ import { Show } from '../components/Show';
 import { SpeedBump } from '../components/SpeedBump';
 import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
-import { useIdentity } from '../hooks/useIdentity';
+import { useIdentity, resolveImageUrl } from '../hooks/useIdentity';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursEventName } from '../inject';
@@ -841,7 +841,7 @@ export const Settings = () => {
     </motion.div>
   );
 
-  const avatarSrc = avatarPreview || enteredImage;
+  const avatarSrc = avatarPreview || (enteredImage ? resolveImageUrl(enteredImage, apiContext) : '');
 
   const identityPage = (
     <motion.div

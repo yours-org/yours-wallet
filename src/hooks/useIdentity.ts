@@ -5,13 +5,25 @@ import {
   updateProfile,
   getProfile,
   inscribe,
-  ONESAT_MAINNET_CONTENT_URL,
   type ProfileResponse,
   type IdentityResponse,
 } from '@1sat/actions';
 import type { OneSatContext } from '@1sat/actions';
 import type { ChromeStorageService } from '../services/ChromeStorage.service';
 import type { ChromeStorageObject } from '../services/types/chromeStorage.types';
+
+/**
+ * Resolve a 1sat:// protocol URI to a renderable HTTPS URL.
+ * Falls back to returning the input if it's already an HTTP URL or empty.
+ */
+export function resolveImageUrl(uri: string, apiContext: OneSatContext): string {
+  if (!uri) return '';
+  if (uri.startsWith('1sat://')) {
+    const outpoint = uri.slice(7).replace('.', '_');
+    return apiContext.services!.ordfs.getContentUrl(outpoint);
+  }
+  return uri;
+}
 
 export type IdentityProfile = {
   name: string;
@@ -147,7 +159,7 @@ export const useIdentity = (apiContext: OneSatContext, chromeStorageService?: Ch
         if (res.error || !res.txid) {
           return { error: res.error || 'Inscription failed' };
         }
-        return { url: `${ONESAT_MAINNET_CONTENT_URL}/${res.txid}_0` };
+        return { url: `1sat://${res.txid}.0` };
       } catch (err) {
         return { error: err instanceof Error ? err.message : String(err) };
       }

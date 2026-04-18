@@ -62,24 +62,29 @@ type OrdCardProps = {
   output: WalletOutput;
   url: string;
   selected: boolean;
+  disabled?: boolean;
   onClick: () => void;
   theme: ReturnType<typeof useTheme>['theme'];
   index: number;
 };
 
-const OrdCard = ({ output, url, selected, onClick, theme, index }: OrdCardProps) => {
+const OrdCard = ({ output, url, selected, disabled, onClick, theme, index }: OrdCardProps) => {
   return (
     <motion.div
       variants={cardVariants}
       custom={index}
-      className="relative rounded-xl overflow-hidden cursor-pointer"
+      animate={{ opacity: disabled ? 0.3 : 1 }}
+      transition={{ duration: 0.2 }}
+      className="relative rounded-xl overflow-hidden"
       style={{
         background: '#17191E',
         border: selected ? '1.5px solid #A1FF8B' : '1px solid rgba(255,255,255,0.06)',
         aspectRatio: '1/1',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        pointerEvents: disabled ? 'none' : 'auto',
       }}
-      whileTap={{ scale: 0.96 }}
-      onClick={onClick}
+      whileTap={disabled ? undefined : { scale: 0.96 }}
+      onClick={disabled ? undefined : onClick}
     >
       {/* Ordinal content fills the card */}
       <div className="w-full h-full flex items-center justify-center">
@@ -191,35 +196,42 @@ export const OrdWallet = () => {
 
   // ── selection logic (unchanged) ─────────────────────────────────────────────
 
+  // Selection mode: once you start selecting, you're locked to one type.
+  // 'transfer' = selecting unlisted items, 'cancel' = selecting listed items, null = nothing selected.
+  const isListedOrdinal = (o: WalletOutput) => o.tags?.includes('ordlock') ?? false;
+
+  // Selection mode: once you start selecting, you're locked to one type.
+  // 'transfer' = selecting unlisted items, 'cancel' = selecting listed items, null = nothing selected.
+  const selectionMode: 'transfer' | 'cancel' | null =
+    selectedOrdinals.length === 0 ? null : selectedOrdinals.every(isListedOrdinal) ? 'cancel' : 'transfer';
+
   const toggleOrdinalSelection = (ord: WalletOutput) => {
     const outpoint = ord.outpoint;
     const isSelected = selectedOrdinals.some((selected) => selected.outpoint === outpoint);
-    const isListing = hasTag(ord.tags, 'list');
+    const isListing = isListedOrdinal(ord);
 
     if (isSelected) {
       setSelectedOrdinals(selectedOrdinals.filter((selected) => selected.outpoint !== outpoint));
+    } else if (selectedOrdinals.length === 0) {
+      // First selection — sets the mode
+      setSelectedOrdinals([ord]);
+    } else if (isListing && selectionMode === 'transfer') {
+      // Can't mix: trying to select a listing while in transfer mode
+      return;
+    } else if (!isListing && selectionMode === 'cancel') {
+      // Can't mix: trying to select an unlisted item while in cancel mode
+      return;
     } else {
-      const hasListingsSelected = selectedOrdinals.some((selected) => hasTag(selected.tags, 'list'));
-      const hasNonListingsSelected = selectedOrdinals.some((selected) => !hasTag(selected.tags, 'list'));
-
-      if (isListing) {
-        if (selectedOrdinals.length === 0) {
-          setSelectedOrdinals([ord]);
-        } else if (hasNonListingsSelected) {
-          addSnackbar('Multiselect listings not supported!', 'info');
-        } else if (selectedOrdinals.length === 1) {
-          addSnackbar('You can only select one listing at a time!', 'info');
-        } else {
-          setSelectedOrdinals([ord]);
-        }
-      } else {
-        if (hasListingsSelected) {
-          addSnackbar('Multiselect listings not supported!', 'info');
-        } else {
-          setSelectedOrdinals([...selectedOrdinals, ord]);
-        }
-      }
+      setSelectedOrdinals([...selectedOrdinals, ord]);
     }
+  };
+
+  const isOrdinalDisabled = (ord: WalletOutput): boolean => {
+    if (selectionMode === null) return false;
+    const isListing = isListedOrdinal(ord);
+    if (selectionMode === 'transfer' && isListing) return true;
+    if (selectionMode === 'cancel' && !isListing) return true;
+    return false;
   };
 
   // ── intersection observer for infinite scroll ───────────────────────────────
@@ -491,7 +503,7 @@ export const OrdWallet = () => {
 
   // ── selected ordinal is a listing? ─────────────────────────────────────────
 
-  const selectedIsListing = selectedOrdinals.length === 1 && selectedOrdinals[0].tags?.includes('ordlock');
+  const selectedIsListing = selectionMode === 'cancel';
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER — Main Grid View
@@ -577,6 +589,7 @@ export const OrdWallet = () => {
                   output={output}
                   url={`${getContentUrl(originOutpoint ?? outpoint)}?outpoint=${outpoint}`}
                   selected={selectedOrdinals.some((s) => s.outpoint === outpoint)}
+                  disabled={isOrdinalDisabled(output)}
                   onClick={() => toggleOrdinalSelection(output)}
                   theme={theme}
                   index={index}
@@ -624,7 +637,7 @@ export const OrdWallet = () => {
                 }}
               >
                 <X size={15} />
-                Cancel Listing
+                {selectedOrdinals.length > 1 ? `Cancel ${selectedOrdinals.length} Listings` : 'Cancel Listing'}
               </motion.button>
             ) : (
               <>

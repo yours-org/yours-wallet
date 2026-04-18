@@ -199,7 +199,10 @@ export const AvatarPicker = ({ theme, apiContext, onSelectExisting, onUploadNew,
                 <div className="grid grid-cols-4 gap-2">
                   {filtered.map((output) => {
                     const origin = resolveOriginOutpoint(output);
-                    const url = getContentUrl(origin ?? output.outpoint);
+                    const outpoint = origin ?? output.outpoint;
+                    const renderUrl = getContentUrl(outpoint);
+                    // Store as 1sat:// protocol URI for on-chain profile data
+                    const protocolUri = `1sat://${outpoint.replace('_', '.')}`;
                     const name = getOutputName(output);
                     return (
                       <motion.button
@@ -207,10 +210,10 @@ export const AvatarPicker = ({ theme, apiContext, onSelectExisting, onUploadNew,
                         whileTap={{ scale: 0.95 }}
                         className="aspect-square rounded-lg overflow-hidden relative group"
                         style={{ border: '1px solid rgba(255,255,255,0.08)' }}
-                        onClick={() => onSelectExisting(url)}
+                        onClick={() => onSelectExisting(protocolUri)}
                         title={name}
                       >
-                        <img src={url} className="w-full h-full object-cover" alt={name} loading="lazy" />
+                        <img src={renderUrl} className="w-full h-full object-cover" alt={name} loading="lazy" />
                       </motion.button>
                     );
                   })}
