@@ -57,6 +57,18 @@ let accountContext: AccountContext | null = null;
 // Set while wallet is reinitializing (e.g. account switch) to prevent
 // ensureWallet from launching a popup during the transition.
 let reinitPromise: Promise<WalletInterface | null> | null = null;
+// Tracks active extension popup connections via chrome.runtime.onConnect.
+// When the browser-action popup opens, it connects with name 'extension-popup'.
+// When it closes, the port disconnects automatically. No timers needed.
+const activePopupPorts = new Set<chrome.runtime.Port>();
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === 'extension-popup') {
+    activePopupPorts.add(port);
+    port.onDisconnect.addListener(() => {
+      activePopupPorts.delete(port);
+    });
+  }
+});
 
 /**
  * Send a balance update notification to the popup.
@@ -464,8 +476,14 @@ if (isInServiceWorker) {
 
   launchPopUp = () => {
     console.log('[background] launchPopUp called');
+
+    // If the extension's browser-action popup is currently open, don't create a window
+    if (activePopupPorts.size > 0) {
+      console.log('[background] launchPopUp: extension popup is connected, skipping window creation');
+      return;
+    }
+
     // Check if any popup window with our extension URL is already open
-    // This handles the case where Chrome's default_popup is already showing
     chrome.windows.getAll({ populate: true }, (windows) => {
       const existingPopup = windows.find(
         (w) => w.type === 'popup' && w.tabs?.some((tab) => tab.url?.startsWith(chrome.runtime.getURL(''))),

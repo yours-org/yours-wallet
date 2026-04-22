@@ -61,6 +61,13 @@ export const App = () => {
 
   useActivityDetector(isLocked, isReady, chromeStorageService);
 
+  // Establish a port connection so the background knows the popup is open.
+  // Port disconnects automatically when the popup closes — no timers needed.
+  useEffect(() => {
+    const port = chrome.runtime.connect({ name: 'extension-popup' });
+    return () => port.disconnect();
+  }, []);
+
   useEffect(() => {
     isReady && getStorageAndSetRequestState(chromeStorageService);
     // eslint-disable-next-line react-hooks/exhaustive-deps
