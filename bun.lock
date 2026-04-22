@@ -8,7 +8,7 @@
         "@1sat/actions": "0.0.109",
         "@1sat/client": "0.0.24",
         "@1sat/connect": "0.0.45",
-        "@1sat/sweep-ui": "0.0.39",
+        "@1sat/sweep-ui": "0.0.40",
         "@1sat/templates": "0.0.9",
         "@1sat/types": "0.0.18",
         "@1sat/utils": "0.0.15",
@@ -82,7 +82,7 @@
 
     "@1sat/connect": ["@1sat/connect@0.0.45", "", { "dependencies": { "@1sat/wallet": "0.0.58", "@sigma-auth/better-auth-plugin": "^0.0.84", "better-auth": "^1.5.4", "eventemitter3": "^5.0.1" }, "peerDependencies": { "@bsv/sdk": "^2.0.13" } }, "sha512-iYx6eza4rpivJLr1ey/idOATd2cAfndgoavv0XN9Bnt6Bxs4qzxD3Z6DY07oHVSk6cNUMBR8fU22wy3/vrPRgQ=="],
 
-    "@1sat/sweep-ui": ["@1sat/sweep-ui@0.0.39", "", { "dependencies": { "@1sat/actions": "0.0.105", "@1sat/client": "0.0.24", "@1sat/connect": "0.0.41", "@1sat/types": "0.0.18", "@1sat/utils": "0.0.15", "bitcoin-backup": "^0.0.11", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^0.577.0", "sonner": "^2.0.7", "tailwind-merge": "^3.5.0" }, "peerDependencies": { "@bsv/sdk": "^2.0.13", "react": "^18.0.0 || ^19.0.0" } }, "sha512-p3Vfl8AZ/R7ZZ6uFpokQD40tpGuMB9n7ZfZdVOQNfFmB3gUu6UK0q3/PmWfkbdi4s4oPg0XXzHVqVgGCXsHR4Q=="],
+    "@1sat/sweep-ui": ["@1sat/sweep-ui@0.0.40", "", { "dependencies": { "@1sat/actions": "0.0.109", "@1sat/client": "0.0.24", "@1sat/connect": "0.0.45", "@1sat/types": "0.0.18", "@1sat/utils": "0.0.15", "bitcoin-backup": "^0.0.11", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^0.577.0", "sonner": "^2.0.7", "tailwind-merge": "^3.5.0" }, "peerDependencies": { "@bsv/sdk": "^2.0.13", "react": "^18.0.0 || ^19.0.0" } }, "sha512-pEUq9msxmkOOykli5CGwfMtLHlxPrEcZO98V+0udpGoxyuRvrohGy1RtaxwTvTvZP7n7sk6TCP+j+/OUYOKa0g=="],
 
     "@1sat/templates": ["@1sat/templates@0.0.9", "", { "dependencies": { "@1sat/types": "0.0.18" }, "peerDependencies": { "@bsv/sdk": "^2.0.13" } }, "sha512-CIZdWq5PUQy/pA7uOBSjQ7y+ebVtYQwFgZjwzESnPLn8DG9aZRqk4pNSLm8vx0clcXBQW+99wCVbs4TJj3Rxuw=="],
 
@@ -1134,10 +1134,6 @@
 
     "zod": ["zod@4.3.6", "", {}, "sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg=="],
 
-    "@1sat/sweep-ui/@1sat/actions": ["@1sat/actions@0.0.105", "", { "dependencies": { "@1sat/client": "0.0.24", "@1sat/templates": "0.0.9", "@1sat/types": "0.0.18", "@1sat/utils": "0.0.15", "@1sat/wallet": "0.0.54" }, "peerDependencies": { "@bsv/sdk": "^2.0.13" } }, "sha512-Pbe+DTUXgkdNj3S8C4LtPLeFR+f1aopUlzIgV58Ktb30eobOR2lAqOEAb2407x3CwA5Xq5kEsmX75g/rcQsSFQ=="],
-
-    "@1sat/sweep-ui/@1sat/connect": ["@1sat/connect@0.0.41", "", { "dependencies": { "@1sat/wallet": "0.0.54", "@sigma-auth/better-auth-plugin": "^0.0.84", "better-auth": "^1.5.4", "eventemitter3": "^5.0.1" }, "peerDependencies": { "@bsv/sdk": "^2.0.13" } }, "sha512-hO30Cpe6Y3VXnkZDv/kpcHXZRKuj18v2DWwV6wwwIZZRZ2jdli/2O3C+G/GHNbhqknBcaI5Wa3QPbfOfTfvDhw=="],
-
     "@bsv/auth-express-middleware/express": ["express@5.2.1", "", { "dependencies": { "accepts": "^2.0.0", "body-parser": "^2.2.1", "content-disposition": "^1.0.0", "content-type": "^1.0.5", "cookie": "^0.7.1", "cookie-signature": "^1.2.1", "debug": "^4.4.0", "depd": "^2.0.0", "encodeurl": "^2.0.0", "escape-html": "^1.0.3", "etag": "^1.8.1", "finalhandler": "^2.1.0", "fresh": "^2.0.0", "http-errors": "^2.0.0", "merge-descriptors": "^2.0.0", "mime-types": "^3.0.0", "on-finished": "^2.4.1", "once": "^1.4.0", "parseurl": "^1.3.3", "proxy-addr": "^2.0.7", "qs": "^6.14.0", "range-parser": "^1.2.1", "router": "^2.2.0", "send": "^1.1.0", "serve-static": "^2.2.0", "statuses": "^2.0.1", "type-is": "^2.0.1", "vary": "^1.1.2" } }, "sha512-hIS4idWWai69NezIdRt2xFVofaF4j+6INOpJlVOLDO8zXGpUVEVzIYk12UUi2JzjEzWL3IOAxcTubgz9Po0yXw=="],
 
     "@bsv/payment-express-middleware/express": ["express@5.2.1", "", { "dependencies": { "accepts": "^2.0.0", "body-parser": "^2.2.1", "content-disposition": "^1.0.0", "content-type": "^1.0.5", "cookie": "^0.7.1", "cookie-signature": "^1.2.1", "debug": "^4.4.0", "depd": "^2.0.0", "encodeurl": "^2.0.0", "escape-html": "^1.0.3", "etag": "^1.8.1", "finalhandler": "^2.1.0", "fresh": "^2.0.0", "http-errors": "^2.0.0", "merge-descriptors": "^2.0.0", "mime-types": "^3.0.0", "on-finished": "^2.4.1", "once": "^1.4.0", "parseurl": "^1.3.3", "proxy-addr": "^2.0.7", "qs": "^6.14.0", "range-parser": "^1.2.1", "router": "^2.2.0", "send": "^1.1.0", "serve-static": "^2.2.0", "statuses": "^2.0.1", "type-is": "^2.0.1", "vary": "^1.1.2" } }, "sha512-hIS4idWWai69NezIdRt2xFVofaF4j+6INOpJlVOLDO8zXGpUVEVzIYk12UUi2JzjEzWL3IOAxcTubgz9Po0yXw=="],
@@ -1231,10 +1227,6 @@
     "type-is/mime-types": ["mime-types@2.1.35", "", { "dependencies": { "mime-db": "1.52.0" } }, "sha512-ZDY+bPm5zTTF+YpCrAU9nK0UgICYPT0QtT1NZWFv4s++TNkcgVaT0g6+4R2uI4MjQjzysHB1zxuWL50hzaeXiw=="],
 
     "wrap-ansi/ansi-styles": ["ansi-styles@4.3.0", "", { "dependencies": { "color-convert": "^2.0.1" } }, "sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg=="],
-
-    "@1sat/sweep-ui/@1sat/actions/@1sat/wallet": ["@1sat/wallet@0.0.54", "", { "dependencies": { "@1sat/client": "0.0.24", "@1sat/templates": "0.0.9", "@1sat/types": "0.0.18", "@bopen-io/templates": "^1.2.3", "@msgpack/msgpack": "^3.1.3", "fflate": "^0.8.2" }, "peerDependencies": { "@bsv/sdk": "^2.0.13", "@bsv/wallet-toolbox": "npm:@bopen-io/wallet-toolbox@2.1.21-parity-fix.1" } }, "sha512-IobGbBwQcP1W428N240le5JAv8BVaqtLugyEHE0nUHOpcPH1r8oyRAda5uh3xl4IItCoXTiHiQGtKYiJU68Hfw=="],
-
-    "@1sat/sweep-ui/@1sat/connect/@1sat/wallet": ["@1sat/wallet@0.0.54", "", { "dependencies": { "@1sat/client": "0.0.24", "@1sat/templates": "0.0.9", "@1sat/types": "0.0.18", "@bopen-io/templates": "^1.2.3", "@msgpack/msgpack": "^3.1.3", "fflate": "^0.8.2" }, "peerDependencies": { "@bsv/sdk": "^2.0.13", "@bsv/wallet-toolbox": "npm:@bopen-io/wallet-toolbox@2.1.21-parity-fix.1" } }, "sha512-IobGbBwQcP1W428N240le5JAv8BVaqtLugyEHE0nUHOpcPH1r8oyRAda5uh3xl4IItCoXTiHiQGtKYiJU68Hfw=="],
 
     "@bsv/auth-express-middleware/express/accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 
