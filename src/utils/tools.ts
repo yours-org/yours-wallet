@@ -1,4 +1,4 @@
-import { LockRequest, SendBsv, TransactionFormat } from 'yours-wallet-provider';
+import { LockRequest, SendBsv, TransactionFormat } from '../services/types/provider.types';
 import { Script, Transaction, Utils } from '@bsv/sdk';
 import {
   Bsv21Indexer,

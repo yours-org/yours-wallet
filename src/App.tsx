@@ -31,6 +31,7 @@ import { PermissionRequestPage } from './pages/requests/PermissionRequest';
 import { GroupedPermissionRequestPage } from './pages/requests/GroupedPermissionRequest';
 import { CounterpartyPermissionRequestPage } from './pages/requests/CounterpartyPermissionRequest';
 import { TransactionApprovalRequest } from './pages/requests/TransactionApprovalRequest';
+import { SweepMigration } from './pages/SweepMigration';
 
 export const App = () => {
   const { isMobile } = useViewport();
@@ -133,6 +134,7 @@ export const App = () => {
                       />
                       <Route path="/import-wallet" element={<ImportAccount onNavigateBack={() => null} newWallet />} />
                       <Route path="/master-restore" element={<MasterRestore />} />
+                      <Route path="/sweep" element={<SweepMigration />} />
                       <Route
                         path="/connect"
                         element={

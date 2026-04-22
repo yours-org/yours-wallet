@@ -202,7 +202,12 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
   const triggerSync = async () => {
     setSyncing(true);
     try {
-      const response = await chrome.runtime.sendMessage({ action: 'STORAGE_SYNC_BACKUPS' });
+      const response = await Promise.race([
+        chrome.runtime.sendMessage({ action: 'STORAGE_SYNC_BACKUPS' }),
+        new Promise<{ success: false; error: string }>((resolve) =>
+          setTimeout(() => resolve({ success: false, error: 'Sync timed out' }), 30000),
+        ),
+      ]);
       if (response?.success) {
         addSnackbar('Sync complete', 'success');
         await fetchInfo();
@@ -752,7 +757,11 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
                 usageText={
                   localUsage ? `${formatBytes(localUsage.used)} / ${formatBytes(localUsage.quota)}` : 'Estimating...'
                 }
-                usagePercent={localUsage ? usagePercent(localUsage.used, localUsage.quota) : undefined}
+                usagePercent={
+                  localUsage
+                    ? Math.max(usagePercent(localUsage.used, localUsage.quota), localUsage.used > 0 ? 1 : 0)
+                    : undefined
+                }
                 usageBarColor={localUsage ? usageBarColor(usagePercent(localUsage.used, localUsage.quota)) : undefined}
                 onClick={() => setSubView({ type: 'detail', url: '', isLocal: true })}
                 contrast={contrast}
@@ -968,7 +977,11 @@ const StoreCard = ({
             >
               <div
                 className="h-full rounded-full"
-                style={{ width: `${pct}%`, background: barColor, minWidth: pct > 0 ? '2px' : '0' }}
+                style={{
+                  width: `${Math.max(pct, pct > 0 ? 4 : 0)}%`,
+                  background: barColor,
+                  minWidth: pct > 0 ? '6px' : '0',
+                }}
               />
             </div>
           )}

@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import { SendMNEE } from 'yours-wallet-provider';
+import { SendMNEE } from '../services/types/provider.types';
 import { RequestParams } from '../inject';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import type {

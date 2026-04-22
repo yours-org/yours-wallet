@@ -1,4 +1,4 @@
-import { NetWork } from 'yours-wallet-provider';
+import { NetWork } from '../services/types/provider.types';
 
 export const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv/main';
 export const URL_WHATSONCHAIN = 'https://whatsonchain.com/tx/';

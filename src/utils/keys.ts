@@ -1,5 +1,5 @@
 import * as bip39 from 'bip39';
-import { DerivationTag } from 'yours-wallet-provider';
+import { DerivationTag } from '../services/types/provider.types';
 import { WifKeys } from '../services/types/keys.types';
 import { DEFAULT_IDENTITY_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';
 import { BigNumber, Hash, HD, Mnemonic, PrivateKey, Utils } from '@bsv/sdk';

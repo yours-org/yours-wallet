@@ -1,4 +1,4 @@
-import { NetWork } from 'yours-wallet-provider';
+import { NetWork } from './types/provider.types';
 import {
   DEFAULT_RELAYX_ORD_PATH,
   DEFAULT_TWETCH_WALLET_PATH,

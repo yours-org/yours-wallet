@@ -9,7 +9,7 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { formatNumberWithCommasAndDecimals, truncate } from '../../utils/format';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
-import { SendMNEE } from 'yours-wallet-provider';
+import { SendMNEE } from '../../services/types/provider.types';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { getErrorMessage } from '../../utils/tools';
 import { MNEE_DECIMALS, MNEE_ICON_URL } from '../../utils/constants';

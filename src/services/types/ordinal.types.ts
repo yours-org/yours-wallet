@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Ordinal } from 'yours-wallet-provider';
+import { Ordinal } from './provider.types';
 
 export type OrdinalResponse = Ordinal[];
 

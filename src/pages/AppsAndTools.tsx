@@ -29,7 +29,7 @@ import { lockBsv, unlockBsv, sendBsv } from '@1sat/actions';
 import { type ParseContext } from '@1sat/wallet-browser';
 import { Input } from '../components/Input';
 import TxPreview from '../components/TxPreview';
-import { TransactionFormat } from 'yours-wallet-provider';
+import { TransactionFormat } from '../services/types/provider.types';
 import { getTxFromRawTxFormat, parseRawTransaction } from '../utils/tools';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { fetchExchangeRate } from '../utils/wallet';
@@ -180,6 +180,7 @@ export const AppsAndTools = () => {
   const [page, setPage] = useState<AppsPage>(query === 'pending-locks' ? 'unlock' : 'main');
   const [otherIsSelected, setOtherIsSelected] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
+  const [pendingSupportAmount, setPendingSupportAmount] = useState<number | null>(null);
   const [lockedUtxos, setLockedUtxos] = useState<LockedOutput[]>([]);
   const [currentBlockHeight, setCurrentBlockHeight] = useState(0);
   const [txData, setTxData] = useState<ParseContext>();
@@ -650,7 +651,8 @@ export const AppsAndTools = () => {
                   if (amt === 'Other') {
                     setOtherIsSelected(true);
                   } else {
-                    handleSubmit(Number(amt));
+                    setSelectedAmount(Number(amt));
+                    setPendingSupportAmount(Number(amt));
                   }
                 }}
               />
@@ -676,7 +678,46 @@ export const AppsAndTools = () => {
           />
           <div className="flex gap-2">
             <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setOtherIsSelected(false)} />
-            <Button theme={theme} type="primary" label="Submit" onClick={() => handleSubmit(Number(selectedAmount))} />
+            <Button
+              theme={theme}
+              type="primary"
+              label="Submit"
+              onClick={() => setPendingSupportAmount(Number(selectedAmount))}
+            />
+          </div>
+        </div>
+      </Show>
+
+      {/* Confirmation speed bump */}
+      <Show when={pendingSupportAmount !== null && pendingSupportAmount > 0}>
+        <div
+          className="mt-4 w-full rounded-xl p-4"
+          style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}
+        >
+          <p className="text-sm font-semibold text-center mb-2" style={{ color: '#FFFFFF' }}>
+            Confirm Donation
+          </p>
+          <p className="text-xs text-center leading-relaxed mb-4" style={{ color: '#98A2B3' }}>
+            You are about to send <span style={{ color: '#FFFFFF', fontWeight: 600 }}>${pendingSupportAmount}</span>{' '}
+            worth of BSV to support the Yours Wallet project. This transaction cannot be reversed.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              theme={theme}
+              type="secondary-outline"
+              label="Cancel"
+              onClick={() => setPendingSupportAmount(null)}
+            />
+            <Button
+              theme={theme}
+              type="primary"
+              label={isProcessing ? 'Sending...' : 'Confirm & Send'}
+              onClick={() => {
+                handleSubmit(pendingSupportAmount!);
+                setPendingSupportAmount(null);
+              }}
+              loading={isProcessing}
+            />
           </div>
         </div>
       </Show>

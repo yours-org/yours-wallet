@@ -47,8 +47,7 @@
     "stream-browserify": "^3.0.0",
     "tailwind-merge": "^3.5.0",
     "url": "^0.11.3",
-    "util": "^0.12.5",
-    "yours-wallet-provider": "^3.7.0"
+    "util": "^0.12.5"
   },
   "scripts": {
     "dev": "vite",

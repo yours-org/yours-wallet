@@ -9,7 +9,7 @@ import {
   SocialProfile,
   SendMNEE,
   MNEEBalance,
-} from 'yours-wallet-provider';
+} from './provider.types';
 import type {
   PermissionRequest,
   GroupedPermissionRequest,

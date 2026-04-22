@@ -1,60 +1,191 @@
 # Remote Storage Provider Guide
 
-How to add your storage service to the Yours Wallet provider registry and implement the required API.
+Run a BRC-100 wallet storage server that Yours Wallet users can connect to — for free community hosting, paid storage, or personal use.
 
-## Adding Your Provider via PR
+## Quick Start
 
-### 1. Add your entry to the provider registry
+```bash
+# Install and initialize the 1sat CLI
+bunx @1sat/cli init
 
-Open `src/components/ProviderPicker.tsx` and add your provider to the `KNOWN_PROVIDERS` array:
+# Start a storage server (local use, no billing)
+1sat config set server.accounts.enabled false
+1sat serve
+```
+
+Your server is now running at `http://localhost:8100`. Point Yours Wallet at it as a custom remote.
+
+## What This Does
+
+Yours Wallet stores transaction history on a remote server so users can recover their data and sync across devices. As a provider, you run a BRC-100 storage server using the `1sat serve` command. The server handles authentication (BRC-103), data sync, and optionally, metered billing — all built in.
+
+---
+
+## Server Setup
+
+### Prerequisites
+
+- [Bun](https://bun.sh) runtime
+- `@1sat/cli` (`bun add -g @1sat/cli`)
+
+### Initialize
+
+```bash
+1sat init
+```
+
+This creates your wallet, generates keys, and writes config to `~/.1sat/config.json`.
+
+### Start the Server
+
+```bash
+1sat serve              # Wallet server + background monitor
+1sat serve wallet       # Server only (no monitor)
+1sat serve monitor      # Monitor only (no HTTP)
+```
+
+The server uses the same wallet instance as CLI commands — one wallet on disk, accessible via both HTTP and CLI.
+
+### Configuration
+
+All settings live under `server.*` in config. Edit via `1sat config set`:
+
+```bash
+# Network
+1sat config set server.host 0.0.0.0       # Listen on all interfaces (default: 127.0.0.1)
+1sat config set server.port 8100          # Port (default: 8100)
+
+# Storage backend
+1sat config set server.storage.provider bun-sqlite   # Default. Use "pg" for Postgres.
+```
+
+---
+
+## Three Modes
+
+### 1. Personal Use (No Billing)
+
+Run a server just for yourself — sync your own wallet across devices.
+
+```bash
+1sat config set server.accounts.enabled false
+1sat serve
+```
+
+Add `http://localhost:8100` (or your machine's IP) as a custom remote in Yours Wallet.
+
+### 2. Free Community Server
+
+Offer free storage to anyone, with a capacity limit per user.
+
+```bash
+1sat config set server.accounts.enabled true
+1sat config set server.accounts.baselineBytes 1073741824      # 1 GB free per user
+1sat config set server.accounts.satsPerUnit 0                 # No paid tier
+1sat serve
+```
+
+### 3. Paid Storage Provider
+
+Offer free baseline storage with metered billing for additional capacity.
+
+```bash
+1sat config set server.accounts.enabled true
+1sat config set server.accounts.baselineBytes 1073741824      # 1 GB free per user
+1sat config set server.accounts.purchaseUnitBytes 1073741824  # Sell in 1 GB chunks
+1sat config set server.accounts.satsPerUnit 1000000           # Price per chunk in satoshis
+1sat config set server.accounts.durationBlocks 4383           # ~1 month validity
+1sat serve
+```
+
+**How billing works:** When a user exceeds their free baseline, the server returns HTTP 507. The Yours Wallet SDK automatically builds a BRC-29 payment transaction, broadcasts it, and retries — all transparent to the user. No payment endpoints to implement.
+
+### Configuration Reference
+
+| Setting                             | Default             | Description                       |
+| ----------------------------------- | ------------------- | --------------------------------- |
+| `server.host`                       | `127.0.0.1`         | Listen address                    |
+| `server.port`                       | `8100`              | Listen port                       |
+| `server.storage.provider`           | `bun-sqlite`        | `bun-sqlite` or `pg`              |
+| `server.accounts.enabled`           | `false`             | Enable per-user capacity metering |
+| `server.accounts.baselineBytes`     | `1073741824` (1 GB) | Free capacity per user            |
+| `server.accounts.purchaseUnitBytes` | `1073741824` (1 GB) | Billing chunk size                |
+| `server.accounts.satsPerUnit`       | `1000000`           | Satoshis per chunk                |
+| `server.accounts.durationBlocks`    | `4383`              | Payment validity (~1 month)       |
+
+### USD-Based Pricing
+
+The `satsPerUnit` config is a static value. If you want to price in USD (e.g. "$1/GB/month") and have the satoshi amount adjust automatically with the BSV exchange rate, you'll need a process that periodically updates the config.
+
+A simple approach — run a cron job that fetches the current BSV/USD rate and recalculates `satsPerUnit`:
+
+```bash
+# Example: price 1 GB at $1/month, update every hour
+# fetch_rate.sh
+#!/bin/bash
+RATE=$(curl -s 'https://api.whatsonchain.com/v1/bsv/main/exchangerate' | jq '.rate')
+TARGET_USD=1.00
+SATS=$(echo "scale=0; ($TARGET_USD / $RATE) * 100000000" | bc)
+1sat config set server.accounts.satsPerUnit $SATS
+```
+
+```bash
+# crontab -e
+0 * * * * /path/to/fetch_rate.sh
+```
+
+The server reads `satsPerUnit` from config on each billing check, so changes take effect immediately without restarting. Existing payments honor the rate at the time they were made — only new purchases use the updated rate.
+
+For more control (rate smoothing, minimum price floors, multi-currency), you'd implement a custom wrapper around the 1sat server that manages the config programmatically.
+
+---
+
+## Adding to the Yours Wallet Provider List
+
+To make your server appear in the Yours Wallet "Add Provider" picker (so users can find you without entering a URL), submit a PR.
+
+### 1. Add your entry
+
+Open `src/components/ProviderPicker.tsx` and add to the `KNOWN_PROVIDERS` array:
 
 ```ts
 {
-  id: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', // Generate a unique UUID (e.g. via uuidgen or uuidgenerator.net)
-  name: 'Your Provider Name',       // Display name shown in the wallet UI
-  url: 'https://your-api.com',      // Base URL for your storage API
+  id: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', // Generate a UUID
+  name: 'Your Provider Name',
+  url: 'https://your-server.com/wallet',
   description: 'Short description of your service.',
 }
 ```
 
-Pricing, capacity, and all other details are fetched live from your server's `GET /account/status` endpoint via `AuthFetch` (BRC-103 mutual authentication). You do not need to hardcode any pricing in the PR — the wallet displays whatever your server returns.
+### 2. Requirements
 
-### 2. PR requirements
+- Your `GET /account/status` endpoint must be live and returning valid data
+- Your server must support BRC-103 mutual authentication
+- Add only your entry — do not modify existing providers
 
-- Add only your entry to the `KNOWN_PROVIDERS` array — do not modify existing entries
-- Your `GET /account/status` endpoint must be live and returning a valid response (see API spec below)
-- Your server must support BRC-103 mutual authentication (the wallet uses `AuthFetch` from `@bsv/sdk`)
-- Include a brief description of your service in the PR body
-
-### Known providers vs custom remotes
-
-Users can also add **custom remotes** by entering any URL. Custom remotes do not get `GET /account/status` calls — the wallet performs a BRC-103 liveness check (via `AuthFetch`) to verify connectivity. Custom remotes handle billing and auth out of band.
-
-Only known providers (listed in `KNOWN_PROVIDERS`) get live pricing and usage data displayed in the wallet UI.
+Pricing and capacity are fetched live from your server. Nothing is hardcoded in the wallet.
 
 ---
 
-## Default Behavior
+## How the Wallet Connects
 
-All wallets start with **local browser storage only** — no remotes configured. Users add remotes from the provider list in Settings > Wallet Backup > Remote Storage.
+### Known providers
+
+The wallet fetches `GET /account/status` via `AuthFetch` (BRC-103) to display live pricing and usage data.
+
+### Custom remotes
+
+Users enter any URL. On add, the wallet performs a BRC-103 liveness check via `AuthFetch` to verify connectivity. After adding, periodic status checks use a simple HTTP connectivity check (not `AuthFetch`). No `/account/status` call — custom remotes handle billing out of band if needed.
+
+### Authentication
+
+All communication uses `AuthFetch` from `@bsv/sdk` (BRC-103 mutual authentication). The handshake happens automatically via `POST /.well-known/auth`. No API keys or custom headers needed.
 
 ---
 
-## Authentication
+## Status Endpoint
 
-All requests to your server are made via `AuthFetch` from `@bsv/sdk`, which implements BRC-103 mutual authentication. The auth handshake happens automatically via `POST /.well-known/auth` at your server's origin. No API keys or custom headers are needed — the wallet's identity key authenticates every request.
-
----
-
-## Required API Endpoints
-
-### `GET /account/status`
-
-Returns the current account status, usage, and pricing for the authenticated caller.
-
-**Authentication:** BRC-103 mutual auth via `AuthFetch` (automatic — no manual headers needed).
-
-**Response:**
+`GET /account/status` — returned automatically by `1sat serve` when accounts are enabled.
 
 ```json
 {
@@ -70,8 +201,8 @@ Returns the current account status, usage, and pricing for the authenticated cal
   "paidThroughBlock": null,
   "pricing": {
     "purchaseUnitBytes": 1073741824,
-    "satsPerUnit": 6250000,
-    "durationBlocks": 4320
+    "satsPerUnit": 1000000,
+    "durationBlocks": 4383
   },
   "nextPayment": {
     "derivationPrefix": "base64...",
@@ -80,139 +211,40 @@ Returns the current account status, usage, and pricing for the authenticated cal
 }
 ```
 
-**Field reference:**
-
-| Field                          | Type           | Description                                                                     |
-| ------------------------------ | -------------- | ------------------------------------------------------------------------------- |
-| `identityKey`                  | string         | The caller's identity key                                                       |
-| `serverIdentityKey`            | string         | The server's identity key                                                       |
-| `accountsEnabled`              | boolean        | Whether accounts are enabled on this server                                     |
-| `currentBlock`                 | number         | Current block height                                                            |
-| `usedBytes`                    | number         | Bytes stored for this caller                                                    |
-| `baselineBytes`                | number         | Free capacity everyone gets                                                     |
-| `paidBytes`                    | number         | Additional capacity from the latest active payment                              |
-| `capacityBytes`                | number         | `baselineBytes + paidBytes`                                                     |
-| `deficitBytes`                 | number         | `max(0, usedBytes - capacityBytes)`                                             |
-| `paidThroughBlock`             | number \| null | Block height when the latest payment expires. `null` if no active payment.      |
-| `pricing.purchaseUnitBytes`    | number         | Bytes per one purchase unit                                                     |
-| `pricing.satsPerUnit`          | number         | Price per unit in satoshis. Server sets this and validates payments against it. |
-| `pricing.durationBlocks`       | number         | How long a purchase lasts in blocks (~144 blocks/day)                           |
-| `nextPayment.derivationPrefix` | string         | Base64-encoded BRC-29 derivation prefix the server expects for the payment      |
-| `nextPayment.derivationSuffix` | string         | Base64-encoded derivation suffix (monotonic per payer)                          |
-
-### Existing Sync Endpoints
-
-Your server must also implement the standard wallet sync protocol used by `@bsv/wallet-toolbox`:
-
-- Data sync (outputs, transactions, certificates) — see the BRC-100 wallet storage specification
-- The wallet communicates with these via the `ChromeCWI` → service worker → wallet-toolbox pipeline
-
-The `/account/status` endpoint above is an addition on top of the existing sync protocol.
+| Field              | Description                                        |
+| ------------------ | -------------------------------------------------- |
+| `usedBytes`        | Bytes stored for this user                         |
+| `baselineBytes`    | Free capacity                                      |
+| `paidBytes`        | Additional capacity from payment                   |
+| `capacityBytes`    | `baselineBytes + paidBytes`                        |
+| `deficitBytes`     | `max(0, usedBytes - capacityBytes)`                |
+| `paidThroughBlock` | Block height when payment expires (`null` if none) |
+| `pricing.*`        | Current billing rates                              |
+| `nextPayment.*`    | BRC-29 derivation params for the next payment      |
 
 ---
 
-## Pricing Model
+## Payment Flow
 
-Storage uses **metered pricing with block-based duration**:
+Handled entirely by the SDK — no code to write.
 
-- Each provider sets a **baseline** (e.g. 1 GB) — free capacity everyone gets
-- Additional capacity is purchased in **units** (e.g. 1 GB per unit) at a fixed satoshi price
-- Purchases last for a fixed number of **blocks** (~144 blocks/day, ~4320 blocks/month)
-- When a purchase expires (`currentBlock > paidThroughBlock`), `paidBytes` drops to 0
-- If `usedBytes > capacityBytes`, the server reports a `deficitBytes` and restricts writes
+1. User performs a billable operation (send, inscribe, etc.)
+2. Server returns **507 Insufficient Storage** if over capacity
+3. `@1sat/wallet` SDK catches the 507, fetches `/account/status`
+4. SDK builds a BRC-29 payment using `nextPayment` derivation params
+5. Server detects payment on-chain, credits capacity
+6. Original operation retries and succeeds
 
-The wallet converts satoshi prices to USD for display using the cached BSV exchange rate.
+The user sees nothing — the operation just takes slightly longer on first 507.
 
----
-
-## Payment Flow (507 Auto-Retry)
-
-Payments are handled transparently by the `@1sat/wallet` SDK. No explicit payment endpoint is needed.
-
-```
-┌─────────┐                    ┌─────────────┐
-│  Wallet  │                    │   Storage    │
-│          │                    │   Server     │
-└────┬─────┘                    └──────┬──────┘
-     │                                 │
-     │  1. Billable op (createAction,  │
-     │     signAction, etc.)           │
-     │────────────────────────────────►│
-     │                                 │
-     │  2. Server returns 507          │
-     │     (over capacity)             │
-     │◄────────────────────────────────│
-     │                                 │
-     │  3. SDK catches 507, fetches    │
-     │     GET /account/status         │
-     │────────────────────────────────►│
-     │  { deficitBytes, pricing,       │
-     │    nextPayment }                │
-     │◄────────────────────────────────│
-     │                                 │
-     │  4. SDK builds BRC-29 payment   │
-     │     using nextPayment derivation│
-     │     params, broadcasts tx       │
-     │─────────────────► (on-chain)    │
-     │                                 │
-     │  5. Server detects payment,     │
-     │     credits capacity            │
-     │                                 │
-     │  6. SDK retries original op     │
-     │────────────────────────────────►│
-     │     ✓ Success                   │
-     │◄────────────────────────────────│
-```
-
-### How it works
-
-1. The wallet performs a billable operation (e.g. `wallet.createAction`)
-2. If the user is over capacity, the server returns **HTTP 507 Insufficient Storage**
-3. The `@1sat/wallet` SDK automatically catches the 507
-4. It fetches `GET /account/status` to get current deficit, pricing, and `nextPayment` derivation params
-5. It builds a BRC-29 self-payment transaction using `wallet.createAction` with the provided derivation prefix/suffix
-6. The server detects the payment on-chain and credits capacity
-7. The original operation is retried and succeeds
-
-**User-visible behavior:** The operation just succeeds (slightly slower on first 507 while payment processes). No 507 errors surface to the UI.
-
-### Payment failure
-
-If the auto-payment fails (e.g. insufficient BSV balance), the SDK throws a `StoragePaymentError` with `code: 'storage-payment-failed'`. The wallet UI displays: "Your remote storage requires a payment that could not be completed. Please ensure you have enough BSV in your wallet."
-
-### BRC-29 Payment Details
-
-The payment transaction uses BRC-29 derivation:
-
-- `protocolID`: `[2, '3241645161d8']`
-- `keyID`: `{nextPayment.derivationPrefix} {nextPayment.derivationSuffix}`
-- `counterparty`: `serverIdentityKey`
-- Amount: `pricing.satsPerUnit × ceil(deficitBytes / pricing.purchaseUnitBytes)`
-
-The server provides a unique `derivationPrefix` and `derivationSuffix` for each payment (monotonic per payer), making the payment address deterministic and verifiable by both sides.
+If the user has insufficient BSV, the wallet shows: "Your remote storage requires a payment that could not be completed."
 
 ---
 
-## Identity
+## Operational Notes
 
-All storage uses the wallet's **storage identity key** — a per-install random identifier used as the local IndexedDB's store key. No BAP identity is required. The storage identity key uniquely identifies the wallet installation. Authentication is handled by BRC-103 mutual auth via `AuthFetch`.
-
-## Active vs Backup
-
-A wallet can have one **active** storage location and zero or more **backup** locations:
-
-- **Active**: Where the wallet reads and writes data. Can be local (this browser) or a remote server. Setting a remote as active enables multi-device sync.
-- **Backup**: A copy of the data for safety. The wallet pushes data to backup remotes but doesn't read from them.
-
-New wallets default to local-active with no remotes. Users add remotes from the provider list and can promote any remote to active.
-
----
-
-## Provider Guidelines
-
-- **Baseline capacity recommended**: Offering free storage (even 500 MB) helps adoption
-- **Grace period**: If a purchase expires and the user is over capacity, allow a grace period before restricting writes
-- **Read-only on deficit**: When `deficitBytes > 0`, allow read-only sync so users can still access their data
-- **No data deletion**: Never delete user data without extended notice. Users should always be able to export.
-- **Pricing transparency**: Pricing is shown in the wallet UI from your `/account/status` response. Users see the rate before committing.
-- **507 response required**: The payment flow depends on your server returning HTTP 507 when the user exceeds capacity during billable operations. Without this, the auto-payment SDK logic won't trigger.
+- **Key management**: Server uses the same key as the CLI (`PRIVATE_KEY_WIF` env or `~/.1sat/keys.bep`)
+- **Database**: SQLite at `~/.1sat/data/wallet-main.db` by default. Use Postgres for production: `1sat config set server.storage.provider pg`
+- **Monitor**: `1sat serve` runs a background monitor for broadcast/proof lifecycle. `1sat serve wallet` skips it if you run the monitor separately.
+- **Reads are always free**: Only writes (createAction, signAction, internalizeAction) are metered
+- **Active vs backup**: Only the active remote triggers 507 payments. Backup remotes receive pushed data without billing.

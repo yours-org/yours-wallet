@@ -22,9 +22,9 @@ interface StorageProvider {
 export const KNOWN_PROVIDERS: StorageProvider[] = [
   {
     id: 'a3e8c1d2-7f4b-4e9a-b6d0-1c5f8e2a9b3d',
-    name: 'Shruggr',
-    url: 'https://wallet.shruggr.cloud',
-    description: 'Community storage provider.',
+    name: '1Sat Storage',
+    url: 'https://wallet.1sat.app',
+    description: 'Official storage partner of Yours Wallet.',
   },
 ];
 

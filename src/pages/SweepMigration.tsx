@@ -430,7 +430,6 @@ export const SweepMigration = () => {
                   chrome.tabs.create({ url: chrome.runtime.getURL('sweep-tab.html') });
                 }}
               />
-              <Button theme={theme} type="secondary-outline" label="I'll Do This Later" onClick={handleSkip} />
             </motion.div>
           </motion.div>
         </div>
@@ -944,7 +943,6 @@ export const SweepMigration = () => {
                   onClick={executeSweeps}
                   disabled={!hasSelection}
                 />
-                <Button theme={theme} type="secondary-outline" label="Skip for Now" onClick={handleSkip} />
               </div>
             </motion.div>
           </Show>

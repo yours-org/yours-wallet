@@ -2,7 +2,7 @@
 declare const chrome: any;
 
 import { Utils } from '@bsv/sdk';
-import { NetWork } from 'yours-wallet-provider';
+import { NetWork } from './types/provider.types';
 import { YoursEventName } from '../inject';
 import { sendMessage, sendMessageAsync } from '../utils/chromeHelpers';
 import {
