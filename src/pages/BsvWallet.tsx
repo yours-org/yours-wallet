@@ -35,6 +35,7 @@ import {
 import { formatNumberWithCommasAndDecimals, formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import { AssetRow } from '../components/AssetRow';
+import { BackupPromo } from '../components/BackupPromo';
 import lockIcon from '../assets/lock.svg';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useWeb3RequestContext } from '../hooks/useWeb3RequestContext';
@@ -89,7 +90,7 @@ export const BsvWallet = () => {
   const [pageState, setPageState] = useState<PageState>('main');
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService, apiContext } = useServiceContext();
+  const { chromeStorageService, apiContext, keysService } = useServiceContext();
   const { profile: identityProfile } = useIdentity(apiContext, chromeStorageService);
   const avatarUrl = useMemo(() => {
     if (!identityProfile.image || !apiContext.services) return '';
@@ -117,9 +118,12 @@ export const BsvWallet = () => {
   const [receiveAddress, setReceiveAddress] = useState<string>('');
   const [bsvBalance, setBsvBalance] = useState<number>(0);
   const [exchangeRate, setExchangeRate] = useState<number>(0);
+  const [balanceLoading, setBalanceLoading] = useState(true);
   const [lockData, setLockData] = useState<LockData>();
   const [isSendAllBsv, setIsSendAllBsv] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showBackupPromo, setShowBackupPromo] = useState(false);
+  const [keysAlreadyBackedUp, setKeysAlreadyBackedUp] = useState(false);
   const [bsv21s, setBsv21s] = useState<Bsv21Balance[]>([]);
   const [manageFavorites, setManageFavorites] = useState(false);
   const [account, setAccount] = useState<Account>();
@@ -264,6 +268,22 @@ export const BsvWallet = () => {
     (async () => {
       const obj = await chromeStorageService.getAndSetStorage();
       setShowWelcome(!!obj?.showWelcome);
+      // Show backup promo only when launched directly (not from a dApp popup)
+      // and only if not previously dismissed (per-account) and no active remote
+      const isPopup = !!(
+        obj?.connectRequest ||
+        obj?.permissionRequest ||
+        obj?.groupedPermissionRequest ||
+        obj?.counterpartyPermissionRequest ||
+        obj?.transactionApprovalRequest
+      );
+      if (!isPopup) {
+        const acct = obj?.accounts?.[obj?.selectedAccount ?? ''];
+        const dismissed = !!acct?.settings?.dismissedBackupPromo;
+        const hasRemotes = (acct?.storageConfig?.remotes?.length ?? 0) > 0;
+        setKeysAlreadyBackedUp(!!acct?.settings?.keysBackedUp);
+        setShowBackupPromo(!dismissed && !hasRemotes);
+      }
       if (obj?.selectedAccount) {
         await getAndSetAccountAndBsv21s();
       }
@@ -298,6 +318,7 @@ export const BsvWallet = () => {
     setBsvBalance(satoshis / 100_000_000);
     const rate = await fetchExchangeRate(apiContext.chain, apiContext.wocApiKey);
     setExchangeRate(rate);
+    setBalanceLoading(false);
   };
 
   useEffect(() => {
@@ -808,15 +829,19 @@ export const BsvWallet = () => {
           className="flex flex-col items-center mt-1"
         >
           <div className="flex items-center gap-2">
-            <h1
-              title={isSyncing ? 'Syncing…' : 'Balance'}
-              className="text-4xl font-bold tracking-tight select-none"
-              style={{ color: theme.color.global.contrast, letterSpacing: '-0.02em' }}
-            >
-              {formatUSD(bsvBalance * exchangeRate)}
-            </h1>
+            {balanceLoading ? (
+              <Loader2 size={28} className="animate-spin" style={{ color: theme.color.global.gray }} />
+            ) : (
+              <h1
+                title={isSyncing ? 'Syncing…' : 'Balance'}
+                className="text-4xl font-bold tracking-tight select-none"
+                style={{ color: theme.color.global.contrast, letterSpacing: '-0.02em' }}
+              >
+                {formatUSD(bsvBalance * exchangeRate + (services.mnee ? mneeBalance : 0))}
+              </h1>
+            )}
             <AnimatePresence>
-              {isSyncing && (
+              {isSyncing && !balanceLoading && (
                 <motion.div
                   key="sync-spinner"
                   initial={{ opacity: 0, scale: 0.8 }}
@@ -830,12 +855,6 @@ export const BsvWallet = () => {
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-          <div className="flex items-center gap-1.5 mt-1">
-            <img src={bsvCoin} className="w-3.5 h-3.5 opacity-70" alt="BSV" />
-            <span className="text-sm font-mono" style={{ color: theme.color.global.gray }}>
-              {bsvBalance.toFixed(8)} BSV
-            </span>
           </div>
         </motion.div>
 
@@ -896,6 +915,7 @@ export const BsvWallet = () => {
             balance={bsvBalance}
             icon={bsvCoin}
             ticker="BSV"
+            decimals={8}
             usdBalance={bsvBalance * exchangeRate}
             showPointer={true}
             onClick={() => setPageState('send')}
@@ -905,6 +925,7 @@ export const BsvWallet = () => {
               balance={mneeBalance}
               icon={MNEE_ICON_URL}
               ticker="MNEE USD"
+              decimals={5}
               usdBalance={mneeBalance}
               showPointer={mneeBalance > 0}
               isMNEE
@@ -1305,7 +1326,6 @@ export const BsvWallet = () => {
           <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
         </motion.button>
         <div className="flex items-center gap-2 flex-1">
-          <img src={bsvCoin} className="w-5 h-5" alt="BSV" />
           <h2 className="text-base font-bold tracking-tight" style={{ color: theme.color.global.contrast }}>
             Send BSV
           </h2>
@@ -1508,6 +1528,41 @@ export const BsvWallet = () => {
   return (
     <>
       <TopNav />
+      {showBackupPromo && (
+        <BackupPromo
+          theme={theme}
+          keysService={keysService}
+          keysAlreadyBackedUp={keysAlreadyBackedUp}
+          onKeysBackedUp={async () => {
+            setKeysAlreadyBackedUp(true);
+            const { account } = chromeStorageService.getCurrentAccountObject();
+            if (account) {
+              await chromeStorageService.updateNested('accounts', {
+                [account.addresses.identityAddress]: {
+                  ...account,
+                  settings: { ...account.settings, keysBackedUp: true },
+                },
+              });
+            }
+          }}
+          onSetup={() => {
+            setShowBackupPromo(false);
+            handleSelect('settings', 'storage');
+          }}
+          onDismiss={async () => {
+            setShowBackupPromo(false);
+            const { account } = chromeStorageService.getCurrentAccountObject();
+            if (account) {
+              await chromeStorageService.updateNested('accounts', {
+                [account.addresses.identityAddress]: {
+                  ...account,
+                  settings: { ...account.settings, dismissedBackupPromo: true },
+                },
+              });
+            }
+          }}
+        />
+      )}
       <Show when={manageFavorites}>
         <ManageTokens
           onBack={() => {

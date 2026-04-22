@@ -147,7 +147,15 @@ export const parseRawTransaction = async (tx: Transaction, apiContext: OneSatCon
   return ctx;
 };
 
-export const getErrorMessage = (error: string | undefined) => {
+export const getErrorMessage = (error: string | unknown | undefined) => {
+  // Check for StoragePaymentError by code (works without importing the class)
+  if (typeof error === 'object' && error !== null && (error as { code?: string }).code === 'storage-payment-failed') {
+    return 'Your remote storage requires a payment that could not be completed. Please ensure you have enough BSV in your wallet.';
+  }
+  // Check for StoragePaymentError message pattern when the error was stringified
+  if (typeof error === 'string' && error.includes('storage-payment-failed')) {
+    return 'Your remote storage requires a payment that could not be completed. Please ensure you have enough BSV in your wallet.';
+  }
   switch (error) {
     case 'invalid-password':
       return 'Invalid Password!';
@@ -203,10 +211,17 @@ export const getErrorMessage = (error: string | undefined) => {
     case 'key-type':
       return 'Key type does not exist!';
 
+    case 'storage-payment-failed':
+      return 'Your remote storage requires a payment that could not be completed. Please ensure you have enough BSV in your wallet.';
+
     default:
       return 'An unknown error has occurred! Try again.';
   }
 };
+
+/** Check if an error is a storage payment failure (code-based, no import needed) */
+export const isStoragePaymentError = (err: unknown): boolean =>
+  typeof err === 'object' && err !== null && (err as { code?: string }).code === 'storage-payment-failed';
 
 export const decimalToHex = (d: number) => {
   // helper function to convert integer to hex

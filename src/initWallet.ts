@@ -11,7 +11,6 @@ import {
 import { syncAddresses, createContext as createActionContext } from '@1sat/actions';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import type { Account, StorageConfig } from './services/types/chromeStorage.types';
-import { DEFAULT_STORAGE_REMOTE } from './utils/constants';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
 import { initSyncContext, type SyncContext } from './initSyncContext';
@@ -64,10 +63,10 @@ const resolveStorageConfig = (
   storageConfig: StorageConfig | undefined,
 ): { activeRemote?: string; backups?: string[] } => {
   if (!storageConfig) {
-    // Implicit default for pre-existing accounts: remote-active against the
-    // shipped provider, no extra backups. Identical to the prior hardcoded
-    // behavior.
-    return { activeRemote: DEFAULT_STORAGE_REMOTE };
+    // No storage config — this is a pre-migration account that was previously
+    // syncing to the default remote. Return local-only; the user can add
+    // remotes from the provider list.
+    return {};
   }
   const { activeRemote, remotes = [] } = storageConfig;
   // `remotes[]` holds every configured remote including the active; filter

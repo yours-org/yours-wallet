@@ -30,6 +30,8 @@ export type AssetRowProps = {
   animate?: boolean;
   isLock?: boolean;
   nextUnlock?: number;
+  /** Decimal places for balance display. Defaults to 3. */
+  decimals?: number;
   onGetMneeClick?: () => void;
   onClick?: () => void;
 };
@@ -47,9 +49,11 @@ export const AssetRow = (props: AssetRowProps) => {
     showPointer,
     onGetMneeClick,
     animate = false,
+    decimals,
   } = props;
   const { theme } = useTheme();
   const isDisplaySat = isLock && balance < 0.0001;
+  const displayDecimals = decimals ?? (isDisplaySat ? 0 : 3);
   const isMneeBalanceZero = !!isMNEE && usdBalance === 0;
 
   return (
@@ -91,7 +95,7 @@ export const AssetRow = (props: AssetRowProps) => {
             >
               {`${formatLargeNumber(
                 isDisplaySat ? balance * BSV_DECIMAL_CONVERSION : balance,
-                isDisplaySat ? 0 : 3,
+                displayDecimals,
               )}${isLock ? (isDisplaySat ? `${balance === 0.00000001 ? ' SAT' : ' SATS'}` : ' BSV') : ''}`}
             </span>
             <span className="text-xs mt-0.5 text-right" style={{ color: theme.color.global.gray }}>

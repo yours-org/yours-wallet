@@ -46,7 +46,7 @@ import { removeWindow } from './utils/chromeHelpers';
 import { Account, ChromeStorageObject, ConnectRequest, StorageConfig } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { initWallet, type AccountContext } from './initWallet';
-import { DEFAULT_STORAGE_REMOTE, HOSTED_YOURS_IMAGE } from './utils/constants';
+import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
 
 let chromeStorageService = new ChromeStorageService();
@@ -183,7 +183,7 @@ export const getWallet = (): WalletInterface | null => {
  * Waits for startup initialization first so we don't launch a popup
  * while the wallet is still auto-initializing from a persisted passKey.
  */
-const ensureWallet = async (): Promise<WalletInterface> => {
+const ensureWallet = async (suppressPopup = false): Promise<WalletInterface> => {
   await startupInitPromise;
   if (accountContext?.wallet) {
     return accountContext.wallet;
@@ -211,6 +211,10 @@ const ensureWallet = async (): Promise<WalletInterface> => {
   }
 
   // Wallet exists but is locked — prompt user to unlock via popup
+  // (unless suppressed, e.g. when called from the extension popup itself)
+  if (suppressPopup) {
+    return Promise.reject(new Error('Wallet not available'));
+  }
   return new Promise((resolve, reject) => {
     pendingWalletWaiters.push({ resolve, reject });
     if (pendingWalletWaiters.length === 1) {
@@ -769,13 +773,11 @@ if (isInServiceWorker) {
       return;
     }
 
-    // If message is from our own extension popup, check wallet state without launching popup
-    // The popup handles its own UI (unlock/create wallet pages)
+    // If message is from our own extension popup, check wallet state without launching popup.
+    // The popup handles its own UI (unlock/create wallet pages).
     if (isFromExtension) {
       const { account, passKey } = chromeStorageService.getCurrentAccountObject();
-      const isWalletAvailable = account?.encryptedKeys && passKey;
-
-      if (!isWalletAvailable) {
+      if (!(account?.encryptedKeys && passKey)) {
         sendResponse({
           type: message.action,
           success: false,
@@ -783,10 +785,11 @@ if (isInServiceWorker) {
         });
         return true;
       }
-      // Wallet is available, continue to authorize
+      // Wallet credentials exist, continue to ensureWallet (which won't launch popup
+      // because suppressPopup flag is set for this call).
     }
 
-    ensureWallet()
+    ensureWallet(isFromExtension)
       .then(() => {
         console.log('[background] ensureWallet resolved for action:', message.action);
         return authorizeRequest(message);
@@ -932,8 +935,7 @@ if (isInServiceWorker) {
         // from the same source of truth used at init time.
         const { account } = chromeStorageService.getCurrentAccountObject();
         const storageConfig: StorageConfig = account?.storageConfig ?? {
-          activeRemote: DEFAULT_STORAGE_REMOTE,
-          remotes: [DEFAULT_STORAGE_REMOTE],
+          remotes: [],
         };
 
         let outputCount = 0;
@@ -1042,8 +1044,7 @@ if (isInServiceWorker) {
     if (!account) throw new Error('No account loaded');
     const identityAddress = account.addresses.identityAddress;
     const existing: StorageConfig = account.storageConfig ?? {
-      activeRemote: DEFAULT_STORAGE_REMOTE,
-      remotes: [DEFAULT_STORAGE_REMOTE],
+      remotes: [],
     };
     const next = patch(existing);
     await chromeStorageService.updateNested('accounts', {
@@ -1145,14 +1146,6 @@ if (isInServiceWorker) {
    * reconnected on next unlock. Refuses if the URL is the current active.
    */
   const processStorageRemoveRemote = async (url: string, sendResponse: CallbackResponse) => {
-    if (!accountContext) {
-      sendResponse({
-        type: 'STORAGE_REMOVE_REMOTE',
-        success: false,
-        error: 'Wallet not initialized',
-      });
-      return;
-    }
     try {
       const nextConfig = await updateStorageConfig((current) => {
         if (current.activeRemote === url) {

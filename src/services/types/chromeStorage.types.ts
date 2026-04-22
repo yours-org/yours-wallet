@@ -29,6 +29,10 @@ export type Settings = {
   customFeeRate: number;
   /** Auto-lock timeout in minutes. Defaults to 10. */
   lockTimeout?: number;
+  /** Set to true once the user dismisses the backup storage promo for this account */
+  dismissedBackupPromo?: boolean;
+  /** Set to true once the user downloads their keys from the walkthrough */
+  keysBackedUp?: boolean;
 };
 
 /**

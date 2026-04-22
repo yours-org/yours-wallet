@@ -1,88 +1,124 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Server, ChevronDown, ChevronUp, Check, Shield } from 'lucide-react';
+import { X, Server, ChevronDown, ChevronUp, Loader2, WifiOff } from 'lucide-react';
 import { Button } from './Button';
 import { Input } from './Input';
 import { Theme } from '../theme.types';
+import { AuthFetch } from '@bsv/sdk';
+import type { WalletInterface } from '@bsv/sdk';
+import type { RemoteStatus, RemoteStatusResult } from '../hooks/useRemoteStatus';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-interface StorageTier {
-  name: string;
-  storage: string;
-  /** Monthly price in satoshis. 0 = free. Set by the server. */
-  priceInSats: number;
-  description: string;
-}
-
+// Known providers only need identity + URL. Pricing comes from the server.
 interface StorageProvider {
   id: string;
   name: string;
   url: string;
   description: string;
-  freeTier: string;
-  paymentAddress: string;
-  tiers: StorageTier[];
 }
 
 // TODO: Move to a JSON file in the repo so providers can add themselves via PR
-const KNOWN_PROVIDERS: StorageProvider[] = [
+export const KNOWN_PROVIDERS: StorageProvider[] = [
   {
-    id: 'yours',
-    name: 'Yours',
-    url: 'https://api.1sat.app/1sat/wallet',
-    description: 'Default provider backed by the 1Sat network.',
-    freeTier: '1 GB free',
-    paymentAddress: '1YoursStoragePaymentAddressXXXXXXXXX',
-    tiers: [
-      { name: 'Free', storage: '1 GB', priceInSats: 0, description: 'Auto-backup included with every wallet' },
-      { name: 'Pro', storage: '10 GB', priceInSats: 6_250_000, description: 'For power users with large collections' },
-      { name: 'Unlimited', storage: 'Unlimited', priceInSats: 31_250_000, description: 'No storage limits' },
-    ],
-  },
-  {
-    id: 'babbage-test',
-    name: 'Babbage Test',
-    url: 'https://storage-test.babbage.systems/wallet',
-    description: 'Babbage test storage node for development and testing.',
-    freeTier: '500 MB free',
-    paymentAddress: '1BabbageTestStoragePaymentXXXXXXXXX',
-    tiers: [
-      { name: 'Free', storage: '500 MB', priceInSats: 0, description: 'Development and testing' },
-      { name: 'Standard', storage: '5 GB', priceInSats: 3_125_000, description: 'Production workloads' },
-      { name: 'Enterprise', storage: '50 GB', priceInSats: 15_625_000, description: 'High-volume applications' },
-    ],
+    id: 'a3e8c1d2-7f4b-4e9a-b6d0-1c5f8e2a9b3d',
+    name: 'Shruggr',
+    url: 'https://wallet.shruggr.cloud',
+    description: 'Community storage provider.',
   },
 ];
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  const value = bytes / Math.pow(1024, i);
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
+}
+
+function formatRate(pricing: RemoteStatus['pricing'], exchangeRate: number): string {
+  const unitGb = pricing.purchaseUnitBytes / 1_073_741_824;
+  const label = unitGb >= 1 ? `${unitGb} GB` : `${Math.round(unitGb * 1024)} MB`;
+  if (!exchangeRate || exchangeRate <= 0) {
+    return `${pricing.satsPerUnit.toLocaleString()} sats/${label}/mo`;
+  }
+  const usd = ((pricing.satsPerUnit / 100_000_000) * exchangeRate).toFixed(2);
+  return `$${usd}/${label}/mo`;
+}
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
 type Props = {
   theme: Theme;
+  wallet: WalletInterface;
   existingRemotes: string[];
-  /** USD per 1 BSV (e.g. 65.50). Used to convert tier prices to sats. */
   exchangeRate: number;
   onSelectProvider: (url: string) => void;
   onClose: () => void;
   busy?: boolean;
 };
 
-function formatTierPrice(sats: number, exchangeRate: number): string {
-  if (sats === 0) return 'Free';
-  if (!exchangeRate || exchangeRate <= 0) return `${sats.toLocaleString()} sats/mo`;
-  const usd = ((sats / 100_000_000) * exchangeRate).toFixed(2);
-  return `$${usd}/mo`;
-}
-
 // ── Component ──────────────────────────────────────────────────────────────
 
-export const ProviderPicker = ({ theme, existingRemotes, exchangeRate, onSelectProvider, onClose, busy }: Props) => {
+export const ProviderPicker = ({
+  theme,
+  wallet,
+  existingRemotes,
+  exchangeRate,
+  onSelectProvider,
+  onClose,
+  busy,
+}: Props) => {
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
-  const [selectedTier, setSelectedTier] = useState<{ providerId: string; tierName: string } | null>(null);
+  const [confirmingProvider, setConfirmingProvider] = useState<{ url: string; name: string; rate: string } | null>(
+    null,
+  );
   const [customUrl, setCustomUrl] = useState('');
   const [customError, setCustomError] = useState('');
+  const [customChecking, setCustomChecking] = useState(false);
+  const [customLive, setCustomLive] = useState<boolean | null>(null);
+  const [statusMap, setStatusMap] = useState<Record<string, RemoteStatusResult>>({});
+  const [fetching, setFetching] = useState(true);
 
-  const handleCustomAdd = () => {
+  // Fetch /account/status from all known providers in parallel on mount
+  useEffect(() => {
+    const fetchAll = async () => {
+      setFetching(true);
+      const authFetch = new AuthFetch(wallet);
+      const results = await Promise.all(
+        KNOWN_PROVIDERS.map(async (p): Promise<[string, RemoteStatusResult]> => {
+          try {
+            const res = await authFetch.fetch(`${p.url.replace(/\/$/, '')}/account/status`, { method: 'GET' });
+            if (!res.ok) return [p.url, { status: 'error', error: `HTTP ${res.status}` }];
+            const data = (await res.json()) as RemoteStatus;
+            return [p.url, { status: 'ok', data }];
+          } catch (err) {
+            return [p.url, { status: 'error', error: err instanceof Error ? err.message : 'Unreachable' }];
+          }
+        }),
+      );
+      setStatusMap(Object.fromEntries(results));
+      setFetching(false);
+    };
+    fetchAll();
+  }, [wallet]);
+
+  /** BRC-103 liveness check via AuthFetch. The handshake to /.well-known/auth
+   *  happens internally. Any response (even 405) proves the server is alive
+   *  and authenticated — only a thrown error means unreachable. */
+  const checkLiveness = async (baseUrl: string): Promise<boolean> => {
+    const authFetch = new AuthFetch(wallet);
+    try {
+      await authFetch.fetch(baseUrl.replace(/\/$/, ''), { method: 'POST' });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleCustomAdd = async () => {
     const url = customUrl.trim();
     if (!url) return;
     try {
@@ -92,7 +128,18 @@ export const ProviderPicker = ({ theme, existingRemotes, exchangeRate, onSelectP
       return;
     }
     setCustomError('');
-    onSelectProvider(url);
+    setCustomChecking(true);
+    setCustomLive(null);
+
+    const live = await checkLiveness(url);
+    setCustomChecking(false);
+    setCustomLive(live);
+
+    if (live) {
+      onSelectProvider(url);
+    } else {
+      setCustomError('Server is unreachable');
+    }
   };
 
   return (
@@ -142,22 +189,39 @@ export const ProviderPicker = ({ theme, existingRemotes, exchangeRate, onSelectP
             {KNOWN_PROVIDERS.map((provider) => {
               const alreadyAdded = existingRemotes.includes(provider.url);
               const isExpanded = expandedProvider === provider.id;
+              const result = statusMap[provider.url];
+              const isLoading = fetching && !result;
+              const isOffline = result?.status === 'error';
+              const serverData = result?.status === 'ok' ? result.data : null;
 
               return (
                 <div
                   key={provider.id}
                   className="rounded-xl overflow-hidden"
                   style={{
-                    background: alreadyAdded ? 'rgba(52,211,153,0.04)' : 'rgba(255,255,255,0.03)',
-                    border: alreadyAdded ? '1px solid rgba(52,211,153,0.15)' : '1px solid rgba(255,255,255,0.06)',
+                    background: alreadyAdded
+                      ? 'rgba(52,211,153,0.04)'
+                      : isOffline
+                        ? 'rgba(249,112,102,0.03)'
+                        : 'rgba(255,255,255,0.03)',
+                    border: alreadyAdded
+                      ? '1px solid rgba(52,211,153,0.15)'
+                      : isOffline
+                        ? '1px solid rgba(249,112,102,0.1)'
+                        : '1px solid rgba(255,255,255,0.06)',
+                    opacity: isOffline ? 0.6 : 1,
                   }}
                 >
-                  {/* Provider header — always visible */}
+                  {/* Provider header */}
                   <button
                     onClick={() => setExpandedProvider(isExpanded ? null : provider.id)}
                     className="flex items-center w-full px-4 py-3 text-left border-0 outline-none cursor-pointer bg-transparent"
                   >
-                    <Server size={16} style={{ color: alreadyAdded ? '#34D399' : '#98A2B3' }} className="shrink-0" />
+                    <Server
+                      size={16}
+                      style={{ color: isOffline ? '#F97066' : alreadyAdded ? '#34D399' : '#98A2B3' }}
+                      className="shrink-0"
+                    />
                     <div className="ml-3 flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold" style={{ color: '#FFFFFF' }}>
@@ -171,15 +235,29 @@ export const ProviderPicker = ({ theme, existingRemotes, exchangeRate, onSelectP
                             Added
                           </span>
                         )}
+                        {isOffline && (
+                          <span
+                            className="text-[8px] font-semibold uppercase px-1.5 py-0.5 rounded"
+                            style={{ color: '#F97066', background: 'rgba(249,112,102,0.1)' }}
+                          >
+                            Offline
+                          </span>
+                        )}
                       </div>
                       <p className="text-[10px] mt-0.5" style={{ color: '#98A2B3' }}>
                         {provider.description}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span className="text-[10px] font-medium" style={{ color: '#34D399' }}>
-                        {provider.freeTier}
-                      </span>
+                      {isLoading ? (
+                        <Loader2 size={12} className="animate-spin" style={{ color: '#667085' }} />
+                      ) : isOffline ? (
+                        <WifiOff size={12} style={{ color: '#F97066' }} />
+                      ) : serverData ? (
+                        <span className="text-[10px] font-medium" style={{ color: '#34D399' }}>
+                          {formatBytes(serverData.baselineBytes)} free
+                        </span>
+                      ) : null}
                       {isExpanded ? (
                         <ChevronUp size={14} style={{ color: '#667085' }} />
                       ) : (
@@ -188,7 +266,7 @@ export const ProviderPicker = ({ theme, existingRemotes, exchangeRate, onSelectP
                     </div>
                   </button>
 
-                  {/* Expanded details — tiers + add button */}
+                  {/* Expanded details */}
                   <AnimatePresence>
                     {isExpanded && (
                       <motion.div
@@ -198,88 +276,85 @@ export const ProviderPicker = ({ theme, existingRemotes, exchangeRate, onSelectP
                         transition={{ duration: 0.2 }}
                         className="overflow-hidden"
                       >
-                        <div className="px-4 pb-3 space-y-2" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                          <p
-                            className="text-[9px] uppercase tracking-wider font-semibold pt-2.5 mb-1.5"
-                            style={{ color: '#667085' }}
-                          >
-                            Plans
-                          </p>
+                        <div className="px-4 pb-3 space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                          {isLoading && (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 size={16} className="animate-spin" style={{ color: '#667085' }} />
+                            </div>
+                          )}
 
-                          {provider.tiers.map((tier) => {
-                            const isSelected =
-                              selectedTier?.providerId === provider.id && selectedTier?.tierName === tier.name;
-                            return (
-                              <button
-                                key={tier.name}
-                                onClick={() =>
-                                  setSelectedTier(isSelected ? null : { providerId: provider.id, tierName: tier.name })
-                                }
-                                className="flex items-center w-full px-3 py-2.5 rounded-lg border-0 outline-none cursor-pointer text-left"
-                                style={{
-                                  background: isSelected ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.02)',
-                                  border: isSelected
-                                    ? '1px solid rgba(52,211,153,0.25)'
-                                    : '1px solid rgba(255,255,255,0.04)',
-                                }}
-                              >
-                                {isSelected ? (
-                                  <Check size={12} style={{ color: '#34D399' }} className="shrink-0" />
-                                ) : (
-                                  <Shield
-                                    size={12}
-                                    style={{ color: tier.priceInSats === 0 ? '#34D399' : '#FDB022' }}
-                                    className="shrink-0"
-                                  />
-                                )}
-                                <div className="ml-2 flex-1 min-w-0">
-                                  <div className="flex items-baseline gap-1.5">
-                                    <span className="text-[11px] font-semibold" style={{ color: '#FFFFFF' }}>
-                                      {tier.name}
-                                    </span>
-                                    <span className="text-[9px]" style={{ color: '#667085' }}>
-                                      {tier.storage}
-                                    </span>
-                                  </div>
-                                  <p className="text-[9px]" style={{ color: '#667085' }}>
-                                    {tier.description}
-                                  </p>
-                                </div>
-                                <span
-                                  className="text-[10px] font-semibold shrink-0 ml-2"
-                                  style={{ color: tier.priceInSats === 0 ? '#34D399' : '#FDB022' }}
+                          {isOffline && (
+                            <div className="pt-2">
+                              <p className="text-[10px] text-center" style={{ color: '#F97066' }}>
+                                Unable to reach this provider. It may be temporarily down.
+                              </p>
+                            </div>
+                          )}
+
+                          {serverData && (
+                            <>
+                              {/* Pricing breakdown */}
+                              <div className="pt-2.5 space-y-2">
+                                <div
+                                  className="flex items-center justify-between px-3 py-2 rounded-lg"
+                                  style={{
+                                    background: 'rgba(52,211,153,0.06)',
+                                    border: '1px solid rgba(52,211,153,0.1)',
+                                  }}
                                 >
-                                  {formatTierPrice(tier.priceInSats, exchangeRate)}
-                                </span>
-                              </button>
-                            );
-                          })}
+                                  <span className="text-[11px] font-semibold" style={{ color: '#FFFFFF' }}>
+                                    Free capacity
+                                  </span>
+                                  <span className="text-[11px] font-semibold" style={{ color: '#34D399' }}>
+                                    {formatBytes(serverData.baselineBytes)}
+                                  </span>
+                                </div>
+                                <div
+                                  className="flex items-center justify-between px-3 py-2 rounded-lg"
+                                  style={{
+                                    background: 'rgba(255,255,255,0.02)',
+                                    border: '1px solid rgba(255,255,255,0.04)',
+                                  }}
+                                >
+                                  <span className="text-[11px]" style={{ color: '#D0D5DD' }}>
+                                    Additional storage
+                                  </span>
+                                  <span className="text-[11px] font-semibold" style={{ color: '#FDB022' }}>
+                                    {formatRate(serverData.pricing, exchangeRate)}
+                                  </span>
+                                </div>
+                              </div>
 
-                          {/* URL */}
-                          <p className="text-[9px] font-mono pt-1" style={{ color: '#475467' }}>
-                            {provider.url}
-                          </p>
+                              {/* URL */}
+                              <p className="text-[9px] font-mono" style={{ color: '#475467' }}>
+                                {provider.url}
+                              </p>
 
-                          {/* Add button — requires tier selection */}
-                          {!alreadyAdded && (
-                            <Button
-                              theme={theme}
-                              type="primary"
-                              label={
-                                busy
-                                  ? 'Adding…'
-                                  : selectedTier?.providerId === provider.id
-                                    ? `Add ${provider.name} — ${selectedTier.tierName}`
-                                    : 'Select a plan above'
-                              }
-                              onClick={
-                                busy || selectedTier?.providerId !== provider.id
-                                  ? () => {}
-                                  : () => onSelectProvider(provider.url)
-                              }
-                              disabled={selectedTier?.providerId !== provider.id}
-                              loading={busy}
-                            />
+                              {/* Add button */}
+                              {!alreadyAdded && (
+                                <Button
+                                  theme={theme}
+                                  type="primary"
+                                  label={busy ? 'Adding…' : `Add ${provider.name}`}
+                                  onClick={
+                                    busy
+                                      ? () => {}
+                                      : () => {
+                                          if (serverData.pricing.satsPerUnit > 0) {
+                                            setConfirmingProvider({
+                                              url: provider.url,
+                                              name: provider.name,
+                                              rate: formatRate(serverData.pricing, exchangeRate),
+                                            });
+                                          } else {
+                                            onSelectProvider(provider.url);
+                                          }
+                                        }
+                                  }
+                                  loading={busy}
+                                />
+                              )}
+                            </>
                           )}
                         </div>
                       </motion.div>
@@ -319,13 +394,61 @@ export const ProviderPicker = ({ theme, existingRemotes, exchangeRate, onSelectP
                 <Button
                   theme={theme}
                   type="secondary-outline"
-                  label={busy ? 'Adding…' : 'Add Custom Remote'}
-                  onClick={busy ? () => {} : handleCustomAdd}
-                  loading={busy}
+                  label={customChecking ? 'Checking…' : busy ? 'Adding…' : 'Add Custom Remote'}
+                  onClick={busy || customChecking ? () => {} : handleCustomAdd}
+                  loading={customChecking || busy}
                 />
               </div>
             </div>
           </div>
+
+          {/* Payment confirmation overlay */}
+          <AnimatePresence>
+            {confirmingProvider && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6 rounded-t-2xl"
+                style={{ background: 'rgba(13,13,13,0.97)' }}
+              >
+                <div className="w-full max-w-[300px] space-y-4">
+                  <p className="text-sm font-semibold text-center" style={{ color: '#FFFFFF' }}>
+                    Confirm paid storage
+                  </p>
+                  <p className="text-xs text-center leading-relaxed" style={{ color: '#98A2B3' }}>
+                    Usage above the free tier on{' '}
+                    <span style={{ color: '#FFFFFF', fontWeight: 600 }}>{confirmingProvider.name}</span> is billed at{' '}
+                    <span style={{ color: '#FDB022', fontWeight: 600 }}>{confirmingProvider.rate}</span>. Payments will
+                    be deducted from your wallet automatically when due.
+                  </p>
+                  <div className="space-y-2 pt-2">
+                    <Button
+                      theme={theme}
+                      type="primary"
+                      label={busy ? 'Adding…' : 'Agree & Add'}
+                      onClick={
+                        busy
+                          ? () => {}
+                          : () => {
+                              onSelectProvider(confirmingProvider.url);
+                              setConfirmingProvider(null);
+                            }
+                      }
+                      loading={busy}
+                    />
+                    <button
+                      onClick={() => setConfirmingProvider(null)}
+                      className="w-full py-2 text-xs border-0 outline-none cursor-pointer bg-transparent"
+                      style={{ color: '#667085' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </motion.div>
     </AnimatePresence>
