@@ -161,6 +161,7 @@ export const Bsv21TokensList = (props: Bsv21TokensListProps) => {
                                 <AssetRow
                                   animate
                                   balance={Number(showAmount(t.all.confirmed, t.dec))}
+                                  decimals={t.dec}
                                   showPointer={true}
                                   icon={t.icon ? getContentUrl(t.icon) : GENERIC_TOKEN_ICON}
                                   ticker={truncate(getTokenName(t), 10, 0)}
@@ -201,6 +202,7 @@ export const Bsv21TokensList = (props: Bsv21TokensListProps) => {
                         <AssetRow
                           animate
                           balance={Number(showAmount(b.all.pending, b.dec))}
+                          decimals={b.dec}
                           showPointer={true}
                           icon={b.icon ? getContentUrl(b.icon) : GENERIC_TOKEN_ICON}
                           ticker={getTokenName(b)}

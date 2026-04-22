@@ -186,6 +186,7 @@ export const Settings = () => {
     if (query === 'manage-accounts') return 'manage-accounts';
     if (query === 'create-account') return 'create-account';
     if (query === 'restore-account') return 'restore-account';
+    if (query === 'storage') return 'storage';
     return 'main';
   });
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
@@ -218,6 +219,7 @@ export const Settings = () => {
     if (query === 'manage-accounts') setPage('manage-accounts');
     else if (query === 'create-account') setPage('create-account');
     else if (query === 'restore-account') setPage('restore-account');
+    else if (query === 'storage') setPage('storage');
   }, [query]);
 
   const handleDeleteAccountIntent = () => {

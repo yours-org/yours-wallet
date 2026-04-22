@@ -7,7 +7,6 @@ import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useTheme } from '../../hooks/useTheme';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { YoursIcon } from '../../components/YoursIcon';
-import { decrypt } from '../../utils/crypto';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -37,18 +36,6 @@ export const Start = () => {
   useEffect(() => {
     if (encryptedKeys) {
       setShowStart(false);
-      const storage = chromeStorageService.getCurrentAccountObject();
-      if (!chromeStorageService.storage?.sweepCompleted && storage.passKey) {
-        try {
-          const keys = JSON.parse(decrypt(encryptedKeys, storage.passKey));
-          if (keys.walletWif || keys.ordWif) {
-            navigate('/sweep');
-            return;
-          }
-        } catch {
-          // Decryption failed — proceed to wallet normally
-        }
-      }
       navigate('/bsv-wallet');
       return;
     }

@@ -1,26 +1,26 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Check,
   ChevronLeft,
   ChevronDown,
   ChevronRight,
   ChevronUp,
   HardDrive,
+  Pencil,
   Plus,
   RefreshCw,
   Server,
-  Shield,
   Trash2,
   Wifi,
   WifiOff,
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { PageLoader } from '../components/PageLoader';
-import { ProviderPicker } from '../components/ProviderPicker';
+import { ProviderPicker, KNOWN_PROVIDERS } from '../components/ProviderPicker';
 import { useTheme } from '../hooks/useTheme';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useServiceContext } from '../hooks/useServiceContext';
+import { useRemoteStatus, type RemoteStatus } from '../hooks/useRemoteStatus';
 import { fetchExchangeRate } from '../utils/wallet';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -45,22 +45,8 @@ interface StorageInfo {
   storageConfig: StorageConfig;
 }
 
-// TODO: Will come from each provider's GET /status endpoint
-interface RemoteTier {
-  name: string;
-  storage: string;
-  /** Monthly price in satoshis. 0 = free. Set by the server. */
-  priceInSats: number;
-  description: string;
-}
-
-interface RemoteUsage {
-  usedBytes: number;
-  totalBytes: number; // -1 = unlimited
-  tier: string;
-  tiers: RemoteTier[];
-  paymentAddress: string;
-}
+// Re-export for use in UI rendering
+type RemoteUsage = RemoteStatus;
 
 export interface StorageStatusProps {
   onBack: () => void;
@@ -108,33 +94,20 @@ function syncStatusLabel(syncStates: SyncStateInfo[], url: string): { label: str
   }
 }
 
-// TODO: Fetch real usage from each remote's GET /status endpoint.
-// Stubbed per-store usage for now.
-function getRemoteUsage(_url: string): RemoteUsage {
-  return {
-    usedBytes: 0,
-    totalBytes: 1_073_741_824, // 1 GB
-    tier: 'free',
-    paymentAddress: '1YoursStoragePaymentAddressXXXXXXXXX', // TODO: real address from GET /status
-    tiers: [
-      { name: 'Free', storage: '1 GB', priceInSats: 0, description: 'Auto-backup included' },
-      { name: 'Pro', storage: '10 GB', priceInSats: 6_250_000, description: 'For power users' },
-      { name: 'Unlimited', storage: 'Unlimited', priceInSats: 31_250_000, description: 'No limits' },
-    ],
-  };
-}
-
 // ── Sub-views ──────────────────────────────────────────────────────────────
 
 type SubView = { type: 'main' } | { type: 'detail'; url: string; isLocal: boolean };
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-function formatTierPrice(sats: number, exchangeRate: number): string {
-  if (sats === 0) return 'Free';
-  if (!exchangeRate || exchangeRate <= 0) return `${sats.toLocaleString()} sats/mo`;
-  const usd = ((sats / 100_000_000) * exchangeRate).toFixed(2);
-  return `$${usd}/mo`;
+function formatRate(pricing: RemoteUsage['pricing'], exchangeRate: number): string {
+  const unitGb = pricing.purchaseUnitBytes / 1_073_741_824;
+  const label = unitGb >= 1 ? `${unitGb} GB` : `${Math.round(unitGb * 1024)} MB`;
+  if (!exchangeRate || exchangeRate <= 0) {
+    return `${pricing.satsPerUnit.toLocaleString()} sats/${label}/mo`;
+  }
+  const usd = ((pricing.satsPerUnit / 100_000_000) * exchangeRate).toFixed(2);
+  return `$${usd}/${label}/mo`;
 }
 
 export const StorageStatus = ({ onBack }: StorageStatusProps) => {
@@ -144,15 +117,25 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
   const [exchangeRate, setExchangeRate] = useState(0);
   const [info, setInfo] = useState<StorageInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [localUsage, setLocalUsage] = useState<{ used: number; quota: number } | null>(null);
+  const remotes = info?.storageConfig?.remotes ?? [];
+  const remotesKey = remotes.join(',');
+  const stableRemotes = useMemo(() => remotes, [remotesKey]);
+  const stableKnownUrls = useMemo(() => KNOWN_PROVIDERS.map((p) => p.url), []);
+  const { statusMap, loading: statusLoading } = useRemoteStatus(
+    apiContext.wallet as any,
+    stableRemotes,
+    stableKnownUrls,
+  );
   const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<'active' | 'remove' | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [showProviderPicker, setShowProviderPicker] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [selectedPlanTier, setSelectedPlanTier] = useState<string | null>(null);
   const [subView, _setSubView] = useState<SubView>({ type: 'main' });
   const containerRef = useRef<HTMLDivElement>(null);
   const setSubView = (view: SubView) => {
     _setSubView(view);
-    setSelectedPlanTier(null);
     // Scroll the parent scrollable container to top on view change
     requestAnimationFrame(() => {
       containerRef.current?.closest('[style*="overflow"]')?.scrollTo(0, 0);
@@ -187,6 +170,16 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
     fetchExchangeRate(apiContext.chain, apiContext.wocApiKey)
       .then(setExchangeRate)
       .catch(() => {});
+    if (navigator.storage?.estimate) {
+      navigator.storage
+        .estimate()
+        .then((est) => {
+          if (est.usage !== undefined && est.quota !== undefined) {
+            setLocalUsage({ used: est.usage, quota: est.quota });
+          }
+        })
+        .catch(() => {});
+    }
   }, [apiContext]);
 
   const runAction = async (action: string, payload: Record<string, unknown>, successMessage: string) => {
@@ -206,22 +199,48 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
     }
   };
 
-  const handleSync = () => runAction('STORAGE_SYNC_BACKUPS', {}, 'Sync complete');
+  const triggerSync = async () => {
+    setSyncing(true);
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'STORAGE_SYNC_BACKUPS' });
+      if (response?.success) {
+        addSnackbar('Sync complete', 'success');
+        await fetchInfo();
+      } else {
+        addSnackbar(response?.error || 'Sync failed', 'error');
+      }
+    } catch {
+      // Sync failed silently
+    } finally {
+      setSyncing(false);
+    }
+  };
 
-  const handleSetActive = (target: 'local' | string) =>
-    runAction(
+  const handleSync = () => {
+    if (!syncing) triggerSync();
+  };
+
+  const handleSetActive = async (target: 'local' | string) => {
+    setBusyAction('active');
+    await runAction(
       'STORAGE_SET_ACTIVE_STORAGE',
       { target },
       target === 'local' ? 'Switched to local' : `Active: ${hostFromUrl(target)}`,
     );
+    setBusyAction(null);
+  };
 
   const handleAddRemote = async (url: string) => {
     await runAction('STORAGE_ADD_REMOTE', { url }, 'Remote added');
     setShowProviderPicker(false);
+    // Auto-sync after adding a new remote
+    triggerSync();
   };
 
   const handleRemoveRemote = async (url: string) => {
+    setBusyAction('remove');
     await runAction('STORAGE_REMOVE_REMOTE', { url }, 'Remote removed');
+    setBusyAction(null);
     setSubView({ type: 'main' });
   };
 
@@ -234,7 +253,6 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
   }
 
   const storageConfig = info?.storageConfig ?? {};
-  const remotes = storageConfig.remotes ?? [];
   const activeRemote = storageConfig.activeRemote;
   const localIsActive = !activeRemote;
   const syncStates = info?.syncStates ?? [];
@@ -244,8 +262,9 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
   if (subView.type === 'detail') {
     const { url, isLocal } = subView;
     const isActive = isLocal ? localIsActive : activeRemote === url;
-    const usage = isLocal ? null : getRemoteUsage(url);
-    const pct = usage ? usagePercent(usage.usedBytes, usage.totalBytes) : 0;
+    const remoteResult = isLocal ? null : statusMap[url];
+    const usage: RemoteUsage | null = remoteResult?.status === 'ok' ? remoteResult.data : null;
+    const pct = usage ? usagePercent(usage.usedBytes, usage.capacityBytes) : 0;
     const barColor = usageBarColor(pct);
     const sync = isLocal ? null : syncStatusLabel(syncStates, url);
 
@@ -290,7 +309,7 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
                     background: isActive ? 'rgba(52,211,153,0.1)' : 'rgba(102,112,133,0.1)',
                   }}
                 >
-                  {isActive ? 'Active' : 'Backup'}
+                  {isActive ? 'In use' : 'Backup copy'}
                 </span>
                 {sync && (
                   <span
@@ -309,16 +328,47 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
             </div>
           </div>
 
-          {/* Usage bar */}
+          {/* Usage */}
           {isLocal ? (
-            <div className="flex items-baseline justify-between">
-              <span className="text-xs font-semibold" style={{ color: contrast }}>
-                Unlimited
-              </span>
-              <span className="text-[10px]" style={{ color: gray }}>
-                Browser IndexedDB
-              </span>
-            </div>
+            localUsage ? (
+              <div>
+                <div className="flex items-baseline justify-between mb-1">
+                  <span className="text-xs font-semibold" style={{ color: contrast }}>
+                    {formatBytes(localUsage.used)}
+                  </span>
+                  <span className="text-[10px]" style={{ color: gray }}>
+                    of {formatBytes(localUsage.quota)} available
+                  </span>
+                </div>
+                <div
+                  className="w-full h-2 rounded-full overflow-hidden"
+                  style={{ background: 'rgba(255,255,255,0.06)' }}
+                >
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${usagePercent(localUsage.used, localUsage.quota)}%` }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    className="h-full rounded-full"
+                    style={{
+                      background: usageBarColor(usagePercent(localUsage.used, localUsage.quota)),
+                      minWidth: localUsage.used > 0 ? '4px' : '0',
+                    }}
+                  />
+                </div>
+                <p className="text-[9px] mt-1.5" style={{ color: gray }}>
+                  Browser-managed storage. Limit set by your browser.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs font-semibold" style={{ color: contrast }}>
+                  Estimating...
+                </span>
+                <span className="text-[10px]" style={{ color: gray }}>
+                  Browser IndexedDB
+                </span>
+              </div>
+            )
           ) : (
             usage && (
               <div>
@@ -327,37 +377,35 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
                     {formatBytes(usage.usedBytes)}
                   </span>
                   <span className="text-[10px]" style={{ color: gray }}>
-                    {usage.totalBytes < 0 ? 'Unlimited' : `of ${formatBytes(usage.totalBytes)}`}
+                    of {formatBytes(usage.capacityBytes)}
                   </span>
                 </div>
-                {usage.totalBytes > 0 && (
-                  <div
-                    className="w-full h-2 rounded-full overflow-hidden"
-                    style={{ background: 'rgba(255,255,255,0.06)' }}
-                  >
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${pct}%` }}
-                      transition={{ duration: 0.6, ease: 'easeOut' }}
-                      className="h-full rounded-full"
-                      style={{ background: barColor, minWidth: pct > 0 ? '4px' : '0' }}
-                    />
-                  </div>
-                )}
+                <div
+                  className="w-full h-2 rounded-full overflow-hidden"
+                  style={{ background: 'rgba(255,255,255,0.06)' }}
+                >
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    className="h-full rounded-full"
+                    style={{ background: barColor, minWidth: pct > 0 ? '4px' : '0' }}
+                  />
+                </div>
               </div>
             )
           )}
 
           {/* Actions */}
-          <div className="flex gap-2 mt-3">
+          <div className="flex flex-col gap-2 mt-3">
             {!isActive && (
               <Button
                 theme={theme}
                 type="primary"
-                label="Set as Active"
+                label="Make Active"
                 onClick={() => handleSetActive(isLocal ? 'local' : url)}
                 disabled={busy}
-                loading={busy}
+                loading={busyAction === 'active'}
               />
             )}
             {!isLocal && !isActive && (
@@ -367,127 +415,75 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
                 label="Remove"
                 onClick={() => handleRemoveRemote(url)}
                 disabled={busy}
-                loading={busy}
+                loading={busyAction === 'remove'}
               />
+            )}
+            {isActive && !isLocal && (
+              <p className="text-[9px] text-center" style={{ color: gray }}>
+                This is your active storage. To remove it, switch to a different location first.
+              </p>
             )}
           </div>
         </div>
 
-        {/* Plans (remote only) */}
-        {!isLocal &&
-          usage &&
-          (() => {
-            const currentIndex = usage.tiers.findIndex((t) => t.name.toLowerCase() === usage.tier);
-            const selectedIndex = selectedPlanTier ? usage.tiers.findIndex((t) => t.name === selectedPlanTier) : -1;
-            const hasSelection = selectedPlanTier && selectedPlanTier !== usage.tiers[currentIndex]?.name;
-            const isUpgrade = hasSelection && selectedIndex > currentIndex;
-            const isDowngrade = hasSelection && selectedIndex < currentIndex;
-
-            return (
-              <div className="w-full rounded-xl p-4 bg-[#17191E]" style={{ border: `1px solid ${gray}15` }}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: gray }}>
-                    Plan
-                  </span>
-                  <span
-                    className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded"
-                    style={{ color: '#34D399', background: 'rgba(52,211,153,0.1)' }}
-                  >
-                    Current: {usage.tiers[currentIndex]?.name ?? usage.tier}
-                  </span>
-                </div>
-
-                <div className="space-y-1.5 mt-3">
-                  {usage.tiers.map((tier) => {
-                    const isCurrent = tier.name.toLowerCase() === usage.tier;
-                    const isSelected = selectedPlanTier === tier.name;
-                    const highlighted = isSelected || (isCurrent && !selectedPlanTier);
-                    return (
-                      <button
-                        key={tier.name}
-                        onClick={() => {
-                          if (isCurrent) {
-                            setSelectedPlanTier(null);
-                          } else {
-                            setSelectedPlanTier(isSelected ? null : tier.name);
-                          }
-                        }}
-                        className="flex items-center w-full px-3 py-2.5 rounded-lg border-0 outline-none cursor-pointer text-left"
-                        style={{
-                          background: highlighted ? 'rgba(52,211,153,0.06)' : 'rgba(255,255,255,0.02)',
-                          border: highlighted ? '1px solid rgba(52,211,153,0.2)' : '1px solid rgba(255,255,255,0.04)',
-                        }}
-                      >
-                        {highlighted ? (
-                          <Check size={14} style={{ color: '#34D399' }} className="shrink-0" />
-                        ) : (
-                          <Shield
-                            size={14}
-                            style={{ color: tier.priceInSats === 0 ? '#667085' : '#FDB022' }}
-                            className="shrink-0"
-                          />
-                        )}
-                        <div className="ml-2 flex-1 min-w-0">
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-[11px] font-semibold" style={{ color: contrast }}>
-                              {tier.name}
-                            </span>
-                            <span className="text-[9px]" style={{ color: gray }}>
-                              {tier.storage}
-                            </span>
-                            {isCurrent && (
-                              <span
-                                className="text-[7px] font-semibold uppercase px-1 py-0.5 rounded shrink-0"
-                                style={{ color: '#34D399', background: 'rgba(52,211,153,0.1)' }}
-                              >
-                                Current
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[9px]" style={{ color: gray }}>
-                            {tier.description}
-                          </p>
-                        </div>
-                        <span
-                          className="text-[10px] font-semibold shrink-0 ml-2"
-                          style={{ color: tier.priceInSats === 0 ? '#34D399' : '#FDB022' }}
-                        >
-                          {formatTierPrice(tier.priceInSats, exchangeRate)}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Change plan button */}
-                {hasSelection && (
-                  <div className="mt-3">
-                    <Button
-                      theme={theme}
-                      type="primary"
-                      label={
-                        busy
-                          ? 'Processing…'
-                          : isUpgrade
-                            ? `Upgrade to ${selectedPlanTier}`
-                            : isDowngrade
-                              ? `Downgrade to ${selectedPlanTier}`
-                              : `Switch to ${selectedPlanTier}`
-                      }
-                      onClick={() => {
-                        // TODO: Implement plan change via POST /pay
-                        addSnackbar('Plan changes coming soon', 'info');
-                      }}
-                      loading={busy}
-                    />
-                    <p className="text-[9px] text-center mt-1.5" style={{ color: gray }}>
-                      {isUpgrade ? 'Upgrade' : 'Downgrade'} paid via BSV from your wallet
-                    </p>
-                  </div>
-                )}
+        {/* Pricing (remote only) */}
+        {!isLocal && usage && (
+          <div className="w-full rounded-xl p-4 bg-[#17191E]" style={{ border: `1px solid ${gray}15` }}>
+            <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: gray }}>
+              Storage & Pricing
+            </span>
+            <div className="space-y-2 mt-2.5">
+              <div
+                className="flex items-center justify-between px-3 py-2 rounded-lg"
+                style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.1)' }}
+              >
+                <span className="text-[11px] font-semibold" style={{ color: contrast }}>
+                  Free capacity
+                </span>
+                <span className="text-[11px] font-semibold" style={{ color: '#34D399' }}>
+                  {formatBytes(usage.baselineBytes)}
+                </span>
               </div>
-            );
-          })()}
+              {usage.paidBytes > 0 && (
+                <div
+                  className="flex items-center justify-between px-3 py-2 rounded-lg"
+                  style={{ background: 'rgba(52,211,153,0.04)', border: '1px solid rgba(52,211,153,0.08)' }}
+                >
+                  <span className="text-[11px]" style={{ color: '#D0D5DD' }}>
+                    Paid capacity
+                  </span>
+                  <span className="text-[11px] font-semibold" style={{ color: '#34D399' }}>
+                    +{formatBytes(usage.paidBytes)}
+                  </span>
+                </div>
+              )}
+              <div
+                className="flex items-center justify-between px-3 py-2 rounded-lg"
+                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+              >
+                <span className="text-[11px]" style={{ color: '#D0D5DD' }}>
+                  Additional storage
+                </span>
+                <span className="text-[11px] font-semibold" style={{ color: '#FDB022' }}>
+                  {formatRate(usage.pricing, exchangeRate)}
+                </span>
+              </div>
+            </div>
+            {usage.deficitBytes > 0 && (
+              <div
+                className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg"
+                style={{ background: 'rgba(249,112,102,0.08)', border: '1px solid rgba(249,112,102,0.2)' }}
+              >
+                <span className="text-[10px] font-medium" style={{ color: '#F97066' }}>
+                  Over capacity by {formatBytes(usage.deficitBytes)} — purchase more storage to sync
+                </span>
+              </div>
+            )}
+            <p className="text-[9px] text-center mt-2" style={{ color: gray }}>
+              ~{Math.round(usage.pricing.durationBlocks / 144)} days per purchase
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -512,11 +508,57 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
         </h2>
       </div>
 
-      {/* Explainer */}
-      <p className="text-[10px] leading-relaxed" style={{ color: gray }}>
-        Your wallet data is stored in one active location and can be backed up to additional remotes. Set a remote as
-        active to sync across multiple devices. Backups replicate your data for safety.
-      </p>
+      {/* How it works — contextual based on current state */}
+      {localIsActive && remotes.length === 0 && (
+        <div
+          className="w-full rounded-xl p-4"
+          style={{ background: 'rgba(253,176,34,0.05)', border: '1px solid rgba(253,176,34,0.15)' }}
+        >
+          <p className="text-xs font-semibold mb-2" style={{ color: '#FDB022' }}>
+            How storage works
+          </p>
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
+              <HardDrive size={12} style={{ color: '#98A2B3' }} className="shrink-0 mt-0.5" />
+              <p className="text-[10px] leading-relaxed" style={{ color: '#D0D5DD' }}>
+                <span style={{ color: '#FFFFFF', fontWeight: 600 }}>Active storage</span> is where your wallet reads and
+                writes data. Right now that's this browser.
+              </p>
+            </div>
+            <div className="flex items-start gap-2">
+              <Server size={12} style={{ color: '#98A2B3' }} className="shrink-0 mt-0.5" />
+              <p className="text-[10px] leading-relaxed" style={{ color: '#D0D5DD' }}>
+                <span style={{ color: '#FFFFFF', fontWeight: 600 }}>Remote servers</span> can be added as backups
+                (copies of your data) or set as active to use this wallet across multiple devices.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {localIsActive && remotes.length > 0 && (
+        <div
+          className="w-full rounded-xl p-3"
+          style={{ background: 'rgba(253,176,34,0.05)', border: '1px solid rgba(253,176,34,0.12)' }}
+        >
+          <p className="text-[10px] leading-relaxed" style={{ color: '#D0D5DD' }}>
+            Your active storage is local. Remotes below are backing up your data. To use this wallet on another device,
+            set a remote as active.
+          </p>
+        </div>
+      )}
+
+      {!localIsActive && (
+        <div
+          className="w-full rounded-xl p-3"
+          style={{ background: 'rgba(52,211,153,0.04)', border: '1px solid rgba(52,211,153,0.1)' }}
+        >
+          <p className="text-[10px] leading-relaxed" style={{ color: '#D0D5DD' }}>
+            Your wallet is syncing to a remote server. You can use the same keys on another device and it will stay in
+            sync.
+          </p>
+        </div>
+      )}
 
       {/* Active storage summary */}
       <div className="w-full rounded-xl p-4 bg-[#17191E]" style={{ border: '1px solid rgba(52,211,153,0.15)' }}>
@@ -524,15 +566,26 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
           <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: '#34D399' }}>
             Active Storage
           </span>
-          <div className="flex items-center gap-1">
-            {localIsActive ? (
-              <WifiOff size={10} style={{ color: gray }} />
-            ) : (
-              <Wifi size={10} style={{ color: '#34D399' }} />
-            )}
-            <span className="text-[9px]" style={{ color: gray }}>
-              {localIsActive ? 'Local only' : 'Multi-device sync'}
-            </span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {localIsActive ? (
+                <WifiOff size={10} style={{ color: gray }} />
+              ) : (
+                <Wifi size={10} style={{ color: '#34D399' }} />
+              )}
+              <span className="text-[9px]" style={{ color: gray }}>
+                {localIsActive ? 'This device only' : 'Synced across devices'}
+              </span>
+            </div>
+            <button
+              onClick={() =>
+                setSubView({ type: 'detail', url: localIsActive ? '' : activeRemote!, isLocal: localIsActive })
+              }
+              className="flex items-center justify-center w-6 h-6 rounded border-0 outline-none cursor-pointer"
+              style={{ background: 'rgba(255,255,255,0.06)' }}
+            >
+              <Pencil size={11} style={{ color: gray }} />
+            </button>
           </div>
         </div>
 
@@ -544,13 +597,78 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
           )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold" style={{ color: contrast }}>
-              {localIsActive ? 'Local Storage' : hostFromUrl(activeRemote!)}
+              {localIsActive ? 'This Browser' : hostFromUrl(activeRemote!)}
             </p>
             <p className="text-[9px]" style={{ color: gray }}>
-              {localIsActive ? 'Browser only — not synced across devices' : 'All devices sync here'}
+              {localIsActive
+                ? 'Data lives only in this browser. Add a remote to protect it.'
+                : 'All devices with your keys connect here'}
             </p>
           </div>
         </div>
+
+        {/* Usage bar for active store */}
+        {(() => {
+          if (localIsActive && localUsage) {
+            const pct = Math.max(usagePercent(localUsage.used, localUsage.quota), localUsage.used > 0 ? 1 : 0);
+            return (
+              <div className="mt-3">
+                <div className="flex items-baseline justify-between mb-1">
+                  <span className="text-[10px] font-semibold" style={{ color: contrast }}>
+                    {formatBytes(localUsage.used)}
+                  </span>
+                  <span className="text-[9px]" style={{ color: gray }}>
+                    of {formatBytes(localUsage.quota)}
+                  </span>
+                </div>
+                <div
+                  className="w-full h-2 rounded-full overflow-hidden"
+                  style={{ background: 'rgba(255,255,255,0.06)' }}
+                >
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    className="h-full rounded-full"
+                    style={{ background: usageBarColor(pct), minWidth: pct > 0 ? '6px' : '0' }}
+                  />
+                </div>
+              </div>
+            );
+          }
+          if (!localIsActive && activeRemote) {
+            const result = statusMap[activeRemote];
+            if (result?.status === 'ok') {
+              const usage = result.data;
+              const pct = Math.max(usagePercent(usage.usedBytes, usage.capacityBytes), usage.usedBytes > 0 ? 1 : 0);
+              return (
+                <div className="mt-3">
+                  <div className="flex items-baseline justify-between mb-1">
+                    <span className="text-[10px] font-semibold" style={{ color: contrast }}>
+                      {formatBytes(usage.usedBytes)}
+                    </span>
+                    <span className="text-[9px]" style={{ color: gray }}>
+                      of {formatBytes(usage.capacityBytes)}
+                    </span>
+                  </div>
+                  <div
+                    className="w-full h-2 rounded-full overflow-hidden"
+                    style={{ background: 'rgba(255,255,255,0.06)' }}
+                  >
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.6, ease: 'easeOut' }}
+                      className="h-full rounded-full"
+                      style={{ background: usageBarColor(pct), minWidth: pct > 0 ? '6px' : '0' }}
+                    />
+                  </div>
+                </div>
+              );
+            }
+          }
+          return null;
+        })()}
 
         {/* Stats */}
         <div className="flex mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
@@ -583,91 +701,157 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
         {/* Sync */}
         <motion.button
           whileTap={{ scale: 0.98 }}
-          onClick={busy ? undefined : handleSync}
-          disabled={busy}
+          onClick={syncing ? undefined : handleSync}
+          disabled={syncing}
           className="flex items-center justify-center gap-2 w-full mt-3 py-2 rounded-lg text-xs font-medium border-0 outline-none cursor-pointer disabled:opacity-50"
           style={{ color: gray, background: 'rgba(255,255,255,0.04)' }}
         >
-          <RefreshCw size={11} className={busy ? 'animate-spin' : ''} />
-          Sync Now
+          <RefreshCw size={11} className={syncing ? 'animate-spin' : ''} />
+          {syncing ? 'Syncing...' : 'Sync Now'}
         </motion.button>
       </div>
 
-      {/* Storage locations */}
-      <div className="w-full rounded-xl p-4 bg-[#17191E]" style={{ border: `1px solid ${gray}15` }}>
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: gray }}>
-              Storage Locations
-            </span>
-            <p className="text-[9px] mt-0.5" style={{ color: gray }}>
-              Tap a location to view details, usage, or change your plan
-            </p>
-          </div>
-          <button
-            onClick={() => setShowProviderPicker(true)}
-            className="flex items-center gap-1 px-2 py-1 rounded border-0 outline-none cursor-pointer"
-            style={{ color: '#34D399', background: 'rgba(52,211,153,0.08)' }}
-          >
-            <Plus size={10} />
-            <span className="text-[9px] font-semibold">Add</span>
-          </button>
-        </div>
+      {/* Backup storage */}
+      {(() => {
+        // Filter to only non-active items
+        const backupRemotes = remotes.filter((url) => url !== activeRemote);
+        const showLocalBackup = !localIsActive;
+        const hasBackups = showLocalBackup || backupRemotes.length > 0;
 
-        {/* Local */}
-        <StoreCard
-          icon={<HardDrive size={14} />}
-          label="Local"
-          isActive={localIsActive}
-          role={localIsActive ? 'active' : 'available'}
-          usageText="Unlimited"
-          onClick={() => setSubView({ type: 'detail', url: '', isLocal: true })}
-          contrast={contrast}
-          gray={gray}
-        />
+        return (
+          <div className="w-full rounded-xl p-4 bg-[#17191E]" style={{ border: `1px solid ${gray}15` }}>
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: gray }}>
+                    Backup Storage
+                  </span>
+                  {syncing && <RefreshCw size={10} className="animate-spin" style={{ color: '#34D399' }} />}
+                </div>
+                <p className="text-[9px] mt-0.5" style={{ color: gray }}>
+                  {syncing ? 'Syncing backups...' : 'Copies of your data for safety'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowProviderPicker(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded border-0 outline-none cursor-pointer"
+                style={{ color: '#34D399', background: 'rgba(52,211,153,0.08)' }}
+              >
+                <Plus size={10} />
+                <span className="text-[9px] font-semibold">Add</span>
+              </button>
+            </div>
 
-        {/* All remotes */}
-        {remotes.map((url) => {
-          const isActive = activeRemote === url;
-          const usage = getRemoteUsage(url);
-          const pct = usagePercent(usage.usedBytes, usage.totalBytes);
-          const barColor = usageBarColor(pct);
-          const sync = syncStatusLabel(syncStates, url);
+            {/* Local — only shown when a remote is active */}
+            {showLocalBackup && (
+              <StoreCard
+                icon={<HardDrive size={14} />}
+                label="This Browser"
+                isActive={false}
+                role="backup"
+                usageText={
+                  localUsage ? `${formatBytes(localUsage.used)} / ${formatBytes(localUsage.quota)}` : 'Estimating...'
+                }
+                usagePercent={localUsage ? usagePercent(localUsage.used, localUsage.quota) : undefined}
+                usageBarColor={localUsage ? usageBarColor(usagePercent(localUsage.used, localUsage.quota)) : undefined}
+                onClick={() => setSubView({ type: 'detail', url: '', isLocal: true })}
+                contrast={contrast}
+                gray={gray}
+              />
+            )}
 
-          return (
-            <StoreCard
-              key={url}
-              icon={<Server size={14} />}
-              label={hostFromUrl(url)}
-              isActive={isActive}
-              role={isActive ? 'active' : 'backup'}
-              usageText={
-                usage.totalBytes < 0
-                  ? 'Unlimited'
-                  : `${formatBytes(usage.usedBytes)} / ${formatBytes(usage.totalBytes)}`
+            {/* Non-active remotes */}
+            {backupRemotes.map((url) => {
+              const result = statusMap[url];
+              const sync = syncStatusLabel(syncStates, url);
+
+              if (result?.status === 'error') {
+                return (
+                  <StoreCard
+                    key={url}
+                    icon={<Server size={14} />}
+                    label={hostFromUrl(url)}
+                    isActive={false}
+                    role="backup"
+                    usageText="Unreachable"
+                    syncStatus={{ label: 'Offline', color: '#F97066' }}
+                    onClick={() => setSubView({ type: 'detail', url, isLocal: false })}
+                    contrast={contrast}
+                    gray={gray}
+                  />
+                );
               }
-              usagePercent={usage.totalBytes > 0 ? pct : undefined}
-              usageBarColor={barColor}
-              syncStatus={sync}
-              tierLabel={usage.tier}
-              onClick={() => setSubView({ type: 'detail', url, isLocal: false })}
-              contrast={contrast}
-              gray={gray}
-            />
-          );
-        })}
 
-        {remotes.length === 0 && (
-          <p className="text-[10px] mt-2 text-center" style={{ color: gray }}>
-            No remotes configured. Add one to enable multi-device sync and backup.
-          </p>
-        )}
-      </div>
+              if (result?.status === 'live') {
+                return (
+                  <StoreCard
+                    key={url}
+                    icon={<Server size={14} />}
+                    label={hostFromUrl(url)}
+                    isActive={false}
+                    role="backup"
+                    usageText="Connected"
+                    syncStatus={sync ?? { label: 'Online', color: '#34D399' }}
+                    onClick={() => setSubView({ type: 'detail', url, isLocal: false })}
+                    contrast={contrast}
+                    gray={gray}
+                  />
+                );
+              }
+
+              if (!result || result.status !== 'ok') {
+                return (
+                  <StoreCard
+                    key={url}
+                    icon={<Server size={14} />}
+                    label={hostFromUrl(url)}
+                    isActive={false}
+                    role="backup"
+                    usageText={statusLoading ? 'Loading...' : 'Connected'}
+                    syncStatus={sync}
+                    onClick={() => setSubView({ type: 'detail', url, isLocal: false })}
+                    contrast={contrast}
+                    gray={gray}
+                  />
+                );
+              }
+
+              const usage = result.data;
+              const pct = usagePercent(usage.usedBytes, usage.capacityBytes);
+              const barColor = usageBarColor(pct);
+
+              return (
+                <StoreCard
+                  key={url}
+                  icon={<Server size={14} />}
+                  label={hostFromUrl(url)}
+                  isActive={false}
+                  role="backup"
+                  usageText={`${formatBytes(usage.usedBytes)} / ${formatBytes(usage.capacityBytes)}`}
+                  usagePercent={pct}
+                  usageBarColor={barColor}
+                  syncStatus={sync}
+                  onClick={() => setSubView({ type: 'detail', url, isLocal: false })}
+                  contrast={contrast}
+                  gray={gray}
+                />
+              );
+            })}
+
+            {!hasBackups && (
+              <p className="text-[10px] mt-2 text-center" style={{ color: gray }}>
+                Add a remote server to back up your data or use your wallet on multiple devices.
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Provider picker overlay */}
       {showProviderPicker && (
         <ProviderPicker
           theme={theme}
+          wallet={apiContext.wallet as any}
           existingRemotes={remotes}
           exchangeRate={exchangeRate}
           onSelectProvider={handleAddRemote}
@@ -721,7 +905,6 @@ interface StoreCardProps {
   usagePercent?: number;
   usageBarColor?: string;
   syncStatus?: { label: string; color: string } | null;
-  tierLabel?: string;
   onClick: () => void;
   contrast: string;
   gray: string;
@@ -736,7 +919,6 @@ const StoreCard = ({
   usagePercent: pct,
   usageBarColor: barColor,
   syncStatus,
-  tierLabel,
   onClick,
   contrast,
   gray,
@@ -765,16 +947,8 @@ const StoreCard = ({
             className="text-[7px] font-semibold uppercase px-1 py-0.5 rounded shrink-0"
             style={{ color: roleColor, background: `${roleColor}15` }}
           >
-            {role === 'active' ? 'Active' : role === 'backup' ? 'Backup' : ''}
+            {role === 'active' ? 'In use' : role === 'backup' ? 'Backup copy' : ''}
           </span>
-          {tierLabel && (
-            <span
-              className="text-[7px] font-semibold uppercase px-1 py-0.5 rounded shrink-0"
-              style={{ color: '#FDB022', background: 'rgba(253,176,34,0.1)' }}
-            >
-              {tierLabel}
-            </span>
-          )}
           {syncStatus && (
             <span
               className="text-[7px] font-semibold px-1 py-0.5 rounded shrink-0"

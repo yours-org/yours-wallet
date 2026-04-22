@@ -114,10 +114,9 @@ export const DEFAULT_ACCOUNT = {
   name: 'Account 1',
   ordinals: [],
   paymentUtxos: [],
-  // Eager default: new accounts start with local active + api.1sat.app as a
-  // configured backup remote. Existing accounts (no storageConfig present)
-  // fall back to remote-active at initWallet time to preserve behavior.
+  // Default: local browser storage is active, no remotes configured.
+  // User adds remotes from the known provider list in settings.
   storageConfig: {
-    remotes: [DEFAULT_STORAGE_REMOTE],
+    remotes: [],
   },
 };
