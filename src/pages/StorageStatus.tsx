@@ -199,31 +199,24 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
     }
   };
 
-  const triggerSync = async () => {
+  const triggerSync = () => {
+    if (syncing) return;
     setSyncing(true);
-    try {
-      const response = await Promise.race([
-        chrome.runtime.sendMessage({ action: 'STORAGE_SYNC_BACKUPS' }),
-        new Promise<{ success: false; error: string }>((resolve) =>
-          setTimeout(() => resolve({ success: false, error: 'Sync timed out' }), 30000),
-        ),
-      ]);
+    addSnackbar('Syncing backups...', 'info');
+    // Fire and forget — the sync runs in the background service worker.
+    // We don't await it because updateBackups() can take minutes for large wallets.
+    chrome.runtime.sendMessage({ action: 'STORAGE_SYNC_BACKUPS' }, (response) => {
+      setSyncing(false);
       if (response?.success) {
         addSnackbar('Sync complete', 'success');
-        await fetchInfo();
-      } else {
-        addSnackbar(response?.error || 'Sync failed', 'error');
+        fetchInfo();
+      } else if (response?.error) {
+        addSnackbar(response.error, 'error');
       }
-    } catch {
-      // Sync failed silently
-    } finally {
-      setSyncing(false);
-    }
+    });
   };
 
-  const handleSync = () => {
-    if (!syncing) triggerSync();
-  };
+  const handleSync = () => triggerSync();
 
   const handleSetActive = async (target: 'local' | string) => {
     setBusyAction('active');
@@ -238,8 +231,6 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
   const handleAddRemote = async (url: string) => {
     await runAction('STORAGE_ADD_REMOTE', { url }, 'Remote added');
     setShowProviderPicker(false);
-    // Auto-sync after adding a new remote
-    triggerSync();
   };
 
   const handleRemoveRemote = async (url: string) => {
@@ -826,7 +817,7 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
               }
 
               const usage = result.data;
-              const pct = usagePercent(usage.usedBytes, usage.capacityBytes);
+              const pct = Math.max(usagePercent(usage.usedBytes, usage.capacityBytes), usage.usedBytes > 0 ? 1 : 0);
               const barColor = usageBarColor(pct);
 
               return (

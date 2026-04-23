@@ -167,14 +167,29 @@ export const TopNav = () => {
               {/* Divider */}
               <div className="mx-3 h-px" style={{ backgroundColor: theme.color.global.gray + '25' }} />
 
-              {/* Add new account */}
+              {/* Add new account options */}
               <motion.div
                 whileHover={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
                 className="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
-                onClick={() => handleSelect('settings', 'create-account')}
+                onClick={() => {
+                  setDropdownVisible(false);
+                  handleSelect('settings', 'create-account');
+                }}
               >
                 <span className="text-sm font-semibold" style={{ color: theme.color.global.gray }}>
-                  + Add New Account
+                  + Create New Account
+                </span>
+              </motion.div>
+              <motion.div
+                whileHover={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+                className="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
+                onClick={() => {
+                  setDropdownVisible(false);
+                  handleSelect('settings', 'restore-account');
+                }}
+              >
+                <span className="text-sm font-semibold" style={{ color: theme.color.global.gray }}>
+                  + Restore / Import
                 </span>
               </motion.div>
             </motion.div>

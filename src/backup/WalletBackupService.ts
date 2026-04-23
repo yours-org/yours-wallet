@@ -2,10 +2,8 @@ import {
   FileRestoreReader,
   Zip,
   ZipDeflate,
-  unzip,
   type BackupManifest,
   type BackupProgressCallback,
-  type Unzipped,
 } from '@1sat/wallet-browser';
 import { encode } from '@msgpack/msgpack';
 import type { WalletStorageManager, sdk } from '@bsv/wallet-toolbox-mobile';
@@ -17,6 +15,72 @@ import { decrypt, deriveKey } from '../utils/crypto';
 type Chain = 'main' | 'test';
 type SyncChunk = sdk.SyncChunk;
 type RequestSyncChunkArgs = sdk.RequestSyncChunkArgs;
+
+// ── v2 multi-account manifest types ──────────────────────────────
+
+export interface AccountManifestEntry {
+  identityKey: string;
+  identityAddress: string;
+  name: string;
+  chunkCount: number;
+}
+
+export interface BackupManifestV2 {
+  version: 2;
+  createdAt: string;
+  chain: Chain;
+  accounts: AccountManifestEntry[];
+}
+
+/** Union of v1 (single-account) and v2 (multi-account) manifests. */
+export type AnyBackupManifest = BackupManifest | BackupManifestV2;
+
+/** Progress event emitted during multi-account backup. */
+export interface MultiAccountProgressEvent {
+  stage: 'preparing' | 'exporting' | 'complete' | 'error';
+  accountName?: string;
+  accountIndex?: number;
+  totalAccounts?: number;
+  message: string;
+}
+
+/** Account descriptor passed into exportAllAccounts. */
+export interface BackupAccountDescriptor {
+  identityKey: string;
+  identityAddress: string;
+  name: string;
+}
+
+/** Sentinel manifest for legacy (pre-BRC-100) SPV-store backups that have no manifest.json. */
+export interface BackupManifestLegacy {
+  version: 0;
+  createdAt: string;
+  chain: Chain;
+  /** Legacy backups have no wallet-toolbox chunks — keys only. */
+  keysOnly: true;
+}
+
+export type AnyBackupManifestOrLegacy = AnyBackupManifest | BackupManifestLegacy;
+
+function isV2Manifest(m: AnyBackupManifest): m is BackupManifestV2 {
+  return m.version === 2;
+}
+
+/**
+ * Chrome storage shape from legacy (pre-BRC-100) backups.
+ * These include the full ChromeStorageObject with passKey embedded.
+ */
+interface LegacyChromeStorage {
+  accounts: Record<string, Account>;
+  selectedAccount: string;
+  accountNumber: number;
+  salt: string;
+  passKey?: string;
+  colorTheme?: Theme;
+  version?: number;
+  hasUpgradedToSPV?: boolean;
+  [key: string]: unknown;
+}
 
 /**
  * Entity names in the order expected by getSyncChunk.
@@ -81,12 +145,17 @@ function chunkHasData(chunk: SyncChunk): boolean {
 }
 
 /**
- * Pending restore data stored in IndexedDB for import after wallet unlock.
+ * Per-account pending restore data stored in IndexedDB.
+ * Keyed by identityKey so each account's data can be imported independently
+ * when that account becomes the active wallet.
+ *
+ * `syncFromReader` enforces that the identityKey matches the authenticated
+ * wallet, so we must import one account at a time as each is activated.
  */
-interface PendingRestore {
-  manifest: BackupManifest;
-  chunks: Record<string, Uint8Array>;
-  settings: Uint8Array;
+interface AccountPendingRestore {
+  manifest: BackupManifest; // v1-shaped manifest for FileRestoreReader
+  chunks: Record<string, Uint8Array>; // flat chunk keys (chunk-XXXX.bin)
+  chunkCount: number;
 }
 
 // IndexedDB name for storing pending restore data
@@ -105,29 +174,27 @@ const PENDING_RESTORE_STORE = 'pending';
  */
 export class WalletBackupService {
   /**
-   * Export wallet data to a ZIP file.
+   * Export wallet data for ALL accounts to a single ZIP file (v2 format).
    *
-   * Approach: Directly call getSyncChunk on the storage in a loop to read all data,
-   * rather than using syncToWriter (which requires a full provider implementation
-   * with sync state tracking).
+   * All accounts share one IndexedDB, partitioned by identityKey. We call
+   * getSyncChunk on the same storage instance with each account's identityKey
+   * — no need to create additional wallet instances.
    *
-   * @param storage - WalletStorageManager instance
-   * @param chromeStorageService - Chrome storage service for account data
-   * @param chain - Network chain (main or test)
-   * @param identityKey - Wallet identity public key
-   * @param onProgress - Progress callback
-   * @returns Blob containing the ZIP file
+   * ZIP layout:
+   *   manifest.json              — v2 manifest with per-account metadata
+   *   chromeStorage.json         — all accounts' encrypted keys & settings
+   *   settings.bin               — storage settings
+   *   <identityAddress>/chunk-XXXX.bin — per-account wallet data chunks
    */
-  static async exportToFile(
+  static async exportAllAccounts(
     storage: WalletStorageManager,
     chromeStorageService: ChromeStorageService,
     chain: Chain,
-    identityKey: string,
-    onProgress: BackupProgressCallback,
+    accounts: BackupAccountDescriptor[],
+    onProgress: (event: MultiAccountProgressEvent) => void,
   ): Promise<Blob> {
-    onProgress({ stage: 'preparing', message: 'Preparing backup...' });
+    onProgress({ stage: 'preparing', message: 'Preparing backup...', totalAccounts: accounts.length });
 
-    // Collect ZIP data in memory
     const zipChunks: Uint8Array[] = [];
     let zipError: Error | null = null;
 
@@ -139,80 +206,87 @@ export class WalletBackupService {
       zipChunks.push(data);
     });
 
-    onProgress({ stage: 'exporting', message: 'Exporting wallet data...' });
-
     const settings = storage.getSettings();
     const storageIdentityKey = settings.storageIdentityKey;
-
-    // Create initial request args for full export (since: undefined = all data)
-    // We use a fake "file-backup" target storage identity key
     const fileBackupStorageKey = 'file-backup-' + Date.now();
 
-    let chunkCount = 0;
-    let offsets = createInitialOffsets();
+    const accountManifestEntries: AccountManifestEntry[] = [];
 
-    // Read chunks directly from storage
-    for (;;) {
-      const args: RequestSyncChunkArgs = {
-        identityKey,
-        fromStorageIdentityKey: storageIdentityKey,
-        toStorageIdentityKey: fileBackupStorageKey,
-        since: undefined, // undefined = all data (not incremental)
-        maxRoughSize: 10000000, // 10MB per chunk
-        maxItems: 1000,
-        offsets,
-      };
+    // Export each account's wallet data
+    for (let acctIdx = 0; acctIdx < accounts.length; acctIdx++) {
+      const acct = accounts[acctIdx];
 
-      // Use runAsSync to get a chunk from the active storage
-      const chunk = await storage.runAsSync(async (sync) => sync.getSyncChunk(args));
+      onProgress({
+        stage: 'exporting',
+        accountName: acct.name,
+        accountIndex: acctIdx,
+        totalAccounts: accounts.length,
+        message: `Backing up "${acct.name}" (${acctIdx + 1} of ${accounts.length})...`,
+      });
 
-      // Write chunk to ZIP
-      const chunkName = `chunk-${String(chunkCount).padStart(4, '0')}.bin`;
-      const encoded = encode(chunk);
-      const deflate = new ZipDeflate(chunkName, { level: 6 });
-      zip.add(deflate);
-      deflate.push(new Uint8Array(encoded), true);
+      let chunkCount = 0;
+      let offsets = createInitialOffsets();
 
-      chunkCount++;
+      for (;;) {
+        const args: RequestSyncChunkArgs = {
+          identityKey: acct.identityKey,
+          fromStorageIdentityKey: storageIdentityKey,
+          toStorageIdentityKey: fileBackupStorageKey,
+          since: undefined,
+          maxRoughSize: 10000000,
+          maxItems: 1000,
+          offsets,
+        };
 
-      // Check if done (no more data)
-      if (!chunkHasData(chunk)) {
-        break;
+        const chunk = await storage.runAsSync(async (sync) => sync.getSyncChunk(args));
+
+        const chunkName = `${acct.identityAddress}/chunk-${String(chunkCount).padStart(4, '0')}.bin`;
+        const encoded = encode(chunk);
+        const deflate = new ZipDeflate(chunkName, { level: 6 });
+        zip.add(deflate);
+        deflate.push(new Uint8Array(encoded), true);
+
+        chunkCount++;
+
+        if (!chunkHasData(chunk)) break;
+
+        const entityCounts: Record<string, number> = {
+          provenTx: chunk.provenTxs?.length ?? 0,
+          outputBasket: chunk.outputBaskets?.length ?? 0,
+          outputTag: chunk.outputTags?.length ?? 0,
+          txLabel: chunk.txLabels?.length ?? 0,
+          transaction: chunk.transactions?.length ?? 0,
+          output: chunk.outputs?.length ?? 0,
+          txLabelMap: chunk.txLabelMaps?.length ?? 0,
+          outputTagMap: chunk.outputTagMaps?.length ?? 0,
+          certificate: chunk.certificates?.length ?? 0,
+          certificateField: chunk.certificateFields?.length ?? 0,
+          commission: chunk.commissions?.length ?? 0,
+          provenTxReq: chunk.provenTxReqs?.length ?? 0,
+        };
+
+        offsets = offsets.map((o) => ({
+          name: o.name,
+          offset: o.offset + (entityCounts[o.name] ?? 0),
+        }));
       }
 
-      // Update offsets based on items returned in this chunk
-      // This allows reading more data in subsequent iterations if needed
-      const entityCounts: Record<string, number> = {
-        provenTx: chunk.provenTxs?.length ?? 0,
-        outputBasket: chunk.outputBaskets?.length ?? 0,
-        outputTag: chunk.outputTags?.length ?? 0,
-        txLabel: chunk.txLabels?.length ?? 0,
-        transaction: chunk.transactions?.length ?? 0,
-        output: chunk.outputs?.length ?? 0,
-        txLabelMap: chunk.txLabelMaps?.length ?? 0,
-        outputTagMap: chunk.outputTagMaps?.length ?? 0,
-        certificate: chunk.certificates?.length ?? 0,
-        certificateField: chunk.certificateFields?.length ?? 0,
-        commission: chunk.commissions?.length ?? 0,
-        provenTxReq: chunk.provenTxReqs?.length ?? 0,
-      };
+      if (zipError) throw zipError;
 
-      // Update offsets for next iteration
-      offsets = offsets.map((o) => ({
-        name: o.name,
-        offset: o.offset + (entityCounts[o.name] ?? 0),
-      }));
+      accountManifestEntries.push({
+        identityKey: acct.identityKey,
+        identityAddress: acct.identityAddress,
+        name: acct.name,
+        chunkCount,
+      });
     }
 
-    if (zipError) throw zipError;
-
+    // Add Chrome storage data (all accounts' keys & settings)
     onProgress({
       stage: 'exporting',
-      message: `Exported ${chunkCount} data chunks`,
+      message: 'Exporting account settings...',
+      totalAccounts: accounts.length,
     });
-
-    // Add Chrome storage data
-    onProgress({ stage: 'exporting', message: 'Exporting account settings...' });
     const chromeStorage = await chromeStorageService.getAndSetStorage();
     const backupChromeStorage: BackupChromeStorage = {
       accounts: chromeStorage?.accounts || {},
@@ -234,64 +308,24 @@ export class WalletBackupService {
     zip.add(settingsDeflate);
     settingsDeflate.push(new Uint8Array(encode(settings)), true);
 
-    // Create and add manifest
-    const manifest: BackupManifest = {
-      version: 1,
+    // Create v2 manifest
+    const manifest: BackupManifestV2 = {
+      version: 2,
       createdAt: new Date().toISOString(),
       chain,
-      identityKey,
-      chunkCount,
+      accounts: accountManifestEntries,
     };
 
     const manifestDeflate = new ZipDeflate('manifest.json', { level: 6 });
     zip.add(manifestDeflate);
     manifestDeflate.push(new TextEncoder().encode(JSON.stringify(manifest, null, 2)), true);
 
-    // Finalize the ZIP
     zip.end();
-
     if (zipError) throw zipError;
 
-    onProgress({ stage: 'complete', message: 'Backup complete!' });
+    onProgress({ stage: 'complete', message: 'Backup complete!', totalAccounts: accounts.length });
 
-    // Cast to BlobPart[] — Uint8Array<ArrayBufferLike> isn't assignable to BlobPart[]
-    // in lib.dom.d.ts because it could theoretically wrap SharedArrayBuffer, but at
-    // runtime these are regular Uint8Arrays produced by fflate.
     return new Blob(zipChunks as unknown as BlobPart[], { type: 'application/zip' });
-  }
-
-  /**
-   * Validate a backup file without importing it.
-   *
-   * @param file - ZIP file to validate
-   * @returns The backup manifest if valid
-   */
-  static async validateBackupFile(file: File): Promise<BackupManifest> {
-    const zipData = new Uint8Array(await file.arrayBuffer());
-    const unzipped = await new Promise<Unzipped>((resolve, reject) => {
-      unzip(zipData, (err, data) => (err ? reject(err) : resolve(data)));
-    });
-
-    const manifestData = unzipped['manifest.json'];
-    if (!manifestData) {
-      throw new Error('Invalid backup file: missing manifest.json');
-    }
-
-    const manifest = JSON.parse(new TextDecoder().decode(manifestData)) as BackupManifest;
-
-    if (manifest.version !== 1) {
-      throw new Error(`Unsupported backup version: ${manifest.version}`);
-    }
-
-    // Verify all chunks exist
-    for (let i = 0; i < manifest.chunkCount; i++) {
-      const chunkName = `chunk-${String(i).padStart(4, '0')}.bin`;
-      if (!unzipped[chunkName]) {
-        throw new Error(`Invalid backup file: missing ${chunkName}`);
-      }
-    }
-
-    return manifest;
   }
 
   // ============================================================
@@ -299,61 +333,146 @@ export class WalletBackupService {
   // ============================================================
 
   /**
-   * Phase 1: Restore Chrome storage and store wallet data for later import.
-   * Validates password by decrypting keys, then stores everything including passKey.
+   * Phase 1: Restore from pre-extracted backup data.
    *
-   * @param chromeStorageService - Chrome storage service
-   * @param file - Backup ZIP file
-   * @param password - User's password to verify and derive passKey
-   * @param onProgress - Progress callback
-   * @returns The backup manifest
+   * The popup decompresses the ZIP (where Web Workers are available) and sends
+   * only the entries the background needs. This method never touches the raw ZIP.
+   *
+   * For legacy backups: only chromeStorage is provided (keys-only restore).
+   * For v1/v2 backups: chromeStorage + manifest + settings + chunks are provided.
    */
-  static async restoreChromeStorage(
+  static async restoreFromExtractedData(
     chromeStorageService: ChromeStorageService,
-    file: File,
+    data: {
+      chromeStorage: Uint8Array;
+      manifest?: Uint8Array;
+      settings?: Uint8Array;
+      chunks?: Record<string, Uint8Array>;
+      isLegacy: boolean;
+    },
     password: string,
     onProgress: BackupProgressCallback,
-  ): Promise<BackupManifest> {
-    onProgress({ stage: 'uploading', message: 'Reading backup file...' });
+  ): Promise<AnyBackupManifestOrLegacy> {
+    // Parse chromeStorage (shared by all formats)
+    const chromeStorageJson = new TextDecoder().decode(data.chromeStorage);
 
-    // Read and unzip the file
-    const zipData = new Uint8Array(await file.arrayBuffer());
-    const unzipped = await new Promise<Unzipped>((resolve, reject) => {
-      unzip(zipData, (err, data) => (err ? reject(err) : resolve(data)));
+    if (data.isLegacy) {
+      // ── Legacy restore (keys only) ──────────────────────────────
+      onProgress({ stage: 'importing', message: 'Detected older backup format. Restoring account keys...' });
+
+      const legacyStorage = JSON.parse(chromeStorageJson) as LegacyChromeStorage;
+      const passKey = this.verifyPasswordAndDeriveKey(legacyStorage, password);
+
+      onProgress({ stage: 'importing', message: 'Restoring account settings...' });
+
+      await chromeStorageService.update({
+        accounts: legacyStorage.accounts,
+        selectedAccount: legacyStorage.selectedAccount,
+        accountNumber: legacyStorage.accountNumber,
+        salt: legacyStorage.salt,
+        passKey,
+        colorTheme: legacyStorage.colorTheme,
+        version: legacyStorage.version,
+        lastActiveTime: Date.now(),
+      });
+
+      console.log('[WalletBackupService] Legacy backup restored (keys only).');
+      onProgress({ stage: 'complete', message: 'Keys restored! Wallet data will sync on first unlock.' });
+
+      return { version: 0, createdAt: new Date().toISOString(), chain: 'main', keysOnly: true };
+    }
+
+    // ── v1/v2 restore ──────────────────────────────────────────
+    if (!data.manifest || !data.settings || !data.chunks) {
+      throw new Error('Invalid restore data: missing manifest, settings, or chunks');
+    }
+
+    const manifest = JSON.parse(new TextDecoder().decode(data.manifest)) as AnyBackupManifest;
+    if (manifest.version !== 1 && manifest.version !== 2) {
+      throw new Error(`Unsupported backup version: ${(manifest as { version: number }).version}`);
+    }
+
+    const backupChromeStorage = JSON.parse(chromeStorageJson) as BackupChromeStorage;
+    const passKey = this.verifyPasswordAndDeriveKey(backupChromeStorage, password);
+
+    onProgress({ stage: 'importing', message: 'Restoring account settings...' });
+
+    await chromeStorageService.update({
+      accounts: backupChromeStorage.accounts,
+      selectedAccount: backupChromeStorage.selectedAccount,
+      accountNumber: backupChromeStorage.accountNumber,
+      salt: backupChromeStorage.salt,
+      passKey,
+      colorTheme: backupChromeStorage.colorTheme,
+      showWelcome: backupChromeStorage.showWelcome,
+      deviceId: backupChromeStorage.deviceId,
+      version: backupChromeStorage.version,
+      lastActiveTime: Date.now(),
     });
 
-    // Read and validate manifest
-    const manifestData = unzipped['manifest.json'];
-    if (!manifestData) {
-      throw new Error('Invalid backup file: missing manifest.json');
+    // Store wallet data chunks in IndexedDB per-account for Phase 2 import.
+    // syncFromReader enforces identityKey === authenticated wallet, so each
+    // account's data is stored separately and imported when that account is active.
+    onProgress({ stage: 'importing', message: 'Storing wallet data for import...' });
+
+    if (isV2Manifest(manifest)) {
+      for (const acct of manifest.accounts) {
+        const flatChunks: Record<string, Uint8Array> = {};
+        for (let i = 0; i < acct.chunkCount; i++) {
+          const namespacedKey = `${acct.identityAddress}/chunk-${String(i).padStart(4, '0')}.bin`;
+          const flatKey = `chunk-${String(i).padStart(4, '0')}.bin`;
+          if (data.chunks[namespacedKey]) {
+            flatChunks[flatKey] = data.chunks[namespacedKey];
+          }
+        }
+        const v1Compat: BackupManifest = {
+          version: 1,
+          createdAt: manifest.createdAt,
+          chain: manifest.chain,
+          identityKey: acct.identityKey,
+          chunkCount: acct.chunkCount,
+        };
+        await this.storeAccountPendingRestore(acct.identityKey, {
+          manifest: v1Compat,
+          chunks: flatChunks,
+          chunkCount: acct.chunkCount,
+        });
+        console.log(
+          `[WalletBackupService] Stored pending data for "${acct.name}" (${Object.keys(flatChunks).length} chunks)`,
+        );
+      }
+    } else {
+      // v1: single account — chunks have flat keys already
+      await this.storeAccountPendingRestore(manifest.identityKey, {
+        manifest,
+        chunks: data.chunks,
+        chunkCount: manifest.chunkCount,
+      });
+      console.log(
+        `[WalletBackupService] Stored pending data for v1 account (${Object.keys(data.chunks).length} chunks)`,
+      );
     }
 
-    const manifest = JSON.parse(new TextDecoder().decode(manifestData)) as BackupManifest;
+    console.log('[WalletBackupService] All pending restore data stored successfully');
+    onProgress({ stage: 'complete', message: 'Restore complete! Initializing wallet...' });
 
-    if (manifest.version !== 1) {
-      throw new Error(`Unsupported backup version: ${manifest.version}`);
-    }
+    return manifest;
+  }
 
-    // Restore Chrome storage (replaces any existing data)
-    onProgress({ stage: 'importing', message: 'Restoring account settings...' });
-    const chromeStorageData = unzipped['chromeStorage.json'];
-    if (!chromeStorageData) {
-      throw new Error('Invalid backup file: missing chromeStorage.json');
-    }
-
-    const backupChromeStorage = JSON.parse(new TextDecoder().decode(chromeStorageData)) as BackupChromeStorage;
-
-    // Verify password by deriving passKey and decrypting keys
-    onProgress({ stage: 'importing', message: 'Verifying password...' });
-    const { salt, accounts, selectedAccount } = backupChromeStorage;
+  /**
+   * Verify the password against the backup's encrypted keys and return the derived passKey.
+   */
+  private static verifyPasswordAndDeriveKey(
+    storage: { salt: string; accounts: Record<string, Account>; selectedAccount: string },
+    password: string,
+  ): string {
+    const { salt, accounts, selectedAccount } = storage;
     if (!salt) {
       throw new Error('Invalid backup file: missing salt');
     }
 
-    // Derive passKey from password + salt
     const passKey = deriveKey(password, salt);
 
-    // Verify by decrypting the selected account's keys
     const account = accounts[selectedAccount];
     if (!account?.encryptedKeys) {
       throw new Error('Invalid backup file: missing encrypted keys');
@@ -361,126 +480,80 @@ export class WalletBackupService {
 
     try {
       const decryptedKeys = decrypt(account.encryptedKeys, passKey);
-      // Verify it's valid JSON
       JSON.parse(decryptedKeys);
     } catch {
       throw new Error('Invalid password - unable to decrypt wallet keys');
     }
 
-    // Password verified - save everything including passKey
-    await chromeStorageService.update({
-      accounts: backupChromeStorage.accounts,
-      selectedAccount: backupChromeStorage.selectedAccount,
-      accountNumber: backupChromeStorage.accountNumber,
-      salt: backupChromeStorage.salt,
-      passKey, // Include the derived passKey so user is authenticated
-      colorTheme: backupChromeStorage.colorTheme,
-      showWelcome: backupChromeStorage.showWelcome,
-      deviceId: backupChromeStorage.deviceId,
-      version: backupChromeStorage.version,
-      lastActiveTime: Date.now(), // Mark as recently active
-    });
-
-    // Store wallet data chunks in IndexedDB for later import
-    onProgress({ stage: 'importing', message: 'Storing wallet data for import...' });
-    const chunks: Record<string, Uint8Array> = {};
-    for (let i = 0; i < manifest.chunkCount; i++) {
-      const chunkName = `chunk-${String(i).padStart(4, '0')}.bin`;
-      if (unzipped[chunkName]) {
-        chunks[chunkName] = unzipped[chunkName];
-      }
-    }
-
-    const settingsData = unzipped['settings.bin'];
-    if (!settingsData) {
-      throw new Error('Invalid backup file: missing settings.bin');
-    }
-
-    console.log('[WalletBackupService] Storing pending restore data in IndexedDB...');
-    console.log('[WalletBackupService] Chunks to store:', Object.keys(chunks).length);
-    await this.storePendingRestore({
-      manifest,
-      chunks,
-      settings: settingsData,
-    });
-    console.log('[WalletBackupService] Pending restore data stored successfully');
-
-    // Verify it was stored
-    const verifyPending = await this.hasPendingRestore();
-    console.log('[WalletBackupService] Verify hasPendingRestore:', verifyPending);
-
-    onProgress({ stage: 'complete', message: 'Restore complete! Initializing wallet...' });
-
-    return manifest;
+    return passKey;
   }
 
   /**
-   * Phase 2: Import pending wallet data after unlock.
-   * Call this after the wallet has been initialized.
+   * Phase 2: Import pending wallet data for the CURRENT account after unlock.
    *
-   * @param storage - WalletStorageManager instance
+   * syncFromReader enforces that identityKey matches the authenticated wallet,
+   * so we can only import one account at a time. Pending data for other accounts
+   * stays in IndexedDB until those accounts are activated (switched to).
+   *
+   * Called from initializeWallet() on every wallet init — including account switches.
+   *
+   * @param storage - WalletStorageManager instance (initialized for current account)
+   * @param identityKey - The current account's identity public key
    * @param onProgress - Progress callback
-   * @returns The backup manifest, or null if no pending restore
    */
   static async importPendingWalletData(
     storage: WalletStorageManager,
+    identityKey: string,
     onProgress: BackupProgressCallback,
-  ): Promise<BackupManifest | null> {
-    const pending = await this.getPendingRestore();
+  ): Promise<void> {
+    const pending = await this.getAccountPendingRestore(identityKey);
     if (!pending) {
-      return null;
+      return;
     }
 
     onProgress({
       stage: 'importing',
-      message: `Importing ${pending.manifest.chunkCount} data chunks...`,
+      message: `Importing wallet data (${pending.chunkCount} chunks)...`,
     });
 
-    // Create the restore reader and import wallet data
     const reader = new FileRestoreReader(pending.chunks, pending.manifest);
-    await storage.syncFromReader(pending.manifest.identityKey, reader);
+    await storage.syncFromReader(identityKey, reader);
 
-    // Clear pending restore
-    await this.clearPendingRestore();
+    // Remove only this account's pending data — others stay for when they're activated
+    await this.clearAccountPendingRestore(identityKey);
 
-    onProgress({ stage: 'complete', message: 'Wallet restore complete!' });
-
-    return pending.manifest;
+    onProgress({ stage: 'complete', message: 'Wallet data imported!' });
   }
 
   /**
-   * Check if there's pending wallet data to import.
+   * Check if there's pending wallet data for a specific account.
    */
-  static async hasPendingRestore(): Promise<boolean> {
-    const pending = await this.getPendingRestore();
+  static async hasPendingRestore(identityKey: string): Promise<boolean> {
+    const pending = await this.getAccountPendingRestore(identityKey);
     return pending !== null;
   }
 
-  /**
-   * Store pending restore data in IndexedDB.
-   */
-  private static async storePendingRestore(data: PendingRestore): Promise<void> {
+  // ── Per-account IndexedDB storage ────────────────────────────
+
+  private static async storeAccountPendingRestore(identityKey: string, data: AccountPendingRestore): Promise<void> {
     const db = await this.openPendingRestoreDB();
     const tx = db.transaction(PENDING_RESTORE_STORE, 'readwrite');
     const store = tx.objectStore(PENDING_RESTORE_STORE);
     await new Promise<void>((resolve, reject) => {
-      const request = store.put(data, 'pending');
+      const request = store.put(data, identityKey);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
     db.close();
   }
 
-  /**
-   * Get pending restore data from IndexedDB.
-   */
-  private static async getPendingRestore(): Promise<PendingRestore | null> {
+  private static async getAccountPendingRestore(identityKey: string): Promise<AccountPendingRestore | null> {
     try {
       const db = await this.openPendingRestoreDB();
       const tx = db.transaction(PENDING_RESTORE_STORE, 'readonly');
       const store = tx.objectStore(PENDING_RESTORE_STORE);
-      const result = await new Promise<PendingRestore | undefined>((resolve, reject) => {
-        const request = store.get('pending');
+      const result = await new Promise<AccountPendingRestore | undefined>((resolve, reject) => {
+        const request = store.get(identityKey);
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
       });
@@ -491,16 +564,13 @@ export class WalletBackupService {
     }
   }
 
-  /**
-   * Clear pending restore data.
-   */
-  static async clearPendingRestore(): Promise<void> {
+  private static async clearAccountPendingRestore(identityKey: string): Promise<void> {
     try {
       const db = await this.openPendingRestoreDB();
       const tx = db.transaction(PENDING_RESTORE_STORE, 'readwrite');
       const store = tx.objectStore(PENDING_RESTORE_STORE);
       await new Promise<void>((resolve, reject) => {
-        const request = store.delete('pending');
+        const request = store.delete(identityKey);
         request.onsuccess = () => resolve();
         request.onerror = () => reject(request.error);
       });
@@ -511,8 +581,24 @@ export class WalletBackupService {
   }
 
   /**
-   * Open the pending restore IndexedDB.
+   * Clear ALL pending restore data (e.g. on unrecoverable error).
    */
+  static async clearAllPendingRestores(): Promise<void> {
+    try {
+      const db = await this.openPendingRestoreDB();
+      const tx = db.transaction(PENDING_RESTORE_STORE, 'readwrite');
+      const store = tx.objectStore(PENDING_RESTORE_STORE);
+      await new Promise<void>((resolve, reject) => {
+        const request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+      db.close();
+    } catch {
+      // Ignore errors
+    }
+  }
+
   private static openPendingRestoreDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(PENDING_RESTORE_DB, 1);

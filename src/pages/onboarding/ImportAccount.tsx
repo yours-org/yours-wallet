@@ -4,7 +4,7 @@ import { ArrowLeft, CheckCircle, Upload } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
-import { YoursIcon } from '../../components/YoursIcon';
+import wifWallet from '../../assets/wif-wallet.svg';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
@@ -152,25 +152,8 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
   const row = theme.color.global.row;
   const bg = theme.color.global.walletBackground;
 
-  const PageHeader = ({ title, onClick }: { title: string; onClick: () => void }) => (
-    <div className="flex w-full items-center gap-3 px-4 pb-4">
-      <motion.button
-        whileTap={{ scale: 0.9 }}
-        onClick={onClick}
-        className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
-        style={{ background: '#17191E' }}
-      >
-        <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
-      </motion.button>
-      <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
-        {title}
-      </span>
-    </div>
-  );
-
   const enterWifsStep = (
     <div className="flex flex-col items-center w-full pb-20">
-      <PageHeader title="Import a WIF Wallet" onClick={() => (newWallet ? navigate('/') : onNavigateBack())} />
       <p className="text-xs mb-4 text-center px-4" style={{ color: gray }}>
         Input assets directly from your WIF private keys or import a 1Sat JSON Wallet.
       </p>
@@ -242,7 +225,6 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
 
   const passwordStep = (
     <div className="flex flex-col items-center w-full pb-20">
-      <PageHeader title={newWallet ? 'Create Password' : 'Import Account'} onClick={() => setStep(1)} />
       <p className="text-xs mb-4 text-center" style={{ color: gray }}>
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
       </p>
@@ -336,16 +318,38 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
   return (
     <>
       <Show when={!loading} whenFalseContent={<PageLoader theme={theme} message="Importing..." />}>
-        <div className="flex flex-col items-center w-full px-2 pt-6 pb-4">
-          <Show when={newWallet}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.85 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4, ease: 'easeOut' }}
-              className="mb-4"
+        <div className="flex flex-col items-center w-full px-2 pt-4 pb-4">
+          {/* Back button + title — above logo, consistent position */}
+          <div
+            className="flex w-full items-center gap-3 px-4 pb-4 pt-4 sticky top-0 z-10"
+            style={{ backgroundColor: bg }}
+          >
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => {
+                if (step === 1) {
+                  newWallet ? navigate('/restore-wallet') : onNavigateBack();
+                } else {
+                  setStep(step - 1);
+                }
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+              style={{ background: '#17191E' }}
             >
-              <YoursIcon width="4rem" />
-            </motion.div>
+              <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
+            </motion.button>
+            <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
+              Import a WIF Wallet
+            </span>
+          </div>
+
+          <Show when={newWallet}>
+            <div
+              className="flex items-center justify-center rounded-2xl mb-4"
+              style={{ width: '4.5rem', height: '4.5rem', backgroundColor: '#17191E' }}
+            >
+              <img src={wifWallet} alt="WIF" style={{ width: 'auto', height: '2.5rem' }} />
+            </div>
           </Show>
 
           <AnimatePresence mode="wait">

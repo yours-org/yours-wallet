@@ -104,8 +104,9 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
   const row = theme.color.global.row;
   const bg = theme.color.global.walletBackground;
 
-  // Step progress dots
-  const StepIndicator = () => (
+  // Step progress dots — plain JSX, not a component, so it doesn't
+  // unmount/remount (replaying animations) on every parent re-render.
+  const stepIndicator = (
     <div className="flex items-center gap-2 mb-6">
       {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
         <motion.div
@@ -124,29 +125,9 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
     </div>
   );
 
-  const PageHeader = ({ title, onClick }: { title: string; onClick: () => void }) => (
-    <div className="flex w-full items-center gap-3 px-4 pb-4">
-      <motion.button
-        whileTap={{ scale: 0.9 }}
-        onClick={onClick}
-        className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
-        style={{ background: '#17191E' }}
-      >
-        <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
-      </motion.button>
-      <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
-        {title}
-      </span>
-    </div>
-  );
-
   const passwordStep = (
     <div className="flex flex-col items-center w-full pb-20">
-      <PageHeader
-        title={newWallet ? 'Create Account' : 'New Account'}
-        onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
-      />
-      <StepIndicator />
+      {stepIndicator}
       <h2 className="text-xl font-bold mb-1 text-center" style={{ color: contrast }}>
         {newWallet ? 'Create password' : 'New Account'}
       </h2>
@@ -199,7 +180,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
 
   const copySeedStep = (
     <div className="flex flex-col items-center w-full">
-      <StepIndicator />
+      {stepIndicator}
       <h2 className="text-xl font-bold mb-1 text-center" style={{ color: contrast }}>
         Your recovery phrase
       </h2>
@@ -278,7 +259,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
 
   const successStep = (
     <div className="flex flex-col items-center w-full">
-      <StepIndicator />
+      {stepIndicator}
       <motion.div
         initial={{ scale: 0.4, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -327,7 +308,38 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
 
   return (
     <Show when={!loading} whenFalseContent={<PageLoader theme={theme} message="Generating keys..." />}>
-      <div className="flex flex-col items-center w-full px-2 pt-6 pb-4">
+      <div className="flex flex-col items-center w-full px-2 pt-4 pb-4">
+        {/* Back button + title — hidden on final "Wallet Ready" step */}
+        {step < TOTAL_STEPS && (
+          <div
+            className="flex w-full items-center gap-3 px-4 pb-4 pt-4 sticky top-0 z-10"
+            style={{ backgroundColor: bg }}
+          >
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={async () => {
+                if (step === 1) {
+                  // If keys were already generated (user went to step 2 then came back),
+                  // clear them so we don't leave orphaned data in chrome storage.
+                  if (seedWords.length > 0 && newWallet) {
+                    await chromeStorageService.clear();
+                  }
+                  newWallet ? navigate('/') : onNavigateBack();
+                } else {
+                  setStep(step - 1);
+                }
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+              style={{ background: '#17191E' }}
+            >
+              <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
+            </motion.button>
+            <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
+              {newWallet ? 'Create Account' : 'New Account'}
+            </span>
+          </div>
+        )}
+
         <Show when={newWallet}>
           <motion.div
             initial={{ opacity: 0, scale: 0.85 }}

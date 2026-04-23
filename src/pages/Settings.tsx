@@ -21,6 +21,9 @@ import {
   Copy,
   Check,
   Camera,
+  AlertTriangle,
+  CheckCircle2,
+  Minus,
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -44,6 +47,7 @@ import { MasterBackupProgressEvent, streamDataToZip } from '../utils/masterExpor
 import { useSnackbar } from '../hooks/useSnackbar';
 import { PermissionsManager } from './PermissionsManager';
 import { StorageStatus } from './StorageStatus';
+import { YoursIcon } from '../components/YoursIcon';
 import activeCircle from '../assets/active-circle.png';
 import ProgressBar from '@ramonak/react-progress-bar';
 
@@ -208,6 +212,12 @@ export const Settings = () => {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [masterBackupProgress, setMasterBackupProgress] = useState(0);
   const [masterBackupEventText, setMasterBackupEventText] = useState('');
+  const [backupInProgress, setBackupInProgress] = useState(false);
+  const [backupAccounts, setBackupAccounts] = useState<
+    Array<{ name: string; icon: string; status: 'pending' | 'active' | 'done' }>
+  >([]);
+  const [backupDone, setBackupDone] = useState(false);
+  const [backupError, setBackupError] = useState('');
   const currentAccount = chromeStorageService.getCurrentAccountObject();
   const [customFeeRate, setCustomFeeRate] = useState(currentAccount.account?.settings.customFeeRate ?? FEE_PER_KB);
   const [lockTimeout, setLockTimeout] = useState(currentAccount.account?.settings.lockTimeout ?? 10);
@@ -235,9 +245,10 @@ export const Settings = () => {
   };
 
   const handleMasterBackupIntent = () => {
+    const accountCount = chromeStorageService.getAllAccounts().length;
     setDecisionType('export-master-backup');
     setSpeedBumpMessage(
-      'You are about to download wallet data for all your accounts. Make sure you are in a safe place.',
+      `This will back up ALL ${accountCount} account${accountCount === 1 ? '' : 's'} in your wallet — keys, transactions, and settings. Make sure you are in a safe place.`,
     );
     setShowSpeedBump(true);
   };
@@ -527,12 +538,53 @@ export const Settings = () => {
   }, [lockTimeout, chromeStorageService, addSnackbar]);
 
   const handleMasterBackup = async () => {
-    await streamDataToZip(chromeStorageService, (e: MasterBackupProgressEvent) => {
-      setMasterBackupEventText(e.message);
-      const progress = e.endValue && e.value ? Math.ceil((e.value / e.endValue) * 100) : 0;
-      setMasterBackupProgress(progress);
-    });
+    // Populate overlay with all accounts
+    const allAccounts = chromeStorageService.getAllAccounts();
+    setBackupAccounts(allAccounts.map((a) => ({ name: a.name, icon: a.icon || '', status: 'pending' })));
+    setBackupInProgress(true);
+    setBackupDone(false);
+    setBackupError('');
+    setMasterBackupProgress(0);
+    setMasterBackupEventText('Preparing backup...');
+
+    try {
+      await streamDataToZip(chromeStorageService, (e: MasterBackupProgressEvent) => {
+        setMasterBackupEventText(e.message);
+        const progress = e.endValue && e.value ? Math.ceil((e.value / e.endValue) * 100) : 0;
+        setMasterBackupProgress(progress);
+
+        // Update per-account status based on accountIndex
+        if (e.accountIndex !== undefined && e.totalAccounts !== undefined) {
+          setBackupAccounts((prev) =>
+            prev.map((a, i) => ({
+              ...a,
+              status: i < e.accountIndex! ? 'done' : i === e.accountIndex! ? 'active' : 'pending',
+            })),
+          );
+        }
+
+        if (e.stage === 'complete') {
+          setBackupAccounts((prev) => prev.map((a) => ({ ...a, status: 'done' })));
+        }
+      });
+      setBackupDone(true);
+      setMasterBackupEventText('Backup complete! File downloaded.');
+      setMasterBackupProgress(100);
+      setBackupAccounts((prev) => prev.map((a) => ({ ...a, status: 'done' })));
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      setBackupError(msg);
+      setMasterBackupEventText(`Backup failed: ${msg}`);
+    }
+  };
+
+  const dismissBackupOverlay = () => {
+    setBackupInProgress(false);
+    setBackupDone(false);
+    setBackupError('');
     setMasterBackupEventText('');
+    setMasterBackupProgress(0);
+    setBackupAccounts([]);
   };
 
   const handleLockWallet = async () => {
@@ -780,64 +832,29 @@ export const Settings = () => {
         {/* Manual backup options */}
         <Section title="Manual Backup">
           <motion.div variants={rowVariant}>
-            {masterBackupEventText ? (
-              <div className="px-4 py-3" style={{ backgroundColor: '#17191E' }}>
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: 'rgba(161,255,139,0.1)' }}
-                  >
-                    <HardDrive size={16} color="#A1FF8B" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold" style={{ color: '#FFFFFF' }}>
-                      Master Backup
-                    </p>
-                    <p className="text-xs" style={{ color: '#98A2B3' }}>
-                      {masterBackupEventText}
-                    </p>
-                  </div>
-                </div>
-                {masterBackupProgress > 0 && (
-                  <ProgressBar
-                    completed={masterBackupProgress}
-                    bgColor={theme.color.component.progressBar}
-                    baseBgColor={theme.color.component.progressBarTrack}
-                    height="8px"
-                  />
-                )}
-                <p className="text-xs mt-2 font-semibold" style={{ color: '#ef4444' }}>
-                  DO NOT CLOSE WALLET OR CHANGE TABS DURING THIS PROCESS!
-                </p>
-              </div>
-            ) : (
-              <SettingRow
-                icon={<HardDrive size={16} />}
-                label="Master Backup"
-                description="Download all wallet data for all accounts"
-                onClick={handleMasterBackupIntent}
-                isFirst
-              />
-            )}
+            <SettingRow
+              icon={<HardDrive size={16} />}
+              label="Master Backup"
+              description={`Back up all ${chromeStorageService.getAllAccounts().length} account${chromeStorageService.getAllAccounts().length === 1 ? '' : 's'} — keys, transactions, and settings`}
+              onClick={handleMasterBackupIntent}
+              isFirst
+            />
           </motion.div>
-          <Show when={!masterBackupEventText}>
-            <Divider />
-            <SettingRow
-              icon={<Download size={16} />}
-              label="Download Keys"
-              description="Download seed, private, and public keys as JSON"
-              onClick={handleExportKeysIntent}
-            />
-            <Divider />
-            <SettingRow
-              icon={<QrCodeIcon size={16} />}
-              label="Export as QR Code"
-              description="Display private keys as QR code for mobile import"
-              onClick={handleExportKeysAsQrCodeIntent}
-              isLast
-            />
-          </Show>
-          {masterBackupEventText && <div className="rounded-b-xl overflow-hidden" />}
+          <Divider />
+          <SettingRow
+            icon={<Download size={16} />}
+            label="Download Keys"
+            description="Download seed, private, and public keys as JSON"
+            onClick={handleExportKeysIntent}
+          />
+          <Divider />
+          <SettingRow
+            icon={<QrCodeIcon size={16} />}
+            label="Export as QR Code"
+            description="Display private keys as QR code for mobile import"
+            onClick={handleExportKeysAsQrCodeIntent}
+            isLast
+          />
         </Section>
       </motion.div>
     </motion.div>
@@ -1205,6 +1222,111 @@ export const Settings = () => {
           onClose={() => setShowAvatarPicker(false)}
         />
       )}
+
+      {/* Full-screen backup overlay — locks all interaction during backup */}
+      <AnimatePresence>
+        {backupInProgress && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center px-6"
+            style={{ backgroundColor: '#010101' }}
+          >
+            <YoursIcon width="3rem" />
+
+            <h2 className="text-lg font-bold mt-4 mb-1 text-center" style={{ color: '#FFFFFF' }}>
+              {backupDone ? 'Backup Complete' : backupError ? 'Backup Failed' : 'Backing Up All Accounts'}
+            </h2>
+            <p className="text-xs mb-5 text-center" style={{ color: '#98A2B3' }}>
+              {backupDone
+                ? 'Your backup file has been downloaded.'
+                : backupError
+                  ? backupError
+                  : `Exporting wallet data for ${backupAccounts.length} account${backupAccounts.length === 1 ? '' : 's'}`}
+            </p>
+
+            {/* Per-account status list */}
+            <div className="w-full max-w-xs space-y-2 mb-5">
+              {backupAccounts.map((acct, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg"
+                  style={{ backgroundColor: '#17191E' }}
+                >
+                  <img
+                    src={acct.icon || activeCircle}
+                    className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                    alt={acct.name}
+                  />
+                  <span className="text-sm flex-1 truncate" style={{ color: '#FFFFFF' }}>
+                    {acct.name}
+                  </span>
+                  {acct.status === 'done' && <CheckCircle2 size={16} color="#A1FF8B" />}
+                  {acct.status === 'active' && (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                    >
+                      <Loader2 size={16} color="#A1FF8B" />
+                    </motion.div>
+                  )}
+                  {acct.status === 'pending' && <Minus size={16} color="#98A2B3" />}
+                </div>
+              ))}
+            </div>
+
+            {/* Progress bar */}
+            {!backupDone && !backupError && masterBackupProgress > 0 && (
+              <div className="w-full max-w-xs mb-3">
+                <ProgressBar
+                  completed={masterBackupProgress}
+                  bgColor={theme.color.component.progressBar}
+                  baseBgColor={theme.color.component.progressBarTrack}
+                  height="18px"
+                  labelSize="10px"
+                  borderRadius="9px"
+                />
+              </div>
+            )}
+
+            {/* Status message */}
+            {!backupDone && !backupError && (
+              <p className="text-xs text-center" style={{ color: '#98A2B3' }}>
+                {masterBackupEventText}
+              </p>
+            )}
+
+            {/* Error icon */}
+            {backupError && (
+              <div className="mb-3">
+                <AlertTriangle size={32} color="#ef4444" />
+              </div>
+            )}
+
+            {/* Done / Error dismiss button */}
+            {(backupDone || backupError) && (
+              <motion.button
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={dismissBackupOverlay}
+                className="mt-4 px-6 py-2.5 rounded-xl text-sm font-semibold border-0 cursor-pointer"
+                style={{
+                  background: backupError
+                    ? '#ef4444'
+                    : `linear-gradient(135deg, ${theme.color.component.primaryButtonLeftGradient}, ${theme.color.component.primaryButtonRightGradient})`,
+                  color: backupError ? '#FFFFFF' : theme.color.component.primaryButtonText,
+                }}
+              >
+                {backupError ? 'Close' : 'Done'}
+              </motion.button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 };

@@ -58,7 +58,7 @@ export const Start = () => {
         {/* Top section — logo + branding */}
         <div className="flex flex-col items-center gap-3 mt-6">
           <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={0}>
-            <YoursIcon width="5rem" animated />
+            <YoursIcon width="5rem" />
           </motion.div>
 
           <motion.h1
@@ -85,7 +85,7 @@ export const Start = () => {
         </div>
 
         {/* Bottom section — actions */}
-        <div className="flex flex-col items-center gap-3 w-full mb-2">
+        <div className="flex flex-col items-center gap-3 w-full mb-2 px-1 overflow-visible">
           {/* Primary: Create */}
           <motion.button
             variants={fadeUp}
@@ -111,21 +111,21 @@ export const Start = () => {
             initial="hidden"
             animate="visible"
             custom={0.36}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 22 }}
             className="w-full p-px rounded-xl"
             style={{
               background: `linear-gradient(135deg, ${theme.color.component.secondaryOutlineButtonGradientLeft}, ${theme.color.component.secondaryOutlineButtonGradientRight})`,
             }}
           >
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+            <button
               onClick={() => navigate('/restore-wallet')}
-              className="w-full rounded-xl h-11 text-sm font-bold tracking-wide"
+              className="w-full rounded-xl h-11 text-sm font-bold tracking-wide border-0 outline-none cursor-pointer"
               style={{ backgroundColor: bg, color: contrast }}
             >
               Restore Wallet
-            </motion.button>
+            </button>
           </motion.div>
 
           {/* GitHub link */}

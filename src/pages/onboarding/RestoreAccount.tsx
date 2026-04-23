@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CheckCircle, ChevronRight } from 'lucide-react';
+import { ArrowLeft, CheckCircle, ChevronRight, Upload } from 'lucide-react';
 import relayXLogo from '../../assets/relayx.svg';
 import twetchLogo from '../../assets/twetch.svg';
 import yoursWhiteLogo from '../../assets/logos/white-logo.png';
@@ -53,6 +53,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   const { keysService, chromeStorageService } = useServiceContext();
   const [accountName, setAccountName] = useState('');
   const [iconURL, setIconURL] = useState('');
+  const hiddenYoursFileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     newWallet && hideMenu();
@@ -62,6 +63,34 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   }, [hideMenu, showMenu, newWallet]);
 
   const handleExpertToggle = () => setIsExpertImport(!isExpertImport);
+
+  const handleYoursJsonUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || file.type !== 'application/json') {
+      addSnackbar('Please upload a JSON file.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      try {
+        const jsonData = JSON.parse(text);
+        if (!jsonData.mnemonic) {
+          addSnackbar('No seed phrase found in file.', 'error');
+          return;
+        }
+        setSeedWords(jsonData.mnemonic);
+        if (jsonData.payDerivationPath) setWalletDerivation(jsonData.payDerivationPath);
+        if (jsonData.ordDerivationPath) setOrdDerivation(jsonData.ordDerivationPath);
+        if (jsonData.identityDerivationPath) setIdentityDerivation(jsonData.identityDerivationPath);
+        setStep(3);
+      } catch {
+        addSnackbar('Error parsing JSON file!', 'error');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
 
   const handleRestore = async (event: React.FormEvent<HTMLFormElement>) => {
     try {
@@ -200,7 +229,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   ];
 
   const PageHeader = ({ title, onClick }: { title: string; onClick: () => void }) => (
-    <div className="flex w-full items-center gap-3 px-4 pb-4">
+    <div className="flex w-full items-center gap-3 px-4 pb-4 pt-4 sticky top-0 z-10" style={{ backgroundColor: bg }}>
       <motion.button
         whileTap={{ scale: 0.9 }}
         onClick={onClick}
@@ -215,6 +244,43 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
     </div>
   );
 
+  /** Back button + title + wallet icon for sub-steps. Rendered inside each step so it animates with the content. */
+  const SubStepHeader = ({ title, onBack }: { title: string; onBack: () => void }) => (
+    <>
+      <div className="flex w-full items-center gap-3 px-4 pb-4 pt-4 sticky top-0 z-10" style={{ backgroundColor: bg }}>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={onBack}
+          className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+          style={{ background: '#17191E' }}
+        >
+          <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
+        </motion.button>
+        <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
+          {title}
+        </span>
+      </div>
+      {newWallet && (
+        <div
+          className="flex items-center justify-center rounded-2xl mb-4 mt-2"
+          style={{ width: '4.5rem', height: '4.5rem', backgroundColor: '#17191E' }}
+        >
+          {importWallet === 'relayx' ? (
+            <img src={relayXLogo} alt="RelayX" style={{ width: 'auto', height: '2.5rem' }} />
+          ) : importWallet === 'twetch' ? (
+            <img src={twetchLogo} alt="Twetch" style={{ width: 'auto', height: '2.5rem' }} />
+          ) : importWallet === 'wif' ? (
+            <img src={wifWallet} alt="WIF" style={{ width: 'auto', height: '2.5rem' }} />
+          ) : importWallet === 'other' ? (
+            <img src={otherWallet} alt="Other" style={{ width: 'auto', height: '2.5rem' }} />
+          ) : (
+            <img src={yoursWhiteLogo} alt="Yours" style={{ width: '1.75rem', height: 'auto' }} />
+          )}
+        </div>
+      )}
+    </>
+  );
+
   const selectImportWallet = (
     <div className="flex flex-col items-center w-full pb-20">
       <PageHeader
@@ -225,7 +291,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
         Select the wallet you'd like to restore from
       </p>
 
-      <div className="w-full flex flex-col gap-1 mb-3">
+      <div className="w-full flex flex-col gap-2.5 mb-3">
         {walletOptions.map((opt) =>
           opt.id ? (
             <WalletRow
@@ -249,7 +315,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
 
   const enterSeedStep = (
     <div className="flex flex-col items-center w-full pb-20">
-      <PageHeader title={getRestoreTitle()} onClick={() => setStep(1)} />
+      <SubStepHeader title={getRestoreTitle()} onBack={() => setStep(1)} />
       <p className="text-xs mb-4 text-center px-4" style={{ color: gray }}>
         {getRestoreDescription()}
       </p>
@@ -327,12 +393,37 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
 
         <Button theme={theme} type="primary" label="Next" isSubmit />
       </form>
+
+      {/* Yours JSON upload — extracts seed and derivation paths from key backup */}
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.97 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+        onClick={() => hiddenYoursFileInput.current?.click()}
+        className="flex items-center justify-center gap-2 w-[87%] h-9 rounded-xl border text-sm font-semibold mt-2"
+        style={{
+          borderColor: gray + '40',
+          color: contrast,
+          background: row,
+        }}
+      >
+        <Upload size={14} style={{ color: accentLeft }} />
+        Upload Yours JSON
+      </motion.button>
+
+      <input
+        type="file"
+        ref={hiddenYoursFileInput}
+        onChange={handleYoursJsonUpload}
+        style={{ display: 'none' }}
+        accept="application/json"
+      />
     </div>
   );
 
   const passwordStep = (
     <div className="flex flex-col items-center w-full pb-20">
-      <PageHeader title={newWallet ? 'Create Password' : 'Import Account'} onClick={() => setStep(2)} />
+      <SubStepHeader title={newWallet ? 'Create Password' : 'Import Account'} onBack={() => setStep(2)} />
       <p className="text-xs mb-4 text-center" style={{ color: gray }}>
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
       </p>
@@ -425,18 +516,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
 
   return (
     <Show when={!loading} whenFalseContent={<PageLoader theme={theme} message="Restoring..." />}>
-      <div className="flex flex-col items-center w-full px-2 pt-6 pb-4">
-        <Show when={newWallet && step !== 1}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, ease: 'easeOut' }}
-            className="mb-4"
-          >
-            <YoursIcon width="4rem" />
-          </motion.div>
-        </Show>
-
+      <div className="flex flex-col items-center w-full px-2 pt-4 pb-4">
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div

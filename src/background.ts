@@ -115,29 +115,36 @@ const initializeWallet = async (): Promise<WalletInterface | null> => {
     bindPermissionCallbacks(accountContext.wallet);
     console.log('[background] initializeWallet: bound permission callbacks');
 
-    // Check for pending restore data from Phase 1 of two-phase restore
-    const hasPending = await WalletBackupService.hasPendingRestore();
-    console.log('[background] initializeWallet: hasPendingRestore:', hasPending);
-    if (hasPending) {
-      console.log('[background] initializeWallet: Found pending restore data, importing...');
-      try {
-        // Use the WalletStorageManager directly from AccountContext. Cast through
-        // `unknown` because WalletBackupService imports WalletStorageManager from
-        // `@bsv/wallet-toolbox-mobile` while AccountContext uses `@bsv/wallet-toolbox`
-        // (same runtime shape, different nested type identities).
-        const storage = accountContext.storage as unknown as Parameters<
-          typeof WalletBackupService.importPendingWalletData
-        >[0];
-        if (storage) {
-          await WalletBackupService.importPendingWalletData(storage, (event) => {
-            console.log('[background] PendingRestore:', event.message);
-          });
-          console.log('[background] initializeWallet: Pending restore complete');
+    // Check for pending restore data for the CURRENT account (Phase 2 of two-phase restore).
+    // Each account's data is stored separately — syncFromReader only accepts the
+    // authenticated account's identityKey. Other accounts' data stays in IndexedDB
+    // until they are switched to and initializeWallet runs again.
+    const { account: currentAccount } = chromeStorageService.getCurrentAccountObject();
+    const currentIdentityKey = currentAccount?.pubKeys?.identityPubKey || '';
+    if (currentIdentityKey) {
+      const hasPending = await WalletBackupService.hasPendingRestore(currentIdentityKey);
+      console.log(
+        '[background] initializeWallet: hasPendingRestore for',
+        currentIdentityKey.slice(0, 8) + '...:',
+        hasPending,
+      );
+      if (hasPending) {
+        console.log('[background] initializeWallet: Found pending restore data, importing...');
+        try {
+          const storage = accountContext.storage as unknown as Parameters<
+            typeof WalletBackupService.importPendingWalletData
+          >[0];
+          if (storage) {
+            await WalletBackupService.importPendingWalletData(storage, currentIdentityKey, (event) => {
+              console.log('[background] PendingRestore:', event.message);
+            });
+            console.log('[background] initializeWallet: Pending restore complete');
+          }
+        } catch (error) {
+          console.error('[background] initializeWallet: Pending restore failed:', error);
+          // Clear only this account's pending data to avoid repeated failures
+          await WalletBackupService.clearAllPendingRestores();
         }
-      } catch (error) {
-        console.error('[background] initializeWallet: Pending restore failed:', error);
-        // Clear the pending restore to avoid repeated failures
-        await WalletBackupService.clearPendingRestore();
       }
     }
   }
@@ -736,7 +743,7 @@ if (isInServiceWorker) {
           processMasterBackup(sendResponse);
           return true;
         case 'MASTER_RESTORE':
-          processMasterRestore(message.fileData, message.password, sendResponse);
+          processMasterRestore(message, sendResponse);
           return true;
         case 'STORAGE_GET_INFO':
           processStorageGetInfo(sendResponse);
@@ -959,10 +966,13 @@ if (isInServiceWorker) {
         let outputCount = 0;
         let transactionCount = 0;
         try {
-          outputCount = await storage.runAsStorageProvider(async (sp) => sp.countOutputs({ partial: {} }));
-          transactionCount = await storage.runAsStorageProvider(async (sp) => sp.countTransactions({ partial: {} }));
+          const userId = await storage.getUserId();
+          outputCount = await storage.runAsStorageProvider(async (sp) => sp.countOutputs({ partial: { userId } }));
+          transactionCount = await storage.runAsStorageProvider(async (sp) =>
+            sp.countTransactions({ partial: { userId } }),
+          );
         } catch {
-          // countOutputs/countTransactions may not be available on all providers
+          // Counts may not be available during initialization
         }
 
         let syncStates: Array<{
@@ -1580,14 +1590,28 @@ if (isInServiceWorker) {
       }
 
       const chain = 'main' as const;
-      const { account } = chromeStorageService.getCurrentAccountObject();
-      const identityKey = account?.pubKeys?.identityPubKey || '';
+
+      // Build list of ALL accounts from chrome storage
+      const chromeStorage = await chromeStorageService.getAndSetStorage();
+      const allAccounts = chromeStorage?.accounts || {};
+      const accountsList = Object.entries(allAccounts)
+        .map(([identityAddress, acct]) => ({
+          identityKey: acct.pubKeys?.identityPubKey || '',
+          identityAddress,
+          name: acct.name || identityAddress.slice(0, 8),
+        }))
+        .filter((a) => a.identityKey); // skip accounts with no identity key
+
+      if (accountsList.length === 0) {
+        sendResponse({ type: 'MASTER_BACKUP', success: false, error: 'No accounts found to back up' });
+        return;
+      }
 
       // Use the WalletStorageManager directly from AccountContext.
       // Cast through `unknown` because WalletBackupService imports its WalletStorageManager
       // type from `@bsv/wallet-toolbox-mobile` while AccountContext uses `@bsv/wallet-toolbox`.
       // They're the same shape at runtime but TypeScript sees two distinct types.
-      const storage = accountContext.storage as unknown as Parameters<typeof WalletBackupService.exportToFile>[0];
+      const storage = accountContext.storage as unknown as Parameters<typeof WalletBackupService.exportAllAccounts>[0];
       if (!storage) {
         sendResponse({
           type: 'MASTER_BACKUP',
@@ -1597,13 +1621,22 @@ if (isInServiceWorker) {
         return;
       }
 
-      const blob = await WalletBackupService.exportToFile(
+      const blob = await WalletBackupService.exportAllAccounts(
         storage,
         chromeStorageService,
         chain,
-        identityKey,
+        accountsList,
         (event) => {
           console.log('[MasterBackup]', event.message);
+          // Broadcast progress to popup so the UI can show per-account status
+          chrome.runtime
+            .sendMessage({
+              action: 'MASTER_BACKUP_PROGRESS',
+              data: event,
+            })
+            .catch(() => {
+              // Popup may not be listening — that's fine
+            });
         },
       );
 
@@ -1623,6 +1656,12 @@ if (isInServiceWorker) {
       });
     } catch (error) {
       console.error('[MasterBackup] Error:', error);
+      chrome.runtime
+        .sendMessage({
+          action: 'MASTER_BACKUP_PROGRESS',
+          data: { stage: 'error', message: error instanceof Error ? error.message : String(error) },
+        })
+        .catch(() => {});
       sendResponse({
         type: 'MASTER_BACKUP',
         success: false,
@@ -1631,31 +1670,79 @@ if (isInServiceWorker) {
     }
   };
 
-  const processMasterRestore = async (fileData: string, password: string, sendResponse: CallbackResponse) => {
-    try {
-      // Convert base64 back to File
-      const binaryString = atob(fileData);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const file = new File([bytes], 'backup.zip', { type: 'application/zip' });
+  /** Decode a base64 string to Uint8Array. */
+  const fromBase64 = (b64: string): Uint8Array => {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  };
 
-      // Restore Chrome storage with password validation
-      console.log('[MasterRestore] Restoring from backup...');
-      const manifest = await WalletBackupService.restoreChromeStorage(chromeStorageService, file, password, (event) => {
-        console.log('[MasterRestore]', event.message);
-      });
+  /**
+   * Process a master restore request.
+   *
+   * The popup decompresses the ZIP (where Web Workers are available) and sends
+   * only the extracted entries the background needs. The background never
+   * touches the raw ZIP — no sync decompression in the service worker.
+   */
+  const processMasterRestore = async (
+    message: {
+      legacy: boolean;
+      password: string;
+      chromeStorageData: string;
+      manifestData?: string;
+      settingsData?: string;
+      chunksData?: Record<string, string>;
+    },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const { legacy, password, chromeStorageData } = message;
+
+      // Decode the pre-extracted entries from the popup
+      const chromeStorageBytes = fromBase64(chromeStorageData);
+      const manifestBytes = message.manifestData ? fromBase64(message.manifestData) : undefined;
+      const settingsBytes = message.settingsData ? fromBase64(message.settingsData) : undefined;
+
+      // Decode chunk entries back to Uint8Arrays
+      let chunks: Record<string, Uint8Array> | undefined;
+      if (message.chunksData) {
+        chunks = {};
+        for (const [key, b64] of Object.entries(message.chunksData)) {
+          chunks[key] = fromBase64(b64);
+        }
+      }
+
+      console.log('[MasterRestore] Restoring from backup...', legacy ? '(legacy)' : '(v1/v2)');
+
+      const manifest = await WalletBackupService.restoreFromExtractedData(
+        chromeStorageService,
+        {
+          chromeStorage: chromeStorageBytes,
+          manifest: manifestBytes,
+          settings: settingsBytes,
+          chunks,
+          isLegacy: legacy,
+        },
+        password,
+        (event) => {
+          console.log('[MasterRestore]', event.message);
+        },
+      );
 
       // Refresh chrome storage service to pick up restored data (including passKey)
       await chromeStorageService.getAndSetStorage();
-      console.log('[MasterRestore] Chrome storage refreshed, initializing wallet...');
+      console.log('[MasterRestore] Chrome storage refreshed');
 
-      // Initialize wallet now that user is authenticated
+      // Initialize the wallet so it's ready when the popup reloads.
+      // For v1/v2 this also triggers Phase 2 import of pending wallet data.
+      // For legacy this creates a fresh wallet-toolbox storage that syncs from remote.
+      console.log('[MasterRestore] Initializing wallet...');
       const wallet = await initializeWallet();
       console.log('[MasterRestore] Wallet initialized:', !!wallet);
 
-      // Manifest travels in `data` since ResponseEventDetail only defines {type, success, data, error}.
       sendResponse({
         type: 'MASTER_RESTORE',
         success: true,
