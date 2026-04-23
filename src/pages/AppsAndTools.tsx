@@ -711,7 +711,7 @@ export const AppsAndTools = () => {
             <Button
               theme={theme}
               type="primary"
-              label={isProcessing ? 'Sending...' : 'Confirm & Send'}
+              label={isProcessing ? 'Sending...' : 'Confirm'}
               onClick={() => {
                 handleSubmit(pendingSupportAmount!);
                 setPendingSupportAmount(null);

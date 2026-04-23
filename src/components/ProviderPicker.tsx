@@ -364,41 +364,74 @@ export const ProviderPicker = ({
               );
             })}
 
-            {/* Custom URL section */}
+            {/* Custom URL section — same expandable pattern as known providers */}
             <div
-              className="rounded-xl p-4"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+              className="rounded-xl overflow-hidden"
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.06)',
+              }}
             >
-              <p className="text-xs font-semibold mb-1" style={{ color: '#FFFFFF' }}>
-                Custom Provider
-              </p>
-              <p className="text-[9px] mb-2.5" style={{ color: '#98A2B3' }}>
-                Enter any URL that implements the storage API
-              </p>
-              <Input
-                theme={theme}
-                placeholder="https://your-server.com/storage"
-                type="text"
-                onChange={(e) => {
-                  setCustomUrl(e.target.value);
-                  setCustomError('');
-                }}
-                value={customUrl}
-              />
-              {customError && (
-                <p className="text-[10px] mt-1" style={{ color: '#F97066' }}>
-                  {customError}
-                </p>
-              )}
-              <div className="mt-2">
-                <Button
-                  theme={theme}
-                  type="secondary-outline"
-                  label={customChecking ? 'Checking…' : busy ? 'Adding…' : 'Add Custom Remote'}
-                  onClick={busy || customChecking ? () => {} : handleCustomAdd}
-                  loading={customChecking || busy}
-                />
-              </div>
+              <button
+                onClick={() => setExpandedProvider(expandedProvider === '__custom__' ? null : '__custom__')}
+                className="flex items-center w-full px-4 py-3 text-left border-0 outline-none cursor-pointer bg-transparent"
+              >
+                <Server size={16} style={{ color: '#98A2B3' }} className="shrink-0" />
+                <div className="ml-3 flex-1 min-w-0">
+                  <span className="text-xs font-semibold" style={{ color: '#FFFFFF' }}>
+                    Custom Provider
+                  </span>
+                  <p className="text-[10px] mt-0.5" style={{ color: '#98A2B3' }}>
+                    Enter any URL that implements the storage API
+                  </p>
+                </div>
+                <div className="shrink-0 ml-2">
+                  {expandedProvider === '__custom__' ? (
+                    <ChevronUp size={14} style={{ color: '#667085' }} />
+                  ) : (
+                    <ChevronDown size={14} style={{ color: '#667085' }} />
+                  )}
+                </div>
+              </button>
+
+              <AnimatePresence>
+                {expandedProvider === '__custom__' && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pb-3 space-y-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div className="pt-2.5">
+                        <Input
+                          theme={theme}
+                          placeholder="https://your-server.com/storage"
+                          type="text"
+                          onChange={(e) => {
+                            setCustomUrl(e.target.value);
+                            setCustomError('');
+                          }}
+                          value={customUrl}
+                        />
+                      </div>
+                      {customError && (
+                        <p className="text-[10px]" style={{ color: '#F97066' }}>
+                          {customError}
+                        </p>
+                      )}
+                      <Button
+                        theme={theme}
+                        type="secondary-outline"
+                        label={customChecking ? 'Checking…' : busy ? 'Adding…' : 'Add Custom Remote'}
+                        onClick={busy || customChecking ? () => {} : handleCustomAdd}
+                        loading={customChecking || busy}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 

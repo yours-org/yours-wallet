@@ -16,7 +16,7 @@ export const BottomMenuProvider = (props: BottomMenuProviderProps) => {
 
   const handleSelect = (item: MenuItems, pageQuery?: string) => {
     setSelected(item);
-    if (pageQuery) setQuery(pageQuery);
+    setQuery(pageQuery ?? '');
   };
 
   const showMenu = () => {
