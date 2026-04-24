@@ -25,17 +25,35 @@ const fail = chalk.red;
 const dim = chalk.dim;
 const bold = chalk.bold;
 
+// ─── Terminal helpers ────────────────────────────────────────
+const rawWrite = process.stdout.write.bind(process.stdout);
+const hideCursor = () => rawWrite('\x1b[?25l');
+const showCursor = () => rawWrite('\x1b[?25h');
+
+function mute() {
+  const origOut = process.stdout.write;
+  const origErr = process.stderr.write;
+  process.stdout.write = (() => true) as typeof process.stdout.write;
+  process.stderr.write = (() => true) as typeof process.stderr.write;
+  return () => {
+    process.stdout.write = origOut;
+    process.stderr.write = origErr;
+  };
+}
+
 // ─── Spinner ─────────────────────────────────────────────────
 const SPIN = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 function spinner(text: string) {
   let i = 0;
+  hideCursor();
   const id = setInterval(() => {
-    process.stdout.write(`\x1b[2K\r  ${accent(SPIN[i++ % SPIN.length])} ${text}`);
+    rawWrite(`\r  ${accent(SPIN[i++ % SPIN.length])} ${text}  `);
   }, 80);
   return (line: string) => {
     clearInterval(id);
-    process.stdout.write(`\x1b[2K\r  ${line}\n`);
+    rawWrite(`\x1b[2K\r  ${line}\n`);
+    showCursor();
   };
 }
 
@@ -138,7 +156,9 @@ async function main() {
     const t = Date.now();
 
     try {
-      await build({ configFile: resolve(root, step.cfg), logLevel: 'error' });
+      const unmute = mute();
+      await build({ configFile: resolve(root, step.cfg), logLevel: 'silent' });
+      unmute();
     } catch (err) {
       done(`${fail('✗')} ${idx} ${step.name}  ${fail('FAILED')}`);
       throw err;
@@ -189,6 +209,7 @@ async function main() {
 }
 
 main().catch((err) => {
+  showCursor();
   console.error(fail('\n  ✗ Build failed\n'));
   console.error(err);
   try {
