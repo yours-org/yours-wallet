@@ -11,7 +11,7 @@
     "@1sat/templates": "0.0.9",
     "@1sat/types": "0.0.18",
     "@1sat/utils": "0.0.15",
-    "@1sat/wallet-browser": "0.0.49",
+    "@1sat/wallet-browser": "0.0.52",
     "@bsv/sdk": "^2.0.13",
     "@bsv/wallet-toolbox-mobile": "npm:@bopen-io/wallet-toolbox-mobile@2.1.21-parity-fix.2",
     "@fortawesome/react-fontawesome": "^0.2.2",

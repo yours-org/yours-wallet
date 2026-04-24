@@ -1,5 +1,6 @@
 /* global chrome */
 
+import { isCWIEventName } from '@1sat/wallet-browser';
 import { CustomListenerName, EmitEventDetail, RequestEventDetail, RequestParams, ResponseEventDetail } from './inject';
 
 console.log('🌱 Yours Wallet Loaded');
@@ -12,7 +13,7 @@ script.src = chrome.runtime.getURL('inject.js');
 // Forward CWI requests from page to background service worker
 self.addEventListener(CustomListenerName.YOURS_REQUEST, (e: Event) => {
   const { type, messageId, params: originalParams = {} } = (e as CustomEvent<RequestEventDetail>).detail;
-  if (!type) return;
+  if (!type || !isCWIEventName(type)) return;
 
   let params: RequestParams = {};
 
