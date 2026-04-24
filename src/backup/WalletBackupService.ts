@@ -361,7 +361,7 @@ export class WalletBackupService {
       onProgress({ stage: 'importing', message: 'Detected older backup format. Restoring account keys...' });
 
       const legacyStorage = JSON.parse(chromeStorageJson) as LegacyChromeStorage;
-      const passKey = this.verifyPasswordAndDeriveKey(legacyStorage, password);
+      const passKey = await this.verifyPasswordAndDeriveKey(legacyStorage, password);
 
       onProgress({ stage: 'importing', message: 'Restoring account settings...' });
 
@@ -370,11 +370,11 @@ export class WalletBackupService {
         selectedAccount: legacyStorage.selectedAccount,
         accountNumber: legacyStorage.accountNumber,
         salt: legacyStorage.salt,
-        passKey,
         colorTheme: legacyStorage.colorTheme,
         version: legacyStorage.version,
         lastActiveTime: Date.now(),
       });
+      await chromeStorageService.setPassKey(passKey);
 
       console.log('[WalletBackupService] Legacy backup restored (keys only).');
       onProgress({ stage: 'complete', message: 'Keys restored! Wallet data will sync on first unlock.' });
@@ -393,7 +393,7 @@ export class WalletBackupService {
     }
 
     const backupChromeStorage = JSON.parse(chromeStorageJson) as BackupChromeStorage;
-    const passKey = this.verifyPasswordAndDeriveKey(backupChromeStorage, password);
+    const passKey = await this.verifyPasswordAndDeriveKey(backupChromeStorage, password);
 
     onProgress({ stage: 'importing', message: 'Restoring account settings...' });
 
@@ -402,13 +402,13 @@ export class WalletBackupService {
       selectedAccount: backupChromeStorage.selectedAccount,
       accountNumber: backupChromeStorage.accountNumber,
       salt: backupChromeStorage.salt,
-      passKey,
       colorTheme: backupChromeStorage.colorTheme,
       showWelcome: backupChromeStorage.showWelcome,
       deviceId: backupChromeStorage.deviceId,
       version: backupChromeStorage.version,
       lastActiveTime: Date.now(),
     });
+    await chromeStorageService.setPassKey(passKey);
 
     // Store wallet data chunks in IndexedDB per-account for Phase 2 import.
     // syncFromReader enforces identityKey === authenticated wallet, so each
@@ -462,10 +462,10 @@ export class WalletBackupService {
   /**
    * Verify the password against the backup's encrypted keys and return the derived passKey.
    */
-  private static verifyPasswordAndDeriveKey(
+  private static async verifyPasswordAndDeriveKey(
     storage: { salt: string; accounts: Record<string, Account>; selectedAccount: string },
     password: string,
-  ): string {
+  ): Promise<string> {
     const { salt, accounts, selectedAccount } = storage;
     if (!salt) {
       throw new Error('Invalid backup file: missing salt');
@@ -479,7 +479,7 @@ export class WalletBackupService {
     }
 
     try {
-      const decryptedKeys = decrypt(account.encryptedKeys, passKey);
+      const decryptedKeys = await decrypt(account.encryptedKeys, passKey);
       JSON.parse(decryptedKeys);
     } catch {
       throw new Error('Invalid password - unable to decrypt wallet keys');

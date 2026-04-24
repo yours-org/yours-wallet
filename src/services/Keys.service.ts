@@ -5,7 +5,6 @@ import {
   DEFAULT_ACCOUNT,
   MAINNET_ADDRESS_PREFIX,
   SWEEP_PATH,
-  WOC_BASE_URL,
   CHROME_STORAGE_OBJECT_VERSION,
 } from '../utils/constants';
 import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto';
@@ -14,7 +13,7 @@ import { ChromeStorageService } from './ChromeStorage.service';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
 import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction, Utils } from '@bsv/sdk';
-import { WocUtxo } from './types/whatsOnChain.types';
+import { OneSatServices } from '@1sat/wallet-browser';
 
 export class KeysService {
   bsvAddress: string;
@@ -23,11 +22,7 @@ export class KeysService {
   bsvPubKey: string;
   ordPubKey: string;
   identityPubKey: string;
-  // TODO: wallet parameter commented out until we determine correct type for sweep functions
-  constructor(
-    private readonly chromeStorageService: ChromeStorageService,
-    // private readonly wallet: OneSatWallet,
-  ) {
+  constructor(private readonly chromeStorageService: ChromeStorageService) {
     this.bsvAddress = '';
     this.ordAddress = '';
     this.identityAddress = '';
@@ -42,13 +37,14 @@ export class KeysService {
     const accountNumber = currentChromeObj?.accountNumber ? currentChromeObj.accountNumber + 1 : totalAccounts + 1;
     await this.chromeStorageService.update({
       selectedAccount: keys.identityAddress,
-      passKey,
       salt,
       version: CHROME_STORAGE_OBJECT_VERSION,
       showWelcome: false,
       deviceId: crypto.randomUUID(),
       accountNumber,
     });
+    // passKey goes to session storage (memory-only, not written to disk)
+    await this.chromeStorageService.setPassKey(passKey);
     const key: keyof ChromeStorageObject = 'accounts';
     const update: Partial<ChromeStorageObject['accounts']> = {
       [keys.identityAddress]: {
@@ -72,17 +68,24 @@ export class KeysService {
   };
 
   private getPassKeyAndSalt = async (password: string, isNewWallet: boolean) => {
-    let acctObj: Partial<ChromeStorageObject> | undefined = {};
+    let salt: string | undefined;
+    let passKey: string | undefined;
+
     if (!isNewWallet) {
       const isVerified = await this.verifyPassword(password);
       if (!isVerified) throw new Error('Unauthorized!');
-      const accountObject = this.chromeStorageService.getCurrentAccountObject();
-      acctObj = accountObject;
-      if (!acctObj?.salt || !acctObj?.passKey) throw new Error('Credentials not found');
+      const { salt: existingSalt } = this.chromeStorageService.getCurrentAccountObject();
+      salt = existingSalt;
+      // verifyPassword stores passKey in session storage on success
+      passKey = await this.chromeStorageService.getPassKey();
+      if (!salt || !passKey) throw new Error('Credentials not found');
+    } else {
+      const acctObj = this.chromeStorageService.getCurrentAccountObject();
+      salt = acctObj?.salt || generateRandomSalt();
+      passKey = deriveKey(password, salt);
     }
-    const salt = isNewWallet && !acctObj?.salt ? generateRandomSalt() : acctObj.salt;
+
     if (!salt) throw new Error('Salt not found');
-    const passKey = isNewWallet ? deriveKey(password, salt) : acctObj.passKey;
     if (!passKey) throw new Error('Passkey not found');
     return { passKey, salt };
   };
@@ -110,122 +113,85 @@ export class KeysService {
     if (mnemonic) {
       this.sweepLegacy(keys);
     }
-    const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
+    const encryptedKeys = await encrypt(JSON.stringify(keys), passKey);
     await this.storeEncryptedKeys(passKey, salt, keys, encryptedKeys);
     return keys;
   };
 
-  sweepLegacy = async (keys: Keys) => {
+  /**
+   * Sweep any BSV sitting at the old default derivation path (SWEEP_PATH)
+   * into the current wallet address. This unifies imported mnemonics into
+   * the shape Yours wallet expects before the user-facing SweepMigration runs.
+   *
+   * Fire-and-forget — failures are logged but don't block onboarding.
+   */
+  private sweepLegacy = async (keys: Keys) => {
     try {
       const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
-      const tx = new Transaction();
-      const outScript = new P2PKH().lock(keys.walletAddress);
-      tx.addOutput({ lockingScript: outScript, change: true });
+      const services = new OneSatServices('main');
 
-      const res = await fetch(`${WOC_BASE_URL}/address/${sweepWallet.address}/unspent`);
-      if (!res.ok) throw new Error(`WoC request failed: ${res.status}`);
-      const utxos = (await res.json()) as WocUtxo[];
+      // Trigger the indexer to process this address before querying
+      for await (const event of services.owner.getTxos(sweepWallet.address, { refresh: true, limit: 1 })) {
+        if (event.type === 'done' || event.type === 'error') break;
+      }
+
+      const utxos =
+        (await services.txo.search(`own:${sweepWallet.address}`, {
+          unspent: true,
+          sats: true,
+          limit: 0,
+        })) ?? [];
       if (utxos.length === 0) return;
-      const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
-      // TODO: Re-enable when wallet type is available
-      // for await (const u of utxos || []) {
-      //   const sourceTransaction = await this.wallet.loadTransaction(u.tx_hash);
-      //   if (!sourceTransaction) {
-      //     console.log(`Could not find source transaction ${u.tx_hash}`);
-      //     continue;
-      //   }
-      //   tx.addInput({
-      //     sourceTransaction,
-      //     sourceOutputIndex: u.tx_pos,
-      //     sequence: 0xffffffff,
-      //     unlockingScriptTemplate: new P2PKH().unlock(sweepWallet.privKey),
-      //   });
-      // }
-      // await tx.fee(feeModel);
-      // await tx.sign();
-      // const response = await this.wallet.broadcast(tx, 'Sweep Legacy Wallet');
-      console.log('sweepLegacy: wallet not available yet');
-      return;
-      const txid = tx.id('hex');
-      console.log('Change sweep:', txid);
-      return { txid, rawtx: Utils.toHex(tx.toBinary()) };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      console.log(error);
-    }
-  };
 
-  getWifBalance = async (wif: string) => {
-    try {
-      const privKey = PrivateKey.fromWif(wif);
-      const res = await fetch(`${WOC_BASE_URL}/address/${privKey.toAddress()}/unspent`);
-      if (!res.ok) throw new Error(`WoC request failed: ${res.status}`);
-      const utxos = (await res.json()) as WocUtxo[];
-      if (utxos.length === 0) return 0;
-      return utxos.reduce((acc, u) => acc + u.value, 0);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      console.log(error);
-      return;
-    }
-  };
-
-  sweepWif = async (wif: string) => {
-    try {
-      const privKey = PrivateKey.fromWif(wif);
       const tx = new Transaction();
-      const outScript = new P2PKH().lock(this.bsvAddress);
-      tx.addOutput({ lockingScript: outScript, change: true });
+      tx.addOutput({ lockingScript: new P2PKH().lock(keys.walletAddress), change: true });
 
-      const res = await fetch(`${WOC_BASE_URL}/address/${privKey.toAddress()}/unspent`);
-      if (!res.ok) throw new Error(`WoC request failed: ${res.status}`);
-      const utxos = (await res.json()) as WocUtxo[];
-      if (utxos.length === 0) return;
-      const feeModel = new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate());
-      // TODO: Re-enable when wallet type is available
-      // for await (const u of utxos || []) {
-      //   const sourceTransaction = await this.wallet.loadTransaction(u.tx_hash);
-      //   if (!sourceTransaction) {
-      //     console.log(`Could not find source transaction ${u.tx_hash}`);
-      //     continue;
-      //   }
-      //   tx.addInput({
-      //     sourceTransaction,
-      //     sourceOutputIndex: u.tx_pos,
-      //     sequence: 0xffffffff,
-      //     unlockingScriptTemplate: new P2PKH().unlock(privKey),
-      //   });
-      // }
-      // await tx.fee(feeModel);
-      // await tx.sign();
-      // await this.wallet.broadcast(tx, 'Sweep WIF');
-      // const txid = tx.id('hex');
-      // console.log('Change sweep:', txid);
-      // return { txid, rawtx: Utils.toHex(tx.toBinary()) };
-      console.log('sweepWif: wallet not available yet');
-      return;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      console.log(error);
+      for (const u of utxos) {
+        const [txid, voutStr] = u.outpoint.split(/[._]/);
+        const rawTx = await services.beef.getRawTx(txid);
+        if (!rawTx.length) continue;
+        const sourceTransaction = Transaction.fromBinary([...rawTx]);
+        tx.addInput({
+          sourceTransaction,
+          sourceOutputIndex: parseInt(voutStr),
+          sequence: 0xffffffff,
+          unlockingScriptTemplate: new P2PKH().unlock(sweepWallet.privKey),
+        });
+      }
+
+      if (tx.inputs.length === 0) return;
+
+      await tx.fee(new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate()));
+      await tx.sign();
+      await services.arcade.submitTransaction(tx.toBinary());
+      console.log('Legacy sweep:', tx.id('hex'));
+    } catch (error) {
+      console.error('sweepLegacy failed:', error);
     }
   };
 
   generateKeysFromWifAndStoreEncrypted = async (password: string, wifs: WifKeys, isNewWallet: boolean) => {
     const { passKey, salt } = await this.getPassKeyAndSalt(password, isNewWallet);
     const keys = getKeysFromWifs(wifs);
-    const encryptedKeys = encrypt(JSON.stringify(keys), passKey);
+    const encryptedKeys = await encrypt(JSON.stringify(keys), passKey);
     await this.storeEncryptedKeys(passKey, salt, keys as Keys, encryptedKeys);
     return keys;
   };
 
   retrieveKeys = async (password?: string): Promise<Keys | Partial<Keys>> => {
-    const accountObj = this.chromeStorageService.getCurrentAccountObject();
-    const { account, passKey } = accountObj;
+    // Verify password before decrypting any key material
+    if (password) {
+      const isVerified = await this.verifyPassword(password);
+      if (!isVerified) throw new Error('Unauthorized!');
+    }
+
+    const { account } = this.chromeStorageService.getCurrentAccountObject();
     if (!account) throw new Error('No account found!');
     const { encryptedKeys } = account;
+    const passKey = await this.chromeStorageService.getPassKey();
     try {
       if (!encryptedKeys || !passKey) throw new Error('No keys found!');
-      const d = decrypt(encryptedKeys, passKey);
+      const d = await decrypt(encryptedKeys, passKey);
       const keys: Keys = JSON.parse(d);
 
       const walletAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.walletAddress).data as number[], [
@@ -251,18 +217,12 @@ export class KeysService {
         this.identityPubKey = keys.identityPubKey;
       }
 
-      // If a password was provided (e.g. key export), verify it first
-      if (password) {
-        const isVerified = await this.verifyPassword(password);
-        if (!isVerified) throw new Error('Unauthorized!');
-      }
-
       return Object.assign({}, keys, {
         ordAddress: ordAddr,
         walletAddress: walletAddr,
       });
     } catch (error) {
-      console.error('Error in retrieveKeys:', error);
+      console.error('Error in retrieveKeys:', error instanceof Error ? error.message : 'Unknown error');
       throw new Error('Failed to retrieve keys');
     }
   };

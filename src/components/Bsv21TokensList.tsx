@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Coins } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { DragDropContext, Draggable, Droppable, DropResult } from 'react-beautiful-dnd';
+import { DragDropContext, Draggable, Droppable, DropResult } from '@hello-pangea/dnd';
 import { ONESAT_MAINNET_CONTENT_URL, type Bsv21Balance } from '@1sat/actions';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';

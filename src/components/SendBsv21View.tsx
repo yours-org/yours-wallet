@@ -8,6 +8,7 @@ import { showAmount, normalize, truncate } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import { getErrorMessage } from '../utils/tools';
 import { Input } from './Input';
+import { SendConfirmation, type SendLineItem } from './SendConfirmation';
 import { Show } from './Show';
 import { CoinHistory } from './CoinHistory';
 import { ONESAT_MAINNET_CONTENT_URL, sendBsv21, type Bsv21Balance } from '@1sat/actions';
@@ -49,6 +50,12 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
   const getTokenName = (b: { sym?: string }): string => b.sym || 'Null';
   const [recipients, setRecipients] = useState<Bsv21Recipient[]>([newRecipient()]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [sendConfirmation, setSendConfirmation] = useState<{
+    icon?: string;
+    lineItems: SendLineItem[];
+    total: string;
+    onConfirm: () => void;
+  } | null>(null);
   const [successTxId, setSuccessTxId] = useState('');
   const sentAtomicRef = useRef<bigint>(0n);
   const [copied, setCopied] = useState(false);
@@ -116,8 +123,6 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
 
   const handleSendBSV21 = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsProcessing(true);
-
     await sleep(25);
 
     // Validate each recipient and build the action input
@@ -127,13 +132,11 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
     for (const r of recipients) {
       if (!validate(r.address)) {
         addSnackbar('All recipients must have a valid 1Sat Ordinal address.', 'info');
-        setIsProcessing(false);
         return;
       }
       const atomic = toAtomic(r.amountInput);
       if (atomic === null || atomic <= 0n) {
         addSnackbar('All recipients must have a valid amount.', 'info');
-        setIsProcessing(false);
         return;
       }
       sendRecipients.push({ address: r.address, amount: atomic });
@@ -142,41 +145,61 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
 
     if (total > maxAmount) {
       addSnackbar('Total amount exceeds available balance.', 'error');
-      setIsProcessing(false);
       return;
     }
 
     if (!token.info.id) {
       addSnackbar('Missing token ID!', 'error');
-      setIsProcessing(false);
       return;
     }
 
-    let sendRes: Awaited<ReturnType<typeof sendBsv21.execute>>;
-    try {
-      sendRes = await sendBsv21.execute(apiContext, {
-        tokenId: token.info.id,
-        recipients: sendRecipients,
-      });
-    } catch (error) {
-      console.error('[SendBsv21View] sendBsv21.execute threw:', error);
-      setIsProcessing(false);
-      addSnackbar(getErrorMessage(undefined), 'error');
-      return;
+    const tokenName = getTokenName(token.info);
+    // Consolidate duplicate addresses by summing amounts
+    const tokenConsolidated = new Map<string, bigint>();
+    const tokenOrder: string[] = [];
+    for (const r of sendRecipients) {
+      tokenConsolidated.set(r.address, (tokenConsolidated.get(r.address) ?? 0n) + r.amount);
+      if (!tokenOrder.includes(r.address)) tokenOrder.push(r.address);
     }
+    const lineItems: SendLineItem[] = tokenOrder.map((addr) => ({
+      address: addr,
+      amount: `${showAmount(tokenConsolidated.get(addr)!, token.info.dec)} ${tokenName}`,
+    }));
 
-    if (!sendRes.txid || sendRes.error) {
-      console.error('[SendBsv21View] sendBsv21 error:', sendRes.error);
-      setIsProcessing(false);
-      addSnackbar(getErrorMessage(sendRes.error), 'error');
-      return;
-    }
+    const tokenIcon = token.info.icon ? `${baseUrl}/${token.info.icon}` : undefined;
+    setSendConfirmation({
+      icon: tokenIcon,
+      lineItems,
+      total: `${showAmount(total, token.info.dec)} ${tokenName}`,
+      onConfirm: async () => {
+        setSendConfirmation(null);
+        setIsProcessing(true);
 
-    // Stash the total sent so the parent can optimistically decrement its
-    // cached token balance without waiting on the overlay to catch up.
-    sentAtomicRef.current = total;
-    setSuccessTxId(sendRes.txid);
-    addSnackbar('Tokens Sent!', 'success');
+        let sendRes: Awaited<ReturnType<typeof sendBsv21.execute>>;
+        try {
+          sendRes = await sendBsv21.execute(apiContext, {
+            tokenId: token.info.id!,
+            recipients: sendRecipients,
+          });
+        } catch (error) {
+          console.error('[SendBsv21View] sendBsv21.execute threw:', error);
+          setIsProcessing(false);
+          addSnackbar(getErrorMessage(undefined), 'error');
+          return;
+        }
+
+        if (!sendRes.txid || sendRes.error) {
+          console.error('[SendBsv21View] sendBsv21 error:', sendRes.error);
+          setIsProcessing(false);
+          addSnackbar(getErrorMessage(sendRes.error), 'error');
+          return;
+        }
+
+        sentAtomicRef.current = total;
+        setSuccessTxId(sendRes.txid);
+        addSnackbar('Tokens Sent!', 'success');
+      },
+    });
   };
 
   const gray = theme.color.global.gray;
@@ -402,6 +425,16 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
       ) : (
         <></>
       )}
+      <SendConfirmation
+        show={!!sendConfirmation}
+        theme={theme}
+        icon={sendConfirmation?.icon}
+        lineItems={sendConfirmation?.lineItems ?? []}
+        total={sendConfirmation?.total}
+        isProcessing={isProcessing}
+        onConfirm={() => sendConfirmation?.onConfirm()}
+        onCancel={() => setSendConfirmation(null)}
+      />
     </Show>
   );
 };

@@ -1,6 +1,9 @@
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const deepMerge = <T extends Record<string, any>>(target: T, source: Partial<T>): T => {
   for (const key of Object.keys(source) as Array<keyof T>) {
+    if (UNSAFE_KEYS.has(key as string)) continue;
     if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
       if (!target[key]) {
         target[key] = {} as T[keyof T];
@@ -12,8 +15,3 @@ export const deepMerge = <T extends Record<string, any>>(target: T, source: Part
   }
   return target;
 };
-
-// TODO: Migrate setDerivationTags to use OneSatWallet
-// This function is currently not called anywhere in the codebase.
-// When needed, it should search for panda/yours tags using wallet.listOutputs()
-// and wallet.parse() to get the inscription content.

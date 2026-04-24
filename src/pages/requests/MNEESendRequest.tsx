@@ -57,6 +57,16 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
         count: YOURS_ADDRESS_COUNT,
       });
 
+      // Check balance before sending
+      const totalRequested = request.reduce((sum, r) => sum + r.amount, 0);
+      const derivedAddresses = derivationResult.derivations.map((d) => d.address);
+      const balanceRes = await getMneeBalance.execute(apiContext, { addresses: derivedAddresses });
+      if (totalRequested > balanceRes.totalDecimal) {
+        addSnackbar('Insufficient MNEE balance!', 'error');
+        setIsProcessing(false);
+        return;
+      }
+
       addSnackbar('Transaction initiated. Processing...', 'info');
 
       const sendRes = await sendMnee.execute(apiContext, {
@@ -148,7 +158,8 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
 
       <Show when={!isProcessing && !!request}>
         <motion.div
-          className="flex flex-col items-center w-full px-4 pt-6 pb-4"
+          className="flex flex-col items-center w-full px-4 pt-6 pb-4 overflow-y-auto"
+          style={{ maxHeight: '100vh' }}
           initial={{ opacity: 0, y: 20, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ type: 'spring', damping: 24, stiffness: 260 }}

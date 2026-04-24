@@ -433,6 +433,7 @@ export const Settings = () => {
     setShouldVisibleExportedKeys(true);
     setTimeout(() => {
       setShouldVisibleExportedKeys(false);
+      setExportKeysAsQrData('');
     }, 10000);
   };
 
@@ -465,7 +466,12 @@ export const Settings = () => {
       setShowSpeedBump(false);
     }
 
-    if (decisionType === 'export-master-backup') {
+    if (decisionType === 'export-master-backup' && password) {
+      const isVerified = await chromeStorageService.verifyPassword(password);
+      if (!isVerified) {
+        addSnackbar('Invalid password!', 'error');
+        return;
+      }
       handleMasterBackup();
       setDecisionType(undefined);
       setShowSpeedBump(false);

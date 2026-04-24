@@ -109,13 +109,14 @@ export const SweepMigration = () => {
     }
 
     try {
-      const { account, passKey } = chromeStorageService.getCurrentAccountObject();
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      const passKey = await chromeStorageService.getPassKey();
       if (!account?.encryptedKeys || !passKey) {
         setPasswordError('No encrypted keys found');
         setIsProcessing(false);
         return;
       }
-      const decrypted = decrypt(account.encryptedKeys, passKey);
+      const decrypted = await decrypt(account.encryptedKeys, passKey);
       const keys: Keys = JSON.parse(decrypted);
       if (!keys.walletWif && !keys.ordWif) {
         setPasswordError('No legacy keys found in this account');

@@ -123,6 +123,8 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const checkLockState = async () => {
       if (!isReady || !services) return;
       try {
+        // Re-read from chrome.storage.local to pick up changes from the background
+        await services.chromeStorageService?.getAndSetStorage();
         const result = services.chromeStorageService?.getCurrentAccountObject();
         const currentTime = Date.now();
         const lastActiveTime = result?.lastActiveTime;

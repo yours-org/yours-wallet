@@ -12,13 +12,34 @@ import {
   INACTIVITY_LIMIT,
   MAINNET_ADDRESS_PREFIX,
 } from '../utils/constants';
-import { decrypt, deriveKey } from '../utils/crypto';
+import { decrypt, deriveKey, encrypt } from '../utils/crypto';
 import { Keys } from '../utils/keys';
 import { deepMerge } from './serviceHelpers';
 import { Account, ChromeStorageObject, CurrentAccountObject, DeprecatedStorage } from './types/chromeStorage.types';
 
 export class ChromeStorageService {
   storage: Partial<ChromeStorageObject> | undefined;
+
+  // passKey lives in chrome.storage.session (in-memory only, survives service worker idle,
+  // cleared on browser close, not written to disk, not accessible to content scripts).
+  private cachedPassKey: string | undefined;
+
+  setPassKey = async (passKey: string): Promise<void> => {
+    this.cachedPassKey = passKey;
+    await chrome.storage.session.set({ passKey });
+  };
+
+  getPassKey = async (): Promise<string | undefined> => {
+    if (this.cachedPassKey) return this.cachedPassKey;
+    const result = await chrome.storage.session.get('passKey');
+    this.cachedPassKey = result.passKey;
+    return result.passKey;
+  };
+
+  clearPassKey = async (): Promise<void> => {
+    this.cachedPassKey = undefined;
+    await chrome.storage.session.remove('passKey');
+  };
 
   private set = async (obj: Partial<ChromeStorageObject>): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
@@ -80,7 +101,6 @@ export class ChromeStorageService {
       exchangeRateCache,
       lastActiveTime,
       network,
-      passKey,
       popupWindowId,
       salt,
       socialProfile,
@@ -132,7 +152,6 @@ export class ChromeStorageService {
       popupWindowId,
       exchangeRateCache,
       lastActiveTime,
-      passKey,
       salt,
       version: CHROME_STORAGE_OBJECT_VERSION,
       deviceId: crypto.randomUUID(),
@@ -152,11 +171,13 @@ export class ChromeStorageService {
     return newInterface;
   };
 
-  private retrieveKeysFromOldStorage(storage: Partial<DeprecatedStorage>): Partial<Keys> | undefined {
-    const { encryptedKeys, passKey } = storage;
+  private async retrieveKeysFromOldStorage(storage: Partial<DeprecatedStorage>): Promise<Partial<Keys> | undefined> {
+    const { encryptedKeys } = storage;
+    // passKey is no longer in local storage — read from session (only available if user already unlocked)
+    const passKey = this.cachedPassKey;
     try {
       if (!encryptedKeys || !passKey) return;
-      const d = decrypt(encryptedKeys, passKey);
+      const d = await decrypt(encryptedKeys, passKey);
       const keys: Keys = JSON.parse(d);
 
       const walletAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.walletAddress).data as number[], [
@@ -186,7 +207,7 @@ export class ChromeStorageService {
         identityPubKey,
       };
     } catch (error) {
-      console.log('Error in retrieveKeys:', error);
+      console.error('Error in retrieveKeys:', error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
@@ -194,7 +215,7 @@ export class ChromeStorageService {
     storage: Partial<DeprecatedStorage>,
   ): Promise<Partial<ChromeStorageObject>> => {
     if (!(storage as DeprecatedStorage)?.appState) {
-      const keys = this.retrieveKeysFromOldStorage(storage);
+      const keys = await this.retrieveKeysFromOldStorage(storage);
       if (!keys) return storage;
       (storage as DeprecatedStorage).appState = {
         isLocked: true,
@@ -236,6 +257,20 @@ export class ChromeStorageService {
 
   getAndSetStorage = async (): Promise<Partial<ChromeStorageObject> | undefined> => {
     this.storage = await this.get(null); // fetches all chrome storage by passing null
+
+    // Hydrate passKey from session storage (memory-only, survives service worker idle)
+    if (!this.cachedPassKey) {
+      await this.getPassKey();
+    }
+
+    // If passKey is still in local storage (pre-session-storage upgrade), move it to session and clean up
+    const legacyPassKey = (this.storage as Record<string, unknown>)?.passKey as string | undefined;
+    if (legacyPassKey) {
+      if (!this.cachedPassKey) {
+        await this.setPassKey(legacyPassKey);
+      }
+      await this.remove(['passKey']);
+    }
 
     // Migrate from ancient deprecated format (pre-versioned storage)
     if (!this.storage.version && !this.storage.deviceId) {
@@ -306,7 +341,6 @@ export class ChromeStorageService {
       exchangeRateCache: this.storage.exchangeRateCache,
       isLocked: this.storage.isLocked,
       lastActiveTime: this.storage.lastActiveTime,
-      passKey: this.storage.passKey,
       salt: this.storage.salt,
     };
   };
@@ -362,32 +396,30 @@ export class ChromeStorageService {
 
   /**
    * Verify a password by deriving the passKey and attempting to decrypt stored keys.
-   * On success, re-stores the passKey so the wallet can initialize.
+   * On success, stores the passKey in session storage so the wallet can initialize.
    * On failure, passKey remains absent — keys stay inaccessible.
    */
   verifyPassword = async (password: string): Promise<boolean> => {
-    const { salt, account } = this.getCurrentAccountObject();
+    const { salt, account, selectedAccount } = this.getCurrentAccountObject();
     if (!salt || !account?.encryptedKeys) return false;
     try {
       const derivedKey = deriveKey(password, salt);
       // Attempt decryption — throws if password is wrong
-      const decrypted = decrypt(account.encryptedKeys, derivedKey);
+      const decrypted = await decrypt(account.encryptedKeys, derivedKey);
       JSON.parse(decrypted); // Verify it's valid JSON
-      // Password correct — restore passKey so initializeWallet can use it
-      await this.update({ passKey: derivedKey });
+      // Password correct — store passKey in session (memory-only, not on disk)
+      await this.setPassKey(derivedKey);
+
+      // Upgrade legacy encryption to v2 (AES-256-GCM) if needed
+      if (selectedAccount && !account.encryptedKeys.startsWith('v2:')) {
+        const reEncrypted = await encrypt(decrypted, derivedKey);
+        const key: keyof ChromeStorageObject = 'accounts';
+        await this.updateNested(key, { [selectedAccount]: { ...account, encryptedKeys: reEncrypted } });
+      }
+
       return true;
     } catch {
       return false;
-    }
-  };
-
-  /**
-   * Clear the passKey from storage so keys cannot be decrypted without re-entering the password.
-   */
-  clearPassKey = async (): Promise<void> => {
-    await this.remove(['passKey']);
-    if (this.storage) {
-      (this.storage as Record<string, unknown>).passKey = undefined;
     }
   };
 }

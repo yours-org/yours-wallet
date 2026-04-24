@@ -174,14 +174,23 @@ const startupInitPromise = chromeStorageService
     // Only initialize wallet if it's within the active session window.
     // If locked (inactive or manual lock), keys stay encrypted until the user unlocks.
     await chromeStorageService.getAndSetStorage();
-    const { account, lastActiveTime, passKey } = chromeStorageService.getCurrentAccountObject();
+    const { account, lastActiveTime } = chromeStorageService.getCurrentAccountObject();
+    const passKey = await chromeStorageService.getPassKey();
     const isUnlocked =
       passKey && account?.encryptedKeys && lastActiveTime && Date.now() - Number(lastActiveTime) < getInactivityLimit();
 
     if (isUnlocked) {
-      await initializeWallet();
-    } else {
-      console.log('[background] Wallet is locked on startup — skipping key decryption');
+      try {
+        await initializeWallet();
+      } catch (error) {
+        console.error('[background] Failed to initialize wallet on startup — locking:', error);
+        await chromeStorageService.clearPassKey();
+        await chromeStorageService.update({ isLocked: true, lastActiveTime: 0 });
+      }
+    } else if (account?.encryptedKeys) {
+      // Wallet exists but can't initialize (no passKey or timed out) — ensure locked state
+      await chromeStorageService.clearPassKey();
+      await chromeStorageService.update({ isLocked: true, lastActiveTime: 0 });
     }
   })
   .catch((error) => {
@@ -431,6 +440,7 @@ if (isInServiceWorker) {
   const signOut = async () => {
     await accountContext?.close();
     accountContext = null;
+    await chromeStorageService.clearPassKey();
     await deleteAllIDBDatabases();
   };
 
@@ -449,7 +459,7 @@ if (isInServiceWorker) {
         console.log('[background] switchAccount: storage loaded, initializing wallet');
         await initializeWallet();
         console.log('[background] switchAccount: wallet initialized successfully');
-        return accountContext?.wallet ?? null;
+        return (accountContext as AccountContext | null)?.wallet ?? null;
       } catch (error) {
         console.error('[background] switchAccount: failed to initialize wallet:', error);
         return null;
@@ -572,8 +582,22 @@ if (isInServiceWorker) {
     // Check if message is from our own extension popup
     const isFromExtension = sender.origin?.startsWith(`chrome-extension://${chrome.runtime.id}`);
 
-    // Handle yours wallet events that should be broadcast
-    if ([YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT].includes(message.action)) {
+    // Cross-validate originator against sender.origin for external messages
+    if (!isFromExtension && message.originator && sender.origin) {
+      try {
+        const senderHost = new URL(sender.origin).host;
+        if (message.originator !== senderHost) {
+          sendResponse({ type: message.action, success: false, error: 'Origin mismatch' });
+          return true;
+        }
+      } catch {
+        sendResponse({ type: message.action, success: false, error: 'Invalid origin' });
+        return true;
+      }
+    }
+
+    // Handle yours wallet events that should be broadcast (only from extension, not web pages)
+    if (isFromExtension && [YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT].includes(message.action)) {
       emitEventToActiveTabs(message);
     }
 
@@ -618,6 +642,15 @@ if (isInServiceWorker) {
     ];
 
     if (noAuthRequired.includes(message.action)) {
+      // IS_AUTHENTICATED and GET_VERSION are read-only discovery endpoints safe for any caller.
+      // Everything else is an internal popup→background message that requires the sender
+      // to be the extension itself (not a web page proxied through the content script).
+      const openToAll = [CWIEventName.IS_AUTHENTICATED, CWIEventName.GET_VERSION];
+      if (!openToAll.includes(message.action) && !isFromExtension) {
+        sendResponse({ type: message.action, success: false, error: 'Unauthorized' });
+        return true;
+      }
+
       switch (message.action) {
         case YoursEventName.USER_CONNECT_RESPONSE:
           return processConnectResponse(message as { decision: Decision });
@@ -801,8 +834,8 @@ if (isInServiceWorker) {
     // If message is from our own extension popup, check wallet state without launching popup.
     // The popup handles its own UI (unlock/create wallet pages).
     if (isFromExtension) {
-      const { account, passKey } = chromeStorageService.getCurrentAccountObject();
-      if (!(account?.encryptedKeys && passKey)) {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account?.encryptedKeys) {
         sendResponse({
           type: message.action,
           success: false,
@@ -1419,14 +1452,25 @@ if (isInServiceWorker) {
 
   const emitEventToActiveTabs = (message: { action: YoursEventName; params: RequestParams }) => {
     const { action, params } = message;
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    const whitelist = account?.settings?.whitelist;
+    const whitelistedDomains = new Set(whitelist?.map((app: WhitelistedApp) => app.domain) ?? []);
+
     chrome.tabs.query({}, function (tabs) {
       tabs.forEach(function (tab: chrome.tabs.Tab) {
-        if (tab.id) {
-          chrome.tabs.sendMessage(tab.id, {
-            type: CustomListenerName.YOURS_EMIT_EVENT,
-            action,
-            params,
-          });
+        if (tab.id && tab.url) {
+          try {
+            const host = new URL(tab.url).host;
+            if (whitelistedDomains.has(host)) {
+              chrome.tabs.sendMessage(tab.id, {
+                type: CustomListenerName.YOURS_EMIT_EVENT,
+                action,
+                params,
+              });
+            }
+          } catch {
+            // invalid URL, skip
+          }
         }
       });
     });

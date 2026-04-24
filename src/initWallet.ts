@@ -20,11 +20,12 @@ import { initSyncContext, type SyncContext } from './initSyncContext';
 const ADMIN_ORIGINATOR = `chrome-extension://${chrome.runtime.id}`;
 
 /**
- * Decrypt keys from chrome storage using the stored passKey.
+ * Decrypt keys from chrome storage using the passKey from session storage.
  * Throws if account or passKey is missing (caller should ensure authentication first).
  */
-const decryptKeys = (chromeStorageService: ChromeStorageService): Keys => {
-  const { account, passKey } = chromeStorageService.getCurrentAccountObject();
+const decryptKeys = async (chromeStorageService: ChromeStorageService): Promise<Keys> => {
+  const { account } = chromeStorageService.getCurrentAccountObject();
+  const passKey = await chromeStorageService.getPassKey();
 
   if (!account?.encryptedKeys) {
     throw new Error('No account found - wallet not initialized');
@@ -33,7 +34,7 @@ const decryptKeys = (chromeStorageService: ChromeStorageService): Keys => {
     throw new Error('No passKey found - user not authenticated');
   }
 
-  const decrypted = decrypt(account.encryptedKeys, passKey);
+  const decrypted = await decrypt(account.encryptedKeys, passKey);
   return JSON.parse(decrypted) as Keys;
 };
 
@@ -115,7 +116,7 @@ export const initWallet = async (
   await chromeStorageService.getAndSetStorage();
 
   // 1. BROWSER-SPECIFIC: Decrypt keys
-  const keys = decryptKeys(chromeStorageService);
+  const keys = await decryptKeys(chromeStorageService);
   if (!keys.identityWif) {
     throw new Error('No identity key found in decrypted keys');
   }

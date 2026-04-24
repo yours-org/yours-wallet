@@ -92,11 +92,14 @@ export const getKeysFromWifs = (wifs: WifKeys) => {
     identityPrivKey = PrivateKey.fromWif(wifs.identityPk);
   } else {
     const privBuf = walletPrivKey.toArray().concat(ordPrivKey.toArray());
+    let attempt = 0;
     while (!identityPrivKey) {
-      const bn = new BigNumber(Hash.sha256(privBuf));
+      const hashInput = attempt === 0 ? privBuf : [...privBuf, attempt];
+      const bn = new BigNumber(Hash.sha256(hashInput));
       if (bn.lt(new BigNumber('ffffffff ffffffff ffffffff fffffffe baaedce6 af48a03b bfd25e8c d0364141', 16))) {
         identityPrivKey = PrivateKey.fromString(bn.toHex(), 'hex');
       }
+      attempt++;
     }
   }
 

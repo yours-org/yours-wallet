@@ -27,3 +27,6 @@ yarn-error.log*
 
 #custom script
 .vercel
+
+# build metadata
+scripts/.build-meta.json

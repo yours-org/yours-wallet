@@ -203,7 +203,7 @@ export const AppsAndTools = () => {
       return;
     }
     // Store the WIF temporarily, then open the sweep tab which reads and clears it
-    chrome.storage.local.set({ sweepExternalWif: wifKey.trim() }, () => {
+    chrome.storage.session.set({ sweepExternalWif: wifKey.trim() }, () => {
       chrome.tabs.create({ url: chrome.runtime.getURL('sweep-tab.html') });
     });
     setWifKey('');

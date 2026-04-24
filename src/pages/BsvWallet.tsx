@@ -60,6 +60,7 @@ import { ManageTokens } from '../components/ManageTokens';
 import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { SendBsv21View } from '../components/SendBsv21View';
 import { AssetPicker, type PickableAsset } from '../components/AssetPicker';
+import { SendConfirmation, type SendLineItem } from '../components/SendConfirmation';
 import { CoinHistory } from '../components/CoinHistory';
 import { getMneeBalance, sendMnee, deriveDepositAddresses, ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 import { MneeClient } from '@1sat/client';
@@ -113,6 +114,12 @@ export const BsvWallet = () => {
   const [unlockAttempted, setUnlockAttempted] = useState(false);
   const { connectRequest } = useWeb3RequestContext();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [sendConfirmation, setSendConfirmation] = useState<{
+    icon?: string;
+    lineItems: SendLineItem[];
+    total: string;
+    onConfirm: () => void;
+  } | null>(null);
   // Get identityAddress from chrome storage (selected account)
   const identityAddress = chromeStorageService.getCurrentAccountObject().account?.addresses?.identityAddress || '';
   const [receiveAddress, setReceiveAddress] = useState<string>('');
@@ -406,170 +413,98 @@ export const BsvWallet = () => {
 
   const handleSendMNEE = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsProcessing(true);
     await sleep(25);
 
     // Validate all recipients
     for (const r of mneeRecipients) {
       if (!r.address || r.amount === null || r.amount === undefined) {
         addSnackbar('All recipients must have an address and amount!', 'info');
-        setIsProcessing(false);
+        return;
+      }
+      if (!isValidEmail(r.address) && !validate(r.address)) {
+        addSnackbar('All recipients must have a valid BSV or Paymail address!', 'info');
         return;
       }
       if (r.amount <= 0.00001) {
         addSnackbar('Minimum send amount is 0.00001 MNEE per recipient!', 'error');
-        setIsProcessing(false);
         return;
       }
     }
 
     if (mneeTotal > mneeBalance) {
       addSnackbar('Insufficient MNEE balance!', 'error');
-      setIsProcessing(false);
       return;
     }
 
     if (!apiContext) {
       addSnackbar('Wallet not ready.', 'error');
-      setIsProcessing(false);
       return;
     }
 
-    try {
-      const derivationResult = await deriveDepositAddresses.execute(apiContext, {
-        prefix: 'yours',
-        startIndex: 0,
-        count: 5,
-      });
-
-      addSnackbar('Transaction initiated. Processing...', 'info');
-
-      const res = await sendMnee.execute(apiContext, {
-        recipients: mneeRecipients.map((r) => ({ address: r.address, amount: r.amount as number })),
-        derivations: derivationResult.derivations,
-      });
-
-      if (res.error) {
-        addSnackbar(`Transaction failed: ${res.error}`, 'error');
-        setIsProcessing(false);
-        return;
-      }
-
-      resetMneeRecipients();
-      // Optimistic: subtract what we just sent from the displayed balance
-      // instead of waiting on the MNEE backend to reflect the update.
-      setMneeBalance((prev) => Math.max(0, prev - mneeTotal));
-      updateMneeBalance().catch((err) => console.error('[handleSendMNEE] reconcile refresh failed:', err));
-      setMneeHistoryRefreshKey((k) => k + 1);
-      setPageState('main');
-      addSnackbar('Transaction Successful!', 'success');
-    } catch (error: unknown) {
-      console.error('MNEE transfer error:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('status: 423')) {
-        addSnackbar('The sending or receiving address may be frozen. Please contact support.', 'error');
-      } else {
-        addSnackbar(getErrorMessage(errorMessage) || 'Transfer failed. Please try again.', 'error');
-      }
-    } finally {
-      setIsProcessing(false);
+    // Consolidate duplicate addresses by summing amounts
+    const mneeConsolidated = new Map<string, number>();
+    const mneeOrder: string[] = [];
+    for (const r of mneeRecipients) {
+      mneeConsolidated.set(r.address, (mneeConsolidated.get(r.address) ?? 0) + (r.amount as number));
+      if (!mneeOrder.includes(r.address)) mneeOrder.push(r.address);
     }
+    const lineItems: SendLineItem[] = mneeOrder.map((addr) => ({
+      address: addr,
+      amount: `$${formatNumberWithCommasAndDecimals(mneeConsolidated.get(addr)!, 2)} MNEE`,
+    }));
 
-    /* Legacy MNEE transfer code removed — now using @1sat/actions sendMnee
-    const keys = await keysService.retrieveKeys(passwordConfirm);
-    if (!keys?.walletWif) {
-      addSnackbar('Invalid password!', 'error');
-      setIsProcessing(false);
-      return;
-    }
+    setSendConfirmation({
+      icon: MNEE_ICON_URL,
+      lineItems,
+      total: `$${formatNumberWithCommasAndDecimals(mneeTotal, 2)} MNEE`,
+      onConfirm: async () => {
+        setSendConfirmation(null);
+        setIsProcessing(true);
 
-    try {
-      // Initiate the transfer with broadcast flag
-      const res = await mneeService.transfer(
-        [{ address: mneeRecipient, amount: mneeReciepientAmount }],
-        keys.walletWif,
-        { broadcast: true },
-      );
+        try {
+          const derivationResult = await deriveDepositAddresses.execute(apiContext, {
+            prefix: 'yours',
+            startIndex: 0,
+            count: 5,
+          });
 
-      // Handle ticket-based response
-      if (res.ticketId) {
-        addSnackbar('Transaction initiated. Processing...', 'info');
+          addSnackbar('Transaction initiated. Processing...', 'info');
 
-        // Poll for transaction status
-        let finalStatus = null;
-        let attempts = 0;
-        const maxAttempts = 30; // 30 attempts with 2 second intervals = 60 seconds max
+          const res = await sendMnee.execute(apiContext, {
+            recipients: mneeRecipients.map((r) => ({ address: r.address, amount: r.amount as number })),
+            derivations: derivationResult.derivations,
+          });
 
-        while (attempts < maxAttempts) {
-          await sleep(2000); // Wait 2 seconds between polls
-
-          try {
-            const status = await mneeService.getTxStatus(res.ticketId);
-
-            if (status.status === 'SUCCESS' || status.status === 'MINED') {
-              finalStatus = status;
-              break;
-            } else if (status.status === 'FAILED') {
-              addSnackbar(`Transaction failed: ${status.errors || 'Unknown error'}`, 'error');
-              setPasswordConfirm('');
-              setIsProcessing(false);
-              return;
-            }
-            // If BROADCASTING, continue polling
-          } catch (pollError) {
-            console.error('Error polling transaction status:', pollError);
+          if (res.error) {
+            addSnackbar(`Transaction failed: ${res.error}`, 'error');
+            setIsProcessing(false);
+            return;
           }
 
-          attempts++;
-        }
-
-        if (!finalStatus) {
-          addSnackbar('Transaction timeout. Please check your transaction history.', 'error');
-          setPasswordConfirm('');
+          resetMneeRecipients();
+          setMneeBalance((prev) => Math.max(0, prev - mneeTotal));
+          updateMneeBalance().catch((err) => console.error('[handleSendMNEE] reconcile refresh failed:', err));
+          setMneeHistoryRefreshKey((k) => k + 1);
+          setPageState('main');
+          addSnackbar('Transaction Successful!', 'success');
+        } catch (error: unknown) {
+          console.error('MNEE transfer error:', error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          if (errorMessage.includes('status: 423')) {
+            addSnackbar('The sending or receiving address may be frozen. Please contact support.', 'error');
+          } else {
+            addSnackbar(getErrorMessage(errorMessage) || 'Transfer failed. Please try again.', 'error');
+          }
+        } finally {
           setIsProcessing(false);
-          return;
         }
-
-        // Transaction successful
-        setMneeRecipient('');
-        setMneeRecipientAmount(null);
-        setTimeout(updateMneeBalance, 1000);
-        setPasswordConfirm('');
-        setPageState('main');
-        addSnackbar('Transaction Successful!', 'success');
-        setIsProcessing(false);
-      } else if (res.rawtx) {
-        // Legacy response with raw transaction (shouldn't happen with broadcast: true)
-        addSnackbar('Transaction created but not broadcast. Please try again.', 'info');
-        setPasswordConfirm('');
-        setIsProcessing(false);
-        return;
-      } else {
-        // No valid response
-        addSnackbar('Transfer failed. No valid response from server.', 'error');
-        setPasswordConfirm('');
-        setIsProcessing(false);
-        return;
-      }
-    } catch (error: unknown) {
-      console.error('MNEE transfer error:', error);
-      // Check for specific error messages
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('status: 423')) {
-        addSnackbar('The sending or receiving address may be frozen. Please contact support.', 'error');
-      } else {
-        addSnackbar(getErrorMessage(errorMessage) || 'Transfer failed. Please try again.', 'error');
-      }
-      setPasswordConfirm('');
-      setIsProcessing(false);
-    }
-    */
+      },
+    });
   };
 
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     resetRecipientErrors();
-    setIsProcessing(true);
     await sleep(25);
 
     //? multi-send validate all recipients
@@ -577,14 +512,15 @@ export const BsvWallet = () => {
       if (!isValidEmail(recipient.address) && !validate(recipient.address)) {
         updateRecipient(recipient.id, 'error', 'Provide a valid BSV or Paymail address.');
         addSnackbar('All recipients must have valid BSV or Paymail addresses.', 'info');
-        setIsProcessing(false);
         return;
       }
 
-      if (!recipient.satSendAmount && !recipient.usdSendAmount) {
+      if (
+        (!recipient.satSendAmount || recipient.satSendAmount <= 0) &&
+        (!recipient.usdSendAmount || recipient.usdSendAmount <= 0)
+      ) {
         updateRecipient(recipient.id, 'error', 'Provide an amount.');
         addSnackbar('All recipients must have an amount.', 'info');
-        setIsProcessing(false);
         return;
       }
     }
@@ -598,34 +534,54 @@ export const BsvWallet = () => {
       return isValidEmail(r.address) ? { paymail: r.address, satoshis } : { address: r.address, satoshis };
     });
 
-    let sendRes;
-    if (isSendAllBsv) {
-      const r = sendRecipients[0];
-      const destination = r.address ?? r.paymail ?? '';
-      sendRes = await sendAllBsv.execute(apiContext, { destination });
-    } else {
-      sendRes = await sendBsv.execute(apiContext, { requests: sendRecipients });
-    }
-
-    if (!sendRes.txid || sendRes.error) {
-      addSnackbar(getErrorMessage(sendRes.error), 'error');
-      setIsProcessing(false);
-      return;
-    }
-
-    // Optimistic balance update — we already know the send succeeded, so
-    // immediately subtract the outgoing satoshis from the displayed balance.
-    // Then kick off an async refresh in the background to reconcile with the
-    // authoritative source once it catches up.
-    const totalSatsOut = isSendAllBsv
+    const totalSats = isSendAllBsv
       ? Math.round(bsvBalance * BSV_DECIMAL_CONVERSION)
       : sendRecipients.reduce((acc, r) => acc + (r.satoshis ?? 0), 0);
-    setBsvBalance((prev) => Math.max(0, prev - totalSatsOut / BSV_DECIMAL_CONVERSION));
-    refreshUtxos().catch((err) => console.error('[handleSendBsv] reconcile refresh failed:', err));
-    resetSendState();
-    setBsvHistoryRefreshKey((k) => k + 1);
-    setPageState('main');
-    addSnackbar('Transaction Successful!', 'success');
+
+    // Consolidate duplicate addresses by summing satoshis
+    const consolidated = new Map<string, number>();
+    const addressOrder: string[] = [];
+    for (const r of sendRecipients) {
+      const addr = r.address ?? r.paymail ?? '';
+      consolidated.set(addr, (consolidated.get(addr) ?? 0) + r.satoshis);
+      if (!addressOrder.includes(addr)) addressOrder.push(addr);
+    }
+    const lineItems: SendLineItem[] = addressOrder.map((addr) => ({
+      address: addr,
+      amount: `${formatNumberWithCommasAndDecimals(consolidated.get(addr)! / BSV_DECIMAL_CONVERSION, 8)} BSV`,
+    }));
+
+    setSendConfirmation({
+      icon: bsvCoin,
+      lineItems,
+      total: `${formatNumberWithCommasAndDecimals(totalSats / BSV_DECIMAL_CONVERSION, 8)} BSV`,
+      onConfirm: async () => {
+        setSendConfirmation(null);
+        setIsProcessing(true);
+
+        let sendRes;
+        if (isSendAllBsv) {
+          const r = sendRecipients[0];
+          const destination = r.address ?? r.paymail ?? '';
+          sendRes = await sendAllBsv.execute(apiContext, { destination });
+        } else {
+          sendRes = await sendBsv.execute(apiContext, { requests: sendRecipients });
+        }
+
+        if (!sendRes.txid || sendRes.error) {
+          addSnackbar(getErrorMessage(sendRes.error), 'error');
+          setIsProcessing(false);
+          return;
+        }
+
+        setBsvBalance((prev) => Math.max(0, prev - totalSats / BSV_DECIMAL_CONVERSION));
+        refreshUtxos().catch((err) => console.error('[handleSendBsv] reconcile refresh failed:', err));
+        resetSendState();
+        setBsvHistoryRefreshKey((k) => k + 1);
+        setPageState('main');
+        addSnackbar('Transaction Successful!', 'success');
+      },
+    });
   };
 
   const fillInputWithAllBsv = () => {
@@ -1624,6 +1580,16 @@ export const BsvWallet = () => {
       <Show when={!isProcessing && pageState === 'send'}>{send}</Show>
       <Show when={!isProcessing && pageState === 'sendMNEE'}>{sendMNEE}</Show>
       <Show when={!isProcessing && pageState === 'getMNEE'}>{getMnee}</Show>
+      <SendConfirmation
+        show={!!sendConfirmation}
+        theme={theme}
+        icon={sendConfirmation?.icon}
+        lineItems={sendConfirmation?.lineItems ?? []}
+        total={sendConfirmation?.total}
+        isProcessing={isProcessing}
+        onConfirm={() => sendConfirmation?.onConfirm()}
+        onCancel={() => setSendConfirmation(null)}
+      />
     </>
   );
 };

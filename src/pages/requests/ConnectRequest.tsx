@@ -104,7 +104,8 @@ export const ConnectRequest = (props: ConnectRequestProps) => {
       }
     >
       <motion.div
-        className="flex flex-col items-center w-full px-5 pt-6 pb-4"
+        className="flex flex-col items-center w-full px-5 pt-6 pb-4 overflow-y-auto"
+        style={{ maxHeight: '100vh' }}
         initial={{ opacity: 0, y: 24, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', damping: 24, stiffness: 260 }}

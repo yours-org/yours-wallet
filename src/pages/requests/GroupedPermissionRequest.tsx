@@ -32,7 +32,7 @@ export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProp
   const [certChecked, setCertChecked] = useState<boolean[]>(() =>
     (permissions.certificateAccess ?? []).map(() => true),
   );
-  const [spendingChecked, setSpendingChecked] = useState(!!permissions.spendingAuthorization);
+  const [spendingChecked, setSpendingChecked] = useState(false);
 
   useEffect(() => {
     handleSelect('bsv');
@@ -96,7 +96,8 @@ export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProp
 
   return (
     <motion.div
-      className="flex flex-col w-full px-4 pt-5 pb-4"
+      className="flex flex-col w-full px-4 pt-5 pb-4 overflow-y-auto"
+      style={{ maxHeight: '100vh' }}
       initial={{ opacity: 0, y: 20, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', damping: 24, stiffness: 260 }}
@@ -127,6 +128,43 @@ export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProp
         <p className="text-xs mb-3 leading-relaxed" style={{ color: theme.color.global.gray }}>
           {permissions.description}
         </p>
+      </Show>
+
+      {/* Spending authorization — shown separately above the list, default unchecked */}
+      <Show when={!!permissions.spendingAuthorization}>
+        <motion.div
+          className="w-full rounded-2xl px-4 py-3 mb-3"
+          style={{
+            background: 'rgba(247,144,9,0.08)',
+            border: '1px solid rgba(247,144,9,0.2)',
+          }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.06 }}
+        >
+          <p className="text-xs font-bold uppercase tracking-wider pb-1" style={{ color: '#F79009' }}>
+            Spending Authorization
+          </p>
+          <label className="flex items-start gap-3 py-1 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={spendingChecked}
+              onChange={() => setSpendingChecked(!spendingChecked)}
+              className="mt-0.5 accent-orange-400"
+            />
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold" style={{ color: '#F79009' }}>
+                This app wants to spend up to {((permissions.spendingAuthorization?.amount ?? 0) / 1e8).toFixed(8)} BSV{' '}
+                ({(permissions.spendingAuthorization?.amount ?? 0).toLocaleString()} satoshis)
+              </span>
+              {permissions.spendingAuthorization?.description && (
+                <span className="text-xs mt-1 opacity-70" style={{ color: theme.color.global.contrast }}>
+                  App says: &ldquo;{permissions.spendingAuthorization.description}&rdquo;
+                </span>
+              )}
+            </div>
+          </label>
+        </motion.div>
       </Show>
 
       {/* Permissions list */}
@@ -241,34 +279,6 @@ export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProp
               </div>
             </label>
           ))}
-        </Show>
-
-        {/* Spending */}
-        <Show when={!!permissions.spendingAuthorization}>
-          <p
-            className="text-xs font-bold uppercase tracking-wider pt-3 pb-1"
-            style={{ color: theme.color.global.gray }}
-          >
-            Spending
-          </p>
-          <label className="flex items-start gap-3 py-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={spendingChecked}
-              onChange={() => setSpendingChecked(!spendingChecked)}
-              className="mt-0.5 accent-green-400"
-            />
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-semibold" style={{ color: '#A1FF8B' }}>
-                {(permissions.spendingAuthorization?.amount ?? 0).toLocaleString()} satoshis
-              </span>
-              {permissions.spendingAuthorization?.description && (
-                <span className="text-xs mt-0.5 opacity-60" style={{ color: theme.color.global.contrast }}>
-                  {permissions.spendingAuthorization.description}
-                </span>
-              )}
-            </div>
-          </label>
         </Show>
       </motion.div>
 

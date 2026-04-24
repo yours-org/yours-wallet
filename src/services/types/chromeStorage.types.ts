@@ -20,8 +20,6 @@ import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
 import type { ApprovalContext } from '../../yoursApi';
 
-export type Dispatch<T> = (value: T) => void;
-
 export type Settings = {
   whitelist: WhitelistedApp[];
   socialProfile: SocialProfile;
@@ -89,7 +87,6 @@ export interface ChromeStorageObject {
   exchangeRateCache: ExchangeRateCache;
   lastActiveTime: number;
   popupWindowId: number;
-  passKey?: string;
   salt: string;
   isLocked: boolean;
   colorTheme: Theme;
@@ -144,7 +141,6 @@ export type DeprecatedStorage = {
   exchangeRateCache: ExchangeRateCache;
   socialProfile: SocialProfile;
   lastActiveTime: number;
-  passKey: string;
   network: NetWork;
   paymentUtxos: StoredUtxo[];
   salt: string;

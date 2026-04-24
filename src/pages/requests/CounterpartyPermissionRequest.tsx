@@ -82,7 +82,8 @@ export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionR
 
   return (
     <motion.div
-      className="flex flex-col w-full px-4 pt-5 pb-4"
+      className="flex flex-col w-full px-4 pt-5 pb-4 overflow-y-auto"
+      style={{ maxHeight: '100vh' }}
       initial={{ opacity: 0, y: 20, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', damping: 24, stiffness: 260 }}

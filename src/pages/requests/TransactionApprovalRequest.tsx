@@ -55,6 +55,7 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [txData, setTxData] = useState<ParseContext>();
+  const [beefParseFailed, setBeefParseFailed] = useState(false);
   const [satsOut, setSatsOut] = useState(0);
 
   useEffect(() => {
@@ -67,6 +68,7 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
         setTxData(parsedTx);
       } catch (error) {
         console.error('Failed to parse transaction BEEF:', error);
+        setBeefParseFailed(true);
       }
       setIsLoading(false);
     })();
@@ -196,8 +198,23 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
           {/* TxPreview if BEEF was parsed */}
           <Show when={!!txData}>{txData && <TxPreview txData={txData} />}</Show>
 
-          {/* Fallback info rows */}
-          <Show when={!txData}>
+          {/* Parse failure warning */}
+          <Show when={beefParseFailed}>
+            <motion.div
+              className="flex items-start gap-2 rounded-xl px-3 py-2.5 mb-4"
+              style={{ background: 'rgba(255,70,70,0.08)', border: '1px solid rgba(255,70,70,0.15)' }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" style={{ color: '#FF4646' }} />
+              <p className="text-xs leading-relaxed" style={{ color: '#FF4646' }}>
+                Unable to verify this transaction independently. Approval is disabled for your safety.
+              </p>
+            </motion.div>
+          </Show>
+
+          {/* Fallback info rows — only shown when no BEEF was provided (not when parsing failed) */}
+          <Show when={!txData && !beefParseFailed}>
             <motion.div
               className="rounded-2xl px-4 py-3 mb-4"
               style={{ background: theme.color.global.row, border: '1px solid rgba(255,255,255,0.06)' }}
@@ -262,11 +279,11 @@ export const TransactionApprovalRequest = (props: TransactionApprovalRequestProp
               style={{
                 background: 'linear-gradient(135deg, #A1FF8B 0%, #34D399 100%)',
                 color: '#010101',
-                opacity: isProcessing ? 0.6 : 1,
+                opacity: isProcessing || beefParseFailed ? 0.6 : 1,
               }}
-              disabled={isProcessing}
-              whileHover={{ scale: isProcessing ? 1 : 1.02 }}
-              whileTap={{ scale: isProcessing ? 1 : 0.97 }}
+              disabled={isProcessing || beefParseFailed}
+              whileHover={{ scale: isProcessing || beefParseFailed ? 1 : 1.02 }}
+              whileTap={{ scale: isProcessing || beefParseFailed ? 1 : 0.97 }}
               transition={{ type: 'spring', damping: 20, stiffness: 400 }}
             >
               {isProcessing && <Loader2 size={14} className="animate-spin" />}

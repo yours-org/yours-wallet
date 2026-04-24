@@ -22,20 +22,25 @@ function SweepTab() {
   useEffect(() => {
     configureServices(SERVICES_BASE_URL);
 
-    chrome.storage.local.get(null, (storage) => {
+    chrome.storage.local.get(null, async (storage) => {
       try {
         // Check for an externally-provided WIF (e.g. from Sweep Private Key in Tools)
-        const externalWif = storage.sweepExternalWif as string | undefined;
+        const sessionData = await chrome.storage.session.get('sweepExternalWif');
+        const externalWif = sessionData.sweepExternalWif as string | undefined;
         if (externalWif) {
           // Clear it immediately so it doesn't persist
-          chrome.storage.local.remove('sweepExternalWif');
+          chrome.storage.session.remove('sweepExternalWif');
           setKeys({ payPk: externalWif, ordPk: externalWif });
           setLoading(false);
           return;
         }
 
         // Otherwise, load legacy keys from the current account
-        const { accounts, selectedAccount, passKey, isLocked } = storage;
+        const { accounts, selectedAccount, isLocked } = storage;
+
+        // passKey lives in session storage (memory-only), not local storage
+        const session = await chrome.storage.session.get('passKey');
+        const passKey = session.passKey as string | undefined;
 
         if (isLocked || !passKey) {
           setError('Wallet is locked. Please unlock your wallet and try again.');
@@ -56,7 +61,7 @@ function SweepTab() {
           return;
         }
 
-        const decrypted = JSON.parse(decrypt(account.encryptedKeys, passKey));
+        const decrypted = JSON.parse(await decrypt(account.encryptedKeys, passKey));
         if (!decrypted.walletWif && !decrypted.ordWif) {
           setError('No legacy keys found in this account.');
           setLoading(false);
