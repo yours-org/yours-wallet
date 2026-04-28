@@ -431,6 +431,7 @@ export const SweepMigration = () => {
                   chrome.tabs.create({ url: chrome.runtime.getURL('sweep-tab.html') });
                 }}
               />
+              <Button theme={theme} type="secondary-outline" label="Back" onClick={() => navigate(-1)} />
             </motion.div>
           </motion.div>
         </div>

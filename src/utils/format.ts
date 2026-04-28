@@ -65,7 +65,7 @@ export const convertToTokenValue = (balance: number, decimals: number): number =
   return balance / Math.pow(10, decimals);
 };
 
-const removeTrailingZeros = (numStr: string): string => {
+export const removeTrailingZeros = (numStr: string): string => {
   if (numStr.includes('.')) {
     return numStr.replace(/(\.\d*?[1-9])0+$|\.0*$/, '$1');
   }

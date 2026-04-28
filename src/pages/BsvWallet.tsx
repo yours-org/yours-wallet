@@ -64,6 +64,10 @@ import { SendConfirmation, type SendLineItem } from '../components/SendConfirmat
 import { CoinHistory } from '../components/CoinHistory';
 import { getMneeBalance, sendMnee, deriveDepositAddresses, ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 import { MneeClient } from '@1sat/client';
+import { PrivateKey } from '@bsv/sdk';
+import { getLegacyMneeBalance, sweepLegacyMnee } from '../utils/sweepLegacyMnee';
+import { decrypt } from '../utils/crypto';
+import type { Keys } from '../utils/keys';
 
 // CopyAddressed feedback state hook — used in receive view
 
@@ -89,6 +93,7 @@ export const BsvWallet = () => {
   const isReload = urlParams.get('reload') === 'true' || query === 'reload';
   urlParams.delete('reload');
   const [pageState, setPageState] = useState<PageState>('main');
+  const [sendSource, setSendSource] = useState<PageState>('main');
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const { addSnackbar } = useSnackbar();
   const { chromeStorageService, apiContext, keysService } = useServiceContext();
@@ -143,6 +148,12 @@ export const BsvWallet = () => {
   const [mneeHistoryRefreshKey, setMneeHistoryRefreshKey] = useState(0);
   const [mneeBalance, setMneeBalance] = useState(0);
   const [copiedAddress, setCopiedAddress] = useState(false);
+
+  // Legacy MNEE sweep state
+  const [legacyMneeBalance, setLegacyMneeBalance] = useState(0);
+  const [legacyMneeSweeping, setLegacyMneeSweeping] = useState(false);
+  const [legacyMneeSweepMsg, setLegacyMneeSweepMsg] = useState('');
+  const [showLegacyMneePrompt, setShowLegacyMneePrompt] = useState(false);
 
   // MNEE supports multi-recipient at the action level, so the UI mirrors BSV's pattern
   type MneeRecipient = { id: string; address: string; amount: number | null };
@@ -359,6 +370,73 @@ export const BsvWallet = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receiveAddress]);
 
+  // Check for legacy MNEE balance (old address) once wallet is ready
+  useEffect(() => {
+    if (!apiContext?.services?.mnee) return;
+    (async () => {
+      try {
+        const { account } = chromeStorageService.getCurrentAccountObject();
+        const passKey = await chromeStorageService.getPassKey();
+        if (!account?.encryptedKeys || !passKey) return;
+        const decrypted = await decrypt(account.encryptedKeys, passKey);
+        const keys: Keys = JSON.parse(decrypted);
+        if (!keys.walletWif) return;
+        const legacyAddr = PrivateKey.fromWif(keys.walletWif).toPublicKey().toAddress();
+        // Skip if legacy address matches new receive address (same derivation)
+        if (legacyAddr === receiveAddress) return;
+        const balance = await getLegacyMneeBalance(apiContext.services.mnee, legacyAddr);
+        setLegacyMneeBalance(balance);
+      } catch (err) {
+        console.error('[legacyMneeCheck]', err);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receiveAddress, apiContext?.services?.mnee]);
+
+  const handleSweepLegacyMnee = async () => {
+    if (!apiContext?.services?.mnee) return;
+    setLegacyMneeSweeping(true);
+    setLegacyMneeSweepMsg('Starting...');
+    try {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      const passKey = await chromeStorageService.getPassKey();
+      if (!account?.encryptedKeys || !passKey) throw new Error('Keys unavailable');
+      const decrypted = await decrypt(account.encryptedKeys, passKey);
+      const keys: Keys = JSON.parse(decrypted);
+      if (!keys.walletWif) throw new Error('No legacy wallet key');
+
+      // Derive the BRC-29 destination address
+      const derivationResult = await deriveDepositAddresses.execute(apiContext, {
+        prefix: 'yours',
+        startIndex: 0,
+        count: 1,
+      });
+      const destinationAddress = derivationResult.derivations[0]?.address;
+      if (!destinationAddress) throw new Error('Could not derive destination address');
+
+      const result = await sweepLegacyMnee({
+        mneeClient: apiContext.services.mnee,
+        legacyPrivateKey: PrivateKey.fromWif(keys.walletWif),
+        destinationAddress,
+        onProgress: setLegacyMneeSweepMsg,
+      });
+
+      if (result.error) {
+        addSnackbar(`Sweep failed: ${result.error}`, 'error');
+      } else {
+        addSnackbar(`Moved $${result.amount?.toFixed(2)} MNEE to your new wallet!`, 'success');
+        setLegacyMneeBalance(0);
+        updateMneeBalance();
+        setMneeHistoryRefreshKey((k) => k + 1);
+      }
+    } catch (err) {
+      addSnackbar(`Sweep failed: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
+    } finally {
+      setLegacyMneeSweeping(false);
+      setShowLegacyMneePrompt(false);
+    }
+  };
+
   const refreshUtxos = async (showLoad = false) => {
     showLoad && setIsProcessing(true);
     await getAndSetBsvBalance();
@@ -450,13 +528,13 @@ export const BsvWallet = () => {
     }
     const lineItems: SendLineItem[] = mneeOrder.map((addr) => ({
       address: addr,
-      amount: `$${formatNumberWithCommasAndDecimals(mneeConsolidated.get(addr)!, 2)} MNEE`,
+      amount: `$${mneeConsolidated.get(addr)!.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })} MNEE`,
     }));
 
     setSendConfirmation({
       icon: MNEE_ICON_URL,
       lineItems,
-      total: `$${formatNumberWithCommasAndDecimals(mneeTotal, 2)} MNEE`,
+      total: `$${mneeTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })} MNEE`,
       onConfirm: async () => {
         setSendConfirmation(null);
         setIsProcessing(true);
@@ -874,7 +952,10 @@ export const BsvWallet = () => {
             decimals={8}
             usdBalance={bsvBalance * exchangeRate}
             showPointer={true}
-            onClick={() => setPageState('send')}
+            onClick={() => {
+              setSendSource('main');
+              setPageState('send');
+            }}
           />
           <Show when={services.mnee}>
             <AssetRow
@@ -883,10 +964,19 @@ export const BsvWallet = () => {
               ticker="MNEE USD"
               decimals={5}
               usdBalance={mneeBalance}
-              showPointer={mneeBalance > 0}
+              showPointer={mneeBalance > 0 || legacyMneeBalance > 0}
               isMNEE
               onGetMneeClick={() => setPageState('getMNEE')}
-              onClick={() => (mneeBalance > 0 ? setPageState('sendMNEE') : null)}
+              onClick={() => {
+                if (legacyMneeBalance > 0) {
+                  setShowLegacyMneePrompt(true);
+                  return;
+                }
+                if (mneeBalance > 0) {
+                  setSendSource('main');
+                  setPageState('sendMNEE');
+                }
+              }}
             />
           </Show>
           {lockData && (
@@ -919,7 +1009,10 @@ export const BsvWallet = () => {
                 hideStatusLabels
                 tokens={filteredTokens}
                 theme={theme}
-                onTokenClick={(t: Bsv21Balance) => handleTokenClick(t)}
+                onTokenClick={(t: Bsv21Balance) => {
+                  setSendSource('main');
+                  handleTokenClick(t);
+                }}
               />
             )}
           </motion.div>
@@ -987,14 +1080,20 @@ export const BsvWallet = () => {
   ];
 
   const handleAssetSelected = (asset: PickableAsset) => {
+    setSendSource('asset-picker');
     switch (asset.kind) {
       case 'bsv':
         setPageState('send');
         return;
       case 'mnee':
+        if (legacyMneeBalance > 0) {
+          setShowLegacyMneePrompt(true);
+          return;
+        }
         setPageState('sendMNEE');
         return;
       case 'bsv21':
+        setPageState('main');
         handleTokenClick(asset.token);
         return;
     }
@@ -1018,7 +1117,7 @@ export const BsvWallet = () => {
         <motion.button
           whileTap={{ scale: 0.9 }}
           onClick={() => {
-            setPageState('main');
+            setPageState(sendSource);
             resetMneeRecipients();
           }}
           className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
@@ -1272,7 +1371,7 @@ export const BsvWallet = () => {
         <motion.button
           whileTap={{ scale: 0.9 }}
           onClick={() => {
-            setPageState('main');
+            setPageState(sendSource);
             resetRecipients();
             resetSendState();
           }}
@@ -1556,6 +1655,7 @@ export const BsvWallet = () => {
                 );
               }
               setToken(null);
+              setPageState(sendSource);
               // Kick off background reconciliation with the authoritative source —
               // fire-and-forget, doesn't block the UI transition.
               Promise.all([getAndSetAccountAndBsv21s(), getAndSetBsvBalance()]).catch((err) =>
@@ -1590,6 +1690,75 @@ export const BsvWallet = () => {
         onConfirm={() => sendConfirmation?.onConfirm()}
         onCancel={() => setSendConfirmation(null)}
       />
+
+      {/* Legacy MNEE sweep prompt */}
+      <AnimatePresence>
+        {showLegacyMneePrompt && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="flex items-center justify-center"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: theme.color.global.walletBackground,
+              zIndex: 100,
+            }}
+          >
+            <Show
+              when={legacyMneeSweeping}
+              whenFalseContent={
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex flex-col items-center text-center px-6 w-full"
+                >
+                  <img src={MNEE_ICON_URL} alt="MNEE" className="w-12 h-12 rounded-full mb-4" />
+                  <h2 className="text-xl font-bold mb-2" style={{ color: theme.color.global.contrast }}>
+                    Legacy MNEE Found
+                  </h2>
+                  <p className="text-sm mb-6 leading-relaxed" style={{ color: theme.color.global.gray }}>
+                    You have{' '}
+                    <span className="font-semibold" style={{ color: theme.color.global.contrast }}>
+                      $
+                      {legacyMneeBalance.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 5,
+                      })}{' '}
+                      MNEE
+                    </span>{' '}
+                    at your legacy address. Move it to your new wallet?
+                  </p>
+                  <div className="flex items-center gap-3 w-[87%]">
+                    <div className="flex-1">
+                      <Button
+                        theme={theme}
+                        type="secondary-outline"
+                        label="Later"
+                        onClick={() => {
+                          setShowLegacyMneePrompt(false);
+                          if (mneeBalance > 0) {
+                            setSendSource('main');
+                            setPageState('sendMNEE');
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Button theme={theme} type="primary" label="Move MNEE" onClick={handleSweepLegacyMnee} />
+                    </div>
+                  </div>
+                </motion.div>
+              }
+            >
+              <PageLoader theme={theme} message={legacyMneeSweepMsg || 'Moving MNEE...'} />
+            </Show>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 };
