@@ -29,7 +29,7 @@ import {
   MNEE_ICON_URL,
   MNEE_MOBILE_REFERRAL_LINK,
 } from '../utils/constants';
-import { formatNumberWithCommasAndDecimals, formatUSD } from '../utils/format';
+import { formatSats, formatNumberWithCommasAndDecimals, formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import copyIcon from '../assets/copy.svg';
 import { AssetRow } from '../components/AssetRow';
@@ -657,7 +657,7 @@ export const BsvWallet = (props: BsvWalletProps) => {
     return sendAmount
       ? overBalance
         ? 'Insufficient Balance'
-        : `Send ${satAmount / BSV_DECIMAL_CONVERSION}`
+        : `Send ${formatSats(satAmount)}`
       : 'Enter Send Details';
   };
 

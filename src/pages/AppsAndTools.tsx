@@ -11,7 +11,7 @@ import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useTheme } from '../hooks/useTheme';
 import { WhiteLabelTheme } from '../theme.types';
 import { BSV_DECIMAL_CONVERSION, YOURS_DEV_WALLET, featuredApps } from '../utils/constants';
-import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
+import { formatSats, formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { BsvSendRequest } from './requests/BsvSendRequest';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
@@ -205,7 +205,7 @@ export const AppsAndTools = () => {
       return;
     }
 
-    addSnackbar(`Balance found: ${balance / BSV_DECIMAL_CONVERSION} BSV`, 'success');
+    addSnackbar(`Balance found: ${formatSats(balance)} BSV`, 'success');
     setSweepBalance(balance);
   };
 
@@ -523,7 +523,7 @@ export const AppsAndTools = () => {
               <LockDetailsText style={{ textAlign: 'right' }} theme={theme}>
                 {u.satoshis < 1000
                   ? `${u.satoshis} ${u.satoshis > 1n ? 'sats' : 'sat'}`
-                  : `${Number(u.satoshis) / BSV_DECIMAL_CONVERSION} BSV`}
+                  : `${formatSats(Number(u.satoshis))} BSV`}
               </LockDetailsText>
             </LockDetailsContainer>
           );
@@ -698,7 +698,7 @@ export const AppsAndTools = () => {
         <SweepInfo theme={theme}>
           <Text theme={theme}>Available to sweep:</Text>
           <Text style={{ fontWeight: 700 }} theme={theme}>
-            {sweepBalance / BSV_DECIMAL_CONVERSION} BSV
+            {formatSats(sweepBalance)} BSV
           </Text>
         </SweepInfo>
       )}
@@ -729,7 +729,7 @@ export const AppsAndTools = () => {
       <Button
         theme={theme}
         type="primary"
-        label={`Broadcast - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
+        label={`Broadcast - ${formatSats(satsOut)} BSV`}
         onClick={handleBroadcast}
       />
       <Button theme={theme} type="secondary-outline" label="Cancel" onClick={() => setPage('decode-broadcast')} />

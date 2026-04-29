@@ -1,3 +1,8 @@
+import { BSV_DECIMAL_CONVERSION } from './constants';
+
+export const formatSats = (satoshis: number): string =>
+  (satoshis / BSV_DECIMAL_CONVERSION).toFixed(8);
+
 export const formatUSD = (value: number): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',

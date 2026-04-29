@@ -19,7 +19,7 @@ import bsvCoin from '../assets/bsv-coin.svg';
 import lock from '../assets/lock.svg';
 import { Show } from './Show';
 import { NetWork } from 'yours-wallet-provider';
-import { formatNumberWithCommasAndDecimals } from '../utils/format';
+import { formatSats, formatNumberWithCommasAndDecimals } from '../utils/format';
 
 const Container = styled.div<WhiteLabelTheme>`
   display: flex;
@@ -258,12 +258,12 @@ export const TxHistory = (props: TxHistoryProps) => {
   const getAmountText = (tag: Tag, amount: number) => {
     switch (tag) {
       case 'fund':
-        return amount / BSV_DECIMAL_CONVERSION;
+        return formatSats(amount);
       case 'bsv21':
       case 'bsv20':
         return amount;
       case 'lock':
-        return amount / BSV_DECIMAL_CONVERSION + ' BSV';
+        return formatSats(amount) + ' BSV';
       default:
         return amount.toLocaleString() + ' sats';
     }

@@ -8,7 +8,7 @@ import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
+import { formatSats } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { useServiceContext } from '../../hooks/useServiceContext';
@@ -193,7 +193,7 @@ export const BroadcastRequest = (props: BroadcastRequestProps) => {
             <Button
               theme={theme}
               type="primary"
-              label={`Broadcast - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
+              label={`Broadcast - ${formatSats(satsOut)} BSV`}
               disabled={isProcessing}
               isSubmit
             />

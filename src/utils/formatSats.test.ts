@@ -1,9 +1,20 @@
-const BSV_DECIMAL_CONVERSION = 100000000;
+import * as format from './format';
 
-describe('BSV satoshi display', () => {
+describe('formatSats', () => {
+  it('renders 0 sats as "0.00000000"', () => {
+    expect(format.formatSats(0)).toBe('0.00000000');
+  });
+
   it('renders small satoshi amounts without scientific notation', () => {
-    const result = String(18 / BSV_DECIMAL_CONVERSION);
-    expect(result).toBe('1.8e-7'); // currently shows this — bug
-    expect(result).toBe('0.00000018'); // should show this
+    // Bug: 18 / 100_000_000 rendered as "1.8e-7" without formatting
+    expect(format.formatSats(18)).toBe('0.00000018');
+  });
+
+  it('renders whole BSV amounts with full decimals', () => {
+    expect(format.formatSats(100000000)).toBe('1.00000000');
+  });
+
+  it('renders amounts with full 8 decimal places', () => {
+    expect(format.formatSats(100668309)).toBe('1.00668309');
   });
 });

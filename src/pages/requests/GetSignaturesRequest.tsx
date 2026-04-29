@@ -15,7 +15,7 @@ import TxPreview from '../../components/TxPreview';
 import { IndexContext } from 'spv-store';
 import { getErrorMessage, getTxFromRawTxFormat } from '../../utils/tools';
 import { styled } from 'styled-components';
-import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
+import { formatSats } from '../../utils/format';
 
 const Wrapper = styled(ConfirmContent)`
   max-height: calc(100vh - 8rem);
@@ -181,7 +181,7 @@ export const GetSignaturesRequest = (props: GetSignaturesRequestProps) => {
             <Button
               theme={theme}
               type="primary"
-              label={`Sign Tx - ${satsOut > 0 ? satsOut / BSV_DECIMAL_CONVERSION : 0} BSV`}
+              label={`Sign Tx - ${formatSats(satsOut)} BSV`}
               isSubmit
               disabled={isProcessing}
             />

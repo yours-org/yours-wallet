@@ -9,6 +9,7 @@ import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
 import { BSV_DECIMAL_CONVERSION } from '../../utils/constants';
+import { formatSats } from '../../utils/format';
 import { sleep } from '../../utils/sleep';
 import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
 import { SendBsv } from 'yours-wallet-provider';
@@ -229,7 +230,7 @@ export const BsvSendRequest = (props: BsvSendRequestProps) => {
             <Button
               theme={theme}
               type="primary"
-              label={`Approve ${request.reduce((a, item) => a + item.satoshis, 0) / BSV_DECIMAL_CONVERSION} BSV`}
+              label={`Approve ${formatSats(request.reduce((a, item) => a + item.satoshis, 0))} BSV`}
               disabled={isProcessing}
               isSubmit
             />
