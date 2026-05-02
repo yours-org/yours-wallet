@@ -7,6 +7,7 @@ import { ONE_SAT_MARKET_URL } from '../utils/constants';
 import { showAmount, normalize, truncate } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import { getErrorMessage } from '../utils/tools';
+import { isUri } from '../utils/uri';
 import { Input } from './Input';
 import { SendConfirmation, type SendLineItem } from './SendConfirmation';
 import { Show } from './Show';
@@ -166,7 +167,11 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
       amount: `${showAmount(tokenConsolidated.get(addr)!, token.info.dec)} ${tokenName}`,
     }));
 
-    const tokenIcon = token.info.icon ? `${baseUrl}/${token.info.icon}` : undefined;
+    const tokenIcon = token.info.icon
+      ? isUri(token.info.icon)
+        ? token.info.icon
+        : `${baseUrl}/${token.info.icon}`
+      : undefined;
     setSendConfirmation({
       icon: tokenIcon,
       lineItems,
@@ -246,7 +251,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
             <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{ background: row }}>
               <Show when={!!token.info.icon && token.info.icon.length > 0}>
                 <img
-                  src={`${baseUrl}/${token.info.icon}`}
+                  src={isUri(token.info.icon!) ? token.info.icon! : `${baseUrl}/${token.info.icon}`}
                   alt={tokenName}
                   className="w-4 h-4 rounded-full object-cover flex-shrink-0"
                 />

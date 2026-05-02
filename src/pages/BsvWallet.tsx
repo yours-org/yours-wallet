@@ -34,6 +34,7 @@ import {
 } from '../utils/constants';
 import { formatNumberWithCommasAndDecimals, formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
+import { isUri } from '../utils/uri';
 import { AssetRow } from '../components/AssetRow';
 import { BackupPromo } from '../components/BackupPromo';
 import lockIcon from '../assets/lock.svg';
@@ -1073,7 +1074,7 @@ export const BsvWallet = () => {
               ({
                 kind: 'bsv21' as const,
                 token: t,
-                icon: t.icon ? `${ONESAT_MAINNET_CONTENT_URL}/${t.icon}` : GENERIC_TOKEN_ICON,
+                icon: t.icon ? (isUri(t.icon) ? t.icon : `${ONESAT_MAINNET_CONTENT_URL}/${t.icon}`) : GENERIC_TOKEN_ICON,
               }) as PickableAsset,
           )
       : []),

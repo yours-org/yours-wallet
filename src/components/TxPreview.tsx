@@ -7,6 +7,7 @@ import { Flame } from 'lucide-react';
 import type { ParseContext, Txo } from '@1sat/wallet-browser';
 import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 import { useServiceContext } from '../hooks/useServiceContext';
+import { isUri } from '../utils/uri';
 
 interface Origin {
   outpoint?: string;
@@ -69,7 +70,7 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
     if (bsv21WithIcon) {
       return (
         <img
-          src={bsv21.icon?.startsWith('https://') ? bsv21.icon : `${baseUrl}/content/${bsv21.icon}`}
+          src={bsv21.icon && isUri(bsv21.icon) ? bsv21.icon : `${baseUrl}/content/${bsv21.icon}`}
           alt="Token"
           className="mx-1 ml-2"
           style={{ width: '2rem', height: '2rem', borderRadius: '50%' }}

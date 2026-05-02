@@ -8,11 +8,13 @@ import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { Theme } from '../theme.types';
 import { BSV_DECIMAL_CONVERSION, GENERIC_TOKEN_ICON } from '../utils/constants';
 import { showAmount, truncate } from '../utils/format';
+import { isUri } from '../utils/uri';
 import { fetchExchangeRate } from '../utils/wallet';
 import { AssetRow } from './AssetRow';
 import { Show } from './Show';
 
-const getContentUrl = (outpoint: string) => `${ONESAT_MAINNET_CONTENT_URL}/${outpoint}`;
+const resolveIcon = (icon: string) =>
+  isUri(icon) ? icon : `${ONESAT_MAINNET_CONTENT_URL}/${icon}`;
 
 type PriceData = {
   id: string;
@@ -163,7 +165,7 @@ export const Bsv21TokensList = (props: Bsv21TokensListProps) => {
                                   balance={Number(showAmount(t.all.confirmed, t.dec))}
                                   decimals={t.dec}
                                   showPointer={true}
-                                  icon={t.icon ? getContentUrl(t.icon) : GENERIC_TOKEN_ICON}
+                                  icon={t.icon ? resolveIcon(t.icon) : GENERIC_TOKEN_ICON}
                                   ticker={truncate(getTokenName(t), 10, 0)}
                                   usdBalance={
                                     (priceData.find((p) => p.id === t.id)?.satPrice ?? 0) *
@@ -204,7 +206,7 @@ export const Bsv21TokensList = (props: Bsv21TokensListProps) => {
                           balance={Number(showAmount(b.all.pending, b.dec))}
                           decimals={b.dec}
                           showPointer={true}
-                          icon={b.icon ? getContentUrl(b.icon) : GENERIC_TOKEN_ICON}
+                          icon={b.icon ? resolveIcon(b.icon) : GENERIC_TOKEN_ICON}
                           ticker={getTokenName(b)}
                           usdBalance={
                             (priceData.find((p) => p.id === b.id)?.satPrice ?? 0) *
