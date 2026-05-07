@@ -385,7 +385,7 @@ export const BsvWallet = () => {
         const legacyAddr = PrivateKey.fromWif(keys.walletWif).toPublicKey().toAddress();
         // Skip if legacy address matches new receive address (same derivation)
         if (legacyAddr === receiveAddress) return;
-        const balance = await getLegacyMneeBalance(apiContext.services.mnee, legacyAddr);
+        const balance = await getLegacyMneeBalance(apiContext.services!.mnee, legacyAddr);
         setLegacyMneeBalance(balance);
       } catch (err) {
         console.error('[legacyMneeCheck]', err);
@@ -1074,7 +1074,11 @@ export const BsvWallet = () => {
               ({
                 kind: 'bsv21' as const,
                 token: t,
-                icon: t.icon ? (isUri(t.icon) ? t.icon : `${ONESAT_MAINNET_CONTENT_URL}/${t.icon}`) : GENERIC_TOKEN_ICON,
+                icon: t.icon
+                  ? isUri(t.icon)
+                    ? t.icon
+                    : `${ONESAT_MAINNET_CONTENT_URL}/${t.icon}`
+                  : GENERIC_TOKEN_ICON,
               }) as PickableAsset,
           )
       : []),

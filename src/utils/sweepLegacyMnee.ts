@@ -27,7 +27,7 @@ import type { MneeClient, MneeConfig, MneeUtxo } from '@1sat/client';
 
 function cosignLock(userAddress: string, approverPubKey: PublicKey): LockingScript {
   const hash = Utils.fromBase58Check(userAddress);
-  const pkhash = hash.data;
+  const pkhash = hash.data as number[];
   const script = new LockingScript();
   script
     .writeOpCode(OP.OP_DUP)

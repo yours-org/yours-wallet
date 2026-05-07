@@ -5,4 +5,4 @@
  * Useful when a value may be either an addressable URI or an on-chain
  * reference (outpoint) that needs gateway resolution.
  */
-export const isUri = (s: string): boolean => /^[a-z][a-z0-9+\-.]*:/i.test(s)
+export const isUri = (s: string): boolean => /^[a-z][a-z0-9+\-.]*:/i.test(s);

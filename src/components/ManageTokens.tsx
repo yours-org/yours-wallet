@@ -11,8 +11,7 @@ import { isUri } from '../utils/uri';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { ToggleSwitch } from './ToggleSwitch';
 
-const resolveIcon = (icon: string) =>
-  isUri(icon) ? icon : `${ONESAT_MAINNET_CONTENT_URL}/${icon}`;
+const resolveIcon = (icon: string) => (isUri(icon) ? icon : `${ONESAT_MAINNET_CONTENT_URL}/${icon}`);
 
 export type ManageTokensProps = {
   tokens: Bsv21Balance[];

@@ -13,8 +13,7 @@ import { fetchExchangeRate } from '../utils/wallet';
 import { AssetRow } from './AssetRow';
 import { Show } from './Show';
 
-const resolveIcon = (icon: string) =>
-  isUri(icon) ? icon : `${ONESAT_MAINNET_CONTENT_URL}/${icon}`;
+const resolveIcon = (icon: string) => (isUri(icon) ? icon : `${ONESAT_MAINNET_CONTENT_URL}/${icon}`);
 
 type PriceData = {
   id: string;
