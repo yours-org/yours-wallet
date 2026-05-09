@@ -8,6 +8,7 @@ import type {
   CounterpartyPermissionRequest,
 } from '@bsv/wallet-toolbox-mobile';
 import type { ApprovalContext } from '../yoursApi';
+import type { OneSatPromptStorageEntry } from '../services/oneSatPrompt';
 
 export type Web3RequestContextProps = {
   connectRequest: RequestParams | undefined;
@@ -16,6 +17,7 @@ export type Web3RequestContextProps = {
   groupedPermissionRequest: GroupedPermissionRequest | undefined;
   counterpartyPermissionRequest: CounterpartyPermissionRequest | undefined;
   transactionApprovalRequest: ApprovalContext | undefined;
+  oneSatPermissionRequest: OneSatPromptStorageEntry | undefined;
   popupId: number | undefined;
   getStorageAndSetRequestState: (chromeStorageService: ChromeStorageService) => void;
   clearRequest: (type: keyof Omit<Web3RequestContextProps, 'clearRequest'>) => void;

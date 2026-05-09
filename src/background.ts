@@ -45,6 +45,10 @@ import type { LocalWalletPermissionsManager } from '@1sat/wallet-browser';
 import { removeWindow } from './utils/chromeHelpers';
 import { Account, ChromeStorageObject, ConnectRequest, StorageConfig } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
+import {
+  handleOneSatPermissionResponse,
+  initOneSatPromptBridge,
+} from './services/oneSatPrompt';
 import { initWallet, type AccountContext } from './initWallet';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
@@ -541,6 +545,15 @@ if (isInServiceWorker) {
     });
   };
 
+  // Wire the 1Sat permission module's prompt bridge into the popup flow.
+  // Done once during background init so showOneSatPrompt has a working
+  // bridge before initWallet (called on unlock) registers the module.
+  initOneSatPromptBridge({
+    chromeStorage: chromeStorageService,
+    launchPopUp: () => launchPopUp(),
+    getPopupWindowId: () => popupWindowId,
+  });
+
   const verifyAccess = async (requestingOriginator: string): Promise<boolean> => {
     // Check if wallet is locked - locked wallets cannot authorize external requests
     const storage = (await chromeStorageService.getAndSetStorage()) as ChromeStorageObject;
@@ -614,6 +627,7 @@ if (isInServiceWorker) {
       'PERMISSION_RESPONSE',
       'GROUPED_PERMISSION_RESPONSE',
       'COUNTERPARTY_PERMISSION_RESPONSE',
+      'ONE_SAT_PERMISSION_RESPONSE',
       // Internal UI requests (no external domain)
       YoursEventName.GET_BALANCE,
       YoursEventName.GET_PUB_KEYS,
@@ -687,6 +701,12 @@ if (isInServiceWorker) {
           return processCounterpartyPermissionResponse(
             message as { requestID: string; granted: Partial<CounterpartyPermissions> | null; expiry?: number },
           );
+        case 'ONE_SAT_PERMISSION_RESPONSE': {
+          const { requestID, approved } = message as { requestID: string; approved: boolean };
+          const handled = handleOneSatPermissionResponse(requestID, !!approved);
+          sendResponse({ type: 'ONE_SAT_PERMISSION_RESPONSE', success: handled });
+          return true;
+        }
         // Internal UI requests (no external domain, direct from popup)
         case YoursEventName.GET_BALANCE:
           processGetBalanceRequest(sendResponse);

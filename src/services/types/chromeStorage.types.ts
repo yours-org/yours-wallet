@@ -19,6 +19,9 @@ import { WhitelistedApp } from '../../inject';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
 import type { ApprovalContext } from '../../yoursApi';
+import type { OneSatPromptStorageEntry } from '../oneSatPrompt';
+
+export type OneSatPermissionRequestEntry = OneSatPromptStorageEntry;
 
 export type Settings = {
   whitelist: WhitelistedApp[];
@@ -108,6 +111,8 @@ export interface ChromeStorageObject {
   permissionRequest?: PermissionRequest & { requestID: string };
   groupedPermissionRequest?: GroupedPermissionRequest;
   counterpartyPermissionRequest?: CounterpartyPermissionRequest;
+  // 1Sat permission module prompt (createAction or standalone signature)
+  oneSatPermissionRequest?: OneSatPermissionRequestEntry;
   // Transaction approval request from YoursApi
   transactionApprovalRequest?: ApprovalContext;
   // Sweep migration: true after user has been through the sweep flow at least once

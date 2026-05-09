@@ -11,6 +11,7 @@ import type {
   CounterpartyPermissionRequest,
 } from '@bsv/wallet-toolbox-mobile';
 import type { ApprovalContext } from '../../yoursApi';
+import type { OneSatPromptStorageEntry } from '../../services/oneSatPrompt';
 
 export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [connectRequest, setConnectRequest] = useState<RequestParams | undefined>(undefined);
@@ -25,6 +26,9 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     CounterpartyPermissionRequest | undefined
   >(undefined);
   const [transactionApprovalRequest, setTransactionApprovalRequest] = useState<ApprovalContext | undefined>(undefined);
+  const [oneSatPermissionRequest, setOneSatPermissionRequest] = useState<OneSatPromptStorageEntry | undefined>(
+    undefined,
+  );
   const [popupId, setPopupId] = useState<number | undefined>(undefined);
 
   // Listen for storage changes so popup can detect new permission requests while open
@@ -41,6 +45,9 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       }
       if (changes.counterpartyPermissionRequest?.newValue) {
         setCounterpartyPermissionRequest(changes.counterpartyPermissionRequest.newValue);
+      }
+      if ('oneSatPermissionRequest' in changes) {
+        setOneSatPermissionRequest(changes.oneSatPermissionRequest.newValue);
       }
     };
     chrome.storage.local.onChanged.addListener(listener);
@@ -60,6 +67,10 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
     if (type === 'counterpartyPermissionRequest') {
       setCounterpartyPermissionRequest(undefined);
+      return;
+    }
+    if (type === 'oneSatPermissionRequest') {
+      setOneSatPermissionRequest(undefined);
       return;
     }
 
@@ -94,6 +105,7 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       groupedPermissionRequest,
       counterpartyPermissionRequest,
       transactionApprovalRequest,
+      oneSatPermissionRequest,
       popupWindowId,
     } = result;
 
@@ -103,6 +115,7 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (groupedPermissionRequest) setGroupedPermissionRequest(groupedPermissionRequest);
     if (counterpartyPermissionRequest) setCounterpartyPermissionRequest(counterpartyPermissionRequest);
     if (transactionApprovalRequest) setTransactionApprovalRequest(transactionApprovalRequest);
+    if (oneSatPermissionRequest) setOneSatPermissionRequest(oneSatPermissionRequest);
     if (popupWindowId) setPopupId(popupWindowId);
   };
 
@@ -120,6 +133,7 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
         groupedPermissionRequest,
         counterpartyPermissionRequest,
         transactionApprovalRequest,
+        oneSatPermissionRequest,
         clearRequest,
         popupId,
         getStorageAndSetRequestState,

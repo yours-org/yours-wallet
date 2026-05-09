@@ -30,6 +30,7 @@ import { MNEESendRequest } from './pages/requests/MNEESendRequest';
 import { PermissionRequestPage } from './pages/requests/PermissionRequest';
 import { GroupedPermissionRequestPage } from './pages/requests/GroupedPermissionRequest';
 import { CounterpartyPermissionRequestPage } from './pages/requests/CounterpartyPermissionRequest';
+import { OneSatPermissionRequestPage } from './pages/requests/OneSatPermissionRequest';
 import { TransactionApprovalRequest } from './pages/requests/TransactionApprovalRequest';
 import { SweepMigration } from './pages/SweepMigration';
 
@@ -45,6 +46,7 @@ export const App = () => {
     groupedPermissionRequest,
     counterpartyPermissionRequest,
     transactionApprovalRequest,
+    oneSatPermissionRequest,
     clearRequest,
     popupId,
     getStorageAndSetRequestState,
@@ -155,7 +157,8 @@ export const App = () => {
                               !groupedPermissionRequest &&
                               !counterpartyPermissionRequest &&
                               !permissionRequest &&
-                              !transactionApprovalRequest
+                              !transactionApprovalRequest &&
+                              !oneSatPermissionRequest
                             }
                             whenFalseContent={
                               <>
@@ -191,6 +194,13 @@ export const App = () => {
                                   <TransactionApprovalRequest
                                     request={transactionApprovalRequest!}
                                     onResponse={() => clearRequest('transactionApprovalRequest')}
+                                    popupId={popupId}
+                                  />
+                                </Show>
+                                <Show when={!!oneSatPermissionRequest}>
+                                  <OneSatPermissionRequestPage
+                                    request={oneSatPermissionRequest!}
+                                    onResponse={() => clearRequest('oneSatPermissionRequest')}
                                     popupId={popupId}
                                   />
                                 </Show>

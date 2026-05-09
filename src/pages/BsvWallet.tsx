@@ -294,7 +294,8 @@ export const BsvWallet = () => {
         obj?.permissionRequest ||
         obj?.groupedPermissionRequest ||
         obj?.counterpartyPermissionRequest ||
-        obj?.transactionApprovalRequest
+        obj?.transactionApprovalRequest ||
+        obj?.oneSatPermissionRequest
       );
       if (!isPopup) {
         const acct = obj?.accounts?.[obj?.selectedAccount ?? ''];
