@@ -10,11 +10,13 @@ import {
   IndexedDbPermissionStore,
 } from '@1sat/wallet-browser';
 import { syncAddresses, syncCosignDeliveries, createContext as createActionContext } from '@1sat/actions';
+import { createOneSatPermissionModule } from '@1sat/permission-module';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import type { Account, StorageConfig } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
 import { initSyncContext, type SyncContext } from './initSyncContext';
+import { showOneSatPrompt } from './services/oneSatPrompt';
 
 // Admin originator for the extension (bypasses all permission checks)
 // Uses chrome-extension://<id> format to match what ChromeCWI sends
@@ -151,24 +153,41 @@ export const initWallet = async (
     addRemote,
   } = await createWebWallet(walletConfig);
 
-  // 3. Wrap with permissions manager for external app access control.
+  // 3. Build the IndexedDB-backed permission store used by
+  //    LocalWalletPermissionsManager for basket/cert/spending grants.
+  const permissionStore = new IndexedDbPermissionStore({ scope: 'yours-wallet' });
+
+  // 4. Build the 1Sat permission module that gates 'p 1sat'-protocol
+  //    signing via hashOutputs commitments captured at createAction time.
+  //    The module receives the underlying base wallet so its internal
+  //    placeholder-substitution createSignature calls bypass the
+  //    permission manager (no re-prompt loops).
+  const oneSatModule = createOneSatPermissionModule({
+    wallet: baseWallet,
+    promptHandler: showOneSatPrompt,
+    adminOriginator: ADMIN_ORIGINATOR,
+  });
+
+  // 5. Wrap with permissions manager for external app access control.
   // Grants persist in IndexedDB (off-chain) via LocalWalletPermissionsManager.
+  // The 1Sat module is registered under schemeID '1sat' — any 'p 1sat'
+  // protocol or basket prefix and any 'p 1sat' label routes to it.
   const wallet = new LocalWalletPermissionsManager(
     baseWallet,
     ADMIN_ORIGINATOR,
-    {},
-    { store: new IndexedDbPermissionStore({ scope: 'yours-wallet' }) },
+    { permissionModules: { '1sat': oneSatModule } },
+    { store: permissionStore },
   );
 
-  // 4. Initialize sync context (derives addresses, creates services, queue, addressManager)
+  // 5. Initialize sync context (derives addresses, creates services, queue, addressManager)
   const maxKeyIndex = 4; // 0-4 = 5 addresses
   const syncContext = await initSyncContext({
-    wallet,
+    wallet: baseWallet,
     chain,
     maxKeyIndex,
   });
 
-  // 4b. Persist the BRC-29 primary address so other accounts can display it in the UI.
+  // 5b. Persist the primary address so other accounts can display it in the UI.
   // updateNested does a deepMerge under the hood, so a partial { primaryAddress } patch
   // is safe even though TS sees it as missing required Account fields.
   const primaryAddress = syncContext.addressManager.getPrimaryAddress();
@@ -179,7 +198,7 @@ export const initWallet = async (
     });
   }
 
-  // 5. Run address sync via syncAddresses action (fire-and-forget)
+  // 6. Run address sync via syncAddresses action (fire-and-forget)
   const actionCtx = createActionContext(baseWallet, { chain, services: syncContext.services });
 
   const sendSyncStatus = (data: { status: string; [key: string]: unknown }) => {
@@ -214,7 +233,7 @@ export const initWallet = async (
       console.error('[initWallet] Address sync failed:', error);
     });
 
-  // 6. Pull any cosign-wrapped BSV21 deliveries from the messagebox.
+  // 7. Pull any cosign-wrapped BSV21 deliveries from the messagebox.
   // Fire-and-forget; failure here doesn't block wallet init.
   syncCosignDeliveries
     .execute(actionCtx, {})

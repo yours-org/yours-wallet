@@ -6,23 +6,12 @@
  * same underlying IndexedDB database.
  */
 
-import { PublicKey, Utils, type WalletInterface } from '@bsv/sdk';
-import {
-  OneSatServices,
-  AddressManager,
-  YOURS_PREFIX,
-  BRC29_PROTOCOL_ID,
-  type AddressDerivation,
-} from '@1sat/wallet-browser';
-
-// Admin originator for the extension
-const ADMIN_ORIGINATOR = `chrome-extension://${chrome.runtime.id}`;
-
-// Base64-encoded prefix (computed once)
-const BASE64_PREFIX = Utils.toBase64([...new TextEncoder().encode(YOURS_PREFIX)]);
+import type { WalletInterface } from '@bsv/sdk';
+import { OneSatServices, AddressManager, YOURS_PREFIX } from '@1sat/wallet-browser';
+import { deriveDepositAddresses } from '@1sat/actions';
 
 export interface SyncContextOptions {
-  /** Wallet interface (WalletPermissionsManager in service worker, ChromeCWI in UI) */
+  /** Underlying BRC-100 wallet (not the WPM wrapper). */
   wallet: WalletInterface;
   /** Chain: 'main' or 'test' */
   chain: 'main' | 'test';
@@ -38,70 +27,22 @@ export interface SyncContext {
 }
 
 /**
- * Derive yours receive addresses using the wallet interface.
- * Uses BRC-29 protocol with the admin originator for permission checks.
- */
-async function deriveAddresses(
-  wallet: WalletInterface,
-  maxKeyIndex: number,
-): Promise<{ identityPubKey: string; derivations: AddressDerivation[] }> {
-  // Get identity public key first
-  const identityResult = await wallet.getPublicKey({ identityKey: true }, ADMIN_ORIGINATOR);
-  const identityPubKey = identityResult.publicKey;
-
-  const derivations: AddressDerivation[] = [];
-
-  for (let i = 0; i <= maxKeyIndex; i++) {
-    const base64Suffix = Utils.toBase64([(i >>> 24) & 0xff, (i >>> 16) & 0xff, (i >>> 8) & 0xff, i & 0xff]);
-    // keyID uses base64-encoded prefix and suffix joined with space
-    const keyID = `${BASE64_PREFIX} ${base64Suffix}`;
-
-    // Use BRC-29 protocol with forSelf=true (self-referential derivation)
-    const result = await wallet.getPublicKey(
-      {
-        protocolID: BRC29_PROTOCOL_ID,
-        keyID,
-        forSelf: true,
-      },
-      ADMIN_ORIGINATOR,
-    );
-
-    const publicKey = PublicKey.fromString(result.publicKey);
-    const address = publicKey.toAddress();
-
-    derivations.push({
-      address,
-      index: i,
-      derivationPrefix: BASE64_PREFIX,
-      derivationSuffix: base64Suffix,
-      senderIdentityKey: identityPubKey,
-      publicKey: result.publicKey,
-    });
-  }
-
-  return { identityPubKey, derivations };
-}
-
-/**
  * Initialize the sync context.
  *
- * Derives addresses using the wallet interface (with admin originator),
- * then creates OneSatServices and AddressManager.
+ * Defers to `@1sat/actions` `deriveDepositAddresses` so the wallet's
+ * receive address matches what dApps compute through the same SDK action.
  */
 export async function initSyncContext(options: SyncContextOptions): Promise<SyncContext> {
   const { wallet, chain, maxKeyIndex } = options;
-
-  // Derive addresses with admin originator for permission checks
-  const { derivations } = await deriveAddresses(wallet, maxKeyIndex);
-
-  // Create AddressManager with pre-derived addresses
-  const addressManager = new AddressManager(derivations);
-
-  // Create services (1Sat ecosystem)
   const services = new OneSatServices(chain);
+
+  const { derivations } = await deriveDepositAddresses.execute(
+    { wallet, services, chain },
+    { prefix: YOURS_PREFIX, startIndex: 0, count: maxKeyIndex + 1 },
+  );
 
   return {
     services,
-    addressManager,
+    addressManager: new AddressManager(derivations),
   };
 }
