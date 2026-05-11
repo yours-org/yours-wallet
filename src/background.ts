@@ -45,10 +45,7 @@ import type { LocalWalletPermissionsManager } from '@1sat/wallet-browser';
 import { removeWindow } from './utils/chromeHelpers';
 import { Account, ChromeStorageObject, ConnectRequest, StorageConfig } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import {
-  handleOneSatPermissionResponse,
-  initOneSatPromptBridge,
-} from './services/oneSatPrompt';
+import { handleOneSatPermissionResponse, initOneSatPromptBridge } from './services/oneSatPrompt';
 import { initWallet, type AccountContext } from './initWallet';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';

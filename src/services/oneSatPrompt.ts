@@ -56,9 +56,7 @@ export const initOneSatPromptBridge = (deps: {
  * The popup is responsible for clearing the storage entry after rendering
  * so subsequent prompts don't reuse stale state.
  */
-export const showOneSatPrompt = async (
-  request: PromptRequest,
-): Promise<boolean> => {
+export const showOneSatPrompt = async (request: PromptRequest): Promise<boolean> => {
   if (!depsResolved || !chromeStorageRef) {
     console.warn('[oneSatPrompt] bridge not initialized; auto-rejecting');
     return false;
@@ -75,9 +73,7 @@ export const showOneSatPrompt = async (
       .then(() => {
         const popupId = getPopupWindowIdRef();
         if (popupId !== undefined) {
-          chrome.windows
-            .update(popupId, { focused: true })
-            .catch(() => launchPopUpRef());
+          chrome.windows.update(popupId, { focused: true }).catch(() => launchPopUpRef());
         } else {
           launchPopUpRef();
         }
@@ -98,10 +94,7 @@ export const showOneSatPrompt = async (
  * found (e.g. service worker restarted and lost its in-memory state
  * after the prompt was queued).
  */
-export const handleOneSatPermissionResponse = (
-  requestID: string,
-  approved: boolean,
-): boolean => {
+export const handleOneSatPermissionResponse = (requestID: string, approved: boolean): boolean => {
   // chromeStorage.update() does a deepMerge — setting `undefined` does NOT
   // remove the key. We must call chrome.storage.local.remove directly.
   chrome.storage.local.remove('oneSatPermissionRequest').catch(() => {});
