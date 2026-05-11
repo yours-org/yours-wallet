@@ -3,6 +3,7 @@ import { OneSatPermissionPrompt } from '@1sat/permission-module-ui';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useTheme } from '../../hooks/useTheme';
 import { sendMessage } from '../../utils/chromeHelpers';
+import yoursIcon from '../../assets/logos/icon.png';
 import type { OneSatPromptStorageEntry } from '../../services/oneSatPrompt';
 
 export type OneSatPermissionRequestProps = {
@@ -44,11 +45,15 @@ export const OneSatPermissionRequestPage = ({
   const themeProp = isDark ? 'dark' : 'light';
 
   return (
-    <OneSatPermissionPrompt
-      request={request.request}
-      onApprove={() => respond(true)}
-      onReject={() => respond(false)}
-      theme={themeProp}
-    />
+    <div style={{ width: '100%', height: '100%', overflowY: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+      <OneSatPermissionPrompt
+        request={request.request}
+        onApprove={() => respond(true)}
+        onReject={() => respond(false)}
+        theme={themeProp}
+        appName="Yours Wallet"
+        appIcon={yoursIcon}
+      />
+    </div>
   );
 };
