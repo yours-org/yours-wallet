@@ -8,7 +8,7 @@
     "@1sat/client": "0.0.32",
     "@1sat/connect": "0.0.58",
     "@1sat/permission-module": "0.0.12",
-    "@1sat/permission-module-ui": "0.0.6",
+    "@1sat/permission-module-ui": "0.0.7",
     "@1sat/sweep-ui": "0.0.48",
     "@1sat/templates": "0.0.16",
     "@1sat/types": "0.0.25",
