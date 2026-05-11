@@ -184,7 +184,10 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
         try {
           sendRes = await sendBsv21.execute(apiContext, {
             tokenId: token.info.id!,
-            recipients: sendRecipients,
+            recipients: sendRecipients.map((r) => ({
+              amount: r.amount,
+              destination: { address: r.address },
+            })),
           });
         } catch (error) {
           console.error('[SendBsv21View] sendBsv21.execute threw:', error);
