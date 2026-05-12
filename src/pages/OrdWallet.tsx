@@ -9,7 +9,7 @@ import { Show } from '../components/Show';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { cancelListing, getOrdinals, listOrdinal, transferOrdinals } from '@1sat/actions';
+import { cancelListing, deriveDepositAddresses, getOrdinals, listOrdinal, transferOrdinals } from '@1sat/actions';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { sleep } from '../utils/sleep';
 import { TopNav } from '../components/TopNav';
@@ -395,8 +395,17 @@ export const OrdWallet = () => {
       return;
     }
 
-    // TODO: Get payAddress from BRC-29 receive address
-    const payAddress = '';
+    const { derivations } = await deriveDepositAddresses.execute(apiContext, {
+      prefix: 'yours',
+      startIndex: 0,
+      count: 1,
+    });
+    const payAddress = derivations[0]?.address;
+    if (!payAddress) {
+      addSnackbar('Could not derive payment address', 'error');
+      setIsProcessing(false);
+      return;
+    }
 
     const listRes = await listOrdinal.execute(apiContext, {
       ordinal: selectedOrdinals[0],
