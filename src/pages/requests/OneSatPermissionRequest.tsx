@@ -49,7 +49,7 @@ export const OneSatPermissionRequestPage = ({ request, onResponse }: OneSatPermi
         height: '100%',
         overflowY: 'auto',
         display: 'flex',
-        alignItems: 'flex-start',
+        alignItems: 'stretch',
         justifyContent: 'center',
       }}
     >
