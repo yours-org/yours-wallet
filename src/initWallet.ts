@@ -9,7 +9,7 @@ import {
   LocalWalletPermissionsManager,
   IndexedDbPermissionStore,
 } from '@1sat/wallet-browser';
-import { syncAddresses, syncCosignDeliveries, createContext as createActionContext } from '@1sat/actions';
+import { syncAddresses, createContext as createActionContext } from '@1sat/actions';
 import { createOneSatPermissionModule } from '@1sat/permission-module';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import type { Account, StorageConfig } from './services/types/chromeStorage.types';
@@ -231,20 +231,6 @@ export const initWallet = async (
       const message = error instanceof Error ? error.message : String(error);
       sendSyncStatus({ status: 'error', message });
       console.error('[initWallet] Address sync failed:', error);
-    });
-
-  // 7. Pull any cosign-wrapped BSV21 deliveries from the messagebox.
-  // Fire-and-forget; failure here doesn't block wallet init.
-  syncCosignDeliveries
-    .execute(actionCtx, {})
-    .then((result) => {
-      console.log('[initWallet] Cosign deliveries sync complete:', result);
-    })
-    .catch((error: unknown) => {
-      console.error(
-        '[initWallet] Cosign deliveries sync failed:',
-        error instanceof Error ? error.message : String(error),
-      );
     });
 
   // Create close function
