@@ -2,13 +2,14 @@
  * Per-coin transaction history fetchers.
  *
  * Three different backends depending on the coin type:
- * - BSV:   wallet.listActions() + negative filter (exclude bsv21/origin/lock labels + baskets)
- * - BSV21: wallet.listActions({ labels: [`bsv21:<tokenId>`] }) — server-side filtered by label
+ * - BSV:   wallet.listActions() + negative filter (exclude any 'p 1sat '-labeled action + non-BSV baskets)
+ * - BSV21: wallet.listActions({ labels: [buildTokenLabel(tokenId)] }) — server-side filtered by P-label
  * - MNEE:  getMneeHistory.execute() — purpose-built action with rich per-tx metadata
  *
  * All three return the same `CoinTxSummary` shape so the UI stays agnostic.
  */
 import { getMneeHistory, type OneSatContext } from '@1sat/actions';
+import { buildTokenLabel } from '@1sat/types';
 import type { WalletAction } from '@bsv/sdk';
 import { BSV_DECIMAL_CONVERSION } from './constants';
 import { formatNumberWithCommasAndDecimals, showAmount, truncate } from './format';
@@ -16,9 +17,12 @@ import { formatNumberWithCommasAndDecimals, showAmount, truncate } from './forma
 /** Baskets that indicate a non-BSV action (BSV list should exclude these). */
 const NON_BSV_BASKETS = new Set(['bsv21', '1sat', 'ordinals', 'lock', 'opns', 'sigma', 'bsocial', 'bap']);
 
-/** Label prefixes/values that indicate a non-BSV action. */
-const NON_BSV_LABEL_PREFIXES = ['bsv21:', 'origin:'];
-const NON_BSV_LABEL_VALUES = new Set(['ordlock', 'lock', 'opns']);
+/**
+ * Any P-labeled action (`'p 1sat ...'`) is by definition not a plain-BSV
+ * payment — the 1Sat permission module dispatch label is added to every
+ * P1SAT-tracked action, so the prefix uniquely identifies them.
+ */
+const NON_BSV_LABEL_PREFIXES = ['p 1sat '];
 
 export type CoinTxDirection = 'sent' | 'received' | 'transfer';
 
@@ -47,7 +51,6 @@ export type FetchMneeHistoryOpts = {
 const isNonBsvAction = (action: WalletAction): boolean => {
   const labels = action.labels ?? [];
   for (const label of labels) {
-    if (NON_BSV_LABEL_VALUES.has(label)) return true;
     for (const prefix of NON_BSV_LABEL_PREFIXES) {
       if (label.startsWith(prefix)) return true;
     }
@@ -215,7 +218,7 @@ export const fetchBsv21History = async (
   const wantLimit = opts.limit ?? 50;
   const skipFromNewest = opts.offset ?? 0;
   const probeArgs = {
-    labels: [`bsv21:${tokenId}`],
+    labels: [buildTokenLabel(tokenId)],
     labelQueryMode: 'all' as const,
   };
   const probe = await ctx.wallet.listActions({ ...probeArgs, limit: 1, offset: 0 });
