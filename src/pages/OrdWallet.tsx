@@ -107,6 +107,16 @@ const OrdCard = ({ output, url, selected, disabled, onClick, theme, index }: Ord
         )}
       </AnimatePresence>
 
+      {/* Listed badge */}
+      {output.tags?.includes('ordlock') && (
+        <div
+          className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[0.55rem] font-bold"
+          style={{ background: '#E5A920', color: '#010101' }}
+        >
+          Listed
+        </div>
+      )}
+
       {/* Name label */}
       <div
         className="absolute bottom-0 left-0 right-0 px-1.5 py-1"
