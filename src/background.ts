@@ -1655,7 +1655,9 @@ if (isInServiceWorker) {
           });
           return;
         }
-        const address = accountContext.syncContext.addressManager.getPrimaryAddress();
+        // Prefer the user's selected primaryAddress from storage; fall back to index 0.
+        const { account } = chromeStorageService.getCurrentAccountObject();
+        const address = account?.primaryAddress ?? accountContext.syncContext.addressManager.getPrimaryAddress();
         sendResponse({
           type: YoursEventName.GET_RECEIVE_ADDRESS,
           success: true,
