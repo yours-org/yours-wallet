@@ -179,7 +179,7 @@ export const initWallet = async (
   );
 
   // 5. Initialize sync context (derives addresses, creates services, queue, addressManager)
-  const maxKeyIndex = 4; // 0-4 = 5 addresses
+  const maxKeyIndex = account?.settings?.maxKeyIndex ?? 4; // default: 0-4 = 5 addresses
   const syncContext = await initSyncContext({
     wallet: baseWallet,
     chain,

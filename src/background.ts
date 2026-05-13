@@ -42,6 +42,7 @@ import type {
   CounterpartyPermissions,
 } from '@bsv/wallet-toolbox-mobile';
 import type { LocalWalletPermissionsManager } from '@1sat/wallet-browser';
+import { deriveDepositAddresses } from '@1sat/actions';
 import { removeWindow } from './utils/chromeHelpers';
 import { Account, ChromeStorageObject, ConnectRequest, StorageConfig } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
@@ -650,6 +651,9 @@ if (isInServiceWorker) {
       'PERMISSIONS_REVOKE_ALL',
       // Settings (popup internal)
       'UPDATE_FEE_RATE',
+      // Address management (popup internal)
+      'GET_DEPOSIT_ADDRESSES',
+      'GENERATE_NEW_ADDRESS',
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -841,6 +845,68 @@ if (isInServiceWorker) {
         case 'PERMISSIONS_REVOKE_ALL':
           processPermissionsRevokeAll(message, sendResponse);
           return true;
+        case 'GET_DEPOSIT_ADDRESSES': {
+          startupInitPromise.then(() => {
+            if (!accountContext) {
+              sendResponse({ type: 'GET_DEPOSIT_ADDRESSES', success: false, error: 'Wallet not initialized' });
+              return;
+            }
+            const am = accountContext.syncContext.addressManager;
+            const addresses = [];
+            for (let i = 0; i <= am.getMaxKeyIndex(); i++) {
+              const d = am.getAddressAtIndex(i);
+              if (d) addresses.push(d);
+            }
+            sendResponse({ type: 'GET_DEPOSIT_ADDRESSES', success: true, data: addresses });
+          });
+          return true;
+        }
+        case 'GENERATE_NEW_ADDRESS': {
+          if ((globalThis as any).__generatingAddress) {
+            sendResponse({ type: 'GENERATE_NEW_ADDRESS', success: false, error: 'Address generation already in progress' });
+            return true;
+          }
+          (globalThis as any).__generatingAddress = true;
+          startupInitPromise.then(async () => {
+            try {
+              if (!accountContext) {
+                sendResponse({ type: 'GENERATE_NEW_ADDRESS', success: false, error: 'Wallet not initialized' });
+                return;
+              }
+              const am = accountContext.syncContext.addressManager;
+              const newIndex = am.getMaxKeyIndex() + 1;
+              const { derivations } = await deriveDepositAddresses.execute(
+                { wallet: accountContext.baseWallet, chain: 'main' },
+                { startIndex: newIndex, count: 1 },
+              );
+              const newDerivation = derivations[0];
+
+              // Persist BEFORE updating in-memory state so a crash can't lose the index
+              const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+              if (account && selectedAccount) {
+                const key: keyof ChromeStorageObject = 'accounts';
+                await chromeStorageService.updateNested(key, {
+                  [selectedAccount]: {
+                    settings: { ...account.settings, maxKeyIndex: newIndex },
+                  } as unknown as Account,
+                });
+              }
+
+              am.addAddress(newDerivation);
+
+              sendResponse({ type: 'GENERATE_NEW_ADDRESS', success: true, data: newDerivation });
+            } catch (error) {
+              sendResponse({
+                type: 'GENERATE_NEW_ADDRESS',
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            } finally {
+              (globalThis as any).__generatingAddress = false;
+            }
+          });
+          return true;
+        }
         default:
           break;
       }

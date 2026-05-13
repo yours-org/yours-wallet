@@ -93,8 +93,10 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const runSync = async () => {
       try {
+        const { account } = services.chromeStorageService!.getCurrentAccountObject();
+        const addressCount = (account?.settings?.maxKeyIndex ?? 4) + 1;
         const result = await syncAddresses.execute(services.apiContext!, {
-          count: 5,
+          count: addressCount,
         });
         if (!cancelled) {
           console.log('[ServiceProvider] Address sync complete:', result);

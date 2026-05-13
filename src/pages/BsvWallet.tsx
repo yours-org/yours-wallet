@@ -129,6 +129,11 @@ export const BsvWallet = () => {
   // Get identityAddress from chrome storage (selected account)
   const identityAddress = chromeStorageService.getCurrentAccountObject().account?.addresses?.identityAddress || '';
   const [receiveAddress, setReceiveAddress] = useState<string>('');
+  const [depositAddresses, setDepositAddresses] = useState<
+    { address: string; index: number; derivationPrefix: string; derivationSuffix: string }[]
+  >([]);
+  const [selectedAddressIndex, setSelectedAddressIndex] = useState(0);
+  const [generatingAddress, setGeneratingAddress] = useState(false);
   const [bsvBalance, setBsvBalance] = useState<number>(0);
   const [exchangeRate, setExchangeRate] = useState<number>(0);
   const [balanceLoading, setBalanceLoading] = useState(true);
@@ -490,6 +495,55 @@ export const BsvWallet = () => {
     });
   };
 
+  const copyAddress = (address: string) => {
+    navigator.clipboard.writeText(address).then(() => {
+      addSnackbar('Copied!', 'success');
+    });
+  };
+
+  const setPrimaryAddress = (address: string) => {
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (account && selectedAccount) {
+      chromeStorageService.updateNested('accounts', {
+        [selectedAccount]: { primaryAddress: address } as unknown as Account,
+      });
+    }
+  };
+
+  const fetchDepositAddresses = async () => {
+    try {
+      const response = await sendMessageAsync<{ success: boolean; data?: { address: string; index: number; derivationPrefix: string; derivationSuffix: string }[] }>({
+        action: 'GET_DEPOSIT_ADDRESSES',
+      });
+      if (response?.success && response.data) {
+        setDepositAddresses(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to get deposit addresses:', error);
+    }
+  };
+
+  const handleGenerateAddress = async () => {
+    setGeneratingAddress(true);
+    try {
+      const response = await sendMessageAsync<{ success: boolean; data?: { address: string; index: number; derivationPrefix: string; derivationSuffix: string } }>({
+        action: 'GENERATE_NEW_ADDRESS',
+      });
+      if (response?.success && response.data) {
+        setDepositAddresses((prev) => [...prev, response.data!]);
+        setSelectedAddressIndex(response.data.index);
+        setReceiveAddress(response.data.address);
+        setPrimaryAddress(response.data.address);
+        addSnackbar('New address generated!', 'success');
+      }
+    } catch (error) {
+      console.error('Failed to generate address:', error);
+      addSnackbar('Failed to generate address', 'error');
+    } finally {
+      setGeneratingAddress(false);
+    }
+  };
+
   const handleSendMNEE = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     await sleep(25);
@@ -731,6 +785,13 @@ export const BsvWallet = () => {
     }
   };
 
+  // Fetch deposit addresses when entering receive view
+  useEffect(() => {
+    if (pageState === 'receive') {
+      fetchDepositAddresses();
+    }
+  }, [pageState]);
+
   const receive = (
     <motion.div
       initial={{ opacity: 0, y: 18 }}
@@ -757,28 +818,6 @@ export const BsvWallet = () => {
           Receive Assets
         </h2>
       </div>
-
-      {/* Info text */}
-      <Show
-        when={services.ordinals || services.bsv21}
-        whenFalseContent={
-          <p className="text-xs text-center mb-4" style={{ color: theme.color.global.gray }}>
-            You may safely send{' '}
-            <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
-              Bitcoin SV (BSV)
-            </span>{' '}
-            to this address.
-          </p>
-        }
-      >
-        <p className="text-xs text-center mb-4" style={{ color: theme.color.global.gray }}>
-          You may safely send{' '}
-          <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
-            BSV, MNEE, and Ordinals
-          </span>{' '}
-          to this address.
-        </p>
-      </Show>
 
       {/* QR code */}
       <QrCode address={receiveAddress} onClick={handleCopyToClipboard} />
@@ -821,6 +860,95 @@ export const BsvWallet = () => {
           {copiedAddress ? 'Copied!' : 'Copy'}
         </span>
       </motion.button>
+
+      {/* Info text */}
+      <Show
+        when={services.ordinals || services.bsv21}
+        whenFalseContent={
+          <p className="text-xs text-center mt-4 mb-2 max-w-[16rem]" style={{ color: theme.color.global.gray }}>
+            You may safely send{' '}
+            <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
+              Bitcoin SV (BSV)
+            </span>{' '}
+            to this address.
+          </p>
+        }
+      >
+        <p className="text-xs text-center mt-4 mb-2 max-w-[16rem]" style={{ color: theme.color.global.gray }}>
+          You may safely send{' '}
+          <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
+            BSV, MNEE, and Ordinals
+          </span>{' '}
+          to this address.
+        </p>
+      </Show>
+
+      {/* Deposit Addresses */}
+      {depositAddresses.length > 0 && (
+        <div className="w-full mt-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold" style={{ color: theme.color.global.contrast }}>
+              My Deposit Addresses
+            </h3>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={handleGenerateAddress}
+              disabled={generatingAddress}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.65rem] font-semibold border-0 outline-none cursor-pointer"
+              style={{
+                background: 'rgba(161,255,139,0.12)',
+                color: '#A1FF8B',
+                opacity: generatingAddress ? 0.5 : 1,
+              }}
+            >
+              {generatingAddress ? <Loader2 size={10} className="animate-spin" /> : <Plus size={10} />}
+              New Address
+            </motion.button>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            {depositAddresses.map((d) => {
+              const isSelected = d.index === selectedAddressIndex;
+              return (
+                <motion.button
+                  key={d.index}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    setSelectedAddressIndex(d.index);
+                    setReceiveAddress(d.address);
+                    setPrimaryAddress(d.address);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg w-full border-0 outline-none cursor-pointer text-left"
+                  style={{
+                    background: isSelected ? 'rgba(161,255,139,0.08)' : theme.color.global.row,
+                    border: isSelected ? '1px solid rgba(161,255,139,0.25)' : '1px solid transparent',
+                  }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[0.65rem] font-mono truncate" style={{ color: theme.color.global.contrast }}>
+                      {d.address}
+                    </p>
+                    <p className="text-[0.55rem] mt-0.5" style={{ color: theme.color.global.gray }}>
+                      {d.derivationPrefix} {d.derivationSuffix}
+                    </p>
+                  </div>
+                  <motion.div
+                    whileTap={{ scale: 0.85 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyAddress(d.address);
+                    }}
+                    className="flex-shrink-0 p-1 rounded"
+                    style={{ color: theme.color.global.gray }}
+                  >
+                    <Copy size={12} />
+                  </motion.div>
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 

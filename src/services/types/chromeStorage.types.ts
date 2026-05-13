@@ -34,6 +34,8 @@ export type Settings = {
   dismissedBackupPromo?: boolean;
   /** Set to true once the user downloads their keys from the walkthrough */
   keysBackedUp?: boolean;
+  /** Highest deposit address index derived so far. Defaults to 4 (5 addresses). */
+  maxKeyIndex?: number;
 };
 
 /**
