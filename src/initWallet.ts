@@ -10,6 +10,7 @@ import {
 } from '@1sat/wallet-browser';
 import { syncAddresses, createContext as createActionContext } from '@1sat/actions';
 import { createOneSatPermissionModule } from '@1sat/permission-module';
+import type { WalletInterface } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import type { Account, StorageConfig } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
@@ -20,6 +21,28 @@ import { showOneSatPrompt } from './services/oneSatPrompt';
 // Admin originator for the extension (bypasses all permission checks)
 // Uses chrome-extension://<id> format to match what ChromeCWI sends
 const ADMIN_ORIGINATOR = `chrome-extension://${chrome.runtime.id}`;
+
+/**
+ * Wrap a wallet so every method call pre-binds `originator` to the supplied
+ * value. Used to route internal-wallet calls (background sync, etc.) through
+ * the permissions manager as the admin originator — encryption/decryption
+ * still applies, permission prompts are short-circuited via the
+ * `isAdminOriginator` check inside the manager.
+ */
+function withOriginator(wallet: WalletInterface, originator: string): WalletInterface {
+  return new Proxy(wallet, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if (typeof value !== 'function') return value;
+      return function (...args: unknown[]) {
+        if (args.length < 2 || args[1] === undefined) {
+          return (value as Function).call(target, args[0], originator);
+        }
+        return (value as Function).apply(target, args);
+      };
+    },
+  }) as WalletInterface;
+}
 
 /**
  * Decrypt keys from chrome storage using the passKey from session storage.
@@ -178,10 +201,16 @@ export const initWallet = async (
     { store: permissionStore },
   );
 
-  // 5. Initialize sync context (derives addresses, creates services, queue, addressManager)
+  // 5. Initialize sync context (derives addresses, creates services, queue, addressManager).
+  // Background sync calls go through the manager-wrapped wallet (admin
+  // originator pre-bound) so internalizeAction encrypts customInstructions
+  // consistently with dApp-initiated writes. Without this wrap, sync would
+  // bypass the manager entirely and produce plaintext customInstructions —
+  // creating mixed-encoding rows that break later reads.
+  const adminWallet = withOriginator(wallet, ADMIN_ORIGINATOR);
   const maxKeyIndex = account?.settings?.maxKeyIndex ?? 4; // default: 0-4 = 5 addresses
   const syncContext = await initSyncContext({
-    wallet: baseWallet,
+    wallet: adminWallet,
     chain,
     maxKeyIndex,
   });
@@ -200,7 +229,7 @@ export const initWallet = async (
   }
 
   // 6. Run address sync via syncAddresses action (fire-and-forget)
-  const actionCtx = createActionContext(baseWallet, { chain, services: syncContext.services });
+  const actionCtx = createActionContext(adminWallet, { chain, services: syncContext.services });
 
   const sendSyncStatus = (data: { status: string; [key: string]: unknown }) => {
     chrome.runtime
