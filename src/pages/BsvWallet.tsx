@@ -791,10 +791,24 @@ export const BsvWallet = () => {
     }
   };
 
-  // Fetch deposit addresses when entering receive view
+  // Fetch deposit addresses when entering receive view and sync selected index to primaryAddress
   useEffect(() => {
     if (pageState === 'receive') {
-      fetchDepositAddresses();
+      fetchDepositAddresses().then(() => {
+        // Honor the persisted primaryAddress instead of defaulting to index 0
+        const { account: acct } = chromeStorageService.getCurrentAccountObject();
+        const primary = acct?.primaryAddress;
+        if (primary) {
+          setDepositAddresses((prev) => {
+            const match = prev.find((d) => d.address === primary);
+            if (match) {
+              setSelectedAddressIndex(match.index);
+              setReceiveAddress(match.address);
+            }
+            return prev;
+          });
+        }
+      });
     }
   }, [pageState]);
 
