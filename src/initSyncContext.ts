@@ -7,7 +7,7 @@
  */
 
 import type { WalletInterface } from '@bsv/sdk';
-import { OneSatServices, AddressManager, YOURS_PREFIX } from '@1sat/wallet-browser';
+import { OneSatServices, AddressManager } from '@1sat/wallet-browser';
 import { deriveDepositAddresses } from '@1sat/actions';
 
 export interface SyncContextOptions {
@@ -38,7 +38,7 @@ export async function initSyncContext(options: SyncContextOptions): Promise<Sync
 
   const { derivations } = await deriveDepositAddresses.execute(
     { wallet, services, chain },
-    { prefix: YOURS_PREFIX, startIndex: 0, count: maxKeyIndex + 1 },
+    { startIndex: 0, count: maxKeyIndex + 1 },
   );
 
   return {

@@ -2,7 +2,6 @@ import {
   createWebWallet,
   createIndexedDbTaskStateStore,
   type WebWalletConfig,
-  YOURS_PREFIX,
   Wallet,
   WalletStorageManager,
   StorageClient,
@@ -217,7 +216,6 @@ export const initWallet = async (
 
   syncAddresses
     .execute(actionCtx, {
-      prefix: YOURS_PREFIX,
       count: maxKeyIndex + 1,
       onProgress: (progress) => {
         sendSyncStatus({ status: 'progress', ...progress });

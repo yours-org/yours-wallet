@@ -16,8 +16,7 @@ import { MNEE_DECIMALS, MNEE_ICON_URL } from '../../utils/constants';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 import { sendMnee, deriveDepositAddresses, getMneeBalance } from '@1sat/actions';
 
-const YOURS_PREFIX = 'yours';
-const YOURS_ADDRESS_COUNT = 5;
+const DEPOSIT_ADDRESS_COUNT = 5;
 
 export type MNEESendRequestProps = {
   request: SendMNEE[];
@@ -52,9 +51,8 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
       }
 
       const derivationResult = await deriveDepositAddresses.execute(apiContext, {
-        prefix: YOURS_PREFIX,
         startIndex: 0,
-        count: YOURS_ADDRESS_COUNT,
+        count: DEPOSIT_ADDRESS_COUNT,
       });
 
       // Check balance before sending

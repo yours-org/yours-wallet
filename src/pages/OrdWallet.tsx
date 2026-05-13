@@ -396,7 +396,6 @@ export const OrdWallet = () => {
     }
 
     const { derivations } = await deriveDepositAddresses.execute(apiContext, {
-      prefix: 'yours',
       startIndex: 0,
       count: 1,
     });

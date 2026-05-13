@@ -5,7 +5,7 @@ import { INACTIVITY_LIMIT } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import { createContext, syncAddresses } from '@1sat/actions';
 import { fetchExchangeRate } from '../../utils/wallet';
-import { createChromeCWI, OneSatServices, YOURS_PREFIX } from '@1sat/wallet-browser';
+import { createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
 
 const initializeServices = async () => {
   const chromeStorageService = new ChromeStorageService();
@@ -94,7 +94,6 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const runSync = async () => {
       try {
         const result = await syncAddresses.execute(services.apiContext!, {
-          prefix: YOURS_PREFIX,
           count: 5,
         });
         if (!cancelled) {

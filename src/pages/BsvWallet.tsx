@@ -409,7 +409,6 @@ export const BsvWallet = () => {
 
       // Derive the BRC-29 destination address
       const derivationResult = await deriveDepositAddresses.execute(apiContext, {
-        prefix: 'yours',
         startIndex: 0,
         count: 1,
       });
@@ -543,7 +542,6 @@ export const BsvWallet = () => {
 
         try {
           const derivationResult = await deriveDepositAddresses.execute(apiContext, {
-            prefix: 'yours',
             startIndex: 0,
             count: 5,
           });
