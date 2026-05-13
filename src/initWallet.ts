@@ -187,14 +187,16 @@ export const initWallet = async (
   });
 
   // 5b. Persist the primary address so other accounts can display it in the UI.
-  // updateNested does a deepMerge under the hood, so a partial { primaryAddress } patch
-  // is safe even though TS sees it as missing required Account fields.
-  const primaryAddress = syncContext.addressManager.getPrimaryAddress();
-  if (primaryAddress) {
-    const identityAddress = keys.identityAddress;
-    chromeStorageService.updateNested('accounts', {
-      [identityAddress]: { primaryAddress } as unknown as Account,
-    });
+  // Only set it if the account doesn't already have one — preserve the user's
+  // selection from the receive screen across lock/unlock and account switches.
+  if (!account?.primaryAddress) {
+    const primaryAddress = syncContext.addressManager.getPrimaryAddress();
+    if (primaryAddress) {
+      const identityAddress = keys.identityAddress;
+      chromeStorageService.updateNested('accounts', {
+        [identityAddress]: { primaryAddress } as unknown as Account,
+      });
+    }
   }
 
   // 6. Run address sync via syncAddresses action (fire-and-forget)
