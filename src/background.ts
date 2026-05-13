@@ -863,7 +863,11 @@ if (isInServiceWorker) {
         }
         case 'GENERATE_NEW_ADDRESS': {
           if ((globalThis as any).__generatingAddress) {
-            sendResponse({ type: 'GENERATE_NEW_ADDRESS', success: false, error: 'Address generation already in progress' });
+            sendResponse({
+              type: 'GENERATE_NEW_ADDRESS',
+              success: false,
+              error: 'Address generation already in progress',
+            });
             return true;
           }
           (globalThis as any).__generatingAddress = true;

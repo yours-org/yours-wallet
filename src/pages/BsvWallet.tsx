@@ -512,7 +512,10 @@ export const BsvWallet = () => {
 
   const fetchDepositAddresses = async () => {
     try {
-      const response = await sendMessageAsync<{ success: boolean; data?: { address: string; index: number; derivationPrefix: string; derivationSuffix: string }[] }>({
+      const response = await sendMessageAsync<{
+        success: boolean;
+        data?: { address: string; index: number; derivationPrefix: string; derivationSuffix: string }[];
+      }>({
         action: 'GET_DEPOSIT_ADDRESSES',
       });
       if (response?.success && response.data) {
@@ -526,7 +529,10 @@ export const BsvWallet = () => {
   const handleGenerateAddress = async () => {
     setGeneratingAddress(true);
     try {
-      const response = await sendMessageAsync<{ success: boolean; data?: { address: string; index: number; derivationPrefix: string; derivationSuffix: string } }>({
+      const response = await sendMessageAsync<{
+        success: boolean;
+        data?: { address: string; index: number; derivationPrefix: string; derivationSuffix: string };
+      }>({
         action: 'GENERATE_NEW_ADDRESS',
       });
       if (response?.success && response.data) {
