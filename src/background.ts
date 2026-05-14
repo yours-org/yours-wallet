@@ -2368,7 +2368,7 @@ if (isInServiceWorker) {
       const w = await ensureWallet();
 
       const result = await w.signAction(message.params, message.originator);
-      console.log('[signAction] Success:', JSON.stringify(result, null, 2));
+      console.log('[signAction] Success', result?.txid ? `txid=${result.txid}` : '');
       sendResponse({
         type: CWIEventName.SIGN_ACTION,
         success: true,
