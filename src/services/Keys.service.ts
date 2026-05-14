@@ -163,7 +163,7 @@ export class KeysService {
 
       await tx.fee(new SatoshisPerKilobyte(this.chromeStorageService.getCustomFeeRate()));
       await tx.sign();
-      await services.arcade.submitTransaction(tx.toBinary());
+      await services.submitToStack(tx.toBinary());
       console.log('Legacy sweep:', tx.id('hex'));
     } catch (error) {
       console.error('sweepLegacy failed:', error);
