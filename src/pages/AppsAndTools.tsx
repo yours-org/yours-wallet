@@ -26,6 +26,7 @@ import { formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
 import { TopNav } from '../components/TopNav';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { lockBsv, unlockBsv, sendBsv } from '@1sat/actions';
+import { LOCK_BASKET } from '@1sat/types';
 import { type ParseContext } from '@1sat/wallet-browser';
 import { Input } from '../components/Input';
 import TxPreview from '../components/TxPreview';
@@ -217,7 +218,7 @@ export const AppsAndTools = () => {
       setCurrentBlockHeight(height);
 
       const result = await apiContext.wallet.listOutputs({
-        basket: 'lock',
+        basket: LOCK_BASKET,
         includeTags: true,
         limit: 10000,
       });

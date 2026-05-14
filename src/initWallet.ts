@@ -188,6 +188,10 @@ export const initWallet = async (
     wallet: baseWallet,
     promptHandler: showOneSatPrompt,
     adminOriginator: ADMIN_ORIGINATOR,
+    // Reuse the same permission store the LocalWalletPermissionsManager
+    // uses, so basket grants persisted via the grouped-permission popup
+    // are picked up by the module's basket-access checks (and vice versa).
+    permissionStore,
   });
 
   // 5. Wrap with permissions manager for external app access control.
