@@ -1,79 +1,36 @@
 import { useEffect, useState } from 'react';
-import styled from 'styled-components';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, Copy, Check, CheckCircle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
-import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
-import { ToggleSwitch } from '../../components/ToggleSwitch';
-import { NetWork } from 'yours-wallet-provider';
 import { useNavigate } from 'react-router-dom';
 import { YoursIcon } from '../../components/YoursIcon';
-import { FaCopy } from 'react-icons/fa';
 import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
-
-const Content = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-`;
-
-const FormContainer = styled.form`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: none;
-`;
-
-const SeedContainer = styled.div<WhiteLabelTheme>`
-  display: flex;
-  flex-direction: column;
-  background-color: ${({ theme }) => theme.color.global.row};
-  border-radius: 0.5rem;
-  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
-  width: 80%;
-  padding: 1rem;
-  margin: 0.5rem 0 1rem 0;
-`;
-
-const CopyToClipboardContainer = styled.div<WhiteLabelTheme>`
-  display: flex;
-  align-items: center;
-  margin-top: 1.5rem;
-  border: none;
-  background: none;
-  width: fit-content;
-  cursor: pointer;
-`;
-
-const NetworkSelectWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  width: 87%;
-  margin: 0.5rem 0 3rem 0;
-`;
 
 export type CreateAccountProps = {
   onNavigateBack: () => void;
   newWallet?: boolean;
 };
 
+const TOTAL_STEPS = 3;
+
+const stepVariants = {
+  enter: { opacity: 0, x: 24 },
+  center: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -24 },
+};
+
 export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccountProps) => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const { addSnackbar } = useSnackbar();
-  const [network, setNetwork] = useState<NetWork>(NetWork.Mainnet);
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [step, setStep] = useState(1);
@@ -84,10 +41,10 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
   const { keysService, chromeStorageService } = useServiceContext();
   const [accountName, setAccountName] = useState('');
   const [iconURL, setIconURL] = useState('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     newWallet && hideMenu();
-
     return () => {
       showMenu();
     };
@@ -107,10 +64,9 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
         return;
       }
 
-      // Some artificial delay for the loader
       await sleep(50);
 
-      const keys = await keysService.generateSeedAndStoreEncrypted(password, newWallet, network);
+      const keys = await keysService.generateSeedAndStoreEncrypted(password, newWallet);
 
       if (!keys?.mnemonic) {
         addSnackbar('An error occurred while creating the wallet!', 'error');
@@ -123,7 +79,6 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
         return;
       }
       setIdentityAddress(keys.identityAddress);
-      // Save account name and icon URL to local storage
       await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL);
       setStep(2);
     } catch (error) {
@@ -134,19 +89,53 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
     }
   };
 
-  const handleCopyToClipboard = (seed: string) => {
-    navigator.clipboard.writeText(seed).then(() => {
+  const handleCopyToClipboard = () => {
+    navigator.clipboard.writeText(seedWords.join(' ').trim()).then(() => {
+      setCopied(true);
       addSnackbar('Copied!', 'success');
+      setTimeout(() => setCopied(false), 2000);
     });
   };
 
+  const accentLeft = theme.color.component.primaryButtonLeftGradient;
+  const accentRight = theme.color.component.primaryButtonRightGradient;
+  const contrast = theme.color.global.contrast;
+  const gray = theme.color.global.gray;
+  const row = theme.color.global.row;
+  const bg = theme.color.global.walletBackground;
+
+  // Step progress dots — plain JSX, not a component, so it doesn't
+  // unmount/remount (replaying animations) on every parent re-render.
+  const stepIndicator = (
+    <div className="flex items-center gap-2 mb-6">
+      {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+        <motion.div
+          key={i}
+          animate={{
+            width: step === i + 1 ? 24 : 8,
+            opacity: step > i + 1 ? 0.4 : step === i + 1 ? 1 : 0.25,
+          }}
+          transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+          className="h-1.5 rounded-full"
+          style={{
+            background: step >= i + 1 ? `linear-gradient(90deg, ${accentLeft}, ${accentRight})` : gray + '40',
+          }}
+        />
+      ))}
+    </div>
+  );
+
   const passwordStep = (
-    <>
-      <HeaderText theme={theme}>{newWallet ? 'Create password' : 'New Account'}</HeaderText>
-      <Text style={{ marginBottom: '1rem' }} theme={theme}>
+    <div className="flex flex-col items-center w-full pb-20">
+      {stepIndicator}
+      <h2 className="text-xl font-bold mb-1 text-center" style={{ color: contrast }}>
+        {newWallet ? 'Create password' : 'New Account'}
+      </h2>
+      <p className="text-xs mb-5 text-center" style={{ color: gray }}>
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
-      </Text>
-      <FormContainer onSubmit={handleKeyGeneration}>
+      </p>
+
+      <form onSubmit={handleKeyGeneration} className="flex flex-col items-center w-full gap-0">
         <Input
           theme={theme}
           placeholder="Account Name"
@@ -177,16 +166,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
         </Show>
-        <NetworkSelectWrapper>
-          <ToggleSwitch
-            theme={theme}
-            on={network === NetWork.Testnet}
-            onChange={() => setNetwork(network === NetWork.Mainnet ? NetWork.Testnet : NetWork.Mainnet)}
-          />
-          <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
-            {network === NetWork.Testnet ? 'Turn off for mainnet account' : 'Turn on for testnet account'}
-          </Text>
-        </NetworkSelectWrapper>
+
         <Button
           theme={theme}
           type="primary"
@@ -194,50 +174,76 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
           disabled={loading}
           isSubmit
         />
-        <Button
-          theme={theme}
-          type="secondary"
-          label="Go back"
-          onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
-        />
-      </FormContainer>
-    </>
+      </form>
+    </div>
   );
 
   const copySeedStep = (
-    <>
-      <HeaderText theme={theme}>Your recovery phrase</HeaderText>
-      <Text theme={theme} style={{ marginBottom: '1rem' }}>
+    <div className="flex flex-col items-center w-full">
+      {stepIndicator}
+      <h2 className="text-xl font-bold mb-1 text-center" style={{ color: contrast }}>
+        Your recovery phrase
+      </h2>
+      <p className="text-xs mb-4 text-center px-4" style={{ color: gray }}>
         Safely write down and store your seed phrase in a safe place.
-      </Text>
-      <SeedContainer theme={theme}>
-        <Text
-          style={{
-            textAlign: 'left',
-            width: '100%',
-            margin: '0',
-            color: theme.color.global.contrast,
-          }}
-          theme={theme}
+      </p>
+
+      {/* Word grid */}
+      <div className="w-[87%] rounded-xl border p-4 mb-1" style={{ backgroundColor: row, borderColor: gray + '30' }}>
+        <div className="grid grid-cols-3 gap-x-3 gap-y-2">
+          {seedWords.map((word, i) => (
+            <div key={i} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5" style={{ backgroundColor: bg }}>
+              <span className="text-[10px] font-mono w-4 shrink-0 text-right" style={{ color: gray }}>
+                {i + 1}
+              </span>
+              <span className="text-xs font-semibold truncate" style={{ color: contrast }}>
+                {word}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Copy row */}
+        <motion.button
+          whileHover={{ opacity: 0.8 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleCopyToClipboard}
+          className="flex items-center gap-2 mt-4 mx-auto"
+          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
         >
-          {seedWords.join(' ').trim()}
-        </Text>
-        <CopyToClipboardContainer onClick={() => handleCopyToClipboard(seedWords.join(' ').trim())}>
-          <FaCopy size={'0.85rem'} color={theme.color.component.primaryButtonRightGradient} />
-          <Text
-            style={{
-              color: theme.color.component.primaryButtonRightGradient,
-              textDecoration: 'underline',
-              margin: '0 0 0 0.5rem',
-              textAlign: 'left',
-              fontSize: '0.75rem',
-            }}
-            theme={theme}
-          >
-            Copy to clipboard
-          </Text>
-        </CopyToClipboardContainer>
-      </SeedContainer>
+          <AnimatePresence mode="wait">
+            {copied ? (
+              <motion.span
+                key="check"
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.6, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Check size={14} style={{ color: accentLeft }} />
+              </motion.span>
+            ) : (
+              <motion.span
+                key="copy"
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.6, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Copy size={14} style={{ color: accentLeft }} />
+              </motion.span>
+            )}
+          </AnimatePresence>
+          <span className="text-xs font-medium underline underline-offset-2" style={{ color: accentLeft }}>
+            {copied ? 'Copied!' : 'Copy to clipboard'}
+          </span>
+        </motion.button>
+      </div>
+
+      <p className="text-[10px] mt-2 mb-4 text-center px-6" style={{ color: gray + 'bb' }}>
+        Make sure you are in a safe place and no one is watching.
+      </p>
+
       <Button
         theme={theme}
         type="primary"
@@ -248,36 +254,145 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
           setStep(3);
         }}
       />
-    </>
+    </div>
   );
 
   const successStep = (
-    <>
-      <HeaderText theme={theme}>Success!</HeaderText>
-      <Text theme={theme} style={{ marginBottom: '1rem' }}>
-        Your wallet is ready to go.
-      </Text>
-      <Button
-        theme={theme}
-        type="primary"
-        label="Enter"
-        onClick={() => {
-          window.location.reload();
-        }}
-      />
-    </>
+    <div className="flex flex-col items-center w-full">
+      {stepIndicator}
+      <motion.div
+        initial={{ scale: 0.4, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.1 }}
+        className="mb-5 mt-2"
+      >
+        <CheckCircle size={56} style={{ color: accentLeft }} strokeWidth={1.5} />
+      </motion.div>
+
+      <motion.h2
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+        className="text-2xl font-bold mb-2 text-center"
+        style={{ color: contrast }}
+      >
+        Wallet Ready!
+      </motion.h2>
+      <motion.p
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.33 }}
+        className="text-sm mb-6 text-center"
+        style={{ color: gray }}
+      >
+        Your wallet is set up and ready to use.
+      </motion.p>
+
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.42 }}
+        className="w-full"
+      >
+        <Button
+          theme={theme}
+          type="primary"
+          label="Enter"
+          onClick={() => {
+            window.location.reload();
+          }}
+        />
+      </motion.div>
+    </div>
   );
 
   return (
     <Show when={!loading} whenFalseContent={<PageLoader theme={theme} message="Generating keys..." />}>
-      <Content>
+      <div className="flex flex-col items-center w-full px-2 pt-4 pb-4">
+        {/* Back button + title — hidden on final "Wallet Ready" step */}
+        {step < TOTAL_STEPS && (
+          <div
+            className="flex w-full items-center gap-3 px-4 pb-4 pt-4 sticky top-0 z-10"
+            style={{ backgroundColor: bg }}
+          >
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={async () => {
+                if (step === 1) {
+                  // If keys were already generated (user went to step 2 then came back),
+                  // clear them so we don't leave orphaned data in chrome storage.
+                  if (seedWords.length > 0 && newWallet) {
+                    await chromeStorageService.clear();
+                  }
+                  newWallet ? navigate('/') : onNavigateBack();
+                } else {
+                  setStep(step - 1);
+                }
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+              style={{ background: '#17191E' }}
+            >
+              <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
+            </motion.button>
+            <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
+              {newWallet ? 'Create Account' : 'New Account'}
+            </span>
+          </div>
+        )}
+
         <Show when={newWallet}>
-          <YoursIcon width="4rem" />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            className="mb-4"
+          >
+            <YoursIcon width="4rem" />
+          </motion.div>
         </Show>
-        <Show when={step === 1}>{passwordStep}</Show>
-        <Show when={step === 2}>{copySeedStep}</Show>
-        <Show when={step === 3}>{successStep}</Show>
-      </Content>
+
+        <AnimatePresence mode="wait">
+          {step === 1 && (
+            <motion.div
+              key="step1"
+              variants={stepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="w-full"
+            >
+              {passwordStep}
+            </motion.div>
+          )}
+          {step === 2 && (
+            <motion.div
+              key="step2"
+              variants={stepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="w-full"
+            >
+              {copySeedStep}
+            </motion.div>
+          )}
+          {step === 3 && (
+            <motion.div
+              key="step3"
+              variants={stepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="w-full"
+            >
+              {successStep}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </Show>
   );
 };

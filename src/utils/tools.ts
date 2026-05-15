@@ -1,28 +1,27 @@
-import { LockRequest, NetWork, SendBsv, TransactionFormat } from 'yours-wallet-provider';
+import { LockRequest, SendBsv, TransactionFormat } from '../services/types/provider.types';
 import { Script, Transaction, Utils } from '@bsv/sdk';
-import { LOCKUP_PREFIX, LOCKUP_SUFFIX, MAINNET_ADDRESS_PREFIX, TESTNET_ADDRESS_PREFIX } from './constants';
+import {
+  Bsv21Indexer,
+  FundIndexer,
+  InscriptionIndexer,
+  LockIndexer,
+  MapIndexer,
+  OpNSIndexer,
+  OrdLockIndexer,
+  OriginIndexer,
+  Outpoint,
+  SigmaIndexer,
+  type Indexer,
+  type ParseContext,
+  type Txo,
+} from '@1sat/wallet-browser';
+import type { OneSatContext } from '@1sat/actions';
+import { LOCKUP_PREFIX, LOCKUP_SUFFIX } from './constants';
 
 export const getCurrentUtcTimestamp = (): number => {
   const currentDate = new Date();
   const utcTimestamp = currentDate.getTime();
   return Math.floor(utcTimestamp);
-};
-
-export const isAddressOnRightNetwork = (network: NetWork, address: string) => {
-  switch (network) {
-    case NetWork.Mainnet:
-      return address.startsWith('1');
-    case NetWork.Testnet:
-      return !address.startsWith('1');
-  }
-};
-
-export const convertAddressToTestnet = (address: string) => {
-  return Utils.toBase58Check(Utils.fromBase58Check(address).data as number[], [TESTNET_ADDRESS_PREFIX]);
-};
-
-export const convertAddressToMainnet = (address: string) => {
-  return Utils.toBase58Check(Utils.fromBase58Check(address).data as number[], [MAINNET_ADDRESS_PREFIX]);
 };
 
 export const isValidEmail = (email: string) => {
@@ -40,7 +39,123 @@ export const getTxFromRawTxFormat = (rawTx: string | number[], format: Transacti
   }
 };
 
-export const getErrorMessage = (error: string | undefined) => {
+/**
+ * Parse a raw BSV transaction through all 1Sat indexers and return a ParseContext
+ * suitable for rendering with TxPreview. Mirrors OneSatWallet.parseTransaction() —
+ * it hydrates source transactions via services.beef, runs every indexer's parse()
+ * on inputs and outputs, then runs summarize() for the transaction-level view.
+ *
+ * This replaces the old spv-store `oneSatSPV.parseTx(tx)` used on main.
+ */
+export const parseRawTransaction = async (tx: Transaction, apiContext: OneSatContext): Promise<ParseContext> => {
+  const services = apiContext.services;
+  if (!services) throw new Error('services unavailable');
+  const network = 'mainnet' as const;
+
+  // Hydrate source transactions (needed so inputs can be decoded into spends)
+  for (const input of tx.inputs) {
+    if (!input.sourceTransaction && input.sourceTXID) {
+      try {
+        const rawTx = await services.beef.getRawTx(input.sourceTXID);
+        input.sourceTransaction = Transaction.fromBinary(Array.from(rawTx));
+      } catch (err) {
+        console.warn(`Could not load source tx ${input.sourceTXID}:`, err);
+      }
+    }
+  }
+
+  const emptyOwners = new Set<string>();
+  // `services` is typed against a nested copy of @1sat/client, so we cast when
+  // passing to indexers that come from the top-level @1sat/wallet-browser.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const svc = services as any;
+  const indexers: Indexer[] = [
+    new FundIndexer(emptyOwners, network),
+    new InscriptionIndexer(emptyOwners, network),
+    new OriginIndexer(emptyOwners, network, svc),
+    new Bsv21Indexer(emptyOwners, network, svc),
+    new LockIndexer(emptyOwners, network),
+    new MapIndexer(emptyOwners, network),
+    new OrdLockIndexer(emptyOwners, network),
+    new SigmaIndexer(emptyOwners, network),
+    new OpNSIndexer(emptyOwners, network),
+  ];
+
+  const runIndexers = async (txo: Txo) => {
+    for (const indexer of indexers) {
+      try {
+        const result = await indexer.parse(txo);
+        if (!result) continue;
+        txo.data[indexer.tag] = {
+          data: result.data,
+          tags: result.tags,
+          content: result.content,
+        };
+        if (result.owner && !txo.owner) txo.owner = result.owner;
+        if (result.basket && !txo.basket) txo.basket = result.basket;
+      } catch (err) {
+        console.warn(`Indexer ${indexer.tag} failed on ${txo.outpoint.toString()}:`, err);
+      }
+    }
+  };
+
+  const txid = tx.id('hex');
+  const ctx: ParseContext = {
+    tx,
+    txid,
+    txos: [],
+    spends: [],
+    summary: {},
+    indexers,
+  };
+
+  // Parse inputs (as spends of their source outputs)
+  for (let vin = 0; vin < tx.inputs.length; vin++) {
+    const input = tx.inputs[vin];
+    if (!input.sourceTransaction) continue;
+    const sourceTxid = input.sourceTransaction.id('hex');
+    const spend: Txo = {
+      output: input.sourceTransaction.outputs[input.sourceOutputIndex],
+      outpoint: new Outpoint(sourceTxid, input.sourceOutputIndex),
+      data: {},
+    };
+    await runIndexers(spend);
+    ctx.spends.push(spend);
+  }
+
+  // Parse outputs
+  for (let vout = 0; vout < tx.outputs.length; vout++) {
+    const txo: Txo = {
+      output: tx.outputs[vout],
+      outpoint: new Outpoint(txid, vout),
+      data: {},
+    };
+    await runIndexers(txo);
+    ctx.txos.push(txo);
+  }
+
+  // Transaction-level summaries (e.g. bsv21 totals, fund balance deltas)
+  for (const indexer of indexers) {
+    try {
+      const summary = await indexer.summarize(ctx, true);
+      if (summary) ctx.summary[indexer.tag] = summary;
+    } catch (err) {
+      console.warn(`Indexer ${indexer.tag} summarize failed:`, err);
+    }
+  }
+
+  return ctx;
+};
+
+export const getErrorMessage = (error: string | unknown | undefined) => {
+  // Check for StoragePaymentError by code (works without importing the class)
+  if (typeof error === 'object' && error !== null && (error as { code?: string }).code === 'storage-payment-failed') {
+    return 'Your remote storage requires a payment that could not be completed. Please ensure you have enough BSV in your wallet.';
+  }
+  // Check for StoragePaymentError message pattern when the error was stringified
+  if (typeof error === 'string' && error.includes('storage-payment-failed')) {
+    return 'Your remote storage requires a payment that could not be completed. Please ensure you have enough BSV in your wallet.';
+  }
   switch (error) {
     case 'invalid-password':
       return 'Invalid Password!';
@@ -54,8 +169,8 @@ export const getErrorMessage = (error: string | undefined) => {
     case 'fee-too-high':
       return 'Miner fee too high!';
 
-    case 'no-bsv20-utxo':
-      return 'No bsv20 token found!';
+    case 'no-bsv21-utxo':
+      return 'No BSV21 token found!';
 
     case 'token-details':
       return 'Could not gather token details!';
@@ -65,6 +180,12 @@ export const getErrorMessage = (error: string | undefined) => {
 
     case 'broadcast-error':
       return 'There was an error broadcasting the tx!';
+
+    case 'insufficient-tokens':
+      return 'Insufficient token balance!';
+
+    case 'overlay-validation-failed':
+      return 'Could not validate tokens against the overlay!';
 
     case 'source-tx-not-found':
       return 'Source transaction not found!';
@@ -90,10 +211,17 @@ export const getErrorMessage = (error: string | undefined) => {
     case 'key-type':
       return 'Key type does not exist!';
 
+    case 'storage-payment-failed':
+      return 'Your remote storage requires a payment that could not be completed. Please ensure you have enough BSV in your wallet.';
+
     default:
       return 'An unknown error has occurred! Try again.';
   }
 };
+
+/** Check if an error is a storage payment failure (code-based, no import needed) */
+export const isStoragePaymentError = (err: unknown): boolean =>
+  typeof err === 'object' && err !== null && (err as { code?: string }).code === 'storage-payment-failed';
 
 export const decimalToHex = (d: number) => {
   // helper function to convert integer to hex

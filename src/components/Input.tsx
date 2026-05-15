@@ -1,66 +1,20 @@
 import { InputHTMLAttributes } from 'react';
-import styled, { css, keyframes } from 'styled-components';
+import { motion, useAnimation } from 'framer-motion';
 import { Theme } from '../theme.types';
-
-const $shakeAnimation = keyframes`
-  10%, 90% {
-    transform: translate3d(-1px, 0, 0);
-  }
-  
-  20%, 80% {
-    transform: translate3d(2px, 0, 0);
-  }
-
-  30%, 50%, 70% {
-    transform: translate3d(-4px, 0, 0);
-  }
-
-  40%, 60% {
-    transform: translate3d(4px, 0, 0);
-  }
-`;
-
-const TheInput = styled.input<{ theme: Theme; $shake?: string }>`
-  background-color: ${({ theme }) => theme.color.global.row};
-  border-radius: 0.25rem;
-  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
-  font-size: 0.85rem;
-  width: 85%;
-  height: 2rem;
-  padding-left: 0.5rem;
-  margin: 0.25rem;
-  outline: none;
-  text-indent: 0.5rem;
-  color: ${({ theme }) => theme.color.global.contrast};
-  animation: ${(props) =>
-    props.$shake === 'true'
-      ? css`
-          ${$shakeAnimation} 0.5s cubic-bezier(.36,.07,.19,.97) both
-        `
-      : 'none'};
-
-  &[type='number']::-webkit-inner-spin-button,
-  &[type='number']::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-
-  &[type='number'] {
-    -moz-appearance: textfield; /* Firefox */
-  }
-
-  &::placeholder {
-    color: ${({ theme }) => theme.color.global.gray};
-  }
-`;
 
 export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   theme: Theme;
   shake?: string;
 };
 
+const shakeKeyframes = {
+  x: [0, -4, 4, -4, 4, -2, 2, -1, 1, 0],
+  transition: { duration: 0.5, ease: 'easeInOut' as const },
+};
+
 export const Input = (props: InputProps) => {
-  const { shake = 'false', theme, ...allProps } = props;
+  const { shake = 'false', theme, className, style, ...allProps } = props;
+  const controls = useAnimation();
 
   const preventScroll = (e: React.WheelEvent<HTMLInputElement>) => {
     (e.target as HTMLInputElement).blur();
@@ -70,5 +24,34 @@ export const Input = (props: InputProps) => {
     }, 0);
   };
 
-  return <TheInput {...allProps} theme={theme} onWheel={preventScroll} $shake={shake} />;
+  if (shake === 'true') {
+    controls.start(shakeKeyframes);
+  }
+
+  return (
+    <motion.div className="flex justify-center w-full" animate={controls}>
+      <input
+        {...allProps}
+        onWheel={preventScroll}
+        className="w-[85%] h-9 px-4 py-3 mx-1 my-1 rounded-xl border text-sm outline-none transition-all duration-200 [&[type=number]]:[-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        style={{
+          backgroundColor: theme.color.global.row,
+          borderColor: theme.color.global.gray + '40',
+          color: theme.color.global.contrast,
+          fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+          ...style,
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = theme.color.component.primaryButtonLeftGradient + '80';
+          e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.color.component.primaryButtonLeftGradient}30`;
+          allProps.onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = theme.color.global.gray + '40';
+          e.currentTarget.style.boxShadow = 'none';
+          allProps.onBlur?.(e);
+        }}
+      />
+    </motion.div>
+  );
 };

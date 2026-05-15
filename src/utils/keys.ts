@@ -1,8 +1,7 @@
 import * as bip39 from 'bip39';
-import { DerivationTag, NetWork } from 'yours-wallet-provider';
+import { DerivationTag } from '../services/types/provider.types';
 import { WifKeys } from '../services/types/keys.types';
 import { DEFAULT_IDENTITY_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';
-import { convertAddressToTestnet } from './tools';
 import { BigNumber, Hash, HD, Mnemonic, PrivateKey, Utils } from '@bsv/sdk';
 
 export type Keys = {
@@ -46,7 +45,6 @@ export const generateKeysFromTag = (mnemonic: string, derivation: string) => {
 };
 
 export const getKeys = (
-  network: NetWork,
   validMnemonic?: string,
   walletDerivation: string | null = null,
   ordDerivation: string | null = null,
@@ -60,22 +58,19 @@ export const getKeys = (
   const wallet = generateKeysFromTag(mnemonic, walletDerivation || DEFAULT_WALLET_PATH);
   const ord = generateKeysFromTag(mnemonic, ordDerivation || DEFAULT_ORD_PATH);
   const identity = generateKeysFromTag(mnemonic, identityDerivation || DEFAULT_IDENTITY_PATH);
-  const walletAddress = network === NetWork.Testnet ? convertAddressToTestnet(wallet.address) : wallet.address;
-  const ordAddress = network === NetWork.Testnet ? convertAddressToTestnet(ord.address) : ord.address;
-  const identityAddress = network === NetWork.Testnet ? convertAddressToTestnet(identity.address) : identity.address;
 
   const keys: Keys = {
     mnemonic,
     walletWif: wallet.wif,
-    walletAddress,
+    walletAddress: wallet.address,
     walletPubKey: wallet.pubKey.toString(),
     walletDerivationPath: wallet.derivationPath,
     ordWif: ord.wif,
-    ordAddress,
+    ordAddress: ord.address,
     ordPubKey: ord.pubKey.toString(),
     ordDerivationPath: ord.derivationPath,
     identityWif: identity.wif,
-    identityAddress,
+    identityAddress: identity.address,
     identityPubKey: identity.pubKey.toString(),
     identityDerivationPath: identity.derivationPath,
   };
@@ -97,11 +92,14 @@ export const getKeysFromWifs = (wifs: WifKeys) => {
     identityPrivKey = PrivateKey.fromWif(wifs.identityPk);
   } else {
     const privBuf = walletPrivKey.toArray().concat(ordPrivKey.toArray());
+    let attempt = 0;
     while (!identityPrivKey) {
-      const bn = new BigNumber(Hash.sha256(privBuf));
+      const hashInput = attempt === 0 ? privBuf : [...privBuf, attempt];
+      const bn = new BigNumber(Hash.sha256(hashInput));
       if (bn.lt(new BigNumber('ffffffff ffffffff ffffffff fffffffe baaedce6 af48a03b bfd25e8c d0364141', 16))) {
         identityPrivKey = PrivateKey.fromString(bn.toHex(), 'hex');
       }
+      attempt++;
     }
   }
 

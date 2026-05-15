@@ -1,14 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import styled from 'styled-components';
 import walletIcon from '../assets/logos/icon.png';
-
-const YoursImg = styled.img<{
-  $rotation: { x: number; y: number };
-}>`
-  transition: transform 0.1s;
-  width: ${(props) => props.width ?? '6.25rem'};
-  height: ${(props) => props.width ?? '6.25rem'};
-`;
 
 interface Rotation {
   x: number;
@@ -16,9 +7,7 @@ interface Rotation {
 }
 
 export type YoursIconProps = {
-  /** The size of the head */
   width?: string;
-  /** Whether or not the head should follow the mouse */
   animated?: boolean;
 };
 
@@ -36,7 +25,6 @@ export const YoursIcon = (props: YoursIconProps) => {
       const centerX = left + width / 2;
       const centerY = top + height / 2;
 
-      // Calculate angle
       const deltaX = e.clientX - centerX;
       const deltaY = e.clientY - centerY;
       const angleInRadians = Math.atan2(deltaY, deltaX);
@@ -48,20 +36,20 @@ export const YoursIcon = (props: YoursIconProps) => {
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
     };
   }, [animated]);
 
   return (
-    <YoursImg
+    <img
       ref={imgRef}
       src={walletIcon}
-      width={width}
       alt="Yours Head"
-      $rotation={rotation}
+      className="transition-transform duration-100"
       style={{
+        width: width ?? '6.25rem',
+        height: width ?? '6.25rem',
         transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,
       }}
     />

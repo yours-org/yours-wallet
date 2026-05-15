@@ -1,130 +1,431 @@
 /* global chrome */
 import {
-  EncryptRequest,
-  GetSignatures,
-  PubKeys,
-  SendBsv,
-  SendBsvResponse,
-  SignedMessage,
-  TransferOrdinal,
-  DecryptRequest,
-  PurchaseOrdinal,
-  SignatureResponse,
-  TaggedDerivationRequest,
-  TaggedDerivationResponse,
-  GetTaggedKeysRequest,
-  Broadcast,
-  InscribeRequest,
-  SignMessage,
-  NetWork,
-  SendBsv20Response,
-  SendBsv20,
-  GetPaginatedOrdinals,
-  SendMNEEResponse,
-  SendMNEE,
-  LockRequest,
-} from 'yours-wallet-provider';
-import {
   CustomListenerName,
   Decision,
   RequestParams,
   ResponseEventDetail,
-  SerializedBsv20,
   WhitelistedApp,
   YoursEventName,
 } from './inject';
-import { EncryptResponse } from './pages/requests/EncryptRequest';
-import { DecryptResponse } from './pages/requests/DecryptRequest';
-import { removeWindow, sendTransactionNotification } from './utils/chromeHelpers';
-import { GetSignaturesResponse } from './pages/requests/GetSignaturesRequest';
-import { ChromeStorageObject, ConnectRequest } from './services/types/chromeStorage.types';
+import { CWIEventName } from './cwi';
+import type {
+  ListOutputsArgs,
+  RelinquishOutputArgs,
+  ListActionsArgs,
+  GetPublicKeyArgs,
+  GetHeaderArgs,
+  CreateHmacArgs,
+  CreateSignatureArgs,
+  VerifySignatureArgs,
+  VerifyHmacArgs,
+  CreateActionArgs,
+  SignActionArgs,
+  AbortActionArgs,
+  InternalizeActionArgs,
+  WalletEncryptArgs,
+  WalletDecryptArgs,
+  RevealCounterpartyKeyLinkageArgs,
+  RevealSpecificKeyLinkageArgs,
+  AcquireCertificateArgs,
+  ListCertificatesArgs,
+  ProveCertificateArgs,
+  RelinquishCertificateArgs,
+  DiscoverByIdentityKeyArgs,
+  DiscoverByAttributesArgs,
+  WalletInterface,
+} from '@bsv/sdk';
+import type {
+  PermissionRequest,
+  GroupedPermissionRequest,
+  GroupedPermissions,
+  CounterpartyPermissionRequest,
+  CounterpartyPermissions,
+} from '@bsv/wallet-toolbox-mobile';
+import type { LocalWalletPermissionsManager } from '@1sat/wallet-browser';
+import { deriveDepositAddresses } from '@1sat/actions';
+import { removeWindow } from './utils/chromeHelpers';
+import { Account, ChromeStorageObject, ConnectRequest, StorageConfig } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { GorillaPoolService } from './services/GorillaPool.service';
-import { mapOrdinal } from './utils/providerHelper';
-import { TxoLookup, TxoSort } from 'spv-store';
-import { initOneSatSPV } from './initSPVStore';
-import { CHROME_STORAGE_OBJECT_VERSION, HOSTED_YOURS_IMAGE, MNEE_API_TOKEN } from './utils/constants';
-import { convertLockReqToSendBsvReq } from './utils/tools';
-import Mnee from '@mnee/ts-sdk';
-
-// mnee instance for balance check
-const mnee = new Mnee({ environment: 'production', apiKey: MNEE_API_TOKEN });
+import { handleOneSatPermissionResponse, initOneSatPromptBridge } from './services/oneSatPrompt';
+import { initWallet, type AccountContext } from './initWallet';
+import { HOSTED_YOURS_IMAGE } from './utils/constants';
+import { WalletBackupService } from './backup/WalletBackupService';
 
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
-const gorillaPoolService = new GorillaPoolService(chromeStorageService);
 
-export let oneSatSPVPromise = chromeStorageService.getAndSetStorage().then(async (storage) => {
-  const version = storage?.version;
-  if (version && version < 3) {
-    // At version three we're forcing a full resync
-    const dbs = await indexedDB.databases();
-    for (const db of dbs) {
-      if (db.name) {
-        indexedDB.deleteDatabase(db.name);
-        console.log(`Deleted database: ${db.name}`);
-      }
+// Account context - null if locked or not initialized
+let accountContext: AccountContext | null = null;
+// Set while wallet is reinitializing (e.g. account switch) to prevent
+// ensureWallet from launching a popup during the transition.
+let reinitPromise: Promise<WalletInterface | null> | null = null;
+// Tracks active extension popup connections via chrome.runtime.onConnect.
+// When the browser-action popup opens, it connects with name 'extension-popup'.
+// When it closes, the port disconnects automatically. No timers needed.
+const activePopupPorts = new Set<chrome.runtime.Port>();
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === 'extension-popup') {
+    activePopupPorts.add(port);
+    port.onDisconnect.addListener(() => {
+      activePopupPorts.delete(port);
+    });
+  }
+});
+
+/**
+ * Send a balance update notification to the popup.
+ * Uses the SYNC_STATUS_UPDATE event which useSyncTracker listens for.
+ */
+const notifyBalanceUpdate = () => {
+  chrome.runtime
+    .sendMessage({
+      action: YoursEventName.SYNC_STATUS_UPDATE,
+      data: { status: 'complete' },
+    })
+    .catch(() => {
+      // Ignore errors if popup is not open
+    });
+};
+
+// Initialize wallet on startup (will be null if locked)
+const initializeWallet = async (): Promise<WalletInterface | null> => {
+  console.log('[background] initializeWallet: starting, current accountContext:', !!accountContext);
+  if (accountContext) {
+    console.log('[background] initializeWallet: closing existing context');
+    try {
+      await accountContext.close();
+    } catch (error) {
+      console.error('[background] initializeWallet: failed to close existing context (continuing anyway):', error);
     }
-    await chromeStorageService.update({ version: CHROME_STORAGE_OBJECT_VERSION });
-  } else if (version && version < 4) {
-    // At version four we're deleting the txos-db to fix origin index issue.
-    const dbs = await indexedDB.databases();
-    for (const db of dbs) {
-      if (db.name && db.name.startsWith('txos-')) {
-        indexedDB.deleteDatabase(db.name);
-        console.log(`Deleted database: ${db.name}`);
-      }
-    }
-    await chromeStorageService.update({ version: CHROME_STORAGE_OBJECT_VERSION });
+    accountContext = null;
   }
 
-  return initOneSatSPV(chromeStorageService, isInServiceWorker);
-});
+  console.log('[background] initializeWallet: calling initWallet...');
+  accountContext = await initWallet(chromeStorageService, {
+    onTransactionBroadcasted: (txid: string) => {
+      console.log('[background] Transaction broadcasted:', txid);
+      notifyBalanceUpdate();
+    },
+    onTransactionProven: (txid: string) => {
+      console.log('[background] Transaction proven:', txid);
+      notifyBalanceUpdate();
+    },
+  });
+  console.log('[background] initializeWallet: initWallet returned, accountContext:', !!accountContext);
+
+  if (accountContext) {
+    bindPermissionCallbacks(accountContext.wallet);
+    console.log('[background] initializeWallet: bound permission callbacks');
+
+    // Check for pending restore data for the CURRENT account (Phase 2 of two-phase restore).
+    // Each account's data is stored separately — syncFromReader only accepts the
+    // authenticated account's identityKey. Other accounts' data stays in IndexedDB
+    // until they are switched to and initializeWallet runs again.
+    const { account: currentAccount } = chromeStorageService.getCurrentAccountObject();
+    const currentIdentityKey = currentAccount?.pubKeys?.identityPubKey || '';
+    if (currentIdentityKey) {
+      const hasPending = await WalletBackupService.hasPendingRestore(currentIdentityKey);
+      console.log(
+        '[background] initializeWallet: hasPendingRestore for',
+        currentIdentityKey.slice(0, 8) + '...:',
+        hasPending,
+      );
+      if (hasPending) {
+        console.log('[background] initializeWallet: Found pending restore data, importing...');
+        try {
+          const storage = accountContext.storage as unknown as Parameters<
+            typeof WalletBackupService.importPendingWalletData
+          >[0];
+          if (storage) {
+            await WalletBackupService.importPendingWalletData(storage, currentIdentityKey, (event) => {
+              console.log('[background] PendingRestore:', event.message);
+            });
+            console.log('[background] initializeWallet: Pending restore complete');
+          }
+        } catch (error) {
+          console.error('[background] initializeWallet: Pending restore failed:', error);
+          // Clear only this account's pending data to avoid repeated failures
+          await WalletBackupService.clearAllPendingRestores();
+        }
+      }
+    }
+  }
+
+  return accountContext?.wallet ?? null;
+};
+
+// Start initialization — clean up stale popup windows then initialize wallet.
+// ensureWallet() awaits this so CWI messages don't launch popups during init.
+const startupInitPromise = chromeStorageService
+  .getAndSetStorage()
+  .then(async () => {
+    // Close any orphaned extension popup windows from a previous session/reload.
+    const extOrigin = chrome.runtime.getURL('');
+    const allWindows = await chrome.windows.getAll({ populate: true });
+    for (const w of allWindows) {
+      if (w.type === 'popup' && w.id && w.tabs?.some((t) => t.url?.startsWith(extOrigin))) {
+        try {
+          await chrome.windows.remove(w.id);
+        } catch {
+          // Window already gone
+        }
+      }
+    }
+    await chrome.storage.local.remove('popupWindowId');
+
+    // Only initialize wallet if it's within the active session window.
+    // If locked (inactive or manual lock), keys stay encrypted until the user unlocks.
+    await chromeStorageService.getAndSetStorage();
+    const { account, lastActiveTime } = chromeStorageService.getCurrentAccountObject();
+    const passKey = await chromeStorageService.getPassKey();
+    const isUnlocked =
+      passKey && account?.encryptedKeys && lastActiveTime && Date.now() - Number(lastActiveTime) < getInactivityLimit();
+
+    if (isUnlocked) {
+      try {
+        await initializeWallet();
+      } catch (error) {
+        console.error('[background] Failed to initialize wallet on startup — locking:', error);
+        await chromeStorageService.clearPassKey();
+        await chromeStorageService.update({ isLocked: true, lastActiveTime: 0 });
+      }
+    } else if (account?.encryptedKeys) {
+      // Wallet exists but can't initialize (no passKey or timed out) — ensure locked state
+      await chromeStorageService.clearPassKey();
+      await chromeStorageService.update({ isLocked: true, lastActiveTime: 0 });
+    }
+  })
+  .catch((error) => {
+    console.error('[background] Startup initialization failed:', error);
+  });
+
+/**
+ * Get the current wallet instance (WalletPermissionsManager).
+ * Returns null if wallet is locked or not initialized.
+ */
+export const getWallet = (): WalletInterface | null => {
+  console.log('[background] getWallet called, accountContext:', !!accountContext, 'wallet:', !!accountContext?.wallet);
+  return accountContext?.wallet ?? null;
+};
+
+/**
+ * Ensure the wallet is available, prompting user to unlock if needed.
+ * Waits for startup initialization first so we don't launch a popup
+ * while the wallet is still auto-initializing from a persisted passKey.
+ */
+const ensureWallet = async (suppressPopup = false): Promise<WalletInterface> => {
+  await startupInitPromise;
+  if (accountContext?.wallet) {
+    return accountContext.wallet;
+  }
+
+  // If wallet is currently reinitializing (e.g. account switch), wait for that
+  // instead of launching a popup.
+  if (reinitPromise) {
+    const wallet = await reinitPromise;
+    if (wallet) return wallet;
+  }
+
+  // Still no context — check again after reinit may have completed
+  if (accountContext?.wallet) {
+    return accountContext.wallet;
+  }
+
+  // No accountContext — passKey is cleared on lock, so the user must enter their password.
+  // Check if a wallet exists to unlock (encryptedKeys must be present).
+  await chromeStorageService.getAndSetStorage();
+  const { account } = chromeStorageService.getCurrentAccountObject();
+
+  if (!account?.encryptedKeys) {
+    return Promise.reject(new Error('No wallet exists - create wallet first'));
+  }
+
+  // Wallet exists but is locked — prompt user to unlock via popup
+  // (unless suppressed, e.g. when called from the extension popup itself)
+  if (suppressPopup) {
+    return Promise.reject(new Error('Wallet not available'));
+  }
+  return new Promise((resolve, reject) => {
+    pendingWalletWaiters.push({ resolve, reject });
+    if (pendingWalletWaiters.length === 1) {
+      launchPopUp();
+    }
+  });
+};
 
 console.log('Yours Wallet Background Script Running!');
 
-const WOC_BASE_URL = 'https://api.whatsonchain.com/v1/bsv';
-
 type CallbackResponse = (response: ResponseEventDetail) => void;
 
-let responseCallbackForConnectRequest: CallbackResponse | null = null;
-let responseCallbackForSendBsvRequest: CallbackResponse | null = null;
-let responseCallbackForSendBsv20Request: CallbackResponse | null = null;
-let responseCallbackForSendMNEERequest: CallbackResponse | null = null;
-let responseCallbackForTransferOrdinalRequest: CallbackResponse | null = null;
-let responseCallbackForPurchaseOrdinalRequest: CallbackResponse | null = null;
-let responseCallbackForSignMessageRequest: CallbackResponse | null = null;
-let responseCallbackForBroadcastRequest: CallbackResponse | null = null;
-let responseCallbackForGetSignaturesRequest: CallbackResponse | null = null;
-let responseCallbackForGenerateTaggedKeysRequest: CallbackResponse | null = null;
-let responseCallbackForEncryptRequest: CallbackResponse | null = null;
-let responseCallbackForDecryptRequest: CallbackResponse | null = null;
+// Pending permission requests waiting for user approval
+const pendingPermissionRequests = new Map<
+  string,
+  {
+    request: PermissionRequest & { requestID: string };
+    resolve: () => void;
+    reject: (error: Error) => void;
+  }
+>();
+
+// Pending wallet initialization waiters (for ensureWallet when service worker wakes without passKey)
+const pendingWalletWaiters: {
+  resolve: (wallet: WalletInterface) => void;
+  reject: (error: Error) => void;
+}[] = [];
+
+const pendingGroupedPermissionRequests = new Map<
+  string,
+  {
+    request: GroupedPermissionRequest;
+    resolve: () => void;
+    reject: (error: Error) => void;
+  }
+>();
+
+const pendingCounterpartyPermissionRequests = new Map<
+  string,
+  {
+    request: CounterpartyPermissionRequest;
+    resolve: () => void;
+    reject: (error: Error) => void;
+  }
+>();
+
+// Callback for CWI.waitForAuthentication flow
+let responseCallbackForConnectRequest: ((decision: Decision) => void) | null = null;
 let popupWindowId: number | undefined;
 
-const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
+/** Read the user's configured lock timeout (defaults to 10 minutes). */
+const getInactivityLimit = () => chromeStorageService.getLockTimeout();
+
+// Periodic inactivity check — destroys decrypted keys when session expires.
+// This runs even when the popup is closed, ensuring keys don't linger in the service worker.
+chrome.alarms.create('inactivity-lock', { periodInMinutes: 1 });
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== 'inactivity-lock' || !accountContext) return;
+  await chromeStorageService.getAndSetStorage();
+  const { lastActiveTime } = chromeStorageService.getCurrentAccountObject();
+  if (!lastActiveTime || Date.now() - Number(lastActiveTime) >= getInactivityLimit()) {
+    console.log('[background] Inactivity detected — destroying wallet context and clearing passKey');
+    try {
+      await accountContext.close();
+    } catch (err) {
+      console.error('[background] Error closing wallet on inactivity:', err);
+    }
+    accountContext = null;
+    await chromeStorageService.clearPassKey();
+    await chromeStorageService.update({ isLocked: true });
+  }
+});
+
+// Forward declaration for launchPopUp (defined inside isInServiceWorker block)
+let launchPopUp: () => void = () => {
+  console.warn('launchPopUp called before initialization');
+};
+
+/**
+ * Bind permission callbacks to the WalletPermissionsManager.
+ * These callbacks are triggered when an external app needs permission.
+ */
+const bindPermissionCallbacks = (manager: LocalWalletPermissionsManager) => {
+  // Protocol permission (signing, encrypting, HMAC, etc.)
+  manager.bindCallback('onProtocolPermissionRequested', async (request: PermissionRequest & { requestID: string }) => {
+    console.log('Protocol permission requested:', request);
+    await showPermissionPrompt(request);
+  });
+
+  // Basket access permission (listing, inserting, removing outputs)
+  manager.bindCallback('onBasketAccessRequested', async (request: PermissionRequest & { requestID: string }) => {
+    console.log('Basket access requested:', request);
+    await showPermissionPrompt(request);
+  });
+
+  // Certificate access permission
+  manager.bindCallback('onCertificateAccessRequested', async (request: PermissionRequest & { requestID: string }) => {
+    console.log('Certificate access requested:', request);
+    await showPermissionPrompt(request);
+  });
+
+  // Spending authorization
+  manager.bindCallback(
+    'onSpendingAuthorizationRequested',
+    async (request: PermissionRequest & { requestID: string }) => {
+      console.log('Spending authorization requested:', request);
+      await showPermissionPrompt(request);
+    },
+  );
+
+  // Grouped permission (all permissions from manifest.json bundled)
+  manager.bindCallback('onGroupedPermissionRequested', async (request: GroupedPermissionRequest) => {
+    console.log('Grouped permission requested:', request);
+    await showGroupedPermissionPrompt(request);
+  });
+
+  // Counterparty pact (level-2 protocols for a specific counterparty)
+  manager.bindCallback('onCounterpartyPermissionRequested', async (request: CounterpartyPermissionRequest) => {
+    console.log('Counterparty permission requested:', request);
+    await showCounterpartyPermissionPrompt(request);
+  });
+};
+
+/**
+ * Show a permission prompt popup and wait for user response.
+ * Returns a promise that resolves when user grants permission or rejects when denied.
+ */
+const showPermissionPrompt = (request: PermissionRequest & { requestID: string }): Promise<void> => {
+  console.log('[background] showPermissionPrompt called, requestID:', request.requestID, 'type:', request.type);
+  return new Promise((resolve, reject) => {
+    pendingPermissionRequests.set(request.requestID, { request, resolve, reject });
+    chromeStorageService.update({ permissionRequest: request }).then(() => {
+      console.log('[background] showPermissionPrompt: storage updated, popupWindowId:', popupWindowId);
+      if (popupWindowId) {
+        chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
+          console.log('[background] showPermissionPrompt: existing popup gone, creating new');
+          popupWindowId = undefined;
+          launchPopUp();
+        });
+      } else {
+        console.log('[background] showPermissionPrompt: no popup, launching new');
+        launchPopUp();
+      }
+    });
+  });
+};
+
+const showGroupedPermissionPrompt = (request: GroupedPermissionRequest): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    pendingGroupedPermissionRequests.set(request.requestID, { request, resolve, reject });
+    chromeStorageService.update({ groupedPermissionRequest: request }).then(() => {
+      if (popupWindowId) {
+        chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
+          popupWindowId = undefined;
+          launchPopUp();
+        });
+      } else {
+        launchPopUp();
+      }
+    });
+  });
+};
+
+const showCounterpartyPermissionPrompt = (request: CounterpartyPermissionRequest): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    pendingCounterpartyPermissionRequests.set(request.requestID, { request, resolve, reject });
+    chromeStorageService.update({ counterpartyPermissionRequest: request }).then(() => {
+      if (popupWindowId) {
+        chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
+          popupWindowId = undefined;
+          launchPopUp();
+        });
+      } else {
+        launchPopUp();
+      }
+    });
+  });
+};
 
 // only run in background worker
 if (isInServiceWorker) {
-  const initNewTxsListener = async () => {
-    const oneSatSPV = await oneSatSPVPromise;
-    oneSatSPV.events.on('newTxs', (data: number) => {
-      sendTransactionNotification(data);
-    });
-  };
-  initNewTxsListener();
-
-  const processSyncUtxos = async () => {
-    try {
-      const oneSatSPV = await oneSatSPVPromise;
-      if (!oneSatSPV) throw Error('SPV not initialized!');
-      await chromeStorageService.update({ hasUpgradedToSPV: true });
-      await oneSatSPV.sync();
-      console.log('done importing');
-    } catch (error) {
-      console.error('Error during sync:', error);
-    }
-  };
-
   const deleteAllIDBDatabases = async () => {
     const dbs = await indexedDB.databases();
     for (const db of dbs) {
@@ -139,19 +440,41 @@ if (isInServiceWorker) {
   };
 
   const signOut = async () => {
-    await (await oneSatSPVPromise).destroy();
+    await accountContext?.close();
+    accountContext = null;
+    await chromeStorageService.clearPassKey();
     await deleteAllIDBDatabases();
   };
 
   const switchAccount = async () => {
-    await (await oneSatSPVPromise).destroy();
-    chromeStorageService = new ChromeStorageService();
-    await chromeStorageService.getAndSetStorage();
-    oneSatSPVPromise = initOneSatSPV(chromeStorageService, isInServiceWorker);
-    initNewTxsListener();
+    console.log('[background] switchAccount: starting');
+    const doSwitch = async () => {
+      try {
+        // Close existing wallet before switching
+        if (accountContext) {
+          console.log('[background] switchAccount: closing existing wallet');
+          await accountContext.close();
+          accountContext = null;
+        }
+        chromeStorageService = new ChromeStorageService();
+        await chromeStorageService.getAndSetStorage();
+        console.log('[background] switchAccount: storage loaded, initializing wallet');
+        await initializeWallet();
+        console.log('[background] switchAccount: wallet initialized successfully');
+        return (accountContext as AccountContext | null)?.wallet ?? null;
+      } catch (error) {
+        console.error('[background] switchAccount: failed to initialize wallet:', error);
+        return null;
+      } finally {
+        reinitPromise = null;
+      }
+    };
+    reinitPromise = doSwitch();
+    await reinitPromise;
   };
 
-  const launchPopUp = () => {
+  const createNewPopup = () => {
+    console.log('[background] createNewPopup called');
     chrome.windows.create(
       {
         url: chrome.runtime.getURL('index.html'),
@@ -170,88 +493,424 @@ if (isInServiceWorker) {
     );
   };
 
-  const verifyAccess = async (requestingDomain: string): Promise<boolean> => {
-    const { accounts, selectedAccount } = (await chromeStorageService.getAndSetStorage()) as ChromeStorageObject;
+  launchPopUp = () => {
+    console.log('[background] launchPopUp called');
+
+    // If the extension's browser-action popup is currently open, don't create a window
+    if (activePopupPorts.size > 0) {
+      console.log('[background] launchPopUp: extension popup is connected, skipping window creation');
+      return;
+    }
+
+    // Check if any popup window with our extension URL is already open
+    chrome.windows.getAll({ populate: true }, (windows) => {
+      const existingPopup = windows.find(
+        (w) => w.type === 'popup' && w.tabs?.some((tab) => tab.url?.startsWith(chrome.runtime.getURL(''))),
+      );
+
+      if (existingPopup) {
+        // Focus existing popup instead of creating duplicate
+        chrome.windows.update(existingPopup.id!, { focused: true });
+        popupWindowId = existingPopup.id;
+        return;
+      }
+
+      // Fast path: module-level variable still has the popup ID
+      if (popupWindowId) {
+        chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
+          popupWindowId = undefined;
+          createNewPopup();
+        });
+        return;
+      }
+
+      // Module-level var is lost after service worker suspension; check storage
+      chrome.storage.local.get('popupWindowId', (result) => {
+        if (result.popupWindowId) {
+          chrome.windows
+            .update(result.popupWindowId, { focused: true })
+            .then(() => {
+              popupWindowId = result.popupWindowId;
+            })
+            .catch(() => {
+              chrome.storage.local.remove('popupWindowId');
+              createNewPopup();
+            });
+        } else {
+          createNewPopup();
+        }
+      });
+    });
+  };
+
+  // Wire the 1Sat permission module's prompt bridge into the popup flow.
+  // Done once during background init so showOneSatPrompt has a working
+  // bridge before initWallet (called on unlock) registers the module.
+  initOneSatPromptBridge({
+    chromeStorage: chromeStorageService,
+    launchPopUp: () => launchPopUp(),
+    getPopupWindowId: () => popupWindowId,
+  });
+
+  const verifyAccess = async (requestingOriginator: string): Promise<boolean> => {
+    // Check if wallet is locked - locked wallets cannot authorize external requests
+    const storage = (await chromeStorageService.getAndSetStorage()) as ChromeStorageObject;
+    if (storage.isLocked) {
+      return false;
+    }
+
+    // Extension popup always has access (uses chrome-extension://<id> format)
+    const extensionOrigin = `chrome-extension://${chrome.runtime.id}`;
+    if (requestingOriginator === extensionOrigin) {
+      return true;
+    }
+
+    const { accounts, selectedAccount } = storage;
     if (!accounts || !selectedAccount) return false;
     const whitelist = accounts[selectedAccount].settings.whitelist;
     if (!whitelist) return false;
-    return whitelist.map((i: WhitelistedApp) => i.domain).includes(requestingDomain);
+    return whitelist.map((i: WhitelistedApp) => i.domain).includes(requestingOriginator);
   };
 
   const authorizeRequest = async (message: {
-    action: YoursEventName;
-    params: { domain: string };
+    action: YoursEventName | CWIEventName;
+    originator?: string;
   }): Promise<boolean> => {
-    if (
-      message.action === YoursEventName.QUEUE_STATUS_UPDATE ||
-      message.action === YoursEventName.IMPORT_STATUS_UPDATE ||
-      message.action === YoursEventName.FETCHING_TX_STATUS_UPDATE
-    ) {
-      return true;
-    }
-    const { params } = message;
-    return await verifyAccess(params.domain);
+    return await verifyAccess(message.originator || '');
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
-    if ([YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT].includes(message.action)) {
+    console.log(
+      '[background] Received message:',
+      message.action,
+      'originator:',
+      message.originator,
+      'from:',
+      sender.origin,
+    );
+
+    // Check if message is from our own extension popup
+    const isFromExtension = sender.origin?.startsWith(`chrome-extension://${chrome.runtime.id}`);
+
+    // Cross-validate originator against sender.origin for external messages
+    if (!isFromExtension && message.originator && sender.origin) {
+      try {
+        const senderHost = new URL(sender.origin).host;
+        if (message.originator !== senderHost) {
+          sendResponse({ type: message.action, success: false, error: 'Origin mismatch' });
+          return true;
+        }
+      } catch {
+        sendResponse({ type: message.action, success: false, error: 'Invalid origin' });
+        return true;
+      }
+    }
+
+    // Handle yours wallet events that should be broadcast (only from extension, not web pages)
+    if (isFromExtension && [YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT].includes(message.action)) {
       emitEventToActiveTabs(message);
     }
 
+    // Actions that don't require authorization
     const noAuthRequired = [
-      YoursEventName.IS_CONNECTED,
       YoursEventName.USER_CONNECT_RESPONSE,
-      YoursEventName.SEND_BSV_RESPONSE,
-      YoursEventName.SEND_BSV20_RESPONSE,
-      YoursEventName.SEND_MNEE_RESPONSE,
-      YoursEventName.TRANSFER_ORDINAL_RESPONSE,
-      YoursEventName.PURCHASE_ORDINAL_RESPONSE,
-      YoursEventName.SIGN_MESSAGE_RESPONSE,
-      YoursEventName.BROADCAST_RESPONSE,
-      YoursEventName.GET_SIGNATURES_RESPONSE,
-      YoursEventName.GENERATE_TAGGED_KEYS_RESPONSE,
-      YoursEventName.ENCRYPT_RESPONSE,
-      YoursEventName.DECRYPT_RESPONSE,
-      YoursEventName.SYNC_UTXOS,
       YoursEventName.SWITCH_ACCOUNT,
       YoursEventName.SIGNED_OUT,
+      // CWI auth check (no auth required - just checks status)
+      CWIEventName.IS_AUTHENTICATED,
+      // CWI discovery (no auth required - substrate detection ping)
+      CWIEventName.GET_VERSION,
+      // Permission responses from popup
+      'PERMISSION_RESPONSE',
+      'GROUPED_PERMISSION_RESPONSE',
+      'COUNTERPARTY_PERMISSION_RESPONSE',
+      'ONE_SAT_PERMISSION_RESPONSE',
+      // Internal UI requests (no external domain)
+      YoursEventName.GET_BALANCE,
+      YoursEventName.GET_PUB_KEYS,
+      YoursEventName.GET_LEGACY_ADDRESSES,
+      YoursEventName.GET_RECEIVE_ADDRESS,
+      YoursEventName.GET_SOCIAL_PROFILE,
+      // Wallet lock/unlock
+      'WALLET_LOCKED',
+      'WALLET_UNLOCKED',
+      // Master backup/restore
+      'MASTER_BACKUP',
+      'MASTER_RESTORE',
+      // Storage management (popup internal)
+      'STORAGE_GET_INFO',
+      'STORAGE_SYNC_BACKUPS',
+      'STORAGE_SET_ACTIVE_STORAGE',
+      'STORAGE_ADD_REMOTE',
+      'STORAGE_REMOVE_REMOTE',
+      // Permissions management (popup internal)
+      'PERMISSIONS_LIST_ALL',
+      'PERMISSIONS_QUERY_SPENT',
+      'PERMISSIONS_REVOKE_ONE',
+      'PERMISSIONS_REVOKE_ALL',
+      // Settings (popup internal)
+      'UPDATE_FEE_RATE',
+      // Address management (popup internal)
+      'GET_DEPOSIT_ADDRESSES',
+      'GENERATE_NEW_ADDRESS',
     ];
 
     if (noAuthRequired.includes(message.action)) {
+      // IS_AUTHENTICATED and GET_VERSION are read-only discovery endpoints safe for any caller.
+      // Everything else is an internal popup→background message that requires the sender
+      // to be the extension itself (not a web page proxied through the content script).
+      const openToAll = [CWIEventName.IS_AUTHENTICATED, CWIEventName.GET_VERSION];
+      if (!openToAll.includes(message.action) && !isFromExtension) {
+        sendResponse({ type: message.action, success: false, error: 'Unauthorized' });
+        return true;
+      }
+
       switch (message.action) {
-        case YoursEventName.IS_CONNECTED:
-          return processIsConnectedRequest(message.params as { domain: string }, sendResponse);
         case YoursEventName.USER_CONNECT_RESPONSE:
-          return processConnectResponse(message as { decision: Decision; pubKeys: PubKeys });
-        case YoursEventName.SEND_BSV_RESPONSE:
-          return processSendBsvResponse(message as SendBsvResponse);
-        case YoursEventName.SEND_BSV20_RESPONSE:
-          return processSendBsv20Response(message as SendBsv20Response);
-        case YoursEventName.SEND_MNEE_RESPONSE:
-          return processSendMNEEResponse(message as SendMNEEResponse);
-        case YoursEventName.TRANSFER_ORDINAL_RESPONSE:
-          return processTransferOrdinalResponse(message as { txid: string });
-        case YoursEventName.PURCHASE_ORDINAL_RESPONSE:
-          return processPurchaseOrdinalResponse(message as { txid: string });
-        case YoursEventName.SIGN_MESSAGE_RESPONSE:
-          return processSignMessageResponse(message as SignedMessage);
-        case YoursEventName.BROADCAST_RESPONSE:
-          return processBroadcastResponse(message as { txid: string });
-        case YoursEventName.GET_SIGNATURES_RESPONSE:
-          return processGetSignaturesResponse(message as GetSignaturesResponse);
-        case YoursEventName.GENERATE_TAGGED_KEYS_RESPONSE:
-          return processGenerateTaggedKeysResponse(message as TaggedDerivationResponse);
-        case YoursEventName.ENCRYPT_RESPONSE:
-          return processEncryptResponse(message as EncryptResponse);
-        case YoursEventName.DECRYPT_RESPONSE:
-          return processDecryptResponse(message as DecryptResponse);
-        case YoursEventName.SYNC_UTXOS:
-          return processSyncUtxos();
+          return processConnectResponse(message as { decision: Decision });
         case YoursEventName.SWITCH_ACCOUNT:
-          return switchAccount();
+          switchAccount()
+            .then(() => {
+              sendResponse({ type: YoursEventName.SWITCH_ACCOUNT, success: true });
+            })
+            .catch((error) => {
+              sendResponse({ type: YoursEventName.SWITCH_ACCOUNT, success: false, error: String(error) });
+            });
+          return true;
         case YoursEventName.SIGNED_OUT:
           return signOut();
+        // CWI auth check
+        case CWIEventName.IS_AUTHENTICATED:
+          return processCWIIsAuthenticated(message.originator, sendResponse);
+        // CWI discovery - substrate detection ping, no wallet needed
+        case CWIEventName.GET_VERSION:
+          sendResponse({
+            type: CWIEventName.GET_VERSION,
+            success: true,
+            data: { version: 'yours-wallet-1.0.0' },
+          });
+          return true;
+        // Permission responses from popup UI
+        case 'PERMISSION_RESPONSE':
+          return processPermissionResponse(message as { requestID: string; granted: boolean; expiry?: number });
+        case 'GROUPED_PERMISSION_RESPONSE':
+          return processGroupedPermissionResponse(
+            message as { requestID: string; granted: Partial<GroupedPermissions> | null; expiry?: number },
+          );
+        case 'COUNTERPARTY_PERMISSION_RESPONSE':
+          return processCounterpartyPermissionResponse(
+            message as { requestID: string; granted: Partial<CounterpartyPermissions> | null; expiry?: number },
+          );
+        case 'ONE_SAT_PERMISSION_RESPONSE': {
+          const { requestID, approved } = message as { requestID: string; approved: boolean };
+          const handled = handleOneSatPermissionResponse(requestID, !!approved);
+          sendResponse({ type: 'ONE_SAT_PERMISSION_RESPONSE', success: handled });
+          return true;
+        }
+        // Internal UI requests (no external domain, direct from popup)
+        case YoursEventName.GET_BALANCE:
+          processGetBalanceRequest(sendResponse);
+          return true;
+        case YoursEventName.GET_PUB_KEYS:
+          processGetPubKeysRequest(sendResponse);
+          return true;
+        case YoursEventName.GET_LEGACY_ADDRESSES:
+          processGetLegacyAddressesRequest(sendResponse);
+          return true;
+        case YoursEventName.GET_RECEIVE_ADDRESS:
+          processGetReceiveAddressRequest(sendResponse);
+          return true;
+        case YoursEventName.GET_SOCIAL_PROFILE:
+          processGetSocialProfileRequest(sendResponse);
+          return true;
+        case 'WALLET_LOCKED': {
+          // Destroy accountContext and clear passKey so keys cannot be decrypted without password
+          const ctx = accountContext;
+          accountContext = null; // Clear reference immediately to block new callers
+          chromeStorageService.clearPassKey().catch(() => {});
+          if (ctx) {
+            ctx
+              .close()
+              .then(() => console.log('[background] Wallet locked — keys and passKey cleared'))
+              .catch((err) => console.error('[background] Error closing wallet on lock:', err))
+              .finally(() => sendResponse({ type: 'WALLET_LOCKED', success: true }));
+          } else {
+            sendResponse({ type: 'WALLET_LOCKED', success: true });
+          }
+          return true;
+        }
+        case 'WALLET_UNLOCKED':
+          // If wallet context already exists and has pending requests, skip reinitialization
+          // to preserve active CWI operations (e.g., createAction waiting for permission)
+          if (accountContext && pendingPermissionRequests.size > 0) {
+            console.log(
+              '[background] WALLET_UNLOCKED: skipping reinitialization, pending requests:',
+              pendingPermissionRequests.size,
+            );
+            sendResponse({ type: 'WALLET_UNLOCKED', success: true });
+            return true;
+          }
+          // Reinitialize wallet after user unlocks with password
+          chromeStorageService.getAndSetStorage().then(() => {
+            initializeWallet()
+              .then(async (wallet) => {
+                // Mark wallet as unlocked in storage BEFORE resolving waiters,
+                // so verifyAccess() sees the unlocked state when authorizing requests
+                await chromeStorageService.update({ isLocked: false, lastActiveTime: Date.now() });
+
+                sendResponse({ type: 'WALLET_UNLOCKED', success: !!wallet });
+
+                const hadWaiters = pendingWalletWaiters.length > 0;
+                // Resolve any CWI handlers waiting for the wallet
+                if (wallet && hadWaiters) {
+                  for (const waiter of pendingWalletWaiters.splice(0)) {
+                    waiter.resolve(wallet);
+                  }
+                }
+                // Don't close the popup if there's a pending connect request in storage
+                // or if CWI handlers were waiting — the popup needs to transition
+                // from the unlock screen to the connect/permission screen.
+                const storage = await chromeStorageService.getAndSetStorage();
+                const hasPendingRequest =
+                  hadWaiters ||
+                  !!(storage as Record<string, unknown>)?.connectRequest ||
+                  !!(storage as Record<string, unknown>)?.permissionRequest ||
+                  !!(storage as Record<string, unknown>)?.groupedPermissionRequest ||
+                  !!(storage as Record<string, unknown>)?.counterpartyPermissionRequest;
+                if (!hasPendingRequest && popupWindowId) {
+                  removeWindow(popupWindowId);
+                  popupWindowId = undefined;
+                  chrome.storage.local.remove('popupWindowId');
+                }
+              })
+              .catch((error: Error) => {
+                console.error('Failed to initialize wallet:', error);
+                sendResponse({ type: 'WALLET_UNLOCKED', success: false, error: error.message });
+                for (const waiter of pendingWalletWaiters.splice(0)) {
+                  waiter.reject(error);
+                }
+              });
+          });
+          return true;
+        case 'MASTER_BACKUP':
+          processMasterBackup(sendResponse);
+          return true;
+        case 'MASTER_RESTORE':
+          processMasterRestore(message, sendResponse);
+          return true;
+        case 'STORAGE_GET_INFO':
+          processStorageGetInfo(sendResponse);
+          return true;
+        case 'STORAGE_SYNC_BACKUPS':
+          processStorageSyncBackups(sendResponse);
+          return true;
+        case 'STORAGE_SET_ACTIVE_STORAGE':
+          processStorageSetActiveStorage(message.target, sendResponse);
+          return true;
+        case 'STORAGE_ADD_REMOTE':
+          processStorageAddRemote(message.url, sendResponse);
+          return true;
+        case 'STORAGE_REMOVE_REMOTE':
+          processStorageRemoveRemote(message.url, sendResponse);
+          return true;
+        case 'UPDATE_FEE_RATE': {
+          const rate = message.feeRate;
+          if (typeof rate === 'number' && rate >= 1 && accountContext) {
+            // Access the internal storage provider to update fee model at runtime.
+            // This reaches into WalletStorageManager internals — if the SDK changes
+            // its structure, the guard below will catch it and log a warning.
+            const active = (accountContext.storage as any)._active;
+            if (active?.storage?.feeModel) {
+              active.storage.feeModel = { model: 'sat/kb', value: rate };
+            } else {
+              console.warn(
+                '[background] UPDATE_FEE_RATE: could not resolve storage._active.storage.feeModel —',
+                'fee rate will apply on next wallet initialization',
+              );
+            }
+          }
+          sendResponse({ type: 'UPDATE_FEE_RATE', success: true });
+          return true;
+        }
+        case 'PERMISSIONS_LIST_ALL':
+          processPermissionsListAll(sendResponse);
+          return true;
+        case 'PERMISSIONS_QUERY_SPENT':
+          processPermissionsQuerySpent(message, sendResponse);
+          return true;
+        case 'PERMISSIONS_REVOKE_ONE':
+          processPermissionsRevokeOne(message, sendResponse);
+          return true;
+        case 'PERMISSIONS_REVOKE_ALL':
+          processPermissionsRevokeAll(message, sendResponse);
+          return true;
+        case 'GET_DEPOSIT_ADDRESSES': {
+          startupInitPromise.then(() => {
+            if (!accountContext) {
+              sendResponse({ type: 'GET_DEPOSIT_ADDRESSES', success: false, error: 'Wallet not initialized' });
+              return;
+            }
+            const am = accountContext.syncContext.addressManager;
+            const addresses = [];
+            for (let i = 0; i <= am.getMaxKeyIndex(); i++) {
+              const d = am.getAddressAtIndex(i);
+              if (d) addresses.push(d);
+            }
+            sendResponse({ type: 'GET_DEPOSIT_ADDRESSES', success: true, data: addresses });
+          });
+          return true;
+        }
+        case 'GENERATE_NEW_ADDRESS': {
+          if ((globalThis as any).__generatingAddress) {
+            sendResponse({
+              type: 'GENERATE_NEW_ADDRESS',
+              success: false,
+              error: 'Address generation already in progress',
+            });
+            return true;
+          }
+          (globalThis as any).__generatingAddress = true;
+          startupInitPromise.then(async () => {
+            try {
+              if (!accountContext) {
+                sendResponse({ type: 'GENERATE_NEW_ADDRESS', success: false, error: 'Wallet not initialized' });
+                return;
+              }
+              const am = accountContext.syncContext.addressManager;
+              const newIndex = am.getMaxKeyIndex() + 1;
+              const { derivations } = await deriveDepositAddresses.execute(
+                { wallet: accountContext.baseWallet, chain: 'main' },
+                { startIndex: newIndex, count: 1 },
+              );
+              const newDerivation = derivations[0];
+
+              // Persist BEFORE updating in-memory state so a crash can't lose the index
+              const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+              if (account && selectedAccount) {
+                const key: keyof ChromeStorageObject = 'accounts';
+                await chromeStorageService.updateNested(key, {
+                  [selectedAccount]: {
+                    settings: { ...account.settings, maxKeyIndex: newIndex },
+                  } as unknown as Account,
+                });
+              }
+
+              am.addAddress(newDerivation);
+
+              sendResponse({ type: 'GENERATE_NEW_ADDRESS', success: true, data: newDerivation });
+            } catch (error) {
+              sendResponse({
+                type: 'GENERATE_NEW_ADDRESS',
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            } finally {
+              (globalThis as any).__generatingAddress = false;
+            }
+          });
+          return true;
+        }
         default:
           break;
       }
@@ -259,215 +918,689 @@ if (isInServiceWorker) {
       return;
     }
 
-    authorizeRequest(message).then((isAuthorized) => {
-      if (message.action === YoursEventName.CONNECT) {
-        return processConnectRequest(message, sendResponse, isAuthorized);
-      }
-
-      if (!isAuthorized) {
+    // If message is from our own extension popup, check wallet state without launching popup.
+    // The popup handles its own UI (unlock/create wallet pages).
+    if (isFromExtension) {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (!account?.encryptedKeys) {
         sendResponse({
           type: message.action,
           success: false,
-          error: 'Unauthorized!',
+          error: 'Wallet not available',
         });
-        return;
+        return true;
       }
+      // Wallet credentials exist, continue to ensureWallet (which won't launch popup
+      // because suppressPopup flag is set for this call).
+    }
 
-      switch (message.action) {
-        case YoursEventName.DISCONNECT:
-          return processDisconnectRequest(message, sendResponse);
-        case YoursEventName.GET_PUB_KEYS:
-          return processGetPubKeysRequest(sendResponse);
-        case YoursEventName.GET_BALANCE:
-          return processGetBalanceRequest(sendResponse);
-        case YoursEventName.GET_MNEE_BALANCE:
-          return processGetMNEEBalanceRequest(sendResponse);
-        case YoursEventName.GET_ADDRESSES:
-          return processGetAddressesRequest(sendResponse);
-        case YoursEventName.GET_NETWORK:
-          return processGetNetworkRequest(sendResponse);
-        case YoursEventName.GET_ORDINALS:
-          return processGetOrdinalsRequest(message, sendResponse);
-        case YoursEventName.GET_BSV20S:
-          return processGetBsv20sRequest(sendResponse);
-        case YoursEventName.SEND_BSV:
-        case YoursEventName.INSCRIBE: // We use the sendBsv functionality here
-        case YoursEventName.LOCK_BSV: // We use the sendBsv functionality here
-          return processSendBsvRequest(message, sendResponse);
-        case YoursEventName.SEND_BSV20:
-          return processSendBsv20Request(message, sendResponse);
-        case YoursEventName.SEND_MNEE:
-          return processSendMNEERequest(message, sendResponse);
-        case YoursEventName.TRANSFER_ORDINAL:
-          return processTransferOrdinalRequest(message, sendResponse);
-        case YoursEventName.PURCHASE_ORDINAL:
-        case YoursEventName.PURCHASE_BSV20:
-          return processPurchaseOrdinalRequest(message, sendResponse);
-        case YoursEventName.SIGN_MESSAGE:
-          return processSignMessageRequest(message, sendResponse);
-        case YoursEventName.BROADCAST:
-          return processBroadcastRequest(message, sendResponse);
-        case YoursEventName.GET_SIGNATURES:
-          return processGetSignaturesRequest(message, sendResponse);
-        case YoursEventName.GET_SOCIAL_PROFILE:
-          return processGetSocialProfileRequest(sendResponse);
-        case YoursEventName.GET_PAYMENT_UTXOS:
-          return processGetPaymentUtxos(sendResponse);
-        case YoursEventName.GET_EXCHANGE_RATE:
-          return processGetExchangeRate(sendResponse);
-        case YoursEventName.GENERATE_TAGGED_KEYS:
-          return processGenerateTaggedKeysRequest(message, sendResponse);
-        case YoursEventName.GET_TAGGED_KEYS:
-          return processGetTaggedKeys(message, sendResponse);
-        case YoursEventName.ENCRYPT:
-          return processEncryptRequest(message, sendResponse);
-        case YoursEventName.DECRYPT:
-          return processDecryptRequest(message, sendResponse);
-        default:
-          break;
-      }
-    });
+    ensureWallet(isFromExtension)
+      .then(() => {
+        console.log('[background] ensureWallet resolved for action:', message.action);
+        return authorizeRequest(message);
+      })
+      .then((isAuthorized) => {
+        console.log('[background] authorizeRequest result for', message.action, ':', isAuthorized);
+        // CWI waitForAuthentication
+        if (message.action === CWIEventName.WAIT_FOR_AUTHENTICATION) {
+          return processCWIWaitForAuthentication(message, sendResponse, isAuthorized);
+        }
+
+        if (!isAuthorized) {
+          sendResponse({
+            type: message.action,
+            success: false,
+            error: 'Unauthorized!',
+          });
+          return;
+        }
+
+        switch (message.action) {
+          // CWI (BRC-100) handlers - direct passthrough to wallet
+          // WalletPermissionsManager handles permission prompts internally
+          case CWIEventName.LIST_OUTPUTS:
+            processCWIListOutputs(message, sendResponse);
+            return true;
+          case CWIEventName.GET_NETWORK:
+            processCWIGetNetwork(sendResponse);
+            return true;
+          case CWIEventName.GET_HEIGHT:
+            processCWIGetHeight(sendResponse);
+            return true;
+          case CWIEventName.GET_HEADER_FOR_HEIGHT:
+            processCWIGetHeaderForHeight(message, sendResponse);
+            return true;
+          case CWIEventName.GET_VERSION:
+            processCWIGetVersion(sendResponse);
+            return true;
+          case CWIEventName.GET_PUBLIC_KEY:
+            processCWIGetPublicKey(message, sendResponse);
+            return true;
+          case CWIEventName.LIST_ACTIONS:
+            processCWIListActions(message, sendResponse);
+            return true;
+          case CWIEventName.VERIFY_SIGNATURE:
+            processCWIVerifySignature(message, sendResponse);
+            return true;
+          case CWIEventName.VERIFY_HMAC:
+            processCWIVerifyHmac(message, sendResponse);
+            return true;
+          case CWIEventName.CREATE_HMAC:
+            processCWICreateHmac(message, sendResponse);
+            return true;
+          case CWIEventName.CREATE_SIGNATURE:
+            processCWICreateSignature(message, sendResponse);
+            return true;
+          case CWIEventName.ENCRYPT:
+            processCWIEncrypt(message, sendResponse);
+            return true;
+          case CWIEventName.DECRYPT:
+            processCWIDecrypt(message, sendResponse);
+            return true;
+          case CWIEventName.CREATE_ACTION:
+            processCWICreateAction(message, sendResponse);
+            return true;
+          case CWIEventName.SIGN_ACTION:
+            processCWISignAction(message, sendResponse);
+            return true;
+          case CWIEventName.ABORT_ACTION:
+            processCWIAbortAction(message, sendResponse);
+            return true;
+          case CWIEventName.INTERNALIZE_ACTION:
+            processCWIInternalizeAction(message, sendResponse);
+            return true;
+          case CWIEventName.RELINQUISH_OUTPUT:
+            processCWIRelinquishOutput(message, sendResponse);
+            return true;
+          case CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE:
+            processCWIRevealCounterpartyKeyLinkage(message, sendResponse);
+            return true;
+          case CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE:
+            processCWIRevealSpecificKeyLinkage(message, sendResponse);
+            return true;
+          case CWIEventName.ACQUIRE_CERTIFICATE:
+            processCWIAcquireCertificate(message, sendResponse);
+            return true;
+          case CWIEventName.LIST_CERTIFICATES:
+            processCWIListCertificates(message, sendResponse);
+            return true;
+          case CWIEventName.PROVE_CERTIFICATE:
+            processCWIProveCertificate(message, sendResponse);
+            return true;
+          case CWIEventName.RELINQUISH_CERTIFICATE:
+            processCWIRelinquishCertificate(message, sendResponse);
+            return true;
+          case CWIEventName.DISCOVER_BY_IDENTITY_KEY:
+            processCWIDiscoverByIdentityKey(message, sendResponse);
+            return true;
+          case CWIEventName.DISCOVER_BY_ATTRIBUTES:
+            processCWIDiscoverByAttributes(message, sendResponse);
+            return true;
+
+          default:
+            break;
+        }
+      })
+      .catch((error: Error) => {
+        sendResponse({
+          type: message.action,
+          success: false,
+          error: error.message || 'Wallet unavailable',
+        });
+      });
 
     return true;
   });
+
+  // STORAGE MANAGEMENT HANDLERS ********************************
+
+  const processStorageGetInfo = async (sendResponse: CallbackResponse) => {
+    try {
+      await ensureWallet();
+    } catch (err) {
+      sendResponse({
+        type: 'STORAGE_GET_INFO',
+        success: false,
+        error: err instanceof Error ? err.message : 'Wallet not available',
+      });
+      return;
+    }
+    if (!accountContext) {
+      sendResponse({ type: 'STORAGE_GET_INFO', success: false, error: 'Wallet not initialized' });
+      return;
+    }
+    const { storage, remoteStorage } = accountContext;
+    (async () => {
+      try {
+        const stores = storage.getStores();
+        const settings = storage.getSettings();
+        const activeStore = stores.find((s) => s.isActive);
+        const backupStores = stores.filter((s) => s.isBackup);
+        // Surface the persisted per-account config so the UI can render
+        // from the same source of truth used at init time.
+        const { account } = chromeStorageService.getCurrentAccountObject();
+        const storageConfig: StorageConfig = account?.storageConfig ?? {
+          remotes: [],
+        };
+
+        let outputCount = 0;
+        let transactionCount = 0;
+        try {
+          const userId = await storage.getUserId();
+          outputCount = await storage.runAsStorageProvider(async (sp) => sp.countOutputs({ partial: { userId } }));
+          transactionCount = await storage.runAsStorageProvider(async (sp) =>
+            sp.countTransactions({ partial: { userId } }),
+          );
+        } catch {
+          // Counts may not be available during initialization
+        }
+
+        let syncStates: Array<{
+          storageIdentityKey: string;
+          storageName: string;
+          status: string;
+          when?: string;
+        }> = [];
+        try {
+          const states = await storage.runAsStorageProvider(async (sp) => sp.findSyncStates({ partial: {} }));
+          syncStates = states.map((s) => ({
+            storageIdentityKey: s.storageIdentityKey,
+            storageName: s.storageName,
+            status: s.status,
+            when: s.when?.toISOString(),
+          }));
+        } catch {
+          // findSyncStates may not be available
+        }
+
+        sendResponse({
+          type: 'STORAGE_GET_INFO',
+          success: true,
+          data: {
+            activeStore: activeStore
+              ? {
+                  storageIdentityKey: activeStore.storageIdentityKey,
+                  storageName: activeStore.storageName,
+                  endpointURL: activeStore.endpointURL,
+                  isEnabled: activeStore.isEnabled,
+                }
+              : null,
+            backupStores: backupStores.map((s) => ({
+              storageIdentityKey: s.storageIdentityKey,
+              storageName: s.storageName,
+              endpointURL: s.endpointURL,
+            })),
+            storageIdentityKey: settings.storageIdentityKey,
+            remoteUrl: remoteStorage?.endpointUrl,
+            outputCount,
+            transactionCount,
+            syncStates,
+            storageConfig,
+          },
+        });
+      } catch (error) {
+        sendResponse({
+          type: 'STORAGE_GET_INFO',
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+  };
+
+  const processStorageSyncBackups = async (sendResponse: CallbackResponse) => {
+    try {
+      await ensureWallet();
+    } catch (err) {
+      sendResponse({
+        type: 'STORAGE_SYNC_BACKUPS',
+        success: false,
+        error: err instanceof Error ? err.message : 'Wallet not available',
+      });
+      return;
+    }
+    if (!accountContext) {
+      sendResponse({ type: 'STORAGE_SYNC_BACKUPS', success: false, error: 'Wallet not initialized' });
+      return;
+    }
+    accountContext.storage
+      .updateBackups()
+      .then((log) => {
+        sendResponse({ type: 'STORAGE_SYNC_BACKUPS', success: true, data: { log } });
+      })
+      .catch((error: unknown) => {
+        sendResponse({
+          type: 'STORAGE_SYNC_BACKUPS',
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  };
+
+  /**
+   * Read the current account's storageConfig (or the implicit-default shape
+   * for accounts that predate it), apply a patch, and persist the result
+   * back to the same account.
+   *
+   * We resolve absent storageConfig into a concrete shape on first write so
+   * that "remove api.1sat.app" after a "switch to local" on a legacy account
+   * works — the URL gets captured into remotes[] as the implicit→explicit
+   * materialization step.
+   */
+  const updateStorageConfig = async (patch: (current: StorageConfig) => StorageConfig): Promise<StorageConfig> => {
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) throw new Error('No account loaded');
+    const identityAddress = account.addresses.identityAddress;
+    const existing: StorageConfig = account.storageConfig ?? {
+      remotes: [],
+    };
+    const next = patch(existing);
+    await chromeStorageService.updateNested('accounts', {
+      [identityAddress]: { storageConfig: next } as unknown as Account,
+    });
+    return next;
+  };
+
+  const processStorageSetActiveStorage = async (target: 'local' | string, sendResponse: CallbackResponse) => {
+    try {
+      await ensureWallet();
+    } catch (err) {
+      sendResponse({
+        type: 'STORAGE_SET_ACTIVE_STORAGE',
+        success: false,
+        error: err instanceof Error ? err.message : 'Wallet not available',
+      });
+      return;
+    }
+    if (!accountContext) {
+      sendResponse({
+        type: 'STORAGE_SET_ACTIVE_STORAGE',
+        success: false,
+        error: 'Wallet not initialized',
+      });
+      return;
+    }
+    try {
+      await accountContext.setActiveStorage(target);
+      const nextConfig = await updateStorageConfig((current) => {
+        if (target === 'local') {
+          return { activeRemote: undefined, remotes: current.remotes ?? [] };
+        }
+        // Ensure the URL is in the remotes list so it survives restart.
+        const remotes = current.remotes ?? [];
+        const withTarget = remotes.includes(target) ? remotes : [...remotes, target];
+        return { activeRemote: target, remotes: withTarget };
+      });
+      sendResponse({
+        type: 'STORAGE_SET_ACTIVE_STORAGE',
+        success: true,
+        data: { storageConfig: nextConfig },
+      });
+    } catch (error) {
+      sendResponse({
+        type: 'STORAGE_SET_ACTIVE_STORAGE',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const processStorageAddRemote = async (url: string, sendResponse: CallbackResponse) => {
+    try {
+      await ensureWallet();
+    } catch (err) {
+      sendResponse({
+        type: 'STORAGE_ADD_REMOTE',
+        success: false,
+        error: err instanceof Error ? err.message : 'Wallet not available',
+      });
+      return;
+    }
+    if (!accountContext) {
+      sendResponse({
+        type: 'STORAGE_ADD_REMOTE',
+        success: false,
+        error: 'Wallet not initialized',
+      });
+      return;
+    }
+    try {
+      await accountContext.addRemote(url);
+      const nextConfig = await updateStorageConfig((current) => {
+        const remotes = current.remotes ?? [];
+        return {
+          ...current,
+          remotes: remotes.includes(url) ? remotes : [...remotes, url],
+        };
+      });
+      sendResponse({
+        type: 'STORAGE_ADD_REMOTE',
+        success: true,
+        data: { storageConfig: nextConfig },
+      });
+    } catch (error) {
+      sendResponse({
+        type: 'STORAGE_ADD_REMOTE',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  /**
+   * Remove a remote from the configured list. Pure config persistence —
+   * the SDK does not support detaching a live connection, so the removed
+   * remote stays connected for this session and will simply not be
+   * reconnected on next unlock. Refuses if the URL is the current active.
+   */
+  const processStorageRemoveRemote = async (url: string, sendResponse: CallbackResponse) => {
+    try {
+      const nextConfig = await updateStorageConfig((current) => {
+        if (current.activeRemote === url) {
+          throw new Error('Cannot remove the active remote — switch active to local or another remote first.');
+        }
+        const remotes = (current.remotes ?? []).filter((r) => r !== url);
+        return { ...current, remotes };
+      });
+      sendResponse({
+        type: 'STORAGE_REMOVE_REMOTE',
+        success: true,
+        data: { storageConfig: nextConfig },
+      });
+    } catch (error) {
+      sendResponse({
+        type: 'STORAGE_REMOVE_REMOTE',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  // PERMISSIONS MANAGEMENT HANDLERS ********************************
+
+  // biome-ignore lint/suspicious/noExplicitAny: WPM token shapes vary by type
+  type PermissionToken = any & { type: string; originator: string };
+
+  const processPermissionsListAll = async (sendResponse: CallbackResponse) => {
+    try {
+      const wpm = (await ensureWallet()) as LocalWalletPermissionsManager;
+
+      const [protocols, baskets, spending, certificates] = await Promise.all([
+        wpm.listProtocolPermissions({}),
+        wpm.listBasketAccess({}),
+        wpm.listSpendingAuthorizations({}),
+        wpm.listCertificateAccess({}),
+      ]);
+
+      // Tag each token with its type, pass everything else through as-is
+      const allTokens: PermissionToken[] = [
+        ...protocols.map((t: PermissionToken) => ({ ...t, type: 'protocol' })),
+        ...baskets.map((t: PermissionToken) => ({ ...t, type: 'basket' })),
+        ...spending.map((t: PermissionToken) => ({ ...t, type: 'spending' })),
+        ...certificates.map((t: PermissionToken) => ({ ...t, type: 'certificate' })),
+      ];
+
+      // Group by originator
+      const groupMap = new Map<string, PermissionToken[]>();
+      for (const token of allTokens) {
+        const key = token.originator ?? token.rawOriginator ?? '';
+        if (!groupMap.has(key)) groupMap.set(key, []);
+        groupMap.get(key)!.push(token);
+      }
+
+      const groups = Array.from(groupMap.entries()).map(([originator, permissions]) => ({
+        originator,
+        permissions,
+      }));
+
+      sendResponse({ type: 'PERMISSIONS_LIST_ALL', success: true, data: { groups } });
+    } catch (error) {
+      console.error('[PERMISSIONS_LIST_ALL] Error:', error);
+      sendResponse({
+        type: 'PERMISSIONS_LIST_ALL',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const processPermissionsQuerySpent = async (message: { token: PermissionToken }, sendResponse: CallbackResponse) => {
+    try {
+      const wpm = (await ensureWallet()) as LocalWalletPermissionsManager;
+      const satoshisSpent = await wpm.querySpentSince(message.token);
+      sendResponse({ type: 'PERMISSIONS_QUERY_SPENT', success: true, data: { satoshisSpent } });
+    } catch (error) {
+      console.error('[PERMISSIONS_QUERY_SPENT] Error:', error);
+      sendResponse({
+        type: 'PERMISSIONS_QUERY_SPENT',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const processPermissionsRevokeOne = async (message: { token: PermissionToken }, sendResponse: CallbackResponse) => {
+    try {
+      const wpm = (await ensureWallet()) as LocalWalletPermissionsManager;
+      await wpm.revokePermission(message.token);
+      sendResponse({ type: 'PERMISSIONS_REVOKE_ONE', success: true });
+    } catch (error) {
+      console.error('[PERMISSIONS_REVOKE_ONE] Error:', error);
+      sendResponse({
+        type: 'PERMISSIONS_REVOKE_ONE',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const processPermissionsRevokeAll = async (message: { originator: string }, sendResponse: CallbackResponse) => {
+    try {
+      const wpm = (await ensureWallet()) as LocalWalletPermissionsManager;
+      const revoked = await wpm.revokeAllForOriginator(message.originator);
+      sendResponse({ type: 'PERMISSIONS_REVOKE_ALL', success: true, data: { revokedCount: revoked.length } });
+    } catch (error) {
+      console.error('[PERMISSIONS_REVOKE_ALL] Error:', error);
+      sendResponse({
+        type: 'PERMISSIONS_REVOKE_ALL',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  // PERMISSION RESPONSE HANDLER ********************************
+
+  const processPermissionResponse = (response: { requestID: string; granted: boolean; expiry?: number }) => {
+    const pending = pendingPermissionRequests.get(response.requestID);
+    if (!pending) {
+      console.warn('No pending permission request found for:', response.requestID);
+      return;
+    }
+
+    pendingPermissionRequests.delete(response.requestID);
+
+    if (response.granted) {
+      // Grant the permission through the manager
+      // expiry defaults to 0 (never expires), ephemeral defaults to false (persist on-chain)
+      accountContext?.wallet
+        .grantPermission({
+          requestID: response.requestID,
+          expiry: response.expiry,
+        })
+        .then(() => {
+          pending.resolve();
+        })
+        .catch((error) => {
+          pending.reject(error);
+        });
+    } else {
+      // Deny the permission
+      accountContext?.wallet
+        .denyPermission(response.requestID)
+        .then(() => {
+          pending.reject(new Error('Permission denied by user'));
+        })
+        .catch((error) => {
+          pending.reject(error);
+        });
+    }
+
+    chromeStorageService.remove('permissionRequest');
+    closePermissionPopup();
+    return true;
+  };
+
+  const processGroupedPermissionResponse = (response: {
+    requestID: string;
+    granted: Partial<GroupedPermissions> | null;
+    expiry?: number;
+  }) => {
+    const pending = pendingGroupedPermissionRequests.get(response.requestID);
+    if (!pending) {
+      console.warn('No pending grouped permission request found for:', response.requestID);
+      return;
+    }
+
+    pendingGroupedPermissionRequests.delete(response.requestID);
+
+    if (response.granted) {
+      accountContext?.wallet
+        .grantGroupedPermission({
+          requestID: response.requestID,
+          granted: response.granted,
+          expiry: response.expiry,
+        })
+        .then(() => {
+          pending.resolve();
+        })
+        .catch((error) => {
+          pending.reject(error);
+        });
+    } else {
+      accountContext?.wallet
+        .denyGroupedPermission(response.requestID)
+        .then(() => {
+          pending.reject(new Error('Grouped permission denied by user'));
+        })
+        .catch((error) => {
+          pending.reject(error);
+        });
+    }
+
+    chromeStorageService.remove('groupedPermissionRequest');
+    closePermissionPopup();
+    return true;
+  };
+
+  const processCounterpartyPermissionResponse = (response: {
+    requestID: string;
+    granted: Partial<CounterpartyPermissions> | null;
+    expiry?: number;
+  }) => {
+    const pending = pendingCounterpartyPermissionRequests.get(response.requestID);
+    if (!pending) {
+      console.warn('No pending counterparty permission request found for:', response.requestID);
+      return;
+    }
+
+    pendingCounterpartyPermissionRequests.delete(response.requestID);
+
+    if (response.granted) {
+      accountContext?.wallet
+        .grantCounterpartyPermission({
+          requestID: response.requestID,
+          granted: response.granted,
+          expiry: response.expiry,
+        })
+        .then(() => {
+          pending.resolve();
+        })
+        .catch((error) => {
+          pending.reject(error);
+        });
+    } else {
+      accountContext?.wallet
+        .denyCounterpartyPermission(response.requestID)
+        .then(() => {
+          pending.reject(new Error('Counterparty permission denied by user'));
+        })
+        .catch((error) => {
+          pending.reject(error);
+        });
+    }
+
+    chromeStorageService.remove('counterpartyPermissionRequest');
+    closePermissionPopup();
+    return true;
+  };
 
   // EMIT EVENTS ********************************
 
   const emitEventToActiveTabs = (message: { action: YoursEventName; params: RequestParams }) => {
     const { action, params } = message;
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    const whitelist = account?.settings?.whitelist;
+    const whitelistedDomains = new Set(whitelist?.map((app: WhitelistedApp) => app.domain) ?? []);
+
     chrome.tabs.query({}, function (tabs) {
       tabs.forEach(function (tab: chrome.tabs.Tab) {
-        if (tab.id) {
-          chrome.tabs.sendMessage(tab.id, { type: CustomListenerName.YOURS_EMIT_EVENT, action, params });
+        if (tab.id && tab.url) {
+          try {
+            const host = new URL(tab.url).host;
+            if (whitelistedDomains.has(host)) {
+              chrome.tabs.sendMessage(tab.id, {
+                type: CustomListenerName.YOURS_EMIT_EVENT,
+                action,
+                params,
+              });
+            }
+          } catch {
+            // invalid URL, skip
+          }
         }
       });
     });
     return true;
   };
 
-  // REQUESTS ***************************************
+  // YOURS-SPECIFIC HANDLERS ********************************
 
-  const processConnectRequest = (
-    message: { params: RequestParams },
-    sendResponse: CallbackResponse,
-    isAuthorized: boolean,
-  ) => {
-    responseCallbackForConnectRequest = sendResponse;
-    chromeStorageService
-      .update({
-        connectRequest: { ...message.params, isAuthorized } as ConnectRequest,
-      })
-      .then(() => {
-        launchPopUp();
-      });
-
-    return true;
-  };
-
-  const processDisconnectRequest = (message: { params: { domain: string } }, sendResponse: CallbackResponse) => {
+  const processGetBalanceRequest = async (sendResponse: CallbackResponse) => {
     try {
-      chromeStorageService.getAndSetStorage().then(() => {
-        const { account } = chromeStorageService.getCurrentAccountObject();
-        if (!account) throw Error('No account found!');
-        const { whitelist } = account.settings;
-        if (!whitelist) throw Error('Already disconnected!');
-        const { params } = message;
-        const updatedWhitelist = whitelist.filter((i: { domain: string }) => i.domain !== params.domain);
-        const key: keyof ChromeStorageObject = 'accounts';
-        const update: Partial<ChromeStorageObject['accounts']> = {
-          [account.addresses.identityAddress]: {
-            ...account,
-            settings: {
-              ...account.settings,
-              whitelist: updatedWhitelist,
-            },
-          },
-        };
-        chromeStorageService.updateNested(key, update).then(() => {
-          sendResponse({
-            type: YoursEventName.DISCONNECT,
-            success: true,
-            data: true,
-          });
-        });
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.DISCONNECT,
-        success: true, // This is true in the catch because we want to return a boolean
-        data: false,
-      });
-    }
-  };
-
-  const processIsConnectedRequest = (params: { domain: string }, sendResponse: CallbackResponse) => {
-    try {
-      chromeStorageService.getAndSetStorage().then(() => {
-        const result = chromeStorageService.getCurrentAccountObject();
-        if (!result?.account) throw Error('No account found!');
-        const currentTime = Date.now();
-        const lastActiveTime = result.lastActiveTime;
-
-        sendResponse({
-          type: YoursEventName.IS_CONNECTED,
-          success: true,
-          data:
-            !result.isLocked &&
-            currentTime - Number(lastActiveTime) < INACTIVITY_LIMIT &&
-            result.account.settings.whitelist?.map((i: { domain: string }) => i.domain).includes(params.domain),
-        });
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.IS_CONNECTED,
-        success: true, // This is true in the catch because we want to return a boolean
-        error: false,
-      });
-    }
-
-    return true;
-  };
-
-  const processGetBalanceRequest = (sendResponse: CallbackResponse) => {
-    try {
-      chromeStorageService.getAndSetStorage().then(() => {
-        const { account } = chromeStorageService.getCurrentAccountObject();
-        if (!account) throw Error('No account found!');
-        sendResponse({
-          type: YoursEventName.GET_BALANCE,
-          success: true,
-          data: account.balance,
-        });
-      });
-    } catch (error) {
+      await ensureWallet();
+    } catch (err) {
       sendResponse({
         type: YoursEventName.GET_BALANCE,
         success: false,
-        error: JSON.stringify(error),
+        error: err instanceof Error ? err.message : 'Wallet not available',
       });
+      return;
     }
-  };
-
-  const processGetMNEEBalanceRequest = (sendResponse: CallbackResponse) => {
-    try {
-      chromeStorageService.getAndSetStorage().then(() => {
-        const { account } = chromeStorageService.getCurrentAccountObject();
-        if (!account) throw Error('No account found!');
-        mnee.balance(account.addresses.bsvAddress).then(({ amount, decimalAmount }) => {
-          sendResponse({
-            type: YoursEventName.GET_MNEE_BALANCE,
-            success: true,
-            data: { amount, decimalAmount },
-          });
+    if (!accountContext) {
+      sendResponse({
+        type: YoursEventName.GET_BALANCE,
+        success: false,
+        error: 'Wallet not initialized',
+      });
+      return;
+    }
+    accountContext.baseWallet
+      .balance()
+      .then((satoshis) => {
+        sendResponse({
+          type: YoursEventName.GET_BALANCE,
+          success: true,
+          data: satoshis,
+        });
+      })
+      .catch((error) => {
+        sendResponse({
+          type: YoursEventName.GET_BALANCE,
+          success: false,
+          error: error instanceof Error ? error.message : JSON.stringify(error),
         });
       });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GET_MNEE_BALANCE,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
   };
 
   const processGetPubKeysRequest = (sendResponse: CallbackResponse) => {
@@ -490,425 +1623,54 @@ if (isInServiceWorker) {
     }
   };
 
-  const processGetAddressesRequest = (sendResponse: CallbackResponse) => {
+  const processGetLegacyAddressesRequest = (sendResponse: CallbackResponse) => {
     try {
       chromeStorageService.getAndSetStorage().then(() => {
         const { account } = chromeStorageService.getCurrentAccountObject();
         if (!account) throw Error('No account found!');
         sendResponse({
-          type: YoursEventName.GET_ADDRESSES,
+          type: YoursEventName.GET_LEGACY_ADDRESSES,
           success: true,
           data: account.addresses,
         });
       });
     } catch (error) {
       sendResponse({
-        type: YoursEventName.GET_ADDRESSES,
+        type: YoursEventName.GET_LEGACY_ADDRESSES,
         success: false,
         error: JSON.stringify(error),
       });
     }
   };
 
-  const processGetNetworkRequest = (sendResponse: CallbackResponse) => {
-    try {
-      chromeStorageService.getAndSetStorage().then(() => {
+  const processGetReceiveAddressRequest = (sendResponse: CallbackResponse) => {
+    // Wait for startup initialization to complete before checking accountContext
+    startupInitPromise.then(() => {
+      try {
+        if (!accountContext) {
+          sendResponse({
+            type: YoursEventName.GET_RECEIVE_ADDRESS,
+            success: false,
+            error: 'Wallet not initialized',
+          });
+          return;
+        }
+        // Prefer the user's selected primaryAddress from storage; fall back to index 0.
         const { account } = chromeStorageService.getCurrentAccountObject();
-        if (!account) throw Error('No account found!');
+        const address = account?.primaryAddress ?? accountContext.syncContext.addressManager.getPrimaryAddress();
         sendResponse({
-          type: YoursEventName.GET_NETWORK,
+          type: YoursEventName.GET_RECEIVE_ADDRESS,
           success: true,
-          data: account?.network ?? NetWork.Mainnet,
+          data: address,
         });
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GET_NETWORK,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processGetOrdinalsRequest = (message: { params: GetPaginatedOrdinals }, sendResponse: CallbackResponse) => {
-    try {
-      chromeStorageService.getAndSetStorage().then(async () => {
-        const oneSatSPV = await oneSatSPVPromise;
-        if (!oneSatSPV) throw Error('SPV not initialized!');
-        const lookup = message?.params?.mimeType
-          ? new TxoLookup('origin', 'type', message.params.mimeType)
-          : new TxoLookup('origin');
-        if (message.params.from === undefined || message.params.from === null) {
-          const result = await oneSatSPV.search(lookup, TxoSort.DESC, 0);
-          const mapped = result.txos.map(mapOrdinal);
-          sendResponse({
-            type: YoursEventName.GET_ORDINALS,
-            success: true,
-            data: mapped,
-          });
-        } else {
-          const results = await oneSatSPV.search(
-            lookup,
-            TxoSort.DESC,
-            message.params.limit || 50,
-            message.params.from || '',
-          );
-          const mapped = results.txos.map(mapOrdinal);
-          sendResponse({
-            type: YoursEventName.GET_ORDINALS,
-            success: true,
-            data: { ordinals: mapped, from: results.nextPage },
-          });
-        }
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GET_ORDINALS,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processGetBsv20sRequest = (sendResponse: CallbackResponse) => {
-    try {
-      chromeStorageService.getAndSetStorage().then(async () => {
-        let data: SerializedBsv20[] = [];
-        const obj = chromeStorageService.getCurrentAccountObject();
-        if (obj.account?.addresses?.bsvAddress && obj.account?.addresses?.ordAddress) {
-          const rawData = await gorillaPoolService.getBsv20Balances([
-            obj.account?.addresses.bsvAddress,
-            obj.account?.addresses.ordAddress,
-          ]);
-
-          data = rawData.map((d) => {
-            return {
-              ...d,
-              listed: { confirmed: d.listed.confirmed.toString(), pending: d.listed.pending.toString() },
-              all: { confirmed: d.all.confirmed.toString(), pending: d.all.pending.toString() },
-            };
-          });
-        }
-
+      } catch (error) {
         sendResponse({
-          type: YoursEventName.GET_BSV20S,
-          success: true,
-          data,
-        });
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GET_BSV20S,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processGetExchangeRate = (sendResponse: CallbackResponse) => {
-    try {
-      chromeStorageService.getAndSetStorage().then(async (res) => {
-        if (!res) throw Error('Could not get storage!');
-        const { exchangeRateCache } = res;
-        if (exchangeRateCache?.rate && Date.now() - exchangeRateCache.timestamp < 5 * 60 * 1000) {
-          sendResponse({
-            type: YoursEventName.GET_EXCHANGE_RATE,
-            success: true,
-            data: Number(exchangeRateCache.rate.toFixed(2)),
-          });
-        } else {
-          const res = await fetch(`${WOC_BASE_URL}/main/exchangerate`);
-          if (!res.ok) {
-            throw new Error(`Fetch error: ${res.status} - ${res.statusText}`);
-          }
-          const data = await res.json();
-          const rate = data.rate;
-          const currentTime = Date.now();
-          chromeStorageService.update({
-            exchangeRateCache: { rate, timestamp: currentTime },
-          });
-          sendResponse({
-            type: YoursEventName.GET_EXCHANGE_RATE,
-            success: true,
-            data: Number(rate.toFixed(2)),
-          });
-        }
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GET_EXCHANGE_RATE,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processGetPaymentUtxos = (sendResponse: CallbackResponse) => {
-    try {
-      chromeStorageService.getAndSetStorage().then(async () => {
-        const oneSatSPV = await oneSatSPVPromise;
-        if (!oneSatSPV) throw Error('SPV not initialized!');
-        const results = await oneSatSPV.search(new TxoLookup('fund'), undefined, 0);
-        const utxos = results.txos.map((txo) => {
-          return {
-            txid: txo.outpoint.txid,
-            vout: txo.outpoint.vout,
-            satoshis: Number(txo.satoshis),
-            script: Buffer.from(txo.script).toString('hex'),
-          };
-        });
-        sendResponse({
-          type: YoursEventName.GET_PAYMENT_UTXOS,
-          success: true,
-          data: utxos,
-        });
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GET_PAYMENT_UTXOS,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  // Important note: We process the InscribeRequest as a SendBsv request.
-  const processSendBsvRequest = (
-    message: { params: { data: SendBsv[] | InscribeRequest[] | LockRequest[] } },
-    sendResponse: CallbackResponse,
-  ) => {
-    if (!message.params.data) {
-      sendResponse({
-        type: YoursEventName.SEND_BSV,
-        success: false,
-        error: 'Must provide valid params!',
-      });
-      return;
-    }
-    try {
-      responseCallbackForSendBsvRequest = sendResponse;
-      let sendBsvRequest = message.params.data as SendBsv[];
-
-      // If in this if block, it's an inscribe() request.
-      const inscribeRequest = message.params.data as InscribeRequest[];
-      if (inscribeRequest[0].base64Data) {
-        sendBsvRequest = inscribeRequest.map((d: InscribeRequest) => {
-          return {
-            address: d.address,
-            inscription: {
-              base64Data: d.base64Data,
-              mimeType: d.mimeType,
-              map: d.map,
-            },
-            satoshis: d.satoshis ?? 1,
-          } as SendBsv;
+          type: YoursEventName.GET_RECEIVE_ADDRESS,
+          success: false,
+          error: error instanceof Error ? error.message : JSON.stringify(error),
         });
       }
-
-      // If in this if block, it's a lock() request.
-      const lockRequest = message.params.data as LockRequest[];
-      if (lockRequest[0].blockHeight) {
-        sendBsvRequest = convertLockReqToSendBsvReq(lockRequest);
-      }
-
-      chromeStorageService.update({ sendBsvRequest }).then(() => {
-        launchPopUp();
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.SEND_BSV,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processSendBsv20Request = (message: { params: SendBsv20 }, sendResponse: CallbackResponse) => {
-    if (!message.params) {
-      sendResponse({
-        type: YoursEventName.SEND_BSV20,
-        success: false,
-        error: 'Must provide valid params!',
-      });
-      return;
-    }
-    try {
-      responseCallbackForSendBsv20Request = sendResponse;
-      const sendBsv20Request = message.params;
-      chromeStorageService.update({ sendBsv20Request }).then(() => {
-        launchPopUp();
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.SEND_BSV20,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processSendMNEERequest = (message: { params: { data: SendMNEE[] } }, sendResponse: CallbackResponse) => {
-    if (!message.params.data) {
-      sendResponse({
-        type: YoursEventName.SEND_MNEE,
-        success: false,
-        error: 'Must provide valid params!',
-      });
-      return;
-    }
-    try {
-      responseCallbackForSendMNEERequest = sendResponse;
-      const sendMNEERequest = message.params.data;
-      chromeStorageService.update({ sendMNEERequest }).then(() => {
-        launchPopUp();
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.SEND_MNEE,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processTransferOrdinalRequest = (message: { params: TransferOrdinal }, sendResponse: CallbackResponse) => {
-    if (!message.params) {
-      sendResponse({
-        type: YoursEventName.TRANSFER_ORDINAL,
-        success: false,
-        error: 'Must provide valid params!',
-      });
-      return;
-    }
-    try {
-      responseCallbackForTransferOrdinalRequest = sendResponse;
-      chromeStorageService
-        .update({
-          transferOrdinalRequest: message.params,
-        })
-        .then(() => {
-          launchPopUp();
-        });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.TRANSFER_ORDINAL,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processPurchaseOrdinalRequest = (message: { params: PurchaseOrdinal }, sendResponse: CallbackResponse) => {
-    if (!message.params) {
-      sendResponse({
-        type: YoursEventName.PURCHASE_ORDINAL,
-        success: false,
-        error: 'Must provide valid params!',
-      });
-      return;
-    }
-    try {
-      responseCallbackForPurchaseOrdinalRequest = sendResponse;
-      chromeStorageService
-        .update({
-          purchaseOrdinalRequest: message.params,
-        })
-        .then(() => {
-          launchPopUp();
-        });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.PURCHASE_ORDINAL,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processBroadcastRequest = (message: { params: Broadcast }, sendResponse: CallbackResponse) => {
-    if (!message.params) {
-      sendResponse({
-        type: YoursEventName.BROADCAST,
-        success: false,
-        error: 'Must provide valid params!',
-      });
-      return;
-    }
-    try {
-      responseCallbackForBroadcastRequest = sendResponse;
-      chromeStorageService
-        .update({
-          broadcastRequest: message.params,
-        })
-        .then(() => {
-          launchPopUp();
-        });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.BROADCAST,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processSignMessageRequest = (message: { params: SignMessage }, sendResponse: CallbackResponse) => {
-    if (!message.params) {
-      sendResponse({
-        type: YoursEventName.SIGN_MESSAGE,
-        success: false,
-        error: 'Must provide valid params!',
-      });
-      return;
-    }
-    try {
-      responseCallbackForSignMessageRequest = sendResponse;
-      chromeStorageService
-        .update({
-          signMessageRequest: message.params,
-        })
-        .then(() => {
-          launchPopUp();
-        });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.SIGN_MESSAGE,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-
-    return true;
-  };
-
-  const processGetSignaturesRequest = (message: { params: GetSignatures }, sendResponse: CallbackResponse) => {
-    if (!message.params) {
-      sendResponse({
-        type: YoursEventName.GET_SIGNATURES,
-        success: false,
-        error: 'Must provide valid params!',
-      });
-      return;
-    }
-    try {
-      responseCallbackForGetSignaturesRequest = sendResponse;
-      chromeStorageService
-        .update({
-          getSignaturesRequest: {
-            rawtx: message.params.rawtx,
-            sigRequests: message.params.sigRequests,
-          },
-        })
-        .then(() => {
-          launchPopUp();
-        });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GET_SIGNATURES,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
+    });
   };
 
   const processGetSocialProfileRequest = (sendResponse: CallbackResponse) => {
@@ -933,433 +1695,973 @@ if (isInServiceWorker) {
     }
   };
 
-  const processGenerateTaggedKeysRequest = (
-    message: { params: TaggedDerivationRequest },
-    sendResponse: CallbackResponse,
-  ) => {
-    if (!message.params) {
-      sendResponse({
-        type: YoursEventName.GENERATE_TAGGED_KEYS,
-        success: false,
-        error: 'Must provide valid params!',
-      });
-      return;
-    }
+  // MASTER BACKUP/RESTORE HANDLERS ********************************
+
+  const processMasterBackup = async (sendResponse: CallbackResponse) => {
     try {
-      responseCallbackForGenerateTaggedKeysRequest = sendResponse;
-      chromeStorageService
-        .update({
-          generateTaggedKeysRequest: message.params,
-        })
-        .then(() => {
-          launchPopUp();
-        });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GENERATE_TAGGED_KEYS,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processGetTaggedKeys = async (
-    message: { params: GetTaggedKeysRequest & { domain: string } },
-    sendResponse: CallbackResponse,
-  ) => {
-    if (!message.params.label) {
-      sendResponse({
-        type: YoursEventName.GET_TAGGED_KEYS,
-        success: false,
-        error: 'Must provide valid params!',
-      });
-      return;
-    }
-    try {
-      chromeStorageService.getAndSetStorage().then((res) => {
-        const { account } = chromeStorageService.getCurrentAccountObject();
-        if (!res || !account) throw Error('No account found!');
-        const { lastActiveTime, isLocked } = res;
-        const { derivationTags } = account;
-        const currentTime = Date.now();
-        if (isLocked || currentTime - Number(lastActiveTime) > INACTIVITY_LIMIT) {
-          sendResponse({
-            type: YoursEventName.GET_TAGGED_KEYS,
-            success: false,
-            error: 'Unauthorized! Wallet is locked.',
-          });
-        }
-
-        let returnData =
-          derivationTags.length > 0
-            ? derivationTags?.filter(
-                (res: TaggedDerivationResponse) =>
-                  res.tag.label === message.params.label && res.tag.domain === message.params.domain,
-              )
-            : [];
-
-        if (returnData.length > 0 && (message?.params?.ids?.length ?? 0 > 0)) {
-          returnData = returnData?.filter((d: TaggedDerivationResponse) => message?.params?.ids?.includes(d.tag.id));
-        }
-
+      // Service worker may have slept — ensure the wallet is (re)initialized before
+      // accessing accountContext. ensureWallet() silently re-initializes if the wallet
+      // is unlocked, or launches the unlock popup if it isn't.
+      try {
+        await ensureWallet();
+      } catch (err) {
         sendResponse({
-          type: YoursEventName.GET_TAGGED_KEYS,
-          success: true,
-          data: returnData,
-        });
-      });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.GET_TAGGED_KEYS,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-  };
-
-  const processEncryptRequest = (message: { params: EncryptRequest }, sendResponse: CallbackResponse) => {
-    if (!message.params) {
-      sendResponse({
-        type: YoursEventName.ENCRYPT,
-        success: false,
-        error: 'Must provide valid params!',
-      });
-      return;
-    }
-    try {
-      responseCallbackForEncryptRequest = sendResponse;
-      chromeStorageService
-        .update({
-          encryptRequest: message.params,
-        })
-        .then(() => {
-          launchPopUp();
-        });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.ENCRYPT,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-
-    return true;
-  };
-
-  const processDecryptRequest = (message: { params: DecryptRequest }, sendResponse: CallbackResponse) => {
-    if (!message.params) {
-      sendResponse({
-        type: YoursEventName.DECRYPT,
-        success: false,
-        error: 'Must provide valid params!',
-      });
-      return;
-    }
-    try {
-      responseCallbackForDecryptRequest = sendResponse;
-      chromeStorageService
-        .update({
-          decryptRequest: message.params,
-        })
-        .then(() => {
-          launchPopUp();
-        });
-    } catch (error) {
-      sendResponse({
-        type: YoursEventName.DECRYPT,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    }
-
-    return true;
-  };
-
-  // RESPONSES ********************************
-
-  const cleanup = (types: YoursEventName[]) => {
-    chromeStorageService.getAndSetStorage().then((res) => {
-      if (res?.popupWindowId) {
-        removeWindow(res.popupWindowId);
-        chromeStorageService.remove([...types, 'popupWindowId']);
-      }
-    });
-  };
-
-  const processConnectResponse = (response: { decision: Decision; pubKeys: PubKeys }) => {
-    if (!responseCallbackForConnectRequest) throw Error('Missing callback!');
-    try {
-      if (response.decision === 'approved') {
-        responseCallbackForConnectRequest({
-          type: YoursEventName.CONNECT,
-          success: true,
-          data: response.pubKeys.identityPubKey,
-        });
-      } else {
-        responseCallbackForConnectRequest({
-          type: YoursEventName.CONNECT,
+          type: 'MASTER_BACKUP',
           success: false,
-          error: 'User declined the connection request',
-        });
-      }
-    } catch (error) {
-      responseCallbackForConnectRequest?.({
-        type: YoursEventName.CONNECT,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    } finally {
-      cleanup([YoursEventName.CONNECT]);
-    }
-
-    return true;
-  };
-
-  const processSendBsvResponse = (response: SendBsvResponse) => {
-    if (!responseCallbackForSendBsvRequest) throw Error('Missing callback!');
-    try {
-      responseCallbackForSendBsvRequest({
-        type: YoursEventName.SEND_BSV,
-        success: true,
-        data: { txid: response.txid, rawtx: response.rawtx },
-      });
-    } catch (error) {
-      responseCallbackForSendBsvRequest?.({
-        type: YoursEventName.SEND_BSV,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    } finally {
-      cleanup([YoursEventName.SEND_BSV]);
-    }
-
-    return true;
-  };
-
-  const processSendBsv20Response = (response: SendBsv20Response) => {
-    if (!responseCallbackForSendBsv20Request) throw Error('Missing callback!');
-    try {
-      responseCallbackForSendBsv20Request({
-        type: YoursEventName.SEND_BSV20,
-        success: true,
-        data: { txid: response.txid, rawtx: response.rawtx },
-      });
-    } catch (error) {
-      responseCallbackForSendBsv20Request?.({
-        type: YoursEventName.SEND_BSV20,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    } finally {
-      cleanup([YoursEventName.SEND_BSV20]);
-    }
-
-    return true;
-  };
-
-  const processSendMNEEResponse = (response: SendMNEEResponse) => {
-    if (!responseCallbackForSendMNEERequest) throw Error('Missing callback!');
-    try {
-      responseCallbackForSendMNEERequest({
-        type: YoursEventName.SEND_MNEE,
-        success: true,
-        data: { txid: response.txid, rawtx: response.rawtx },
-      });
-    } catch (error) {
-      responseCallbackForSendMNEERequest?.({
-        type: YoursEventName.SEND_MNEE,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    } finally {
-      cleanup([YoursEventName.SEND_MNEE]);
-    }
-
-    return true;
-  };
-
-  const processTransferOrdinalResponse = (response: { txid: string }) => {
-    if (!responseCallbackForTransferOrdinalRequest) throw Error('Missing callback!');
-    try {
-      responseCallbackForTransferOrdinalRequest({
-        type: YoursEventName.TRANSFER_ORDINAL,
-        success: true,
-        data: response?.txid,
-      });
-    } catch (error) {
-      responseCallbackForTransferOrdinalRequest?.({
-        type: YoursEventName.TRANSFER_ORDINAL,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    } finally {
-      cleanup([YoursEventName.TRANSFER_ORDINAL]);
-    }
-
-    return true;
-  };
-
-  const processGenerateTaggedKeysResponse = (response: TaggedDerivationResponse) => {
-    if (!responseCallbackForGenerateTaggedKeysRequest) throw Error('Missing callback!');
-    try {
-      responseCallbackForGenerateTaggedKeysRequest({
-        type: YoursEventName.GENERATE_TAGGED_KEYS,
-        success: true,
-        data: {
-          address: response?.address,
-          pubKey: response?.pubKey,
-          tag: response?.tag,
-        },
-      });
-    } catch (error) {
-      responseCallbackForGenerateTaggedKeysRequest?.({
-        type: YoursEventName.GENERATE_TAGGED_KEYS,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    } finally {
-      cleanup([YoursEventName.GENERATE_TAGGED_KEYS]);
-    }
-
-    return true;
-  };
-
-  const processPurchaseOrdinalResponse = (response: { txid: string }) => {
-    if (!responseCallbackForPurchaseOrdinalRequest) throw Error('Missing callback!');
-    try {
-      responseCallbackForPurchaseOrdinalRequest({
-        type: YoursEventName.PURCHASE_ORDINAL,
-        success: true,
-        data: response?.txid,
-      });
-    } catch (error) {
-      responseCallbackForPurchaseOrdinalRequest?.({
-        type: YoursEventName.PURCHASE_ORDINAL,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    } finally {
-      cleanup([YoursEventName.PURCHASE_ORDINAL]);
-    }
-
-    return true;
-  };
-
-  const processSignMessageResponse = (response: SignedMessage) => {
-    if (!responseCallbackForSignMessageRequest) throw Error('Missing callback!');
-    try {
-      responseCallbackForSignMessageRequest({
-        type: YoursEventName.SIGN_MESSAGE,
-        success: true,
-        data: {
-          address: response?.address,
-          pubKey: response?.pubKey,
-          message: response?.message,
-          sig: response?.sig,
-          derivationTag: response?.derivationTag,
-        },
-      });
-    } catch (error) {
-      responseCallbackForSignMessageRequest?.({
-        type: YoursEventName.SIGN_MESSAGE,
-        success: false,
-        error: JSON.stringify(error),
-      });
-    } finally {
-      cleanup([YoursEventName.SIGN_MESSAGE]);
-    }
-
-    return true;
-  };
-
-  const processBroadcastResponse = (response: { error?: string; txid?: string }) => {
-    if (!responseCallbackForBroadcastRequest) throw Error('Missing callback!');
-    try {
-      if (response?.error) {
-        responseCallbackForBroadcastRequest({
-          type: YoursEventName.BROADCAST,
-          success: false,
-          error: response?.error,
+          error: err instanceof Error ? err.message : 'Wallet not available',
         });
         return;
       }
-      responseCallbackForBroadcastRequest({
-        type: YoursEventName.BROADCAST,
+
+      if (!accountContext) {
+        sendResponse({
+          type: 'MASTER_BACKUP',
+          success: false,
+          error: 'Wallet not initialized',
+        });
+        return;
+      }
+
+      const chain = 'main' as const;
+
+      // Build list of ALL accounts from chrome storage
+      const chromeStorage = await chromeStorageService.getAndSetStorage();
+      const allAccounts = chromeStorage?.accounts || {};
+      const accountsList = Object.entries(allAccounts)
+        .map(([identityAddress, acct]) => ({
+          identityKey: acct.pubKeys?.identityPubKey || '',
+          identityAddress,
+          name: acct.name || identityAddress.slice(0, 8),
+        }))
+        .filter((a) => a.identityKey); // skip accounts with no identity key
+
+      if (accountsList.length === 0) {
+        sendResponse({ type: 'MASTER_BACKUP', success: false, error: 'No accounts found to back up' });
+        return;
+      }
+
+      // Use the WalletStorageManager directly from AccountContext.
+      // Cast through `unknown` because WalletBackupService imports its WalletStorageManager
+      // type from `@bsv/wallet-toolbox-mobile` while AccountContext uses `@bsv/wallet-toolbox`.
+      // They're the same shape at runtime but TypeScript sees two distinct types.
+      const storage = accountContext.storage as unknown as Parameters<typeof WalletBackupService.exportAllAccounts>[0];
+      if (!storage) {
+        sendResponse({
+          type: 'MASTER_BACKUP',
+          success: false,
+          error: 'Storage manager not available',
+        });
+        return;
+      }
+
+      const blob = await WalletBackupService.exportAllAccounts(
+        storage,
+        chromeStorageService,
+        chain,
+        accountsList,
+        (event) => {
+          console.log('[MasterBackup]', event.message);
+          // Broadcast progress to popup so the UI can show per-account status
+          chrome.runtime
+            .sendMessage({
+              action: 'MASTER_BACKUP_PROGRESS',
+              data: event,
+            })
+            .catch(() => {
+              // Popup may not be listening — that's fine
+            });
+        },
+      );
+
+      // Convert blob to base64 for message passing
+      const arrayBuffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64Data = btoa(binary);
+
+      sendResponse({
+        type: 'MASTER_BACKUP',
         success: true,
-        data: response?.txid,
+        data: base64Data,
       });
     } catch (error) {
-      responseCallbackForBroadcastRequest?.({
-        type: YoursEventName.BROADCAST,
+      console.error('[MasterBackup] Error:', error);
+      chrome.runtime
+        .sendMessage({
+          action: 'MASTER_BACKUP_PROGRESS',
+          data: { stage: 'error', message: error instanceof Error ? error.message : String(error) },
+        })
+        .catch(() => {});
+      sendResponse({
+        type: 'MASTER_BACKUP',
         success: false,
-        error: JSON.stringify(error),
+        error: error instanceof Error ? error.message : String(error),
       });
-    } finally {
-      cleanup([YoursEventName.BROADCAST]);
     }
+  };
+
+  /** Decode a base64 string to Uint8Array. */
+  const fromBase64 = (b64: string): Uint8Array => {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  };
+
+  /**
+   * Process a master restore request.
+   *
+   * The popup decompresses the ZIP (where Web Workers are available) and sends
+   * only the extracted entries the background needs. The background never
+   * touches the raw ZIP — no sync decompression in the service worker.
+   */
+  const processMasterRestore = async (
+    message: {
+      legacy: boolean;
+      password: string;
+      chromeStorageData: string;
+      manifestData?: string;
+      settingsData?: string;
+      chunksData?: Record<string, string>;
+    },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const { legacy, password, chromeStorageData } = message;
+
+      // Decode the pre-extracted entries from the popup
+      const chromeStorageBytes = fromBase64(chromeStorageData);
+      const manifestBytes = message.manifestData ? fromBase64(message.manifestData) : undefined;
+      const settingsBytes = message.settingsData ? fromBase64(message.settingsData) : undefined;
+
+      // Decode chunk entries back to Uint8Arrays
+      let chunks: Record<string, Uint8Array> | undefined;
+      if (message.chunksData) {
+        chunks = {};
+        for (const [key, b64] of Object.entries(message.chunksData)) {
+          chunks[key] = fromBase64(b64);
+        }
+      }
+
+      console.log('[MasterRestore] Restoring from backup...', legacy ? '(legacy)' : '(v1/v2)');
+
+      const manifest = await WalletBackupService.restoreFromExtractedData(
+        chromeStorageService,
+        {
+          chromeStorage: chromeStorageBytes,
+          manifest: manifestBytes,
+          settings: settingsBytes,
+          chunks,
+          isLegacy: legacy,
+        },
+        password,
+        (event) => {
+          console.log('[MasterRestore]', event.message);
+        },
+      );
+
+      // Refresh chrome storage service to pick up restored data (including passKey)
+      await chromeStorageService.getAndSetStorage();
+      console.log('[MasterRestore] Chrome storage refreshed');
+
+      // Initialize the wallet so it's ready when the popup reloads.
+      // For v1/v2 this also triggers Phase 2 import of pending wallet data.
+      // For legacy this creates a fresh wallet-toolbox storage that syncs from remote.
+      console.log('[MasterRestore] Initializing wallet...');
+      const wallet = await initializeWallet();
+      console.log('[MasterRestore] Wallet initialized:', !!wallet);
+
+      sendResponse({
+        type: 'MASTER_RESTORE',
+        success: true,
+        data: manifest,
+      });
+    } catch (error) {
+      console.error('[MasterRestore] Error:', error);
+      sendResponse({
+        type: 'MASTER_RESTORE',
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  // CWI (BRC-100) HANDLERS ********************************
+  // All handlers are now direct passthroughs - WalletPermissionsManager handles permission prompts
+
+  // Shared helper: if already authorized, respond immediately; otherwise launch popup
+  const handleConnectOrAuth = (
+    request: ConnectRequest,
+    _sendResponse: CallbackResponse,
+    isAuthorized: boolean,
+    setCallback: () => void,
+    immediateResponse: () => void,
+  ) => {
+    if (isAuthorized) {
+      immediateResponse();
+      return true;
+    }
+    setCallback();
+    chromeStorageService.update({ connectRequest: request }).then(() => {
+      launchPopUp();
+    });
+    return true;
+  };
+
+  // Shared helper to check if a domain is authenticated
+  const checkIsAuthenticated = async (domain?: string): Promise<boolean> => {
+    await chromeStorageService.getAndSetStorage();
+    const result = chromeStorageService.getCurrentAccountObject();
+    if (!result?.account) return false;
+
+    const currentTime = Date.now();
+    const lastActiveTime = result.lastActiveTime;
+
+    return (
+      !result.isLocked &&
+      currentTime - Number(lastActiveTime) < getInactivityLimit() &&
+      (!domain || result.account.settings.whitelist?.map((i: { domain: string }) => i.domain).includes(domain))
+    );
+  };
+
+  const processCWIIsAuthenticated = (originator: string | undefined, sendResponse: CallbackResponse) => {
+    checkIsAuthenticated(originator)
+      .then((isAuthenticated) => {
+        sendResponse({
+          type: CWIEventName.IS_AUTHENTICATED,
+          success: true,
+          data: { authenticated: isAuthenticated },
+        });
+      })
+      .catch(() => {
+        sendResponse({
+          type: CWIEventName.IS_AUTHENTICATED,
+          success: true,
+          data: { authenticated: false },
+        });
+      });
 
     return true;
   };
 
-  const processGetSignaturesResponse = (response: { error?: string; sigResponses?: SignatureResponse[] }) => {
-    if (!responseCallbackForGetSignaturesRequest) throw Error('Missing callback!');
+  const processCWIWaitForAuthentication = (
+    message: { params: RequestParams; originator?: string },
+    sendResponse: CallbackResponse,
+    isAuthorized: boolean,
+  ) => {
+    const domain = message.originator;
+
+    const respond = (success: boolean, error?: string) => {
+      sendResponse({
+        type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+        success,
+        data: success ? { authenticated: true } : undefined,
+        error,
+      });
+    };
+
+    return handleConnectOrAuth(
+      {
+        domain: domain || 'unknown',
+        appName: domain || 'Unknown App',
+        appIcon: HOSTED_YOURS_IMAGE,
+        isAuthorized,
+      } as ConnectRequest,
+      sendResponse,
+      isAuthorized,
+      () => {
+        responseCallbackForConnectRequest = (decision: Decision) => {
+          respond(
+            decision === 'approved',
+            decision !== 'approved' ? 'User declined the connection request' : undefined,
+          );
+        };
+      },
+      () => {
+        respond(true);
+        // Close the unlock popup — connect approval not needed
+        if (popupWindowId) {
+          removeWindow(popupWindowId);
+          popupWindowId = undefined;
+          chrome.storage.local.remove('popupWindowId');
+        }
+      },
+    );
+  };
+
+  // Direct passthrough handlers - wallet handles permissions internally
+  const processCWIListOutputs = async (
+    message: { params: ListOutputsArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
     try {
-      responseCallbackForGetSignaturesRequest({
-        type: YoursEventName.GET_SIGNATURES,
-        success: !response?.error,
-        data: response?.sigResponses ?? [],
-        error: response?.error,
+      const w = await ensureWallet();
+
+      const result = await w.listOutputs(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.LIST_OUTPUTS,
+        success: true,
+        data: result,
       });
     } catch (error) {
-      responseCallbackForGetSignaturesRequest?.({
-        type: YoursEventName.GET_SIGNATURES,
+      sendResponse({
+        type: CWIEventName.LIST_OUTPUTS,
         success: false,
-        error: JSON.stringify(error),
+        error: error instanceof Error ? error.message : JSON.stringify(error),
       });
-    } finally {
-      cleanup([YoursEventName.GET_SIGNATURES]);
     }
-
     return true;
   };
 
-  const processEncryptResponse = (response: { encryptedMessages: string[] }) => {
-    if (!responseCallbackForEncryptRequest) throw Error('Missing callback!');
+  const processCWIGetNetwork = async (sendResponse: CallbackResponse) => {
     try {
-      responseCallbackForEncryptRequest({
-        type: YoursEventName.ENCRYPT,
+      const w = await ensureWallet();
+
+      const result = await w.getNetwork({});
+      sendResponse({
+        type: CWIEventName.GET_NETWORK,
         success: true,
-        data: response.encryptedMessages,
+        data: result,
       });
     } catch (error) {
-      responseCallbackForEncryptRequest?.({
-        type: YoursEventName.ENCRYPT,
+      sendResponse({
+        type: CWIEventName.GET_NETWORK,
         success: false,
-        error: JSON.stringify(error),
+        error: error instanceof Error ? error.message : JSON.stringify(error),
       });
-    } finally {
-      cleanup([YoursEventName.ENCRYPT]);
     }
-
     return true;
   };
 
-  const processDecryptResponse = (response: { decryptedMessages: string[] }) => {
-    if (!responseCallbackForDecryptRequest) throw Error('Missing callback!');
+  const processCWIGetHeight = async (sendResponse: CallbackResponse) => {
     try {
-      responseCallbackForDecryptRequest({
-        type: YoursEventName.DECRYPT,
+      const w = await ensureWallet();
+
+      const result = await w.getHeight({});
+      sendResponse({
+        type: CWIEventName.GET_HEIGHT,
         success: true,
-        data: response.decryptedMessages,
+        data: result,
       });
     } catch (error) {
-      responseCallbackForDecryptRequest?.({
-        type: YoursEventName.DECRYPT,
+      sendResponse({
+        type: CWIEventName.GET_HEIGHT,
         success: false,
-        error: JSON.stringify(error),
+        error: error instanceof Error ? error.message : JSON.stringify(error),
       });
+    }
+    return true;
+  };
+
+  const processCWIGetHeaderForHeight = async (message: { params: GetHeaderArgs }, sendResponse: CallbackResponse) => {
+    try {
+      const w = await ensureWallet();
+
+      const result = await w.getHeaderForHeight(message.params);
+      sendResponse({
+        type: CWIEventName.GET_HEADER_FOR_HEIGHT,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.GET_HEADER_FOR_HEIGHT,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIGetVersion = async (sendResponse: CallbackResponse) => {
+    try {
+      const w = await ensureWallet();
+
+      const result = await w.getVersion({});
+      sendResponse({
+        type: CWIEventName.GET_VERSION,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.GET_VERSION,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIGetPublicKey = async (
+    message: { params: GetPublicKeyArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      console.log(
+        '[background] processCWIGetPublicKey: entering, params:',
+        JSON.stringify(message.params),
+        'originator:',
+        message.originator,
+      );
+      const w = await ensureWallet();
+      console.log('[background] processCWIGetPublicKey: ensureWallet resolved, calling w.getPublicKey...');
+      const result = await w.getPublicKey(message.params, message.originator);
+      console.log('[background] processCWIGetPublicKey: getPublicKey returned successfully');
+      sendResponse({
+        type: CWIEventName.GET_PUBLIC_KEY,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error('[background] processCWIGetPublicKey: error:', error);
+      sendResponse({
+        type: CWIEventName.GET_PUBLIC_KEY,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIListActions = async (
+    message: { params: ListActionsArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+
+      const result = await w.listActions(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.LIST_ACTIONS,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.LIST_ACTIONS,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIVerifySignature = async (
+    message: { params: VerifySignatureArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      console.log('[background] processCWIVerifySignature: entering, originator:', message.originator);
+      const w = await ensureWallet();
+      console.log('[background] processCWIVerifySignature: ensureWallet resolved, calling w.verifySignature...');
+      const result = await w.verifySignature(message.params, message.originator);
+      console.log('[background] processCWIVerifySignature: success');
+      sendResponse({
+        type: CWIEventName.VERIFY_SIGNATURE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error('[background] processCWIVerifySignature: error:', error);
+      sendResponse({
+        type: CWIEventName.VERIFY_SIGNATURE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWICreateHmac = async (
+    message: { params: CreateHmacArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    console.log(
+      '[background] processCWICreateHmac called, originator:',
+      message.originator,
+      'params:',
+      JSON.stringify(message.params),
+    );
+    try {
+      const w = await ensureWallet();
+      console.log('[background] processCWICreateHmac: wallet obtained, calling w.createHmac...');
+      const result = await w.createHmac(message.params, message.originator);
+      console.log('[background] processCWICreateHmac: success');
+      sendResponse({
+        type: CWIEventName.CREATE_HMAC,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error('[background] processCWICreateHmac: error:', error);
+      sendResponse({
+        type: CWIEventName.CREATE_HMAC,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIVerifyHmac = async (
+    message: { params: VerifyHmacArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      console.log('[background] processCWIVerifyHmac: entering, originator:', message.originator);
+      const w = await ensureWallet();
+      console.log('[background] processCWIVerifyHmac: ensureWallet resolved, calling w.verifyHmac...');
+      const result = await w.verifyHmac(message.params, message.originator);
+      console.log('[background] processCWIVerifyHmac: success');
+      sendResponse({
+        type: CWIEventName.VERIFY_HMAC,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error('[background] processCWIVerifyHmac: error:', error);
+      sendResponse({
+        type: CWIEventName.VERIFY_HMAC,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  // Signing operations - wallet handles permission prompts internally via callbacks
+  const processCWICreateSignature = async (
+    message: { params: CreateSignatureArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      console.log('[background] processCWICreateSignature: entering, originator:', message.originator);
+      const w = await ensureWallet();
+      console.log('[background] processCWICreateSignature: ensureWallet resolved, calling w.createSignature...');
+      const result = await w.createSignature(message.params, message.originator);
+      console.log('[background] processCWICreateSignature: success');
+      sendResponse({
+        type: CWIEventName.CREATE_SIGNATURE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error('[background] processCWICreateSignature: error:', error);
+      sendResponse({
+        type: CWIEventName.CREATE_SIGNATURE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIEncrypt = async (
+    message: { params: WalletEncryptArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+
+      const result = await w.encrypt(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.ENCRYPT,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.ENCRYPT,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIDecrypt = async (
+    message: { params: WalletDecryptArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+
+      const result = await w.decrypt(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.DECRYPT,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.DECRYPT,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const closePermissionPopup = () => {
+    if (popupWindowId) {
+      removeWindow(popupWindowId);
+      popupWindowId = undefined;
+      chromeStorageService.remove('popupWindowId');
+    }
+  };
+
+  const processCWICreateAction = async (
+    message: { params: CreateActionArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+
+      console.log('[createAction] Starting with originator:', message.originator);
+      console.log(
+        '[createAction] Params:',
+        JSON.stringify({
+          description: message.params.description,
+          inputCount: message.params.inputs?.length ?? 0,
+          outputCount: message.params.outputs?.length ?? 0,
+          options: message.params.options,
+          hasInputBEEF: !!message.params.inputBEEF,
+          inputBEEFLength: message.params.inputBEEF?.length ?? 0,
+        }),
+      );
+
+      // WalletPermissionsManager will trigger spending authorization callback if needed
+      const result = await w.createAction(message.params, message.originator);
+      console.log('[createAction] Success');
+      sendResponse({
+        type: CWIEventName.CREATE_ACTION,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : 'Unknown';
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error('[createAction] Error:', errorName, errorMessage);
+      if (errorStack) console.error('[createAction] Stack:', errorStack);
+      sendResponse({
+        type: CWIEventName.CREATE_ACTION,
+        success: false,
+        error: errorMessage,
+      });
+    }
+    closePermissionPopup();
+    return true;
+  };
+
+  const processCWISignAction = async (
+    message: { params: SignActionArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+
+      const result = await w.signAction(message.params, message.originator);
+      console.log('[signAction] Success', result?.txid ? `txid=${result.txid}` : '');
+      sendResponse({
+        type: CWIEventName.SIGN_ACTION,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error('[signAction] Error:', error);
+      if (error && typeof error === 'object') {
+        const { sendWithResults, txid, code } = error as Record<string, unknown>;
+        if (sendWithResults) {
+          console.error('[signAction] sendWithResults:', JSON.stringify(sendWithResults, null, 2));
+          console.error('[signAction] txid:', txid, 'code:', code);
+        }
+      }
+      sendResponse({
+        type: CWIEventName.SIGN_ACTION,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    closePermissionPopup();
+    return true;
+  };
+
+  const processCWIAbortAction = async (
+    message: { params: AbortActionArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+
+      const result = await w.abortAction(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.ABORT_ACTION,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.ABORT_ACTION,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIInternalizeAction = async (
+    message: { params: InternalizeActionArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.internalizeAction(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.INTERNALIZE_ACTION,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.INTERNALIZE_ACTION,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIRelinquishOutput = async (
+    message: { params: RelinquishOutputArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.relinquishOutput(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.RELINQUISH_OUTPUT,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.RELINQUISH_OUTPUT,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIRevealCounterpartyKeyLinkage = async (
+    message: { params: RevealCounterpartyKeyLinkageArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.revealCounterpartyKeyLinkage(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIRevealSpecificKeyLinkage = async (
+    message: { params: RevealSpecificKeyLinkageArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.revealSpecificKeyLinkage(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIAcquireCertificate = async (
+    message: { params: AcquireCertificateArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.acquireCertificate(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.ACQUIRE_CERTIFICATE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.ACQUIRE_CERTIFICATE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIListCertificates = async (
+    message: { params: ListCertificatesArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.listCertificates(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.LIST_CERTIFICATES,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.LIST_CERTIFICATES,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIProveCertificate = async (
+    message: { params: ProveCertificateArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.proveCertificate(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.PROVE_CERTIFICATE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.PROVE_CERTIFICATE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIRelinquishCertificate = async (
+    message: { params: RelinquishCertificateArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.relinquishCertificate(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.RELINQUISH_CERTIFICATE,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.RELINQUISH_CERTIFICATE,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIDiscoverByIdentityKey = async (
+    message: { params: DiscoverByIdentityKeyArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.discoverByIdentityKey(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.DISCOVER_BY_IDENTITY_KEY,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.DISCOVER_BY_IDENTITY_KEY,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  const processCWIDiscoverByAttributes = async (
+    message: { params: DiscoverByAttributesArgs; originator?: string },
+    sendResponse: CallbackResponse,
+  ) => {
+    try {
+      const w = await ensureWallet();
+      const result = await w.discoverByAttributes(message.params, message.originator);
+      sendResponse({
+        type: CWIEventName.DISCOVER_BY_ATTRIBUTES,
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.DISCOVER_BY_ATTRIBUTES,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
+    return true;
+  };
+
+  // CONNECT RESPONSE ********************************
+
+  const processConnectResponse = (response: { decision: Decision }) => {
+    console.log(
+      '[processConnectResponse] decision:',
+      response.decision,
+      'hasCallback:',
+      !!responseCallbackForConnectRequest,
+    );
+    if (!responseCallbackForConnectRequest) {
+      console.error('[processConnectResponse] Missing callback!');
+      return true;
+    }
+    try {
+      responseCallbackForConnectRequest(response.decision);
+    } catch (error) {
+      console.error('Error in connect response callback:', error);
     } finally {
-      cleanup([YoursEventName.DECRYPT]);
+      responseCallbackForConnectRequest = null;
+      chromeStorageService.remove('connectRequest');
+      chromeStorageService.getAndSetStorage().then((res) => {
+        if (res?.popupWindowId) {
+          removeWindow(res.popupWindowId);
+          chromeStorageService.remove('popupWindowId');
+        }
+      });
     }
 
     return true;
@@ -1368,127 +2670,39 @@ if (isInServiceWorker) {
   // HANDLE WINDOW CLOSE *****************************************
   chrome.windows.onRemoved.addListener((closedWindowId) => {
     console.log('Window closed: ', closedWindowId);
-    localStorage.removeItem('walletImporting');
 
     if (closedWindowId === popupWindowId) {
       if (responseCallbackForConnectRequest) {
-        responseCallbackForConnectRequest({
-          type: YoursEventName.CONNECT,
-          success: false,
-          error: 'User dismissed the request!',
-        });
+        responseCallbackForConnectRequest('declined');
         responseCallbackForConnectRequest = null;
         chromeStorageService.remove('connectRequest');
       }
 
-      if (responseCallbackForSendBsvRequest) {
-        responseCallbackForSendBsvRequest({
-          type: YoursEventName.SEND_BSV,
-          success: false,
-          error: 'User dismissed the request!',
-        });
-        responseCallbackForSendBsvRequest = null;
-        chromeStorageService.remove('sendBsvRequest');
+      // Deny any pending permission requests when popup is closed
+      for (const [requestID, pending] of pendingPermissionRequests) {
+        accountContext?.wallet.denyPermission(requestID).catch(console.error);
+        pending.reject(new Error('User dismissed the request'));
       }
+      pendingPermissionRequests.clear();
+      chromeStorageService.remove('permissionRequest');
 
-      if (responseCallbackForSendBsv20Request) {
-        responseCallbackForSendBsv20Request({
-          type: YoursEventName.SEND_BSV20,
-          success: false,
-          error: 'User dismissed the request!',
-        });
-        responseCallbackForSendBsvRequest = null;
-        chromeStorageService.remove('sendBsv20Request');
+      for (const [requestID, pending] of pendingGroupedPermissionRequests) {
+        accountContext?.wallet.denyGroupedPermission(requestID).catch(console.error);
+        pending.reject(new Error('User dismissed the request'));
       }
+      pendingGroupedPermissionRequests.clear();
+      chromeStorageService.remove('groupedPermissionRequest');
 
-      if (responseCallbackForSendMNEERequest) {
-        responseCallbackForSendMNEERequest({
-          type: YoursEventName.SEND_MNEE,
-          success: false,
-          error: 'User dismissed the request!',
-        });
-        responseCallbackForSendBsvRequest = null;
-        chromeStorageService.remove('sendMNEERequest');
+      for (const [requestID, pending] of pendingCounterpartyPermissionRequests) {
+        accountContext?.wallet.denyCounterpartyPermission(requestID).catch(console.error);
+        pending.reject(new Error('User dismissed the request'));
       }
+      pendingCounterpartyPermissionRequests.clear();
+      chromeStorageService.remove('counterpartyPermissionRequest');
 
-      if (responseCallbackForSignMessageRequest) {
-        responseCallbackForSignMessageRequest({
-          type: YoursEventName.SIGN_MESSAGE,
-          success: false,
-          error: 'User dismissed the request!',
-        });
-        responseCallbackForSignMessageRequest = null;
-        chromeStorageService.remove('signMessageRequest');
-      }
-
-      if (responseCallbackForTransferOrdinalRequest) {
-        responseCallbackForTransferOrdinalRequest({
-          type: YoursEventName.TRANSFER_ORDINAL,
-          success: false,
-          error: 'User dismissed the request!',
-        });
-        responseCallbackForTransferOrdinalRequest = null;
-        chromeStorageService.remove('transferOrdinalRequest');
-      }
-
-      if (responseCallbackForPurchaseOrdinalRequest) {
-        responseCallbackForPurchaseOrdinalRequest({
-          type: YoursEventName.PURCHASE_ORDINAL,
-          success: false,
-          error: 'User dismissed the request!',
-        });
-        responseCallbackForPurchaseOrdinalRequest = null;
-        chromeStorageService.remove('purchaseOrdinalRequest');
-      }
-
-      if (responseCallbackForBroadcastRequest) {
-        responseCallbackForBroadcastRequest({
-          type: YoursEventName.BROADCAST,
-          success: false,
-          error: 'User dismissed the request!',
-        });
-        responseCallbackForBroadcastRequest = null;
-        chromeStorageService.remove('broadcastRequest');
-      }
-
-      if (responseCallbackForGetSignaturesRequest) {
-        responseCallbackForGetSignaturesRequest({
-          type: YoursEventName.GET_SIGNATURES,
-          success: false,
-          error: 'User dismissed the request!',
-        });
-        responseCallbackForGetSignaturesRequest = null;
-        chromeStorageService.remove('getSignaturesRequest');
-      }
-
-      if (responseCallbackForGenerateTaggedKeysRequest) {
-        responseCallbackForGenerateTaggedKeysRequest({
-          type: YoursEventName.GENERATE_TAGGED_KEYS,
-          success: false,
-          error: 'User dismissed the request!',
-        });
-        responseCallbackForGenerateTaggedKeysRequest = null;
-        chromeStorageService.remove('generateTaggedKeysRequest');
-      }
-
-      if (responseCallbackForEncryptRequest) {
-        responseCallbackForEncryptRequest({
-          type: YoursEventName.ENCRYPT,
-          success: false,
-          error: 'User dismissed the request!',
-        });
-        responseCallbackForEncryptRequest = null;
-        chromeStorageService.remove('encryptRequest');
-      }
-
-      if (responseCallbackForDecryptRequest) {
-        responseCallbackForDecryptRequest({
-          type: YoursEventName.DECRYPT,
-          success: false,
-          error: 'User dismissed the request!',
-        });
-        responseCallbackForDecryptRequest = null;
-        chromeStorageService.remove('decryptRequest');
+      // Reject any CWI handlers waiting for wallet unlock
+      for (const waiter of pendingWalletWaiters.splice(0)) {
+        waiter.reject(new Error('User dismissed the unlock request'));
       }
 
       popupWindowId = undefined;

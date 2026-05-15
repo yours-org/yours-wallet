@@ -1,0 +1,14 @@
+{
+  "workspace": "openprotocollabs",
+  "project": {
+    "id": "9cddd694-3c3d-4f14-b385-b6fb3064c013",
+    "name": "Yours BRC100 Update"
+  },
+  "team": {
+    "id": "d7a8e5a8-67a8-4325-915a-5ec21357c5ca",
+    "name": "OPL",
+    "key": "OPL"
+  },
+  "label": "repo:yours-wallet",
+  "github_org": "yours-org"
+}

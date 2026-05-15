@@ -1,0 +1,284 @@
+import {
+  createWebWallet,
+  createIndexedDbTaskStateStore,
+  type WebWalletConfig,
+  Wallet,
+  WalletStorageManager,
+  StorageClient,
+  LocalWalletPermissionsManager,
+  IndexedDbPermissionStore,
+} from '@1sat/wallet-browser';
+import { syncAddresses, createContext as createActionContext } from '@1sat/actions';
+import { createOneSatPermissionModule } from '@1sat/permission-module';
+import type { WalletInterface } from '@bsv/sdk';
+import { ChromeStorageService } from './services/ChromeStorage.service';
+import type { Account, StorageConfig } from './services/types/chromeStorage.types';
+import { decrypt } from './utils/crypto';
+import type { Keys } from './utils/keys';
+import { initSyncContext, type SyncContext } from './initSyncContext';
+import { showOneSatPrompt } from './services/oneSatPrompt';
+
+// Admin originator for the extension (bypasses all permission checks)
+// Uses chrome-extension://<id> format to match what ChromeCWI sends
+const ADMIN_ORIGINATOR = `chrome-extension://${chrome.runtime.id}`;
+
+/**
+ * Wrap a wallet so every method call pre-binds `originator` to the supplied
+ * value. Used to route internal-wallet calls (background sync, etc.) through
+ * the permissions manager as the admin originator — encryption/decryption
+ * still applies, permission prompts are short-circuited via the
+ * `isAdminOriginator` check inside the manager.
+ */
+function withOriginator(wallet: WalletInterface, originator: string): WalletInterface {
+  return new Proxy(wallet, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if (typeof value !== 'function') return value;
+      return function (...args: unknown[]) {
+        if (args.length < 2 || args[1] === undefined) {
+          return (value as Function).call(target, args[0], originator);
+        }
+        return (value as Function).apply(target, args);
+      };
+    },
+  }) as WalletInterface;
+}
+
+/**
+ * Decrypt keys from chrome storage using the passKey from session storage.
+ * Throws if account or passKey is missing (caller should ensure authentication first).
+ */
+const decryptKeys = async (chromeStorageService: ChromeStorageService): Promise<Keys> => {
+  const { account } = chromeStorageService.getCurrentAccountObject();
+  const passKey = await chromeStorageService.getPassKey();
+
+  if (!account?.encryptedKeys) {
+    throw new Error('No account found - wallet not initialized');
+  }
+  if (!passKey) {
+    throw new Error('No passKey found - user not authenticated');
+  }
+
+  const decrypted = await decrypt(account.encryptedKeys, passKey);
+  return JSON.parse(decrypted) as Keys;
+};
+
+/**
+ * Account context containing wallet and necessary sync components.
+ * All components share the same lifecycle (account-specific).
+ */
+export interface AccountContext {
+  wallet: LocalWalletPermissionsManager;
+  baseWallet: Wallet;
+  syncContext: SyncContext;
+  storage: WalletStorageManager;
+  remoteStorage?: StorageClient;
+  setActiveStorage: (target: 'local' | string) => Promise<void>;
+  addRemote: (url: string) => Promise<void>;
+  /** Call to stop sync and destroy wallet */
+  close: () => Promise<void>;
+}
+
+/**
+ * Resolve a per-account storage config into the flat fields the SDK factory
+ * expects. Accounts predating per-account storage config (`storageConfig`
+ * undefined) get the hardcoded remote-active behavior so their unlock path
+ * is unchanged.
+ */
+const resolveStorageConfig = (
+  storageConfig: StorageConfig | undefined,
+): { activeRemote?: string; backups?: string[] } => {
+  if (!storageConfig) {
+    // No storage config — this is a pre-migration account that was previously
+    // syncing to the default remote. Return local-only; the user can add
+    // remotes from the provider list.
+    return {};
+  }
+  const { activeRemote, remotes = [] } = storageConfig;
+  // `remotes[]` holds every configured remote including the active; filter
+  // the active out before passing to the factory so it doesn't double-connect.
+  const backups = activeRemote ? remotes.filter((url) => url !== activeRemote) : remotes;
+  return { activeRemote, backups };
+};
+
+/**
+ * Read the per-install storageIdentityKey from chrome storage, generating
+ * and persisting a new random value on first use. Shared across all
+ * accounts on this install — the identity is a property of the local
+ * IndexedDB, not of any individual account. Distinct from other installs
+ * of the same account on the same remote so `WalletStorageManager` can
+ * correctly identify which local store is authoritative.
+ */
+const ensureStorageIdentityKey = async (chromeStorageService: ChromeStorageService): Promise<string> => {
+  const existing = chromeStorageService.getCurrentAccountObject().storageIdentityKey;
+  if (existing) return existing;
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const key = `yours-${hex}`;
+  await chromeStorageService.update({ storageIdentityKey: key });
+  return key;
+};
+
+export interface InitWalletOptions {
+  onTransactionBroadcasted?: (txid: string) => void;
+  onTransactionProven?: (txid: string) => void;
+}
+
+/**
+ * Initialize the Wallet instance with all sync components.
+ *
+ * Uses remote storage as the sole storage backend — no local IndexedDB.
+ * The server handles transaction lifecycle (broadcasting, proof checking).
+ *
+ * Throws if account or passKey is missing (caller should ensure authentication first).
+ * Call this after user authentication (unlock).
+ */
+export const initWallet = async (
+  chromeStorageService: ChromeStorageService,
+  options?: InitWalletOptions,
+): Promise<AccountContext> => {
+  // Ensure storage is loaded
+  await chromeStorageService.getAndSetStorage();
+
+  // 1. BROWSER-SPECIFIC: Decrypt keys
+  const keys = await decryptKeys(chromeStorageService);
+  if (!keys.identityWif) {
+    throw new Error('No identity key found in decrypted keys');
+  }
+
+  const chain = 'main' as const;
+
+  // 2. Create wallet using browser factory. Storage topology comes from the
+  // current account's persisted storageConfig (or implicit default for
+  // pre-existing accounts that have none yet). storageIdentityKey is
+  // per-install and lazily materialized.
+  const { account } = chromeStorageService.getCurrentAccountObject();
+  const { activeRemote, backups } = resolveStorageConfig(account?.storageConfig);
+  const storageIdentityKey = await ensureStorageIdentityKey(chromeStorageService);
+
+  const walletConfig: WebWalletConfig = {
+    privateKey: keys.identityWif,
+    chain,
+    feeModel: { model: 'sat/kb', value: chromeStorageService.getCustomFeeRate() },
+    activeRemote,
+    backups,
+    storageIdentityKey,
+    taskStateStore: createIndexedDbTaskStateStore(),
+  };
+
+  const {
+    wallet: baseWallet,
+    destroy: destroyWallet,
+    storage,
+    remoteStorage,
+    setActiveStorage,
+    addRemote,
+  } = await createWebWallet(walletConfig);
+
+  // 3. Build the IndexedDB-backed permission store used by
+  //    LocalWalletPermissionsManager for basket/cert/spending grants.
+  const permissionStore = new IndexedDbPermissionStore({ scope: 'yours-wallet' });
+
+  // 4. Build the 1Sat permission module that gates 'p 1sat'-protocol
+  //    signing via hashOutputs commitments captured at createAction time.
+  //    The module receives the underlying base wallet so its internal
+  //    placeholder-substitution createSignature calls bypass the
+  //    permission manager (no re-prompt loops).
+  const oneSatModule = createOneSatPermissionModule({
+    wallet: baseWallet,
+    promptHandler: showOneSatPrompt,
+    adminOriginator: ADMIN_ORIGINATOR,
+    // Reuse the same permission store the LocalWalletPermissionsManager
+    // uses, so basket grants persisted via the grouped-permission popup
+    // are picked up by the module's basket-access checks (and vice versa).
+    permissionStore,
+  });
+
+  // 5. Wrap with permissions manager for external app access control.
+  // Grants persist in IndexedDB (off-chain) via LocalWalletPermissionsManager.
+  // The 1Sat module is registered under schemeID '1sat' — any 'p 1sat'
+  // protocol or basket prefix and any 'p 1sat' label routes to it.
+  const wallet = new LocalWalletPermissionsManager(
+    baseWallet,
+    ADMIN_ORIGINATOR,
+    { permissionModules: { '1sat': oneSatModule } },
+    { store: permissionStore },
+  );
+
+  // 5. Initialize sync context (derives addresses, creates services, queue, addressManager).
+  // Background sync calls go through the manager-wrapped wallet (admin
+  // originator pre-bound) so internalizeAction encrypts customInstructions
+  // consistently with dApp-initiated writes. Without this wrap, sync would
+  // bypass the manager entirely and produce plaintext customInstructions —
+  // creating mixed-encoding rows that break later reads.
+  const adminWallet = withOriginator(wallet, ADMIN_ORIGINATOR);
+  const maxKeyIndex = account?.settings?.maxKeyIndex ?? 4; // default: 0-4 = 5 addresses
+  const syncContext = await initSyncContext({
+    wallet: adminWallet,
+    chain,
+    maxKeyIndex,
+  });
+
+  // 5b. Persist the primary address so other accounts can display it in the UI.
+  // Only set it if the account doesn't already have one — preserve the user's
+  // selection from the receive screen across lock/unlock and account switches.
+  if (!account?.primaryAddress) {
+    const primaryAddress = syncContext.addressManager.getPrimaryAddress();
+    if (primaryAddress) {
+      const identityAddress = keys.identityAddress;
+      chromeStorageService.updateNested('accounts', {
+        [identityAddress]: { primaryAddress } as unknown as Account,
+      });
+    }
+  }
+
+  // 6. Run address sync via syncAddresses action (fire-and-forget)
+  const actionCtx = createActionContext(adminWallet, { chain, services: syncContext.services });
+
+  const sendSyncStatus = (data: { status: string; [key: string]: unknown }) => {
+    chrome.runtime
+      .sendMessage({
+        action: 'syncStatusUpdate',
+        data,
+      })
+      .catch(() => {
+        // Ignore errors if popup is not open
+      });
+  };
+
+  console.log('[initWallet] Starting address sync...');
+  sendSyncStatus({ status: 'start', addressCount: maxKeyIndex + 1 });
+
+  syncAddresses
+    .execute(actionCtx, {
+      count: maxKeyIndex + 1,
+      onProgress: (progress) => {
+        sendSyncStatus({ status: 'progress', ...progress });
+      },
+    })
+    .then((result) => {
+      sendSyncStatus({ status: 'complete', ...result });
+      console.log('[initWallet] Address sync complete:', result);
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      sendSyncStatus({ status: 'error', message });
+      console.error('[initWallet] Address sync failed:', error);
+    });
+
+  // Create close function
+  const close = async () => {
+    await destroyWallet();
+  };
+
+  return {
+    wallet,
+    baseWallet,
+    syncContext,
+    storage,
+    remoteStorage,
+    setActiveStorage,
+    addRemote,
+    close,
+  };
+};

@@ -1,6 +1,10 @@
 import { ECIES, PrivateKey, PublicKey, Utils } from '@bsv/sdk';
 import CryptoJS from 'crypto-js';
 
+const V2_PREFIX = 'v2:';
+
+// --- Key derivation (unchanged — changing this would break existing passwords) ---
+
 export const deriveKey = (password: string, salt: string) => {
   const key = CryptoJS.PBKDF2(password, salt, {
     keySize: 256 / 32,
@@ -11,30 +15,64 @@ export const deriveKey = (password: string, salt: string) => {
 };
 
 export const generateRandomSalt = (length = 16) => {
-  return CryptoJS.lib.WordArray.random(length).toString(CryptoJS.enc.Hex);
+  return bytesToHex(crypto.getRandomValues(new Uint8Array(length)));
 };
 
-export const encrypt = (textToEncrypt: string, password: string): string => {
-  const salt = CryptoJS.lib.WordArray.random(128 / 8); // 128-bit salt
-  const key256Bits = CryptoJS.PBKDF2(password, salt, {
-    keySize: 256 / 32, // 256-bit key
-    iterations: 1000,
-  });
+// --- Hex conversion helpers ---
 
-  // IV (initialization vector) - we generate a random one
-  const iv = CryptoJS.lib.WordArray.random(128 / 8);
-
-  const ciphertext = CryptoJS.AES.encrypt(textToEncrypt, key256Bits, {
-    iv: iv,
-  });
-
-  // We concatenate the salt and the IV before the ciphertext
-  const saltedCiphertext = salt.toString() + iv.toString() + ciphertext.toString();
-
-  return saltedCiphertext;
+const hexToBytes = (hex: string): Uint8Array => {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+  }
+  return bytes;
 };
 
-export const decrypt = (saltedCiphertext: string, password: string): string => {
+const bytesToHex = (bytes: Uint8Array): string => {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+};
+
+// --- v2: AES-256-GCM via Web Crypto API (passKey used directly as key) ---
+
+const importKey = async (passKeyHex: string): Promise<CryptoKey> => {
+  return crypto.subtle.importKey('raw', hexToBytes(passKeyHex).buffer as ArrayBuffer, 'AES-GCM', false, [
+    'encrypt',
+    'decrypt',
+  ]);
+};
+
+export const encrypt = async (textToEncrypt: string, passKeyHex: string): Promise<string> => {
+  const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV per NIST recommendation for GCM
+  const key = await importKey(passKeyHex);
+  const encoded = new TextEncoder().encode(textToEncrypt);
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
+  // GCM auth tag is appended to ciphertext automatically
+  return V2_PREFIX + bytesToHex(iv) + bytesToHex(new Uint8Array(ciphertext));
+};
+
+// --- Decrypt: v2 (AES-GCM) or legacy (CryptoJS AES-CBC with 1k-iteration PBKDF2) ---
+
+export const decrypt = async (data: string, passKeyHex: string): Promise<string> => {
+  if (data.startsWith(V2_PREFIX)) {
+    const payload = data.slice(V2_PREFIX.length);
+    const iv = hexToBytes(payload.slice(0, 24)); // 12 bytes = 24 hex chars
+    const ciphertext = hexToBytes(payload.slice(24));
+    const key = await importKey(passKeyHex);
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
+      key,
+      ciphertext.buffer as ArrayBuffer,
+    );
+    return new TextDecoder().decode(decrypted);
+  }
+
+  // Legacy: salt(32 hex) + iv(32 hex) + base64 ciphertext, PBKDF2 1k iterations AES-CBC
+  return decryptLegacy(data, passKeyHex);
+};
+
+const decryptLegacy = (saltedCiphertext: string, password: string): string => {
   const salt = CryptoJS.enc.Hex.parse(saltedCiphertext.slice(0, 32));
   const iv = CryptoJS.enc.Hex.parse(saltedCiphertext.slice(32, 64));
   const ciphertext = saltedCiphertext.slice(64);
@@ -44,11 +82,11 @@ export const decrypt = (saltedCiphertext: string, password: string): string => {
     iterations: 1000,
   });
 
-  const bytes = CryptoJS.AES.decrypt(ciphertext, key256Bits, { iv: iv });
-  const originalText = bytes.toString(CryptoJS.enc.Utf8);
-
-  return originalText;
+  const bytes = CryptoJS.AES.decrypt(ciphertext, key256Bits, { iv });
+  return bytes.toString(CryptoJS.enc.Utf8);
 };
+
+// --- ECIES (unchanged) ---
 
 export const encryptUsingPrivKey = (
   message: string,

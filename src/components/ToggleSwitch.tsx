@@ -1,49 +1,6 @@
-import styled from 'styled-components';
 import { ChangeEvent } from 'react';
-import { WhiteLabelTheme, Theme } from '../theme.types';
-
-const Label = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-`;
-
-const Switch = styled.div<WhiteLabelTheme>`
-  position: relative;
-  width: 2rem;
-  height: 1rem;
-  background: ${({ theme }) => theme.color.global.contrast + '30'};
-  border-radius: 2rem;
-  padding: 0.25rem;
-  transition: 300ms all;
-
-  &:before {
-    transition: 300ms all;
-    content: '';
-    position: absolute;
-    width: 1.25rem;
-    height: 1.25rem;
-    border-radius: 50%;
-    top: 50%;
-    left: 0.125rem;
-    background: #ffffff;
-    transform: translate(0, -50%);
-  }
-`;
-
-const Input = styled.input<WhiteLabelTheme>`
-  opacity: 0;
-  position: absolute;
-
-  &:checked + ${Switch} {
-    background: ${({ theme }) => theme.color.component.toggleSwitchOn};
-
-    &:before {
-      transform: translate(1rem, -50%);
-    }
-  }
-`;
+import { motion } from 'framer-motion';
+import { Theme } from '../theme.types';
 
 export type ToggleSwitchProps = {
   on: boolean;
@@ -60,10 +17,23 @@ export const ToggleSwitch = (props: ToggleSwitchProps) => {
     }
   };
 
+  const trackOn = theme.color.component.toggleSwitchOn;
+  const trackOff = theme.color.global.contrast + '30';
+
   return (
-    <Label>
-      <Input checked={on} type="checkbox" onChange={handleChange} theme={theme} />
-      <Switch theme={theme} />
-    </Label>
+    <label className="flex items-center gap-2.5 cursor-pointer">
+      <input checked={on} type="checkbox" onChange={handleChange} className="sr-only" />
+      <div
+        className="relative w-10 h-5 rounded-full transition-colors duration-300"
+        style={{ background: on ? trackOn : trackOff }}
+      >
+        <motion.div
+          className="absolute top-1/2 w-4 h-4 rounded-full bg-white shadow-sm"
+          style={{ y: '-50%' }}
+          animate={{ x: on ? '1.25rem' : '0.125rem' }}
+          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+        />
+      </div>
+    </label>
   );
 };

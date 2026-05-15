@@ -1,6 +1,30 @@
 import { HOSTED_YOURS_IMAGE } from './constants';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+/**
+ * Send a message to the service worker and get a response.
+ * Returns a Promise that resolves with the response.
+ */
+export const sendMessageAsync = <T = any>(message: any): Promise<T> => {
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.runtime.sendMessage(message, (response: T) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(response);
+        }
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
+/**
+ * Fire-and-forget message to service worker (no response expected).
+ */
 export const sendMessage = (message: any) => {
   try {
     chrome.runtime.sendMessage(message, () => {

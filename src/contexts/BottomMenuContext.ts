@@ -6,6 +6,7 @@ type BottomMenuContextType = {
   selected: MenuItems | null;
   query: string;
   handleSelect: (item: MenuItems, query?: string) => void;
+  clearSelection: () => void;
   showMenu: () => void;
   hideMenu: () => void;
   isVisible: boolean;

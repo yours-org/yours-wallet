@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import styled from 'styled-components';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, CheckCircle, Upload } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
-import { YoursIcon } from '../../components/YoursIcon';
-import { HeaderText, Text } from '../../components/Reusable';
+import wifWallet from '../../assets/wif-wallet.svg';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
@@ -15,27 +15,15 @@ import { WifKeys } from '../../services/types/keys.types';
 import { useNavigate } from 'react-router-dom';
 import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
 
-const Content = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-`;
-
-const FormContainer = styled.form`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: none;
-`;
-
 export type ImportAccountProps = {
   onNavigateBack: () => void;
   newWallet?: boolean;
+};
+
+const stepVariants = {
+  enter: { opacity: 0, x: 24 },
+  center: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -24 },
 };
 
 export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccountProps) => {
@@ -58,7 +46,6 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
 
   useEffect(() => {
     newWallet && hideMenu();
-
     return () => {
       showMenu();
     };
@@ -91,7 +78,6 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
         setLoading(true);
       }
 
-      // Some artificial delay for the loader
       await sleep(50);
       const keys = await keysService.generateKeysFromWifAndStoreEncrypted(
         password,
@@ -108,8 +94,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
       }
 
       await chromeStorageService.switchAccount(keys.identityAddress || identityPk);
-      // Save account name and icon URL to local storage
-      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL); // Call the imported function
+      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL);
       setStep(3);
     } catch (error) {
       console.log(error);
@@ -160,13 +145,91 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
     }
   };
 
+  const accentLeft = theme.color.component.primaryButtonLeftGradient;
+  const accentRight = theme.color.component.primaryButtonRightGradient;
+  const contrast = theme.color.global.contrast;
+  const gray = theme.color.global.gray;
+  const row = theme.color.global.row;
+  const bg = theme.color.global.walletBackground;
+
+  const enterWifsStep = (
+    <div className="flex flex-col items-center w-full pb-20">
+      <p className="text-xs mb-4 text-center px-4" style={{ color: gray }}>
+        Input assets directly from your WIF private keys or import a 1Sat JSON Wallet.
+      </p>
+
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          setStep(2);
+        }}
+        className="flex flex-col items-center w-full"
+      >
+        <Input
+          theme={theme}
+          placeholder="Pay WIF private key"
+          type="text"
+          value={payPk}
+          onChange={(e) => setPayPk(e.target.value)}
+        />
+        <Input
+          theme={theme}
+          placeholder="Ord WIF private key"
+          type="text"
+          value={ordPk}
+          onChange={(e) => setOrdPk(e.target.value)}
+        />
+        <Input
+          theme={theme}
+          placeholder="Identity WIF private key"
+          type="text"
+          value={identityPk}
+          onChange={(e) => setIdentityPk(e.target.value)}
+        />
+
+        <p className="text-xs text-center my-3 px-4" style={{ color: gray + 'bb' }}>
+          Make sure you are in a safe place and no one is watching.
+        </p>
+
+        <Button theme={theme} type="primary" label="Next" isSubmit />
+      </form>
+
+      {/* JSON upload */}
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.97 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+        onClick={handleJsonUploadClick}
+        className="flex items-center justify-center gap-2 w-[87%] h-9 rounded-xl border text-sm font-semibold my-1"
+        style={{
+          borderColor: gray + '40',
+          color: contrast,
+          background: row,
+        }}
+        aria-label="Upload 1Sat JSON wallet file"
+      >
+        <Upload size={14} style={{ color: accentLeft }} />
+        Upload 1Sat JSON
+      </motion.button>
+
+      <input
+        type="file"
+        ref={hiddenFileInput}
+        onChange={handleFileRead}
+        style={{ display: 'none' }}
+        accept="application/json"
+      />
+    </div>
+  );
+
   const passwordStep = (
-    <>
-      <HeaderText theme={theme}>{newWallet ? 'Create password' : 'Import Account'}</HeaderText>
-      <Text theme={theme}>
+    <div className="flex flex-col items-center w-full pb-20">
+      <p className="text-xs mb-4 text-center" style={{ color: gray }}>
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
-      </Text>
-      <FormContainer onSubmit={handleImport}>
+      </p>
+
+      <form onSubmit={handleImport} className="flex flex-col items-center w-full">
         <Input
           theme={theme}
           placeholder="Account Name"
@@ -195,105 +258,142 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
             type="password"
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
-            style={{ marginBottom: '2rem' }}
           />
         </Show>
-        <Button theme={theme} type="primary" label="Finish" disabled={explicitlyDisableButton || loading} isSubmit />
-        <Button
-          theme={theme}
-          type="secondary"
-          label="Go back"
-          onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
-        />
-      </FormContainer>
-    </>
-  );
-
-  const enterWifsStep = (
-    <>
-      <HeaderText theme={theme}>Import a WIF Wallet</HeaderText>
-      <Text theme={theme}>Input assets directly from your WIF private keys or import a 1Sat JSON Wallet.</Text>
-      <FormContainer onSubmit={() => setStep(2)}>
-        <Input
-          theme={theme}
-          placeholder="Pay WIF private key"
-          type="text"
-          value={payPk}
-          onChange={(e) => setPayPk(e.target.value)}
-          style={{ margin: '0.25rem' }}
-        />
-        <Input
-          theme={theme}
-          placeholder="Ord WIF private key"
-          type="text"
-          value={ordPk}
-          onChange={(e) => setOrdPk(e.target.value)}
-          style={{ margin: '0.25rem' }}
-        />
-        <Input
-          theme={theme}
-          placeholder="Identity WIF private key"
-          type="text"
-          value={identityPk}
-          onChange={(e) => setIdentityPk(e.target.value)}
-          style={{ margin: '0.25rem' }}
-        />
-        <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
-          Make sure you are in a safe place and no one is watching.
-        </Text>
-        <Button theme={theme} type="primary" label="Next" isSubmit />
-      </FormContainer>
-      <Button
-        theme={theme}
-        type="secondary-outline"
-        onClick={handleJsonUploadClick}
-        label="Upload 1Sat JSON"
-        style={{ margin: 0 }}
-      />
-      <input
-        type="file"
-        ref={hiddenFileInput}
-        onChange={handleFileRead}
-        style={{ display: 'none' }}
-        accept="application/json"
-      />
-      <Button
-        theme={theme}
-        type="secondary"
-        label="Go back"
-        onClick={() => (newWallet ? navigate('/') : onNavigateBack())}
-      />
-    </>
+        <div className="mt-3 w-full">
+          <Button theme={theme} type="primary" label="Finish" disabled={explicitlyDisableButton || loading} isSubmit />
+        </div>
+      </form>
+    </div>
   );
 
   const successStep = (
-    <>
-      <HeaderText theme={theme}>Success!</HeaderText>
-      <Text theme={theme} style={{ marginBottom: '1rem' }}>
-        Your wallet has been imported.
-      </Text>
-      <Button
-        theme={theme}
-        type="primary"
-        label="Enter"
-        onClick={() => {
-          window.location.reload();
-        }}
-      />
-    </>
+    <div className="flex flex-col items-center w-full">
+      <motion.div
+        initial={{ scale: 0.4, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.1 }}
+        className="mb-5 mt-4"
+      >
+        <CheckCircle size={56} style={{ color: accentLeft }} strokeWidth={1.5} />
+      </motion.div>
+
+      <motion.h2
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+        className="text-2xl font-bold mb-2 text-center"
+        style={{ color: contrast }}
+      >
+        Wallet Imported!
+      </motion.h2>
+      <motion.p
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.33 }}
+        className="text-sm mb-6 text-center"
+        style={{ color: gray }}
+      >
+        Your wallet has been imported successfully.
+      </motion.p>
+
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.42 }}
+        className="w-full"
+      >
+        <Button
+          theme={theme}
+          type="primary"
+          label="Enter"
+          onClick={() => {
+            window.location.reload();
+          }}
+        />
+      </motion.div>
+    </div>
   );
 
   return (
     <>
       <Show when={!loading} whenFalseContent={<PageLoader theme={theme} message="Importing..." />}>
-        <Content>
+        <div className="flex flex-col items-center w-full px-2 pt-4 pb-4">
+          {/* Back button + title — above logo, consistent position */}
+          <div
+            className="flex w-full items-center gap-3 px-4 pb-4 pt-4 sticky top-0 z-10"
+            style={{ backgroundColor: bg }}
+          >
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => {
+                if (step === 1) {
+                  newWallet ? navigate('/restore-wallet') : onNavigateBack();
+                } else {
+                  setStep(step - 1);
+                }
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+              style={{ background: '#17191E' }}
+            >
+              <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
+            </motion.button>
+            <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
+              Import a WIF Wallet
+            </span>
+          </div>
+
           <Show when={newWallet}>
-            <YoursIcon width="4rem" />
+            <div
+              className="flex items-center justify-center rounded-2xl mb-4"
+              style={{ width: '4.5rem', height: '4.5rem', backgroundColor: '#17191E' }}
+            >
+              <img src={wifWallet} alt="WIF" style={{ width: 'auto', height: '2.5rem' }} />
+            </div>
           </Show>
-          <Show when={step === 1}>{enterWifsStep}</Show>
-          <Show when={step === 2}>{passwordStep}</Show>
-          <Show when={step === 3}>{successStep}</Show>
-        </Content>
+
+          <AnimatePresence mode="wait">
+            {step === 1 && (
+              <motion.div
+                key="step1"
+                variants={stepVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.25, ease: 'easeInOut' }}
+                className="w-full"
+              >
+                {enterWifsStep}
+              </motion.div>
+            )}
+            {step === 2 && (
+              <motion.div
+                key="step2"
+                variants={stepVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.25, ease: 'easeInOut' }}
+                className="w-full"
+              >
+                {passwordStep}
+              </motion.div>
+            )}
+            {step === 3 && (
+              <motion.div
+                key="step3"
+                variants={stepVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.25, ease: 'easeInOut' }}
+                className="w-full"
+              >
+                {successStep}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </Show>
     </>
   );

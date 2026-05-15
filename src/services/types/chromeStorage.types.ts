@@ -5,33 +5,56 @@ import {
   Ordinal,
   PubKeys,
   TaggedDerivationResponse,
-  SendBsv,
-  TransferOrdinal,
-  PurchaseOrdinal,
-  SignMessage,
   Broadcast,
-  GetSignatures,
-  TaggedDerivationRequest,
-  EncryptRequest,
-  DecryptRequest,
   SocialProfile,
-  SendBsv20,
   SendMNEE,
   MNEEBalance,
-} from 'yours-wallet-provider';
+} from './provider.types';
+import type {
+  PermissionRequest,
+  GroupedPermissionRequest,
+  CounterpartyPermissionRequest,
+} from '@bsv/wallet-toolbox-mobile';
 import { WhitelistedApp } from '../../inject';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
+import type { ApprovalContext } from '../../yoursApi';
+import type { OneSatPromptStorageEntry } from '../oneSatPrompt';
 
-export type Dispatch<T> = (value: T) => void;
+export type OneSatPermissionRequestEntry = OneSatPromptStorageEntry;
 
 export type Settings = {
-  noApprovalLimit: number;
   whitelist: WhitelistedApp[];
-  isPasswordRequired: boolean;
   socialProfile: SocialProfile;
   favoriteTokens: string[];
   customFeeRate: number;
+  /** Auto-lock timeout in minutes. Defaults to 10. */
+  lockTimeout?: number;
+  /** Set to true once the user dismisses the backup storage promo for this account */
+  dismissedBackupPromo?: boolean;
+  /** Set to true once the user downloads their keys from the walkthrough */
+  keysBackedUp?: boolean;
+  /** Highest deposit address index derived so far. Defaults to 4 (5 addresses). */
+  maxKeyIndex?: number;
+};
+
+/**
+ * Per-account storage configuration.
+ *
+ * `activeRemote` is a pointer: when set, it names which URL in `remotes[]`
+ * is the active store; when undefined, local storage is active.
+ *
+ * `remotes[]` is the full list of configured remote URLs. A URL being active
+ * does not remove it from this list — add/remove and set-active are separate
+ * operations.
+ *
+ * Absence of this field means "implicit default" — treated as remote-active
+ * against the hardcoded provider URL so existing accounts keep their prior
+ * behavior until the user explicitly configures storage.
+ */
+export type StorageConfig = {
+  activeRemote?: string;
+  remotes?: string[];
 };
 
 export interface Account {
@@ -42,9 +65,12 @@ export interface Account {
   derivationTags: TaggedDerivationResponse[];
   settings: Settings;
   addresses: Addresses;
+  /** BRC-29 primary receive address (index 0, "yours" prefix). Persisted on wallet init. */
+  primaryAddress?: string;
   balance: Balance;
   mneeBalance: MNEEBalance;
   pubKeys: PubKeys;
+  storageConfig?: StorageConfig;
 }
 
 export type ExchangeRateCache = {
@@ -66,24 +92,33 @@ export interface ChromeStorageObject {
   exchangeRateCache: ExchangeRateCache;
   lastActiveTime: number;
   popupWindowId: number;
-  passKey: string;
   salt: string;
   isLocked: boolean;
   colorTheme: Theme;
   version?: number;
-  hasUpgradedToSPV?: boolean;
+  deviceId?: string;
+  /**
+   * Per-install random identifier used as the local IndexedDB's
+   * `storageIdentityKey`. Distinguishes this install's local store from
+   * other installs of the same account on the shared remote, so
+   * `WalletStorageManager` can correctly identify which local is the
+   * authoritative active store. Generated on first unlock.
+   */
+  storageIdentityKey?: string;
+  showWelcome?: boolean;
   connectRequest?: ConnectRequest;
-  sendBsvRequest?: SendBsv[];
-  sendBsv20Request?: SendBsv20;
   sendMNEERequest?: SendMNEE[];
-  transferOrdinalRequest?: TransferOrdinal;
-  purchaseOrdinalRequest?: PurchaseOrdinal;
-  signMessageRequest?: SignMessage;
   broadcastRequest?: Broadcast;
-  getSignaturesRequest?: GetSignatures;
-  generateTaggedKeysRequest?: TaggedDerivationRequest;
-  encryptRequest?: EncryptRequest;
-  decryptRequest?: DecryptRequest;
+  // Permission requests from WalletPermissionsManager
+  permissionRequest?: PermissionRequest & { requestID: string };
+  groupedPermissionRequest?: GroupedPermissionRequest;
+  counterpartyPermissionRequest?: CounterpartyPermissionRequest;
+  // 1Sat permission module prompt (createAction or standalone signature)
+  oneSatPermissionRequest?: OneSatPermissionRequestEntry;
+  // Transaction approval request from YoursApi
+  transactionApprovalRequest?: ApprovalContext;
+  // Sweep migration: true after user has been through the sweep flow at least once
+  sweepCompleted?: boolean;
 }
 
 export type CurrentAccountObject = Omit<
@@ -91,24 +126,16 @@ export type CurrentAccountObject = Omit<
   | 'accounts'
   | 'popupWindowId'
   | 'connectRequest'
-  | 'sendBsvRequest'
-  | 'sendBsv20Request'
   | 'sendMNEERequest'
-  | 'transferOrdinalRequest'
-  | 'purchaseOrdinalRequest'
-  | 'signMessageRequest'
   | 'broadcastRequest'
-  | 'getSignaturesRequest'
-  | 'generateTaggedKeysRequest'
-  | 'encryptRequest'
-  | 'decryptRequest'
+  | 'permissionRequest'
+  | 'transactionApprovalRequest'
 > & { account: Account };
 
 type AppState = {
   addresses: Addresses;
   balance: Balance;
   isLocked: boolean;
-  isPasswordRequired: boolean;
   network: NetWork;
   ordinals: Ordinal[];
   pubKeys: PubKeys;
@@ -120,9 +147,7 @@ export type DeprecatedStorage = {
   encryptedKeys: string;
   exchangeRateCache: ExchangeRateCache;
   socialProfile: SocialProfile;
-  noApprovalLimit: number;
   lastActiveTime: number;
-  passKey: string;
   network: NetWork;
   paymentUtxos: StoredUtxo[];
   salt: string;

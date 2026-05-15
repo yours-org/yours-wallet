@@ -1,217 +1,172 @@
-import { IndexContext, Txo } from 'spv-store';
-import styled from 'styled-components';
-import { Ordinal } from 'yours-wallet-provider';
 import { useTheme } from '../hooks/useTheme';
-import { WhiteLabelTheme } from '../theme.types';
-import { GP_BASE_URL, KNOWN_BURN_ADDRESSES } from '../utils/constants';
+import { KNOWN_BURN_ADDRESSES } from '../utils/constants';
 import { convertAtomicValueToReadableTokenValue, formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
-import { mapOrdinal } from '../utils/providerHelper';
 import { Show } from './Show';
 import lockImage from '../assets/lock.svg';
-import { useMemo } from 'react';
-import { FaFire } from 'react-icons/fa';
+import { Flame } from 'lucide-react';
+import type { ParseContext, Txo } from '@1sat/wallet-browser';
+import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
+import { useServiceContext } from '../hooks/useServiceContext';
+import { isUri } from '../utils/uri';
 
-const Container = styled.div`
-  display: flex;
-  flex-direction: column;
-  width: 90%;
-`;
+interface Origin {
+  outpoint?: string;
+  nonce?: number;
+  insc?: { file?: { type: string; size: number; hash: string; content?: number[] } };
+  map?: { [key: string]: unknown };
+}
 
-const SectionHeader = styled.h3<WhiteLabelTheme>`
-  color: ${({ theme }) => theme.color.global.contrast};
-  font-weight: 900;
-  margin-bottom: 0.5rem;
-  font-size: 1.25rem;
-`;
-
-const Row = styled.div<WhiteLabelTheme & { $toSign: boolean }>`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  background-color: ${({ theme }) => theme.color.global.row};
-  border: ${({ theme, $toSign }) => ($toSign ? `1px solid ${theme.color.component.snackbarSuccess}` : 'none')};
-  border-radius: 0.25rem;
-`;
-
-const Index = styled.div<WhiteLabelTheme>`
-  font-weight: bold;
-  color: ${({ theme }) => theme.color.global.gray};
-  margin-right: 0.5rem;
-`;
-
-const RowData = styled.div<WhiteLabelTheme>`
-  color: ${({ theme }) => theme.color.global.contrast};
-`;
-
-const NftImage = styled.img<{ $isCircle: boolean }>`
-  width: ${({ $isCircle }) => ($isCircle ? '2rem' : '2.75rem')};
-  height: ${({ $isCircle }) => ($isCircle ? '2rem' : '2.75rem')};
-  border-radius: ${({ $isCircle }) => ($isCircle ? '50%' : '0.25rem')};
-  margin: 0 0.25rem 0 0.5rem;
-`;
-
-const AmountImageWrapper = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const IndexOwnerWrapper = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const Label = styled.div<WhiteLabelTheme>`
-  color: ${({ theme }) => theme.color.global.contrast};
-  text-align: right;
-`;
+interface Bsv21Data {
+  id?: string;
+  sym?: string;
+  dec?: number;
+  amt?: string | bigint;
+  icon?: string;
+}
 
 type TxPreviewProps = {
-  txData: IndexContext;
+  txData: ParseContext;
   inputsToSign?: number[];
 };
+
+const getOrigin = (txo: Txo): Origin | undefined => txo.data.origin?.data as Origin | undefined;
+const getBsv21 = (txo: Txo): Bsv21Data | undefined => txo.data.bsv21?.data as Bsv21Data | undefined;
+const getLock = (txo: Txo): { until: number } | undefined => txo.data.lock?.data as { until: number } | undefined;
+const getSatoshis = (txo: Txo): number => Number(txo.output.satoshis || 0);
 
 const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
   console.log('txData', txData);
   const { theme } = useTheme();
+  const { apiContext } = useServiceContext();
   const labelMaxLength = 20;
-  const mappedInputs = useMemo(() => txData?.spends.map((txo: Txo) => mapOrdinal(txo)), [txData]);
-  const mappedOutputs = useMemo(() => txData?.txos.map((txo: Txo) => mapOrdinal(txo)), [txData]);
+  const baseUrl = apiContext?.services?.baseUrl ?? ONESAT_MAINNET_CONTENT_URL;
 
-  console.log('mappedInputs', mappedInputs);
-  console.log('mappedOutputs', mappedOutputs);
+  const contrast = theme.color.global.contrast;
+  const gray = theme.color.global.gray;
+  const row = theme.color.global.row;
+  const successColor = theme.color.component.snackbarSuccess;
+  const errorColor = theme.color.component.snackbarError;
 
-  const renderNftOrTokenImage = (ordinal: Ordinal) => {
-    const inscriptionWithOutpoint =
-      ordinal?.origin?.data?.insc?.file?.type.startsWith('image') && !!ordinal.origin.outpoint;
-    const bsv20WithIcon = !!ordinal?.data?.bsv20 && !!ordinal.data.bsv20.icon;
-    const isLock = !!ordinal?.data?.lock;
+  const renderNftOrTokenImage = (txo: Txo) => {
+    const origin = getOrigin(txo);
+    const bsv21 = getBsv21(txo);
+    const lock = getLock(txo);
 
-    if (inscriptionWithOutpoint) {
-      return <NftImage $isCircle={false} src={`${GP_BASE_URL}/content/${ordinal.origin?.outpoint}`} alt="NFT" />;
+    const inscriptionWithOutpoint = origin?.insc?.file?.type?.startsWith('image') && !!origin.outpoint;
+    const bsv21WithIcon = !!bsv21 && !!bsv21.icon;
+    const isLock = !!lock;
+
+    if (inscriptionWithOutpoint && origin?.outpoint) {
+      return (
+        <img
+          src={`${baseUrl}/content/${origin.outpoint}`}
+          alt="NFT"
+          className="mx-1 ml-2"
+          style={{ width: '2.75rem', height: '2.75rem', borderRadius: '0.25rem' }}
+        />
+      );
     }
 
-    if (bsv20WithIcon) {
+    if (bsv21WithIcon) {
       return (
-        <NftImage
-          $isCircle
-          src={
-            ordinal.data.bsv20?.icon?.startsWith('https://')
-              ? ordinal.data.bsv20.icon
-              : `${GP_BASE_URL}/content/${ordinal.data.bsv20?.icon}`
-          }
+        <img
+          src={bsv21.icon && isUri(bsv21.icon) ? bsv21.icon : `${baseUrl}/content/${bsv21.icon}`}
           alt="Token"
+          className="mx-1 ml-2"
+          style={{ width: '2rem', height: '2rem', borderRadius: '50%' }}
         />
       );
     }
 
     if (isLock) {
-      return <NftImage $isCircle src={lockImage} alt="Lock" />;
+      return (
+        <img
+          src={lockImage}
+          alt="Lock"
+          className="mx-1 ml-2"
+          style={{ width: '2rem', height: '2rem', borderRadius: '50%' }}
+        />
+      );
     }
     return null;
   };
 
-  if (!mappedInputs || !mappedOutputs) return null;
+  if (!txData?.spends || !txData?.txos) return null;
+
+  const renderTxoRow = (txo: Txo, index: number, isInput: boolean) => {
+    const origin = getOrigin(txo);
+    const bsv21 = getBsv21(txo);
+    const satoshis = getSatoshis(txo);
+    const mapName = origin?.map?.name as string | undefined;
+    const toSign = isInput && !!inputsToSign?.includes(index);
+
+    return (
+      <div
+        key={index}
+        className="flex justify-between items-center p-3 mb-2 rounded"
+        style={{
+          backgroundColor: row,
+          border: toSign ? `1px solid ${successColor}` : 'none',
+        }}
+      >
+        <div className="flex items-center">
+          <span className="font-bold mr-2" style={{ color: gray }}>
+            #{index}
+          </span>
+          <span style={{ color: contrast }}>{txo.owner ? truncate(txo.owner, 6, 6) : 'Script/Contract'}</span>
+          {toSign && (
+            <span className="ml-2" style={{ color: contrast }}>
+              ✍️
+            </span>
+          )}
+          {!isInput && !!txo.owner && KNOWN_BURN_ADDRESSES.includes(txo.owner) && (
+            <Flame size={16} color={errorColor} className="ml-2" />
+          )}
+        </div>
+
+        <div className="flex items-center">
+          <span style={{ color: contrast }}>
+            <Show
+              when={!!bsv21}
+              whenFalseContent={
+                <Show
+                  when={!!mapName}
+                  whenFalseContent={
+                    <span className="text-right" style={{ color: contrast }}>
+                      {formatNumberWithCommasAndDecimals(satoshis, 0)} {satoshis > 1 ? 'sats' : 'sat'}
+                    </span>
+                  }
+                >
+                  <span className="text-right" style={{ color: contrast }}>
+                    {mapName && truncate(mapName, labelMaxLength, 0)}
+                  </span>
+                </Show>
+              }
+            >
+              <span className="text-right" style={{ color: contrast }}>
+                {convertAtomicValueToReadableTokenValue(Number(bsv21?.amt || 0), Number(bsv21?.dec || 0))}{' '}
+                {truncate(bsv21?.sym ?? 'Unknown FT', labelMaxLength, 0)}
+              </span>
+            </Show>
+          </span>
+          {renderNftOrTokenImage(txo)}
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <Container>
-      <SectionHeader theme={theme} style={{ marginTop: '0.5rem' }}>
+    <div className="flex flex-col w-full">
+      <h3 className="font-black mb-2 text-xl mt-2" style={{ color: contrast }}>
         Inputs
-      </SectionHeader>
-      {mappedInputs.map((input: Ordinal, index: number) => {
-        return (
-          <Row $toSign={!!inputsToSign?.includes(index)} key={index} theme={theme}>
-            <IndexOwnerWrapper>
-              <Index theme={theme}>#{index}</Index>
-              {<RowData theme={theme}>{input.owner ? truncate(input.owner, 6, 6) : 'Script/Contract'}</RowData>}
-              {!!inputsToSign?.includes(index) && (
-                <RowData style={{ marginLeft: '0.5rem' }} theme={theme}>
-                  ✍️
-                </RowData>
-              )}
-            </IndexOwnerWrapper>
+      </h3>
+      {txData.spends.map((txo: Txo, index: number) => renderTxoRow(txo, index, true))}
 
-            <AmountImageWrapper>
-              <RowData theme={theme}>
-                <Show
-                  when={!!input.data.bsv20}
-                  whenFalseContent={
-                    <Show
-                      when={!!input.origin?.data?.map?.name}
-                      whenFalseContent={
-                        <Label theme={theme}>
-                          {formatNumberWithCommasAndDecimals(input.satoshis, 0)} {input.satoshis > 1 ? 'sats' : 'sat'}
-                        </Label>
-                      }
-                    >
-                      <Label theme={theme}>
-                        {input.origin?.data?.map?.name && truncate(input.origin.data.map.name, labelMaxLength, 0)}
-                      </Label>
-                    </Show>
-                  }
-                >
-                  <Label theme={theme}>
-                    {convertAtomicValueToReadableTokenValue(
-                      Number(input.data.bsv20?.amt),
-                      Number(input.data.bsv20?.dec),
-                    )}{' '}
-                    {truncate(input.data.bsv20?.tick ?? input.data.bsv20?.sym ?? 'Unknown FT', labelMaxLength, 0)}
-                  </Label>
-                </Show>
-              </RowData>
-              {renderNftOrTokenImage(input)}
-            </AmountImageWrapper>
-          </Row>
-        );
-      })}
-
-      <SectionHeader theme={theme}>Outputs</SectionHeader>
-      {mappedOutputs.map((output: Ordinal, index: number) => {
-        return (
-          <Row $toSign={false} key={index} theme={theme}>
-            <IndexOwnerWrapper>
-              <Index theme={theme}>#{index}</Index>
-              <RowData theme={theme}>{output.owner ? truncate(output.owner, 6, 6) : 'Script/Contract'}</RowData>
-              <Show when={!!output.owner && KNOWN_BURN_ADDRESSES.includes(output.owner)}>
-                <FaFire color={theme.color.component.snackbarError} size={'1rem'} style={{ marginLeft: '0.5rem' }} />
-              </Show>
-            </IndexOwnerWrapper>
-
-            <AmountImageWrapper>
-              <RowData theme={theme}>
-                <Show
-                  when={!!output.data.bsv20}
-                  whenFalseContent={
-                    <Show
-                      when={!!output.origin?.data?.map?.name}
-                      whenFalseContent={
-                        <Label theme={theme}>
-                          {formatNumberWithCommasAndDecimals(output.satoshis, 0)} {output.satoshis > 1 ? 'sats' : 'sat'}
-                        </Label>
-                      }
-                    >
-                      <Label theme={theme}>
-                        {output.origin?.data?.map?.name && truncate(output.origin.data.map.name, labelMaxLength, 0)}
-                      </Label>
-                    </Show>
-                  }
-                >
-                  <Label theme={theme}>
-                    {convertAtomicValueToReadableTokenValue(
-                      Number(output.data.bsv20?.amt),
-                      Number(output.data.bsv20?.dec),
-                    )}{' '}
-                    {truncate(output.data.bsv20?.tick || output.data.bsv20?.sym || 'Unknown FT', labelMaxLength, 0)}
-                  </Label>
-                </Show>
-              </RowData>
-              {renderNftOrTokenImage(output)}
-            </AmountImageWrapper>
-          </Row>
-        );
-      })}
-    </Container>
+      <h3 className="font-black mb-2 text-xl" style={{ color: contrast }}>
+        Outputs
+      </h3>
+      {txData.txos.map((txo: Txo, index: number) => renderTxoRow(txo, index, false))}
+    </div>
   );
 };
 

@@ -1,135 +1,93 @@
-import styled, { css } from 'styled-components';
-import { WhiteLabelTheme } from '../theme.types';
+import React from 'react';
 
-export const HeaderText = styled.h1<WhiteLabelTheme>`
-  font-size: 1.35rem;
-  color: ${({ theme }) => theme.color.global.contrast};
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  font-weight: 600;
-  margin: 0.25rem 0;
-  text-align: center;
-`;
+// --- MainContent ---
+// Scrollable content area used by BsvWallet
+export const MainContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ style, children, ...props }, ref) =>
+    React.createElement(
+      'div',
+      {
+        ref,
+        style: {
+          display: 'flex',
+          flexDirection: 'column' as const,
+          alignItems: 'center',
+          width: '100%',
+          height: 'calc(100% - 3.75rem)',
+          overflowY: 'auto' as const,
+          overflowX: 'hidden' as const,
+          ...style,
+        },
+        ...props,
+      },
+      children,
+    ),
+);
+MainContent.displayName = 'MainContent';
 
-export const SubHeaderText = styled.h1<WhiteLabelTheme>`
-  font-size: 1rem;
-  color: ${({ theme }) => theme.color.global.contrast};
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  font-weight: 400;
-  margin: 0.1rem 0;
-  text-align: center;
-`;
+// --- Warning ---
+// Inline colored span used in AppsAndTools and SweepMigration
+export const Warning = ({
+  children,
+  theme,
+  style,
+  ...props
+}: {
+  children?: React.ReactNode;
+  theme: { color: { component: { snackbarWarning: string } } };
+  style?: React.CSSProperties;
+} & React.HTMLAttributes<HTMLSpanElement>) =>
+  React.createElement(
+    'span',
+    {
+      style: {
+        color: theme.color.component.snackbarWarning,
+        fontWeight: 700,
+        ...style,
+      },
+      ...props,
+    },
+    children,
+  );
 
-export const Divider = styled.hr`
-  width: 80%;
-  opacity: 0.3;
-  margin: 1rem;
-`;
-
-export const Text = styled.p<WhiteLabelTheme>`
-  font-size: 0.85rem;
-  color: ${({ theme }) => theme.color.global.contrast};
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  font-weight: 400;
-  margin: 0.25rem 0 1rem 0;
-  text-align: center;
-  width: 90%;
-`;
-
-export const Badge = styled.button<WhiteLabelTheme>`
-  background: transparent;
-  border-radius: 0.5rem;
-  border: none;
-  color: ${({ theme }) => theme.color.global.contrast + '90'};
-  margin: 0.5rem 1rem 4.5rem 1rem;
-  padding: 0.25rem 1rem;
-  ${() => css`
-    background: #bf4f74;
-    color: white;
-  `}
-`;
-
-export const ConfirmContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-`;
-
-export const FormContainer = styled.form`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: none;
-`;
-
-export const ButtonContainer = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  width: 90%;
-  margin: 0.5rem;
-`;
-
-export const MainContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  height: calc(100% - 3.75rem);
-  overflow-y: auto;
-  overflow-x: hidden;
-`;
-
-export const ReceiveContent = styled(MainContent)`
-  justify-content: center;
-  width: 100%;
-  height: calc(100% - 3.75rem);
-`;
-
-export const StyledImage = styled.img<{ $size?: string }>`
-  width: ${({ $size }) => $size ?? '5rem'};
-  height: ${({ $size }) => $size ?? '5rem'};
-`;
-
-export const GithubIcon = styled.img`
-  width: 1.25rem;
-  height: 1.25rem;
-  cursor: pointer;
-`;
-
-export const Warning = styled.span<WhiteLabelTheme>`
-  color: ${({ theme }) => theme.color.component.snackbarWarning};
-  font-weight: 700;
-`;
-
-export const DateTimePicker = styled.input.attrs({
-  type: 'datetime-local',
-})<WhiteLabelTheme>`
-  background-color: ${({ theme }) => theme.color.global.row};
-  border-radius: 0.25rem;
-  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
-  width: 80%;
-  height: auto;
-  font-size: 0.85rem;
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  padding: 0.5rem 1rem;
-  margin: 0.5rem;
-  outline: none;
-  color: ${({ theme }) => theme.color.global.contrast};
-
-  &::placeholder {
-    color: ${({ theme }) => theme.color.global.gray};
-  }
-
-  &:focus {
-    border: 1px solid ${({ theme }) => theme.color.component.primaryButtonLeftGradient};
-  }
-
-  &::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-  }
-`;
+// --- DateTimePicker ---
+// Styled datetime-local input used in AppsAndTools
+export const DateTimePicker = ({
+  theme,
+  style,
+  className,
+  ...props
+}: {
+  theme: {
+    color: {
+      global: { row: string; gray: string; contrast: string };
+      component: { primaryButtonLeftGradient: string };
+    };
+  };
+  style?: React.CSSProperties;
+  className?: string;
+} & React.InputHTMLAttributes<HTMLInputElement>) =>
+  React.createElement(
+    'div',
+    { className: 'flex justify-center w-full' },
+    React.createElement('input', {
+      type: 'datetime-local',
+      className,
+      style: {
+        backgroundColor: theme.color.global.row,
+        borderRadius: '0.75rem',
+        border: `1px solid ${theme.color.global.gray}40`,
+        width: '85%',
+        height: '2.25rem',
+        fontSize: '0.875rem',
+        fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+        padding: '0.75rem 1rem',
+        margin: '0.25rem',
+        outline: 'none',
+        color: theme.color.global.contrast,
+        WebkitAppearance: 'none' as never,
+        ...style,
+      },
+      ...props,
+    }),
+  );

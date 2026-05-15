@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, CheckCircle, ChevronRight, Upload } from 'lucide-react';
 import relayXLogo from '../../assets/relayx.svg';
 import twetchLogo from '../../assets/twetch.svg';
 import yoursWhiteLogo from '../../assets/logos/white-logo.png';
@@ -10,97 +11,28 @@ import masterWallet from '../../assets/master-wallet.svg';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { PageLoader } from '../../components/PageLoader';
-import { HeaderText, Text } from '../../components/Reusable';
 import { Show } from '../../components/Show';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import { WalletRow } from '../../components/WalletRow';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { WhiteLabelTheme } from '../../theme.types';
 import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { SupportedWalletImports } from '../../services/types/keys.types';
-import { NetWork } from 'yours-wallet-provider';
 import { SettingsPage } from '../Settings';
 import { YoursIcon } from '../../components/YoursIcon';
 import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
 
-const Content = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-`;
-
-const FormContainer = styled.form`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: none;
-`;
-
-const SeedInput = styled.textarea<WhiteLabelTheme & { $isExpert: boolean }>`
-  background-color: ${({ theme }) => theme.color.global.row};
-  border-radius: 0.5rem;
-  border: 1px solid ${({ theme }) => theme.color.global.gray + '50'};
-  width: 80%;
-  height: 4rem;
-  font-size: 0.85rem;
-  font-family: 'Inter', Arial, Helvetica, sans-serif;
-  padding: 1rem;
-  margin: 0.5rem;
-  outline: none;
-  color: ${({ theme }) => theme.color.global.contrast + '80'};
-  resize: none;
-
-  &::placeholder {
-    color: ${({ theme }) => theme.color.global.contrast + '80'};
-  }
-`;
-
-const ExpertImportWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 90%;
-`;
-
-const WalletWrapper = styled.div`
-  display: flex;
-  align-items: center;
-`;
-
-const YoursWalletContainer = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #000000;
-  width: 1.25rem;
-  height: 1.25rem;
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-`;
-
-const WalletLogo = styled.img`
-  width: auto;
-  height: 2.25rem;
-`;
-
-const WalletText = styled(Text)`
-  margin: 0 0 0 1rem;
-  text-align: left;
-  color: ${({ theme }) => theme.color.global.contrast};
-  font-weight: 600;
-`;
-
 export type RestoreAccountProps = {
   onNavigateBack: (page: SettingsPage) => void;
   newWallet?: boolean;
+};
+
+const stepVariants = {
+  enter: { opacity: 0, x: 24 },
+  center: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -24 },
 };
 
 export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAccountProps) => {
@@ -121,16 +53,44 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   const { keysService, chromeStorageService } = useServiceContext();
   const [accountName, setAccountName] = useState('');
   const [iconURL, setIconURL] = useState('');
+  const hiddenYoursFileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     newWallet && hideMenu();
-
     return () => {
       showMenu();
     };
   }, [hideMenu, showMenu, newWallet]);
 
   const handleExpertToggle = () => setIsExpertImport(!isExpertImport);
+
+  const handleYoursJsonUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || file.type !== 'application/json') {
+      addSnackbar('Please upload a JSON file.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      try {
+        const jsonData = JSON.parse(text);
+        if (!jsonData.mnemonic) {
+          addSnackbar('No seed phrase found in file.', 'error');
+          return;
+        }
+        setSeedWords(jsonData.mnemonic);
+        if (jsonData.payDerivationPath) setWalletDerivation(jsonData.payDerivationPath);
+        if (jsonData.ordDerivationPath) setOrdDerivation(jsonData.ordDerivationPath);
+        if (jsonData.identityDerivationPath) setIdentityDerivation(jsonData.identityDerivationPath);
+        setStep(3);
+      } catch {
+        addSnackbar('Error parsing JSON file!', 'error');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
 
   const handleRestore = async (event: React.FormEvent<HTMLFormElement>) => {
     try {
@@ -146,12 +106,10 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
         return;
       }
 
-      // Some artificial delay for the loader
       await sleep(50);
       const keys = await keysService.generateSeedAndStoreEncrypted(
         password,
         newWallet,
-        NetWork.Mainnet,
         seedWords,
         walletDerivation,
         ordDerivation,
@@ -168,8 +126,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
       const objKeys = Object.keys(chromeObject.accounts);
       if (!objKeys) throw new Error('Object identity address not found');
       await chromeStorageService.switchAccount(keys.identityAddress);
-      // Save account name and icon URL to local storage
-      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL); // Call the imported function
+      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL);
 
       setStep(4);
     } catch (error) {
@@ -211,13 +168,267 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
       : 'Enter a seed phrase and use custom derivation paths to import a wallet from anywhere!';
   };
 
-  const passwordStep = (
+  const accentLeft = theme.color.component.primaryButtonLeftGradient;
+  const accentRight = theme.color.component.primaryButtonRightGradient;
+  const contrast = theme.color.global.contrast;
+  const gray = theme.color.global.gray;
+  const row = theme.color.global.row;
+  const bg = theme.color.global.walletBackground;
+
+  // Wallet option rows
+  type WalletDef = { id: SupportedWalletImports | undefined; label: string; logo: React.ReactNode };
+  const walletOptions: WalletDef[] = [
+    {
+      id: 'yours',
+      label: theme.settings.walletName,
+      logo: (
+        <div
+          className="flex items-center justify-center rounded-lg"
+          style={{ backgroundColor: '#000', width: '2.25rem', height: '2.25rem', padding: '0.35rem' }}
+        >
+          <img src={yoursWhiteLogo} alt="Yours" style={{ width: '1rem', height: 'auto' }} />
+        </div>
+      ),
+    },
+    {
+      id: 'relayx',
+      label: 'RelayX',
+      logo: <img src={relayXLogo} alt="RelayX" style={{ width: 'auto', height: '2.25rem' }} />,
+    },
+    {
+      id: 'twetch',
+      label: 'Twetch',
+      logo: <img src={twetchLogo} alt="Twetch" style={{ width: 'auto', height: '2.25rem' }} />,
+    },
+    {
+      id: 'wif',
+      label: 'Restore with private key',
+      logo: <img src={wifWallet} alt="WIF" style={{ width: 'auto', height: '2.25rem' }} />,
+    },
+    ...(newWallet
+      ? [
+          {
+            id: 'master' as SupportedWalletImports,
+            label: 'Restore from master backup',
+            logo: (
+              <div
+                className="flex items-center justify-center rounded-lg"
+                style={{ backgroundColor: '#000', width: '2.25rem', height: '2.25rem', padding: '0.35rem' }}
+              >
+                <img src={masterWallet} alt="Master" style={{ width: '1.25rem' }} />
+              </div>
+            ),
+          },
+        ]
+      : []),
+    {
+      id: 'other',
+      label: 'Other',
+      logo: <img src={otherWallet} alt="Other" style={{ width: 'auto', height: '2.25rem' }} />,
+    },
+  ];
+
+  const PageHeader = ({ title, onClick }: { title: string; onClick: () => void }) => (
+    <div className="flex w-full items-center gap-3 px-4 pb-4 pt-4 sticky top-0 z-10" style={{ backgroundColor: bg }}>
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        onClick={onClick}
+        className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+        style={{ background: '#17191E' }}
+      >
+        <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
+      </motion.button>
+      <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
+        {title}
+      </span>
+    </div>
+  );
+
+  /** Back button + title + wallet icon for sub-steps. Rendered inside each step so it animates with the content. */
+  const SubStepHeader = ({ title, onBack }: { title: string; onBack: () => void }) => (
     <>
-      <HeaderText theme={theme}>{newWallet ? 'Create password' : 'Import Account'}</HeaderText>
-      <Text theme={theme}>
+      <div className="flex w-full items-center gap-3 px-4 pb-4 pt-4 sticky top-0 z-10" style={{ backgroundColor: bg }}>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={onBack}
+          className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+          style={{ background: '#17191E' }}
+        >
+          <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
+        </motion.button>
+        <span className="text-base font-bold" style={{ color: '#FFFFFF' }}>
+          {title}
+        </span>
+      </div>
+      {newWallet && (
+        <div
+          className="flex items-center justify-center rounded-2xl mb-4 mt-2"
+          style={{ width: '4.5rem', height: '4.5rem', backgroundColor: '#17191E' }}
+        >
+          {importWallet === 'relayx' ? (
+            <img src={relayXLogo} alt="RelayX" style={{ width: 'auto', height: '2.5rem' }} />
+          ) : importWallet === 'twetch' ? (
+            <img src={twetchLogo} alt="Twetch" style={{ width: 'auto', height: '2.5rem' }} />
+          ) : importWallet === 'wif' ? (
+            <img src={wifWallet} alt="WIF" style={{ width: 'auto', height: '2.5rem' }} />
+          ) : importWallet === 'other' ? (
+            <img src={otherWallet} alt="Other" style={{ width: 'auto', height: '2.5rem' }} />
+          ) : (
+            <img src={yoursWhiteLogo} alt="Yours" style={{ width: '1.75rem', height: 'auto' }} />
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  const selectImportWallet = (
+    <div className="flex flex-col items-center w-full pb-20">
+      <PageHeader
+        title="Restore a Wallet"
+        onClick={() => (newWallet ? navigate('/') : onNavigateBack('manage-accounts'))}
+      />
+      <p className="text-xs mb-4 text-center px-4" style={{ color: gray }}>
+        Select the wallet you'd like to restore from
+      </p>
+
+      <div className="w-full flex flex-col gap-2.5 mb-3">
+        {walletOptions.map((opt) =>
+          opt.id ? (
+            <WalletRow
+              key={opt.id}
+              onClick={() => handleWalletSelection(opt.id)}
+              element={
+                <div className="flex items-center gap-3 w-full">
+                  {opt.logo}
+                  <span className="text-sm font-semibold flex-1" style={{ color: contrast }}>
+                    {opt.label}
+                  </span>
+                  <ChevronRight size={16} style={{ color: gray }} />
+                </div>
+              }
+            />
+          ) : null,
+        )}
+      </div>
+    </div>
+  );
+
+  const enterSeedStep = (
+    <div className="flex flex-col items-center w-full pb-20">
+      <SubStepHeader title={getRestoreTitle()} onBack={() => setStep(1)} />
+      <p className="text-xs mb-4 text-center px-4" style={{ color: gray }}>
+        {getRestoreDescription()}
+      </p>
+
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          setStep(3);
+        }}
+        className="flex flex-col items-center w-full"
+      >
+        <div className="w-[87%] mb-2">
+          <textarea
+            placeholder="Enter secret recovery words"
+            onChange={(e) => setSeedWords(e.target.value)}
+            rows={isExpertImport ? 3 : 4}
+            className="w-full rounded-xl border text-sm outline-none resize-none px-4 py-3 transition-all duration-200"
+            style={{
+              backgroundColor: row,
+              borderColor: gray + '40',
+              color: contrast,
+              fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = accentLeft + '80';
+              e.currentTarget.style.boxShadow = `0 0 0 2px ${accentLeft}30`;
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = gray + '40';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          />
+        </div>
+
+        <Show when={isExpertImport}>
+          <Input
+            theme={theme}
+            placeholder="Wallet Derivation ex. m/44'/236'/0'/0/0"
+            type="text"
+            value={walletDerivation ?? ''}
+            onChange={(e) => setWalletDerivation(e.target.value)}
+            style={{ margin: '0.1rem', width: '85%' }}
+          />
+          <Input
+            theme={theme}
+            placeholder="Ordinal Derivation ex. m/44'/236'/1'/0/0"
+            type="text"
+            value={ordDerivation ?? ''}
+            onChange={(e) => setOrdDerivation(e.target.value)}
+            style={{ margin: '0.1rem', width: '85%' }}
+          />
+          <Input
+            theme={theme}
+            placeholder="Identity Derivation ex. m/0'/236'/0'/0/0"
+            type="text"
+            value={identityDerivation ?? ''}
+            onChange={(e) => setIdentityDerivation(e.target.value)}
+            style={{ margin: '0.1rem 0 0.5rem', width: '85%' }}
+          />
+        </Show>
+
+        <Show when={importWallet === 'other'}>
+          <div className="flex items-center w-[87%] my-2 gap-3">
+            <ToggleSwitch theme={theme} on={isExpertImport} onChange={handleExpertToggle} />
+            <span className="text-xs text-left" style={{ color: gray }}>
+              Use custom derivations
+            </span>
+          </div>
+        </Show>
+
+        <p className="text-xs text-center my-3 px-4" style={{ color: gray + 'bb' }}>
+          Make sure you are in a safe place and no one is watching.
+        </p>
+
+        <Button theme={theme} type="primary" label="Next" isSubmit />
+      </form>
+
+      {/* Yours JSON upload — extracts seed and derivation paths from key backup */}
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.97 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+        onClick={() => hiddenYoursFileInput.current?.click()}
+        className="flex items-center justify-center gap-2 w-[87%] h-9 rounded-xl border text-sm font-semibold mt-2"
+        style={{
+          borderColor: gray + '40',
+          color: contrast,
+          background: row,
+        }}
+      >
+        <Upload size={14} style={{ color: accentLeft }} />
+        Upload Yours JSON
+      </motion.button>
+
+      <input
+        type="file"
+        ref={hiddenYoursFileInput}
+        onChange={handleYoursJsonUpload}
+        style={{ display: 'none' }}
+        accept="application/json"
+      />
+    </div>
+  );
+
+  const passwordStep = (
+    <div className="flex flex-col items-center w-full pb-20">
+      <SubStepHeader title={newWallet ? 'Create Password' : 'Import Account'} onBack={() => setStep(2)} />
+      <p className="text-xs mb-4 text-center" style={{ color: gray }}>
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}
-      </Text>
-      <FormContainer onSubmit={handleRestore}>
+      </p>
+
+      <form onSubmit={handleRestore} className="flex flex-col items-center w-full">
         <Input
           theme={theme}
           placeholder="Account Name"
@@ -246,172 +457,121 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
             type="password"
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
-            style={{ marginBottom: '2rem' }}
           />
         </Show>
-        <Button theme={theme} type="primary" label="Finish" disabled={loading} isSubmit />
-        <Button theme={theme} type="secondary" label="Go back" onClick={() => setStep(2)} />
-      </FormContainer>
-    </>
-  );
-
-  const enterSeedStep = (
-    <>
-      <HeaderText theme={theme}>{getRestoreTitle()}</HeaderText>
-      <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
-        {getRestoreDescription()}
-      </Text>
-      <FormContainer onSubmit={() => setStep(3)}>
-        <SeedInput
-          theme={theme}
-          placeholder="Enter secret recovery words"
-          onChange={(e) => setSeedWords(e.target.value)}
-          $isExpert={isExpertImport}
-        />
-        <Show when={isExpertImport}>
-          <Input
-            theme={theme}
-            placeholder="Wallet Derivation ex. m/44'/236'/0'/0/0"
-            type="text"
-            value={walletDerivation ?? ''}
-            onChange={(e) => setWalletDerivation(e.target.value)}
-            style={{ margin: '0.1rem', width: '85%' }}
-          />
-          <Input
-            theme={theme}
-            placeholder="Ordinal Derivation ex. m/44'/236'/1'/0/0"
-            type="text"
-            value={ordDerivation ?? ''}
-            onChange={(e) => setOrdDerivation(e.target.value)}
-            style={{ margin: '0.1rem', width: '85%' }}
-          />
-          <Input
-            theme={theme}
-            placeholder="Identity Derivation ex. m/0'/236'/0'/0/0"
-            type="text"
-            value={identityDerivation ?? ''}
-            onChange={(e) => setIdentityDerivation(e.target.value)}
-            style={{ margin: '0.1rem 0 1rem', width: '85%' }}
-          />
-        </Show>
-        <Show when={importWallet === 'other'}>
-          <ExpertImportWrapper>
-            <ToggleSwitch theme={theme} on={isExpertImport} onChange={handleExpertToggle} />
-            <Text theme={theme} style={{ margin: '0 0 0 0.5rem', textAlign: 'left' }}>
-              Use custom derivations
-            </Text>
-          </ExpertImportWrapper>
-        </Show>
-        <Text theme={theme} style={{ margin: '1rem 0 1rem' }}>
-          Make sure you are in a safe place and no one is watching.
-        </Text>
-        <Button theme={theme} type="primary" label="Next" isSubmit />
-        <Button theme={theme} type="secondary" label="Go back" onClick={() => setStep(1)} />
-      </FormContainer>
-    </>
-  );
-
-  const availableWallets = (wallets: (SupportedWalletImports | undefined)[]) => {
-    return wallets.map((wallet) => {
-      return (
-        !!wallet && (
-          <WalletRow
-            key={window.crypto.randomUUID()}
-            onClick={() => handleWalletSelection(wallet)}
-            element={
-              <>
-                <Show when={wallet === 'yours'}>
-                  <WalletWrapper>
-                    <YoursWalletContainer theme={theme}>
-                      <WalletLogo src={yoursWhiteLogo} style={{ width: '1rem', height: 'auto' }} />
-                    </YoursWalletContainer>
-                    <WalletText theme={theme}>{theme.settings.walletName}</WalletText>
-                  </WalletWrapper>
-                </Show>
-                <Show when={wallet === 'relayx'}>
-                  <WalletWrapper>
-                    <WalletLogo src={relayXLogo} />
-                    <WalletText theme={theme}>RelayX</WalletText>
-                  </WalletWrapper>
-                </Show>
-                <Show when={wallet === 'twetch'}>
-                  <WalletWrapper>
-                    <WalletLogo src={twetchLogo} />
-                    <WalletText theme={theme}>Twetch</WalletText>
-                  </WalletWrapper>
-                </Show>
-                <Show when={wallet === 'other'}>
-                  <WalletWrapper>
-                    <WalletLogo src={otherWallet} />
-                    <WalletText theme={theme}>Other</WalletText>
-                  </WalletWrapper>
-                </Show>
-                <Show when={wallet === 'wif'}>
-                  <WalletWrapper>
-                    <WalletLogo src={wifWallet} />
-                    <WalletText theme={theme}>Restore with private key</WalletText>
-                  </WalletWrapper>
-                </Show>
-                <Show when={newWallet && wallet === 'master'}>
-                  <WalletWrapper>
-                    <YoursWalletContainer theme={theme}>
-                      <WalletLogo src={masterWallet} style={{ width: '1.25rem' }} />
-                    </YoursWalletContainer>
-                    <WalletText theme={theme}>Restore from master backup</WalletText>
-                  </WalletWrapper>
-                </Show>
-              </>
-            }
-          />
-        )
-      );
-    });
-  };
-
-  const selectImportWallet = (
-    <>
-      <HeaderText theme={theme}>Restore a Wallet</HeaderText>
-      <Text theme={theme} style={{ marginBottom: '1rem', width: '90%' }}>
-        Select the wallet you'd like to restore from
-      </Text>
-      {availableWallets(['yours', 'relayx', 'twetch', 'wif', newWallet ? 'master' : undefined, 'other'])}
-      <Button
-        theme={theme}
-        type="secondary"
-        label="Go back"
-        onClick={() => (newWallet ? navigate('/') : onNavigateBack('manage-accounts'))}
-      />
-    </>
+        <div className="mt-3 w-full">
+          <Button theme={theme} type="primary" label="Finish" disabled={loading} isSubmit />
+        </div>
+      </form>
+    </div>
   );
 
   const successStep = (
-    <>
-      <HeaderText theme={theme}>Success!</HeaderText>
-      <Text theme={theme} style={{ marginBottom: '1rem' }}>
-        Your wallet has been restored.
-      </Text>
-      <Button
-        theme={theme}
-        type="primary"
-        label="Enter"
-        onClick={() => {
-          window.location.reload();
-        }}
-      />
-    </>
+    <div className="flex flex-col items-center w-full">
+      <motion.div
+        initial={{ scale: 0.4, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.1 }}
+        className="mb-5 mt-4"
+      >
+        <CheckCircle size={56} style={{ color: accentLeft }} strokeWidth={1.5} />
+      </motion.div>
+
+      <motion.h2
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+        className="text-2xl font-bold mb-2 text-center"
+        style={{ color: contrast }}
+      >
+        Wallet Restored!
+      </motion.h2>
+      <motion.p
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.33 }}
+        className="text-sm mb-6 text-center"
+        style={{ color: gray }}
+      >
+        Your wallet has been successfully restored.
+      </motion.p>
+
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.42 }}
+        className="w-full"
+      >
+        <Button
+          theme={theme}
+          type="primary"
+          label="Enter"
+          onClick={() => {
+            window.location.reload();
+          }}
+        />
+      </motion.div>
+    </div>
   );
 
   return (
     <Show when={!loading} whenFalseContent={<PageLoader theme={theme} message="Restoring..." />}>
-      <Content>
-        <Show when={newWallet && step !== 1}>
-          <YoursIcon width="4rem" />
-        </Show>
-        <Show when={step === 1}>{selectImportWallet}</Show>
-        <Show when={step === 2}>{enterSeedStep}</Show>
-        <Show when={step === 3}>{passwordStep}</Show>
-        <Show when={step === 4}>{successStep}</Show>
-      </Content>
+      <div className="flex flex-col items-center w-full px-2 pt-4 pb-4">
+        <AnimatePresence mode="wait">
+          {step === 1 && (
+            <motion.div
+              key="step1"
+              variants={stepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="w-full"
+            >
+              {selectImportWallet}
+            </motion.div>
+          )}
+          {step === 2 && (
+            <motion.div
+              key="step2"
+              variants={stepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="w-full"
+            >
+              {enterSeedStep}
+            </motion.div>
+          )}
+          {step === 3 && (
+            <motion.div
+              key="step3"
+              variants={stepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="w-full"
+            >
+              {passwordStep}
+            </motion.div>
+          )}
+          {step === 4 && (
+            <motion.div
+              key="step4"
+              variants={stepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="w-full"
+            >
+              {successStep}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </Show>
   );
 };

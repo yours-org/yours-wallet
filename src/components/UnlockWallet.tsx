@@ -1,30 +1,13 @@
 import { useState } from 'react';
-import styled from 'styled-components';
+import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useViewport } from '../hooks/useViewport';
-import { WhiteLabelTheme } from '../theme.types';
 import { sleep } from '../utils/sleep';
-import { Button } from './Button';
 import { Input } from './Input';
-import { FormContainer, HeaderText, Text } from './Reusable';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursIcon } from './YoursIcon';
-import { setDerivationTags } from '../services/serviceHelpers';
-import { Keys } from '../utils/keys';
-
-const Container = styled.div<WhiteLabelTheme & { $isMobile: boolean }>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  width: ${(props) => (props.$isMobile ? '100vw' : '22.5rem')};
-  height: ${(props) => (props.$isMobile ? '100vh' : '33.75rem')};
-  margin: 0;
-  background-color: ${({ theme }) => theme.color.global.walletBackground};
-  color: ${({ theme }) => theme.color.global.contrast};
-  z-index: 100;
-`;
+import { sendMessageAsync } from '../utils/chromeHelpers';
 
 export type UnlockWalletProps = {
   onUnlock: () => void;
@@ -37,7 +20,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
   const { isMobile } = useViewport();
-  const { keysService, chromeStorageService, oneSatSPV } = useServiceContext();
+  const { chromeStorageService } = useServiceContext();
 
   const handleUnlock = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -45,13 +28,23 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
     setIsProcessing(true);
     await sleep(25);
 
-    const isVerified = await keysService.verifyPassword(password);
+    const isVerified = await chromeStorageService.verifyPassword(password);
     if (isVerified) {
       setVerificationFailed(false);
       const timestamp = Date.now();
       await chromeStorageService.update({ lastActiveTime: timestamp });
-      const keys = (await keysService.retrieveKeys(password)) as Keys;
-      await setDerivationTags(keys, oneSatSPV, chromeStorageService);
+
+      try {
+        const response = await sendMessageAsync<{ success: boolean; error?: string }>({
+          action: 'WALLET_UNLOCKED',
+        });
+        if (!response?.success) {
+          console.error('Wallet unlock failed:', response?.error);
+        }
+      } catch (error) {
+        console.error('Wallet unlock error:', error);
+      }
+
       onUnlock();
     } else {
       setVerificationFailed(true);
@@ -62,14 +55,62 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
     }
   };
 
+  const outlineLeft = theme.color.component.secondaryOutlineButtonGradientLeft;
+  const outlineRight = theme.color.component.secondaryOutlineButtonGradientRight;
+  const contrast = theme.color.global.contrast;
+  const gray = theme.color.global.gray;
+  const bg = theme.color.global.walletBackground;
+
   return (
-    <Container $isMobile={isMobile} theme={theme}>
-      <YoursIcon width="4rem" />
-      <HeaderText style={{ fontSize: '1.75rem' }} theme={theme}>
-        Unlock Wallet
-      </HeaderText>
-      <Text theme={theme}>Use password to unlock your wallet.</Text>
-      <FormContainer onSubmit={handleUnlock}>
+    <div
+      className="flex flex-col items-center justify-center text-center"
+      style={{
+        width: isMobile ? '100vw' : '22.5rem',
+        height: isMobile ? '100vh' : '33.75rem',
+        backgroundColor: bg,
+        color: contrast,
+        zIndex: 100,
+      }}
+    >
+      {/* Logo */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="mb-8"
+      >
+        <YoursIcon width="4rem" />
+      </motion.div>
+
+      {/* Title */}
+      <motion.h1
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.3, ease: 'easeOut' }}
+        className="text-xl font-bold mb-1 tracking-tight"
+        style={{ color: contrast }}
+      >
+        Welcome back
+      </motion.h1>
+
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.18 }}
+        className="text-xs mb-8"
+        style={{ color: gray }}
+      >
+        Enter your password to unlock
+      </motion.p>
+
+      {/* Form */}
+      <motion.form
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.24, duration: 0.3 }}
+        onSubmit={handleUnlock}
+        className="flex flex-col items-center w-full gap-3"
+      >
         <Input
           theme={theme}
           placeholder="Password"
@@ -80,14 +121,37 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           autoFocus
           onKeyDown={(e) => e.stopPropagation()}
         />
-        <Button
-          theme={theme}
-          type="secondary-outline"
-          label={isProcessing ? 'Unlocking...' : 'Unlock'}
-          disabled={isProcessing || password === ''}
-          isSubmit
-        />
-      </FormContainer>
-    </Container>
+
+        <div className="flex justify-center w-full">
+          <motion.div
+            whileHover={!isProcessing && password !== '' ? { scale: 1.02 } : undefined}
+            whileTap={!isProcessing && password !== '' ? { scale: 0.98 } : undefined}
+            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            className="flex items-center w-[87%] p-px rounded-xl"
+            style={{ background: `linear-gradient(135deg, ${outlineLeft}, ${outlineRight})` }}
+          >
+            <button
+              type="submit"
+              disabled={isProcessing || password === ''}
+              className="relative inline-flex items-center justify-center w-full font-bold text-sm rounded-xl h-10 px-4 outline-none select-none cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none gap-2"
+              style={{
+                backgroundColor: bg,
+                color: contrast,
+                fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+              }}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  Unlocking...
+                </>
+              ) : (
+                'Unlock'
+              )}
+            </button>
+          </motion.div>
+        </div>
+      </motion.form>
+    </div>
   );
 };

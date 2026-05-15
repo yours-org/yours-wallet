@@ -1,102 +1,66 @@
-import styled from 'styled-components';
-import { Ordinal as OrdinalType } from 'yours-wallet-provider';
-import { WhiteLabelTheme, Theme } from '../theme.types';
-import { Text } from './Reusable';
+import { useEffect, useState } from 'react';
+import type { WalletOutput } from '@bsv/sdk';
+import { Theme } from '../theme.types';
 import { Show } from './Show';
+import { getTagValue, getOutputName } from '../utils/format';
 
-export type OrdinalDivProps = WhiteLabelTheme & {
-  url?: string;
-  selected?: boolean;
-  size?: string;
+function wrapperBase(size?: string): React.CSSProperties {
+  const s = size ?? '6.5rem';
+  return { height: s, width: s, borderRadius: '12%', cursor: 'pointer' };
+}
+
+function selectedBorder(selected: boolean | undefined, color: string): React.CSSProperties {
+  return selected ? { border: `0.1rem solid ${color}` } : {};
+}
+
+export type JsonProps = {
+  theme: Theme;
+  children?: React.ReactNode;
+  style?: React.CSSProperties;
 };
 
-const OrdinalWrapper = styled.div<OrdinalDivProps>`
-  height: ${(props) => props.size ?? '6.5rem'};
-  width: ${(props) => props.size ?? '6.5rem'};
-  background-image: url(${(props) => props.url});
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  border-radius: 12%;
-  cursor: pointer;
-  border: ${(props) =>
-    props.selected ? `0.1rem solid ${props.theme.color.component.ordinalSelectedBorder}` : undefined};
-`;
+export const Json = ({ theme, children, style }: JsonProps) => (
+  <pre
+    style={{
+      fontFamily: "'DM Mono', monospace",
+      fontSize: '0.65rem',
+      color: theme.color.component.ordinalTypeJson,
+      margin: 0,
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+      ...style,
+    }}
+  >
+    {children}
+  </pre>
+);
 
-const IFrameWrapper = styled.div<OrdinalDivProps>`
-  height: ${(props) => props.size ?? '6.5rem'};
-  width: ${(props) => props.size ?? '6.5rem'};
-  border-radius: 12%;
-  cursor: pointer;
-  border: ${(props) =>
-    props.selected ? `0.1rem solid ${props.theme.color.component.ordinalSelectedBorder}` : undefined};
-`;
+export type FlexWrapperProps = {
+  children?: React.ReactNode;
+  style?: React.CSSProperties;
+};
 
-const StyledIFrame = styled.iframe<OrdinalDivProps>`
-  height: ${(props) => props.size ?? '6.5rem'};
-  width: ${(props) => props.size ?? '6.5rem'};
-  border-radius: 12%;
-  border: none;
-  pointer-events: none;
-`;
-
-const TextWrapper = styled(OrdinalWrapper)`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow-x: auto;
-  background-color: ${(props) => props.theme.color.global.row};
-`;
-
-const OrdText = styled(Text)`
-  color: ${(props) => props.theme.color.component.ordinalTypePlainText};
-  text-align: center;
-  width: 100%;
-  margin: 0;
-  font-size: 90%;
-`;
-
-const UnsupportedText = styled(OrdText)`
-  color: ${(props) => props.theme.color.component.ordinalTypeUnsupported};
-`;
-
-const JsonWrapper = styled.div<OrdinalDivProps>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: ${(props) => props.size ?? '6.5rem'};
-  width: ${(props) => props.size ?? '6.5rem'};
-  border-radius: 0.5rem;
-  position: relative;
-  background-color: ${(props) => props.theme.color.global.row};
-  cursor: pointer;
-  border: ${(props) =>
-    props.selected ? `0.1rem solid ${props.theme.color.component.ordinalSelectedBorder}` : undefined};
-  overflow: auto;
-`;
-
-export const Json = styled.pre<WhiteLabelTheme>`
-  font-family: 'DM Mono', monospace;
-  font-size: 0.65rem;
-  color: ${(props) => props.theme.color.component.ordinalTypeJson};
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-`;
-
-export const FlexWrapper = styled.div`
-  flex: 0 1 calc(33.333% - 1rem); // Adjust the percentage and subtraction to account for margins/gaps
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 0.25rem;
-  transition: 0.3s ease-in-out;
-
-  &:hover {
-    transform: scale(1.02);
-  }
-`;
+export const FlexWrapper = ({ children, style }: FlexWrapperProps) => (
+  <div
+    style={{
+      flex: '0 1 calc(33.333% - 1rem)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      margin: '0.25rem',
+      transition: '0.3s ease-in-out',
+      ...style,
+    }}
+    onMouseEnter={(e) => {
+      (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.02)';
+    }}
+    onMouseLeave={(e) => {
+      (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
+    }}
+  >
+    {children}
+  </div>
+);
 
 export type OrdinalProps = {
   theme: Theme;
@@ -104,73 +68,193 @@ export type OrdinalProps = {
   isTransfer?: boolean;
   selected?: boolean;
   size?: string;
-  inscription: OrdinalType;
+  output: WalletOutput;
   onClick?: () => void;
 };
 
 export const Ordinal = (props: OrdinalProps) => {
-  const { url, selected, isTransfer, size, inscription, theme, onClick } = props;
-  const contentType = inscription?.origin?.data?.insc?.file?.type;
+  const { url, selected, isTransfer, size, output, theme, onClick } = props;
 
-  // We can use this function to properly render unique use cases that may have different metadata than what is supported by default
-  const getOrdinalName = () => {
-    if (inscription?.origin?.data?.map?.name) {
-      return inscription.origin?.data?.map?.name;
-    } else if (inscription?.origin?.data?.map?.app === 'ssm') {
-      if (inscription?.origin?.data?.map?.chatName) {
-        return `SSM - ${inscription?.origin?.data?.map?.chatName}`;
-      } else {
-        return 'Unknown SSM Channel';
-      }
-    } else {
-      return 'Unknown Name';
+  const contentType = getTagValue(output.tags, 'type');
+  const name = getOutputName(output);
+
+  const [fetchedText, setFetchedText] = useState<string | null>(null);
+  const needsTextFetch =
+    contentType?.startsWith('text/') ||
+    contentType?.startsWith('application/json') ||
+    contentType?.startsWith('application/op-ns');
+
+  useEffect(() => {
+    if (!needsTextFetch || !url) return;
+    fetch(url)
+      .then((r) => r.text())
+      .then(setFetchedText)
+      .catch(() => setFetchedText(null));
+  }, [url, needsTextFetch]);
+
+  const textContent = fetchedText;
+
+  const getJsonContent = (): Record<string, unknown> | undefined => {
+    if (!contentType?.startsWith('application/json') || !textContent) return undefined;
+    try {
+      return JSON.parse(textContent);
+    } catch {
+      return undefined;
     }
   };
+
+  const s = size ?? '6.5rem';
+  const border = selectedBorder(selected, theme.color.component.ordinalSelectedBorder);
 
   const renderContent = () => {
     switch (true) {
       case contentType?.startsWith('image/svg'):
       case contentType?.startsWith('text/html'):
         return (
-          <IFrameWrapper size={size} selected={selected} theme={theme} onClick={onClick}>
-            <StyledIFrame src={url} sandbox="true" size={size} />
-          </IFrameWrapper>
+          <div style={{ ...wrapperBase(size), ...border }} onClick={onClick}>
+            <iframe
+              src={url}
+              sandbox="true"
+              style={{
+                height: s,
+                width: s,
+                borderRadius: '12%',
+                border: 'none',
+                pointerEvents: 'none',
+              }}
+            />
+          </div>
         );
+
       case contentType?.startsWith('image/'):
-        return <OrdinalWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick} />;
+        return (
+          <div style={{ ...wrapperBase(size), overflow: 'hidden', ...border }} onClick={onClick}>
+            <img
+              src={url}
+              alt={name}
+              loading="lazy"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+                borderRadius: 'inherit',
+              }}
+            />
+          </div>
+        );
+
       case contentType?.startsWith('text/'):
       case contentType?.startsWith('application/op-ns'):
         return (
-          <TextWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <OrdText theme={theme}>{inscription.origin?.data?.insc?.file?.text}</OrdText>
-          </TextWrapper>
+          <div
+            style={{
+              ...wrapperBase(size),
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflowX: 'auto',
+              backgroundColor: theme.color.global.row,
+              ...border,
+            }}
+            onClick={onClick}
+          >
+            <p
+              style={{
+                color: theme.color.component.ordinalTypePlainText,
+                textAlign: 'center',
+                width: '100%',
+                margin: 0,
+                fontSize: '90%',
+              }}
+            >
+              {textContent}
+            </p>
+          </div>
         );
+
       case contentType?.startsWith('application/json'):
         return (
-          <JsonWrapper size={size} selected={selected} url={url} theme={theme} onClick={onClick}>
-            <Json theme={theme}>{JSON.stringify(inscription.origin?.data?.insc?.file?.json, null, 2)}</Json>
-          </JsonWrapper>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: s,
+              width: s,
+              borderRadius: '0.5rem',
+              position: 'relative',
+              backgroundColor: theme.color.global.row,
+              cursor: 'pointer',
+              overflow: 'auto',
+              ...border,
+            }}
+            onClick={onClick}
+          >
+            <Json theme={theme}>{JSON.stringify(getJsonContent(), null, 2)}</Json>
+          </div>
         );
+
       default:
         return (
-          <TextWrapper size={size} selected={selected} theme={theme} onClick={onClick}>
-            <UnsupportedText theme={theme}>😩 Syncing or Unsupported File Type</UnsupportedText>
-          </TextWrapper>
+          <div
+            style={{
+              ...wrapperBase(size),
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflowX: 'auto',
+              backgroundColor: theme.color.global.row,
+              ...border,
+            }}
+            onClick={onClick}
+          >
+            <p
+              style={{
+                color: theme.color.component.ordinalTypeUnsupported,
+                textAlign: 'center',
+                width: '100%',
+                margin: 0,
+                fontSize: '90%',
+              }}
+            >
+              Syncing or Unsupported File Type
+            </p>
+          </div>
         );
     }
   };
+
+  // When rendered inside a full-size card (e.g. OrdCard passes size="100%"), skip
+  // the legacy FlexWrapper that constrains content to 33% width — fill the parent
+  // instead so images and text occupy the entire card.
+  const fillParent = size === '100%' || isTransfer;
+
+  if (fillParent) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {renderContent()}
+      </div>
+    );
+  }
 
   return (
     <FlexWrapper>
       {renderContent()}
       <Show when={!isTransfer}>
-        <Text
-          theme={theme}
-          style={{ margin: '0.25rem 0', cursor: 'pointer', fontSize: '0.75rem' }}
+        <p
+          style={{
+            margin: '0.25rem 0',
+            cursor: 'pointer',
+            fontSize: '0.75rem',
+            color: theme.color.global.contrast,
+          }}
           onClick={() => window.open(url, '_blank')}
         >
-          {getOrdinalName()}
-        </Text>
+          {name}
+        </p>
       </Show>
     </FlexWrapper>
   );

@@ -1,80 +1,24 @@
-import { styled } from 'styled-components';
+import { motion } from 'framer-motion';
 import { useTheme } from '../hooks/useTheme';
-import { WhiteLabelTheme } from '../theme.types';
-import { HeaderText, Text } from './Reusable';
 import { formatLargeNumber, formatUSD } from '../utils/format';
 import { Show } from './Show';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 
-const Container = styled.div<WhiteLabelTheme & { $animate: boolean }>`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: ${({ theme }) => theme.color.global.row};
-  padding: 1rem 0;
-  width: 90%;
-  border-radius: 0.5rem;
-  margin: 0.25rem;
-  transition: transform 0.3s ease-in-out;
-
-  &:hover {
-    transform: ${({ $animate }) => ($animate ? 'scale(1.02)' : 'none')};
-  }
-`;
-
-const Icon = styled.img<{ size?: string }>`
-  width: 2.25rem;
-  height: 2.25rem;
-  margin-left: 1rem;
-  border-radius: 50%;
-`;
-
-const TickerWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  width: 100%;
-`;
-
-const TickerTextWrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  margin-left: 1rem;
-`;
-
-const BalanceWrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  margin-right: 1rem;
-  width: 40%;
-`;
-
-const GradientButton = styled.button<WhiteLabelTheme>`
-  background: linear-gradient(135deg, #de973f, #f9dd63);
-  color: ${({ theme }) => theme.color.global.row};
-  border: none;
-  padding: 0.5rem 1rem;
-  font-size: 0.85rem;
-  font-weight: bold;
-  border-radius: 0.25rem;
-  width: 10rem;
-  margin-right: 1rem;
-  cursor: pointer;
-  transition:
-    transform 0.2s ease-in-out,
-    opacity 0.2s;
-  outline: none;
-
-  &:hover {
-    transform: scale(1.05);
-    opacity: 0.9;
-  }
-
-  &:active {
-    transform: scale(0.98);
-  }
-`;
+const GradientButton = ({ onClick, theme }: { onClick?: () => void; theme: ReturnType<typeof useTheme>['theme'] }) => (
+  <motion.button
+    whileHover={{ scale: 1.03 }}
+    whileTap={{ scale: 0.97 }}
+    onClick={onClick}
+    className="text-xs font-bold px-4 py-2 rounded-xl mr-3 cursor-pointer border-0 outline-none"
+    style={{
+      background: 'linear-gradient(135deg, #de973f, #f9dd63)',
+      color: theme.color.global.row,
+      minWidth: '7rem',
+    }}
+  >
+    Get MNEE
+  </motion.button>
+);
 
 export type AssetRowProps = {
   icon: string;
@@ -86,6 +30,8 @@ export type AssetRowProps = {
   animate?: boolean;
   isLock?: boolean;
   nextUnlock?: number;
+  /** Decimal places for balance display. Defaults to 3. */
+  decimals?: number;
   onGetMneeClick?: () => void;
   onClick?: () => void;
 };
@@ -103,50 +49,63 @@ export const AssetRow = (props: AssetRowProps) => {
     showPointer,
     onGetMneeClick,
     animate = false,
+    decimals,
   } = props;
   const { theme } = useTheme();
   const isDisplaySat = isLock && balance < 0.0001;
+  const displayDecimals = decimals ?? (isDisplaySat ? 0 : 3);
   const isMneeBalanceZero = !!isMNEE && usdBalance === 0;
+
   return (
-    <Container
-      style={{ cursor: showPointer ? 'pointer' : undefined }}
+    <motion.div
+      whileHover={animate ? { scale: 1.015, x: 2 } : {}}
+      whileTap={showPointer ? { scale: 0.985 } : {}}
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+      className="flex items-center justify-between w-[92%] mx-auto rounded-xl px-0 py-3 mb-1.5"
+      style={{
+        backgroundColor: theme.color.global.row,
+        cursor: showPointer ? 'pointer' : 'default',
+        border: `1px solid ${theme.color.global.gray}14`,
+      }}
       onClick={onClick}
-      theme={theme}
-      $animate={animate}
     >
-      <TickerWrapper>
+      {/* Left: icon + name */}
+      <div className="flex items-center flex-1 min-w-0 ml-3">
         <Show when={!!icon && icon.length > 0}>
-          <Icon src={icon} />
+          <img src={icon} className="w-9 h-9 rounded-full object-cover flex-shrink-0" alt={ticker} />
         </Show>
-        <TickerTextWrapper>
-          <HeaderText style={{ fontSize: '1rem' }} theme={theme}>
+        <div className="flex flex-col items-start ml-3 min-w-0">
+          <span className="text-sm font-semibold leading-tight" style={{ color: theme.color.global.contrast }}>
             {ticker}
-          </HeaderText>
-          <Text style={{ margin: '0', textAlign: 'left', color: theme.color.global.gray }} theme={theme}>
+          </span>
+          <span className="text-xs mt-0.5" style={{ color: theme.color.global.gray }}>
             {isLock ? 'Next unlock' : 'Balance'}
-          </Text>
-        </TickerTextWrapper>
-      </TickerWrapper>
+          </span>
+        </div>
+      </div>
+
+      {/* Right: balance */}
       <Show
         when={isMneeBalanceZero}
         whenFalseContent={
-          <BalanceWrapper>
-            <HeaderText style={{ textAlign: 'right', fontSize: '1rem' }} theme={theme}>
+          <div className="flex flex-col items-end mr-3 min-w-0 max-w-[45%]">
+            <span
+              className="text-sm font-semibold text-right leading-tight"
+              style={{ color: theme.color.global.contrast }}
+            >
               {`${formatLargeNumber(
                 isDisplaySat ? balance * BSV_DECIMAL_CONVERSION : balance,
-                isDisplaySat ? 0 : 3,
+                displayDecimals,
               )}${isLock ? (isDisplaySat ? `${balance === 0.00000001 ? ' SAT' : ' SATS'}` : ' BSV') : ''}`}
-            </HeaderText>
-            <Text style={{ textAlign: 'right', margin: '0', color: theme.color.global.gray }} theme={theme}>
+            </span>
+            <span className="text-xs mt-0.5 text-right" style={{ color: theme.color.global.gray }}>
               {isLock ? `Block ${nextUnlock}` : formatUSD(usdBalance)}
-            </Text>
-          </BalanceWrapper>
+            </span>
+          </div>
         }
       >
-        <GradientButton theme={theme} onClick={onGetMneeClick}>
-          Get MNEE
-        </GradientButton>
+        <GradientButton theme={theme} onClick={onGetMneeClick} />
       </Show>
-    </Container>
+    </motion.div>
   );
 };
