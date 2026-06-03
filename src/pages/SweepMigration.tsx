@@ -426,8 +426,9 @@ export const SweepMigration = () => {
               <Button
                 theme={theme}
                 type="primary"
-                label="Start Migration"
+                label="Launch Tool"
                 onClick={() => {
+                  void chromeStorageService.update({ sweepStarted: true });
                   chrome.tabs.create({ url: chrome.runtime.getURL('sweep-tab.html') });
                 }}
               />

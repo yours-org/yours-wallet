@@ -6,6 +6,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ArrowLeft,
+  ArrowRight,
   Copy,
   Check,
   Trash2,
@@ -142,6 +143,7 @@ export const BsvWallet = () => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [showBackupPromo, setShowBackupPromo] = useState(false);
   const [keysAlreadyBackedUp, setKeysAlreadyBackedUp] = useState(false);
+  const [showMigrationBanner, setShowMigrationBanner] = useState(false);
   const [bsv21s, setBsv21s] = useState<Bsv21Balance[]>([]);
   const [manageFavorites, setManageFavorites] = useState(false);
   const [account, setAccount] = useState<Account>();
@@ -308,6 +310,7 @@ export const BsvWallet = () => {
         const hasRemotes = (acct?.storageConfig?.remotes?.length ?? 0) > 0;
         setKeysAlreadyBackedUp(!!acct?.settings?.keysBackedUp);
         setShowBackupPromo(!dismissed && !hasRemotes);
+        setShowMigrationBanner(!obj?.sweepStarted && !obj?.sweepCompleted);
       }
       if (obj?.selectedAccount) {
         await getAndSetAccountAndBsv21s();
@@ -761,6 +764,12 @@ export const BsvWallet = () => {
     setShowWelcome(false);
   };
 
+  const handleMigrationBannerClick = () => {
+    setShowMigrationBanner(false);
+    void chromeStorageService.update({ sweepStarted: true });
+    navigate('/sweep');
+  };
+
   const handleTokenClick = (token: Bsv21Balance) => {
     if (token.all.pending > 0n) {
       addSnackbar('Pending tokens cannot be sent!', 'error', 2000);
@@ -988,6 +997,31 @@ export const BsvWallet = () => {
         className="flex flex-col items-center w-full pt-14 pb-16 overflow-y-auto"
         style={{ minHeight: '100%' }}
       >
+        {/* ── Legacy migration banner ── */}
+        <AnimatePresence>
+          {showMigrationBanner && (
+            <motion.button
+              key="migration-banner"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              type="button"
+              onClick={handleMigrationBannerClick}
+              className="flex items-center justify-between gap-2 w-[92%] mb-4 px-4 py-2.5 rounded-xl border-0 outline-none cursor-pointer text-left"
+              style={{
+                background: 'rgba(253,176,34,0.08)',
+                border: '1px solid rgba(253,176,34,0.2)',
+              }}
+            >
+              <span className="text-xs leading-snug" style={{ color: '#FDB022' }}>
+                <span style={{ fontWeight: 600 }}>Don't see your assets?</span> Open the migration tool.
+              </span>
+              <ArrowRight size={14} style={{ color: '#FDB022' }} className="shrink-0" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+
         {/* ── Profile avatar ── */}
         <Show when={avatarReady}>
           <motion.div

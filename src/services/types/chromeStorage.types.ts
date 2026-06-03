@@ -125,6 +125,11 @@ export interface ChromeStorageObject {
   transactionApprovalRequest?: ApprovalContext;
   // Sweep migration: true after user has been through the sweep flow at least once
   sweepCompleted?: boolean;
+  // Sweep migration: true once the user has either tapped the home-screen
+  // migration banner OR tapped the CTA on the migration intro page. Used to
+  // dismiss the home-screen banner — distinct from sweepCompleted, which only
+  // flips after the user finishes or skips the flow inside the tool.
+  sweepStarted?: boolean;
 }
 
 export type CurrentAccountObject = Omit<
