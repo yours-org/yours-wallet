@@ -1375,21 +1375,23 @@ export const BsvWallet = () => {
                     setTimeout(() => (e.target as HTMLInputElement).focus(), 0);
                   }}
                 />
-                <motion.button
-                  whileTap={{ scale: 0.93 }}
-                  type="button"
-                  onClick={() => handleFillMaxMnee(recipient.id)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 mr-1.5 rounded-lg border-0 outline-none cursor-pointer shrink-0"
-                  style={{ background: `${theme.color.component.primaryButtonLeftGradient}18` }}
-                  title="Fill with available MNEE (minus fee)"
-                >
-                  <span
-                    className="text-[11px] font-bold"
-                    style={{ color: theme.color.component.primaryButtonLeftGradient }}
+                {mneeRecipients.length === 1 && (
+                  <motion.button
+                    whileTap={{ scale: 0.93 }}
+                    type="button"
+                    onClick={() => handleFillMaxMnee(recipient.id)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 mr-1.5 rounded-lg border-0 outline-none cursor-pointer shrink-0"
+                    style={{ background: `${theme.color.component.primaryButtonLeftGradient}18` }}
+                    title="Fill with available MNEE (minus fee)"
                   >
-                    MAX
-                  </span>
-                </motion.button>
+                    <span
+                      className="text-[11px] font-bold"
+                      style={{ color: theme.color.component.primaryButtonLeftGradient }}
+                    >
+                      MAX
+                    </span>
+                  </motion.button>
+                )}
               </div>
             </motion.div>
           ))}
@@ -1539,35 +1541,53 @@ export const BsvWallet = () => {
         </div>
       </div>
 
-      {/* Balance chip */}
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.97 }}
-        onClick={fillInputWithAllBsv}
-        className="flex items-center gap-2 px-4 py-2 rounded-full border-0 outline-none cursor-pointer mb-5"
-        style={{ background: theme.color.global.row }}
-        title="Tap to fill max balance"
-      >
-        <img src={bsvCoin} alt="BSV" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
-        <span className="text-xs" style={{ color: theme.color.global.gray }}>
-          Balance
-        </span>
-        <span className="text-sm font-semibold font-mono" style={{ color: theme.color.global.contrast }}>
-          {bsvBalance.toFixed(8)}
-        </span>
-        <span className="text-xs font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
-          BSV
-        </span>
-        <span
-          className="text-[10px] ml-1 px-1.5 py-0.5 rounded"
-          style={{
-            background: `${theme.color.component.primaryButtonLeftGradient}20`,
-            color: theme.color.component.primaryButtonLeftGradient,
-          }}
+      {/* Balance chip — MAX is single-recipient only */}
+      {recipients.length > 1 ? (
+        <div
+          className="flex items-center gap-2 px-4 py-2 rounded-full mb-5"
+          style={{ background: theme.color.global.row }}
         >
-          MAX
-        </span>
-      </motion.button>
+          <img src={bsvCoin} alt="BSV" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
+          <span className="text-xs" style={{ color: theme.color.global.gray }}>
+            Balance
+          </span>
+          <span className="text-sm font-semibold font-mono" style={{ color: theme.color.global.contrast }}>
+            {bsvBalance.toFixed(8)}
+          </span>
+          <span className="text-xs font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
+            BSV
+          </span>
+        </div>
+      ) : (
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={fillInputWithAllBsv}
+          className="flex items-center gap-2 px-4 py-2 rounded-full border-0 outline-none cursor-pointer mb-5"
+          style={{ background: theme.color.global.row }}
+          title="Tap to fill max balance"
+        >
+          <img src={bsvCoin} alt="BSV" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
+          <span className="text-xs" style={{ color: theme.color.global.gray }}>
+            Balance
+          </span>
+          <span className="text-sm font-semibold font-mono" style={{ color: theme.color.global.contrast }}>
+            {bsvBalance.toFixed(8)}
+          </span>
+          <span className="text-xs font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
+            BSV
+          </span>
+          <span
+            className="text-[10px] ml-1 px-1.5 py-0.5 rounded"
+            style={{
+              background: `${theme.color.component.primaryButtonLeftGradient}20`,
+              color: theme.color.component.primaryButtonLeftGradient,
+            }}
+          >
+            MAX
+          </span>
+        </motion.button>
+      )}
 
       {/* Form */}
       <form noValidate onSubmit={(e) => handleSendBsv(e)} className="flex flex-col items-center w-full gap-3">

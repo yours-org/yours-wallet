@@ -347,18 +347,20 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
                       value={recipient.amountInput}
                       onChange={(e) => updateRecipient(recipient.id, 'amountInput', e.target.value)}
                     />
-                    <motion.button
-                      type="button"
-                      whileTap={{ scale: 0.93 }}
-                      onClick={() => handleSetMax(recipient.id)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 mr-1.5 rounded-lg border-0 outline-none cursor-pointer shrink-0"
-                      style={{ background: `${accent}18` }}
-                      title="Fill with remaining available amount"
-                    >
-                      <span className="text-[11px] font-bold" style={{ color: accent }}>
-                        MAX
-                      </span>
-                    </motion.button>
+                    {recipients.length === 1 && (
+                      <motion.button
+                        type="button"
+                        whileTap={{ scale: 0.93 }}
+                        onClick={() => handleSetMax(recipient.id)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 mr-1.5 rounded-lg border-0 outline-none cursor-pointer shrink-0"
+                        style={{ background: `${accent}18` }}
+                        title="Fill with remaining available amount"
+                      >
+                        <span className="text-[11px] font-bold" style={{ color: accent }}>
+                          MAX
+                        </span>
+                      </motion.button>
+                    )}
                   </div>
                 </motion.div>
               ))}
