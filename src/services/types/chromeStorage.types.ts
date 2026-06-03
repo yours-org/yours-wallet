@@ -36,6 +36,18 @@ export type Settings = {
   keysBackedUp?: boolean;
   /** Highest deposit address index derived so far. Defaults to 4 (5 addresses). */
   maxKeyIndex?: number;
+  /**
+   * Sweep migration: true once the user has either tapped the home-screen
+   * migration banner OR tapped the CTA on the migration intro page. Used to
+   * dismiss the home-screen banner. Per-account because each account has its
+   * own legacy keys to sweep.
+   */
+  sweepStarted?: boolean;
+  /**
+   * Sweep migration: true after the user has been through the sweep flow at
+   * least once for this account (Done or Skip).
+   */
+  sweepCompleted?: boolean;
 };
 
 /**
@@ -123,13 +135,6 @@ export interface ChromeStorageObject {
   oneSatPermissionRequest?: OneSatPermissionRequestEntry;
   // Transaction approval request from YoursApi
   transactionApprovalRequest?: ApprovalContext;
-  // Sweep migration: true after user has been through the sweep flow at least once
-  sweepCompleted?: boolean;
-  // Sweep migration: true once the user has either tapped the home-screen
-  // migration banner OR tapped the CTA on the migration intro page. Used to
-  // dismiss the home-screen banner — distinct from sweepCompleted, which only
-  // flips after the user finishes or skips the flow inside the tool.
-  sweepStarted?: boolean;
 }
 
 export type CurrentAccountObject = Omit<

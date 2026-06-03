@@ -310,7 +310,7 @@ export const BsvWallet = () => {
         const hasRemotes = (acct?.storageConfig?.remotes?.length ?? 0) > 0;
         setKeysAlreadyBackedUp(!!acct?.settings?.keysBackedUp);
         setShowBackupPromo(!dismissed && !hasRemotes);
-        setShowMigrationBanner(!obj?.sweepStarted && !obj?.sweepCompleted);
+        setShowMigrationBanner(!acct?.settings?.sweepStarted && !acct?.settings?.sweepCompleted);
       }
       if (obj?.selectedAccount) {
         await getAndSetAccountAndBsv21s();
@@ -764,9 +764,17 @@ export const BsvWallet = () => {
     setShowWelcome(false);
   };
 
-  const handleMigrationBannerClick = () => {
+  const handleMigrationBannerClick = async () => {
     setShowMigrationBanner(false);
-    void chromeStorageService.update({ sweepStarted: true });
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (account) {
+      await chromeStorageService.updateNested('accounts', {
+        [account.addresses.identityAddress]: {
+          ...account,
+          settings: { ...account.settings, sweepStarted: true },
+        },
+      });
+    }
     navigate('/sweep');
   };
 

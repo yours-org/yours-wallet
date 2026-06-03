@@ -300,13 +300,24 @@ export const SweepMigration = () => {
     setStep('results');
   };
 
+  const persistSweepFlag = async (flag: 'sweepStarted' | 'sweepCompleted') => {
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    if (!account) return;
+    await chromeStorageService.updateNested('accounts', {
+      [account.addresses.identityAddress]: {
+        ...account,
+        settings: { ...account.settings, [flag]: true },
+      },
+    });
+  };
+
   const handleSkip = async () => {
-    await chromeStorageService.update({ sweepCompleted: true });
+    await persistSweepFlag('sweepCompleted');
     navigate('/bsv-wallet');
   };
 
   const handleDone = async () => {
-    await chromeStorageService.update({ sweepCompleted: true });
+    await persistSweepFlag('sweepCompleted');
     navigate('/bsv-wallet');
   };
 
@@ -428,7 +439,7 @@ export const SweepMigration = () => {
                 type="primary"
                 label="Launch Tool"
                 onClick={() => {
-                  void chromeStorageService.update({ sweepStarted: true });
+                  void persistSweepFlag('sweepStarted');
                   chrome.tabs.create({ url: chrome.runtime.getURL('sweep-tab.html') });
                 }}
               />

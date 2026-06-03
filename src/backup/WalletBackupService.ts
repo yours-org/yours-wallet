@@ -154,7 +154,9 @@ function chunkHasData(chunk: SyncChunk): boolean {
  */
 interface AccountPendingRestore {
   manifest: BackupManifest; // v1-shaped manifest for FileRestoreReader
-  chunks: Record<string, Uint8Array>; // flat chunk keys (chunk-XXXX.bin)
+  // Narrow `ArrayBuffer`-backed variant — required so the value is assignable
+  // to fflate's `Unzipped` when constructing `FileRestoreReader`.
+  chunks: Record<string, Uint8Array<ArrayBuffer>>; // flat chunk keys (chunk-XXXX.bin)
   chunkCount: number;
 }
 
@@ -347,7 +349,7 @@ export class WalletBackupService {
       chromeStorage: Uint8Array;
       manifest?: Uint8Array;
       settings?: Uint8Array;
-      chunks?: Record<string, Uint8Array>;
+      chunks?: Record<string, Uint8Array<ArrayBuffer>>;
       isLegacy: boolean;
     },
     password: string,
@@ -417,7 +419,7 @@ export class WalletBackupService {
 
     if (isV2Manifest(manifest)) {
       for (const acct of manifest.accounts) {
-        const flatChunks: Record<string, Uint8Array> = {};
+        const flatChunks: Record<string, Uint8Array<ArrayBuffer>> = {};
         for (let i = 0; i < acct.chunkCount; i++) {
           const namespacedKey = `${acct.identityAddress}/chunk-${String(i).padStart(4, '0')}.bin`;
           const flatKey = `chunk-${String(i).padStart(4, '0')}.bin`;

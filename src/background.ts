@@ -1881,8 +1881,10 @@ if (isInServiceWorker) {
     }
   };
 
-  /** Decode a base64 string to Uint8Array. */
-  const fromBase64 = (b64: string): Uint8Array => {
+  /** Decode a base64 string to Uint8Array. Returns the narrow `ArrayBuffer`-backed
+   *  variant (not `ArrayBufferLike`) so the result is assignable to fflate's
+   *  `Unzipped` type when fed into `FileRestoreReader` downstream. */
+  const fromBase64 = (b64: string): Uint8Array<ArrayBuffer> => {
     const binary = atob(b64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
@@ -1918,7 +1920,7 @@ if (isInServiceWorker) {
       const settingsBytes = message.settingsData ? fromBase64(message.settingsData) : undefined;
 
       // Decode chunk entries back to Uint8Arrays
-      let chunks: Record<string, Uint8Array> | undefined;
+      let chunks: Record<string, Uint8Array<ArrayBuffer>> | undefined;
       if (message.chunksData) {
         chunks = {};
         for (const [key, b64] of Object.entries(message.chunksData)) {
