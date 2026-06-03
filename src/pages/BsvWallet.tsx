@@ -1772,10 +1772,6 @@ export const BsvWallet = () => {
               });
             }
           }}
-          onSetup={() => {
-            setShowBackupPromo(false);
-            handleSelect('settings', 'storage');
-          }}
           onDismiss={async () => {
             setShowBackupPromo(false);
             const { account } = chromeStorageService.getCurrentAccountObject();

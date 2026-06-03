@@ -72,9 +72,6 @@ export const ProviderPicker = ({
   busy,
 }: Props) => {
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
-  const [confirmingProvider, setConfirmingProvider] = useState<{ url: string; name: string; rate: string } | null>(
-    null,
-  );
   const [customUrl, setCustomUrl] = useState('');
   const [customError, setCustomError] = useState('');
   const [customChecking, setCustomChecking] = useState(false);
@@ -336,21 +333,7 @@ export const ProviderPicker = ({
                                   theme={theme}
                                   type="primary"
                                   label={busy ? 'Adding…' : `Add ${provider.name}`}
-                                  onClick={
-                                    busy
-                                      ? () => {}
-                                      : () => {
-                                          if (serverData.pricing.satsPerUnit > 0) {
-                                            setConfirmingProvider({
-                                              url: provider.url,
-                                              name: provider.name,
-                                              rate: formatRate(serverData.pricing, exchangeRate),
-                                            });
-                                          } else {
-                                            onSelectProvider(provider.url);
-                                          }
-                                        }
-                                  }
+                                  onClick={busy ? () => {} : () => onSelectProvider(provider.url)}
                                   loading={busy}
                                 />
                               )}
@@ -434,54 +417,6 @@ export const ProviderPicker = ({
               </AnimatePresence>
             </div>
           </div>
-
-          {/* Payment confirmation overlay */}
-          <AnimatePresence>
-            {confirmingProvider && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6 rounded-t-2xl"
-                style={{ background: 'rgba(13,13,13,0.97)' }}
-              >
-                <div className="w-full max-w-[300px] space-y-4">
-                  <p className="text-sm font-semibold text-center" style={{ color: '#FFFFFF' }}>
-                    Confirm paid storage
-                  </p>
-                  <p className="text-xs text-center leading-relaxed" style={{ color: '#98A2B3' }}>
-                    Usage above the free tier on{' '}
-                    <span style={{ color: '#FFFFFF', fontWeight: 600 }}>{confirmingProvider.name}</span> is billed at{' '}
-                    <span style={{ color: '#FDB022', fontWeight: 600 }}>{confirmingProvider.rate}</span>. Payments will
-                    be deducted from your wallet automatically when due.
-                  </p>
-                  <div className="space-y-2 pt-2">
-                    <Button
-                      theme={theme}
-                      type="primary"
-                      label={busy ? 'Adding…' : 'Agree & Add'}
-                      onClick={
-                        busy
-                          ? () => {}
-                          : () => {
-                              onSelectProvider(confirmingProvider.url);
-                              setConfirmingProvider(null);
-                            }
-                      }
-                      loading={busy}
-                    />
-                    <button
-                      onClick={() => setConfirmingProvider(null)}
-                      className="w-full py-2 text-xs border-0 outline-none cursor-pointer bg-transparent"
-                      style={{ color: '#667085' }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </motion.div>
       </motion.div>
     </AnimatePresence>

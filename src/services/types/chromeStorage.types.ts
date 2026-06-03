@@ -55,6 +55,12 @@ export type Settings = {
 export type StorageConfig = {
   activeRemote?: string;
   remotes?: string[];
+  /**
+   * Set to true when the user explicitly removes the default backup remote.
+   * Suppresses the background's idempotent auto-attach so the user's opt-out
+   * is honored across unlocks. Cleared when the user re-adds the default URL.
+   */
+  defaultBackupOptedOut?: boolean;
 };
 
 export interface Account {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  AlertTriangle,
   ChevronLeft,
   ChevronDown,
   ChevronRight,
@@ -17,6 +18,7 @@ import {
 import { Button } from '../components/Button';
 import { PageLoader } from '../components/PageLoader';
 import { ProviderPicker, KNOWN_PROVIDERS } from '../components/ProviderPicker';
+import { SpeedBump } from '../components/SpeedBump';
 import { useTheme } from '../hooks/useTheme';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useServiceContext } from '../hooks/useServiceContext';
@@ -110,6 +112,14 @@ function formatRate(pricing: RemoteUsage['pricing'], exchangeRate: number): stri
   return `$${usd}/${label}/mo`;
 }
 
+// True when usage on a remote has crossed 80% of the free tier (baselineBytes)
+// but is not yet over it. Once usage exceeds baselineBytes, paidBytes/deficitBytes
+// flows take over and the "approaching" copy is no longer accurate.
+function isApproachingFreeLimit(usage: RemoteUsage): boolean {
+  if (usage.baselineBytes <= 0) return false;
+  return usage.usedBytes >= usage.baselineBytes * 0.8 && usage.usedBytes < usage.baselineBytes;
+}
+
 export const StorageStatus = ({ onBack }: StorageStatusProps) => {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
@@ -133,6 +143,9 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
   const [showProviderPicker, setShowProviderPicker] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [subView, _setSubView] = useState<SubView>({ type: 'main' });
+  // Pending last-remote removal — when set, the SpeedBump is shown and the
+  // removal only executes after the user confirms.
+  const [pendingRemoveUrl, setPendingRemoveUrl] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const setSubView = (view: SubView) => {
     _setSubView(view);
@@ -233,11 +246,24 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
     setShowProviderPicker(false);
   };
 
-  const handleRemoveRemote = async (url: string) => {
+  const executeRemoveRemote = async (url: string) => {
     setBusyAction('remove');
     await runAction('STORAGE_REMOVE_REMOTE', { url }, 'Remote removed');
     setBusyAction(null);
     setSubView({ type: 'main' });
+  };
+
+  /**
+   * Gate the remove flow with a danger confirmation when this remote is the
+   * only one configured — losing it leaves the user with no off-device
+   * backup. For non-last removals the existing single-tap flow is preserved.
+   */
+  const handleRemoveRemote = (url: string) => {
+    if (remotes.length === 1) {
+      setPendingRemoveUrl(url);
+      return;
+    }
+    void executeRemoveRemote(url);
   };
 
   if (loading) {
@@ -266,6 +292,22 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
 
     return (
       <div ref={containerRef} className="flex flex-col w-full py-2 pb-20 space-y-3">
+        <SpeedBump
+          theme={theme}
+          message={
+            pendingRemoveUrl
+              ? `Removing ${hostFromUrl(pendingRemoveUrl)} leaves you with no off-device backup. If you lose this browser, your transaction history can't be recovered. Are you sure?`
+              : ''
+          }
+          showSpeedBump={!!pendingRemoveUrl}
+          onCancel={() => setPendingRemoveUrl(null)}
+          onConfirm={() => {
+            const target = pendingRemoveUrl;
+            setPendingRemoveUrl(null);
+            if (target) void executeRemoveRemote(target);
+          }}
+        />
+
         {/* Header */}
         <div className="flex items-center gap-3 mb-5 w-full">
           <motion.button
@@ -465,6 +507,18 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
                 </span>
               </div>
             </div>
+            {isApproachingFreeLimit(usage) && (
+              <div
+                className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg"
+                style={{ background: 'rgba(253,176,34,0.08)', border: '1px solid rgba(253,176,34,0.2)' }}
+              >
+                <span className="text-[10px] font-medium" style={{ color: '#FDB022' }}>
+                  Approaching free storage limit ({usagePercent(usage.usedBytes, usage.baselineBytes)}% of{' '}
+                  {formatBytes(usage.baselineBytes)}). Additional usage billed at{' '}
+                  {formatRate(usage.pricing, exchangeRate)}.
+                </span>
+              </div>
+            )}
             {usage.deficitBytes > 0 && (
               <div
                 className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg"
@@ -504,31 +558,34 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
         </h2>
       </div>
 
-      {/* How it works — contextual based on current state */}
+      {/* No-backup action card — replaces the educational box in the empty
+          state so the Add Backup CTA isn't buried below the active-storage
+          card. Users land here after explicitly removing their last remote or
+          when auto-attach has not yet succeeded. */}
       {localIsActive && remotes.length === 0 && (
         <div
-          className="w-full rounded-xl p-4"
-          style={{ background: 'rgba(253,176,34,0.05)', border: '1px solid rgba(253,176,34,0.15)' }}
+          className="w-full rounded-xl p-4 space-y-3"
+          style={{ background: 'rgba(249,112,102,0.06)', border: '1px solid rgba(249,112,102,0.2)' }}
         >
-          <p className="text-xs font-semibold mb-2" style={{ color: '#FDB022' }}>
-            How storage works
-          </p>
-          <div className="space-y-2">
-            <div className="flex items-start gap-2">
-              <HardDrive size={12} style={{ color: '#98A2B3' }} className="shrink-0 mt-0.5" />
-              <p className="text-[10px] leading-relaxed" style={{ color: '#D0D5DD' }}>
-                <span style={{ color: '#FFFFFF', fontWeight: 600 }}>Active storage</span> is where your wallet reads and
-                writes data. Right now that's this browser.
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle size={16} style={{ color: '#F97066' }} className="shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-xs font-semibold mb-1" style={{ color: '#F97066' }}>
+                No backup configured
               </p>
-            </div>
-            <div className="flex items-start gap-2">
-              <Server size={12} style={{ color: '#98A2B3' }} className="shrink-0 mt-0.5" />
               <p className="text-[10px] leading-relaxed" style={{ color: '#D0D5DD' }}>
-                <span style={{ color: '#FFFFFF', fontWeight: 600 }}>Remote servers</span> can be added as backups
-                (copies of your data) or set as active to use this wallet across multiple devices.
+                Your transaction history is stored only on this device. If you lose this browser, your keys alone can't
+                recover your assets.
               </p>
             </div>
           </div>
+          <Button
+            theme={theme}
+            type="primary"
+            label="Add Backup"
+            onClick={() => setShowProviderPicker(true)}
+            disabled={busy}
+          />
         </div>
       )}
 
@@ -659,6 +716,17 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
                       style={{ background: usageBarColor(pct), minWidth: pct > 0 ? '6px' : '0' }}
                     />
                   </div>
+                  {isApproachingFreeLimit(usage) && (
+                    <div
+                      className="flex items-center gap-2 mt-2 px-2.5 py-1.5 rounded-md"
+                      style={{ background: 'rgba(253,176,34,0.08)', border: '1px solid rgba(253,176,34,0.2)' }}
+                    >
+                      <span className="text-[9px] font-medium leading-snug" style={{ color: '#FDB022' }}>
+                        Approaching free storage limit. Additional usage billed at{' '}
+                        {formatRate(usage.pricing, exchangeRate)}.
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             }

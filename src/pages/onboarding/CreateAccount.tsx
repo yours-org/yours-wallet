@@ -282,10 +282,20 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.33 }}
-        className="text-sm mb-6 text-center"
+        className="text-sm mb-3 text-center"
         style={{ color: gray }}
       >
         Your wallet is set up and ready to use.
+      </motion.p>
+
+      <motion.p
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.38 }}
+        className="text-[11px] mb-6 text-center leading-relaxed px-2"
+        style={{ color: '#667085' }}
+      >
+        Your transactions are backed up to 1Sat Storage. Manage anytime in Settings &gt; Wallet Backup.
       </motion.p>
 
       <motion.div
