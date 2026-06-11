@@ -1,0 +1,92 @@
+# Yours Wallet
+
+> Open-source non-custodial BSV wallet built on BRC-100. Chrome extension with multi-device sync, on-chain identity, ordinals, BSV-21 tokens, and the MNEE stablecoin. dApps integrate via @1sat/actions using a `createContext` + `action.execute(ctx, input)` pattern.
+
+## Start here
+
+- [Introduction](./README.md): What Yours Wallet is and how the docs are organized.
+- [For AI Agents](./ai-onboarding.md): Primer on the wallet's mental model, BEEF, baskets, permissions, and the `{ txid?, error? }` return shape.
+- [Quickstart](./quickstart.md): 30-second copy-paste setup with `WalletProvider`, `ConnectButton`, `useWallet`, and `sendBsv`.
+
+## Concepts
+
+- [BRC-100](./concepts/brc-100.md): Wallet interface standard. The wallet tracks keys + transaction history. Methods are permission-gated.
+- [BEEF](./concepts/beef.md): Background Evaluation Extended Format. Required for transfer / list / cancel / opns operations on ordinals.
+- [Actions & Context](./concepts/actions-and-context.md): The `createContext` + `action.execute(ctx, input)` model and `{ txid?, error? }` envelope.
+- [Baskets & Tags](./concepts/baskets-and-tags.md): Outputs live in baskets; tags annotate them (`origin`, `type:<mime>`, etc.).
+- [Derivations](./concepts/derivations.md): P1SAT derived addresses (used by MNEE). Default prefix is `'1sat'`.
+- [Permissions](./concepts/permissions.md): Every wallet operation may prompt the user; handle `user-rejected`.
+
+## Actions (@1sat/actions)
+
+Payments:
+- [sendBsv](./actions/send-bsv.md), [sendAllBsv](./actions/send-all-bsv.md), [listOutputs](./actions/list-outputs.md)
+
+Ordinals:
+- [getOrdinals](./actions/get-ordinals.md), [transferOrdinals](./actions/transfer-ordinals.md), [inscribe](./actions/inscribe.md), [burnOrdinals](./actions/burn-ordinals.md)
+
+Marketplace (OrdLock):
+- [listOrdinal](./actions/list-ordinal.md), [purchaseOrdinal](./actions/purchase-ordinal.md), [cancelListing](./actions/cancel-listing.md), [deriveCancelAddress](./actions/derive-cancel-address.md)
+
+Collections:
+- [mintCollection](./actions/mint-collection.md), [mintCollectionItem](./actions/mint-collection-item.md)
+
+BSV-21 Tokens:
+- [getBsv21Balances](./actions/get-bsv21-balances.md), [sendBsv21](./actions/send-bsv21.md), [listTokens](./actions/list-tokens.md), [purchaseBsv21](./actions/purchase-bsv21.md), [deployBsv21Mint](./actions/deploy-bsv21-mint.md), [deployBsv21Auth](./actions/deploy-bsv21-auth.md), [mintBsv21](./actions/mint-bsv21.md)
+
+MNEE Stablecoin:
+- [deriveDepositAddresses](./actions/derive-deposit-addresses.md), [getMneeBalance](./actions/get-mnee-balance.md), [sendMnee](./actions/send-mnee.md), [getMneeHistory](./actions/get-mnee-history.md), [getMneeTxStatus](./actions/get-mnee-tx-status.md), [getMneeConfig](./actions/get-mnee-config.md), [getMneeUtxos](./actions/get-mnee-utxos.md)
+
+Identity (BAP):
+- [getProfile](./actions/get-profile.md), [publishIdentity](./actions/publish-identity.md), [updateProfile](./actions/update-profile.md), [rotateIdentity](./actions/rotate-identity.md), [attest](./actions/attest.md), [computeBapId / resolveBapId](./actions/compute-resolve-bap-id.md)
+
+Locks (Timelock):
+- [getLockData](./actions/get-lock-data.md), [lockBsv](./actions/lock-bsv.md), [unlockBsv](./actions/unlock-bsv.md)
+
+Signing & Encryption:
+- [signBsm](./actions/sign-bsm.md), [getAuthToken](./actions/get-auth-token.md), [Encrypt / Decrypt](./actions/encrypt-decrypt.md), [getFriendPublicKey](./actions/get-friend-public-key.md)
+
+Social:
+- [createSocialPost](./actions/create-social-post.md)
+
+OpNS Names:
+- [opnsRegister](./actions/opns-register.md), [opnsDeregister](./actions/opns-deregister.md), [getOpnsNames](./actions/get-opns-names.md)
+
+Sync:
+- [syncAddresses](./actions/sync-addresses.md), [syncMessages](./actions/sync-messages.md), [syncCosignDeliveries](./actions/sync-cosign-deliveries.md)
+
+Sweep / Import:
+- [sweepBsv](./actions/sweep-bsv.md), [sweepOrdinals](./actions/sweep-ordinals.md), [sweepBsv21](./actions/sweep-bsv21.md), [sweepDeposit](./actions/sweep-deposit.md)
+
+## Low-Level (BRC-100 WalletInterface)
+
+- [Blockchain Queries](./low-level/blockchain-queries.md): `getHeight`, `getHeaderForHeight`, `getNetwork`, `getVersion`.
+- [Key Derivation](./low-level/key-derivation.md): `getPublicKey` with BRC-42 `protocolID` / `keyID` / `counterparty`.
+- [Transaction Actions](./low-level/transaction-actions.md): `createAction`, `signAction`, `abortAction`, `internalizeAction`.
+- [Cryptography](./low-level/cryptography.md): `createSignature`, `verifySignature`, `createHmac`, `encrypt`, `decrypt`.
+- [Certificates](./low-level/certificates.md): `acquireCertificate`, `listCertificates`, `proveCertificate`, `relinquishCertificate`.
+- [Discovery](./low-level/discovery.md): `discoverByIdentityKey`, `discoverByAttributes`.
+- [Key Linkage](./low-level/key-linkage.md): `revealCounterpartyKeyLinkage`, `revealSpecificKeyLinkage`.
+- [Output Management](./low-level/output-management.md): `listOutputs`, `relinquishOutput`.
+- [Action History](./low-level/action-history.md): `listActions`.
+
+## Cookbook
+
+- [Mint & List Ordinal](./cookbook/mint-and-list-ordinal.md): Full inscribe → fetch → list flow.
+- [Sweep Paper Wallet](./cookbook/sweep-paper-wallet.md): Import BSV / ordinals / BSV-21 from a WIF key.
+- [MNEE Send Flow](./cookbook/mnee-send-flow.md): Derive → balance → sendMnee (with `Number(...)` rule).
+- [BAP Identity Setup](./cookbook/bap-identity-setup.md): Publish profile with avatar.
+- [Event Listening](./cookbook/event-listening.md): React to `signedOut` / `switchAccount` events.
+- [Multi-Account Handling](./cookbook/multi-account-handling.md): Avoid cache leakage across accounts.
+
+## Migration
+
+- [Legacy Provider → @1sat/actions](./migration/legacy-provider.md): Map of `window.yours.*` → modern API.
+- [Version History](./migration/version-history.md): Package version pins and breaking changes.
+
+## Reference
+
+- [Errors](./reference/errors.md): Error code catalog with agent remediation.
+- [Types](./reference/types.md): `WalletOutput`, `WalletStatus`, BEEF, ordinal tags, content URLs.
+- [Packages](./reference/packages.md): Install map for `@1sat/react`, `@1sat/connect`, `@1sat/actions`, `@1sat/client`, `@bsv/sdk`.
+- [Events](./reference/events.md): `YoursEmitEvent` reference.
