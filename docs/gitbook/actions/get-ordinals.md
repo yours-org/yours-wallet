@@ -18,7 +18,7 @@ getOrdinals.execute(ctx: OneSatContext, input: GetOrdinalsInput): Promise<GetOrd
 
 ```ts
 interface GetOrdinalsInput {
-  limit?: number;  // default ~50
+  limit?: number; // default ~50
 }
 ```
 
@@ -26,8 +26,8 @@ interface GetOrdinalsInput {
 
 ```ts
 interface GetOrdinalsResult {
-  outputs: WalletOutput[];   // ordinal outputs the wallet currently holds
-  BEEF?: Uint8Array;         // transaction ancestry; pass as inputBEEF to spending actions
+  outputs: WalletOutput[]; // ordinal outputs the wallet currently holds
+  BEEF?: Uint8Array; // transaction ancestry; pass as inputBEEF to spending actions
 }
 ```
 
@@ -59,7 +59,7 @@ import { getOrdinals, transferOrdinals } from '@1sat/actions';
 const { outputs, BEEF } = await getOrdinals.execute(ctx, {});
 if (!BEEF) throw new Error('No BEEF returned');
 
-const ordinal = outputs.find(o => o.outpoint === targetOutpoint);
+const ordinal = outputs.find((o) => o.outpoint === targetOutpoint);
 if (!ordinal) throw new Error('Ordinal not found');
 
 await transferOrdinals.execute(ctx, {
@@ -82,8 +82,8 @@ The result is a snapshot. If you act on an ordinal long after fetching, fetch ag
 
 Typically thrown rather than returned in the result. Wrap in try/catch.
 
-| Code | Cause |
-| ---- | ----- |
+| Code            | Cause                        |
+| --------------- | ---------------------------- |
 | `not-connected` | Wallet disconnected mid-call |
 
 ## Related

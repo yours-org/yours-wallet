@@ -19,9 +19,9 @@ updateProfile.execute(ctx: OneSatContext, input: UpdateProfileInput): Promise<Up
 ```ts
 interface UpdateProfileInput {
   profile: {
-    '@type'?: string;       // typically 'Person' or 'Organization' (Schema.org)
+    '@type'?: string; // typically 'Person' or 'Organization' (Schema.org)
     name?: string;
-    image?: string;         // 1sat://txid.vout or a URL
+    image?: string; // 1sat://txid.vout or a URL
     description?: string;
     [key: string]: any;
   };
@@ -75,11 +75,11 @@ if (result.error) throw new Error(result.error);
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `insufficient-funds` | Not enough BSV |
-| `invalid-profile` | Profile shape invalid |
+| Code                 | Cause                         |
+| -------------------- | ----------------------------- |
+| `user-rejected`      | User denied the wallet prompt |
+| `insufficient-funds` | Not enough BSV                |
+| `invalid-profile`    | Profile shape invalid         |
 
 ## Related
 

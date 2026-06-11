@@ -22,7 +22,7 @@ wallet.discoverByIdentityKey(input: DiscoverByIdentityKeyInput): Promise<Discove
 
 ```ts
 interface DiscoverByIdentityKeyInput {
-  identityKey: string;  // pubkey to look up
+  identityKey: string; // pubkey to look up
   limit?: number;
 }
 ```
@@ -48,7 +48,7 @@ wallet.discoverByAttributes(input: DiscoverByAttributesInput): Promise<Discovery
 
 ```ts
 interface DiscoverByAttributesInput {
-  attributes: Record<string, string>;  // attribute name -> value
+  attributes: Record<string, string>; // attribute name -> value
   limit?: number;
 }
 ```

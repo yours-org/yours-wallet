@@ -22,7 +22,7 @@ wallet.createSignature(input: CreateSignatureInput): Promise<{ signature: number
 
 ```ts
 interface CreateSignatureInput {
-  data: number[];                // bytes to sign
+  data: number[]; // bytes to sign
   protocolID: [number, string];
   keyID: string;
   counterparty?: string;
@@ -114,7 +114,7 @@ interface EncryptInput {
   plaintext: number[];
   protocolID: [number, string];
   keyID: string;
-  counterparty: string;  // pubkey
+  counterparty: string; // pubkey
 }
 ```
 
@@ -122,7 +122,7 @@ interface EncryptInput {
 
 ```tsx
 const { ciphertext } = await wallet.encrypt({
-  plaintext: [72, 101, 108, 108, 111],  // "Hello"
+  plaintext: [72, 101, 108, 108, 111], // "Hello"
   protocolID: [1, 'my-protocol'],
   keyID: 'enc-key',
   counterparty: '02abc...',

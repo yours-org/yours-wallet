@@ -99,12 +99,12 @@ Omit `destination` to lock the inscription to the wallet's own ordinal basket (t
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `insufficient-funds` | Not enough BSV |
-| `invalid-content` | Bad base64 |
-| `invalid-destination` | Malformed `destination` |
+| Code                     | Cause                              |
+| ------------------------ | ---------------------------------- |
+| `user-rejected`          | User denied the wallet prompt      |
+| `insufficient-funds`     | Not enough BSV                     |
+| `invalid-content`        | Bad base64                         |
+| `invalid-destination`    | Malformed `destination`            |
 | `storage-payment-failed` | Wallet remote storage needs top-up |
 
 ## Related

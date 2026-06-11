@@ -65,7 +65,7 @@ Send to a plain BSV address:
 import { getOrdinals, transferOrdinals } from '@1sat/actions';
 
 const { outputs, BEEF } = await getOrdinals.execute(ctx, {});
-const ordinal = outputs.find(o => o.outpoint === targetOutpoint);
+const ordinal = outputs.find((o) => o.outpoint === targetOutpoint);
 if (!ordinal) throw new Error('Ordinal not found');
 
 const result = await transferOrdinals.execute(ctx, {
@@ -79,12 +79,14 @@ Send to an identity pubkey (preferred — derives a per-counterparty address):
 
 ```tsx
 const result = await transferOrdinals.execute(ctx, {
-  transfers: [{
-    ordinal,
-    counterparty: '02recipient-identity-key...',
-    map: { app: 'my-app', type: 'gift' },
-    extraTags: ['status:gifted'],
-  }],
+  transfers: [
+    {
+      ordinal,
+      counterparty: '02recipient-identity-key...',
+      map: { app: 'my-app', type: 'gift' },
+      extraTags: ['status:gifted'],
+    },
+  ],
   inputBEEF: BEEF ? Array.from(BEEF) : undefined,
 });
 ```
@@ -105,14 +107,14 @@ You MUST pass the actual `WalletOutput` object — not just an outpoint string. 
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `no-beef` | `inputBEEF` missing and not resolvable from tags |
-| `not-found` | Ordinal not in wallet (stale snapshot — refetch) |
-| `invalid-address` | Malformed `address` |
-| `invalid-counterparty` | Malformed `counterparty` pubkey hex |
-| `storage-payment-failed` | Wallet remote storage needs top-up |
+| Code                     | Cause                                            |
+| ------------------------ | ------------------------------------------------ |
+| `user-rejected`          | User denied the wallet prompt                    |
+| `no-beef`                | `inputBEEF` missing and not resolvable from tags |
+| `not-found`              | Ordinal not in wallet (stale snapshot — refetch) |
+| `invalid-address`        | Malformed `address`                              |
+| `invalid-counterparty`   | Malformed `counterparty` pubkey hex              |
+| `storage-payment-failed` | Wallet remote storage needs top-up               |
 
 ## Related
 

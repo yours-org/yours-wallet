@@ -61,9 +61,9 @@ console.log('Identity published in:', result.txid);
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
+| Code                 | Cause                              |
+| -------------------- | ---------------------------------- |
+| `user-rejected`      | User denied the wallet prompt      |
 | `insufficient-funds` | Not enough BSV for the inscription |
 
 ## Related

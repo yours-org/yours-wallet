@@ -25,7 +25,7 @@ import { useWallet } from '@1sat/react';
 function useOrdinals() {
   const { identityKey } = useWallet();
   return useQuery({
-    queryKey: ['ordinals', identityKey],   // <-- include identityKey
+    queryKey: ['ordinals', identityKey], // <-- include identityKey
     queryFn: () => getOrdinals.execute(ctx, {}),
     enabled: !!identityKey,
   });
@@ -45,7 +45,7 @@ function useOrdinalsState(ctx: any) {
 
   useEffect(() => {
     if (!identityKey || !ctx) {
-      setOrdinals([]);   // clear when no account
+      setOrdinals([]); // clear when no account
       return;
     }
     let cancelled = false;
@@ -53,7 +53,9 @@ function useOrdinalsState(ctx: any) {
       const { outputs } = await getOrdinals.execute(ctx, {});
       if (!cancelled) setOrdinals(outputs);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [identityKey, ctx]);
 
   return ordinals;

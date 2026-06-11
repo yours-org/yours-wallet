@@ -20,7 +20,7 @@ sweepOrdinals.execute(ctx: OneSatContext, input: SweepOrdinalsInput): Promise<Sw
 import type { PrivateKey } from '@bsv/sdk';
 
 interface SweepOrdinalsInput {
-  inputs: SweepInput[];   // from prepareSweepInputs — filtered to ordinal UTXOs
+  inputs: SweepInput[]; // from prepareSweepInputs — filtered to ordinal UTXOs
   keys: PrivateKey[];
 }
 ```
@@ -70,10 +70,10 @@ Only pass ordinal-bearing UTXOs in `inputs`. Mixing in plain BSV outputs will pr
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `no-inputs` | No ordinal inputs to sweep |
+| Code             | Cause                         |
+| ---------------- | ----------------------------- |
+| `user-rejected`  | User denied the wallet prompt |
+| `no-inputs`      | No ordinal inputs to sweep    |
 | `signing-failed` | Key does not unlock the input |
 
 ## Related

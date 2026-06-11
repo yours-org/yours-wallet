@@ -37,7 +37,7 @@ wallet.getHeaderForHeight(input: { height: number }): Promise<{ header: string }
 
 ```ts
 interface GetHeaderForHeightInput {
-  height: number;  // block height
+  height: number; // block height
 }
 ```
 
@@ -45,7 +45,7 @@ interface GetHeaderForHeightInput {
 
 ```ts
 interface GetHeaderForHeightResult {
-  header: string;  // hex-encoded 80-byte block header
+  header: string; // hex-encoded 80-byte block header
 }
 ```
 

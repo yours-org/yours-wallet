@@ -18,10 +18,10 @@ listOrdinal.execute(ctx: OneSatContext, input: ListOrdinalInput): Promise<ListOr
 
 ```ts
 interface ListOrdinalInput {
-  ordinal: WalletOutput;  // output from getOrdinals
-  inputBEEF: number[];    // Array.from(BEEF) from getOrdinals
-  price: number;          // listing price in SATOSHIS
-  payAddress: string;     // address that receives BSV when purchased
+  ordinal: WalletOutput; // output from getOrdinals
+  inputBEEF: number[]; // Array.from(BEEF) from getOrdinals
+  price: number; // listing price in SATOSHIS
+  payAddress: string; // address that receives BSV when purchased
 }
 ```
 
@@ -53,13 +53,13 @@ import { getOrdinals, listOrdinal } from '@1sat/actions';
 const { outputs, BEEF } = await getOrdinals.execute(ctx, {});
 if (!BEEF) throw new Error('No BEEF returned');
 
-const ordinal = outputs.find(o => o.outpoint === targetOutpoint);
+const ordinal = outputs.find((o) => o.outpoint === targetOutpoint);
 if (!ordinal) throw new Error('Ordinal not found');
 
 const result = await listOrdinal.execute(ctx, {
   ordinal,
   inputBEEF: Array.from(BEEF),
-  price: 100000,            // 0.001 BSV
+  price: 100000, // 0.001 BSV
   payAddress: '1Seller...',
 });
 if (result.error) throw new Error(result.error);
@@ -82,13 +82,13 @@ The ordinal is moved to an OrdLock output. To take it back without selling, use 
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `no-beef` | `inputBEEF` missing or invalid |
-| `not-found` | Ordinal not in wallet (stale — refetch) |
-| `invalid-address` | Malformed `payAddress` |
-| `invalid-amount` | Non-positive or non-integer `price` |
+| Code              | Cause                                   |
+| ----------------- | --------------------------------------- |
+| `user-rejected`   | User denied the wallet prompt           |
+| `no-beef`         | `inputBEEF` missing or invalid          |
+| `not-found`       | Ordinal not in wallet (stale — refetch) |
+| `invalid-address` | Malformed `payAddress`                  |
+| `invalid-amount`  | Non-positive or non-integer `price`     |
 
 ## Related
 

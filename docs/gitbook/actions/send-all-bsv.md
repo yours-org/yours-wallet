@@ -18,7 +18,7 @@ sendAllBsv.execute(ctx: OneSatContext, input: SendAllBsvInput): Promise<SendAllB
 
 ```ts
 interface SendAllBsvInput {
-  destination: string;  // P2PKH address to receive the swept balance
+  destination: string; // P2PKH address to receive the swept balance
 }
 ```
 
@@ -65,11 +65,11 @@ Irreversible. After success the wallet has zero `default`-basket BSV balance. Ma
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `no-spendable-outputs` | `default` basket is empty |
-| `invalid-address` | Malformed destination address |
+| Code                   | Cause                         |
+| ---------------------- | ----------------------------- |
+| `user-rejected`        | User denied the wallet prompt |
+| `no-spendable-outputs` | `default` basket is empty     |
+| `invalid-address`      | Malformed destination address |
 
 ## Related
 

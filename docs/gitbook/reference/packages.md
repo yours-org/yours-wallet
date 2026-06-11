@@ -13,27 +13,27 @@ bun add @1sat/react @1sat/actions @1sat/connect @1sat/client @1sat/types @bsv/sd
 
 ## Package map
 
-| Package | Purpose | Key exports |
-|---------|---------|-------------|
-| `@1sat/react` | React hooks and components | `useWallet`, `WalletProvider`, `ConnectButton` |
-| `@1sat/connect` | BRC-100 wallet detection | (used internally by `WalletProvider`) |
-| `@1sat/actions` | Action execution | `createContext`, `sendBsv`, `getOrdinals`, `inscribe`, `signBsm`, `sendMnee`, `lockBsv`, `deriveDepositAddresses`, ... |
-| `@1sat/client` | Backend services | `OneSatServices`, `MneeClient`, `BapClient`, types: `MneeConfig`, `MneeTransferStatus`, `MneeUtxo` |
-| `@1sat/types` | Shared TypeScript types | `Destination`, `AddressDerivation`, `P1SAT_PROTOCOL`, `CollectionTraits`, etc. |
-| `@bsv/sdk` | BSV transaction library | `WalletInterface`, `AuthFetch`, `PrivateKey`, `Utils`, `Transaction`, `Script` |
+| Package         | Purpose                    | Key exports                                                                                                            |
+| --------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `@1sat/react`   | React hooks and components | `useWallet`, `WalletProvider`, `ConnectButton`                                                                         |
+| `@1sat/connect` | BRC-100 wallet detection   | (used internally by `WalletProvider`)                                                                                  |
+| `@1sat/actions` | Action execution           | `createContext`, `sendBsv`, `getOrdinals`, `inscribe`, `signBsm`, `sendMnee`, `lockBsv`, `deriveDepositAddresses`, ... |
+| `@1sat/client`  | Backend services           | `OneSatServices`, `MneeClient`, `BapClient`, types: `MneeConfig`, `MneeTransferStatus`, `MneeUtxo`                     |
+| `@1sat/types`   | Shared TypeScript types    | `Destination`, `AddressDerivation`, `P1SAT_PROTOCOL`, `CollectionTraits`, etc.                                         |
+| `@bsv/sdk`      | BSV transaction library    | `WalletInterface`, `AuthFetch`, `PrivateKey`, `Utils`, `Transaction`, `Script`                                         |
 
 ## Current pinned versions (production)
 
 ```json
 {
   "dependencies": {
-    "@1sat/react":   "0.0.x",
+    "@1sat/react": "0.0.x",
     "@1sat/connect": "0.0.67",
     "@1sat/actions": "0.0.166",
-    "@1sat/client":  "0.0.38",
-    "@1sat/types":   "0.0.31",
-    "@1sat/utils":   "0.0.25",
-    "@bsv/sdk":      "^2.0.13"
+    "@1sat/client": "0.0.38",
+    "@1sat/types": "0.0.31",
+    "@1sat/utils": "0.0.25",
+    "@bsv/sdk": "^2.0.13"
   }
 }
 ```

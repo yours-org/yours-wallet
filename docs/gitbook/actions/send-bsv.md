@@ -92,11 +92,13 @@ Send with embedded OP_RETURN data:
 
 ```tsx
 const result = await sendBsv.execute(ctx, {
-  requests: [{
-    address: '1Receiver...',
-    satoshis: 1000,
-    data: ['my-app', 'event', 'click'],
-  }],
+  requests: [
+    {
+      address: '1Receiver...',
+      satoshis: 1000,
+      data: ['my-app', 'event', 'click'],
+    },
+  ],
 });
 ```
 
@@ -104,15 +106,17 @@ Send with an embedded inscription:
 
 ```tsx
 const result = await sendBsv.execute(ctx, {
-  requests: [{
-    address: '1Receiver...',
-    satoshis: 1,
-    inscription: {
-      base64Data: pngBase64,
-      mimeType: 'image/png',
-      map: { app: 'my-app', type: 'attachment' },
+  requests: [
+    {
+      address: '1Receiver...',
+      satoshis: 1,
+      inscription: {
+        base64Data: pngBase64,
+        mimeType: 'image/png',
+        map: { app: 'my-app', type: 'attachment' },
+      },
     },
-  }],
+  ],
 });
 ```
 
@@ -132,13 +136,13 @@ For pure inscriptions (where there is no separate payment), prefer [inscribe](./
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `insufficient-funds` | Not enough BSV |
-| `invalid-address` | Malformed `address` |
-| `paymail-resolution-failed` | `paymail` did not resolve |
-| `storage-payment-failed` | Wallet remote storage needs top-up |
+| Code                        | Cause                              |
+| --------------------------- | ---------------------------------- |
+| `user-rejected`             | User denied the wallet prompt      |
+| `insufficient-funds`        | Not enough BSV                     |
+| `invalid-address`           | Malformed `address`                |
+| `paymail-resolution-failed` | `paymail` did not resolve          |
+| `storage-payment-failed`    | Wallet remote storage needs top-up |
 
 ## Related
 

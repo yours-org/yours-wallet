@@ -44,20 +44,15 @@ const allUtxos = await scanUtxos(address);
 Split the scanned UTXOs by type (BSV / ordinal / BSV-21). The exact split logic depends on your indexer's response — for 1sat-stack-style indexers, ordinals carry an `origin` field and BSV-21s carry a `tokenId`.
 
 ```tsx
-const bsvUtxos = allUtxos.filter(u => !u.origin && !u.tokenId);
-const ordUtxos = allUtxos.filter(u => !!u.origin);
-const bsv21Utxos = allUtxos.filter(u => !!u.tokenId);
+const bsvUtxos = allUtxos.filter((u) => !u.origin && !u.tokenId);
+const ordUtxos = allUtxos.filter((u) => !!u.origin);
+const bsv21Utxos = allUtxos.filter((u) => !!u.tokenId);
 ```
 
 ### 4. Prepare inputs and sweep each category
 
 ```tsx
-import {
-  prepareSweepInputs,
-  sweepBsv,
-  sweepOrdinals,
-  sweepBsv21,
-} from '@1sat/actions';
+import { prepareSweepInputs, sweepBsv, sweepOrdinals, sweepBsv21 } from '@1sat/actions';
 
 const results: { type: string; txid: string }[] = [];
 

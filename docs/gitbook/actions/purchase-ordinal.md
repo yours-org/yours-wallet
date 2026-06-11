@@ -18,7 +18,7 @@ purchaseOrdinal.execute(ctx: OneSatContext, input: PurchaseOrdinalInput): Promis
 
 ```ts
 interface PurchaseOrdinalInput {
-  outpoint: string;  // listing outpoint, "txid.vout"
+  outpoint: string; // listing outpoint, "txid.vout"
 }
 ```
 
@@ -66,12 +66,12 @@ Listings can be sniped — between when your UI shows the listing and when the u
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `insufficient-funds` | Not enough BSV to cover the price + fees |
-| `not-found` | Listing outpoint does not exist |
-| `already-spent` | Listing was already purchased or cancelled |
+| Code                 | Cause                                      |
+| -------------------- | ------------------------------------------ |
+| `user-rejected`      | User denied the wallet prompt              |
+| `insufficient-funds` | Not enough BSV to cover the price + fees   |
+| `not-found`          | Listing outpoint does not exist            |
+| `already-spent`      | Listing was already purchased or cancelled |
 
 ## Related
 

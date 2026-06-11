@@ -40,10 +40,10 @@ function MyComponent() {
 }
 ```
 
-* `WalletProvider` (around your app) auto-detects BRC-100 wallets and manages connection state.
-* `useWallet()` returns `{ wallet, status, identityKey, connect, disconnect, providerType }`.
-* `createContext(wallet, { chain, services })` produces an opaque `ctx` you pass to every action.
-* `action.execute(ctx, input)` performs the operation.
+- `WalletProvider` (around your app) auto-detects BRC-100 wallets and manages connection state.
+- `useWallet()` returns `{ wallet, status, identityKey, connect, disconnect, providerType }`.
+- `createContext(wallet, { chain, services })` produces an opaque `ctx` you pass to every action.
+- `action.execute(ctx, input)` performs the operation.
 
 ## The return shape
 
@@ -73,7 +73,7 @@ For any operation that **spends an existing ordinal output** — `transferOrdina
 ```ts
 const { outputs, BEEF } = await getOrdinals.execute(ctx, {});
 if (!BEEF) throw new Error('No BEEF available');
-const ordinal = outputs.find(o => o.outpoint === targetOutpoint);
+const ordinal = outputs.find((o) => o.outpoint === targetOutpoint);
 
 await transferOrdinals.execute(ctx, {
   transfers: [{ ordinal, address: '1Recipient...' }],
@@ -100,7 +100,7 @@ const { derivations } = await deriveDepositAddresses.execute(ctx, {
   startIndex: 0,
   count: 5,
 });
-const addresses = derivations.map(d => d.address);
+const addresses = derivations.map((d) => d.address);
 // addresses for balance/history; derivations for sending
 ```
 
@@ -112,8 +112,8 @@ See [Derivations](concepts/derivations.md) and [sendMnee](actions/send-mnee.md).
 
 ## High-level vs low-level
 
-* **High-level**: `@1sat/actions` — use this 95% of the time. Opinionated, ergonomic, covers common operations.
-* **Low-level**: BRC-100 `WalletInterface` methods on the `wallet` object — `wallet.createAction`, `wallet.createSignature`, `wallet.getPublicKey`, etc. Use when `@1sat/actions` does not cover the use case. See [Low-Level](low-level/blockchain-queries.md).
+- **High-level**: `@1sat/actions` — use this 95% of the time. Opinionated, ergonomic, covers common operations.
+- **Low-level**: BRC-100 `WalletInterface` methods on the `wallet` object — `wallet.createAction`, `wallet.createSignature`, `wallet.getPublicKey`, etc. Use when `@1sat/actions` does not cover the use case. See [Low-Level](low-level/blockchain-queries.md).
 
 ## Rules of thumb
 
@@ -130,24 +130,24 @@ See [Derivations](concepts/derivations.md) and [sendMnee](actions/send-mnee.md).
 
 ## Common errors to handle gracefully
 
-| Error | Meaning | What to do |
-|-------|---------|------------|
-| `user-rejected` | User declined the wallet prompt | Surface friendly message; allow retry |
-| `storage-payment-failed` | User needs more BSV for storage costs | Direct them to top up |
-| `insufficient-funds` | Not enough BSV in `default` basket | Show balance + amount diff |
-| `not-connected` | Wallet not connected | Call `connect()` |
+| Error                    | Meaning                               | What to do                            |
+| ------------------------ | ------------------------------------- | ------------------------------------- |
+| `user-rejected`          | User declined the wallet prompt       | Surface friendly message; allow retry |
+| `storage-payment-failed` | User needs more BSV for storage costs | Direct them to top up                 |
+| `insufficient-funds`     | Not enough BSV in `default` basket    | Show balance + amount diff            |
+| `not-connected`          | Wallet not connected                  | Call `connect()`                      |
 
 Full catalog in [Errors](reference/errors.md).
 
 ## What you should NOT do
 
-* Do not write code that talks to `window.yours` — that is the legacy injected provider and is being phased out. Use `@1sat/actions`. See [Migration](migration/legacy-provider.md).
-* Do not cache balances or ordinals without keying by `identityKey` — they leak across accounts.
-* Do not assume `BEEF` is available — always check.
-* Do not pass strings where numbers are expected (MNEE) or vice versa (BSV-21).
+- Do not write code that talks to `window.yours` — that is the legacy injected provider and is being phased out. Use `@1sat/actions`. See [Migration](migration/legacy-provider.md).
+- Do not cache balances or ordinals without keying by `identityKey` — they leak across accounts.
+- Do not assume `BEEF` is available — always check.
+- Do not pass strings where numbers are expected (MNEE) or vice versa (BSV-21).
 
 ## Next
 
-* [Quickstart](quickstart.md) — runnable boilerplate
-* [Actions index](README.md#actions) — find the operation you need
-* [Cookbook](cookbook/mint-and-list-ordinal.md) — task-oriented recipes
+- [Quickstart](quickstart.md) — runnable boilerplate
+- [Actions index](README.md#actions) — find the operation you need
+- [Cookbook](cookbook/mint-and-list-ordinal.md) — task-oriented recipes

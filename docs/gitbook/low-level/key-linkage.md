@@ -24,8 +24,8 @@ Prove that a key derived for a specific counterparty is linked to the wallet's i
 
 ```ts
 interface RevealCounterpartyKeyLinkageInput {
-  counterparty: string;  // pubkey
-  verifier: string;      // pubkey of the party who will verify
+  counterparty: string; // pubkey
+  verifier: string; // pubkey of the party who will verify
 }
 ```
 

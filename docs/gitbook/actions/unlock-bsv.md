@@ -67,9 +67,9 @@ If `unlockable === 0`, calling `unlockBsv` is wasteful (returns error or no-op).
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
+| Code                | Cause                                           |
+| ------------------- | ----------------------------------------------- |
+| `user-rejected`     | User denied the wallet prompt                   |
 | `nothing-to-unlock` | No locked output has reached its `until` height |
 
 ## Related

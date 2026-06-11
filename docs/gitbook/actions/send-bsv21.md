@@ -38,7 +38,7 @@ interface SendBsv21Input {
 ```ts
 interface TokenOperationResponse {
   txid?: string;
-  tx?: number[];   // raw transaction bytes
+  tx?: number[]; // raw transaction bytes
   error?: string;
 }
 ```
@@ -63,8 +63,8 @@ const result = await sendBsv21.execute(ctx, {
   tokenId: 'abc123...def_0',
   recipients: [
     {
-      amount: 1000n,                              // bigint
-      destination: { address: '1Recipient...' },  // Destination
+      amount: 1000n, // bigint
+      destination: { address: '1Recipient...' }, // Destination
     },
   ],
 });
@@ -97,13 +97,13 @@ const result = await sendBsv21.execute(ctx, {
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `insufficient-token-balance` | Not enough of the token |
-| `insufficient-funds` | Not enough BSV for tx fee |
-| `invalid-destination` | Malformed `destination` |
-| `invalid-token-id` | `tokenId` not in expected `txid_vout` format |
+| Code                         | Cause                                        |
+| ---------------------------- | -------------------------------------------- |
+| `user-rejected`              | User denied the wallet prompt                |
+| `insufficient-token-balance` | Not enough of the token                      |
+| `insufficient-funds`         | Not enough BSV for tx fee                    |
+| `invalid-destination`        | Malformed `destination`                      |
+| `invalid-token-id`           | `tokenId` not in expected `txid_vout` format |
 
 ## Related
 

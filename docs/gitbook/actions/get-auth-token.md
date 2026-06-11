@@ -65,7 +65,7 @@ await fetch('/api/orders/123', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': `Bitcoin-Auth ${result.authToken}`,
+    Authorization: `Bitcoin-Auth ${result.authToken}`,
   },
   body: JSON.stringify({ qty: 5 }),
 });

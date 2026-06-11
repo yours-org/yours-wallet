@@ -24,9 +24,9 @@ interface GetLockDataInput {}
 
 ```ts
 interface GetLockDataResult {
-  totalLocked: number;     // satoshis currently locked
-  unlockable: number;      // satoshis that can be unlocked right now
-  nextUnlock?: number;     // block height of the next upcoming unlock
+  totalLocked: number; // satoshis currently locked
+  unlockable: number; // satoshis that can be unlocked right now
+  nextUnlock?: number; // block height of the next upcoming unlock
 }
 ```
 

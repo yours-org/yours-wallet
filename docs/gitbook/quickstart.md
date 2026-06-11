@@ -126,8 +126,8 @@ function SendForm() {
 
   return (
     <div>
-      <input placeholder="Address" value={address} onChange={e => setAddress(e.target.value)} />
-      <input placeholder="Satoshis" value={amount} onChange={e => setAmount(e.target.value)} />
+      <input placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} />
+      <input placeholder="Satoshis" value={amount} onChange={(e) => setAmount(e.target.value)} />
       <button onClick={handleSend}>Send</button>
     </div>
   );
@@ -136,8 +136,8 @@ function SendForm() {
 
 ## Next steps
 
-* [For AI Agents](ai-onboarding.md) — the mental model in 150 lines
-* [Actions & Context](concepts/actions-and-context.md) — deeper on the pattern
-* [BEEF](concepts/beef.md) — why ordinal ops have a two-step flow
-* [Cookbook](cookbook/mint-and-list-ordinal.md) — end-to-end recipes
-* Working test app: [test-1sat-sdk](https://github.com/b-open-io/1sat-sdk/tree/master/test-1sat-sdk)
+- [For AI Agents](ai-onboarding.md) — the mental model in 150 lines
+- [Actions & Context](concepts/actions-and-context.md) — deeper on the pattern
+- [BEEF](concepts/beef.md) — why ordinal ops have a two-step flow
+- [Cookbook](cookbook/mint-and-list-ordinal.md) — end-to-end recipes
+- Working test app: [test-1sat-sdk](https://github.com/b-open-io/1sat-sdk/tree/master/test-1sat-sdk)

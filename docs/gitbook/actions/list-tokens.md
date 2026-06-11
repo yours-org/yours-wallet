@@ -29,10 +29,10 @@ interface ListTokensInput {
 type ListTokensResult = WalletOutput[];
 
 interface WalletOutput {
-  outpoint: string;        // "txid.vout"
+  outpoint: string; // "txid.vout"
   satoshis: number;
   spendable: boolean;
-  tags?: string[];         // token tags include id, type:bsv-21, etc.
+  tags?: string[]; // token tags include id, type:bsv-21, etc.
   labels?: string[];
   lockingScript?: string;
   customInstructions?: string;

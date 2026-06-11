@@ -18,8 +18,8 @@ cancelListing.execute(ctx: OneSatContext, input: CancelListingInput): Promise<Ca
 
 ```ts
 interface CancelListingInput {
-  listing: WalletOutput;  // the OrdLock listing output, from getOrdinals
-  inputBEEF: number[];    // Array.from(BEEF) from getOrdinals
+  listing: WalletOutput; // the OrdLock listing output, from getOrdinals
+  inputBEEF: number[]; // Array.from(BEEF) from getOrdinals
 }
 ```
 
@@ -51,7 +51,7 @@ import { getOrdinals, cancelListing } from '@1sat/actions';
 const { outputs, BEEF } = await getOrdinals.execute(ctx, {});
 if (!BEEF) throw new Error('No BEEF returned');
 
-const listing = outputs.find(o => o.outpoint === listingOutpoint);
+const listing = outputs.find((o) => o.outpoint === listingOutpoint);
 if (!listing) throw new Error('Listing not found');
 
 const result = await cancelListing.execute(ctx, {
@@ -74,12 +74,12 @@ After cancel, the ordinal returns to the lister's wallet in the ordinals basket.
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `no-beef` | `inputBEEF` missing or invalid |
-| `not-found` | Listing not in wallet (already cancelled/purchased — refetch) |
-| `not-lister` | Wallet does not control the cancel key |
+| Code            | Cause                                                         |
+| --------------- | ------------------------------------------------------------- |
+| `user-rejected` | User denied the wallet prompt                                 |
+| `no-beef`       | `inputBEEF` missing or invalid                                |
+| `not-found`     | Listing not in wallet (already cancelled/purchased — refetch) |
+| `not-lister`    | Wallet does not control the cancel key                        |
 
 ## Related
 

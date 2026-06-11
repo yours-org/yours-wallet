@@ -60,7 +60,7 @@ const { derivations } = await deriveDepositAddresses.execute(ctx, {
   startIndex: 0,
   count: 5,
 });
-const addresses = derivations.map(d => d.address);
+const addresses = derivations.map((d) => d.address);
 ```
 
 Custom prefix (only when you want a distinct address set):

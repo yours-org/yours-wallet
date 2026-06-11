@@ -117,11 +117,11 @@ const result = await mintCollection.execute(ctx, {
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `insufficient-funds` | Not enough BSV |
-| `invalid-content` | Bad base64 |
+| Code                 | Cause                         |
+| -------------------- | ----------------------------- |
+| `user-rejected`      | User denied the wallet prompt |
+| `insufficient-funds` | Not enough BSV                |
+| `invalid-content`    | Bad base64                    |
 
 ## Related
 

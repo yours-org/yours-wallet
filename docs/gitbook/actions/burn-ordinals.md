@@ -14,8 +14,8 @@ Burning is **irreversible**. The ordinal cannot be recovered. Use only when the 
 
 Two forms are exported:
 
-* **`burnOrdinals`** — high-level action. Call `.execute(ctx, input)` directly. Builds, signs, and broadcasts in one step.
-* **`buildBurnOrdinals`** — builder. Returns `CreateActionArgs` for `wallet.createAction`. Use when you need to inspect or modify the transaction before broadcasting.
+- **`burnOrdinals`** — high-level action. Call `.execute(ctx, input)` directly. Builds, signs, and broadcasts in one step.
+- **`buildBurnOrdinals`** — builder. Returns `CreateActionArgs` for `wallet.createAction`. Use when you need to inspect or modify the transaction before broadcasting.
 
 ## burnOrdinals (action)
 
@@ -54,7 +54,7 @@ interface OrdinalOperationResponse {
 import { getOrdinals, burnOrdinals } from '@1sat/actions';
 
 const { outputs, BEEF } = await getOrdinals.execute(ctx, {});
-const toBurn = outputs.filter(o => burnSet.includes(o.outpoint));
+const toBurn = outputs.filter((o) => burnSet.includes(o.outpoint));
 
 const result = await burnOrdinals.execute(ctx, {
   ordinals: toBurn,

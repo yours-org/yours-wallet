@@ -22,10 +22,10 @@ wallet.listOutputs(input: ListOutputsInput): Promise<ListOutputsResult>
 
 ```ts
 interface ListOutputsInput {
-  basket: string;                       // e.g. 'default'
-  tags?: string[];                      // optional filter
-  includeTags?: boolean;                // include each output's tags in the result
-  include?: 'locking scripts';          // include locking scripts (larger payload)
+  basket: string; // e.g. 'default'
+  tags?: string[]; // optional filter
+  includeTags?: boolean; // include each output's tags in the result
+  include?: 'locking scripts'; // include locking scripts (larger payload)
   limit?: number;
 }
 ```
@@ -38,12 +38,12 @@ interface ListOutputsResult {
 }
 
 interface WalletOutput {
-  outpoint: string;        // "txid.vout"
+  outpoint: string; // "txid.vout"
   satoshis: number;
   spendable: boolean;
   tags?: string[];
   labels?: string[];
-  lockingScript?: string;  // when include: 'locking scripts'
+  lockingScript?: string; // when include: 'locking scripts'
   customInstructions?: string;
 }
 ```
@@ -80,7 +80,7 @@ const { outputs } = await wallet.listOutputs({
   include: 'locking scripts',
   limit: 200,
 });
-outputs.forEach(o => console.log(o.outpoint, o.lockingScript));
+outputs.forEach((o) => console.log(o.outpoint, o.lockingScript));
 ```
 
 Filter by tag:

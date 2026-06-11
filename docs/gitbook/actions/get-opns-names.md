@@ -29,8 +29,8 @@ interface GetOpnsNamesInput {
 
 ```ts
 interface GetOpnsNamesResult {
-  outputs: WalletOutput[];   // OpNS name ordinals the wallet owns
-  BEEF?: BEEF;               // ancestry — pass as inputBEEF to register/deregister
+  outputs: WalletOutput[]; // OpNS name ordinals the wallet owns
+  BEEF?: BEEF; // ancestry — pass as inputBEEF to register/deregister
 }
 ```
 

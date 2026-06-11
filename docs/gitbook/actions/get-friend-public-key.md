@@ -33,7 +33,7 @@ interface FriendPubKeyRequest {
 
 ```ts
 interface FriendPubKeyResponse {
-  publicKey?: string;   // derived shared key, hex-encoded compressed
+  publicKey?: string; // derived shared key, hex-encoded compressed
   error?: string;
 }
 ```

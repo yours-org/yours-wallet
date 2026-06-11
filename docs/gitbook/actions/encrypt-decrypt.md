@@ -22,10 +22,10 @@ encryptForCounterparty.execute(ctx: OneSatContext, input: EncryptRequest): Promi
 
 ```ts
 interface EncryptRequest {
-  plaintext: number[];          // byte array, e.g. [...new TextEncoder().encode('hi')]
+  plaintext: number[]; // byte array, e.g. [...new TextEncoder().encode('hi')]
   protocolID: [number, string]; // BRC-42 protocol
-  keyID: string;                // BRC-42 key id
-  counterparty: string;         // recipient pubkey (33-byte compressed hex)
+  keyID: string; // BRC-42 key id
+  counterparty: string; // recipient pubkey (33-byte compressed hex)
 }
 ```
 
@@ -33,7 +33,7 @@ interface EncryptRequest {
 
 ```ts
 interface EncryptResponse {
-  ciphertext?: number[];   // byte array
+  ciphertext?: number[]; // byte array
   error?: string;
 }
 ```
@@ -72,7 +72,7 @@ interface DecryptRequest {
   ciphertext: number[];
   protocolID: [number, string];
   keyID: string;
-  counterparty: string;   // sender pubkey
+  counterparty: string; // sender pubkey
 }
 ```
 
@@ -128,11 +128,11 @@ For round-trip success, the sender and recipient must use the SAME `protocolID`,
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `invalid-counterparty` | Bad pubkey hex |
-| `invalid-ciphertext` | Ciphertext corrupted or wrong counterparty/protocolID/keyID |
+| Code                   | Cause                                                       |
+| ---------------------- | ----------------------------------------------------------- |
+| `user-rejected`        | User denied the wallet prompt                               |
+| `invalid-counterparty` | Bad pubkey hex                                              |
+| `invalid-ciphertext`   | Ciphertext corrupted or wrong counterparty/protocolID/keyID |
 
 ## Related
 

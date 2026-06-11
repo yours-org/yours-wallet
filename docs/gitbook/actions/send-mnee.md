@@ -35,8 +35,8 @@ interface SendMneeInput {
 
 ```ts
 interface SendMneeResult {
-  txid?: string;       // populated when on-chain
-  ticketId?: string;   // populated when settlement is batched off-chain — poll getMneeTxStatus
+  txid?: string; // populated when on-chain
+  ticketId?: string; // populated when settlement is batched off-chain — poll getMneeTxStatus
   error?: string;
 }
 ```
@@ -64,10 +64,8 @@ const { derivations } = await deriveDepositAddresses.execute(ctx, {
 
 // 2. Send
 const result = await sendMnee.execute(ctx, {
-  recipients: [
-    { address: '1Recipient...', amount: Number(userInput) },
-  ],
-  derivations,   // REQUIRED — pass the full derivations array
+  recipients: [{ address: '1Recipient...', amount: Number(userInput) }],
+  derivations, // REQUIRED — pass the full derivations array
 });
 if (result.error) throw new Error(result.error);
 
@@ -95,12 +93,12 @@ MNEE settlements may be batched off-chain via the MNEE cosigner. A `ticketId` (w
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
+| Code                | Cause                                                   |
+| ------------------- | ------------------------------------------------------- |
+| `user-rejected`     | User denied the wallet prompt                           |
 | `insufficient-mnee` | Not enough MNEE balance across the provided derivations |
-| `invalid-address` | Malformed recipient address |
-| `invalid-amount` | `amount` was not a number or was non-positive |
+| `invalid-address`   | Malformed recipient address                             |
+| `invalid-amount`    | `amount` was not a number or was non-positive           |
 
 ## Related
 

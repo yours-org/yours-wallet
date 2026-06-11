@@ -66,7 +66,7 @@ import { deployBsv21Mint } from '@1sat/actions';
 
 const result = await deployBsv21Mint.execute(ctx, {
   symbol: 'MEME',
-  amount: 1_000_000n * 10n ** 8n,   // 1M tokens with 8 decimals
+  amount: 1_000_000n * 10n ** 8n, // 1M tokens with 8 decimals
   decimals: 8,
   icon: 'https://example.com/meme.png',
 });
@@ -103,12 +103,12 @@ The returned `tokenId` uses **underscore** format `txid_vout`. Pin it for `sendB
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `insufficient-funds` | Not enough BSV |
-| `invalid-symbol` | Symbol too long (>32 chars) or invalid characters |
-| `invalid-amount` | Supply not a positive integer |
+| Code                 | Cause                                             |
+| -------------------- | ------------------------------------------------- |
+| `user-rejected`      | User denied the wallet prompt                     |
+| `insufficient-funds` | Not enough BSV                                    |
+| `invalid-symbol`     | Symbol too long (>32 chars) or invalid characters |
+| `invalid-amount`     | Supply not a positive integer                     |
 
 ## Related
 

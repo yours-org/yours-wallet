@@ -106,12 +106,12 @@ The mint fails if the collection has hit its `quantity` cap. There is no client-
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `collection-full` | Parent collection has reached its `quantity` cap |
-| `not-found` | `collectionId` does not exist |
-| `insufficient-funds` | Not enough BSV |
+| Code                 | Cause                                            |
+| -------------------- | ------------------------------------------------ |
+| `user-rejected`      | User denied the wallet prompt                    |
+| `collection-full`    | Parent collection has reached its `quantity` cap |
+| `not-found`          | `collectionId` does not exist                    |
+| `insufficient-funds` | Not enough BSV                                   |
 
 ## Related
 

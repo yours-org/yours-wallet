@@ -25,19 +25,19 @@ const totalSats = outputs.reduce((sum, o) => sum + o.satoshis, 0);
 
 Tags are string annotations on individual outputs. Ordinal outputs carry well-known tags:
 
-| Tag | Meaning |
-|-----|---------|
-| `origin` (bare) | This output IS the origin inscription |
+| Tag                 | Meaning                                             |
+| ------------------- | --------------------------------------------------- |
+| `origin` (bare)     | This output IS the origin inscription               |
 | `origin:<outpoint>` | Transfer — the tag's outpoint references the origin |
-| `type:<mime>` | Content type (e.g. `type:image/png`) |
-| `name:<string>` | Friendly name |
+| `type:<mime>`       | Content type (e.g. `type:image/png`)                |
+| `name:<string>`     | Friendly name                                       |
 
 Use the tag value to build content URLs:
 
 ```tsx
 import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 
-const originTag = ord.tags?.find(t => t.startsWith('origin:'));
+const originTag = ord.tags?.find((t) => t.startsWith('origin:'));
 const originOutpoint = originTag?.slice('origin:'.length) ?? ord.outpoint;
 const url = `${ONESAT_MAINNET_CONTENT_URL}/${originOutpoint}`;
 ```
@@ -83,12 +83,12 @@ await wallet.relinquishOutput({
 
 ```ts
 interface WalletOutput {
-  outpoint: string;        // "txid.vout"
+  outpoint: string; // "txid.vout"
   satoshis: number;
   spendable: boolean;
   tags?: string[];
   labels?: string[];
-  lockingScript?: string;  // when include: 'locking scripts'
+  lockingScript?: string; // when include: 'locking scripts'
   customInstructions?: string;
 }
 ```
@@ -97,7 +97,7 @@ Full type docs in [Types](../reference/types.md).
 
 ## Related
 
-* [Output Management](../low-level/output-management.md) — low-level `listOutputs` / `relinquishOutput`
-* [getOrdinals](../actions/get-ordinals.md) — high-level wrapper that also returns BEEF
-* [listOutputs (action)](../actions/list-outputs.md) — high-level UTXO listing
-* [Types](../reference/types.md) — `WalletOutput` and tag conventions
+- [Output Management](../low-level/output-management.md) — low-level `listOutputs` / `relinquishOutput`
+- [getOrdinals](../actions/get-ordinals.md) — high-level wrapper that also returns BEEF
+- [listOutputs (action)](../actions/list-outputs.md) — high-level UTXO listing
+- [Types](../reference/types.md) — `WalletOutput` and tag conventions

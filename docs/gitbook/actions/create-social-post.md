@@ -18,8 +18,8 @@ createSocialPost.execute(ctx: OneSatContext, input: CreateSocialPostInput): Prom
 
 ```ts
 interface CreateSocialPostInput {
-  content: string;  // post body
-  app: string;      // app namespace, e.g. 'my-social-app'
+  content: string; // post body
+  app: string; // app namespace, e.g. 'my-social-app'
 }
 ```
 
@@ -67,11 +67,11 @@ The post is written on-chain. Deletion is not possible. Validate `content` (leng
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `insufficient-funds` | Not enough BSV |
-| `invalid-content` | Content invalid (e.g. empty) |
+| Code                 | Cause                         |
+| -------------------- | ----------------------------- |
+| `user-rejected`      | User denied the wallet prompt |
+| `insufficient-funds` | Not enough BSV                |
+| `invalid-content`    | Content invalid (e.g. empty)  |
 
 ## Related
 

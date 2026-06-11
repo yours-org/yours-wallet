@@ -23,20 +23,20 @@ interface CreateActionInput {
   description: string;
   inputs?: Array<{
     outpoint: string;
-    unlockingScript?: string;       // omit to defer signing to signAction
+    unlockingScript?: string; // omit to defer signing to signAction
     inputDescription?: string;
   }>;
   outputs?: Array<{
-    lockingScript: string;          // hex
+    lockingScript: string; // hex
     satoshis: number;
     outputDescription: string;
     basket?: string;
     tags?: string[];
   }>;
-  inputBEEF?: number[];             // ancestry for external inputs
+  inputBEEF?: number[]; // ancestry for external inputs
   options?: {
     acceptDelayedBroadcast?: boolean;
-    noSend?: boolean;               // build & sign without broadcasting
+    noSend?: boolean; // build & sign without broadcasting
   };
 }
 ```
@@ -45,8 +45,8 @@ interface CreateActionInput {
 
 ```ts
 interface CreateActionResult {
-  txid?: string;        // populated unless noSend or external signing
-  reference?: string;   // handle for signAction / abortAction
+  txid?: string; // populated unless noSend or external signing
+  reference?: string; // handle for signAction / abortAction
   // ... additional fields depending on options
 }
 ```
@@ -56,11 +56,13 @@ interface CreateActionResult {
 ```tsx
 const result = await wallet.createAction({
   description: 'Send 1000 sats to alice',
-  outputs: [{
-    lockingScript: '76a914...88ac',
-    satoshis: 1000,
-    outputDescription: 'payment',
-  }],
+  outputs: [
+    {
+      lockingScript: '76a914...88ac',
+      satoshis: 1000,
+      outputDescription: 'payment',
+    },
+  ],
   options: { acceptDelayedBroadcast: false },
 });
 console.log('txid:', result.txid);
@@ -80,8 +82,8 @@ Sign a previously-created action that left some inputs unsigned (`unlockingScrip
 
 ```ts
 interface SignActionInput {
-  reference: string;                        // from createAction
-  spends: Record<number, { unlockingScript: string }>;  // keyed by input index
+  reference: string; // from createAction
+  spends: Record<number, { unlockingScript: string }>; // keyed by input index
 }
 ```
 
@@ -124,7 +126,7 @@ Import an externally-built transaction into the wallet (so the wallet knows it o
 
 ```ts
 interface InternalizeActionInput {
-  tx: number[];        // BEEF bytes (Array.from(beef))
+  tx: number[]; // BEEF bytes (Array.from(beef))
   outputs: Array<{
     outputIndex: number;
     basket?: string;

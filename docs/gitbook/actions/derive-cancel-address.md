@@ -12,7 +12,7 @@ If you need to preview the cancel-authorized address for a listing in your UI, y
 
 1. Use [cancelListing](./cancel-listing.md) directly — it derives the cancel key internally and signs.
 2. Wait for the SDK to expose this as a first-class action (track the `@1sat/actions` releases).
-{% endhint %}
+   {% endhint %}
 
 ## What it does internally
 

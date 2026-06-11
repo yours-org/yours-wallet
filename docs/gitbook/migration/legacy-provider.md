@@ -13,75 +13,75 @@ The `window.yours` global is **deprecated**. Use `@1sat/actions` for all new cod
 
 ## Connection & status
 
-| Legacy | Modern |
-|--------|--------|
-| `yours.connect()` | `<WalletProvider>` + `useWallet()` + `<ConnectButton>` (from `@1sat/react`). Auto-detects BRC-100 wallets. |
-| `yours.isConnected()` | `useWallet().status === 'connected'` — reactive |
-| `yours.disconnect()` | `useWallet().disconnect()` |
-| `yours.on('signedOut', fn)` | `window.addEventListener('YoursEmitEvent', fn)`; check `e.detail.action === 'signedOut'` |
-| `yours.on('switchAccount', fn)` | Same — `e.detail.action === 'switchAccount'` |
+| Legacy                          | Modern                                                                                                     |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `yours.connect()`               | `<WalletProvider>` + `useWallet()` + `<ConnectButton>` (from `@1sat/react`). Auto-detects BRC-100 wallets. |
+| `yours.isConnected()`           | `useWallet().status === 'connected'` — reactive                                                            |
+| `yours.disconnect()`            | `useWallet().disconnect()`                                                                                 |
+| `yours.on('signedOut', fn)`     | `window.addEventListener('YoursEmitEvent', fn)`; check `e.detail.action === 'signedOut'`                   |
+| `yours.on('switchAccount', fn)` | Same — `e.detail.action === 'switchAccount'`                                                               |
 
 ## Payments
 
-| Legacy | Modern |
-|--------|--------|
-| `yours.sendBsv(requests)` | `sendBsv.execute(ctx, { requests })` |
-| `yours.getBalance()` | `wallet.listOutputs({ basket: 'default' })` then sum `o.satoshis` |
-| `yours.getAddresses()` | `deriveDepositAddresses.execute(ctx, { startIndex, count })` — default prefix `'1sat'` (P1SAT) |
-| `yours.getPubKeys()` | `wallet.getPublicKey({ protocolID, keyID })` |
+| Legacy                    | Modern                                                                                         |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| `yours.sendBsv(requests)` | `sendBsv.execute(ctx, { requests })`                                                           |
+| `yours.getBalance()`      | `wallet.listOutputs({ basket: 'default' })` then sum `o.satoshis`                              |
+| `yours.getAddresses()`    | `deriveDepositAddresses.execute(ctx, { startIndex, count })` — default prefix `'1sat'` (P1SAT) |
+| `yours.getPubKeys()`      | `wallet.getPublicKey({ protocolID, keyID })`                                                   |
 
 ## Ordinals
 
-| Legacy | Modern |
-|--------|--------|
-| `yours.getOrdinals()` | `getOrdinals.execute(ctx, {})` — now returns `{ outputs, BEEF }` |
+| Legacy                                     | Modern                                                                                                               |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `yours.getOrdinals()`                      | `getOrdinals.execute(ctx, {})` — now returns `{ outputs, BEEF }`                                                     |
 | `yours.transferOrdinal(outpoint, address)` | Two steps: `getOrdinals` then `transferOrdinals.execute(ctx, { transfers, inputBEEF })`. BEEF must be fetched first. |
-| `yours.inscribe(payload)` | `inscribe.execute(ctx, { base64Content, contentType, map?, signWithBAP? })`. Content must be pre-encoded as base64. |
+| `yours.inscribe(payload)`                  | `inscribe.execute(ctx, { base64Content, contentType, map?, signWithBAP? })`. Content must be pre-encoded as base64.  |
 
 ## Marketplace
 
-| Legacy | Modern |
-|--------|--------|
+| Legacy                               | Modern                                                                |
+| ------------------------------------ | --------------------------------------------------------------------- |
 | `yours.listOrdinal(outpoint, price)` | `listOrdinal.execute(ctx, { ordinal, inputBEEF, price, payAddress })` |
-| `yours.purchaseOrdinal(outpoint)` | `purchaseOrdinal.execute(ctx, { outpoint })` |
-| `yours.cancelListing(outpoint)` | `cancelListing.execute(ctx, { listing, inputBEEF })` |
+| `yours.purchaseOrdinal(outpoint)`    | `purchaseOrdinal.execute(ctx, { outpoint })`                          |
+| `yours.cancelListing(outpoint)`      | `cancelListing.execute(ctx, { listing, inputBEEF })`                  |
 
 ## Identity (BAP)
 
-| Legacy | Modern |
-|--------|--------|
-| `yours.getProfile()` | `getProfile.execute(ctx, {})` |
-| `yours.publishIdentity()` | `publishIdentity.execute(ctx, {})` |
+| Legacy                         | Modern                                    |
+| ------------------------------ | ----------------------------------------- |
+| `yours.getProfile()`           | `getProfile.execute(ctx, {})`             |
+| `yours.publishIdentity()`      | `publishIdentity.execute(ctx, {})`        |
 | `yours.updateProfile(profile)` | `updateProfile.execute(ctx, { profile })` |
 
 ## Signing & encryption
 
-| Legacy | Modern |
-|--------|--------|
-| `yours.signMessage(message)` | `signBsm.execute(ctx, { message })` — returns `{ sig, address, pubKey }` |
+| Legacy                            | Modern                                                                                          |
+| --------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `yours.signMessage(message)`      | `signBsm.execute(ctx, { message })` — returns `{ sig, address, pubKey }`                        |
 | `yours.encrypt(message, pubkeys)` | `encryptForCounterparty.execute(ctx, { counterparty, message })` — single counterparty per call |
-| `yours.decrypt(messages)` | `decryptFromCounterparty.execute(ctx, { counterparty, ciphertext })` |
+| `yours.decrypt(messages)`         | `decryptFromCounterparty.execute(ctx, { counterparty, ciphertext })`                            |
 
 ## Tokens
 
-| Legacy | Modern |
-|--------|--------|
-| `yours.getTokens()` | `getBsv21Balances.execute(ctx, {})` |
+| Legacy                 | Modern                                                                                                                              |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `yours.getTokens()`    | `getBsv21Balances.execute(ctx, {})`                                                                                                 |
 | `yours.sendToken(...)` | `sendBsv21.execute(ctx, { tokenId, recipients })` — amounts are STRINGS in atomic units; tokenIds use UNDERSCORE format `txid_vout` |
 
 ## Locks
 
-| Legacy | Modern |
-|--------|--------|
+| Legacy                | Modern                               |
+| --------------------- | ------------------------------------ |
 | `yours.lockBsv(reqs)` | `lockBsv.execute(ctx, { requests })` |
-| `yours.unlockBsv()` | `unlockBsv.execute(ctx, {})` |
+| `yours.unlockBsv()`   | `unlockBsv.execute(ctx, {})`         |
 
 ## Generic transaction operations
 
 The legacy provider exposed a single `yours.sendTx` for everything. In the modern API:
 
-* For wallet-managed transactions: use the appropriate `@1sat/actions` action.
-* For custom transactions: use `wallet.createAction({ description, outputs, options })` directly. See [Transaction Actions](../low-level/transaction-actions.md).
+- For wallet-managed transactions: use the appropriate `@1sat/actions` action.
+- For custom transactions: use `wallet.createAction({ description, outputs, options })` directly. See [Transaction Actions](../low-level/transaction-actions.md).
 
 ## Why migrate
 

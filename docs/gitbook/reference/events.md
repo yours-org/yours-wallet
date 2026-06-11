@@ -9,10 +9,10 @@ Yours Wallet dispatches `CustomEvent` instances on `window` under the name `Your
 
 ## Event types
 
-| `action` | When emitted | Recommended response |
-|----------|--------------|----------------------|
-| `signedOut` | User signed out of the wallet extension | Call `disconnect()`; clear app state |
-| `switchAccount` | User switched to a different account | Call `disconnect()`, wait ~500ms, call `connect()` |
+| `action`        | When emitted                            | Recommended response                               |
+| --------------- | --------------------------------------- | -------------------------------------------------- |
+| `signedOut`     | User signed out of the wallet extension | Call `disconnect()`; clear app state               |
+| `switchAccount` | User switched to a different account    | Call `disconnect()`, wait ~500ms, call `connect()` |
 
 ## Listener pattern
 
@@ -70,9 +70,12 @@ The event name (`YoursEmitEvent`) is stable, but the set of `action` values may 
 const handler = (e: Event) => {
   const { action } = (e as CustomEvent).detail;
   switch (action) {
-    case 'signedOut': /* ... */ break;
-    case 'switchAccount': /* ... */ break;
-    default: /* ignore unknown events */ break;
+    case 'signedOut':
+      /* ... */ break;
+    case 'switchAccount':
+      /* ... */ break;
+    default:
+      /* ignore unknown events */ break;
   }
 };
 ```

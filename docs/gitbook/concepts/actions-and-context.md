@@ -23,9 +23,9 @@ const services = new OneSatServices('main');
 const ctx = createContext(wallet, { chain: 'main', services });
 ```
 
-* `wallet` is the BRC-100 `WalletInterface` from `useWallet()`.
-* `chain` is `'main'` for BSV mainnet (test chain not currently supported by Yours).
-* `services` is a `OneSatServices` instance from `@1sat/client` that handles backend lookups (UTXO scans, ORDFS, broadcast).
+- `wallet` is the BRC-100 `WalletInterface` from `useWallet()`.
+- `chain` is `'main'` for BSV mainnet (test chain not currently supported by Yours).
+- `services` is a `OneSatServices` instance from `@1sat/client` that handles backend lookups (UTXO scans, ORDFS, broadcast).
 
 ## The React pattern
 
@@ -98,17 +98,17 @@ Every action page follows the same template (signature, input, output, precondit
 
 The categories:
 
-* Payments — [sendBsv](../actions/send-bsv.md), [sendAllBsv](../actions/send-all-bsv.md), [listOutputs](../actions/list-outputs.md)
-* Ordinals — [getOrdinals](../actions/get-ordinals.md), [transferOrdinals](../actions/transfer-ordinals.md), [inscribe](../actions/inscribe.md), [burnOrdinals](../actions/burn-ordinals.md)
-* Marketplace — [listOrdinal](../actions/list-ordinal.md), [purchaseOrdinal](../actions/purchase-ordinal.md), [cancelListing](../actions/cancel-listing.md), [deriveCancelAddress](../actions/derive-cancel-address.md)
-* Collections — [mintCollection](../actions/mint-collection.md), [mintCollectionItem](../actions/mint-collection-item.md)
-* BSV-21 — [getBsv21Balances](../actions/get-bsv21-balances.md), [sendBsv21](../actions/send-bsv21.md), [listTokens](../actions/list-tokens.md), [purchaseBsv21](../actions/purchase-bsv21.md)
-* MNEE — [deriveDepositAddresses](../actions/derive-deposit-addresses.md), [sendMnee](../actions/send-mnee.md), [getMneeBalance](../actions/get-mnee-balance.md), and more
-* Identity — [getProfile](../actions/get-profile.md), [updateProfile](../actions/update-profile.md), [publishIdentity](../actions/publish-identity.md)
-* Locks — [lockBsv](../actions/lock-bsv.md), [unlockBsv](../actions/unlock-bsv.md), [getLockData](../actions/get-lock-data.md)
-* Signing — [signBsm](../actions/sign-bsm.md), [encrypt-decrypt](../actions/encrypt-decrypt.md)
-* OpNS — [opnsRegister](../actions/opns-register.md), [opnsDeregister](../actions/opns-deregister.md)
-* Sweep — [sweepBsv](../actions/sweep-bsv.md), [sweepOrdinals](../actions/sweep-ordinals.md), [sweepBsv21](../actions/sweep-bsv21.md)
+- Payments — [sendBsv](../actions/send-bsv.md), [sendAllBsv](../actions/send-all-bsv.md), [listOutputs](../actions/list-outputs.md)
+- Ordinals — [getOrdinals](../actions/get-ordinals.md), [transferOrdinals](../actions/transfer-ordinals.md), [inscribe](../actions/inscribe.md), [burnOrdinals](../actions/burn-ordinals.md)
+- Marketplace — [listOrdinal](../actions/list-ordinal.md), [purchaseOrdinal](../actions/purchase-ordinal.md), [cancelListing](../actions/cancel-listing.md), [deriveCancelAddress](../actions/derive-cancel-address.md)
+- Collections — [mintCollection](../actions/mint-collection.md), [mintCollectionItem](../actions/mint-collection-item.md)
+- BSV-21 — [getBsv21Balances](../actions/get-bsv21-balances.md), [sendBsv21](../actions/send-bsv21.md), [listTokens](../actions/list-tokens.md), [purchaseBsv21](../actions/purchase-bsv21.md)
+- MNEE — [deriveDepositAddresses](../actions/derive-deposit-addresses.md), [sendMnee](../actions/send-mnee.md), [getMneeBalance](../actions/get-mnee-balance.md), and more
+- Identity — [getProfile](../actions/get-profile.md), [updateProfile](../actions/update-profile.md), [publishIdentity](../actions/publish-identity.md)
+- Locks — [lockBsv](../actions/lock-bsv.md), [unlockBsv](../actions/unlock-bsv.md), [getLockData](../actions/get-lock-data.md)
+- Signing — [signBsm](../actions/sign-bsm.md), [encrypt-decrypt](../actions/encrypt-decrypt.md)
+- OpNS — [opnsRegister](../actions/opns-register.md), [opnsDeregister](../actions/opns-deregister.md)
+- Sweep — [sweepBsv](../actions/sweep-bsv.md), [sweepOrdinals](../actions/sweep-ordinals.md), [sweepBsv21](../actions/sweep-bsv21.md)
 
 Full index in the [SUMMARY](../SUMMARY.md) sidebar.
 
@@ -118,7 +118,7 @@ For use cases not covered by `@1sat/actions`, call the BRC-100 `wallet.*` method
 
 ## Related
 
-* [BRC-100](brc-100.md) — the underlying interface
-* [BEEF](beef.md) — required by spend-side actions
-* [Permissions](permissions.md) — every action may prompt
-* [Errors](../reference/errors.md) — error code catalog
+- [BRC-100](brc-100.md) — the underlying interface
+- [BEEF](beef.md) — required by spend-side actions
+- [Permissions](permissions.md) — every action may prompt
+- [Errors](../reference/errors.md) — error code catalog

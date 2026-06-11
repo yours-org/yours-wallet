@@ -34,12 +34,12 @@ interface ListOutputsInput {
 
 ```ts
 interface WalletOutput {
-  outpoint: string;        // "txid.vout"
+  outpoint: string; // "txid.vout"
   satoshis: number;
   spendable: boolean;
   tags?: string[];
   labels?: string[];
-  lockingScript?: string;  // when include: 'locking scripts'
+  lockingScript?: string; // when include: 'locking scripts'
   customInstructions?: string;
 }
 ```
@@ -80,7 +80,7 @@ wallet.relinquishOutput(input: RelinquishOutputInput): Promise<void>
 ```ts
 interface RelinquishOutputInput {
   basket: string;
-  output: string;  // outpoint "txid.vout"
+  output: string; // outpoint "txid.vout"
 }
 ```
 

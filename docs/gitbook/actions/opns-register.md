@@ -20,8 +20,8 @@ opnsRegister.execute(ctx: OneSatContext, input: OpnsRegisterInput): Promise<Opns
 
 ```ts
 interface OpnsRegisterInput {
-  ordinal: WalletOutput;       // the OpNS name ordinal, from getOrdinals
-  inputBEEF?: number[];        // Array.from(BEEF) — optional but recommended
+  ordinal: WalletOutput; // the OpNS name ordinal, from getOrdinals
+  inputBEEF?: number[]; // Array.from(BEEF) — optional but recommended
 }
 ```
 
@@ -51,7 +51,7 @@ interface OpnsRegisterResult {
 import { getOrdinals, opnsRegister } from '@1sat/actions';
 
 const { outputs, BEEF } = await getOrdinals.execute(ctx, {});
-const opnsOrdinal = outputs.find(o => o.outpoint === opnsOutpoint);
+const opnsOrdinal = outputs.find((o) => o.outpoint === opnsOutpoint);
 if (!opnsOrdinal) throw new Error('OpNS name not found');
 
 const result = await opnsRegister.execute(ctx, {
@@ -73,10 +73,10 @@ You must own the OpNS name ordinal. Registration binds it to your wallet's ident
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `not-found` | OpNS name ordinal not in wallet (stale — refetch) |
+| Code                 | Cause                                                                        |
+| -------------------- | ---------------------------------------------------------------------------- |
+| `user-rejected`      | User denied the wallet prompt                                                |
+| `not-found`          | OpNS name ordinal not in wallet (stale — refetch)                            |
 | `already-registered` | The name is already bound (use [opnsDeregister](./opns-deregister.md) first) |
 
 ## Related

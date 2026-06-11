@@ -20,7 +20,7 @@ sweepBsv21.execute(ctx: OneSatContext, input: SweepBsv21Input): Promise<SweepBsv
 import type { PrivateKey } from '@bsv/sdk';
 
 interface SweepBsv21Input {
-  inputs: SweepInput[];   // from prepareSweepInputs — filtered to BSV-21 UTXOs
+  inputs: SweepInput[]; // from prepareSweepInputs — filtered to BSV-21 UTXOs
   keys: PrivateKey[];
 }
 ```
@@ -74,10 +74,10 @@ A typical paper-wallet import calls all three sweep functions in sequence: first
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `no-inputs` | No BSV-21 inputs to sweep |
+| Code             | Cause                         |
+| ---------------- | ----------------------------- |
+| `user-rejected`  | User denied the wallet prompt |
+| `no-inputs`      | No BSV-21 inputs to sweep     |
 | `signing-failed` | Key does not unlock the input |
 
 ## Related

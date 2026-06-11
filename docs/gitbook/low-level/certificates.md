@@ -22,10 +22,10 @@ wallet.acquireCertificate(input: AcquireCertificateInput): Promise<Certificate>
 
 ```ts
 interface AcquireCertificateInput {
-  type: string;                              // certificate type identifier
-  certifier: string;                         // certifier pubkey
+  type: string; // certificate type identifier
+  certifier: string; // certifier pubkey
   acquisitionProtocol: 'direct' | 'issuance';
-  fields: Record<string, string>;            // field name -> value
+  fields: Record<string, string>; // field name -> value
 }
 ```
 
@@ -81,8 +81,8 @@ Generate a proof that reveals only selected fields to a verifier.
 ```ts
 interface ProveCertificateInput {
   certificate: Certificate;
-  fieldsToReveal: string[];   // names of fields to disclose
-  verifier: string;           // verifier pubkey
+  fieldsToReveal: string[]; // names of fields to disclose
+  verifier: string; // verifier pubkey
 }
 ```
 
@@ -91,7 +91,7 @@ interface ProveCertificateInput {
 ```tsx
 const proof = await wallet.proveCertificate({
   certificate: cert,
-  fieldsToReveal: ['name'],   // hide email, show name
+  fieldsToReveal: ['name'], // hide email, show name
   verifier: '02verifier-pubkey...',
 });
 // Send `proof` to the verifier.

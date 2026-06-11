@@ -25,7 +25,7 @@ const { derivations } = await deriveDepositAddresses.execute(ctx, {
   startIndex: 0,
   count: 5,
 });
-const addresses = derivations.map(d => d.address);
+const addresses = derivations.map((d) => d.address);
 ```
 
 {% hint style="info" %}
@@ -52,10 +52,8 @@ if (sendAmount > balance.totalDecimal) {
 import { sendMnee } from '@1sat/actions';
 
 const result = await sendMnee.execute(ctx, {
-  recipients: [
-    { address: recipientAddress, amount: Number(userInput) },
-  ],
-  derivations,   // REQUIRED — the wallet needs these to sign inputs
+  recipients: [{ address: recipientAddress, amount: Number(userInput) }],
+  derivations, // REQUIRED — the wallet needs these to sign inputs
 });
 if (result.error) throw new Error(result.error);
 ```
@@ -93,7 +91,7 @@ async function pollUntilSettled(ticketId: string) {
       console.log('Confirmed on-chain:', status.txid);
       return;
     }
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000));
   }
   throw new Error('Polling timeout');
 }

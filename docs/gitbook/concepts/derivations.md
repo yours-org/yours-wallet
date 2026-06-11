@@ -39,7 +39,7 @@ const { derivations } = await deriveDepositAddresses.execute(ctx, {
 });
 
 // For balance / history calls: just the address strings
-const addresses = derivations.map(d => d.address);
+const addresses = derivations.map((d) => d.address);
 
 // For sending MNEE: pass the full derivations array — sendMnee needs the keyID info
 ```
@@ -49,18 +49,14 @@ const addresses = derivations.map(d => d.address);
 ## Typical MNEE flow
 
 ```tsx
-import {
-  deriveDepositAddresses,
-  getMneeBalance,
-  sendMnee,
-} from '@1sat/actions';
+import { deriveDepositAddresses, getMneeBalance, sendMnee } from '@1sat/actions';
 
 // 1. Derive (cache these)
 const { derivations } = await deriveDepositAddresses.execute(ctx, {
   startIndex: 0,
   count: 5,
 });
-const addresses = derivations.map(d => d.address);
+const addresses = derivations.map((d) => d.address);
 
 // 2. Check balance (just addresses needed)
 const balance = await getMneeBalance.execute(ctx, { addresses });
@@ -97,7 +93,7 @@ If the user receives MNEE while the wallet is offline, call `syncAddresses` to b
 ```tsx
 import { syncAddresses } from '@1sat/actions';
 
-await syncAddresses.execute(ctx, { count: 5 });   // default prefix
+await syncAddresses.execute(ctx, { count: 5 }); // default prefix
 ```
 
 ## Related

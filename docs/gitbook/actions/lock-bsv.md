@@ -19,8 +19,8 @@ lockBsv.execute(ctx: OneSatContext, input: LockBsvInput): Promise<LockBsvResult>
 ```ts
 interface LockBsvInput {
   requests: Array<{
-    satoshis: number;  // amount to lock — integer
-    until: number;     // BLOCK HEIGHT (not timestamp) at which it unlocks
+    satoshis: number; // amount to lock — integer
+    until: number; // BLOCK HEIGHT (not timestamp) at which it unlocks
   }>;
 }
 ```
@@ -50,9 +50,7 @@ interface LockBsvResult {
 import { lockBsv } from '@1sat/actions';
 
 const result = await lockBsv.execute(ctx, {
-  requests: [
-    { satoshis: 100000, until: 900000 },
-  ],
+  requests: [{ satoshis: 100000, until: 900000 }],
 });
 if (result.error) throw new Error(result.error);
 console.log('Locked in:', result.txid);
@@ -74,12 +72,12 @@ Locked BSV is not spendable until `until`. The user can [unlockBsv](./unlock-bsv
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `insufficient-funds` | Not enough BSV |
-| `invalid-amount` | Non-integer satoshis or non-positive |
-| `invalid-height` | `until` not a positive integer |
+| Code                 | Cause                                |
+| -------------------- | ------------------------------------ |
+| `user-rejected`      | User denied the wallet prompt        |
+| `insufficient-funds` | Not enough BSV                       |
+| `invalid-amount`     | Non-integer satoshis or non-positive |
+| `invalid-height`     | `until` not a positive integer       |
 
 ## Related
 

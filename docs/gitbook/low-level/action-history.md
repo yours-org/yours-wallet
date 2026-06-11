@@ -18,7 +18,7 @@ wallet.listActions(input: ListActionsInput): Promise<{ actions: Action[] }>
 
 ```ts
 interface ListActionsInput {
-  labels?: string[];   // filter to actions carrying these labels
+  labels?: string[]; // filter to actions carrying these labels
   limit?: number;
 }
 ```

@@ -11,10 +11,10 @@ icon: signal
 
 Yours Wallet dispatches `CustomEvent` instances on `window` under the name `YoursEmitEvent`. The discriminator is `e.detail.action`:
 
-| `action` | Meaning | Recommended response |
-|----------|---------|----------------------|
-| `signedOut` | User signed out of the wallet | Call `disconnect()` and clear app state |
-| `switchAccount` | User switched accounts | Call `disconnect()`, then `connect()` after a short delay |
+| `action`        | Meaning                       | Recommended response                                      |
+| --------------- | ----------------------------- | --------------------------------------------------------- |
+| `signedOut`     | User signed out of the wallet | Call `disconnect()` and clear app state                   |
+| `switchAccount` | User switched accounts        | Call `disconnect()`, then `connect()` after a short delay |
 
 ## Basic listener
 

@@ -26,9 +26,9 @@ interface GetProfileInput {}
 interface GetProfileResult {
   bapId?: string;
   profile?: {
-    '@type'?: string;          // typically 'Person' or 'Organization' (Schema.org)
+    '@type'?: string; // typically 'Person' or 'Organization' (Schema.org)
     name?: string;
-    image?: string;            // may be a 1sat://txid.vout URI
+    image?: string; // may be a 1sat://txid.vout URI
     description?: string;
     [key: string]: any;
   };

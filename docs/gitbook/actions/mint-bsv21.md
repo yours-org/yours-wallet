@@ -10,9 +10,9 @@ icon: hammer
 
 Spends the current auth UTXO of a mintable BSV-21 token (one previously deployed via [deployBsv21Auth](./deploy-bsv21-auth.md)) to do any combination of:
 
-* Mint new supply (`mint`)
-* Continue minting authority — to self by default, or transfer it (`auth`)
-* Permanently end minting (`endMinting: true`) — no continuing auth output
+- Mint new supply (`mint`)
+- Continue minting authority — to self by default, or transfer it (`auth`)
+- Permanently end minting (`endMinting: true`) — no continuing auth output
 
 ## Signature
 
@@ -121,10 +121,10 @@ const result = await mintBsv21.execute(ctx, {
 const result = await mintBsv21.execute(ctx, {
   tokenId: 'abc123...def_0',
   mint: {
-    amount: 50_000n,           // final mint
+    amount: 50_000n, // final mint
     destination: { address: '1Final...' },
   },
-  endMinting: true,            // no continuing auth — irreversible
+  endMinting: true, // no continuing auth — irreversible
 });
 // result.authOutpoint will be undefined
 ```
@@ -145,12 +145,12 @@ After a successful mint, the OLD `authOutpoint` is spent. Always pin the new `au
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `not-found` | Token's auth UTXO not in wallet (already spent / not received) |
-| `invalid-amount` | Bad `mint.amount` |
-| `insufficient-funds` | Not enough BSV for tx fee |
+| Code                 | Cause                                                          |
+| -------------------- | -------------------------------------------------------------- |
+| `user-rejected`      | User denied the wallet prompt                                  |
+| `not-found`          | Token's auth UTXO not in wallet (already spent / not received) |
+| `invalid-amount`     | Bad `mint.amount`                                              |
+| `insufficient-funds` | Not enough BSV for tx fee                                      |
 
 ## Related
 

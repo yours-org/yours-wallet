@@ -22,29 +22,29 @@ wallet.getPublicKey(input: GetPublicKeyInput): Promise<{ publicKey: string }>
 
 ```ts
 interface GetPublicKeyInput {
-  protocolID: [number, string];  // [securityLevel, protocolName]
-  keyID: string;                 // arbitrary key identifier
-  counterparty?: string;         // pubkey hex, 'self', or 'anyone' (default 'self')
-  forSelf?: boolean;             // when true, derive a "for me" variant
+  protocolID: [number, string]; // [securityLevel, protocolName]
+  keyID: string; // arbitrary key identifier
+  counterparty?: string; // pubkey hex, 'self', or 'anyone' (default 'self')
+  forSelf?: boolean; // when true, derive a "for me" variant
 }
 ```
 
 `protocolID`:
 
-* `securityLevel`: `0` (no permission needed) | `1` (per-call permission) | `2` (per-permission grant)
-* `protocolName`: arbitrary string namespace, e.g. `'social posts'`
+- `securityLevel`: `0` (no permission needed) | `1` (per-call permission) | `2` (per-permission grant)
+- `protocolName`: arbitrary string namespace, e.g. `'social posts'`
 
 `counterparty`:
 
-* `'self'` — derive a key only the wallet can use
-* `'anyone'` — derive a publicly-derivable key
-* `'02abc...'` — derive a key shared with a specific counterparty (ECDH-based)
+- `'self'` — derive a key only the wallet can use
+- `'anyone'` — derive a publicly-derivable key
+- `'02abc...'` — derive a key shared with a specific counterparty (ECDH-based)
 
 ### Output
 
 ```ts
 interface GetPublicKeyResult {
-  publicKey: string;  // hex-encoded compressed pubkey
+  publicKey: string; // hex-encoded compressed pubkey
 }
 ```
 

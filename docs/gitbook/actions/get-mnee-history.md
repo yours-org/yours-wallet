@@ -74,7 +74,7 @@ const { derivations } = await deriveDepositAddresses.execute(ctx, {
   startIndex: 0,
   count: 5,
 });
-const addresses = derivations.map(d => d.address);
+const addresses = derivations.map((d) => d.address);
 
 const { history, nextScore } = await getMneeHistory.execute(ctx, {
   addresses,

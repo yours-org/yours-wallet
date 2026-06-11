@@ -23,7 +23,7 @@ const { outputs, BEEF } = await getOrdinals.execute(ctx, {});
 if (!BEEF) throw new Error('No BEEF returned');
 
 // Step 3: find the ordinal you want
-const ordinal = outputs.find(o => o.outpoint === targetOutpoint);
+const ordinal = outputs.find((o) => o.outpoint === targetOutpoint);
 if (!ordinal) throw new Error('Ordinal not found');
 
 // Step 4: pass both to the spending action
@@ -49,6 +49,7 @@ The wallet needs the spending action's `inputBEEF` to prove to its peers (and to
 ```ts
 if (!BEEF) throw new Error('No BEEF available');
 ```
+
 {% endhint %}
 
 ## The `inputBEEF` parameter
@@ -56,29 +57,29 @@ if (!BEEF) throw new Error('No BEEF available');
 Actions that need BEEF accept `inputBEEF: number[]` (a serialized byte array). Convert with `Array.from(BEEF)`:
 
 ```ts
-inputBEEF: Array.from(BEEF)
+inputBEEF: Array.from(BEEF);
 ```
 
 `BEEF` is a `Uint8Array`; `inputBEEF` is `number[]` for JSON-serializable transport.
 
 ## Which actions need BEEF
 
-| Action | Needs BEEF? |
-|--------|-------------|
-| `transferOrdinals` | yes (required) |
-| `listOrdinal` | yes (required) |
-| `cancelListing` | yes (required) |
-| `opnsRegister` | yes (optional but recommended) |
-| `opnsDeregister` | yes (optional but recommended) |
-| `buildBurnOrdinals` | yes (required) |
-| `sendBsv` | no — wallet manages BSV BEEF internally |
-| `sendBsv21` | no |
-| `sendMnee` | no |
-| `inscribe` | no — creates a new output rather than spending one |
+| Action              | Needs BEEF?                                        |
+| ------------------- | -------------------------------------------------- |
+| `transferOrdinals`  | yes (required)                                     |
+| `listOrdinal`       | yes (required)                                     |
+| `cancelListing`     | yes (required)                                     |
+| `opnsRegister`      | yes (optional but recommended)                     |
+| `opnsDeregister`    | yes (optional but recommended)                     |
+| `buildBurnOrdinals` | yes (required)                                     |
+| `sendBsv`           | no — wallet manages BSV BEEF internally            |
+| `sendBsv21`         | no                                                 |
+| `sendMnee`          | no                                                 |
+| `inscribe`          | no — creates a new output rather than spending one |
 
 ## Related
 
-* [getOrdinals](../actions/get-ordinals.md) — the entry point that returns BEEF
-* [transferOrdinals](../actions/transfer-ordinals.md), [listOrdinal](../actions/list-ordinal.md), [cancelListing](../actions/cancel-listing.md) — consumers
-* [Transaction Actions](../low-level/transaction-actions.md) — the underlying BRC-100 `createAction` / `internalizeAction` methods that operate on BEEF
-* BRC standard: [BRC-95](https://github.com/bitcoin-sv/BRCs/blob/master/transactions/0095.md) — BEEF specification
+- [getOrdinals](../actions/get-ordinals.md) — the entry point that returns BEEF
+- [transferOrdinals](../actions/transfer-ordinals.md), [listOrdinal](../actions/list-ordinal.md), [cancelListing](../actions/cancel-listing.md) — consumers
+- [Transaction Actions](../low-level/transaction-actions.md) — the underlying BRC-100 `createAction` / `internalizeAction` methods that operate on BEEF
+- BRC standard: [BRC-95](https://github.com/bitcoin-sv/BRCs/blob/master/transactions/0095.md) — BEEF specification

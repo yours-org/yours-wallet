@@ -38,7 +38,7 @@ console.log('Inscribed in:', mintTxid);
 The wallet tracks inscriptions in its ordinals basket. Give it a moment so subsequent `getOrdinals` reflects the new mint:
 
 ```tsx
-await new Promise(r => setTimeout(r, 2000));
+await new Promise((r) => setTimeout(r, 2000));
 ```
 
 {% hint style="info" %}
@@ -60,7 +60,7 @@ The new ordinal's outpoint is `${mintTxid}.0` (output index 0 by convention):
 
 ```tsx
 const newOutpoint = `${mintTxid}.0`;
-const ordinal = outputs.find(o => o.outpoint === newOutpoint);
+const ordinal = outputs.find((o) => o.outpoint === newOutpoint);
 if (!ordinal) throw new Error('Mint not yet tracked — retry getOrdinals');
 ```
 
@@ -72,7 +72,7 @@ import { listOrdinal } from '@1sat/actions';
 const listResult = await listOrdinal.execute(ctx, {
   ordinal,
   inputBEEF: Array.from(BEEF),
-  price: 100000,                  // 0.001 BSV
+  price: 100000, // 0.001 BSV
   payAddress: '1YourPayoutAddr...',
 });
 if (listResult.error) throw new Error(listResult.error);

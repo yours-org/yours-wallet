@@ -11,13 +11,13 @@ Yours Wallet uses a `WalletPermissionsManager` to gate every operation that sign
 
 Operations fall into permission buckets:
 
-| Bucket | When prompted |
-|--------|---------------|
-| `createAction` | Any action that creates / broadcasts a transaction |
-| `createSignature` | Message signing, encryption |
-| `getPublicKey` | First time accessing a derived key for a protocol/keyID |
-| `acquireCertificate` | Certificate operations |
-| `revealKeyLinkage` | Privacy-sensitive linkage proofs |
+| Bucket               | When prompted                                           |
+| -------------------- | ------------------------------------------------------- |
+| `createAction`       | Any action that creates / broadcasts a transaction      |
+| `createSignature`    | Message signing, encryption                             |
+| `getPublicKey`       | First time accessing a derived key for a protocol/keyID |
+| `acquireCertificate` | Certificate operations                                  |
+| `revealKeyLinkage`   | Privacy-sensitive linkage proofs                        |
 
 Each prompt may be a one-time grant or a session-long grant, depending on the user's choice in the wallet UI.
 
@@ -88,7 +88,7 @@ try {
 
 ## Related
 
-* [Errors](../reference/errors.md) — `user-rejected`, `storage-payment-failed`, etc.
-* [Events](../reference/events.md) — `signedOut`, `switchAccount`
-* [Multi-Account Handling](../cookbook/multi-account-handling.md) — keying caches by identityKey
-* [Event Listening](../cookbook/event-listening.md) — listener patterns
+- [Errors](../reference/errors.md) — `user-rejected`, `storage-payment-failed`, etc.
+- [Events](../reference/events.md) — `signedOut`, `switchAccount`
+- [Multi-Account Handling](../cookbook/multi-account-handling.md) — keying caches by identityKey
+- [Event Listening](../cookbook/event-listening.md) — listener patterns

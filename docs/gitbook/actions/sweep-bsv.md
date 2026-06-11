@@ -20,8 +20,8 @@ sweepBsv.execute(ctx: OneSatContext, input: SweepBsvInput): Promise<SweepBsvResu
 import type { PrivateKey } from '@bsv/sdk';
 
 interface SweepBsvInput {
-  inputs: SweepInput[];      // prepared via prepareSweepInputs
-  keys: PrivateKey[];        // signing keys (one per address)
+  inputs: SweepInput[]; // prepared via prepareSweepInputs
+  keys: PrivateKey[]; // signing keys (one per address)
 }
 ```
 
@@ -80,11 +80,11 @@ The WIF key gives access to the funds. Handle it in memory, do not log it, and c
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `no-inputs` | `inputs` array empty (nothing to sweep) |
-| `signing-failed` | Provided key does not unlock the input |
+| Code             | Cause                                   |
+| ---------------- | --------------------------------------- |
+| `user-rejected`  | User denied the wallet prompt           |
+| `no-inputs`      | `inputs` array empty (nothing to sweep) |
+| `signing-failed` | Provided key does not unlock the input  |
 
 ## Related
 

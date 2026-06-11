@@ -51,7 +51,7 @@ interface OpnsDeregisterResult {
 import { getOrdinals, opnsDeregister } from '@1sat/actions';
 
 const { outputs, BEEF } = await getOrdinals.execute(ctx, {});
-const opnsOrdinal = outputs.find(o => o.outpoint === opnsOutpoint);
+const opnsOrdinal = outputs.find((o) => o.outpoint === opnsOutpoint);
 if (!opnsOrdinal) throw new Error('OpNS name not found');
 
 const result = await opnsDeregister.execute(ctx, {
@@ -69,11 +69,11 @@ Deregistering does NOT destroy the name — the ordinal remains in your wallet. 
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `not-found` | OpNS name not in wallet (stale — refetch) |
-| `not-registered` | Name is not currently registered |
+| Code             | Cause                                     |
+| ---------------- | ----------------------------------------- |
+| `user-rejected`  | User denied the wallet prompt             |
+| `not-found`      | OpNS name not in wallet (stale — refetch) |
+| `not-registered` | Name is not currently registered          |
 
 ## Related
 

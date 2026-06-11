@@ -104,11 +104,11 @@ The auth output is non-transferable through normal `sendBsv21` — it must be sp
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
-| `insufficient-funds` | Not enough BSV |
-| `invalid-symbol` | Symbol too long or invalid |
+| Code                 | Cause                         |
+| -------------------- | ----------------------------- |
+| `user-rejected`      | User denied the wallet prompt |
+| `insufficient-funds` | Not enough BSV                |
+| `invalid-symbol`     | Symbol too long or invalid    |
 
 ## Related
 

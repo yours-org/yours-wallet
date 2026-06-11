@@ -36,11 +36,11 @@ interface SignBsmRequest {
 
 ```ts
 interface SignBsmResponse {
-  address?: string;        // signer address
-  pubKey?: string;         // signer compressed pubkey (hex)
-  message?: string;        // echoed message
-  sig?: string;            // base64-encoded BSM signature
-  derivationTag?: SignBsmRequest['tag'];   // echoed tag if provided
+  address?: string; // signer address
+  pubKey?: string; // signer compressed pubkey (hex)
+  message?: string; // echoed message
+  sig?: string; // base64-encoded BSM signature
+  derivationTag?: SignBsmRequest['tag']; // echoed tag if provided
   error?: string;
 }
 ```

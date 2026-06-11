@@ -26,7 +26,8 @@ interface GetMneeTxStatusInput {
 ## Output
 
 ```ts
-type MneeTransferStatus = /* from @1sat/client */
+type MneeTransferStatus =
+  /* from @1sat/client */
   // status fields including txid when settled, plus any pending / failed state.
   // See @1sat/client for the full shape.
   any;
@@ -59,7 +60,7 @@ if (result.ticketId) {
       console.log('Settled in:', status.txid);
       break;
     }
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000));
   }
 }
 ```

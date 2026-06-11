@@ -12,13 +12,13 @@ The current Yours Wallet integration depends on the following package versions (
 ```json
 {
   "dependencies": {
-    "@1sat/react":   "0.0.x",
+    "@1sat/react": "0.0.x",
     "@1sat/connect": "0.0.67",
     "@1sat/actions": "0.0.166",
-    "@1sat/client":  "0.0.38",
-    "@1sat/types":   "0.0.31",
-    "@1sat/utils":   "0.0.25",
-    "@bsv/sdk":      "^2.0.13"
+    "@1sat/client": "0.0.38",
+    "@1sat/types": "0.0.31",
+    "@1sat/utils": "0.0.25",
+    "@bsv/sdk": "^2.0.13"
   }
 }
 ```
@@ -27,12 +27,12 @@ The current Yours Wallet integration depends on the following package versions (
 
 ## What each package provides
 
-* **`@1sat/react`** — React hooks and components: `useWallet`, `WalletProvider`, `ConnectButton`.
-* **`@1sat/connect`** — BRC-100 wallet detection. Used internally by `WalletProvider`.
-* **`@1sat/actions`** — All the `xxx.execute(ctx, input)` actions plus builder helpers (`buildBurnOrdinals`, `prepareSweepInputs`, etc).
-* **`@1sat/client`** — Backend services: `OneSatServices`, `MneeClient`, `BapClient`, `MneeConfig`, `MneeTransferStatus`, `MneeUtxo`.
-* **`@1sat/types`** — Shared TypeScript types: `Destination`, `AddressDerivation`, `P1SAT_PROTOCOL`, `CollectionTraits`, etc.
-* **`@bsv/sdk`** — Transaction primitives, BRC-100 `WalletInterface`, `PrivateKey`, `Utils`, `Transaction`, `Script`.
+- **`@1sat/react`** — React hooks and components: `useWallet`, `WalletProvider`, `ConnectButton`.
+- **`@1sat/connect`** — BRC-100 wallet detection. Used internally by `WalletProvider`.
+- **`@1sat/actions`** — All the `xxx.execute(ctx, input)` actions plus builder helpers (`buildBurnOrdinals`, `prepareSweepInputs`, etc).
+- **`@1sat/client`** — Backend services: `OneSatServices`, `MneeClient`, `BapClient`, `MneeConfig`, `MneeTransferStatus`, `MneeUtxo`.
+- **`@1sat/types`** — Shared TypeScript types: `Destination`, `AddressDerivation`, `P1SAT_PROTOCOL`, `CollectionTraits`, etc.
+- **`@bsv/sdk`** — Transaction primitives, BRC-100 `WalletInterface`, `PrivateKey`, `Utils`, `Transaction`, `Script`.
 
 ## Breaking changes
 
@@ -42,10 +42,10 @@ The single largest break in Yours Wallet's history: the move from the `window.yo
 
 ### Naming changes from older `@1sat/actions` releases
 
-* `prefix` default for `deriveDepositAddresses` and `syncAddresses` changed to `'1sat'` (was historically variable per wallet). Omit `prefix` to use the default.
-* `sendMnee` now requires a `derivations` array (the full objects from `deriveDepositAddresses`), not just addresses.
-* BSV-21 amounts are now `bigint | string`; recipients use a `Destination` object (e.g. `{ address }`) rather than a bare address string.
-* `Bsv21Balance.all` and `Bsv21Balance.listed` now hold `bigint` values for `confirmed` and `pending`.
+- `prefix` default for `deriveDepositAddresses` and `syncAddresses` changed to `'1sat'` (was historically variable per wallet). Omit `prefix` to use the default.
+- `sendMnee` now requires a `derivations` array (the full objects from `deriveDepositAddresses`), not just addresses.
+- BSV-21 amounts are now `bigint | string`; recipients use a `Destination` object (e.g. `{ address }`) rather than a bare address string.
+- `Bsv21Balance.all` and `Bsv21Balance.listed` now hold `bigint` values for `confirmed` and `pending`.
 
 ## Actions not yet documented
 

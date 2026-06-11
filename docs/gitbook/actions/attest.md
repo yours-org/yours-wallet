@@ -18,8 +18,8 @@ attest.execute(ctx: OneSatContext, input: AttestInput): Promise<AttestResult>
 
 ```ts
 interface AttestInput {
-  attestationHash: string;  // sha256 of the URN being attested
-  counter: string;          // monotonically increasing per-subject counter
+  attestationHash: string; // sha256 of the URN being attested
+  counter: string; // monotonically increasing per-subject counter
 }
 ```
 

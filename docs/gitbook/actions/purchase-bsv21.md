@@ -73,7 +73,7 @@ const result = await purchaseBsv21.execute(ctx, {
   outpoint: 'listingTxid.0',
   amount: 1000n,
   marketplaceAddress: '1Marketplace...',
-  marketplaceRate: 0.025,   // 2.5%
+  marketplaceRate: 0.025, // 2.5%
 });
 ```
 
@@ -93,13 +93,13 @@ Format mismatch is the most common bug: `tokenId` uses **underscore** (`txid_vou
 
 ## Errors
 
-| Code | Cause |
-| ---- | ----- |
-| `user-rejected` | User denied the wallet prompt |
+| Code                 | Cause                                    |
+| -------------------- | ---------------------------------------- |
+| `user-rejected`      | User denied the wallet prompt            |
 | `insufficient-funds` | Not enough BSV to cover the price + fees |
-| `not-found` | Listing outpoint does not exist |
-| `already-spent` | Listing already purchased / cancelled |
-| `invalid-token-id` | `tokenId` not in expected format |
+| `not-found`          | Listing outpoint does not exist          |
+| `already-spent`      | Listing already purchased / cancelled    |
+| `invalid-token-id`   | `tokenId` not in expected format         |
 
 ## Related
 

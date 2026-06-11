@@ -14,8 +14,8 @@ These are plain async functions, NOT `.execute(ctx, input)` actions. They take `
 
 Two related helpers:
 
-* **`computeBapId(ctx)`** — derives the BAP ID deterministically from the wallet's identity key. Always returns a string. Does NOT require an on-chain record.
-* **`resolveBapId(ctx)`** — looks up the BAP ID on-chain. Returns `null` if no identity has been published.
+- **`computeBapId(ctx)`** — derives the BAP ID deterministically from the wallet's identity key. Always returns a string. Does NOT require an on-chain record.
+- **`resolveBapId(ctx)`** — looks up the BAP ID on-chain. Returns `null` if no identity has been published.
 
 Use `computeBapId` when you need an identifier locally (UI keying, request signatures). Use `resolveBapId` when you need to confirm the identity is actually published.
 

@@ -27,7 +27,7 @@ interface GetMneeUtxosInput {
 
 ```ts
 interface GetMneeUtxosResult {
-  utxos: MneeUtxo[];   // from @1sat/client
+  utxos: MneeUtxo[]; // from @1sat/client
 }
 ```
 
@@ -52,7 +52,7 @@ const { derivations } = await deriveDepositAddresses.execute(ctx, {
   startIndex: 0,
   count: 5,
 });
-const addresses = derivations.map(d => d.address);
+const addresses = derivations.map((d) => d.address);
 
 const { utxos } = await getMneeUtxos.execute(ctx, { addresses });
 console.log(`${utxos.length} MNEE UTXOs`);

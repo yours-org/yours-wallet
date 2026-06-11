@@ -60,8 +60,8 @@ import { getBsv21Balances } from '@1sat/actions';
 const balances = await getBsv21Balances.execute(ctx, {});
 
 for (const b of balances) {
-  const total = b.all.confirmed + b.all.pending;     // bigint math
-  const display = Number(total) / 10 ** b.dec;       // convert for UI
+  const total = b.all.confirmed + b.all.pending; // bigint math
+  const display = Number(total) / 10 ** b.dec; // convert for UI
   console.log(`${b.sym ?? b.id}: ${display}`);
 }
 ```
