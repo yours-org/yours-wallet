@@ -26,7 +26,7 @@ The fast path:
 - Multi-account: switch between accounts within a single wallet.
 - Ordinals: view, transfer, list, cancel listings, mint collections, inscribe.
 - BSV-21 tokens: balances and sends with full atomic precision.
-- MNEE stablecoin: native send / receive via P1SAT-derived addresses (default keyID prefix `'1sat'`).
+- MNEE stablecoin: native send / receive
 
 ## Navigation
 
@@ -38,7 +38,7 @@ The five things you must understand to use the SDK correctly:
 - [BEEF](concepts/beef.md) — why ordinal operations need to fetch first
 - [Actions & Context](concepts/actions-and-context.md) — the `createContext` + `.execute(ctx, input)` pattern
 - [Baskets & Tags](concepts/baskets-and-tags.md) — how outputs are organized
-- [Derivations](concepts/derivations.md) — P1SAT derived addresses for MNEE (default prefix `'1sat'`)
+- [Derivations](concepts/derivations.md) — P1SAT deposit-address derivation
 - [Permissions](concepts/permissions.md) — every operation may prompt the user
 
 ### Actions
