@@ -726,12 +726,14 @@ export const BsvWallet = () => {
   };
 
   const fillInputWithAllBsv = () => {
-    setSatSendAmount(Math.round(bsvBalance * BSV_DECIMAL_CONVERSION));
-    setRecipients([
+    const maxSats = Math.round(bsvBalance * BSV_DECIMAL_CONVERSION);
+    setSatSendAmount(maxSats);
+    // MAX is single-recipient only. Preserve the existing recipient's id and
+    // address/paymail so we don't wipe the user's input or remount the card.
+    setRecipients((prev) => [
       {
-        id: crypto.randomUUID(),
-        address: '',
-        satSendAmount: Math.round(bsvBalance * BSV_DECIMAL_CONVERSION),
+        ...prev[0],
+        satSendAmount: maxSats,
         usdSendAmount: null,
         amountType: 'bsv',
       },
