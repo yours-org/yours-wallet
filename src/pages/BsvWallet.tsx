@@ -732,10 +732,11 @@ export const BsvWallet = () => {
     // address/paymail so we don't wipe the user's input or remount the card.
     setRecipients((prev) => [
       {
-        ...prev[0],
+        ...(prev[0] ?? {}),
         satSendAmount: maxSats,
         usdSendAmount: null,
         amountType: 'bsv',
+        error: undefined,
       },
     ]);
   };
