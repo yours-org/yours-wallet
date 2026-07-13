@@ -80,9 +80,7 @@ export const Ordinal = (props: OrdinalProps) => {
 
   const [fetchedText, setFetchedText] = useState<string | null>(null);
   const needsTextFetch =
-    contentType?.startsWith('text/') ||
-    contentType?.startsWith('application/json') ||
-    contentType?.startsWith('application/op-ns');
+    contentType?.startsWith('text/') || contentType?.startsWith('application/json');
 
   useEffect(() => {
     if (!needsTextFetch || !url) return;
@@ -145,7 +143,6 @@ export const Ordinal = (props: OrdinalProps) => {
         );
 
       case contentType?.startsWith('text/'):
-      case contentType?.startsWith('application/op-ns'):
         return (
           <div
             style={{
