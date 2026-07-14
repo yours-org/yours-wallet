@@ -1,9 +1,9 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { KeysService } from '../../services/Keys.service';
-import { INACTIVITY_LIMIT } from '../../utils/constants';
+import { INACTIVITY_LIMIT, MESSAGEBOX_URL } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
-import { createContext, syncAddresses } from '@1sat/actions';
+import { createContext, syncAddresses, syncMessages } from '@1sat/actions';
 import { fetchExchangeRate } from '../../utils/wallet';
 import { createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
 
@@ -104,6 +104,16 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
       } catch (error) {
         if (!cancelled) {
           console.error('[ServiceProvider] Address sync error:', error);
+        }
+      }
+      try {
+        const result = await syncMessages.execute(services.apiContext!, { messageboxUrl: MESSAGEBOX_URL });
+        if (!cancelled && (result.processed > 0 || result.failed > 0)) {
+          console.log('[ServiceProvider] Message box sync complete:', result);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('[ServiceProvider] Message box sync error:', error);
         }
       }
     };

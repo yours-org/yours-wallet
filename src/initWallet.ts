@@ -8,10 +8,11 @@ import {
   LocalWalletPermissionsManager,
   IndexedDbPermissionStore,
 } from '@1sat/wallet-browser';
-import { syncAddresses, createContext as createActionContext } from '@1sat/actions';
+import { syncAddresses, syncMessages, createContext as createActionContext } from '@1sat/actions';
 import { createOneSatPermissionModule } from '@1sat/permission-module';
 import type { WalletInterface } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';
+import { MESSAGEBOX_URL } from './utils/constants';
 import type { Account, StorageConfig } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
@@ -264,6 +265,18 @@ export const initWallet = async (
       const message = error instanceof Error ? error.message : String(error);
       sendSyncStatus({ status: 'error', message });
       console.error('[initWallet] Address sync failed:', error);
+    });
+
+  // Sync incoming paymail payments from the message box (fire-and-forget)
+  syncMessages
+    .execute(actionCtx, { messageboxUrl: MESSAGEBOX_URL })
+    .then((result) => {
+      if (result.processed > 0 || result.failed > 0) {
+        console.log('[initWallet] Message box sync complete:', result);
+      }
+    })
+    .catch((error: unknown) => {
+      console.error('[initWallet] Message box sync failed:', error);
     });
 
   // Create close function

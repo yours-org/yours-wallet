@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@1sat/actions": "0.0.174",
+    "@1sat/actions": "0.0.179",
     "@1sat/client": "0.0.42",
     "@1sat/connect": "0.0.75",
     "@1sat/permission-module": "0.0.35",
@@ -14,7 +14,7 @@
     "@1sat/types": "0.0.32",
     "@1sat/utils": "0.0.26",
     "@1sat/wallet-browser": "0.0.76",
-    "@bsv/sdk": "^2.0.13",
+    "@bsv/sdk": "^2.1.6",
     "@bsv/wallet-toolbox-mobile": "2.1.24",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@hello-pangea/dnd": "^18.0.1",
