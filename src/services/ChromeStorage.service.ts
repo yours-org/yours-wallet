@@ -7,6 +7,8 @@ import { YoursEventName } from '../inject';
 import { sendMessage, sendMessageAsync } from '../utils/chromeHelpers';
 import {
   CHROME_STORAGE_OBJECT_VERSION,
+  DEFAULT_ACCOUNT,
+  DEFAULT_STORAGE_REMOTE_URL,
   FEE_PER_KB,
   HOSTED_YOURS_IMAGE,
   INACTIVITY_LIMIT,
@@ -143,6 +145,7 @@ export class ChromeStorageService {
             identityPubKey: appState.pubKeys.identityPubKey,
           },
           network: network ?? appState.network ?? NetWork.Mainnet,
+          storageConfig: { ...DEFAULT_ACCOUNT.storageConfig },
         },
       },
       selectedAccount: appState.addresses.identityAddress,
@@ -248,10 +251,48 @@ export class ChromeStorageService {
     });
   };
 
+  /**
+   * - No storageConfig yet (pre–per-account config): write the current default.
+   * - Local active + default remote already listed: promote remote to active.
+   * - Any other setup (custom active, remotes without the default, etc.): leave alone.
+   */
+  private migrateToV6 = async (): Promise<void> => {
+    const accounts = this.storage?.accounts ?? {};
+    const updates: Record<string, Account> = {};
+    const defaultConfig = { ...DEFAULT_ACCOUNT.storageConfig };
+
+    for (const [id, account] of Object.entries(accounts)) {
+      const config = account.storageConfig;
+      if (!config) {
+        updates[id] = { ...account, storageConfig: defaultConfig };
+        continue;
+      }
+      // Already remote-active (default or custom) — leave alone.
+      if (config.activeRemote) continue;
+      // Only promote when the default remote is already configured as a backup.
+      if (!(config.remotes ?? []).includes(DEFAULT_STORAGE_REMOTE_URL)) continue;
+
+      updates[id] = {
+        ...account,
+        storageConfig: { ...config, activeRemote: DEFAULT_STORAGE_REMOTE_URL },
+      };
+    }
+
+    await this.set({
+      version: 6,
+      ...(Object.keys(updates).length > 0
+        ? { accounts: { ...accounts, ...updates } }
+        : {}),
+    });
+  };
+
   private runMigrations = async (): Promise<void> => {
     const currentVersion = this.storage?.version ?? 0;
     if (currentVersion < 5) {
       await this.migrateToV5();
+    }
+    if ((this.storage?.version ?? currentVersion) < 6) {
+      await this.migrateToV6();
     }
   };
 

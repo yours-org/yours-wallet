@@ -29,7 +29,10 @@ export const DEFAULT_RELAYX_ORD_PATH = "m/44'/236'/0'/2/0";
 export const SWEEP_PATH = "m/44'/236'/0'/0/0";
 export const DEFAULT_IDENTITY_PATH = "m/0'/236'/0'/0/0";
 export const DEFAULT_TWETCH_WALLET_PATH = 'm/0/0';
-export const CHROME_STORAGE_OBJECT_VERSION = 5;
+export const CHROME_STORAGE_OBJECT_VERSION = 6;
+
+/** Default remote storage provider (active store for new wallets). */
+export const DEFAULT_STORAGE_REMOTE_URL = 'https://wallet.1sat.app';
 
 export const LOCKUP_PREFIX = `97dfd76851bf465e8f715593b217714858bbe9570ff3bd5e33840a34e20ff026 02ba79df5f8ae7604a9830f03c7933028186aede0675a16f025dc4f8be8eec0382 1008ce7480da41702918d1ec8e6849ba32b4d65b1e40dc669c31a1e6306b266c 0 0`;
 
@@ -83,6 +86,7 @@ export const DEFAULT_ACCOUNT = {
   ordinals: [],
   paymentUtxos: [],
   storageConfig: {
-    remotes: [],
+    activeRemote: DEFAULT_STORAGE_REMOTE_URL,
+    remotes: [DEFAULT_STORAGE_REMOTE_URL],
   },
 };

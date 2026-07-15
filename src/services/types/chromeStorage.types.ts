@@ -60,19 +60,12 @@ export type Settings = {
  * does not remove it from this list — add/remove and set-active are separate
  * operations.
  *
- * Absence of this field means "implicit default" — treated as remote-active
- * against the hardcoded provider URL so existing accounts keep their prior
- * behavior until the user explicitly configures storage.
+ * New accounts use DEFAULT_STORAGE_REMOTE_URL as active with local as backup.
+ * Absence of this field is unexpected for a healthy install.
  */
 export type StorageConfig = {
   activeRemote?: string;
   remotes?: string[];
-  /**
-   * Set to true when the user explicitly removes the default backup remote.
-   * Suppresses the background's idempotent auto-attach so the user's opt-out
-   * is honored across unlocks. Cleared when the user re-adds the default URL.
-   */
-  defaultBackupOptedOut?: boolean;
 };
 
 export interface Account {

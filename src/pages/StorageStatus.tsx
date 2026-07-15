@@ -558,10 +558,7 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
         </h2>
       </div>
 
-      {/* No-backup action card — replaces the educational box in the empty
-          state so the Add Backup CTA isn't buried below the active-storage
-          card. Users land here after explicitly removing their last remote or
-          when auto-attach has not yet succeeded. */}
+      {/* Empty remotes: local-only, no backup configured. */}
       {localIsActive && remotes.length === 0 && (
         <div
           className="w-full rounded-xl p-4 space-y-3"

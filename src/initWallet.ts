@@ -82,17 +82,12 @@ export interface AccountContext {
 
 /**
  * Resolve a per-account storage config into the flat fields the SDK factory
- * expects. Accounts predating per-account storage config (`storageConfig`
- * undefined) get the hardcoded remote-active behavior so their unlock path
- * is unchanged.
+ * expects. Missing storageConfig → local-only (no remotes).
  */
 const resolveStorageConfig = (
   storageConfig: StorageConfig | undefined,
 ): { activeRemote?: string; backups?: string[] } => {
   if (!storageConfig) {
-    // No storage config — this is a pre-migration account that was previously
-    // syncing to the default remote. Return local-only; the user can add
-    // remotes from the provider list.
     return {};
   }
   const { activeRemote, remotes = [] } = storageConfig;
@@ -150,8 +145,7 @@ export const initWallet = async (
   const chain = 'main' as const;
 
   // 2. Create wallet using browser factory. Storage topology comes from the
-  // current account's persisted storageConfig (or implicit default for
-  // pre-existing accounts that have none yet). storageIdentityKey is
+  // current account's persisted storageConfig. storageIdentityKey is
   // per-install and lazily materialized.
   const { account } = chromeStorageService.getCurrentAccountObject();
   const { activeRemote, backups } = resolveStorageConfig(account?.storageConfig);

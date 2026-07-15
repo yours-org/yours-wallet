@@ -87,67 +87,6 @@ const notifyBalanceUpdate = () => {
     });
 };
 
-/**
- * Default storage provider attached as a backup remote whenever the current
- * account has no remotes configured. Mirrors the URL listed in
- * `KNOWN_PROVIDERS` in `src/components/ProviderPicker.tsx`. Kept here as a
- * literal so the background script doesn't need to import the UI component.
- */
-const DEFAULT_BACKUP_REMOTE_URL = 'https://wallet.1sat.app';
-
-/**
- * Idempotent: if the current account's `storageConfig.remotes` is empty (or
- * the field is absent), attach `DEFAULT_BACKUP_REMOTE_URL` as a backup remote
- * (never active). Persists the URL into storageConfig.remotes on success and
- * kicks off a fire-and-forget backup sync so the new backup picks up the
- * existing local data without blocking unlock.
- *
- * Failures are swallowed — the next unlock will retry naturally because the
- * "remotes empty" check is the only gate.
- *
- * Must NOT promote to active and must NOT override an existing remotes list.
- */
-const ensureDefaultBackupRemote = async (ctx: AccountContext): Promise<void> => {
-  try {
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    if (!account) return;
-    const existing = account.storageConfig?.remotes ?? [];
-    if (existing.length > 0) return;
-    // Honor explicit user opt-out: if the user previously removed the default
-    // backup remote, do not re-attach it on subsequent unlocks. Cleared when
-    // the user re-adds the default URL via STORAGE_ADD_REMOTE.
-    if (account.storageConfig?.defaultBackupOptedOut) return;
-
-    console.log('[background] ensureDefaultBackupRemote: attaching', DEFAULT_BACKUP_REMOTE_URL);
-    await ctx.addRemote(DEFAULT_BACKUP_REMOTE_URL);
-
-    // Persist the URL into the account's storageConfig.remotes so it survives
-    // restart. Preserve any other storageConfig fields the user may have set
-    // (defensively — at this point we only attach when remotes is empty, but
-    // activeRemote could be present from a prior partial-config state).
-    const identityAddress = account.addresses.identityAddress;
-    const nextConfig: StorageConfig = {
-      ...(account.storageConfig ?? {}),
-      remotes: [DEFAULT_BACKUP_REMOTE_URL],
-    };
-    await chromeStorageService.updateNested('accounts', {
-      [identityAddress]: { storageConfig: nextConfig } as unknown as Account,
-    });
-
-    // Fire-and-forget initial backup sync so the new remote picks up existing
-    // local data. Failure here is fine — sync re-runs on demand and on next
-    // unlock.
-    ctx.storage
-      .updateBackups()
-      .then(() => console.log('[background] ensureDefaultBackupRemote: initial backup sync complete'))
-      .catch((err: unknown) => {
-        console.warn('[background] ensureDefaultBackupRemote: initial backup sync failed:', err);
-      });
-  } catch (error) {
-    console.warn('[background] ensureDefaultBackupRemote: attach failed (will retry on next unlock):', error);
-  }
-};
-
 // Initialize wallet on startup (will be null if locked)
 const initializeWallet = async (): Promise<WalletInterface | null> => {
   console.log('[background] initializeWallet: starting, current accountContext:', !!accountContext);
@@ -211,9 +150,6 @@ const initializeWallet = async (): Promise<WalletInterface | null> => {
       }
     }
 
-    // Auto-attach the default backup remote on every unlock if none is
-    // configured. Idempotent and benign — see ensureDefaultBackupRemote.
-    await ensureDefaultBackupRemote(accountContext);
   }
 
   return accountContext?.wallet ?? null;
@@ -1242,23 +1178,12 @@ if (isInServiceWorker) {
       });
   };
 
-  /**
-   * Read the current account's storageConfig (or the implicit-default shape
-   * for accounts that predate it), apply a patch, and persist the result
-   * back to the same account.
-   *
-   * We resolve absent storageConfig into a concrete shape on first write so
-   * that "remove api.1sat.app" after a "switch to local" on a legacy account
-   * works — the URL gets captured into remotes[] as the implicit→explicit
-   * materialization step.
-   */
+  /** Patch and persist the current account's storageConfig. */
   const updateStorageConfig = async (patch: (current: StorageConfig) => StorageConfig): Promise<StorageConfig> => {
     const { account } = chromeStorageService.getCurrentAccountObject();
     if (!account) throw new Error('No account loaded');
     const identityAddress = account.addresses.identityAddress;
-    const existing: StorageConfig = account.storageConfig ?? {
-      remotes: [],
-    };
+    const existing: StorageConfig = account.storageConfig ?? { remotes: [] };
     const next = patch(existing);
     await chromeStorageService.updateNested('accounts', {
       [identityAddress]: { storageConfig: next } as unknown as Account,
@@ -1289,12 +1214,11 @@ if (isInServiceWorker) {
       await accountContext.setActiveStorage(target);
       const nextConfig = await updateStorageConfig((current) => {
         if (target === 'local') {
-          return { activeRemote: undefined, remotes: current.remotes ?? [] };
+          return { ...current, activeRemote: undefined, remotes: current.remotes ?? [] };
         }
-        // Ensure the URL is in the remotes list so it survives restart.
         const remotes = current.remotes ?? [];
         const withTarget = remotes.includes(target) ? remotes : [...remotes, target];
-        return { activeRemote: target, remotes: withTarget };
+        return { ...current, activeRemote: target, remotes: withTarget };
       });
       sendResponse({
         type: 'STORAGE_SET_ACTIVE_STORAGE',
@@ -1333,16 +1257,10 @@ if (isInServiceWorker) {
       await accountContext.addRemote(url);
       const nextConfig = await updateStorageConfig((current) => {
         const remotes = current.remotes ?? [];
-        const next: StorageConfig = {
+        return {
           ...current,
           remotes: remotes.includes(url) ? remotes : [...remotes, url],
         };
-        // Re-adding the default backup remote clears any prior opt-out so the
-        // background auto-attach resumes its normal behavior on next unlock.
-        if (url === DEFAULT_BACKUP_REMOTE_URL && current.defaultBackupOptedOut) {
-          next.defaultBackupOptedOut = false;
-        }
-        return next;
       });
       sendResponse({
         type: 'STORAGE_ADD_REMOTE',
@@ -1370,15 +1288,10 @@ if (isInServiceWorker) {
         if (current.activeRemote === url) {
           throw new Error('Cannot remove the active remote — switch active to local or another remote first.');
         }
-        const remotes = (current.remotes ?? []).filter((r) => r !== url);
-        const next: StorageConfig = { ...current, remotes };
-        // Removing the default backup remote is an explicit user opt-out.
-        // Persist the choice so the background's idempotent auto-attach does
-        // not re-add it on the next unlock.
-        if (url === DEFAULT_BACKUP_REMOTE_URL) {
-          next.defaultBackupOptedOut = true;
-        }
-        return next;
+        return {
+          ...current,
+          remotes: (current.remotes ?? []).filter((r) => r !== url),
+        };
       });
       sendResponse({
         type: 'STORAGE_REMOVE_REMOTE',
