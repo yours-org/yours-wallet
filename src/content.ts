@@ -5,10 +5,8 @@ import { CustomListenerName, RequestEventDetail, RequestParams, ResponseEventDet
 
 console.log('🌱 Yours Wallet Loaded');
 
-// Inject the inject.js script into the page context
-const script = document.createElement('script');
-script.src = chrome.runtime.getURL('inject.js');
-(document.head || document.documentElement).appendChild(script);
+// inject.js runs as a MAIN-world content script (see manifest.json), so
+// window.CWI is bound before any page script executes.
 
 // Forward CWI requests from page to background service worker
 self.addEventListener(CustomListenerName.YOURS_REQUEST, (e: Event) => {
