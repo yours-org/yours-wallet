@@ -1,7 +1,7 @@
 /* global chrome */
 
 import { isCWIEventName } from '@1sat/wallet-browser';
-import { CustomListenerName, EmitEventDetail, RequestEventDetail, RequestParams, ResponseEventDetail } from './inject';
+import { CustomListenerName, RequestEventDetail, RequestParams, ResponseEventDetail } from './inject';
 
 console.log('🌱 Yours Wallet Loaded');
 
@@ -38,12 +38,3 @@ const buildResponseCallback = (messageId: string) => {
     self.dispatchEvent(responseEvent);
   };
 };
-
-// Forward broadcast events from background to page (SIGNED_OUT, SWITCH_ACCOUNT)
-chrome.runtime.onMessage.addListener((message: EmitEventDetail) => {
-  const { type, action, params } = message;
-  if (type === CustomListenerName.YOURS_EMIT_EVENT) {
-    const event = new CustomEvent(type, { detail: { action, params } });
-    self.dispatchEvent(event);
-  }
-});

@@ -1,12 +1,5 @@
 /* global chrome */
-import {
-  CustomListenerName,
-  Decision,
-  RequestParams,
-  ResponseEventDetail,
-  WhitelistedApp,
-  YoursEventName,
-} from './inject';
+import { Decision, RequestParams, ResponseEventDetail, YoursEventName } from './inject';
 import { CWIEventName } from './cwi';
 import type {
   ListOutputsArgs,
@@ -44,7 +37,7 @@ import type {
 import type { LocalWalletPermissionsManager } from '@1sat/wallet-browser';
 import { deriveDepositAddresses } from '@1sat/actions';
 import { removeWindow } from './utils/chromeHelpers';
-import { Account, ChromeStorageObject, ConnectRequest, StorageConfig } from './services/types/chromeStorage.types';
+import { Account, ChromeStorageObject, StorageConfig } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { handleOneSatPermissionResponse, initOneSatPromptBridge } from './services/oneSatPrompt';
 import { initWallet, type AccountContext } from './initWallet';
@@ -149,7 +142,6 @@ const initializeWallet = async (): Promise<WalletInterface | null> => {
         }
       }
     }
-
   }
 
   return accountContext?.wallet ?? null;
@@ -553,33 +545,6 @@ if (isInServiceWorker) {
     getPopupWindowId: () => popupWindowId,
   });
 
-  const verifyAccess = async (requestingOriginator: string): Promise<boolean> => {
-    // Check if wallet is locked - locked wallets cannot authorize external requests
-    const storage = (await chromeStorageService.getAndSetStorage()) as ChromeStorageObject;
-    if (storage.isLocked) {
-      return false;
-    }
-
-    // Extension popup always has access (uses chrome-extension://<id> format)
-    const extensionOrigin = `chrome-extension://${chrome.runtime.id}`;
-    if (requestingOriginator === extensionOrigin) {
-      return true;
-    }
-
-    const { accounts, selectedAccount } = storage;
-    if (!accounts || !selectedAccount) return false;
-    const whitelist = accounts[selectedAccount].settings.whitelist;
-    if (!whitelist) return false;
-    return whitelist.map((i: WhitelistedApp) => i.domain).includes(requestingOriginator);
-  };
-
-  const authorizeRequest = async (message: {
-    action: YoursEventName | CWIEventName;
-    originator?: string;
-  }): Promise<boolean> => {
-    return await verifyAccess(message.originator || '');
-  };
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
     console.log(
@@ -606,11 +571,6 @@ if (isInServiceWorker) {
         sendResponse({ type: message.action, success: false, error: 'Invalid origin' });
         return true;
       }
-    }
-
-    // Handle yours wallet events that should be broadcast (only from extension, not web pages)
-    if (isFromExtension && [YoursEventName.SIGNED_OUT, YoursEventName.SWITCH_ACCOUNT].includes(message.action)) {
-      emitEventToActiveTabs(message);
     }
 
     // Actions that don't require authorization
@@ -683,7 +643,7 @@ if (isInServiceWorker) {
           return signOut();
         // CWI auth check
         case CWIEventName.IS_AUTHENTICATED:
-          return processCWIIsAuthenticated(message.originator, sendResponse);
+          return processCWIIsAuthenticated(sendResponse);
         // CWI discovery - substrate detection ping, no wallet needed
         case CWIEventName.GET_VERSION:
           sendResponse({
@@ -938,35 +898,20 @@ if (isInServiceWorker) {
     ensureWallet(isFromExtension)
       .then(() => {
         console.log('[background] ensureWallet resolved for action:', message.action);
-        return authorizeRequest(message);
-      })
-      .then((isAuthorized) => {
-        console.log('[background] authorizeRequest result for', message.action, ':', isAuthorized);
-        // CWI waitForAuthentication
-        if (message.action === CWIEventName.WAIT_FOR_AUTHENTICATION) {
-          return processCWIWaitForAuthentication(message, sendResponse, isAuthorized);
-        }
-
-        if (!isAuthorized) {
-          sendResponse({
-            type: message.action,
-            success: false,
-            error: 'Unauthorized!',
-          });
-          return;
-        }
-
         switch (message.action) {
           // CWI (BRC-100) handlers - direct passthrough to wallet
           // WalletPermissionsManager handles permission prompts internally
+          case CWIEventName.WAIT_FOR_AUTHENTICATION:
+            processCWIWaitForAuthentication(message, sendResponse);
+            return true;
           case CWIEventName.LIST_OUTPUTS:
             processCWIListOutputs(message, sendResponse);
             return true;
           case CWIEventName.GET_NETWORK:
-            processCWIGetNetwork(sendResponse);
+            processCWIGetNetwork(message, sendResponse);
             return true;
           case CWIEventName.GET_HEIGHT:
-            processCWIGetHeight(sendResponse);
+            processCWIGetHeight(message, sendResponse);
             return true;
           case CWIEventName.GET_HEADER_FOR_HEIGHT:
             processCWIGetHeaderForHeight(message, sendResponse);
@@ -1526,35 +1471,6 @@ if (isInServiceWorker) {
     return true;
   };
 
-  // EMIT EVENTS ********************************
-
-  const emitEventToActiveTabs = (message: { action: YoursEventName; params: RequestParams }) => {
-    const { action, params } = message;
-    const { account } = chromeStorageService.getCurrentAccountObject();
-    const whitelist = account?.settings?.whitelist;
-    const whitelistedDomains = new Set(whitelist?.map((app: WhitelistedApp) => app.domain) ?? []);
-
-    chrome.tabs.query({}, function (tabs) {
-      tabs.forEach(function (tab: chrome.tabs.Tab) {
-        if (tab.id && tab.url) {
-          try {
-            const host = new URL(tab.url).host;
-            if (whitelistedDomains.has(host)) {
-              chrome.tabs.sendMessage(tab.id, {
-                type: CustomListenerName.YOURS_EMIT_EVENT,
-                action,
-                params,
-              });
-            }
-          } catch {
-            // invalid URL, skip
-          }
-        }
-      });
-    });
-    return true;
-  };
-
   // YOURS-SPECIFIC HANDLERS ********************************
 
   const processGetBalanceRequest = async (sendResponse: CallbackResponse) => {
@@ -1885,29 +1801,12 @@ if (isInServiceWorker) {
   };
 
   // CWI (BRC-100) HANDLERS ********************************
-  // All handlers are now direct passthroughs - WalletPermissionsManager handles permission prompts
+  // All handlers are direct passthroughs - WalletPermissionsManager handles permission prompts
 
-  // Shared helper: if already authorized, respond immediately; otherwise launch popup
-  const handleConnectOrAuth = (
-    request: ConnectRequest,
-    _sendResponse: CallbackResponse,
-    isAuthorized: boolean,
-    setCallback: () => void,
-    immediateResponse: () => void,
-  ) => {
-    if (isAuthorized) {
-      immediateResponse();
-      return true;
-    }
-    setCallback();
-    chromeStorageService.update({ connectRequest: request }).then(() => {
-      launchPopUp();
-    });
-    return true;
-  };
-
-  // Shared helper to check if a domain is authenticated
-  const checkIsAuthenticated = async (domain?: string): Promise<boolean> => {
+  // Reports the user's authentication status (wallet set up and unlocked).
+  // Per BRC-100 this is user-to-wallet status, independent of the calling
+  // origin — site-level trust is handled by the permissions manager.
+  const checkIsAuthenticated = async (): Promise<boolean> => {
     await chromeStorageService.getAndSetStorage();
     const result = chromeStorageService.getCurrentAccountObject();
     if (!result?.account) return false;
@@ -1915,15 +1814,11 @@ if (isInServiceWorker) {
     const currentTime = Date.now();
     const lastActiveTime = result.lastActiveTime;
 
-    return (
-      !result.isLocked &&
-      currentTime - Number(lastActiveTime) < getInactivityLimit() &&
-      (!domain || result.account.settings.whitelist?.map((i: { domain: string }) => i.domain).includes(domain))
-    );
+    return !result.isLocked && currentTime - Number(lastActiveTime) < getInactivityLimit();
   };
 
-  const processCWIIsAuthenticated = (originator: string | undefined, sendResponse: CallbackResponse) => {
-    checkIsAuthenticated(originator)
+  const processCWIIsAuthenticated = (sendResponse: CallbackResponse) => {
+    checkIsAuthenticated()
       .then((isAuthenticated) => {
         sendResponse({
           type: CWIEventName.IS_AUTHENTICATED,
@@ -1942,49 +1837,29 @@ if (isInServiceWorker) {
     return true;
   };
 
-  const processCWIWaitForAuthentication = (
+  const processCWIWaitForAuthentication = async (
     message: { params: RequestParams; originator?: string },
     sendResponse: CallbackResponse,
-    isAuthorized: boolean,
   ) => {
-    const domain = message.originator;
+    try {
+      const w = await ensureWallet();
 
-    const respond = (success: boolean, error?: string) => {
+      // The permissions manager handles the grouped-permission flow: it
+      // fetches the originator's manifest.json and prompts once for any
+      // declared permissions before resolving.
+      const result = await w.waitForAuthentication({}, message.originator);
       sendResponse({
         type: CWIEventName.WAIT_FOR_AUTHENTICATION,
-        success,
-        data: success ? { authenticated: true } : undefined,
-        error,
+        success: true,
+        data: result,
       });
-    };
-
-    return handleConnectOrAuth(
-      {
-        domain: domain || 'unknown',
-        appName: domain || 'Unknown App',
-        appIcon: HOSTED_YOURS_IMAGE,
-        isAuthorized,
-      } as ConnectRequest,
-      sendResponse,
-      isAuthorized,
-      () => {
-        responseCallbackForConnectRequest = (decision: Decision) => {
-          respond(
-            decision === 'approved',
-            decision !== 'approved' ? 'User declined the connection request' : undefined,
-          );
-        };
-      },
-      () => {
-        respond(true);
-        // Close the unlock popup — connect approval not needed
-        if (popupWindowId) {
-          removeWindow(popupWindowId);
-          popupWindowId = undefined;
-          chrome.storage.local.remove('popupWindowId');
-        }
-      },
-    );
+    } catch (error) {
+      sendResponse({
+        type: CWIEventName.WAIT_FOR_AUTHENTICATION,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
   };
 
   // Direct passthrough handlers - wallet handles permissions internally
@@ -2011,11 +1886,11 @@ if (isInServiceWorker) {
     return true;
   };
 
-  const processCWIGetNetwork = async (sendResponse: CallbackResponse) => {
+  const processCWIGetNetwork = async (message: { originator?: string }, sendResponse: CallbackResponse) => {
     try {
       const w = await ensureWallet();
 
-      const result = await w.getNetwork({});
+      const result = await w.getNetwork({}, message.originator);
       sendResponse({
         type: CWIEventName.GET_NETWORK,
         success: true,
@@ -2031,11 +1906,11 @@ if (isInServiceWorker) {
     return true;
   };
 
-  const processCWIGetHeight = async (sendResponse: CallbackResponse) => {
+  const processCWIGetHeight = async (message: { originator?: string }, sendResponse: CallbackResponse) => {
     try {
       const w = await ensureWallet();
 
-      const result = await w.getHeight({});
+      const result = await w.getHeight({}, message.originator);
       sendResponse({
         type: CWIEventName.GET_HEIGHT,
         success: true,
