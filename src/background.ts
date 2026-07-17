@@ -712,7 +712,7 @@ if (isInServiceWorker) {
             initializeWallet()
               .then(async (wallet) => {
                 // Mark wallet as unlocked in storage BEFORE resolving waiters,
-                // so verifyAccess() sees the unlocked state when authorizing requests
+                // so requests resolved from the queue see the unlocked state.
                 await chromeStorageService.update({ isLocked: false, lastActiveTime: Date.now() });
 
                 sendResponse({ type: 'WALLET_UNLOCKED', success: !!wallet });
