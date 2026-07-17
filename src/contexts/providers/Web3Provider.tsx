@@ -1,6 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { SendMNEE } from '../../services/types/provider.types';
-import { RequestParams } from '../../inject';
 import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
 import { sleep } from '../../utils/sleep';
@@ -14,7 +13,6 @@ import type { ApprovalContext } from '../../yoursApi';
 import type { OneSatPromptStorageEntry } from '../../services/oneSatPrompt';
 
 export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [connectRequest, setConnectRequest] = useState<RequestParams | undefined>(undefined);
   const [sendMNEERequest, setSendMNEERequest] = useState<SendMNEE[] | undefined>(undefined);
   const [permissionRequest, setPermissionRequest] = useState<(PermissionRequest & { requestID: string }) | undefined>(
     undefined,
@@ -34,9 +32,6 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   // Listen for storage changes so popup can detect new permission requests while open
   useEffect(() => {
     const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      if (changes.connectRequest?.newValue) {
-        setConnectRequest(changes.connectRequest.newValue);
-      }
       if (changes.permissionRequest?.newValue) {
         setPermissionRequest(changes.permissionRequest.newValue);
       }
@@ -76,9 +71,6 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     await sleep(1000);
     switch (type) {
-      case 'connectRequest':
-        setConnectRequest(undefined);
-        break;
       case 'sendMNEERequest':
         setSendMNEERequest(undefined);
         break;
@@ -99,7 +91,6 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const handleRequestStates = async (result: Partial<ChromeStorageObject>) => {
     const {
-      connectRequest,
       sendMNEERequest,
       permissionRequest,
       groupedPermissionRequest,
@@ -109,7 +100,6 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
       popupWindowId,
     } = result;
 
-    if (connectRequest) setConnectRequest(connectRequest);
     if (sendMNEERequest) setSendMNEERequest(sendMNEERequest);
     if (permissionRequest) setPermissionRequest(permissionRequest);
     if (groupedPermissionRequest) setGroupedPermissionRequest(groupedPermissionRequest);
@@ -127,7 +117,6 @@ export const Web3RequestProvider: React.FC<{ children: ReactNode }> = ({ childre
   return (
     <Web3RequestContext.Provider
       value={{
-        connectRequest,
         sendMNEERequest,
         permissionRequest,
         groupedPermissionRequest,

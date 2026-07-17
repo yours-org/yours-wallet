@@ -11,9 +11,6 @@ export enum YoursEventName {
   SYNC_STATUS_UPDATE = 'syncStatusUpdate',
   BLOCK_HEIGHT_UPDATE = 'blockHeightUpdate',
 
-  // Connection/auth flow (used by CWI.waitForAuthentication callback)
-  USER_CONNECT_RESPONSE = 'userConnectResponse',
-
   // Internal UI requests (popup -> background)
   GET_BALANCE = 'getBalance',
   GET_PUB_KEYS = 'getPubKeys',
@@ -62,5 +59,3 @@ export type WhitelistedApp = {
   domain: string;
   icon: string;
 };
-
-export type Decision = 'approved' | 'declined';

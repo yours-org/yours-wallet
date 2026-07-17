@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { useContext, useEffect, useState } from 'react';
-import { MemoryRouter as Router, Route, Routes, useNavigate } from 'react-router-dom';
+import { useContext, useEffect } from 'react';
+import { MemoryRouter as Router, Route, Routes } from 'react-router-dom';
 import { Show } from './components/Show';
 import { UnlockWallet } from './components/UnlockWallet';
 import { BottomMenuContext } from './contexts/BottomMenuContext';
@@ -14,9 +14,7 @@ import { ImportAccount } from './pages/onboarding/ImportAccount';
 import { RestoreAccount } from './pages/onboarding/RestoreAccount';
 import { Start } from './pages/onboarding/Start';
 import { OrdWallet } from './pages/OrdWallet';
-import { ConnectRequest } from './pages/requests/ConnectRequest';
 import { Settings } from './pages/Settings';
-import { WhitelistedApp } from './inject';
 import { PageLoader } from './components/PageLoader';
 import { useServiceContext } from './hooks/useServiceContext';
 import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
@@ -40,7 +38,6 @@ export const App = () => {
   const { isLocked, isReady, chromeStorageService, setIsLocked } = useServiceContext();
   const menuContext = useContext(BottomMenuContext);
   const {
-    connectRequest,
     sendMNEERequest,
     permissionRequest,
     groupedPermissionRequest,
@@ -51,16 +48,8 @@ export const App = () => {
     popupId,
     getStorageAndSetRequestState,
   } = useWeb3RequestContext();
-  const [whitelistedApps, setWhitelistedApps] = useState<WhitelistedApp[]>([]);
 
   const walletBg = theme.color.global.walletBackground;
-
-  useEffect(() => {
-    if (isReady) {
-      const { account } = chromeStorageService.getCurrentAccountObject();
-      setWhitelistedApps(account?.settings?.whitelist ?? []);
-    }
-  }, [chromeStorageService, isReady]);
 
   useActivityDetector(isLocked, isReady, chromeStorageService);
 
@@ -75,16 +64,6 @@ export const App = () => {
     isReady && getStorageAndSetRequestState(chromeStorageService);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReady]);
-
-  const RequestRouter = () => {
-    const navigate = useNavigate();
-    useEffect(() => {
-      if (connectRequest) {
-        navigate('/connect');
-      }
-    }, [connectRequest, navigate]);
-    return null;
-  };
 
   const handleUnlock = async () => {
     setIsLocked(false);
@@ -126,7 +105,6 @@ export const App = () => {
                 <SyncingBlocks />
                 <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
                   <Router>
-                    <RequestRouter />
                     <Routes>
                       <Route path="/" element={<Start />} />
                       <Route path="/create-wallet" element={<CreateAccount onNavigateBack={() => null} newWallet />} />
@@ -137,17 +115,6 @@ export const App = () => {
                       <Route path="/import-wallet" element={<ImportAccount onNavigateBack={() => null} newWallet />} />
                       <Route path="/master-restore" element={<MasterRestore />} />
                       <Route path="/sweep" element={<SweepMigration />} />
-                      <Route
-                        path="/connect"
-                        element={
-                          <ConnectRequest
-                            request={connectRequest}
-                            onDecision={() => clearRequest('connectRequest')}
-                            whiteListedApps={whitelistedApps}
-                            popupId={popupId}
-                          />
-                        }
-                      />
                       <Route
                         path="/bsv-wallet"
                         element={

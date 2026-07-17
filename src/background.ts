@@ -1,5 +1,5 @@
 /* global chrome */
-import { Decision, RequestParams, ResponseEventDetail, YoursEventName } from './inject';
+import { RequestParams, ResponseEventDetail, YoursEventName } from './inject';
 import { CWIEventName } from './cwi';
 import type {
   ListOutputsArgs,
@@ -284,8 +284,6 @@ const pendingCounterpartyPermissionRequests = new Map<
   }
 >();
 
-// Callback for CWI.waitForAuthentication flow
-let responseCallbackForConnectRequest: ((decision: Decision) => void) | null = null;
 let popupWindowId: number | undefined;
 
 /** Read the user's configured lock timeout (defaults to 10 minutes). */
@@ -575,7 +573,6 @@ if (isInServiceWorker) {
 
     // Actions that don't require authorization
     const noAuthRequired = [
-      YoursEventName.USER_CONNECT_RESPONSE,
       YoursEventName.SWITCH_ACCOUNT,
       YoursEventName.SIGNED_OUT,
       // CWI auth check (no auth required - just checks status)
@@ -628,8 +625,6 @@ if (isInServiceWorker) {
       }
 
       switch (message.action) {
-        case YoursEventName.USER_CONNECT_RESPONSE:
-          return processConnectResponse(message as { decision: Decision });
         case YoursEventName.SWITCH_ACCOUNT:
           switchAccount()
             .then(() => {
@@ -729,13 +724,12 @@ if (isInServiceWorker) {
                     waiter.resolve(wallet);
                   }
                 }
-                // Don't close the popup if there's a pending connect request in storage
-                // or if CWI handlers were waiting — the popup needs to transition
-                // from the unlock screen to the connect/permission screen.
+                // Don't close the popup if there's a pending permission request in
+                // storage or if CWI handlers were waiting — the popup needs to
+                // transition from the unlock screen to the permission screen.
                 const storage = await chromeStorageService.getAndSetStorage();
                 const hasPendingRequest =
                   hadWaiters ||
-                  !!(storage as Record<string, unknown>)?.connectRequest ||
                   !!(storage as Record<string, unknown>)?.permissionRequest ||
                   !!(storage as Record<string, unknown>)?.groupedPermissionRequest ||
                   !!(storage as Record<string, unknown>)?.counterpartyPermissionRequest;
@@ -2504,48 +2498,11 @@ if (isInServiceWorker) {
     return true;
   };
 
-  // CONNECT RESPONSE ********************************
-
-  const processConnectResponse = (response: { decision: Decision }) => {
-    console.log(
-      '[processConnectResponse] decision:',
-      response.decision,
-      'hasCallback:',
-      !!responseCallbackForConnectRequest,
-    );
-    if (!responseCallbackForConnectRequest) {
-      console.error('[processConnectResponse] Missing callback!');
-      return true;
-    }
-    try {
-      responseCallbackForConnectRequest(response.decision);
-    } catch (error) {
-      console.error('Error in connect response callback:', error);
-    } finally {
-      responseCallbackForConnectRequest = null;
-      chromeStorageService.remove('connectRequest');
-      chromeStorageService.getAndSetStorage().then((res) => {
-        if (res?.popupWindowId) {
-          removeWindow(res.popupWindowId);
-          chromeStorageService.remove('popupWindowId');
-        }
-      });
-    }
-
-    return true;
-  };
-
   // HANDLE WINDOW CLOSE *****************************************
   chrome.windows.onRemoved.addListener((closedWindowId) => {
     console.log('Window closed: ', closedWindowId);
 
     if (closedWindowId === popupWindowId) {
-      if (responseCallbackForConnectRequest) {
-        responseCallbackForConnectRequest('declined');
-        responseCallbackForConnectRequest = null;
-        chromeStorageService.remove('connectRequest');
-      }
-
       // Deny any pending permission requests when popup is closed
       for (const [requestID, pending] of pendingPermissionRequests) {
         accountContext?.wallet.denyPermission(requestID).catch(console.error);

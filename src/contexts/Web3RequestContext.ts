@@ -1,6 +1,5 @@
 import { createContext } from 'react';
 import { SendMNEE } from '../services/types/provider.types';
-import { RequestParams } from '../inject';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
 import type {
   PermissionRequest,
@@ -11,7 +10,6 @@ import type { ApprovalContext } from '../yoursApi';
 import type { OneSatPromptStorageEntry } from '../services/oneSatPrompt';
 
 export type Web3RequestContextProps = {
-  connectRequest: RequestParams | undefined;
   sendMNEERequest: SendMNEE[] | undefined;
   permissionRequest: (PermissionRequest & { requestID: string }) | undefined;
   groupedPermissionRequest: GroupedPermissionRequest | undefined;

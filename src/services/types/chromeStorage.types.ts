@@ -89,13 +89,6 @@ export type ExchangeRateCache = {
   timestamp: number;
 };
 
-export type ConnectRequest = {
-  appIcon: string;
-  appName: string;
-  domain: string;
-  isAuthorized: boolean;
-};
-
 export interface ChromeStorageObject {
   accounts: { [identityAddress: string]: Account };
   selectedAccount: string;
@@ -117,7 +110,6 @@ export interface ChromeStorageObject {
    */
   storageIdentityKey?: string;
   showWelcome?: boolean;
-  connectRequest?: ConnectRequest;
   sendMNEERequest?: SendMNEE[];
   broadcastRequest?: Broadcast;
   // Permission requests from WalletPermissionsManager
@@ -134,7 +126,6 @@ export type CurrentAccountObject = Omit<
   ChromeStorageObject,
   | 'accounts'
   | 'popupWindowId'
-  | 'connectRequest'
   | 'sendMNEERequest'
   | 'broadcastRequest'
   | 'permissionRequest'

@@ -40,7 +40,6 @@ import { AssetRow } from '../components/AssetRow';
 import { BackupPromo } from '../components/BackupPromo';
 import lockIcon from '../assets/lock.svg';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useWeb3RequestContext } from '../hooks/useWeb3RequestContext';
 import { useServiceContext } from '../hooks/useServiceContext';
 import {
   getBsv21Balances,
@@ -119,7 +118,6 @@ export const BsvWallet = () => {
   }, [avatarUrl]);
 
   const [unlockAttempted, setUnlockAttempted] = useState(false);
-  const { connectRequest } = useWeb3RequestContext();
   const [isProcessing, setIsProcessing] = useState(false);
   const [sendConfirmation, setSendConfirmation] = useState<{
     icon?: string;
@@ -297,7 +295,6 @@ export const BsvWallet = () => {
       // Show backup promo only when launched directly (not from a dApp popup)
       // and only if not previously dismissed (per-account) and no active remote
       const isPopup = !!(
-        obj?.connectRequest ||
         obj?.permissionRequest ||
         obj?.groupedPermissionRequest ||
         obj?.counterpartyPermissionRequest ||
@@ -454,13 +451,6 @@ export const BsvWallet = () => {
     // (Monitor + syncAddresses). The UI only needs to re-read current state.
     showLoad && setIsProcessing(false);
   };
-
-  useEffect(() => {
-    if (connectRequest) {
-      navigate('/connect');
-      return;
-    }
-  });
 
   useEffect(() => {
     if (!identityAddress || isSyncing) return;
