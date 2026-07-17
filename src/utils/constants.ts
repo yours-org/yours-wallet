@@ -72,7 +72,6 @@ export const DEFAULT_ACCOUNT = {
   addresses: { bsvAddress: '', ordAddress: '', identityAddress: '' },
   pubKeys: { bsvPubKey: '', ordPubKey: '', identityPubKey: '' },
   settings: {
-    whitelist: [],
     socialProfile: { avatar: HOSTED_YOURS_IMAGE, displayName: 'Anonymous' },
     favoriteTokens: [],
     customFeeRate: FEE_PER_KB,

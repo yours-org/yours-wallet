@@ -106,7 +106,6 @@ export class ChromeStorageService {
       popupWindowId,
       salt,
       socialProfile,
-      whitelist,
     } = oldStorage;
 
     const newInterface: Partial<ChromeStorageObject> = {
@@ -117,7 +116,6 @@ export class ChromeStorageService {
           encryptedKeys, // See Keys type
           derivationTags: derivationTags ?? [],
           settings: {
-            whitelist: whitelist ?? [],
             socialProfile: {
               displayName: socialProfile?.displayName ?? 'Anonymous',
               avatar: socialProfile?.avatar ?? HOSTED_YOURS_IMAGE,
@@ -280,9 +278,7 @@ export class ChromeStorageService {
 
     await this.set({
       version: 6,
-      ...(Object.keys(updates).length > 0
-        ? { accounts: { ...accounts, ...updates } }
-        : {}),
+      ...(Object.keys(updates).length > 0 ? { accounts: { ...accounts, ...updates } } : {}),
     });
   };
 

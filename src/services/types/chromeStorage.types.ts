@@ -15,7 +15,6 @@ import type {
   GroupedPermissionRequest,
   CounterpartyPermissionRequest,
 } from '@bsv/wallet-toolbox-mobile';
-import { WhitelistedApp } from '../../inject';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
 import type { ApprovalContext } from '../../yoursApi';
@@ -24,7 +23,6 @@ import type { OneSatPromptStorageEntry } from '../oneSatPrompt';
 export type OneSatPermissionRequestEntry = OneSatPromptStorageEntry;
 
 export type Settings = {
-  whitelist: WhitelistedApp[];
   socialProfile: SocialProfile;
   favoriteTokens: string[];
   customFeeRate: number;
@@ -151,7 +149,6 @@ export type DeprecatedStorage = {
   network: NetWork;
   paymentUtxos: StoredUtxo[];
   salt: string;
-  whitelist: WhitelistedApp[];
   colorTheme: Theme;
   popupWindowId: number;
 };

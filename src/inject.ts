@@ -54,8 +54,3 @@ export type ResponseEventDetail = {
 export type ResponseEvent = {
   detail: ResponseEventDetail;
 };
-
-export type WhitelistedApp = {
-  domain: string;
-  icon: string;
-};

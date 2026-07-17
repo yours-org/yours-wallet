@@ -6,9 +6,6 @@ import { Show } from '../components/Show';
 import { SpeedBump } from '../components/SpeedBump';
 import { useTheme } from '../hooks/useTheme';
 import { useSnackbar } from '../hooks/useSnackbar';
-import { useServiceContext } from '../hooks/useServiceContext';
-import type { WhitelistedApp } from '../inject';
-import type { ChromeStorageObject } from '../services/types/chromeStorage.types';
 
 /** Permission token as returned by WPM — passed through as-is from background */
 interface PermissionToken {
@@ -35,15 +32,11 @@ interface OriginatorGroup {
   permissions: PermissionToken[];
 }
 
-/** A domain unified from both whitelist + BRC-100 permission origins. */
-interface UnifiedEntry {
+/** A domain with its BRC-100 permission grants. */
+interface DomainEntry {
   /** Display key (also used as originator for BRC-100 calls) */
   domain: string;
-  /** Icon URL from the whitelist, if any */
-  icon?: string;
-  /** True if this domain is in the local Yours whitelist */
-  connected: boolean;
-  /** BRC-100 permission tokens for this originator (may be empty) */
+  /** BRC-100 permission tokens for this originator */
   permissions: PermissionToken[];
 }
 
@@ -159,10 +152,8 @@ export interface PermissionsManagerProps {
 export const PermissionsManager = ({ onBack: _onBack }: PermissionsManagerProps) => {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
-  const { chromeStorageService } = useServiceContext();
 
   const [groups, setGroups] = useState<OriginatorGroup[]>([]);
-  const [whitelist, setWhitelist] = useState<WhitelistedApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
   const [revoking, setRevoking] = useState<Set<string>>(new Set());
@@ -183,52 +174,26 @@ export const PermissionsManager = ({ onBack: _onBack }: PermissionsManagerProps)
       } else {
         addSnackbar(response.error || 'Failed to load permissions', 'error');
       }
-
-      // Whitelist from chrome storage
-      await chromeStorageService.getAndSetStorage();
-      const { account } = chromeStorageService.getCurrentAccountObject();
-      setWhitelist(account?.settings?.whitelist ?? []);
     } catch (error) {
       addSnackbar('Failed to load: ' + (error instanceof Error ? error.message : String(error)), 'error');
     } finally {
       setLoading(false);
     }
-  }, [addSnackbar, chromeStorageService]);
+  }, [addSnackbar]);
 
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Merge whitelist + permission origins into a single list, keyed by display domain
-  const entries: UnifiedEntry[] = useMemo(() => {
-    const map = new Map<string, UnifiedEntry>();
-
-    for (const app of whitelist) {
-      map.set(app.domain, {
-        domain: app.domain,
-        icon: app.icon,
-        connected: true,
-        permissions: [],
-      });
-    }
-
-    for (const group of groups) {
-      const domain = group.originator;
-      const existing = map.get(domain);
-      if (existing) {
-        existing.permissions = group.permissions;
-      } else {
-        map.set(domain, {
-          domain,
-          connected: false,
-          permissions: group.permissions,
-        });
-      }
-    }
-
-    return Array.from(map.values()).sort((a, b) => a.domain.localeCompare(b.domain));
-  }, [whitelist, groups]);
+  // One entry per originator that holds permission grants.
+  const entries: DomainEntry[] = useMemo(
+    () =>
+      groups
+        .map((group) => ({ domain: group.originator, permissions: group.permissions }))
+        .sort((a, b) => a.domain.localeCompare(b.domain)),
+    [groups],
+  );
 
   const handleToggleExpand = async (domain: string) => {
     if (expandedDomain === domain) {
@@ -289,21 +254,6 @@ export const PermissionsManager = ({ onBack: _onBack }: PermissionsManagerProps)
     }
   };
 
-  const removeWhitelistEntry = async (domain: string) => {
-    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
-    if (!account || !selectedAccount) return;
-    const newList = (account.settings?.whitelist ?? []).filter((a) => a.domain !== domain);
-    const key: keyof ChromeStorageObject = 'accounts';
-    const update: Partial<ChromeStorageObject['accounts']> = {
-      [selectedAccount]: {
-        ...account,
-        settings: { ...account.settings, whitelist: newList },
-      },
-    };
-    await chromeStorageService.updateNested(key, update);
-    setWhitelist(newList);
-  };
-
   const promptRevokeAll = (domain: string) => {
     setRevokeAllTarget(domain);
     setShowSpeedBump(true);
@@ -317,26 +267,15 @@ export const PermissionsManager = ({ onBack: _onBack }: PermissionsManagerProps)
 
     setFullyRevokingDomain(domain);
     try {
-      const entry = entries.find((e) => e.domain === domain);
-      const hasPermissions = (entry?.permissions.length ?? 0) > 0;
-
-      // 1. Revoke BRC-100 permission tokens (on-chain, affects all wallets with same identity)
-      if (hasPermissions) {
-        const response = await chrome.runtime.sendMessage({
-          action: 'PERMISSIONS_REVOKE_ALL',
-          originator: domain,
-        });
-        if (response.success) {
-          setGroups((prev) => prev.filter((g) => g.originator !== domain));
-        } else {
-          addSnackbar(response.error || 'Revoke failed', 'error');
-          return;
-        }
-      }
-
-      // 2. Remove from local whitelist (this wallet only)
-      if (entry?.connected) {
-        await removeWhitelistEntry(domain);
+      const response = await chrome.runtime.sendMessage({
+        action: 'PERMISSIONS_REVOKE_ALL',
+        originator: domain,
+      });
+      if (response.success) {
+        setGroups((prev) => prev.filter((g) => g.originator !== domain));
+      } else {
+        addSnackbar(response.error || 'Revoke failed', 'error');
+        return;
       }
 
       if (expandedDomain === domain) setExpandedDomain(null);
@@ -360,7 +299,7 @@ export const PermissionsManager = ({ onBack: _onBack }: PermissionsManagerProps)
     <div className="flex flex-col items-center w-full py-2 px-3 pb-20">
       <SpeedBump
         theme={theme}
-        message={`Revoke all access for ${revokeAllTarget ? extractDomain(revokeAllTarget) : 'this app'}? This removes the connection from this wallet and revokes any on-chain permission tokens.`}
+        message={`Revoke all access for ${revokeAllTarget ? extractDomain(revokeAllTarget) : 'this app'}? This revokes every permission granted to this app.`}
         showSpeedBump={showSpeedBump}
         onCancel={() => {
           setShowSpeedBump(false);
@@ -409,35 +348,18 @@ export const PermissionsManager = ({ onBack: _onBack }: PermissionsManagerProps)
                 className="flex items-center justify-between w-full px-3 py-2.5 cursor-pointer border-0 outline-none text-left bg-transparent"
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  {entry.icon ? (
-                    <img
-                      src={entry.icon}
-                      alt={displayDomain}
-                      className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
-                    />
-                  ) : (
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: 'rgba(161,255,139,0.1)' }}
-                    >
-                      <Globe size={14} color="#A1FF8B" />
-                    </div>
-                  )}
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: 'rgba(161,255,139,0.1)' }}
+                  >
+                    <Globe size={14} color="#A1FF8B" />
+                  </div>
 
                   <div className="flex flex-col min-w-0 flex-1">
                     <span className="text-sm font-semibold truncate" style={{ color: contrast }}>
                       {displayDomain}
                     </span>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      {entry.connected && (
-                        <span
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider"
-                          style={{ backgroundColor: 'rgba(161,255,139,0.12)', color: '#A1FF8B' }}
-                        >
-                          <span className="w-1 h-1 rounded-full" style={{ backgroundColor: '#A1FF8B' }} />
-                          Connected
-                        </span>
-                      )}
                       {permissionCount > 0 && (
                         <span className="text-[10px]" style={{ color: gray }}>
                           {permissionCount} permission{permissionCount === 1 ? '' : 's'}
