@@ -1547,7 +1547,10 @@ export const BsvWallet = () => {
       </motion.button>
 
       <CoinHistory
-        filter={{ type: 'mnee', addresses: mneeAddresses.length ? mneeAddresses : receiveAddress ? [receiveAddress] : [] }}
+        filter={{
+          type: 'mnee',
+          addresses: mneeAddresses.length ? mneeAddresses : receiveAddress ? [receiveAddress] : [],
+        }}
         refreshKey={mneeHistoryRefreshKey}
       />
     </motion.div>
