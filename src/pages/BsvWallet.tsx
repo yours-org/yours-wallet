@@ -128,6 +128,9 @@ export const BsvWallet = () => {
   // Get identityAddress from chrome storage (selected account)
   const identityAddress = chromeStorageService.getCurrentAccountObject().account?.addresses?.identityAddress || '';
   const [receiveAddress, setReceiveAddress] = useState<string>('');
+  // All derived MNEE deposit addresses for the account (not just the currently selected
+  // receiveAddress), used so MNEE balance/history aggregate deposits made to any address.
+  const [mneeAddresses, setMneeAddresses] = useState<string[]>([]);
   const [depositAddresses, setDepositAddresses] = useState<
     { address: string; index: number; derivationPrefix: string; derivationSuffix: string }[]
   >([]);
@@ -246,10 +249,70 @@ export const BsvWallet = () => {
     return { totalBsv, totalUsd };
   };
 
+  // BIP44-style gap limit for MNEE address discovery. `settings.maxKeyIndex` only advances
+  // when the user clicks "+ New Address" in this browser session, so a restored wallet (or one
+  // used across multiple devices) has no local record of higher indices that were previously
+  // funded elsewhere. Rather than deriving/checking unbounded addresses, probe ahead in bounded
+  // batches and stop as soon as a full batch comes back with no MNEE activity — mirrors standard
+  // HD wallet address-discovery behavior instead of scanning indefinitely.
+  const MNEE_GAP_LIMIT = 20;
+  const MNEE_MAX_GAP_SCANS = 10; // hard cap: at most 200 addresses probed ahead per call
+
+  /** Extend and persist maxKeyIndex if any higher, not-yet-tracked address has an MNEE balance. */
+  const discoverMneeMaxKeyIndex = async (knownMaxKeyIndex: number): Promise<number> => {
+    if (!apiContext) return knownMaxKeyIndex;
+    let maxKeyIndex = knownMaxKeyIndex;
+    let scanStart = knownMaxKeyIndex + 1;
+
+    for (let scan = 0; scan < MNEE_MAX_GAP_SCANS; scan++) {
+      const { derivations } = await deriveDepositAddresses.execute(apiContext, {
+        startIndex: scanStart,
+        count: MNEE_GAP_LIMIT,
+      });
+      const batchAddresses = derivations.map((d) => d.address);
+      const res = await getMneeBalance.execute(apiContext, { addresses: batchAddresses });
+      const fundedIndices = (res.balances ?? [])
+        .filter((b) => b.decimalAmount > 0)
+        .map((b) => batchAddresses.indexOf(b.address))
+        .filter((i) => i >= 0)
+        .map((i) => scanStart + i);
+
+      if (fundedIndices.length === 0) break; // full gap with no activity — stop probing
+
+      maxKeyIndex = Math.max(maxKeyIndex, ...fundedIndices);
+      scanStart += MNEE_GAP_LIMIT;
+    }
+
+    if (maxKeyIndex > knownMaxKeyIndex) {
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      if (account) {
+        await chromeStorageService.updateNested('accounts', {
+          [identityAddress]: { settings: { ...account.settings, maxKeyIndex } } as unknown as Account,
+        });
+      }
+    }
+
+    return maxKeyIndex;
+  };
+
   const updateMneeBalance = async () => {
     if (!receiveAddress || !apiContext) return;
     try {
-      const res = await getMneeBalance.execute(apiContext, { addresses: [receiveAddress] });
+      // Aggregate MNEE balance across all derived deposit addresses for this account,
+      // not just the currently selected receive address, since MNEE can be deposited
+      // to any previously derived address.
+      const { account: acctForMnee } = chromeStorageService.getCurrentAccountObject();
+      const knownMaxKeyIndex = acctForMnee?.settings?.maxKeyIndex ?? 4; // default: 0-4 = 5 addresses
+      const maxKeyIndex = await discoverMneeMaxKeyIndex(knownMaxKeyIndex);
+      const { derivations } = await deriveDepositAddresses.execute(apiContext, {
+        startIndex: 0,
+        count: maxKeyIndex + 1,
+      });
+      const addresses = derivations.map((d) => d.address);
+      setMneeAddresses(addresses.length ? addresses : [receiveAddress]);
+      const res = await getMneeBalance.execute(apiContext, {
+        addresses: addresses.length ? addresses : [receiveAddress],
+      });
       setMneeBalance(res.totalDecimal);
 
       // Update MNEE balance in Chrome storage
@@ -1484,7 +1547,7 @@ export const BsvWallet = () => {
       </motion.button>
 
       <CoinHistory
-        filter={{ type: 'mnee', addresses: receiveAddress ? [receiveAddress] : [] }}
+        filter={{ type: 'mnee', addresses: mneeAddresses.length ? mneeAddresses : receiveAddress ? [receiveAddress] : [] }}
         refreshKey={mneeHistoryRefreshKey}
       />
     </motion.div>
