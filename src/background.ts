@@ -644,7 +644,7 @@ if (isInServiceWorker) {
           sendResponse({
             type: CWIEventName.GET_VERSION,
             success: true,
-            data: { version: 'yours-wallet-1.0.0' },
+            data: { version: `yours-wallet-${chrome.runtime.getManifest().version}` },
           });
           return true;
         // Permission responses from popup UI
@@ -909,9 +909,6 @@ if (isInServiceWorker) {
             return true;
           case CWIEventName.GET_HEADER_FOR_HEIGHT:
             processCWIGetHeaderForHeight(message, sendResponse);
-            return true;
-          case CWIEventName.GET_VERSION:
-            processCWIGetVersion(sendResponse);
             return true;
           case CWIEventName.GET_PUBLIC_KEY:
             processCWIGetPublicKey(message, sendResponse);
@@ -1933,26 +1930,6 @@ if (isInServiceWorker) {
     } catch (error) {
       sendResponse({
         type: CWIEventName.GET_HEADER_FOR_HEIGHT,
-        success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
-      });
-    }
-    return true;
-  };
-
-  const processCWIGetVersion = async (sendResponse: CallbackResponse) => {
-    try {
-      const w = await ensureWallet();
-
-      const result = await w.getVersion({});
-      sendResponse({
-        type: CWIEventName.GET_VERSION,
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      sendResponse({
-        type: CWIEventName.GET_VERSION,
         success: false,
         error: error instanceof Error ? error.message : JSON.stringify(error),
       });
