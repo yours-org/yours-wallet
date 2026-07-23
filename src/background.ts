@@ -286,6 +286,58 @@ const pendingCounterpartyPermissionRequests = new Map<
 
 let popupWindowId: number | undefined;
 
+// In-flight dApp CWI requests that may have opened (or reused) the floating popup.
+let inFlightDappRequests = 0;
+
+const DAPP_UI_STORAGE_KEYS = [
+  'permissionRequest',
+  'groupedPermissionRequest',
+  'counterpartyPermissionRequest',
+  'oneSatPermissionRequest',
+  'transactionApprovalRequest',
+  'sendMNEERequest',
+] as const;
+
+const hasQueuedDappUi = async (): Promise<boolean> => {
+  if (pendingPermissionRequests.size > 0) return true;
+  if (pendingGroupedPermissionRequests.size > 0) return true;
+  if (pendingCounterpartyPermissionRequests.size > 0) return true;
+  const storage = await chromeStorageService.getAndSetStorage();
+  const s = storage as Record<string, unknown>;
+  return DAPP_UI_STORAGE_KEYS.some((key) => !!s[key]);
+};
+
+const closeDappPopup = (): void => {
+  if (!popupWindowId) return;
+  removeWindow(popupWindowId);
+  popupWindowId = undefined;
+  chrome.storage.local.remove('popupWindowId');
+};
+
+/**
+ * Close the floating dApp popup when no permission/approval UI is queued.
+ * Ignores in-flight CWI work so unlock and permission screens dismiss as
+ * soon as their UI is done; a later prompt reopens via launchPopUp.
+ * Never touches the browser-action popup (activePopupPorts).
+ */
+const closeDappPopupIfNoUi = async (): Promise<void> => {
+  if (!popupWindowId) return;
+  if (await hasQueuedDappUi()) return;
+  closeDappPopup();
+};
+
+/**
+ * Close the floating dApp popup only when fully idle: no queued UI, no
+ * unlock waiters, and no in-flight dApp CWI requests.
+ */
+const closeDappPopupIfIdle = async (): Promise<void> => {
+  if (!popupWindowId) return;
+  if (inFlightDappRequests > 0) return;
+  if (pendingWalletWaiters.length > 0) return;
+  if (await hasQueuedDappUi()) return;
+  closeDappPopup();
+};
+
 /** Read the user's configured lock timeout (defaults to 10 minutes). */
 const getInactivityLimit = () => chromeStorageService.getLockTimeout();
 
@@ -717,27 +769,17 @@ if (isInServiceWorker) {
 
                 sendResponse({ type: 'WALLET_UNLOCKED', success: !!wallet });
 
-                const hadWaiters = pendingWalletWaiters.length > 0;
                 // Resolve any CWI handlers waiting for the wallet
-                if (wallet && hadWaiters) {
+                if (wallet && pendingWalletWaiters.length > 0) {
                   for (const waiter of pendingWalletWaiters.splice(0)) {
                     waiter.resolve(wallet);
                   }
                 }
-                // Don't close the popup if there's a pending permission request in
-                // storage or if CWI handlers were waiting — the popup needs to
-                // transition from the unlock screen to the permission screen.
-                const storage = await chromeStorageService.getAndSetStorage();
-                const hasPendingRequest =
-                  hadWaiters ||
-                  !!(storage as Record<string, unknown>)?.permissionRequest ||
-                  !!(storage as Record<string, unknown>)?.groupedPermissionRequest ||
-                  !!(storage as Record<string, unknown>)?.counterpartyPermissionRequest;
-                if (!hasPendingRequest && popupWindowId) {
-                  removeWindow(popupWindowId);
-                  popupWindowId = undefined;
-                  chrome.storage.local.remove('popupWindowId');
-                }
+                // Close the unlock popup only once fully idle: in-flight dApp
+                // calls resumed by this unlock may still raise an approval
+                // screen in this window; silent calls close it via their
+                // completion hook moments later.
+                await closeDappPopupIfIdle();
               })
               .catch((error: Error) => {
                 console.error('Failed to initialize wallet:', error);
@@ -889,6 +931,23 @@ if (isInServiceWorker) {
       // because suppressPopup flag is set for this call).
     }
 
+    // Track dApp CWI work so the floating popup closes when the request is
+    // done and no approval UI remains. Extension-internal callers skip this —
+    // they use suppressPopup and must not own popupWindowId lifecycle.
+    const runDappRequest = (work: Promise<unknown>) => {
+      if (isFromExtension) {
+        void work;
+        return;
+      }
+      inFlightDappRequests++;
+      void Promise.resolve(work)
+        .catch(() => {})
+        .finally(() => {
+          inFlightDappRequests--;
+          void closeDappPopupIfIdle();
+        });
+    };
+
     ensureWallet(isFromExtension)
       .then(() => {
         console.log('[background] ensureWallet resolved for action:', message.action);
@@ -896,82 +955,82 @@ if (isInServiceWorker) {
           // CWI (BRC-100) handlers - direct passthrough to wallet
           // WalletPermissionsManager handles permission prompts internally
           case CWIEventName.WAIT_FOR_AUTHENTICATION:
-            processCWIWaitForAuthentication(message, sendResponse);
+            runDappRequest(processCWIWaitForAuthentication(message, sendResponse));
             return true;
           case CWIEventName.LIST_OUTPUTS:
-            processCWIListOutputs(message, sendResponse);
+            runDappRequest(processCWIListOutputs(message, sendResponse));
             return true;
           case CWIEventName.GET_NETWORK:
-            processCWIGetNetwork(message, sendResponse);
+            runDappRequest(processCWIGetNetwork(message, sendResponse));
             return true;
           case CWIEventName.GET_HEIGHT:
-            processCWIGetHeight(message, sendResponse);
+            runDappRequest(processCWIGetHeight(message, sendResponse));
             return true;
           case CWIEventName.GET_HEADER_FOR_HEIGHT:
-            processCWIGetHeaderForHeight(message, sendResponse);
+            runDappRequest(processCWIGetHeaderForHeight(message, sendResponse));
             return true;
           case CWIEventName.GET_PUBLIC_KEY:
-            processCWIGetPublicKey(message, sendResponse);
+            runDappRequest(processCWIGetPublicKey(message, sendResponse));
             return true;
           case CWIEventName.LIST_ACTIONS:
-            processCWIListActions(message, sendResponse);
+            runDappRequest(processCWIListActions(message, sendResponse));
             return true;
           case CWIEventName.VERIFY_SIGNATURE:
-            processCWIVerifySignature(message, sendResponse);
+            runDappRequest(processCWIVerifySignature(message, sendResponse));
             return true;
           case CWIEventName.VERIFY_HMAC:
-            processCWIVerifyHmac(message, sendResponse);
+            runDappRequest(processCWIVerifyHmac(message, sendResponse));
             return true;
           case CWIEventName.CREATE_HMAC:
-            processCWICreateHmac(message, sendResponse);
+            runDappRequest(processCWICreateHmac(message, sendResponse));
             return true;
           case CWIEventName.CREATE_SIGNATURE:
-            processCWICreateSignature(message, sendResponse);
+            runDappRequest(processCWICreateSignature(message, sendResponse));
             return true;
           case CWIEventName.ENCRYPT:
-            processCWIEncrypt(message, sendResponse);
+            runDappRequest(processCWIEncrypt(message, sendResponse));
             return true;
           case CWIEventName.DECRYPT:
-            processCWIDecrypt(message, sendResponse);
+            runDappRequest(processCWIDecrypt(message, sendResponse));
             return true;
           case CWIEventName.CREATE_ACTION:
-            processCWICreateAction(message, sendResponse);
+            runDappRequest(processCWICreateAction(message, sendResponse));
             return true;
           case CWIEventName.SIGN_ACTION:
-            processCWISignAction(message, sendResponse);
+            runDappRequest(processCWISignAction(message, sendResponse));
             return true;
           case CWIEventName.ABORT_ACTION:
-            processCWIAbortAction(message, sendResponse);
+            runDappRequest(processCWIAbortAction(message, sendResponse));
             return true;
           case CWIEventName.INTERNALIZE_ACTION:
-            processCWIInternalizeAction(message, sendResponse);
+            runDappRequest(processCWIInternalizeAction(message, sendResponse));
             return true;
           case CWIEventName.RELINQUISH_OUTPUT:
-            processCWIRelinquishOutput(message, sendResponse);
+            runDappRequest(processCWIRelinquishOutput(message, sendResponse));
             return true;
           case CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE:
-            processCWIRevealCounterpartyKeyLinkage(message, sendResponse);
+            runDappRequest(processCWIRevealCounterpartyKeyLinkage(message, sendResponse));
             return true;
           case CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE:
-            processCWIRevealSpecificKeyLinkage(message, sendResponse);
+            runDappRequest(processCWIRevealSpecificKeyLinkage(message, sendResponse));
             return true;
           case CWIEventName.ACQUIRE_CERTIFICATE:
-            processCWIAcquireCertificate(message, sendResponse);
+            runDappRequest(processCWIAcquireCertificate(message, sendResponse));
             return true;
           case CWIEventName.LIST_CERTIFICATES:
-            processCWIListCertificates(message, sendResponse);
+            runDappRequest(processCWIListCertificates(message, sendResponse));
             return true;
           case CWIEventName.PROVE_CERTIFICATE:
-            processCWIProveCertificate(message, sendResponse);
+            runDappRequest(processCWIProveCertificate(message, sendResponse));
             return true;
           case CWIEventName.RELINQUISH_CERTIFICATE:
-            processCWIRelinquishCertificate(message, sendResponse);
+            runDappRequest(processCWIRelinquishCertificate(message, sendResponse));
             return true;
           case CWIEventName.DISCOVER_BY_IDENTITY_KEY:
-            processCWIDiscoverByIdentityKey(message, sendResponse);
+            runDappRequest(processCWIDiscoverByIdentityKey(message, sendResponse));
             return true;
           case CWIEventName.DISCOVER_BY_ATTRIBUTES:
-            processCWIDiscoverByAttributes(message, sendResponse);
+            runDappRequest(processCWIDiscoverByAttributes(message, sendResponse));
             return true;
 
           default:
@@ -984,6 +1043,7 @@ if (isInServiceWorker) {
           success: false,
           error: error.message || 'Wallet unavailable',
         });
+        if (!isFromExtension) void closeDappPopupIfIdle();
       });
 
     return true;
@@ -1374,7 +1434,7 @@ if (isInServiceWorker) {
     }
 
     chromeStorageService.remove('permissionRequest');
-    closePermissionPopup();
+    void closeDappPopupIfNoUi();
     return true;
   };
 
@@ -1416,7 +1476,7 @@ if (isInServiceWorker) {
     }
 
     chromeStorageService.remove('groupedPermissionRequest');
-    closePermissionPopup();
+    void closeDappPopupIfNoUi();
     return true;
   };
 
@@ -1458,7 +1518,7 @@ if (isInServiceWorker) {
     }
 
     chromeStorageService.remove('counterpartyPermissionRequest');
-    closePermissionPopup();
+    void closeDappPopupIfNoUi();
     return true;
   };
 
@@ -2147,14 +2207,6 @@ if (isInServiceWorker) {
     return true;
   };
 
-  const closePermissionPopup = () => {
-    if (popupWindowId) {
-      removeWindow(popupWindowId);
-      popupWindowId = undefined;
-      chromeStorageService.remove('popupWindowId');
-    }
-  };
-
   const processCWICreateAction = async (
     message: { params: CreateActionArgs; originator?: string },
     sendResponse: CallbackResponse,
@@ -2195,7 +2247,6 @@ if (isInServiceWorker) {
         error: errorMessage,
       });
     }
-    closePermissionPopup();
     return true;
   };
 
@@ -2228,7 +2279,6 @@ if (isInServiceWorker) {
         error: error instanceof Error ? error.message : JSON.stringify(error),
       });
     }
-    closePermissionPopup();
     return true;
   };
 
