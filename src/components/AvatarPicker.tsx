@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Loader2, X, ImageIcon } from 'lucide-react';
-import { getOrdinals } from '@1sat/actions';
+import { listOrdinals } from '@1sat/actions';
 import type { OneSatContext } from '@1sat/actions';
 import type { WalletOutput } from '@bsv/sdk';
 import { getTagValue, resolveOriginOutpoint, getOutputName } from '../utils/format';
@@ -47,7 +47,7 @@ export const AvatarPicker = ({ theme, apiContext, onSelectExisting, onUploadNew,
       }
 
       try {
-        const { outputs } = await getOrdinals.execute(apiContext, {
+        const { outputs } = await listOrdinals.execute(apiContext, {
           limit: PAGE_SIZE,
           offset: offsetRef.current,
         });

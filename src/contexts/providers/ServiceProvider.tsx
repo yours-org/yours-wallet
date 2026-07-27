@@ -1,9 +1,9 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { KeysService } from '../../services/Keys.service';
-import { INACTIVITY_LIMIT, MESSAGEBOX_URL } from '../../utils/constants';
+import { INACTIVITY_LIMIT } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
-import { createContext, syncAddresses, syncMessages } from '@1sat/actions';
+import { createContext } from '@1sat/actions';
 import { fetchExchangeRate } from '../../utils/wallet';
 import { createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
 
@@ -17,7 +17,12 @@ const initializeServices = async () => {
   const chromeCWI = createChromeCWI();
   const chain = 'main' as const;
   const services = new OneSatServices(chain);
-  const apiContext = createContext(chromeCWI, { chain, services });
+  // chromeCWI is the gated background wallet — module owns apply.
+  const apiContext = createContext(chromeCWI, {
+    chain,
+    services,
+    isBaseWallet: false,
+  });
 
   return {
     chromeStorageService,
@@ -52,15 +57,16 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
         const { chromeStorageService, apiContext } = initializedServices;
         const { account, lastActiveTime } = chromeStorageService.getCurrentAccountObject();
 
-        // Determine initial lock state before marking ready
-        // If no encrypted keys exist, user needs onboarding - not the unlock screen
+        // Unlocked only with session passKey AND within inactivity window.
+        // lastActiveTime alone must not unlock (passKey is cleared on restart).
         if (!account?.encryptedKeys) {
           setIsLocked(false);
-        } else if (lastActiveTime && Date.now() - lastActiveTime <= chromeStorageService.getLockTimeout()) {
-          // Has keys but was recently active - unlock
-          setIsLocked(false);
+        } else {
+          const passKey = await chromeStorageService.getPassKey();
+          const withinTimeout =
+            !!lastActiveTime && Date.now() - Number(lastActiveTime) <= chromeStorageService.getLockTimeout();
+          setIsLocked(!(passKey && withinTimeout));
         }
-        // Otherwise keep isLocked=true (has keys, inactive)
 
         if (account) {
           // Pre-fetch exchange rate to cache it
@@ -83,47 +89,8 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Run syncAddresses when wallet is unlocked
-  useEffect(() => {
-    if (!isReady || isLocked || !services?.apiContext) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const runSync = async () => {
-      try {
-        const { account } = services.chromeStorageService!.getCurrentAccountObject();
-        const addressCount = (account?.settings?.maxKeyIndex ?? 4) + 1;
-        const result = await syncAddresses.execute(services.apiContext!, {
-          count: addressCount,
-        });
-        if (!cancelled) {
-          console.log('[ServiceProvider] Address sync complete:', result);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('[ServiceProvider] Address sync error:', error);
-        }
-      }
-      try {
-        const result = await syncMessages.execute(services.apiContext!, { messageboxUrl: MESSAGEBOX_URL });
-        if (!cancelled && (result.processed > 0 || result.failed > 0)) {
-          console.log('[ServiceProvider] Message box sync complete:', result);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('[ServiceProvider] Message box sync error:', error);
-        }
-      }
-    };
-
-    runSync();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isReady, isLocked, services?.apiContext]);
+  // Address/message sync runs in the service worker on unlock (initWallet).
+  // Do not also run it here — concurrent popup+SW sync races storage.
 
   const lockWallet = useCallback(async () => {
     if (!isReady) return;
@@ -132,22 +99,23 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   useEffect(() => {
     const checkLockState = async () => {
-      if (!isReady || !services) return;
+      if (!isReady || !services?.chromeStorageService) return;
       try {
-        // Re-read from chrome.storage.local to pick up changes from the background
-        await services.chromeStorageService?.getAndSetStorage();
-        const result = services.chromeStorageService?.getCurrentAccountObject();
-        const currentTime = Date.now();
+        const chromeStorageService = services.chromeStorageService;
+        await chromeStorageService.getAndSetStorage();
+        const result = chromeStorageService.getCurrentAccountObject();
         const lastActiveTime = result?.lastActiveTime;
-
-        if (!lastActiveTime) return;
+        const timeout = chromeStorageService.getLockTimeout() ?? INACTIVITY_LIMIT;
 
         if (!result?.account?.encryptedKeys) {
           setIsLocked(false);
           return;
         }
 
-        if (currentTime - lastActiveTime > (services?.chromeStorageService?.getLockTimeout() ?? INACTIVITY_LIMIT)) {
+        const passKey = await chromeStorageService.getPassKey();
+        const timedOut = !lastActiveTime || Date.now() - Number(lastActiveTime) > timeout;
+
+        if (timedOut || !passKey) {
           lockWallet();
         } else {
           setIsLocked(false);

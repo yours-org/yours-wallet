@@ -1,15 +1,16 @@
 import validate from 'bitcoin-address-validation';
 import { useCallback, useEffect, useState } from 'react';
-import { Beef, type BEEF, type WalletOutput } from '@bsv/sdk';
+import type { WalletOutput } from '@bsv/sdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Check, ImageOff, Send, Tag, X } from 'lucide-react';
+import { cancelOrdinalListing, listOrdinals, sellOrdinal, sendOrdinals } from '@1sat/actions';
+import { readAssetIdTag } from '@1sat/types';
 import { Ordinal } from '../components/Ordinal';
 import { PageLoader } from '../components/PageLoader';
 import { Show } from '../components/Show';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { cancelListing, deriveDepositAddresses, getOrdinals, listOrdinal, transferOrdinals } from '@1sat/actions';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 import { sleep } from '../utils/sleep';
 import { TopNav } from '../components/TopNav';
@@ -194,7 +195,6 @@ export const OrdWallet = () => {
   const [successTxId, setSuccessTxId] = useState('');
   const { addSnackbar, message } = useSnackbar();
   const [ordinals, setOrdinals] = useState<WalletOutput[]>([]);
-  const [ordinalsBEEFs, setOrdinalsBEEFs] = useState<BEEF[]>([]);
   const [from, setFrom] = useState<string>();
   const listedOrdinals = ordinals.filter((o) => o.tags?.includes('ordlock'));
   const myOrdinals = ordinals.filter((o) => !o.tags?.includes('ordlock'));
@@ -257,11 +257,7 @@ export const OrdWallet = () => {
     if (!apiContext) return;
     if (ordinals.length === 0) setIsProcessing(true);
     const offset = from ? parseInt(from, 10) : 0;
-    const { outputs, BEEF } = await getOrdinals.execute(apiContext, { limit: 50, offset });
-
-    if (BEEF) {
-      setOrdinalsBEEFs((prev) => [...prev, BEEF]);
-    }
+    const { outputs } = await listOrdinals.execute(apiContext, { limit: 50, offset });
 
     const filtered = outputs.filter((o) => {
       const contentType = getTagValue(o.tags, 'type');
@@ -304,8 +300,7 @@ export const OrdWallet = () => {
   };
 
   const refreshOrdinals = async () => {
-    const { outputs, BEEF } = await getOrdinals.execute(apiContext, { limit: 50, offset: 0 });
-    setOrdinalsBEEFs(BEEF ? [BEEF] : []);
+    const { outputs } = await listOrdinals.execute(apiContext, { limit: 50, offset: 0 });
 
     const filtered = outputs.filter((o) => {
       const contentType = getTagValue(o.tags, 'type');
@@ -316,26 +311,15 @@ export const OrdWallet = () => {
     setFrom(outputs.length.toString());
   };
 
-  const getMergedBeefForOrdinals = (selected: WalletOutput[]): number[] | undefined => {
-    if (ordinalsBEEFs.length === 0) return undefined;
-
-    const neededTxids = new Set(selected.map((o) => o.outpoint.split('.')[0]));
-    const merged = new Beef();
-
-    for (const beefBytes of ordinalsBEEFs) {
-      const beef = Beef.fromBinary(beefBytes);
-      for (const txid of neededTxids) {
-        if (beef.findTxid(txid)?.tx) {
-          merged.mergeBeef(beef);
-          break;
-        }
-      }
+  const requireAssetId = (output: WalletOutput): string | undefined => {
+    const id = readAssetIdTag(output.tags);
+    if (!id) {
+      addSnackbar('Ordinal is missing a tracking id and cannot be spent yet', 'error');
     }
-
-    return merged.toBinary();
+    return id;
   };
 
-  // ── handlers (unchanged) ────────────────────────────────────────────────────
+  // ── handlers ────────────────────────────────────────────────────────────────
 
   const handleMultiTransferOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -344,23 +328,17 @@ export const OrdWallet = () => {
     await sleep(25);
 
     try {
-      const inputBEEF = getMergedBeefForOrdinals(selectedOrdinals);
-      if (!inputBEEF) {
-        console.error('[OrdWallet] No BEEF available');
-        addSnackbar('No transaction data available', 'error');
-        setIsProcessing(false);
-        return;
+      const transfers: { id: string; address: string }[] = [];
+      for (const ordinal of selectedOrdinals) {
+        const id = requireAssetId(ordinal);
+        if (!id) {
+          setIsProcessing(false);
+          return;
+        }
+        transfers.push({ id, address: addresses[ordinal.outpoint] });
       }
 
-      const transfers = selectedOrdinals.map((ordinal) => ({
-        ordinal,
-        address: addresses[ordinal.outpoint],
-      }));
-
-      const transferRes = await transferOrdinals.execute(apiContext, {
-        transfers,
-        inputBEEF,
-      });
+      const transferRes = await sendOrdinals.execute(apiContext, { transfers });
 
       if (!transferRes.txid || transferRes.error) {
         console.error('[OrdWallet] Transfer failed:', transferRes.error);
@@ -398,29 +376,15 @@ export const OrdWallet = () => {
       return;
     }
 
-    const inputBEEF = getMergedBeefForOrdinals(selectedOrdinals);
-    if (!inputBEEF) {
-      addSnackbar('No transaction data available', 'error');
+    const id = requireAssetId(selectedOrdinals[0]);
+    if (!id) {
       setIsProcessing(false);
       return;
     }
 
-    const { derivations } = await deriveDepositAddresses.execute(apiContext, {
-      startIndex: 0,
-      count: 1,
-    });
-    const payAddress = derivations[0]?.address;
-    if (!payAddress) {
-      addSnackbar('Could not derive payment address', 'error');
-      setIsProcessing(false);
-      return;
-    }
-
-    const listRes = await listOrdinal.execute(apiContext, {
-      ordinal: selectedOrdinals[0],
-      inputBEEF,
+    const listRes = await sellOrdinal.execute(apiContext, {
+      id,
       price: Math.ceil(bsvListAmount * BSV_DECIMAL_CONVERSION),
-      payAddress,
     });
 
     if (!listRes.txid || listRes.error) {
@@ -440,17 +404,13 @@ export const OrdWallet = () => {
 
     await sleep(25);
 
-    const inputBEEF = getMergedBeefForOrdinals(selectedOrdinals);
-    if (!inputBEEF) {
-      addSnackbar('No transaction data available', 'error');
+    const id = requireAssetId(selectedOrdinals[0]);
+    if (!id) {
       setIsProcessing(false);
       return;
     }
 
-    const cancelRes = await cancelListing.execute(apiContext, {
-      listing: selectedOrdinals[0],
-      inputBEEF,
-    });
+    const cancelRes = await cancelOrdinalListing.execute(apiContext, { id });
 
     if (!cancelRes.txid || cancelRes.error) {
       addSnackbar(getErrorMessage(cancelRes.error), 'error');

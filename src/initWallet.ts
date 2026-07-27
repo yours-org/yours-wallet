@@ -78,7 +78,81 @@ export interface AccountContext {
   addRemote: (url: string) => Promise<void>;
   /** Call to stop sync and destroy wallet */
   close: () => Promise<void>;
+  /** Admin-bound wallet used for internal sync (same generation as this context). */
+  adminWallet: WalletInterface;
+  /** Deposit address count used by syncAddresses for this generation. */
+  depositAddressCount: number;
+  /**
+   * False as soon as drop starts. Wallet is gone — callers must reject.
+   * Set true only while this context is the live wallet.
+   */
+  alive: boolean;
 }
+
+/** Single-flight sync for the current live wallet generation. */
+let syncFlight: { ctx: AccountContext; promise: Promise<void> } | null = null;
+
+const sendSyncStatus = (data: { status: string; [key: string]: unknown }) => {
+  chrome.runtime
+    .sendMessage({
+      action: 'syncStatusUpdate',
+      data,
+    })
+    .catch(() => {
+      // Popup may be closed
+    });
+};
+
+/**
+ * Run address + message sync for a live wallet. Joins an in-flight run for the
+ * same context; starts a new run if the context is new (e.g. after unlock/switch).
+ * Owned by the service worker — UI triggers via popup port / message only.
+ */
+export const runWalletSync = (ctx: AccountContext, reason: string): Promise<void> => {
+  // Only the live wallet syncs. Callers must not invoke this after drop.
+  if (!ctx.alive) return Promise.resolve();
+  if (syncFlight?.ctx === ctx) return syncFlight.promise;
+
+  const t0 = Date.now();
+  console.log(`[walletSync] start (${reason})`);
+  const promise = (async () => {
+    const actionCtx = createActionContext(ctx.adminWallet, {
+      chain: 'main',
+      services: ctx.syncContext.services,
+    });
+    const count = ctx.depositAddressCount;
+
+    sendSyncStatus({ status: 'start', addressCount: count });
+    try {
+      const result = await syncAddresses.execute(actionCtx, {
+        count,
+        onProgress: (progress) => {
+          sendSyncStatus({ status: 'progress', ...progress });
+        },
+      });
+      sendSyncStatus({ status: 'complete', ...result });
+      console.log(`[walletSync] address sync complete (${reason}) ${Date.now() - t0}ms:`, result);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      sendSyncStatus({ status: 'error', message });
+      console.error(`[walletSync] address sync failed (${reason}):`, error);
+    }
+
+    try {
+      const msgResult = await syncMessages.execute(actionCtx, { messageboxUrl: MESSAGEBOX_URL });
+      if (msgResult.processed > 0 || msgResult.failed > 0) {
+        console.log(`[walletSync] message sync (${reason}):`, msgResult);
+      }
+    } catch (error: unknown) {
+      console.error(`[walletSync] message sync failed (${reason}):`, error);
+    }
+  })().finally(() => {
+    if (syncFlight?.ctx === ctx) syncFlight = null;
+  });
+
+  syncFlight = { ctx, promise };
+  return promise;
+};
 
 /**
  * Resolve a per-account storage config into the flat fields the SDK factory
@@ -227,58 +301,8 @@ export const initWallet = async (
     }
   }
 
-  // 6. Run address sync via syncAddresses action (fire-and-forget)
-  const actionCtx = createActionContext(adminWallet, { chain, services: syncContext.services });
-
-  const sendSyncStatus = (data: { status: string; [key: string]: unknown }) => {
-    chrome.runtime
-      .sendMessage({
-        action: 'syncStatusUpdate',
-        data,
-      })
-      .catch(() => {
-        // Ignore errors if popup is not open
-      });
-  };
-
-  console.log('[initWallet] Starting address sync...');
-  sendSyncStatus({ status: 'start', addressCount: maxKeyIndex + 1 });
-
-  syncAddresses
-    .execute(actionCtx, {
-      count: maxKeyIndex + 1,
-      onProgress: (progress) => {
-        sendSyncStatus({ status: 'progress', ...progress });
-      },
-    })
-    .then((result) => {
-      sendSyncStatus({ status: 'complete', ...result });
-      console.log('[initWallet] Address sync complete:', result);
-    })
-    .catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      sendSyncStatus({ status: 'error', message });
-      console.error('[initWallet] Address sync failed:', error);
-    });
-
-  // Sync incoming paymail payments from the message box (fire-and-forget)
-  syncMessages
-    .execute(actionCtx, { messageboxUrl: MESSAGEBOX_URL })
-    .then((result) => {
-      if (result.processed > 0 || result.failed > 0) {
-        console.log('[initWallet] Message box sync complete:', result);
-      }
-    })
-    .catch((error: unknown) => {
-      console.error('[initWallet] Message box sync failed:', error);
-    });
-
-  // Create close function
-  const close = async () => {
-    await destroyWallet();
-  };
-
-  return {
+  // Build context, then attach close that can clear this generation's sync flight.
+  const context: AccountContext = {
     wallet,
     baseWallet,
     syncContext,
@@ -286,6 +310,22 @@ export const initWallet = async (
     remoteStorage,
     setActiveStorage,
     addRemote,
-    close,
+    adminWallet,
+    depositAddressCount: maxKeyIndex + 1,
+    alive: true,
+    close: async () => {
+      context.alive = false;
+      if (syncFlight?.ctx === context) syncFlight = null;
+      try {
+        await destroyWallet();
+      } catch (error) {
+        console.warn('[lifecycle] close destroyWallet error:', error);
+      }
+    },
   };
+
+  // Sync once when this instance becomes live (single-flight; popup may join).
+  void runWalletSync(context, 'become-live');
+
+  return context;
 };

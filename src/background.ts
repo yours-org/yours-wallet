@@ -40,18 +40,16 @@ import { removeWindow } from './utils/chromeHelpers';
 import { Account, ChromeStorageObject, StorageConfig } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
 import { handleOneSatPermissionResponse, initOneSatPromptBridge } from './services/oneSatPrompt';
-import { initWallet, type AccountContext } from './initWallet';
+import type { AccountContext } from './initWallet';
+import { createWallet, dropWallet, getCreating, getLiveContext, getLiveWallet, requireLiveContext, syncIfLive } from './walletLifecycle';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
 
 let chromeStorageService = new ChromeStorageService();
+
+// Check if we're in a service worker context
 const isInServiceWorker = self?.document === undefined;
 
-// Account context - null if locked or not initialized
-let accountContext: AccountContext | null = null;
-// Set while wallet is reinitializing (e.g. account switch) to prevent
-// ensureWallet from launching a popup during the transition.
-let reinitPromise: Promise<WalletInterface | null> | null = null;
 // Tracks active extension popup connections via chrome.runtime.onConnect.
 // When the browser-action popup opens, it connects with name 'extension-popup'.
 // When it closes, the port disconnects automatically. No timers needed.
@@ -62,6 +60,8 @@ chrome.runtime.onConnect.addListener((port) => {
     port.onDisconnect.addListener(() => {
       activePopupPorts.delete(port);
     });
+    // Popup opened while wallet live → sync (no-op if gone).
+    syncIfLive('popup-open');
   }
 });
 
@@ -80,71 +80,43 @@ const notifyBalanceUpdate = () => {
     });
 };
 
-// Initialize wallet on startup (will be null if locked)
-const initializeWallet = async (): Promise<WalletInterface | null> => {
-  console.log('[background] initializeWallet: starting, current accountContext:', !!accountContext);
-  if (accountContext) {
-    console.log('[background] initializeWallet: closing existing context');
-    try {
-      await accountContext.close();
-    } catch (error) {
-      console.error('[background] initializeWallet: failed to close existing context (continuing anyway):', error);
-    }
-    accountContext = null;
-  }
-
-  console.log('[background] initializeWallet: calling initWallet...');
-  accountContext = await initWallet(chromeStorageService, {
-    onTransactionBroadcasted: (txid: string) => {
-      console.log('[background] Transaction broadcasted:', txid);
-      notifyBalanceUpdate();
+/** Only path that stands up a wallet. */
+const bringWalletLive = async (): Promise<WalletInterface | null> => {
+  const ctx = await createWallet({
+    chromeStorageService,
+    options: {
+      onTransactionBroadcasted: (txid: string) => {
+        console.log('[background] Transaction broadcasted:', txid);
+        notifyBalanceUpdate();
+      },
+      onTransactionProven: (txid: string) => {
+        console.log('[background] Transaction proven:', txid);
+        notifyBalanceUpdate();
+      },
     },
-    onTransactionProven: (txid: string) => {
-      console.log('[background] Transaction proven:', txid);
-      notifyBalanceUpdate();
+    onReady: async (ready) => {
+      bindPermissionCallbacks(ready.wallet);
+      const { account: currentAccount } = chromeStorageService.getCurrentAccountObject();
+      const currentIdentityKey = currentAccount?.pubKeys?.identityPubKey || '';
+      if (!currentIdentityKey) return;
+      const hasPending = await WalletBackupService.hasPendingRestore(currentIdentityKey);
+      if (!hasPending) return;
+      // Still the live wallet?
+      if (getLiveContext() !== ready) return;
+      try {
+        const storage = ready.storage as unknown as Parameters<typeof WalletBackupService.importPendingWalletData>[0];
+        if (storage) {
+          await WalletBackupService.importPendingWalletData(storage, currentIdentityKey, (event) => {
+            console.log('[background] PendingRestore:', event.message);
+          });
+        }
+      } catch (error) {
+        console.error('[background] Pending restore failed:', error);
+        await WalletBackupService.clearAllPendingRestores();
+      }
     },
   });
-  console.log('[background] initializeWallet: initWallet returned, accountContext:', !!accountContext);
-
-  if (accountContext) {
-    bindPermissionCallbacks(accountContext.wallet);
-    console.log('[background] initializeWallet: bound permission callbacks');
-
-    // Check for pending restore data for the CURRENT account (Phase 2 of two-phase restore).
-    // Each account's data is stored separately — syncFromReader only accepts the
-    // authenticated account's identityKey. Other accounts' data stays in IndexedDB
-    // until they are switched to and initializeWallet runs again.
-    const { account: currentAccount } = chromeStorageService.getCurrentAccountObject();
-    const currentIdentityKey = currentAccount?.pubKeys?.identityPubKey || '';
-    if (currentIdentityKey) {
-      const hasPending = await WalletBackupService.hasPendingRestore(currentIdentityKey);
-      console.log(
-        '[background] initializeWallet: hasPendingRestore for',
-        currentIdentityKey.slice(0, 8) + '...:',
-        hasPending,
-      );
-      if (hasPending) {
-        console.log('[background] initializeWallet: Found pending restore data, importing...');
-        try {
-          const storage = accountContext.storage as unknown as Parameters<
-            typeof WalletBackupService.importPendingWalletData
-          >[0];
-          if (storage) {
-            await WalletBackupService.importPendingWalletData(storage, currentIdentityKey, (event) => {
-              console.log('[background] PendingRestore:', event.message);
-            });
-            console.log('[background] initializeWallet: Pending restore complete');
-          }
-        } catch (error) {
-          console.error('[background] initializeWallet: Pending restore failed:', error);
-          // Clear only this account's pending data to avoid repeated failures
-          await WalletBackupService.clearAllPendingRestores();
-        }
-      }
-    }
-  }
-
-  return accountContext?.wallet ?? null;
+  return ctx?.wallet ?? null;
 };
 
 // Start initialization — clean up stale popup windows then initialize wallet.
@@ -176,7 +148,7 @@ const startupInitPromise = chromeStorageService
 
     if (isUnlocked) {
       try {
-        await initializeWallet();
+        await bringWalletLive();
       } catch (error) {
         console.error('[background] Failed to initialize wallet on startup — locking:', error);
         await chromeStorageService.clearPassKey();
@@ -197,8 +169,7 @@ const startupInitPromise = chromeStorageService
  * Returns null if wallet is locked or not initialized.
  */
 export const getWallet = (): WalletInterface | null => {
-  console.log('[background] getWallet called, accountContext:', !!accountContext, 'wallet:', !!accountContext?.wallet);
-  return accountContext?.wallet ?? null;
+  return getLiveWallet();
 };
 
 /**
@@ -207,25 +178,25 @@ export const getWallet = (): WalletInterface | null => {
  * while the wallet is still auto-initializing from a persisted passKey.
  */
 const ensureWallet = async (suppressPopup = false): Promise<WalletInterface> => {
-  await startupInitPromise;
-  if (accountContext?.wallet) {
-    return accountContext.wallet;
+  // Don't block forever if startup create is hung (e.g. remote).
+  await Promise.race([
+    startupInitPromise,
+    new Promise<void>((resolve) => setTimeout(resolve, 12_000)),
+  ]);
+
+  const live = getLiveWallet();
+  if (live) return live;
+
+  // Account switch / unlock rebuild: wait for in-flight create instead of unlock popup.
+  const inflight = getCreating();
+  if (inflight) {
+    const ctx = await inflight;
+    if (ctx?.wallet) return ctx.wallet;
   }
 
-  // If wallet is currently reinitializing (e.g. account switch), wait for that
-  // instead of launching a popup.
-  if (reinitPromise) {
-    const wallet = await reinitPromise;
-    if (wallet) return wallet;
-  }
+  const again = getLiveWallet();
+  if (again) return again;
 
-  // Still no context — check again after reinit may have completed
-  if (accountContext?.wallet) {
-    return accountContext.wallet;
-  }
-
-  // No accountContext — passKey is cleared on lock, so the user must enter their password.
-  // Check if a wallet exists to unlock (encryptedKeys must be present).
   await chromeStorageService.getAndSetStorage();
   const { account } = chromeStorageService.getCurrentAccountObject();
 
@@ -233,8 +204,6 @@ const ensureWallet = async (suppressPopup = false): Promise<WalletInterface> => 
     return Promise.reject(new Error('No wallet exists - create wallet first'));
   }
 
-  // Wallet exists but is locked — prompt user to unlock via popup
-  // (unless suppressed, e.g. when called from the extension popup itself)
   if (suppressPopup) {
     return Promise.reject(new Error('Wallet not available'));
   }
@@ -345,17 +314,12 @@ const getInactivityLimit = () => chromeStorageService.getLockTimeout();
 // This runs even when the popup is closed, ensuring keys don't linger in the service worker.
 chrome.alarms.create('inactivity-lock', { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name !== 'inactivity-lock' || !accountContext) return;
+  if (alarm.name !== 'inactivity-lock' || !getLiveContext()) return;
   await chromeStorageService.getAndSetStorage();
   const { lastActiveTime } = chromeStorageService.getCurrentAccountObject();
   if (!lastActiveTime || Date.now() - Number(lastActiveTime) >= getInactivityLimit()) {
-    console.log('[background] Inactivity detected — destroying wallet context and clearing passKey');
-    try {
-      await accountContext.close();
-    } catch (err) {
-      console.error('[background] Error closing wallet on inactivity:', err);
-    }
-    accountContext = null;
+    console.log('[background] Inactivity detected — wallet gone, clearing passKey');
+    await dropWallet('inactivity');
     await chromeStorageService.clearPassKey();
     await chromeStorageService.update({ isLocked: true });
   }
@@ -483,37 +447,17 @@ if (isInServiceWorker) {
   };
 
   const signOut = async () => {
-    await accountContext?.close();
-    accountContext = null;
+    await dropWallet('signOut');
     await chromeStorageService.clearPassKey();
     await deleteAllIDBDatabases();
   };
 
   const switchAccount = async () => {
     console.log('[background] switchAccount: starting');
-    const doSwitch = async () => {
-      try {
-        // Close existing wallet before switching
-        if (accountContext) {
-          console.log('[background] switchAccount: closing existing wallet');
-          await accountContext.close();
-          accountContext = null;
-        }
-        chromeStorageService = new ChromeStorageService();
-        await chromeStorageService.getAndSetStorage();
-        console.log('[background] switchAccount: storage loaded, initializing wallet');
-        await initializeWallet();
-        console.log('[background] switchAccount: wallet initialized successfully');
-        return (accountContext as AccountContext | null)?.wallet ?? null;
-      } catch (error) {
-        console.error('[background] switchAccount: failed to initialize wallet:', error);
-        return null;
-      } finally {
-        reinitPromise = null;
-      }
-    };
-    reinitPromise = doSwitch();
-    await reinitPromise;
+    chromeStorageService = new ChromeStorageService();
+    await chromeStorageService.getAndSetStorage();
+    await bringWalletLive();
+    console.log('[background] switchAccount: live');
   };
 
   const createNewPopup = () => {
@@ -733,62 +677,50 @@ if (isInServiceWorker) {
           processGetSocialProfileRequest(sendResponse);
           return true;
         case 'WALLET_LOCKED': {
-          // Destroy accountContext and clear passKey so keys cannot be decrypted without password
-          const ctx = accountContext;
-          accountContext = null; // Clear reference immediately to block new callers
-          chromeStorageService.clearPassKey().catch(() => {});
-          if (ctx) {
-            ctx
-              .close()
-              .then(() => console.log('[background] Wallet locked — keys and passKey cleared'))
-              .catch((err) => console.error('[background] Error closing wallet on lock:', err))
-              .finally(() => sendResponse({ type: 'WALLET_LOCKED', success: true }));
-          } else {
-            sendResponse({ type: 'WALLET_LOCKED', success: true });
-          }
+          // Shared teardown barrier — unlock must await this before create.
+          void (async () => {
+            try {
+              await dropWallet('WALLET_LOCKED');
+              await chromeStorageService.clearPassKey();
+              console.log('[background] Wallet locked — keys and passKey cleared');
+              sendResponse({ type: 'WALLET_LOCKED', success: true });
+            } catch (err) {
+              console.error('[background] Error locking wallet:', err);
+              sendResponse({ type: 'WALLET_LOCKED', success: false });
+            }
+          })();
           return true;
         }
         case 'WALLET_UNLOCKED':
-          // If wallet context already exists and has pending requests, skip reinitialization
-          // to preserve active CWI operations (e.g., createAction waiting for permission)
-          if (accountContext && pendingPermissionRequests.size > 0) {
+          if (getLiveContext() && pendingPermissionRequests.size > 0) {
             console.log(
-              '[background] WALLET_UNLOCKED: skipping reinitialization, pending requests:',
+              '[background] WALLET_UNLOCKED: already live, pending requests:',
               pendingPermissionRequests.size,
             );
             sendResponse({ type: 'WALLET_UNLOCKED', success: true });
             return true;
           }
-          // Reinitialize wallet after user unlocks with password
-          chromeStorageService.getAndSetStorage().then(() => {
-            initializeWallet()
-              .then(async (wallet) => {
-                // Mark wallet as unlocked in storage BEFORE resolving waiters,
-                // so requests resolved from the queue see the unlocked state.
-                await chromeStorageService.update({ isLocked: false, lastActiveTime: Date.now() });
-
-                sendResponse({ type: 'WALLET_UNLOCKED', success: !!wallet });
-
-                // Resolve any CWI handlers waiting for the wallet
-                if (wallet && pendingWalletWaiters.length > 0) {
-                  for (const waiter of pendingWalletWaiters.splice(0)) {
-                    waiter.resolve(wallet);
-                  }
-                }
-                // Close the unlock popup only once fully idle: in-flight dApp
-                // calls resumed by this unlock may still raise an approval
-                // screen in this window; silent calls close it via their
-                // completion hook moments later.
-                await closeDappPopupIfIdle();
-              })
-              .catch((error: Error) => {
-                console.error('Failed to initialize wallet:', error);
-                sendResponse({ type: 'WALLET_UNLOCKED', success: false, error: error.message });
+          void (async () => {
+            try {
+              await chromeStorageService.getAndSetStorage();
+              const wallet = await bringWalletLive();
+              await chromeStorageService.update({ isLocked: false, lastActiveTime: Date.now() });
+              sendResponse({ type: 'WALLET_UNLOCKED', success: !!wallet });
+              if (wallet && pendingWalletWaiters.length > 0) {
                 for (const waiter of pendingWalletWaiters.splice(0)) {
-                  waiter.reject(error);
+                  waiter.resolve(wallet);
                 }
-              });
-          });
+              }
+              await closeDappPopupIfIdle();
+            } catch (error) {
+              const err = error instanceof Error ? error : new Error(String(error));
+              console.error('Failed to bring wallet live:', err);
+              sendResponse({ type: 'WALLET_UNLOCKED', success: false, error: err.message });
+              for (const waiter of pendingWalletWaiters.splice(0)) {
+                waiter.reject(err);
+              }
+            }
+          })();
           return true;
         case 'MASTER_BACKUP':
           processMasterBackup(sendResponse);
@@ -813,11 +745,11 @@ if (isInServiceWorker) {
           return true;
         case 'UPDATE_FEE_RATE': {
           const rate = message.feeRate;
-          if (typeof rate === 'number' && rate >= 1 && accountContext) {
+          if (typeof rate === 'number' && rate >= 1 && getLiveContext()) {
             // Access the internal storage provider to update fee model at runtime.
             // This reaches into WalletStorageManager internals — if the SDK changes
             // its structure, the guard below will catch it and log a warning.
-            const active = (accountContext.storage as any)._active;
+            const active = (requireLiveContext().storage as any)._active;
             if (active?.storage?.feeModel) {
               active.storage.feeModel = { model: 'sat/kb', value: rate };
             } else {
@@ -844,11 +776,11 @@ if (isInServiceWorker) {
           return true;
         case 'GET_DEPOSIT_ADDRESSES': {
           startupInitPromise.then(() => {
-            if (!accountContext) {
+            if (!getLiveContext()) {
               sendResponse({ type: 'GET_DEPOSIT_ADDRESSES', success: false, error: 'Wallet not initialized' });
               return;
             }
-            const am = accountContext.syncContext.addressManager;
+            const am = requireLiveContext().syncContext.addressManager;
             const addresses = [];
             for (let i = 0; i <= am.getMaxKeyIndex(); i++) {
               const d = am.getAddressAtIndex(i);
@@ -870,14 +802,14 @@ if (isInServiceWorker) {
           (globalThis as any).__generatingAddress = true;
           startupInitPromise.then(async () => {
             try {
-              if (!accountContext) {
+              if (!getLiveContext()) {
                 sendResponse({ type: 'GENERATE_NEW_ADDRESS', success: false, error: 'Wallet not initialized' });
                 return;
               }
-              const am = accountContext.syncContext.addressManager;
+              const am = requireLiveContext().syncContext.addressManager;
               const newIndex = am.getMaxKeyIndex() + 1;
               const { derivations } = await deriveDepositAddresses.execute(
-                { wallet: accountContext.baseWallet, chain: 'main' },
+                { wallet: requireLiveContext().baseWallet, chain: 'main' },
                 { startIndex: newIndex, count: 1 },
               );
               const newDerivation = derivations[0];
@@ -1053,7 +985,7 @@ if (isInServiceWorker) {
 
   const processStorageGetInfo = async (sendResponse: CallbackResponse) => {
     try {
-      await ensureWallet();
+      await ensureWallet(true);
     } catch (err) {
       sendResponse({
         type: 'STORAGE_GET_INFO',
@@ -1062,11 +994,11 @@ if (isInServiceWorker) {
       });
       return;
     }
-    if (!accountContext) {
+    if (!getLiveContext()) {
       sendResponse({ type: 'STORAGE_GET_INFO', success: false, error: 'Wallet not initialized' });
       return;
     }
-    const { storage, remoteStorage } = accountContext;
+    const { storage, remoteStorage } = requireLiveContext();
     (async () => {
       try {
         const stores = storage.getStores();
@@ -1147,7 +1079,7 @@ if (isInServiceWorker) {
 
   const processStorageSyncBackups = async (sendResponse: CallbackResponse) => {
     try {
-      await ensureWallet();
+      await ensureWallet(true);
     } catch (err) {
       sendResponse({
         type: 'STORAGE_SYNC_BACKUPS',
@@ -1156,11 +1088,11 @@ if (isInServiceWorker) {
       });
       return;
     }
-    if (!accountContext) {
+    if (!getLiveContext()) {
       sendResponse({ type: 'STORAGE_SYNC_BACKUPS', success: false, error: 'Wallet not initialized' });
       return;
     }
-    accountContext.storage
+    requireLiveContext().storage
       .updateBackups()
       .then((log) => {
         sendResponse({ type: 'STORAGE_SYNC_BACKUPS', success: true, data: { log } });
@@ -1189,7 +1121,7 @@ if (isInServiceWorker) {
 
   const processStorageSetActiveStorage = async (target: 'local' | string, sendResponse: CallbackResponse) => {
     try {
-      await ensureWallet();
+      await ensureWallet(true);
     } catch (err) {
       sendResponse({
         type: 'STORAGE_SET_ACTIVE_STORAGE',
@@ -1198,7 +1130,7 @@ if (isInServiceWorker) {
       });
       return;
     }
-    if (!accountContext) {
+    if (!getLiveContext()) {
       sendResponse({
         type: 'STORAGE_SET_ACTIVE_STORAGE',
         success: false,
@@ -1207,7 +1139,7 @@ if (isInServiceWorker) {
       return;
     }
     try {
-      await accountContext.setActiveStorage(target);
+      await requireLiveContext().setActiveStorage(target);
       const nextConfig = await updateStorageConfig((current) => {
         if (target === 'local') {
           return { ...current, activeRemote: undefined, remotes: current.remotes ?? [] };
@@ -1232,7 +1164,7 @@ if (isInServiceWorker) {
 
   const processStorageAddRemote = async (url: string, sendResponse: CallbackResponse) => {
     try {
-      await ensureWallet();
+      await ensureWallet(true);
     } catch (err) {
       sendResponse({
         type: 'STORAGE_ADD_REMOTE',
@@ -1241,7 +1173,7 @@ if (isInServiceWorker) {
       });
       return;
     }
-    if (!accountContext) {
+    if (!getLiveContext()) {
       sendResponse({
         type: 'STORAGE_ADD_REMOTE',
         success: false,
@@ -1250,7 +1182,7 @@ if (isInServiceWorker) {
       return;
     }
     try {
-      await accountContext.addRemote(url);
+      await requireLiveContext().addRemote(url);
       const nextConfig = await updateStorageConfig((current) => {
         const remotes = current.remotes ?? [];
         return {
@@ -1310,7 +1242,7 @@ if (isInServiceWorker) {
 
   const processPermissionsListAll = async (sendResponse: CallbackResponse) => {
     try {
-      const wpm = (await ensureWallet()) as LocalWalletPermissionsManager;
+      const wpm = (await ensureWallet(true)) as LocalWalletPermissionsManager;
 
       const [protocols, baskets, spending, certificates] = await Promise.all([
         wpm.listProtocolPermissions({}),
@@ -1353,7 +1285,7 @@ if (isInServiceWorker) {
 
   const processPermissionsQuerySpent = async (message: { token: PermissionToken }, sendResponse: CallbackResponse) => {
     try {
-      const wpm = (await ensureWallet()) as LocalWalletPermissionsManager;
+      const wpm = (await ensureWallet(true)) as LocalWalletPermissionsManager;
       const satoshisSpent = await wpm.querySpentSince(message.token);
       sendResponse({ type: 'PERMISSIONS_QUERY_SPENT', success: true, data: { satoshisSpent } });
     } catch (error) {
@@ -1368,7 +1300,7 @@ if (isInServiceWorker) {
 
   const processPermissionsRevokeOne = async (message: { token: PermissionToken }, sendResponse: CallbackResponse) => {
     try {
-      const wpm = (await ensureWallet()) as LocalWalletPermissionsManager;
+      const wpm = (await ensureWallet(true)) as LocalWalletPermissionsManager;
       await wpm.revokePermission(message.token);
       sendResponse({ type: 'PERMISSIONS_REVOKE_ONE', success: true });
     } catch (error) {
@@ -1383,7 +1315,7 @@ if (isInServiceWorker) {
 
   const processPermissionsRevokeAll = async (message: { originator: string }, sendResponse: CallbackResponse) => {
     try {
-      const wpm = (await ensureWallet()) as LocalWalletPermissionsManager;
+      const wpm = (await ensureWallet(true)) as LocalWalletPermissionsManager;
       const revoked = await wpm.revokeAllForOriginator(message.originator);
       sendResponse({ type: 'PERMISSIONS_REVOKE_ALL', success: true, data: { revokedCount: revoked.length } });
     } catch (error) {
@@ -1410,7 +1342,7 @@ if (isInServiceWorker) {
     if (response.granted) {
       // Grant the permission through the manager
       // expiry defaults to 0 (never expires), ephemeral defaults to false (persist on-chain)
-      accountContext?.wallet
+      getLiveWallet()
         .grantPermission({
           requestID: response.requestID,
           expiry: response.expiry,
@@ -1423,7 +1355,7 @@ if (isInServiceWorker) {
         });
     } else {
       // Deny the permission
-      accountContext?.wallet
+      getLiveWallet()
         .denyPermission(response.requestID)
         .then(() => {
           pending.reject(new Error('Permission denied by user'));
@@ -1452,7 +1384,7 @@ if (isInServiceWorker) {
     pendingGroupedPermissionRequests.delete(response.requestID);
 
     if (response.granted) {
-      accountContext?.wallet
+      getLiveWallet()
         .grantGroupedPermission({
           requestID: response.requestID,
           granted: response.granted,
@@ -1465,7 +1397,7 @@ if (isInServiceWorker) {
           pending.reject(error);
         });
     } else {
-      accountContext?.wallet
+      getLiveWallet()
         .denyGroupedPermission(response.requestID)
         .then(() => {
           pending.reject(new Error('Grouped permission denied by user'));
@@ -1494,7 +1426,7 @@ if (isInServiceWorker) {
     pendingCounterpartyPermissionRequests.delete(response.requestID);
 
     if (response.granted) {
-      accountContext?.wallet
+      getLiveWallet()
         .grantCounterpartyPermission({
           requestID: response.requestID,
           granted: response.granted,
@@ -1507,7 +1439,7 @@ if (isInServiceWorker) {
           pending.reject(error);
         });
     } else {
-      accountContext?.wallet
+      getLiveWallet()
         .denyCounterpartyPermission(response.requestID)
         .then(() => {
           pending.reject(new Error('Counterparty permission denied by user'));
@@ -1525,40 +1457,38 @@ if (isInServiceWorker) {
   // YOURS-SPECIFIC HANDLERS ********************************
 
   const processGetBalanceRequest = async (sendResponse: CallbackResponse) => {
+    // Extension-internal only (see noAuthRequired). Never launch/wait on unlock
+    // popup — that hangs the UI forever when the wallet is locked or reiniting.
+    const t0 = Date.now();
+    console.log(`[lifecycle] getBalance START live=${!!getLiveContext()}`);
     try {
-      await ensureWallet();
+      const e0 = Date.now();
+      await ensureWallet(true);
+      console.log(`[lifecycle] getBalance ensureWallet ${Date.now() - e0}ms live=${!!getLiveContext()}`);
+      if (!getLiveContext()) {
+        sendResponse({
+          type: YoursEventName.GET_BALANCE,
+          success: false,
+          error: 'Wallet not initialized',
+        });
+        return;
+      }
+      const b0 = Date.now();
+      const satoshis = await requireLiveContext().baseWallet.balance();
+      console.log(`[lifecycle] getBalance balance() ${Date.now() - b0}ms total=${Date.now() - t0}ms sats=${satoshis}`);
+      sendResponse({
+        type: YoursEventName.GET_BALANCE,
+        success: true,
+        data: satoshis,
+      });
     } catch (err) {
+      console.error(`[lifecycle] getBalance FAIL after ${Date.now() - t0}ms:`, err);
       sendResponse({
         type: YoursEventName.GET_BALANCE,
         success: false,
         error: err instanceof Error ? err.message : 'Wallet not available',
       });
-      return;
     }
-    if (!accountContext) {
-      sendResponse({
-        type: YoursEventName.GET_BALANCE,
-        success: false,
-        error: 'Wallet not initialized',
-      });
-      return;
-    }
-    accountContext.baseWallet
-      .balance()
-      .then((satoshis) => {
-        sendResponse({
-          type: YoursEventName.GET_BALANCE,
-          success: true,
-          data: satoshis,
-        });
-      })
-      .catch((error) => {
-        sendResponse({
-          type: YoursEventName.GET_BALANCE,
-          success: false,
-          error: error instanceof Error ? error.message : JSON.stringify(error),
-        });
-      });
   };
 
   const processGetPubKeysRequest = (sendResponse: CallbackResponse) => {
@@ -1601,34 +1531,32 @@ if (isInServiceWorker) {
     }
   };
 
-  const processGetReceiveAddressRequest = (sendResponse: CallbackResponse) => {
-    // Wait for startup initialization to complete before checking accountContext
-    startupInitPromise.then(() => {
-      try {
-        if (!accountContext) {
-          sendResponse({
-            type: YoursEventName.GET_RECEIVE_ADDRESS,
-            success: false,
-            error: 'Wallet not initialized',
-          });
-          return;
-        }
-        // Prefer the user's selected primaryAddress from storage; fall back to index 0.
-        const { account } = chromeStorageService.getCurrentAccountObject();
-        const address = account?.primaryAddress ?? accountContext.syncContext.addressManager.getPrimaryAddress();
-        sendResponse({
-          type: YoursEventName.GET_RECEIVE_ADDRESS,
-          success: true,
-          data: address,
-        });
-      } catch (error) {
+  const processGetReceiveAddressRequest = async (sendResponse: CallbackResponse) => {
+    try {
+      // Wait for startup and any unlock/account-switch rebuild (no unlock popup).
+      await ensureWallet(true);
+      if (!getLiveContext()) {
         sendResponse({
           type: YoursEventName.GET_RECEIVE_ADDRESS,
           success: false,
-          error: error instanceof Error ? error.message : JSON.stringify(error),
+          error: 'Wallet not initialized',
         });
+        return;
       }
-    });
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      const address = account?.primaryAddress ?? requireLiveContext().syncContext.addressManager.getPrimaryAddress();
+      sendResponse({
+        type: YoursEventName.GET_RECEIVE_ADDRESS,
+        success: true,
+        data: address,
+      });
+    } catch (error) {
+      sendResponse({
+        type: YoursEventName.GET_RECEIVE_ADDRESS,
+        success: false,
+        error: error instanceof Error ? error.message : JSON.stringify(error),
+      });
+    }
   };
 
   const processGetSocialProfileRequest = (sendResponse: CallbackResponse) => {
@@ -1657,11 +1585,9 @@ if (isInServiceWorker) {
 
   const processMasterBackup = async (sendResponse: CallbackResponse) => {
     try {
-      // Service worker may have slept — ensure the wallet is (re)initialized before
-      // accessing accountContext. ensureWallet() silently re-initializes if the wallet
-      // is unlocked, or launches the unlock popup if it isn't.
+      // Extension-internal: wait for live wallet, never open a second unlock popup.
       try {
-        await ensureWallet();
+        await ensureWallet(true);
       } catch (err) {
         sendResponse({
           type: 'MASTER_BACKUP',
@@ -1671,7 +1597,7 @@ if (isInServiceWorker) {
         return;
       }
 
-      if (!accountContext) {
+      if (!getLiveContext()) {
         sendResponse({
           type: 'MASTER_BACKUP',
           success: false,
@@ -1702,7 +1628,7 @@ if (isInServiceWorker) {
       // Cast through `unknown` because WalletBackupService imports its WalletStorageManager
       // type from `@bsv/wallet-toolbox-mobile` while AccountContext uses `@bsv/wallet-toolbox`.
       // They're the same shape at runtime but TypeScript sees two distinct types.
-      const storage = accountContext.storage as unknown as Parameters<typeof WalletBackupService.exportAllAccounts>[0];
+      const storage = requireLiveContext().storage as unknown as Parameters<typeof WalletBackupService.exportAllAccounts>[0];
       if (!storage) {
         sendResponse({
           type: 'MASTER_BACKUP',
@@ -1833,7 +1759,7 @@ if (isInServiceWorker) {
       // For v1/v2 this also triggers Phase 2 import of pending wallet data.
       // For legacy this creates a fresh wallet-toolbox storage that syncs from remote.
       console.log('[MasterRestore] Initializing wallet...');
-      const wallet = await initializeWallet();
+      const wallet = await bringWalletLive();
       console.log('[MasterRestore] Wallet initialized:', !!wallet);
 
       sendResponse({
@@ -2532,21 +2458,21 @@ if (isInServiceWorker) {
     if (closedWindowId === popupWindowId) {
       // Deny any pending permission requests when popup is closed
       for (const [requestID, pending] of pendingPermissionRequests) {
-        accountContext?.wallet.denyPermission(requestID).catch(console.error);
+        getLiveWallet().denyPermission(requestID).catch(console.error);
         pending.reject(new Error('User dismissed the request'));
       }
       pendingPermissionRequests.clear();
       chromeStorageService.remove('permissionRequest');
 
       for (const [requestID, pending] of pendingGroupedPermissionRequests) {
-        accountContext?.wallet.denyGroupedPermission(requestID).catch(console.error);
+        getLiveWallet().denyGroupedPermission(requestID).catch(console.error);
         pending.reject(new Error('User dismissed the request'));
       }
       pendingGroupedPermissionRequests.clear();
       chromeStorageService.remove('groupedPermissionRequest');
 
       for (const [requestID, pending] of pendingCounterpartyPermissionRequests) {
-        accountContext?.wallet.denyCounterpartyPermission(requestID).catch(console.error);
+        getLiveWallet().denyCounterpartyPermission(requestID).catch(console.error);
         pending.reject(new Error('User dismissed the request'));
       }
       pendingCounterpartyPermissionRequests.clear();
