@@ -1,0 +1,21 @@
+{
+  "name": "yours-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless BRC-100 HTTP + MCP sidecar for Yours Wallet",
+  "scripts": {
+    "init": "bun src/cli.ts init",
+    "daemon": "bun src/cli.ts daemon",
+    "mcp": "bun src/cli.ts mcp",
+    "test": "bun test src",
+    "smoke": "bun src/smoke.ts"
+  },
+  "dependencies": {
+    "@1sat/actions": "0.0.196",
+    "@1sat/wallet-node": "0.0.70",
+    "@bsv/sdk": "^2.2.0",
+    "@bsv/wallet-toolbox": "npm:@bopen-io/wallet-toolbox@2.6.2-brc153.5",
+    "bitcoin-backup": "^0.0.11"
+  }
+}

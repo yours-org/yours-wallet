@@ -1,0 +1,6 @@
+{
+  "originators": ["yours-agent://mcp", "http://localhost", "http://127.0.0.1"],
+  "maxSatsPerAction": 10000,
+  "maxSatsPerHour": 50000,
+  "maxSatsPerDay": 200000
+}

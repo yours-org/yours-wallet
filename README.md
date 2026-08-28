@@ -8,6 +8,14 @@
 
 Open-source, non-custodial BSV wallet built on BRC-100. Chrome extension with multi-device sync, on-chain identity, and ordinal support.
 
+This fork adds **yours-agent**: a headless BRC-100 HTTP + MCP sidecar so LLM agents can use the wallet without clicking extension popups. See [agent/README.md](agent/README.md).
+
+```bash
+YOURS_AGENT_PASSWORD='…' bun run agent:init -- --generate
+YOURS_AGENT_PASSWORD='…' bun run agent:daemon   # http://127.0.0.1:3321
+YOURS_AGENT_PASSWORD='…' bun run agent:mcp      # Cursor MCP stdio
+```
+
 ## What It Does
 
 Yours Wallet manages BSV, 1Sat Ordinals, BSV-21 tokens, and MNEE stablecoins from a single Chrome extension. It uses the BRC-100 wallet standard for transaction management, which means your wallet tracks both your keys and your transaction history to locate assets on-chain.

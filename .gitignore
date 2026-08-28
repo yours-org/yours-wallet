@@ -36,3 +36,8 @@ scripts/.build-meta.json
 .puppeteer-profile-clean/
 .debug-wallet.json
 .debug-session.log
+
+# yours-agent sidecar
+agent/node_modules/
+agent/*.db
+agent/wallet-*.db

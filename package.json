@@ -50,10 +50,15 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsx scripts/build.ts",
+    "build": "NODE_OPTIONS='--max-old-space-size=8192' bun scripts/build.ts",
     "preview": "vite preview",
     "format": "prettier --write .",
-    "debug:ext": "tsx scripts/debug-extension.ts"
+    "debug:ext": "tsx scripts/debug-extension.ts",
+    "agent:init": "bun agent/src/cli.ts init",
+    "agent:daemon": "bun agent/src/cli.ts daemon",
+    "agent:mcp": "bun agent/src/cli.ts mcp",
+    "agent:test": "bun test agent/src",
+    "agent:smoke": "bun agent/src/smoke.ts"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.1",
