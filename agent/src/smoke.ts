@@ -33,7 +33,21 @@ async function main(): Promise<void> {
   resetRuntime();
 
   const runtime = await getRuntime();
-  const caller = (method: string, args: unknown, originator: string) => runtime.call(method, args, originator);
+  const caller = async (method: string, args: unknown, originator: string) => {
+    if (method === 'signMessage' || method === 'signBsm') {
+      const message = String((args as { message?: string })?.message ?? '');
+      return runtime.signMessage(message, originator);
+    }
+    if (method === 'syncAddresses') {
+      const body = (args ?? {}) as { prefix?: string; count?: number; force?: boolean };
+      return runtime.syncDeposits({
+        prefix: body.prefix,
+        count: body.count,
+        force: body.force === true,
+      });
+    }
+    return runtime.call(method, args, originator);
+  };
 
   const versionRes = await handleWalletRequest(new Request('http://127.0.0.1:3321/getVersion', { method: 'POST', body: '{}' }), caller);
   const networkRes = await handleWalletRequest(new Request('http://127.0.0.1:3321/getNetwork', { method: 'GET' }), caller);
@@ -97,6 +111,34 @@ async function main(): Promise<void> {
     throw new Error(`get_budget missing caps: ${budgetText}`);
   }
 
+  const signMsg = (await dispatchMcp({
+    jsonrpc: '2.0',
+    id: 12,
+    method: 'tools/call',
+    params: { name: 'sign_message', arguments: { message: 'aibounties-auth-v1:smoke-challenge' } },
+  })) as { result?: { isError?: boolean; content?: Array<{ text: string }> } };
+  if (signMsg.result?.isError) {
+    throw new Error(`sign_message failed: ${signMsg.result.content?.[0]?.text}`);
+  }
+  const signText = signMsg.result?.content?.[0]?.text ?? '';
+  if (!signText.includes('signature') || !signText.includes('publicKey')) {
+    throw new Error(`sign_message missing fields: ${signText}`);
+  }
+  if (/[5KL][1-9A-HJ-NP-Za-km-z]{50,52}/.test(signText) || signText.includes('smoke-test-password')) {
+    throw new Error('sign_message leaked a secret');
+  }
+
+  const syncHttp = await handleWalletRequest(
+    new Request('http://127.0.0.1:3321/syncAddresses', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Originator: 'yours-agent://mcp' },
+      body: JSON.stringify({ force: true, count: 1 }),
+    }),
+    caller,
+  );
+  // sync may fail offline; surface only hard routing failures
+  if (syncHttp.status === 404) throw new Error('syncAddresses route missing');
+
   const infoMsg = (await dispatchMcp({
     jsonrpc: '2.0',
     id: 11,
@@ -117,7 +159,7 @@ async function main(): Promise<void> {
   await runtime.close();
   console.error('[yours-agent] smoke ok');
   console.error(
-    `[yours-agent] getVersion=${versionRes.status} getNetwork=${networkRes.status} listOutputs=${outputsRes.status} createActionCap=${capRes.status} mcp=ok`,
+    `[yours-agent] getVersion=${versionRes.status} getNetwork=${networkRes.status} listOutputs=${outputsRes.status} createActionCap=${capRes.status} signMessage=ok syncAddresses=${syncHttp.status} mcp=ok`,
   );
 }
 

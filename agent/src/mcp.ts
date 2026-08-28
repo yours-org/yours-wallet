@@ -23,17 +23,24 @@ const tools: Array<{
 }> = [
   {
     name: 'wallet_info',
-    description: 'Show chain, deposit address, identity key, balance (sats), and UTXO count.',
+    description:
+      'Show chain, 1sat deposit address, identity key, balance (sats), and UTXO count. Syncs inbound deposits first.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     handler: async () => (await getRuntime()).walletInfo(),
   },
   {
     name: 'balance',
-    description: 'Return spendable BSV balance in satoshis from the default basket.',
+    description:
+      'Return BSV balance in satoshis (funding + unswept deposit baskets). Syncs inbound deposits first.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     handler: async () => {
       const info = await (await getRuntime()).walletInfo();
-      return { satoshis: info.balance, utxos: info.utxos };
+      return {
+        satoshis: info.balance,
+        fundingBalance: info.fundingBalance,
+        depositBalance: info.depositBalance,
+        utxos: info.utxos,
+      };
     },
   },
   {
@@ -46,8 +53,50 @@ const tools: Array<{
     },
   },
   {
+    name: 'sign_message',
+    description:
+      'Bitcoin Signed Message (compact base64) with the identity private key. Use for AI Bounties login: sign the server `message` (usually aibounties-auth-v1:${challenge}), then POST signature + identityKey. Does NOT use BRC-100 createSignature — derived-key signatures will not verify against the identity pubkey.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          description: 'Exact UTF-8 string to sign (pass the challenge message as returned by the API, do not pre-hash)',
+        },
+      },
+      required: ['message'],
+      additionalProperties: false,
+    },
+    handler: async (args) => {
+      const message = String(args.message ?? '');
+      if (!message) throw new Error('message is required');
+      return (await getRuntime()).signMessage(message);
+    },
+  },
+  {
+    name: 'sync_addresses',
+    description:
+      'Sync inbound payments to the 1sat deposit address(es) via the indexer (internalizeBeef + optional deposit sweep into the default funding basket). Call when list_outputs / balance look stale after a receive.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prefix: { type: 'string', default: '1sat', description: 'KeyID prefix (default 1sat)' },
+        count: { type: 'integer', default: 1, description: 'Number of addresses to scan' },
+        force: { type: 'boolean', default: false, description: 'Bypass sync throttle' },
+      },
+      additionalProperties: false,
+    },
+    handler: async (args) =>
+      (await getRuntime()).syncDeposits({
+        prefix: args.prefix !== undefined ? String(args.prefix) : undefined,
+        count: args.count !== undefined ? Number(args.count) : undefined,
+        force: args.force === true,
+      }),
+  },
+  {
     name: 'send_bsv',
-    description: 'Send satoshis to a Bitcoin address. Subject to spend caps in ~/.yours-agent/policy.json.',
+    description:
+      'Send satoshis to a Bitcoin address. Subject to spend caps in ~/.yours-agent/policy.json (defaults 10k/action — raise maxSatsPerAction there for larger payouts; MCP cannot change policy).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -67,18 +116,28 @@ const tools: Array<{
   },
   {
     name: 'list_outputs',
-    description: 'List wallet outputs in a BRC-100 basket (default: default).',
+    description:
+      'List wallet outputs in a BRC-100 basket. Default basket is funding ("default"). Fresh 1sat P2PKH deposits land in "1sat-deposit" until swept; call sync_addresses or wallet_info first after a receive.',
     inputSchema: {
       type: 'object',
       properties: {
         basket: { type: 'string', default: 'default' },
         limit: { type: 'integer', default: 20 },
         tags: { type: 'array', items: { type: 'string' } },
+        sync: {
+          type: 'boolean',
+          default: true,
+          description: 'Run deposit sync before listing (default true)',
+        },
       },
       additionalProperties: false,
     },
-    handler: async (args) =>
-      (await getRuntime()).call(
+    handler: async (args) => {
+      const runtime = await getRuntime();
+      if (args.sync !== false) {
+        await runtime.syncDeposits().catch(() => undefined);
+      }
+      return runtime.call(
         'listOutputs',
         {
           basket: String(args.basket ?? 'default'),
@@ -87,7 +146,8 @@ const tools: Array<{
           include: 'locking scripts',
         },
         MCP_ORIGINATOR,
-      ),
+      );
+    },
   },
   {
     name: 'list_actions',

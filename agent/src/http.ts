@@ -1,4 +1,4 @@
-import { WALLET_METHODS } from './constants';
+import { AGENT_HTTP_METHODS, WALLET_METHODS } from './constants';
 import { AgentError, isAgentError } from './errors';
 import { logError, redact } from './redact';
 import { getRuntime } from './runtime';
@@ -20,6 +20,25 @@ async function readArgs(req: Request): Promise<unknown> {
   }
 }
 
+/** Agent-specific HTTP methods (identity BSM, deposit sync) — not BRC-100 WalletInterface. */
+async function handleAgentMethod(method: string, args: unknown, originator: string): Promise<unknown> {
+  const runtime = await getRuntime();
+  const body = (args ?? {}) as Record<string, unknown>;
+  if (method === 'signMessage' || method === 'signBsm') {
+    const message = String(body.message ?? '');
+    if (!message) throw new AgentError('ERR_JSON', 'message is required', {}, 400);
+    return runtime.signMessage(message, originator);
+  }
+  if (method === 'syncAddresses') {
+    return runtime.syncDeposits({
+      prefix: body.prefix !== undefined ? String(body.prefix) : undefined,
+      count: body.count !== undefined ? Number(body.count) : undefined,
+      force: body.force === true,
+    });
+  }
+  throw new AgentError('ERR_METHOD', `Unknown agent method: ${method}`, { method }, 404);
+}
+
 export async function handleWalletRequest(req: Request, caller?: WalletCaller): Promise<Response> {
   const url = new URL(req.url);
   if (url.pathname === '/' || url.pathname === '/health') {
@@ -27,8 +46,10 @@ export async function handleWalletRequest(req: Request, caller?: WalletCaller): 
   }
 
   const method = url.pathname.replace(/^\//, '');
-  if (!WALLET_METHODS.includes(method as (typeof WALLET_METHODS)[number])) {
-    return errorResponse(new AgentError('ERR_METHOD', `Unknown BRC-100 method: ${method}`, { method }, 404));
+  const isWallet = WALLET_METHODS.includes(method as (typeof WALLET_METHODS)[number]);
+  const isAgent = (AGENT_HTTP_METHODS as readonly string[]).includes(method);
+  if (!isWallet && !isAgent) {
+    return errorResponse(new AgentError('ERR_METHOD', `Unknown method: ${method}`, { method }, 404));
   }
 
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -37,6 +58,16 @@ export async function handleWalletRequest(req: Request, caller?: WalletCaller): 
 
   try {
     const args = await readArgs(req);
+    if (isAgent) {
+      // Prefer injected caller for tests that stub agent methods the same way.
+      if (typeof caller === 'function') {
+        const result = await caller(method, args, originatorFrom(req));
+        return json(result ?? {});
+      }
+      const result = await handleAgentMethod(method, args, originatorFrom(req));
+      return json(result ?? {});
+    }
+
     // Bun.serve's fetch is (req, server) — ignore a non-function second arg.
     const call =
       typeof caller === 'function'

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { WALLET_METHODS } from './constants';
+import { AGENT_HTTP_METHODS, WALLET_METHODS } from './constants';
 import { AgentError } from './errors';
 
 describe('BRC-100 method table', () => {
@@ -7,6 +7,12 @@ describe('BRC-100 method table', () => {
     for (const method of ['createAction', 'listOutputs', 'getVersion', 'getNetwork', 'isAuthenticated', 'getPublicKey']) {
       expect(WALLET_METHODS).toContain(method);
     }
+  });
+
+  test('agent HTTP extras cover identity BSM and deposit sync', () => {
+    expect(AGENT_HTTP_METHODS).toContain('signMessage');
+    expect(AGENT_HTTP_METHODS).toContain('syncAddresses');
+    expect(WALLET_METHODS).not.toContain('signMessage');
   });
 });
 

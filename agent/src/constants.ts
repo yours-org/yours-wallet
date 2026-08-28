@@ -44,4 +44,10 @@ export const WALLET_METHODS = [
 
 export type WalletMethod = (typeof WALLET_METHODS)[number];
 
+/**
+ * Agent HTTP extras (not BRC-100 WalletInterface).
+ * Identity BSM is different from createSignature (which uses derived protocol keys).
+ */
+export const AGENT_HTTP_METHODS = ['signMessage', 'signBsm', 'syncAddresses'] as const;
+
 export const SPEND_METHODS = new Set<string>(['createAction']);

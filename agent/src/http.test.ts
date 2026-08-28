@@ -79,4 +79,47 @@ describe('HTTP JSON substrate', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ totalOutputs: 0, outputs: [] });
   });
+
+  test('POST /signMessage returns identity BSM compact base64 via caller', async () => {
+    const caller = async (method: string, args: unknown) => {
+      expect(method).toBe('signMessage');
+      expect((args as { message: string }).message).toBe('aibounties-auth-v1:chal');
+      return {
+        signature: 'fakeCompactBase64Signature==',
+        publicKey: '02' + 'ab'.repeat(32),
+        address: '1Fake',
+        message: 'aibounties-auth-v1:chal',
+      };
+    };
+    const res = await handleWalletRequest(
+      new Request('http://127.0.0.1:3321/signMessage', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', Originator: 'yours-agent://mcp' },
+        body: JSON.stringify({ message: 'aibounties-auth-v1:chal' }),
+      }),
+      caller,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { signature: string; publicKey: string };
+    expect(body.signature).toContain('fakeCompact');
+    expect(body.publicKey.startsWith('02')).toBe(true);
+    expect(JSON.stringify(body)).not.toMatch(/PASSWORD|PRIVATE_KEY_WIF|[5KL][1-9A-HJ-NP-Za-km-z]{50,52}/);
+  });
+
+  test('POST /syncAddresses is routed', async () => {
+    const res = await handleWalletRequest(
+      new Request('http://127.0.0.1:3321/syncAddresses', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', Originator: 'http://localhost' },
+        body: JSON.stringify({ force: true }),
+      }),
+      async (method, args) => {
+        expect(method).toBe('syncAddresses');
+        expect((args as { force: boolean }).force).toBe(true);
+        return { skipped: false, processed: 0, failed: 0, lastScore: 0, addresses: [] };
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ processed: 0 });
+  });
 });

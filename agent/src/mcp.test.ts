@@ -18,6 +18,13 @@ describe('MCP stdio protocol', () => {
     expect(names).toContain('wallet_info');
     expect(names).toContain('get_budget');
     expect(names).toContain('create_action');
+    expect(names).toContain('sign_message');
+    expect(names).toContain('sync_addresses');
+    const signTool = listed.result.tools.find((t) => t.name === 'sign_message') as {
+      description: string;
+    };
+    expect(signTool.description.toLowerCase()).toContain('identity');
+    expect(signTool.description).toMatch(/aibounties|BSM|createSignature/i);
   });
 
   test('extracts LSP Content-Length frames and NDJSON', () => {
