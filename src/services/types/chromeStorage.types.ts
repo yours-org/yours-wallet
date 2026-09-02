@@ -7,20 +7,10 @@ import {
   TaggedDerivationResponse,
   Broadcast,
   SocialProfile,
-  SendMNEE,
   MNEEBalance,
 } from './provider.types';
-import type {
-  PermissionRequest,
-  GroupedPermissionRequest,
-  CounterpartyPermissionRequest,
-} from '@bsv/wallet-toolbox-client';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
-import type { ApprovalContext } from '../../yoursApi';
-import type { OneSatPromptStorageEntry } from '../oneSatPrompt';
-
-export type OneSatPermissionRequestEntry = OneSatPromptStorageEntry;
 
 export type Settings = {
   socialProfile: SocialProfile;
@@ -108,27 +98,12 @@ export interface ChromeStorageObject {
    */
   storageIdentityKey?: string;
   showWelcome?: boolean;
-  sendMNEERequest?: SendMNEE[];
   broadcastRequest?: Broadcast;
-  // Permission requests from WalletPermissionsManager
-  permissionRequest?: PermissionRequest & { requestID: string };
-  groupedPermissionRequest?: GroupedPermissionRequest;
-  counterpartyPermissionRequest?: CounterpartyPermissionRequest;
-  // 1Sat permission module prompt (createAction or standalone signature)
-  oneSatPermissionRequest?: OneSatPermissionRequestEntry;
-  // Transaction approval request from YoursApi
-  transactionApprovalRequest?: ApprovalContext;
 }
 
-export type CurrentAccountObject = Omit<
-  ChromeStorageObject,
-  | 'accounts'
-  | 'popupWindowId'
-  | 'sendMNEERequest'
-  | 'broadcastRequest'
-  | 'permissionRequest'
-  | 'transactionApprovalRequest'
-> & { account: Account };
+export type CurrentAccountObject = Omit<ChromeStorageObject, 'accounts' | 'popupWindowId' | 'broadcastRequest'> & {
+  account: Account;
+};
 
 type AppState = {
   addresses: Addresses;

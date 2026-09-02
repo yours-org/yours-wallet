@@ -16,36 +16,18 @@ import { OrdWallet } from './pages/OrdWallet';
 import { Settings } from './pages/Settings';
 import { PageLoader } from './components/PageLoader';
 import { useServiceContext } from './hooks/useServiceContext';
-import { useWeb3RequestContext } from './hooks/useWeb3RequestContext';
 import { SyncingBlocks } from './components/SyncingBlocks';
 import { MasterRestore } from './pages/onboarding/MasterRestore';
 import { BlockHeightProvider } from './contexts/providers/BlockHeightProvider';
 import { SyncProvider } from './contexts/providers/SyncProvider';
 import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
 import { SnackbarProvider } from './contexts/providers/SnackbarProvider';
-import { MNEESendRequest } from './pages/requests/MNEESendRequest';
-import { PermissionRequestPage } from './pages/requests/PermissionRequest';
-import { GroupedPermissionRequestPage } from './pages/requests/GroupedPermissionRequest';
-import { CounterpartyPermissionRequestPage } from './pages/requests/CounterpartyPermissionRequest';
-import { OneSatPermissionRequestPage } from './pages/requests/OneSatPermissionRequest';
-import { TransactionApprovalRequest } from './pages/requests/TransactionApprovalRequest';
 import { SweepMigration } from './pages/SweepMigration';
 
 export const App = () => {
   const { theme } = useTheme();
   const { isLocked, isReady, chromeStorageService, setIsLocked, isSwitchingAccount } = useServiceContext();
   const menuContext = useContext(BottomMenuContext);
-  const {
-    sendMNEERequest,
-    permissionRequest,
-    groupedPermissionRequest,
-    counterpartyPermissionRequest,
-    transactionApprovalRequest,
-    oneSatPermissionRequest,
-    clearRequest,
-    popupId,
-    getStorageAndSetRequestState,
-  } = useWeb3RequestContext();
 
   const walletBg = theme.color.global.walletBackground;
 
@@ -57,11 +39,6 @@ export const App = () => {
     const port = chrome.runtime.connect({ name: 'extension-popup' });
     return () => port.disconnect();
   }, []);
-
-  useEffect(() => {
-    isReady && getStorageAndSetRequestState(chromeStorageService);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady]);
 
   const handleUnlock = async () => {
     setIsLocked(false);
@@ -123,69 +100,7 @@ export const App = () => {
                         />
                         <Route path="/master-restore" element={<MasterRestore />} />
                         <Route path="/sweep" element={<SweepMigration />} />
-                        <Route
-                          path="/bsv-wallet"
-                          element={
-                            <Show
-                              when={
-                                !sendMNEERequest &&
-                                !groupedPermissionRequest &&
-                                !counterpartyPermissionRequest &&
-                                !permissionRequest &&
-                                !transactionApprovalRequest &&
-                                !oneSatPermissionRequest
-                              }
-                              whenFalseContent={
-                                <>
-                                  <Show when={!!sendMNEERequest}>
-                                    <MNEESendRequest
-                                      request={sendMNEERequest!}
-                                      onResponse={() => clearRequest('sendMNEERequest')}
-                                      popupId={popupId}
-                                    />
-                                  </Show>
-                                  <Show when={!!groupedPermissionRequest}>
-                                    <GroupedPermissionRequestPage
-                                      request={groupedPermissionRequest!}
-                                      onResponse={() => clearRequest('groupedPermissionRequest')}
-                                      popupId={popupId}
-                                    />
-                                  </Show>
-                                  <Show when={!!counterpartyPermissionRequest}>
-                                    <CounterpartyPermissionRequestPage
-                                      request={counterpartyPermissionRequest!}
-                                      onResponse={() => clearRequest('counterpartyPermissionRequest')}
-                                      popupId={popupId}
-                                    />
-                                  </Show>
-                                  <Show when={!!permissionRequest}>
-                                    <PermissionRequestPage
-                                      request={permissionRequest!}
-                                      onResponse={() => clearRequest('permissionRequest')}
-                                      popupId={popupId}
-                                    />
-                                  </Show>
-                                  <Show when={!!transactionApprovalRequest}>
-                                    <TransactionApprovalRequest
-                                      request={transactionApprovalRequest!}
-                                      onResponse={() => clearRequest('transactionApprovalRequest')}
-                                      popupId={popupId}
-                                    />
-                                  </Show>
-                                  <Show when={!!oneSatPermissionRequest}>
-                                    <OneSatPermissionRequestPage
-                                      request={oneSatPermissionRequest!}
-                                      onResponse={() => clearRequest('oneSatPermissionRequest')}
-                                      popupId={popupId}
-                                    />
-                                  </Show>
-                                </>
-                              }
-                            >
-                              <BsvWallet />
-                            </Show>
-                          }
-                        />
+                        <Route path="/bsv-wallet" element={<BsvWallet />} />
                         <Route path="/ord-wallet" element={<OrdWallet />} />
                         <Route path="/tools" element={<AppsAndTools />} />
                         <Route path="/settings" element={<Settings />} />

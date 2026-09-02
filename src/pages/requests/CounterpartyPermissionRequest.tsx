@@ -5,7 +5,7 @@ import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
+import { sendMessage } from '../../utils/chromeHelpers';
 import type {
   CounterpartyPermissionRequest as CounterpartyPermissionRequestType,
   CounterpartyPermissions,
@@ -13,12 +13,11 @@ import type {
 
 export type CounterpartyPermissionRequestProps = {
   request: CounterpartyPermissionRequestType;
-  popupId: number | undefined;
   onResponse: () => void;
 };
 
 export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionRequestProps) => {
-  const { request, onResponse, popupId } = props;
+  const { request, onResponse } = props;
   const { theme } = useTheme();
   const { handleSelect, hideMenu } = useBottomMenu();
   const { addSnackbar } = useSnackbar();
@@ -47,7 +46,6 @@ export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionR
         granted: buildGranted(),
       });
       onResponse();
-      window.close();
     } catch (error) {
       addSnackbar(error instanceof Error ? error.message : String(error), 'error');
       setIsProcessing(false);
@@ -62,17 +60,6 @@ export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionR
       granted: null,
     });
     onResponse();
-    window.close();
-  };
-
-  const handleCancel = async () => {
-    sendMessage({
-      action: 'COUNTERPARTY_PERMISSION_RESPONSE',
-      requestID: request.requestID,
-      granted: null,
-    });
-    if (popupId) removeWindow(popupId);
-    window.location.reload();
   };
 
   const toggleProtocol = (i: number) => setProtocolChecked((prev) => prev.map((v, j) => (j === i ? !v : v)));

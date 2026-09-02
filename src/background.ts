@@ -39,7 +39,13 @@ import { deriveDepositAddresses } from '@1sat/actions';
 import { removeWindow } from './utils/chromeHelpers';
 import { Account, ChromeStorageObject, StorageConfig } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { handleOneSatPermissionResponse, initOneSatPromptBridge } from './services/oneSatPrompt';
+import {
+  denyAllOneSatPrompts,
+  getPendingOneSatPrompt,
+  handleOneSatPermissionResponse,
+  initOneSatPromptBridge,
+} from './services/oneSatPrompt';
+import type { PromptKind } from './promptProtocol';
 import { initWallet, openAccountStorageForBackup, type AccountContext } from './initWallet';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
@@ -185,6 +191,17 @@ const startupInitPromise = chromeStorageService
     }
     await chrome.storage.local.remove('popupWindowId');
 
+    // One-time migration: prompts now live in memory + prompt.html windows,
+    // so drop request entries persisted by older versions.
+    await chrome.storage.local.remove([
+      'permissionRequest',
+      'groupedPermissionRequest',
+      'counterpartyPermissionRequest',
+      'oneSatPermissionRequest',
+      'transactionApprovalRequest',
+      'sendMNEERequest',
+    ]);
+
     // Only initialize wallet if it's within the active session window.
     // If locked (inactive or manual lock), keys stay encrypted until the user unlocks.
     await chromeStorageService.getAndSetStorage();
@@ -261,7 +278,7 @@ const ensureWallet = async (suppressPopup = false): Promise<WalletInterface> => 
   return new Promise((resolve, reject) => {
     pendingWalletWaiters.push({ resolve, reject });
     if (pendingWalletWaiters.length === 1) {
-      launchPopUp();
+      showUnlockUi();
     }
   });
 };
@@ -309,23 +326,11 @@ let popupWindowId: number | undefined;
 // In-flight dApp CWI requests that may have opened (or reused) the floating popup.
 let inFlightDappRequests = 0;
 
-const DAPP_UI_STORAGE_KEYS = [
-  'permissionRequest',
-  'groupedPermissionRequest',
-  'counterpartyPermissionRequest',
-  'oneSatPermissionRequest',
-  'transactionApprovalRequest',
-  'sendMNEERequest',
-] as const;
-
-const hasQueuedDappUi = async (): Promise<boolean> => {
-  if (pendingPermissionRequests.size > 0) return true;
-  if (pendingGroupedPermissionRequests.size > 0) return true;
-  if (pendingCounterpartyPermissionRequests.size > 0) return true;
-  const storage = await chromeStorageService.getAndSetStorage();
-  const s = storage as Record<string, unknown>;
-  return DAPP_UI_STORAGE_KEYS.some((key) => !!s[key]);
-};
+const hasQueuedDappUi = (): boolean =>
+  pendingPermissionRequests.size > 0 ||
+  pendingGroupedPermissionRequests.size > 0 ||
+  pendingCounterpartyPermissionRequests.size > 0 ||
+  getPendingOneSatPrompt() !== undefined;
 
 const closeDappPopup = (): void => {
   if (!popupWindowId) return;
@@ -337,12 +342,12 @@ const closeDappPopup = (): void => {
 /**
  * Close the floating dApp popup when no permission/approval UI is queued.
  * Ignores in-flight CWI work so unlock and permission screens dismiss as
- * soon as their UI is done; a later prompt reopens via launchPopUp.
+ * soon as their UI is done; a later prompt reopens via showPromptUi.
  * Never touches the browser-action popup (activePopupPorts).
  */
-const closeDappPopupIfNoUi = async (): Promise<void> => {
+const closeDappPopupIfNoUi = (): void => {
   if (!popupWindowId) return;
-  if (await hasQueuedDappUi()) return;
+  if (hasQueuedDappUi()) return;
   closeDappPopup();
 };
 
@@ -350,12 +355,41 @@ const closeDappPopupIfNoUi = async (): Promise<void> => {
  * Close the floating dApp popup only when fully idle: no queued UI, no
  * unlock waiters, and no in-flight dApp CWI requests.
  */
-const closeDappPopupIfIdle = async (): Promise<void> => {
+const closeDappPopupIfIdle = (): void => {
   if (!popupWindowId) return;
   if (inFlightDappRequests > 0) return;
   if (pendingWalletWaiters.length > 0) return;
-  if (await hasQueuedDappUi()) return;
+  if (hasQueuedDappUi()) return;
   closeDappPopup();
+};
+
+/** Look up a queued prompt payload for the prompt window by kind/requestID. */
+const getPendingPromptPayload = (kind: string, requestID?: string): unknown => {
+  switch (kind) {
+    case 'permission':
+      return requestID ? pendingPermissionRequests.get(requestID)?.request : undefined;
+    case 'groupedPermission':
+      return requestID ? pendingGroupedPermissionRequests.get(requestID)?.request : undefined;
+    case 'counterpartyPermission':
+      return requestID ? pendingCounterpartyPermissionRequests.get(requestID)?.request : undefined;
+    case 'oneSatPermission':
+      return getPendingOneSatPrompt(requestID);
+    default:
+      return undefined;
+  }
+};
+
+/** The oldest queued prompt, if any, for the prompt window to render next. */
+const getNextPendingPrompt = (): { kind: PromptKind; requestID: string } | undefined => {
+  const permission = pendingPermissionRequests.keys().next();
+  if (!permission.done) return { kind: 'permission', requestID: permission.value };
+  const grouped = pendingGroupedPermissionRequests.keys().next();
+  if (!grouped.done) return { kind: 'groupedPermission', requestID: grouped.value };
+  const counterparty = pendingCounterpartyPermissionRequests.keys().next();
+  if (!counterparty.done) return { kind: 'counterpartyPermission', requestID: counterparty.value };
+  return getPendingOneSatPrompt()
+    ? { kind: 'oneSatPermission', requestID: getPendingOneSatPrompt()!.requestID }
+    : undefined;
 };
 
 /** Read the user's configured lock timeout (defaults to 10 minutes). */
@@ -376,9 +410,13 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
-// Forward declaration for launchPopUp (defined inside isInServiceWorker block)
-let launchPopUp: () => void = () => {
-  console.warn('launchPopUp called before initialization');
+// Forward declarations for the prompt-window launchers (defined inside the
+// isInServiceWorker block below).
+let showPromptUi: (kind: PromptKind, requestID?: string) => void = () => {
+  console.warn('showPromptUi called before initialization');
+};
+let showUnlockUi: () => void = () => {
+  console.warn('showUnlockUi called before initialization');
 };
 
 /**
@@ -434,51 +472,21 @@ const showPermissionPrompt = (request: PermissionRequest & { requestID: string }
   console.log('[background] showPermissionPrompt called, requestID:', request.requestID, 'type:', request.type);
   return new Promise((resolve, reject) => {
     pendingPermissionRequests.set(request.requestID, { request, resolve, reject });
-    chromeStorageService.update({ permissionRequest: request }).then(() => {
-      console.log('[background] showPermissionPrompt: storage updated, popupWindowId:', popupWindowId);
-      if (popupWindowId) {
-        chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
-          console.log('[background] showPermissionPrompt: existing popup gone, creating new');
-          popupWindowId = undefined;
-          launchPopUp();
-        });
-      } else {
-        console.log('[background] showPermissionPrompt: no popup, launching new');
-        launchPopUp();
-      }
-    });
+    showPromptUi('permission', request.requestID);
   });
 };
 
 const showGroupedPermissionPrompt = (request: GroupedPermissionRequest): Promise<void> => {
   return new Promise((resolve, reject) => {
     pendingGroupedPermissionRequests.set(request.requestID, { request, resolve, reject });
-    chromeStorageService.update({ groupedPermissionRequest: request }).then(() => {
-      if (popupWindowId) {
-        chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
-          popupWindowId = undefined;
-          launchPopUp();
-        });
-      } else {
-        launchPopUp();
-      }
-    });
+    showPromptUi('groupedPermission', request.requestID);
   });
 };
 
 const showCounterpartyPermissionPrompt = (request: CounterpartyPermissionRequest): Promise<void> => {
   return new Promise((resolve, reject) => {
     pendingCounterpartyPermissionRequests.set(request.requestID, { request, resolve, reject });
-    chromeStorageService.update({ counterpartyPermissionRequest: request }).then(() => {
-      if (popupWindowId) {
-        chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
-          popupWindowId = undefined;
-          launchPopUp();
-        });
-      } else {
-        launchPopUp();
-      }
-    });
+    showPromptUi('counterpartyPermission', request.requestID);
   });
 };
 
@@ -525,11 +533,15 @@ if (isInServiceWorker) {
     await reinitPromise;
   };
 
-  const createNewPopup = () => {
-    console.log('[background] createNewPopup called');
+  const createNewPopup = (kind?: PromptKind, requestID?: string) => {
+    console.log('[background] createNewPopup called', kind, requestID);
+    const params = new URLSearchParams();
+    if (kind) params.set('kind', kind);
+    if (requestID) params.set('requestID', requestID);
+    const query = params.toString();
     chrome.windows.create(
       {
-        url: chrome.runtime.getURL('index.html'),
+        url: chrome.runtime.getURL('prompt.html') + (query ? `?${query}` : ''),
         type: 'popup',
         width: 392,
         height: 567,
@@ -545,14 +557,14 @@ if (isInServiceWorker) {
     );
   };
 
-  launchPopUp = () => {
-    console.log('[background] launchPopUp called');
+  const notifyPromptWindow = (kind: PromptKind, requestID?: string) => {
+    chrome.runtime.sendMessage({ action: 'SHOW_PROMPT', kind, requestID }).catch(() => {
+      // No listener (window still booting); it reads its URL params on mount
+    });
+  };
 
-    // If the extension's browser-action popup is currently open, don't create a window
-    if (activePopupPorts.size > 0) {
-      console.log('[background] launchPopUp: extension popup is connected, skipping window creation');
-      return;
-    }
+  showPromptUi = (kind, requestID) => {
+    console.log('[background] showPromptUi called', kind, requestID);
 
     // Check if any popup window with our extension URL is already open
     chrome.windows.getAll({ populate: true }, (windows) => {
@@ -561,18 +573,22 @@ if (isInServiceWorker) {
       );
 
       if (existingPopup) {
-        // Focus existing popup instead of creating duplicate
+        // Focus existing popup and push the new prompt into it
         chrome.windows.update(existingPopup.id!, { focused: true });
         popupWindowId = existingPopup.id;
+        notifyPromptWindow(kind, requestID);
         return;
       }
 
       // Fast path: module-level variable still has the popup ID
       if (popupWindowId) {
-        chrome.windows.update(popupWindowId, { focused: true }).catch(() => {
-          popupWindowId = undefined;
-          createNewPopup();
-        });
+        chrome.windows
+          .update(popupWindowId, { focused: true })
+          .then(() => notifyPromptWindow(kind, requestID))
+          .catch(() => {
+            popupWindowId = undefined;
+            createNewPopup(kind, requestID);
+          });
         return;
       }
 
@@ -583,25 +599,34 @@ if (isInServiceWorker) {
             .update(result.popupWindowId, { focused: true })
             .then(() => {
               popupWindowId = result.popupWindowId;
+              notifyPromptWindow(kind, requestID);
             })
             .catch(() => {
               chrome.storage.local.remove('popupWindowId');
-              createNewPopup();
+              createNewPopup(kind, requestID);
             });
         } else {
-          createNewPopup();
+          createNewPopup(kind, requestID);
         }
       });
     });
   };
 
-  // Wire the 1Sat permission module's prompt bridge into the popup flow.
+  showUnlockUi = () => {
+    // The browser-action popup renders its own unlock UI; never force a
+    // window over it just to unlock.
+    if (activePopupPorts.size > 0) {
+      console.log('[background] showUnlockUi: extension popup is connected, skipping window creation');
+      return;
+    }
+    showPromptUi('unlock');
+  };
+
+  // Wire the 1Sat permission module's prompt bridge into the prompt flow.
   // Done once during background init so showOneSatPrompt has a working
   // bridge before initWallet (called on unlock) registers the module.
   initOneSatPromptBridge({
-    chromeStorage: chromeStorageService,
-    launchPopUp: () => launchPopUp(),
-    getPopupWindowId: () => popupWindowId,
+    showPrompt: (requestID) => showPromptUi('oneSatPermission', requestID),
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -645,6 +670,9 @@ if (isInServiceWorker) {
       'GROUPED_PERMISSION_RESPONSE',
       'COUNTERPARTY_PERMISSION_RESPONSE',
       'ONE_SAT_PERMISSION_RESPONSE',
+      // Prompt window flow queries
+      'GET_PROMPT_PAYLOAD',
+      'GET_NEXT_PROMPT',
       // Internal UI requests (no external domain)
       YoursEventName.GET_BALANCE,
       YoursEventName.GET_PUB_KEYS,
@@ -726,6 +754,22 @@ if (isInServiceWorker) {
           sendResponse({ type: 'ONE_SAT_PERMISSION_RESPONSE', success: handled });
           return true;
         }
+        // Prompt window payload/flow queries
+        case 'GET_PROMPT_PAYLOAD': {
+          const { kind, requestID } = message as { kind: string; requestID?: string };
+          const payload = getPendingPromptPayload(kind, requestID);
+          console.log('[background] GET_PROMPT_PAYLOAD', kind, requestID, 'found:', !!payload);
+          sendResponse({ type: 'GET_PROMPT_PAYLOAD', success: !!payload, data: payload });
+          return true;
+        }
+        case 'GET_NEXT_PROMPT': {
+          sendResponse({
+            type: 'GET_NEXT_PROMPT',
+            success: true,
+            data: { prompt: getNextPendingPrompt(), busy: inFlightDappRequests > 0 },
+          });
+          return true;
+        }
         // Internal UI requests (no external domain, direct from popup)
         case YoursEventName.GET_BALANCE:
           processGetBalanceRequest(sendResponse);
@@ -780,7 +824,7 @@ if (isInServiceWorker) {
                 // calls resumed by this unlock may still raise an approval
                 // screen in this window; silent calls close it via their
                 // completion hook moments later.
-                await closeDappPopupIfIdle();
+                closeDappPopupIfIdle();
               })
               .catch((error: Error) => {
                 console.error('Failed to initialize wallet:', error);
@@ -1493,8 +1537,7 @@ if (isInServiceWorker) {
         });
     }
 
-    chromeStorageService.remove('permissionRequest');
-    void closeDappPopupIfNoUi();
+    closeDappPopupIfNoUi();
     return true;
   };
 
@@ -1535,8 +1578,7 @@ if (isInServiceWorker) {
         });
     }
 
-    chromeStorageService.remove('groupedPermissionRequest');
-    void closeDappPopupIfNoUi();
+    closeDappPopupIfNoUi();
     return true;
   };
 
@@ -1577,8 +1619,7 @@ if (isInServiceWorker) {
         });
     }
 
-    chromeStorageService.remove('counterpartyPermissionRequest');
-    void closeDappPopupIfNoUi();
+    closeDappPopupIfNoUi();
     return true;
   };
 
@@ -2645,21 +2686,20 @@ if (isInServiceWorker) {
         pending.reject(new Error('User dismissed the request'));
       }
       pendingPermissionRequests.clear();
-      chromeStorageService.remove('permissionRequest');
 
       for (const [requestID, pending] of pendingGroupedPermissionRequests) {
         accountContext?.wallet.denyGroupedPermission(requestID).catch(console.error);
         pending.reject(new Error('User dismissed the request'));
       }
       pendingGroupedPermissionRequests.clear();
-      chromeStorageService.remove('groupedPermissionRequest');
 
       for (const [requestID, pending] of pendingCounterpartyPermissionRequests) {
         accountContext?.wallet.denyCounterpartyPermission(requestID).catch(console.error);
         pending.reject(new Error('User dismissed the request'));
       }
       pendingCounterpartyPermissionRequests.clear();
-      chromeStorageService.remove('counterpartyPermissionRequest');
+
+      denyAllOneSatPrompts();
 
       // Reject any CWI handlers waiting for wallet unlock
       for (const waiter of pendingWalletWaiters.splice(0)) {

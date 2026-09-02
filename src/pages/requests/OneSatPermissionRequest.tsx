@@ -8,14 +8,13 @@ import type { OneSatPromptStorageEntry } from '../../services/oneSatPrompt';
 
 export type OneSatPermissionRequestProps = {
   request: OneSatPromptStorageEntry;
-  popupId: number | undefined;
   onResponse: () => void;
 };
 
 /**
- * Render the 1Sat permission prompt fed in via chrome storage. Approve /
- * reject post `ONE_SAT_PERMISSION_RESPONSE` back to the background script,
- * which resolves the module's pending Promise.
+ * Render the 1Sat permission prompt fetched from the background's pending
+ * map. Approve / reject post `ONE_SAT_PERMISSION_RESPONSE` back to the
+ * background script, which resolves the module's pending Promise.
  */
 export const OneSatPermissionRequestPage = ({ request, onResponse }: OneSatPermissionRequestProps) => {
   const { theme } = useTheme();
@@ -38,7 +37,6 @@ export const OneSatPermissionRequestPage = ({ request, onResponse }: OneSatPermi
       approved,
     });
     onResponse();
-    window.close();
   };
 
   // Pick a theme from the wallet's resolved theme. The component supports
