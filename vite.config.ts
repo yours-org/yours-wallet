@@ -3,6 +3,18 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { resolve } from 'path';
+import { execSync } from 'child_process';
+
+const gitCommit = (() => {
+  try {
+    const hash = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    // -uno: only tracked-file changes count as dirty, matching `git describe --dirty`
+    const dirty = execSync('git status --porcelain -uno', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    return dirty ? `${hash}-dirty` : hash;
+  } catch {
+    return 'unknown';
+  }
+})();
 
 // Main config for popup/extension pages
 export default defineConfig({
@@ -51,5 +63,6 @@ export default defineConfig({
   },
   define: {
     'process.env': {},
+    __BUILD_COMMIT__: JSON.stringify(gitCommit),
   },
 });
