@@ -14,6 +14,7 @@ import {
   createContext as createActionContext,
   migrateLegacyP1SatBaskets,
 } from '@1sat/actions';
+import { buildAddressSyncTask, DEFAULT_ADDRESS_SYNC_INTERVAL_MS } from './utils/addressSyncTask';
 import { createAssetPermissionModules } from '@1sat/permission-module';
 import type { WalletInterface } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';
@@ -216,7 +217,11 @@ export const initWallet = async (
     remoteStorage,
     setActiveStorage,
     addRemote,
-  } = await createWebWallet(walletConfig);
+    monitor,
+  } = await createWebWallet({
+    ...walletConfig,
+    skipInitialMonitor: true,
+  } as WebWalletConfig);
 
   // 3. Build the IndexedDB-backed permission store used by
   //    LocalWalletPermissionsManager for basket/cert/spending grants.
@@ -282,7 +287,6 @@ export const initWallet = async (
     }
   }
 
-  // 6. Run address sync via syncAddresses action (fire-and-forget)
   const actionCtx = createActionContext(adminWallet, { chain, services: syncContext.services });
 
   const sendSyncStatus = (data: { status: string; [key: string]: unknown }) => {
@@ -296,25 +300,33 @@ export const initWallet = async (
       });
   };
 
-  console.log('[initWallet] Starting address sync...');
-  sendSyncStatus({ status: 'start', addressCount: maxKeyIndex + 1 });
-
-  syncAddresses
-    .execute(actionCtx, {
-      count: maxKeyIndex + 1,
-      onProgress: (progress) => {
-        sendSyncStatus({ status: 'progress', ...progress });
-      },
-    })
-    .then((result) => {
-      sendSyncStatus({ status: 'complete', ...result });
-      console.log('[initWallet] Address sync complete:', result);
-    })
-    .catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      sendSyncStatus({ status: 'error', message });
-      console.error('[initWallet] Address sync failed:', error);
+  if (monitor) {
+    monitor.addTask(
+      buildAddressSyncTask(monitor, DEFAULT_ADDRESS_SYNC_INTERVAL_MS, {
+        run: async () => {
+          sendSyncStatus({ status: 'start', addressCount: maxKeyIndex + 1 });
+          try {
+            const result = await syncAddresses.execute(actionCtx, {
+              count: maxKeyIndex + 1,
+              onProgress: (progress) => {
+                sendSyncStatus({ status: 'progress', ...progress });
+              },
+            });
+            sendSyncStatus({ status: 'complete', ...result });
+            console.log('[initWallet] Address sync complete:', result);
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            sendSyncStatus({ status: 'error', message });
+            console.error('[initWallet] Address sync failed:', error);
+            throw error;
+          }
+        },
+      }),
+    );
+    monitor.runOnce().catch((err: unknown) => {
+      console.error('[initWallet] monitor runOnce failed:', err);
     });
+  }
 
   // Sync incoming paymail payments from the message box (fire-and-forget)
   syncMessages
