@@ -36,3 +36,9 @@ scripts/.build-meta.json
 .puppeteer-profile-clean/
 .debug-wallet.json
 .debug-session.log
+
+# release packaging output (scripts/package.ts)
+/release
+
+# release zips live on GitHub Releases, never in git
+/public/builds

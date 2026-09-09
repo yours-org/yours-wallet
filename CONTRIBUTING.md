@@ -54,6 +54,12 @@ git push origin my-feature
 
 Navigate to your fork on GitHub and create a pull request into `yours-org/yours-wallet:main`.
 
+## Continuous Integration
+
+Every pull request runs the same checks as a release build: `bun run format:check`, `bun run typecheck`, a full extension build, and `bun run verify:build`. Run them locally before pushing to avoid a red check. CI must pass before a pull request can be merged.
+
+Releases are cut from `main` by maintainers and built by GitHub Actions. See [docs/releasing.md](docs/releasing.md).
+
 ## Using AI Agents
 
 For a comprehensive guide to the codebase architecture, conventions, and common patterns, see [Contributing with Agents](docs/contributing-with-agents.md). Point your AI coding assistant at that doc to help fix bugs or implement features.

@@ -1,6 +1,7 @@
 ![Example Image](/public/banner.png)
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/yours-org/yours-wallet/actions/workflows/ci.yml/badge.svg)](https://github.com/yours-org/yours-wallet/actions/workflows/ci.yml)
 
 <a href="https://chromewebstore.google.com/detail/yours-wallet/mlbnicldlpdimbjdcncnklfempedeipj" target="_blank">Download Chrome Extension</a>
 
@@ -120,6 +121,10 @@ src/
 Integrate Yours Wallet into your dApp: **[Provider API Documentation](docs/provider-api.md)**
 
 Covers connection, sending BSV, ordinals, tokens, MNEE, identity, locks, message signing, and marketplace operations. Working example app: [test-1sat-sdk](https://github.com/b-open-io/1sat-sdk/tree/master/test-1sat-sdk)
+
+### Releases
+
+Releases are built by GitHub Actions, never on a developer machine. Every tagged version ships as a reproducible zip with per-file checksums and a signed provenance attestation, so anyone can confirm that what is on the Chrome Web Store matches this source. See **[Releasing](docs/releasing.md)** for how to cut a release and how to verify one.
 
 ### Contributing
 

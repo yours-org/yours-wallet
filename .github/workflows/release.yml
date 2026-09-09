@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TAG: ${{ github.ref_name }}
+
+jobs:
+  build:
+    name: Build, package, and attest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/build-extension
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: release/pw-*.zip
+
+      - name: Upload release files
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ github.ref_name }}
+          path: release/
+          if-no-files-found: error
+
+  reproduce:
+    name: Reproduce on a fresh runner
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/build-extension
+
+      - name: Download the first build
+        uses: actions/download-artifact@v8
+        with:
+          name: release-${{ github.ref_name }}
+          path: expected
+
+      - name: Compare with the first build
+        run: |
+          set -euo pipefail
+          zip=$(basename release/pw-*.zip)
+          if ! diff -u expected/SHA256SUMS release/SHA256SUMS; then
+            echo "::error::Build output differs between two clean runners. The build is not reproducible."
+            exit 1
+          fi
+          if ! cmp -s "expected/$zip" "release/$zip"; then
+            echo "::error::File contents match but the zip differs. Packaging is not deterministic."
+            exit 1
+          fi
+          hash=$(cut -d' ' -f1 "release/$zip.sha256")
+          echo "Reproduced $zip byte-for-byte: $hash"
+          {
+            echo "### Reproducibility check passed"
+            echo
+            echo "A second clean runner rebuilt \`$zip\` byte-for-byte (\`$hash\`)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Draft GitHub release
+    needs: [build, reproduce]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release files
+        uses: actions/download-artifact@v8
+        with:
+          name: release-${{ github.ref_name }}
+          path: release
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          zip=$(basename release/pw-*.zip)
+          hash=$(cut -d' ' -f1 "release/$zip.sha256")
+          extra=""
+          case "$RELEASE_TAG" in *-*) extra="--prerelease" ;; esac
+
+          gh release create "$RELEASE_TAG" \
+            "release/$zip" "release/$zip.sha256" release/SHA256SUMS \
+            --draft $extra --verify-tag --generate-notes --title "Release $RELEASE_TAG"
+
+          notes=$(gh release view "$RELEASE_TAG" --json body --jq .body)
+          {
+            printf '%s\n\n' "$notes"
+            printf '## Verify this release\n\n'
+            printf 'Built by GitHub Actions from %s.\n\n' "$GITHUB_SHA"
+            printf '`%s` sha256: `%s`\n\n' "$zip" "$hash"
+            printf '```sh\nsha256sum -c %s.sha256\ngh attestation verify %s --repo %s\n```\n\n' "$zip" "$zip" "$GITHUB_REPOSITORY"
+            printf 'To rebuild from source and compare, see [docs/releasing.md](https://github.com/%s/blob/%s/docs/releasing.md#verifying-a-release).\n' "$GITHUB_REPOSITORY" "$RELEASE_TAG"
+          } > notes.md
+          gh release edit "$RELEASE_TAG" --notes-file notes.md
+
+          echo "Drafted $(gh release view "$RELEASE_TAG" --json url --jq .url)"

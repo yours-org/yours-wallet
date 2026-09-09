@@ -27,8 +27,13 @@ const bold = chalk.bold;
 
 // ─── Terminal helpers ────────────────────────────────────────
 const rawWrite = process.stdout.write.bind(process.stdout);
-const hideCursor = () => rawWrite('\x1b[?25l');
-const showCursor = () => rawWrite('\x1b[?25h');
+const isTTY = Boolean(process.stdout.isTTY);
+const hideCursor = () => {
+  if (isTTY) rawWrite('\x1b[?25l');
+};
+const showCursor = () => {
+  if (isTTY) rawWrite('\x1b[?25h');
+};
 
 function mute() {
   const origOut = process.stdout.write;
@@ -45,6 +50,11 @@ function mute() {
 const SPIN = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 function spinner(text: string) {
+  // Not a terminal (CI logs): one line when a step starts, one when it finishes.
+  if (!isTTY) {
+    rawWrite(`  · ${text}\n`);
+    return (line: string) => rawWrite(`  ${line}\n`);
+  }
   let i = 0;
   hideCursor();
   const id = setInterval(() => {
