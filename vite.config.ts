@@ -7,9 +7,13 @@ import { execSync } from 'child_process';
 
 const gitCommit = (() => {
   try {
-    const hash = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    const hash = execSync('git rev-parse --short=7 HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
     // -uno: only tracked-file changes count as dirty, matching `git describe --dirty`
-    const dirty = execSync('git status --porcelain -uno', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    const dirty = execSync('git status --porcelain -uno', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
     return dirty ? `${hash}-dirty` : hash;
   } catch {
     return 'unknown';

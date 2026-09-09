@@ -1,0 +1,39 @@
+name: Build extension
+description: Install the pinned toolchain, then check, build, verify, and package the extension into release/
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version-file: .bun-version
+
+    - name: Set up Node
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+
+    - name: Check formatting
+      shell: bash
+      run: bun run format:check
+
+    - name: Typecheck
+      shell: bash
+      run: bun run typecheck
+
+    - name: Build
+      shell: bash
+      run: bun run build
+
+    - name: Verify build output
+      shell: bash
+      run: bun run verify:build
+
+    - name: Package
+      shell: bash
+      run: bun run package
