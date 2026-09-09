@@ -31,13 +31,9 @@ export const isValidEmail = (email: string) => {
 export const getTxFromRawTxFormat = (rawTx: string | number[], format: TransactionFormat) => {
   switch (format) {
     case 'beef':
-      return typeof rawTx === 'string'
-        ? Transaction.fromHexBEEF(rawTx)
-        : Transaction.fromBEEF(rawTx);
+      return typeof rawTx === 'string' ? Transaction.fromHexBEEF(rawTx) : Transaction.fromBEEF(rawTx);
     case 'ef':
-      return typeof rawTx === 'string'
-        ? Transaction.fromHexEF(rawTx)
-        : Transaction.fromEF(rawTx);
+      return typeof rawTx === 'string' ? Transaction.fromHexEF(rawTx) : Transaction.fromEF(rawTx);
     default:
       return Transaction.fromHex(rawTx as string);
   }
