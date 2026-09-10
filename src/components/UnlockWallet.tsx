@@ -123,9 +123,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
         const latest = await grantUsbAccessIfNeeded();
         if (latest?.status !== 'ok') {
           // Missing key is not a wrong password: shake, say so, and leave the password alone.
-          failUnlock(
-            latest?.status === 'permission' ? 'Access to your USB key was not allowed' : 'Insert your USB key',
-          );
+          failUnlock(latest?.status === 'permission' ? 'USB access not allowed' : 'Insert your USB key');
           return;
         }
         material = { master: latest.master };
@@ -164,7 +162,6 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const contrast = theme.color.global.contrast;
   const gray = theme.color.global.gray;
   const bg = theme.color.global.walletBackground;
-  const accent = theme.color.component.primaryButtonLeftGradient;
   const danger = theme.color.component.warningButton;
 
   const stickLabel = (stickId: string) => usbSecurity?.sticks.find((s) => s.id === stickId)?.label ?? 'USB key';
@@ -177,7 +174,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: 0.2 }}
-      className="flex flex-col items-center gap-1.5 -mt-5 mb-5 text-xs"
+      className="flex flex-col items-center gap-1.5 -mt-5 mb-5 text-xs text-center max-w-[85%]"
       style={{ color: gray }}
     >
       {recoveryMode ? (
@@ -202,21 +199,15 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           Checking for USB key...
         </span>
       ) : probe.status === 'ok' ? (
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#34D399' }} />
-          USB key detected: {stickLabel(probe.stickId)}
-        </span>
-      ) : probe.status === 'permission' ? (
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accent }} />
-          USB key found. Chrome will ask to allow access when you unlock.
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: '#34D399' }} />
+          USB key: {stickLabel(probe.stickId)}
         </span>
       ) : (
         <>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: gray }} />
-            Insert your USB key
-          </span>
+          {/* 'permission' looks identical to 'absent' from here: Chrome can't tell whether the
+              drive is plugged in until access is granted and a read is attempted on Unlock. */}
+          <span>Insert your USB key</span>
           <span className="flex items-center gap-3">
             <button type="button" className={linkClass} style={linkStyle} onClick={() => void openUsbWindow('repick')}>
               Find my USB key

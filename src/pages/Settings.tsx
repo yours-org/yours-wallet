@@ -309,7 +309,7 @@ export const Settings = () => {
   const handleRemoveUsbStickIntent = (stickId: string) => {
     if (!usbSecurity) return;
     if (usbSecurity.sticks.length <= 1) {
-      addSnackbar('Add another key first, or turn USB security off', 'error');
+      addSnackbar('Add another key first, or turn USB unlock off', 'error');
       return;
     }
     const label = usbSecurity.sticks.find((s) => s.id === stickId)?.label ?? 'this key';
@@ -781,7 +781,7 @@ export const Settings = () => {
             <Divider />
             <SettingRow
               icon={<Usb size={16} />}
-              label="USB Key"
+              label="USB Unlock"
               description={
                 usbSecurity?.enabled
                   ? `${usbSecurity.sticks.length} key${usbSecurity.sticks.length === 1 ? '' : 's'} registered`
@@ -1270,7 +1270,7 @@ export const Settings = () => {
       exit="exit"
       className="w-full px-4 pb-24"
     >
-      <SubPageHeader title="USB Key" onBack={() => setPage('main')} />
+      <SubPageHeader title="USB Unlock" onBack={() => setPage('main')} />
       <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-4">
         {!usbSecurity?.enabled ? (
           <>
@@ -1299,18 +1299,18 @@ export const Settings = () => {
                 </div>
               </div>
               <p className="text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
-                Once on, this wallet can only be unlocked with your password and a registered USB drive plugged in. That
-                protects a locked wallet on a stolen, shared, or unattended machine even if someone knows your password.
+                Unlocking needs your password and a registered USB drive. A locked wallet stays locked even if someone
+                knows your password.
               </p>
             </motion.div>
 
             <Section title="What it does not do">
               <div className="px-4 py-3 bg-[#17191E] space-y-2">
                 {[
-                  'While the wallet is unlocked your keys are in memory, exactly as today.',
-                  'A copy of the key file on the drive plus your password still opens the wallet.',
-                  'Lose every registered drive and the recovery code and you must restore from a backup.',
-                  'This is USB unlock, not a hardware wallet. Nothing is signed on the drive.',
+                  'Keys are in memory while unlocked, as today.',
+                  'A copied key file plus your password still opens it.',
+                  'No drive and no recovery code means restoring from backup.',
+                  'Not a hardware wallet. Nothing is signed on the drive.',
                 ].map((line) => (
                   <div key={line} className="flex items-start gap-2">
                     <Minus size={12} className="mt-0.5 shrink-0" style={{ color: '#98A2B3' }} />
@@ -1329,8 +1329,7 @@ export const Settings = () => {
             >
               <AlertTriangle size={14} className="mt-0.5 shrink-0" style={{ color: '#FBBF24' }} />
               <p className="text-xs leading-snug" style={{ color: '#FBBF24' }}>
-                Take a fresh master backup first. Turning this on re-encrypts every account, and a backup is your only
-                way back in without a drive or the recovery code.
+                Make a fresh master backup first. It is your only way back without a drive or the recovery code.
               </p>
             </motion.div>
 
@@ -1400,14 +1399,14 @@ export const Settings = () => {
               <SettingRow
                 icon={<AlertTriangle size={16} />}
                 label="Lost a key? Rotate"
-                description="New secret and recovery code; old keys stop working"
+                description="Old keys stop working"
                 onClick={() => void openUsbWindow('rotate')}
               />
               <Divider />
               <SettingRow
                 icon={<Lock size={16} />}
                 label="Turn off"
-                description="Go back to password-only unlock"
+                description="Password-only unlock"
                 onClick={() => void openUsbWindow('disable')}
                 danger
                 isLast
@@ -1415,7 +1414,7 @@ export const Settings = () => {
             </Section>
 
             <motion.p variants={rowVariant} className="text-[10px] text-center px-2" style={{ color: '#475467' }}>
-              USB unlock protects a locked wallet. It is not a hardware wallet: keys are in memory while unlocked.
+              Not a hardware wallet. Keys are in memory while unlocked.
             </motion.p>
           </>
         )}

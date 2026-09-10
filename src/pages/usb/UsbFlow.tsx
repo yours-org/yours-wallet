@@ -59,26 +59,11 @@ export const UsbFlow = () => {
   if (!mode) {
     body = <BlockedStep title="Nothing to do" message="This window was opened without a USB key action." />;
   } else if (!isUsbSupported()) {
-    body = (
-      <BlockedStep
-        title="USB unlock isn't available here"
-        message="USB key security needs a browser that supports the File System Access API, such as Chrome or Edge."
-      />
-    );
+    body = <BlockedStep title="USB unlock isn't available here" message="It needs Chrome or Edge." />;
   } else if (needsEnabled(mode) && !usbSecurity?.enabled) {
-    body = (
-      <BlockedStep
-        title="USB key security is off"
-        message="Turn it on from Settings → Security before using this action."
-      />
-    );
+    body = <BlockedStep title="USB unlock is off" message="Turn it on from Settings → Security." />;
   } else if (mode === 'enroll' && usbSecurity?.enabled) {
-    body = (
-      <BlockedStep
-        title="USB key security is already on"
-        message="Use Settings → Security to add another USB key, rotate, or turn it off."
-      />
-    );
+    body = <BlockedStep title="USB unlock is already on" message="Manage it from Settings → Security." />;
   } else if (needsUnlock(mode) && isLocked) {
     return (
       <UsbShell>

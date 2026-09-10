@@ -33,37 +33,20 @@ const OverviewStep = ({ onContinue }: { onContinue: () => void }) => {
 
   return (
     <StepBody stepKey="overview">
-      <Heading
-        title="Turn on USB key security"
-        subtitle="Unlocking will need your password and a registered USB drive."
-      />
+      <Heading title="Turn on USB unlock" subtitle="Unlock with your password and a USB drive." />
       <Note>
         <p className="m-0 mb-1 font-semibold">Protects against</p>
-        <Bullets
-          items={[
-            'Someone who knows your password using a stolen or unattended computer.',
-            'Copied wallet data: without the USB key the stored keys cannot be decrypted.',
-          ]}
-        />
+        <Bullets items={['Someone with your password on your computer.', 'Copies of your wallet data.']} />
       </Note>
       <Note tone="warn">
         <p className="m-0 mb-1 font-semibold">Does not protect against</p>
-        <Bullets
-          items={[
-            'Malware on this computer while the wallet is unlocked.',
-            'Someone who has both the key file from the drive and your password.',
-          ]}
-        />
-        <p className="m-0 mt-2">
-          If you lose every USB key <strong>and</strong> the recovery code, the only way back is restoring from your
-          backup.
-        </p>
+        <Bullets items={['Malware while the wallet is unlocked.', 'Someone with the drive and your password.']} />
+        <p className="m-0 mt-2">No USB key and no recovery code means restoring from backup.</p>
       </Note>
       {backedUp === false && (
         <Note tone="warn">
           <p className="m-0 mb-1 font-semibold">Back up first</p>
-          Open the extension and go to <strong>Settings → Wallet Backup → Master Backup</strong>. Once the backup has
-          been saved, come back here and press &ldquo;Check again&rdquo;.
+          Settings → Wallet Backup → Master Backup, then press &ldquo;Check again&rdquo;.
         </Note>
       )}
       <Button theme={theme} type="primary" label="Continue" disabled={backedUp !== true} onClick={onContinue} />
@@ -110,7 +93,7 @@ export const EnrollFlow = () => {
     }
     if (!res?.success) {
       await deleteHandle(drive.id);
-      return res?.error ?? 'Could not turn on USB key security';
+      return res?.error ?? 'Could not turn on USB unlock';
     }
     await chromeStorageService.getAndSetStorage();
     setIsLocked(false);
@@ -128,9 +111,7 @@ export const EnrollFlow = () => {
           <LabelStep
             key="s2"
             defaultLabel={label}
-            note={
-              drive?.existed ? 'This drive already carries a Yours USB key file. It will be reused as is.' : undefined
-            }
+            note={drive?.existed ? 'This drive already has a Yours key file. It will be reused.' : undefined}
             onNext={(l) => {
               setLabel(l);
               setStep(3);
@@ -141,17 +122,13 @@ export const EnrollFlow = () => {
         {step === 4 && (
           <PasswordStep
             key="s4"
-            subtitle="Your wallet will be re-encrypted so that this USB key and your password are both needed to unlock it."
-            buttonLabel="Turn on USB key security"
+            subtitle="Enter your password to finish."
+            buttonLabel="Turn on USB unlock"
             onConfirm={confirmPassword}
           />
         )}
         {step === 5 && (
-          <DoneStep
-            key="s5"
-            title="USB key security is on"
-            message="Unlocking now needs this USB key and your password."
-          />
+          <DoneStep key="s5" title="USB unlock is on" message="Unlocking needs this USB key and your password." />
         )}
       </AnimatePresence>
     </>

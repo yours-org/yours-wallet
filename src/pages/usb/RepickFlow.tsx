@@ -29,7 +29,7 @@ export const RepickFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
       }
       const result = await adoptPickedDrive(handle, usbSecurity);
       if (result.status !== 'ok') {
-        setError("That drive doesn't hold one of your registered USB keys.");
+        setError("That drive doesn't hold a registered key.");
         return;
       }
       setFound(usbSecurity.sticks.find((s) => s.id === result.stickId)?.label ?? 'USB key');
@@ -46,14 +46,8 @@ export const RepickFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
         <DoneStep key="done" title={`Found ${found}`} message="Close this window and unlock." />
       ) : (
         <StepBody key="pick" stepKey="repick">
-          <Heading
-            title="Find my USB key"
-            subtitle="Pick the drive that holds one of your registered USB keys so the wallet can read it again."
-          />
-          <Note>
-            The dialog will say <strong>&ldquo;Yours Wallet wants to edit files&rdquo;</strong>. Pick the USB drive
-            itself, at its top level.
-          </Note>
+          <Heading title="Find my USB key" subtitle="Pick the drive that holds your key." />
+          <Note>Pick the drive itself, not a folder. The dialog will name Yours Wallet.</Note>
           <div
             className="flex items-center justify-center w-full rounded-xl py-6 mb-3"
             style={{ backgroundColor: theme.color.global.row }}

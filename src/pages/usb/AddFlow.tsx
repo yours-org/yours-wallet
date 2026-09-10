@@ -43,7 +43,7 @@ export const AddFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
           <PresenceStep
             key="s0"
             usbSecurity={usbSecurity}
-            subtitle="Adding a key copies the master factor from a key you already registered."
+            subtitle="Insert a key you already registered."
             onPresent={(p) => {
               setMaster(p.master);
               setStep(1);
@@ -53,8 +53,8 @@ export const AddFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
         {step === 1 && (
           <ChooseDriveStep
             key="s1"
-            title="Choose the new USB drive"
-            subtitle="Insert the drive you want to add, then pick it."
+            title="Choose the new drive"
+            subtitle="Insert the drive to add, then pick it."
             onPicked={onPicked}
           />
         )}
@@ -62,14 +62,12 @@ export const AddFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
           <LabelStep
             key="s2"
             defaultLabel={nextKeyLabel(usbSecurity)}
-            note={
-              drive?.existed ? 'This drive already carries a Yours USB key file. It will be reused as is.' : undefined
-            }
+            note={drive?.existed ? 'This drive already has a Yours key file. It will be reused.' : undefined}
             buttonLabel="Add USB key"
             onNext={register}
           />
         )}
-        {step === 3 && <DoneStep key="s3" title="USB key added" message="Added. Both keys now unlock this wallet." />}
+        {step === 3 && <DoneStep key="s3" title="USB key added" message="Both keys unlock this wallet." />}
       </AnimatePresence>
     </>
   );

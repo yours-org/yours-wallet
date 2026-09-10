@@ -32,7 +32,7 @@ export const DisableFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
     } catch (e) {
       res = { success: false, error: e instanceof Error ? e.message : String(e) };
     }
-    if (!res?.success) return res?.error ?? 'Could not turn off USB key security';
+    if (!res?.success) return res?.error ?? 'Could not turn off USB unlock';
     if (erase && identity.handle) await deleteStickFile(identity.handle);
     await clearHandles();
     await chromeStorageService.getAndSetStorage();
@@ -49,8 +49,8 @@ export const DisableFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
           <IdentityStep
             key="s0"
             usbSecurity={usbSecurity}
-            title="Turn off USB key security"
-            subtitle="Insert one of your registered USB keys, or enter your current recovery code."
+            title="Turn off USB unlock"
+            subtitle="Insert a registered USB key or enter your recovery code."
             onIdentified={(id) => {
               setIdentity(id);
               setStep(1);
@@ -60,15 +60,15 @@ export const DisableFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
         {step === 1 && (
           <PasswordStep
             key="s1"
-            subtitle="Your wallet will be re-encrypted so that your password alone unlocks it."
-            buttonLabel="Turn off USB key security"
+            subtitle="Enter your password to finish."
+            buttonLabel="Turn off USB unlock"
             extra={
               identity?.handle ? (
                 <Checkbox
                   checked={erase}
                   onChange={setErase}
-                  label="Also erase the key file from the inserted USB drive"
-                  warning="If another computer uses this USB key, it will be locked out until re-registered."
+                  label="Also erase the key file from this drive"
+                  warning="Other computers using this key will need it registered again."
                 />
               ) : undefined
             }
@@ -76,7 +76,7 @@ export const DisableFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
           />
         )}
         {step === 2 && (
-          <DoneStep key="s2" title="USB key security is off" message="Your password alone unlocks the wallet." />
+          <DoneStep key="s2" title="USB unlock is off" message="Your password alone unlocks the wallet." />
         )}
       </AnimatePresence>
     </>

@@ -50,10 +50,7 @@ export const ChooseDriveStep = ({ title = 'Choose your USB drive', subtitle, onP
   return (
     <StepBody stepKey="choose-drive">
       <Heading title={title} subtitle={subtitle} />
-      <Note>
-        The dialog will say <strong>&ldquo;Yours Wallet wants to edit files&rdquo;</strong>. Pick the USB drive itself,
-        at its top level, not a folder inside it.
-      </Note>
+      <Note>Pick the drive itself, not a folder. The dialog will name Yours Wallet.</Note>
       <div
         className="flex items-center justify-center w-full rounded-xl py-6 mb-3"
         style={{ backgroundColor: theme.color.global.row }}
@@ -101,7 +98,7 @@ export const LabelStep = ({ defaultLabel, note, buttonLabel = 'Continue', onNext
 
   return (
     <StepBody stepKey="label">
-      <Heading title="Name this USB key" subtitle="A short name so you can tell your keys apart in Settings." />
+      <Heading title="Name this USB key" subtitle="So you can tell your keys apart." />
       {note && <Note>{note}</Note>}
       <form onSubmit={(e) => void submit(e)} className="flex flex-col items-center w-full">
         <Input
@@ -196,7 +193,7 @@ export const RecoveryCodeStep = ({ master, onConfirmed }: RecoveryCodeStepProps)
     try {
       const decoded = await decodeRecoveryCode(typed);
       if (decoded !== master) {
-        setError("That doesn't match the recovery code. Check it and try again.");
+        setError("That doesn't match. Check it and try again.");
         return;
       }
       onConfirmed();
@@ -208,14 +205,8 @@ export const RecoveryCodeStep = ({ master, onConfirmed }: RecoveryCodeStepProps)
   if (phase === 'show') {
     return (
       <StepBody stepKey="recovery-show">
-        <Heading
-          title="Your recovery code"
-          subtitle="Write this down and keep it somewhere safe, away from the USB key."
-        />
-        <Note tone="warn">
-          This code is shown <strong>once</strong>. It restores access if every USB key is lost. Without it and without
-          a USB key, this wallet can only be restored from your backup.
-        </Note>
+        <Heading title="Recovery code" subtitle="Write it down. Keep it away from the USB key." />
+        <Note tone="warn">Shown once. It gets you in if every USB key is lost.</Note>
         {code ? <CodeBox code={code} /> : null}
         <Button
           theme={theme}
@@ -230,10 +221,7 @@ export const RecoveryCodeStep = ({ master, onConfirmed }: RecoveryCodeStepProps)
 
   return (
     <StepBody stepKey="recovery-verify">
-      <Heading
-        title="Confirm your recovery code"
-        subtitle="Type the code you wrote down. Dashes and case don't matter."
-      />
+      <Heading title="Confirm the code" subtitle="Type what you wrote down. Dashes and case don't matter." />
       <form onSubmit={(e) => void verify(e)} className="flex flex-col items-center w-full">
         <textarea
           value={typed}

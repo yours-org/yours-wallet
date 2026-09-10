@@ -59,9 +59,9 @@ export const RotateFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
   };
 
   const driveNote = drive?.registered
-    ? `This is your registered key "${drive.registered.label}". It stays registered with the new master.`
+    ? `Registered as "${drive.registered.label}". It stays registered.`
     : drive?.existed
-      ? 'This drive already carries a Yours USB key file. It will be reused as is.'
+      ? 'This drive already has a Yours key file. It will be reused.'
       : undefined;
 
   return (
@@ -69,10 +69,8 @@ export const RotateFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
       <Stepper steps={STEPS} current={step} />
       {step === 0 && (
         <Note tone="warn">
-          Rotation creates a new master factor and a new recovery code. Only the USB key you register now will work
-          afterwards; add your other keys again from Settings. Anyone holding a copy of an old key file{' '}
-          <strong>and</strong> a copy of this wallet&rsquo;s data from before now can still open that old copy with your
-          password.
+          New secret, new recovery code. Other keys stop working until you add them again. Copies of your wallet data
+          taken before now still open with an old key and your password.
         </Note>
       )}
       <AnimatePresence mode="wait">
@@ -89,8 +87,8 @@ export const RotateFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
         {step === 1 && (
           <ChooseDriveStep
             key="s1"
-            title="Choose the USB drive to keep"
-            subtitle="This becomes the only registered key until you add the others again."
+            title="Choose the drive to keep"
+            subtitle="Your only key until you add the others again."
             onPicked={onPicked}
           />
         )}
@@ -109,13 +107,13 @@ export const RotateFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
         {step === 4 && (
           <PasswordStep
             key="s4"
-            subtitle="Your wallet will be re-encrypted under the new master factor."
+            subtitle="Enter your password to finish."
             buttonLabel="Rotate USB key"
             onConfirm={confirmPassword}
           />
         )}
         {step === 5 && (
-          <DoneStep key="s5" title="Rotation complete" message="Register your other USB keys again from Settings." />
+          <DoneStep key="s5" title="Rotation complete" message="Add your other USB keys again from Settings." />
         )}
       </AnimatePresence>
     </>

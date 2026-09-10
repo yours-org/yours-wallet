@@ -99,7 +99,7 @@ export const useStickProbe = (usbSecurity: UsbSecurity, onOk: (probe: PresentSti
         onOkRef.current(result);
         return;
       }
-      setError("That drive doesn't hold one of your registered USB keys.");
+      setError("That drive doesn't hold a registered key.");
       retry();
     } catch (e) {
       setError(errorText(e));
@@ -130,8 +130,8 @@ const PresenceBody = ({ probe, busy, error, allowAccess, findKey }: ReturnType<t
               {probe === null
                 ? 'Checking for your USB key…'
                 : probe.status === 'permission'
-                  ? 'Chrome needs permission to read your USB key'
-                  : 'Insert one of your registered USB keys'}
+                  ? 'Allow Chrome to read your USB key'
+                  : 'Insert a registered USB key'}
             </span>
           </>
         )}
@@ -173,7 +173,7 @@ export const PresenceStep = ({ usbSecurity, title, subtitle, onPresent }: Presen
     <StepBody stepKey="presence">
       <Heading
         title={title ?? 'Insert a registered USB key'}
-        subtitle={subtitle ?? 'The master factor is read from a key you already registered.'}
+        subtitle={subtitle ?? 'Any key you already registered.'}
       />
       <PresenceBody {...state} />
     </StepBody>
@@ -212,11 +212,11 @@ export const IdentityStep = ({ usbSecurity, title, subtitle, onIdentified }: Ide
     try {
       const master = await decodeRecoveryCode(code);
       if (!master) {
-        setCodeError("That isn't a valid recovery code. Check for typos.");
+        setCodeError('Not a valid recovery code.');
         return;
       }
       if (!(await verifyMasterCheck(master, usbSecurity.masterCheck))) {
-        setCodeError("That recovery code doesn't belong to this wallet.");
+        setCodeError("This code doesn't belong to this wallet.");
         return;
       }
       onIdentified({ master });
@@ -229,7 +229,7 @@ export const IdentityStep = ({ usbSecurity, title, subtitle, onIdentified }: Ide
     <StepBody stepKey="identity">
       <Heading
         title={title ?? 'Confirm it’s you'}
-        subtitle={subtitle ?? 'Insert one of your registered USB keys, or enter your current recovery code.'}
+        subtitle={subtitle ?? 'Insert a registered USB key or enter your recovery code.'}
       />
       <PresenceBody {...state} />
       {!showCode && state.probe?.status !== 'ok' && (
@@ -237,7 +237,7 @@ export const IdentityStep = ({ usbSecurity, title, subtitle, onIdentified }: Ide
       )}
       {showCode && state.probe?.status !== 'ok' && (
         <form onSubmit={(e) => void submitCode(e)} className="flex flex-col items-center w-full mt-3">
-          <Note>Enter the recovery code you wrote down when USB key security was turned on or last rotated.</Note>
+          <Note>Enter the code you wrote down.</Note>
           <textarea
             value={code}
             onChange={(e) => setCode(e.target.value)}
