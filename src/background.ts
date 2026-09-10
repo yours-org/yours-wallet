@@ -90,7 +90,23 @@ const dropWalletContext = (reason: string) => {
 };
 
 // Initialize wallet on startup (will be null if locked)
-const initializeWallet = async (): Promise<WalletInterface | null> => {
+/**
+ * The initialization currently in flight, whoever started it (startup, unlock,
+ * account switch, restore). ensureWallet() waits on it so popup calls that arrive
+ * while the wallet is being built are queued instead of failing with
+ * "Wallet not available" — which left the first MNEE lookup after an unlock at zero.
+ */
+let initInFlight: Promise<WalletInterface | null> | null = null;
+
+const initializeWallet = (): Promise<WalletInterface | null> => {
+  const run = runInitializeWallet();
+  initInFlight = run;
+  return run.finally(() => {
+    if (initInFlight === run) initInFlight = null;
+  });
+};
+
+const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   console.log('[background] initializeWallet: starting, current accountContext:', !!accountContext);
   if (accountContext) {
     dropWalletContext('before-init');
@@ -215,10 +231,11 @@ const ensureWallet = async (suppressPopup = false): Promise<WalletInterface> => 
     return accountContext.wallet;
   }
 
-  // If wallet is currently reinitializing (e.g. account switch), wait for that
-  // instead of launching a popup.
-  if (reinitPromise) {
-    const wallet = await reinitPromise;
+  // If wallet is currently initializing (startup, unlock, account switch, restore),
+  // wait for that instead of rejecting or launching a popup.
+  const inFlight = reinitPromise ?? initInFlight;
+  if (inFlight) {
+    const wallet = await inFlight.catch(() => null);
     if (wallet) return wallet;
   }
 

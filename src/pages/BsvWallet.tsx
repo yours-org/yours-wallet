@@ -12,7 +12,6 @@ import {
   Trash2,
   Plus,
   ArrowUpDown,
-  ExternalLink,
   Loader2,
   RefreshCw,
 } from 'lucide-react';
@@ -303,7 +302,9 @@ export const BsvWallet = () => {
     return maxKeyIndex;
   };
 
-  const updateMneeBalance = async () => {
+  const MNEE_FETCH_RETRIES = 2;
+
+  const updateMneeBalance = async (attempt = 0): Promise<void> => {
     if (!receiveAddress || !apiContext) return;
     try {
       // Aggregate MNEE balance across all derived deposit addresses for this account,
@@ -343,7 +344,13 @@ export const BsvWallet = () => {
       };
       await chromeStorageService.updateNested(key, update);
     } catch (error) {
-      console.error('Failed to update MNEE balance:', error);
+      console.error(`Failed to update MNEE balance (attempt ${attempt + 1}):`, error);
+      // The first fetch can race service-worker initialization (e.g. storage migration
+      // right after an upgrade). A failed lookup would otherwise leave the balance at
+      // zero until the page remounts, so retry with a short backoff.
+      if (attempt < MNEE_FETCH_RETRIES) {
+        setTimeout(() => void updateMneeBalance(attempt + 1), 2000 * (attempt + 1));
+      }
     }
   };
 
@@ -451,6 +458,15 @@ export const BsvWallet = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receiveAddress]);
+
+  // Refresh MNEE when the service worker's address sync finishes, the same trigger
+  // that refreshes the BSV balance. Without this, MNEE was fetched exactly once.
+  useEffect(() => {
+    if (!isSyncing && receiveAddress) {
+      updateMneeBalance();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSyncing]);
 
   // Check for legacy MNEE balance (old address) once wallet is ready
   useEffect(() => {
@@ -1554,25 +1570,6 @@ export const BsvWallet = () => {
           isSubmit
         />
       </form>
-
-      {/* Swap & Bridge banner */}
-      <motion.button
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={() => window.open('https://swap-user.mnee.net', '_blank')}
-        className="flex items-center justify-between w-full mt-3 px-4 py-3 rounded-2xl border-0 outline-none cursor-pointer"
-        style={{ background: 'linear-gradient(135deg, #ff950015, #ffb80015)', border: '1px solid #ff950030' }}
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold" style={{ color: '#ffb800' }}>
-            Swap &amp; Bridge
-          </span>
-          <span className="text-xs" style={{ color: theme.color.global.gray }}>
-            Convert assets on mnee.net
-          </span>
-        </div>
-        <ExternalLink size={14} style={{ color: '#ffb800' }} />
-      </motion.button>
 
       <CoinHistory
         filter={{
