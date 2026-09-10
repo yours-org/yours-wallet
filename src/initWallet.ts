@@ -17,7 +17,7 @@ import {
 import { createAssetPermissionModules } from '@1sat/permission-module';
 import type { WalletInterface } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { CHROME_STORAGE_OBJECT_VERSION, MESSAGEBOX_URL } from './utils/constants';
+import { WALLET_DATA_MIGRATION_VERSION, MESSAGEBOX_URL } from './utils/constants';
 import type { Account, StorageConfig } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
@@ -253,7 +253,7 @@ export const initWallet = async (
   const adminWallet = withOriginator(wallet, ADMIN_ORIGINATOR);
 
   const storageVersion = chromeStorageService.storage?.version ?? 0;
-  if (storageVersion < CHROME_STORAGE_OBJECT_VERSION) {
+  if (storageVersion < WALLET_DATA_MIGRATION_VERSION) {
     try {
       await migrateLegacyP1SatBaskets(baseWallet);
       await chromeStorageService.completeWalletDataMigration();

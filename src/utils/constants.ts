@@ -1,8 +1,7 @@
 import { NetWork } from '../services/types/provider.types';
+import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 
 export const URL_WHATSONCHAIN = 'https://whatsonchain.com/tx/';
-
-const GP_BASE_URL = 'https://ordinals.gorillapool.io';
 
 export const MAINNET_ADDRESS_PREFIX = 0x00;
 export const BSV_DECIMAL_CONVERSION = 100000000;
@@ -18,7 +17,7 @@ export const GENERIC_TOKEN_ICON =
 export const KNOWN_BURN_ADDRESSES = ['1111111111111111111114oLvT2', '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'];
 
 // MNEE
-export const MNEE_ICON_URL = `${GP_BASE_URL}/content/9c7f7f1788c6382d5ac737a4052334cf150b52d1e46c484ecfb1d6e00184f263_0`;
+export const MNEE_ICON_URL = `${ONESAT_MAINNET_CONTENT_URL}/9c7f7f1788c6382d5ac737a4052334cf150b52d1e46c484ecfb1d6e00184f263_0`;
 export const MNEE_DECIMALS = 5;
 export const MNEE_MOBILE_REFERRAL_LINK = 'https://rockwalletllc.pxf.io/6ygyKG';
 
@@ -29,7 +28,16 @@ export const DEFAULT_RELAYX_ORD_PATH = "m/44'/236'/0'/2/0";
 export const SWEEP_PATH = "m/44'/236'/0'/0/0";
 export const DEFAULT_IDENTITY_PATH = "m/0'/236'/0'/0/0";
 export const DEFAULT_TWETCH_WALLET_PATH = 'm/0/0';
-export const CHROME_STORAGE_OBJECT_VERSION = 7;
+/**
+ * Storage schema version. Bump when adding a migration in ChromeStorageService.runMigrations.
+ *  5: deviceId / showWelcome
+ *  6: per-account storageConfig
+ *  7: legacy 'p 1sat' baskets re-filed (runs in initWallet; needs an unlocked wallet)
+ *  8: customFeeRate reset to FEE_PER_KB for every account (v5.0.4)
+ */
+export const CHROME_STORAGE_OBJECT_VERSION = 8;
+/** Version stamped once the unlock-time basket migration has run. */
+export const WALLET_DATA_MIGRATION_VERSION = 7;
 
 /** Default remote storage provider (active store for new wallets). */
 export const DEFAULT_STORAGE_REMOTE_URL = 'https://wallet.1sat.app';

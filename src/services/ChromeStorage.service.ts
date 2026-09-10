@@ -7,6 +7,7 @@ import { YoursEventName } from '../inject';
 import { sendMessage, sendMessageAsync } from '../utils/chromeHelpers';
 import {
   CHROME_STORAGE_OBJECT_VERSION,
+  WALLET_DATA_MIGRATION_VERSION,
   DEFAULT_ACCOUNT,
   DEFAULT_STORAGE_REMOTE_URL,
   FEE_PER_KB,
@@ -282,6 +283,24 @@ export class ChromeStorageService {
     });
   };
 
+  /**
+   * v5.0.4: reset every account's custom fee rate to the default. Earlier builds let
+   * users set arbitrary rates, and send-all budgets its fee from this value; rates
+   * that drifted from the storage server's model made sweeps fail or overpay.
+   */
+  private migrateToV8 = async (): Promise<void> => {
+    const accounts = this.storage?.accounts ?? {};
+    const updates: Record<string, Account> = {};
+    for (const [id, account] of Object.entries(accounts)) {
+      if (account.settings?.customFeeRate === FEE_PER_KB) continue;
+      updates[id] = { ...account, settings: { ...account.settings, customFeeRate: FEE_PER_KB } };
+    }
+    await this.set({
+      version: 8,
+      ...(Object.keys(updates).length > 0 ? { accounts: { ...accounts, ...updates } } : {}),
+    });
+  };
+
   private runMigrations = async (): Promise<void> => {
     const currentVersion = this.storage?.version ?? 0;
     if (currentVersion < 5) {
@@ -290,11 +309,20 @@ export class ChromeStorageService {
     if ((this.storage?.version ?? currentVersion) < 6) {
       await this.migrateToV6();
     }
+    // v7 is stamped by completeWalletDataMigration after the unlock-time basket
+    // re-file. Storage-only migrations past it must wait for that stamp, or a
+    // wallet still on v6 would jump ahead and never run the basket step.
+    const afterV6 = this.storage?.version ?? currentVersion;
+    if (afterV6 >= WALLET_DATA_MIGRATION_VERSION && afterV6 < 8) {
+      await this.migrateToV8();
+    }
   };
 
   /** Basket re-file runs in initWallet (needs an unlocked wallet). */
   completeWalletDataMigration = async (): Promise<void> => {
-    await this.set({ version: CHROME_STORAGE_OBJECT_VERSION });
+    // Stamp the wallet-data version, not the latest schema version: set() re-reads
+    // storage and runMigrations then applies any storage-only steps that follow.
+    await this.set({ version: WALLET_DATA_MIGRATION_VERSION });
   };
 
   getAndSetStorage = async (): Promise<Partial<ChromeStorageObject> | undefined> => {
