@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Minus,
+  Usb,
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -38,7 +39,8 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
 import { FEE_PER_KB } from '../utils/constants';
-import { ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { ChromeStorageObject, UsbSecurity } from '../services/types/chromeStorage.types';
+import { deleteHandle, isUsbSupported, openUsbWindow, probeSticks, type StickProbe } from '../services/UsbKey.service';
 import { AvatarPicker } from '../components/AvatarPicker';
 import { CreateAccount } from './onboarding/CreateAccount';
 import { RestoreAccount } from './onboarding/RestoreAccount';
@@ -63,7 +65,8 @@ export type SettingsPage =
   | 'export-keys-options'
   | 'export-keys-qr'
   | 'storage'
-  | 'permissions';
+  | 'permissions'
+  | 'usb-security';
 
 type DecisionType =
   | 'sign-out'
@@ -72,7 +75,8 @@ type DecisionType =
   | 'export-keys-qr-code'
   | 'delete-account'
   | 'inscribe-avatar'
-  | 'save-profile';
+  | 'save-profile'
+  | 'remove-usb-stick';
 
 // --- Animation variants ---
 const pageVariants = {
@@ -252,6 +256,81 @@ export const Settings = () => {
   const [customFeeRate, setCustomFeeRate] = useState(currentAccount.account?.settings.customFeeRate ?? FEE_PER_KB);
   const [lockTimeout, setLockTimeout] = useState(currentAccount.account?.settings.lockTimeout ?? 10);
   const [selectedAccountIdentityAddress, setSelectedAccountIdentityAddress] = useState<string | undefined>();
+
+  // --- USB key security ---
+  const usbSupported = isUsbSupported();
+  const [usbSecurity, setUsbSecurity] = useState<UsbSecurity | undefined>(() => chromeStorageService.getUsbSecurity());
+  const [usbProbe, setUsbProbe] = useState<StickProbe | undefined>();
+  const [pendingRemoveStickId, setPendingRemoveStickId] = useState<string | undefined>();
+  const usbProbing = useRef(false);
+
+  const refreshUsbSecurity = useCallback(async () => {
+    await chromeStorageService.getAndSetStorage();
+    const latest = chromeStorageService.getUsbSecurity();
+    setUsbSecurity(latest);
+    if (!latest?.enabled || usbProbing.current) {
+      if (!latest?.enabled) setUsbProbe(undefined);
+      return;
+    }
+    usbProbing.current = true;
+    try {
+      setUsbProbe(await probeSticks(latest));
+    } catch {
+      setUsbProbe({ status: 'absent' });
+    } finally {
+      usbProbing.current = false;
+    }
+  }, [chromeStorageService]);
+
+  // The USB window writes usbSecurity from another context: follow storage
+  // changes and window focus so this page never shows a stale list.
+  useEffect(() => {
+    if (!usbSupported) return;
+    const onChanged = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
+      if (area === 'local' && 'usbSecurity' in changes) void refreshUsbSecurity();
+    };
+    const onFocus = () => void refreshUsbSecurity();
+    chrome.storage.onChanged.addListener(onChanged);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      chrome.storage.onChanged.removeListener(onChanged);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [usbSupported, refreshUsbSecurity]);
+
+  // Keep the "Inserted" badge live while the USB page is open.
+  useEffect(() => {
+    if (page !== 'usb-security' || !usbSupported) return;
+    void refreshUsbSecurity();
+    const timer = window.setInterval(() => void refreshUsbSecurity(), 2000);
+    return () => window.clearInterval(timer);
+  }, [page, usbSupported, refreshUsbSecurity]);
+
+  const handleRemoveUsbStickIntent = (stickId: string) => {
+    if (!usbSecurity) return;
+    if (usbSecurity.sticks.length <= 1) {
+      addSnackbar('Add another key first, or turn USB security off', 'error');
+      return;
+    }
+    const label = usbSecurity.sticks.find((s) => s.id === stickId)?.label ?? 'this key';
+    setPendingRemoveStickId(stickId);
+    setSpeedBumpMessage(`Remove "${label}"? It will no longer unlock this wallet.`);
+    setDecisionType('remove-usb-stick');
+    setShowSpeedBump(true);
+  };
+
+  const handleRemoveUsbStick = async () => {
+    const usb = chromeStorageService.getUsbSecurity();
+    const id = pendingRemoveStickId;
+    setPendingRemoveStickId(undefined);
+    if (!usb || !id || usb.sticks.length <= 1) return;
+    await chromeStorageService.replaceTopLevel({
+      usbSecurity: { ...usb, sticks: usb.sticks.filter((s) => s.id !== id) },
+    });
+    await deleteHandle(id);
+    addSnackbar('USB key removed', 'success');
+    await refreshUsbSecurity();
+  };
 
   // React to query deep-links (e.g. clicking "+ Add New Account" in the TopNav
   // wallet switcher while already on the Settings page).
@@ -496,6 +575,7 @@ export const Settings = () => {
 
   const handleCancel = () => {
     setShowSpeedBump(false);
+    setPendingRemoveStickId(undefined);
     if (decisionType === 'inscribe-avatar') {
       setAvatarPreview(null);
       setPendingAvatar(null);
@@ -542,6 +622,11 @@ export const Settings = () => {
       handleSaveProfile();
       setDecisionType(undefined);
       setShowSpeedBump(false);
+    }
+    if (decisionType === 'remove-usb-stick') {
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+      await handleRemoveUsbStick();
     }
   };
 
@@ -689,8 +774,24 @@ export const Settings = () => {
           description="Backup seed, download JSON, or QR code"
           onClick={() => setPage('export-keys-options')}
           isFirst
-          isLast
+          isLast={!usbSupported}
         />
+        {usbSupported && (
+          <>
+            <Divider />
+            <SettingRow
+              icon={<Usb size={16} />}
+              label="USB Key"
+              description={
+                usbSecurity?.enabled
+                  ? `${usbSecurity.sticks.length} key${usbSecurity.sticks.length === 1 ? '' : 's'} registered`
+                  : 'Require a USB drive to unlock'
+              }
+              onClick={() => setPage('usb-security')}
+              isLast
+            />
+          </>
+        )}
       </Section>
 
       {/* Preferences section */}
@@ -1160,6 +1261,168 @@ export const Settings = () => {
     </motion.div>
   );
 
+  const usbSecurityPage = (
+    <motion.div
+      key="usb-security"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-24"
+    >
+      <SubPageHeader title="USB Key" onBack={() => setPage('main')} />
+      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-4">
+        {!usbSecurity?.enabled ? (
+          <>
+            <motion.div
+              variants={rowVariant}
+              className="rounded-xl p-4"
+              style={{
+                background: 'linear-gradient(135deg, rgba(161,255,139,0.08), rgba(52,211,153,0.04))',
+                border: '1px solid rgba(161,255,139,0.15)',
+              }}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: 'rgba(161,255,139,0.12)' }}
+                >
+                  <Usb size={18} color="#A1FF8B" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: '#FFFFFF' }}>
+                    USB unlock
+                  </p>
+                  <p className="text-[10px] mt-0.5" style={{ color: '#98A2B3' }}>
+                    Your password plus an ordinary USB drive
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
+                Once on, this wallet can only be unlocked with your password and a registered USB drive plugged in. That
+                protects a locked wallet on a stolen, shared, or unattended machine even if someone knows your password.
+              </p>
+            </motion.div>
+
+            <Section title="What it does not do">
+              <div className="px-4 py-3 bg-[#17191E] space-y-2">
+                {[
+                  'While the wallet is unlocked your keys are in memory, exactly as today.',
+                  'A copy of the key file on the drive plus your password still opens the wallet.',
+                  'Lose every registered drive and the recovery code and you must restore from a backup.',
+                  'This is USB unlock, not a hardware wallet. Nothing is signed on the drive.',
+                ].map((line) => (
+                  <div key={line} className="flex items-start gap-2">
+                    <Minus size={12} className="mt-0.5 shrink-0" style={{ color: '#98A2B3' }} />
+                    <p className="text-xs leading-snug" style={{ color: '#98A2B3' }}>
+                      {line}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Section>
+
+            <motion.div
+              variants={rowVariant}
+              className="flex items-start gap-2 rounded-xl px-4 py-3"
+              style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}
+            >
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" style={{ color: '#FBBF24' }} />
+              <p className="text-xs leading-snug" style={{ color: '#FBBF24' }}>
+                Take a fresh master backup first. Turning this on re-encrypts every account, and a backup is your only
+                way back in without a drive or the recovery code.
+              </p>
+            </motion.div>
+
+            <motion.div variants={rowVariant} className="flex flex-col items-center gap-2">
+              <Button theme={theme} type="primary" label="Turn on" onClick={() => void openUsbWindow('enroll')} />
+              <Button
+                theme={theme}
+                type="secondary-outline"
+                label="Make a backup first"
+                onClick={() => setPage('export-keys-options')}
+              />
+            </motion.div>
+          </>
+        ) : (
+          <>
+            <Section title="Registered keys">
+              {usbSecurity.sticks.map((stick, i) => {
+                const inserted = usbProbe?.status === 'ok' && usbProbe.stickId === stick.id;
+                return (
+                  <div key={stick.id}>
+                    {i > 0 && <Divider />}
+                    <SettingRow
+                      icon={<Usb size={16} />}
+                      label={stick.label}
+                      description={`Added ${new Date(stick.addedAt).toLocaleDateString()}`}
+                      isFirst={i === 0}
+                      isLast={i === usbSecurity.sticks.length - 1}
+                      right={
+                        <div className="flex items-center gap-2">
+                          {inserted && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5"
+                              style={{ backgroundColor: 'rgba(52,211,153,0.15)', color: '#34D399' }}
+                            >
+                              <span
+                                className="inline-block w-1.5 h-1.5 rounded-full"
+                                style={{ backgroundColor: '#34D399' }}
+                              />
+                              Inserted
+                            </span>
+                          )}
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleRemoveUsbStickIntent(stick.id)}
+                            className="text-[11px] font-semibold rounded-lg px-2 py-1 border-none cursor-pointer outline-none"
+                            style={{ backgroundColor: 'rgba(239,68,68,0.12)', color: '#ef4444' }}
+                          >
+                            Remove
+                          </motion.button>
+                        </div>
+                      }
+                    />
+                  </div>
+                );
+              })}
+            </Section>
+
+            <Section title="Manage">
+              <SettingRow
+                icon={<Plus size={16} />}
+                label="Add another USB key"
+                description="Needs a registered key inserted"
+                onClick={() => void openUsbWindow('add')}
+                isFirst
+              />
+              <Divider />
+              <SettingRow
+                icon={<AlertTriangle size={16} />}
+                label="Lost a key? Rotate"
+                description="New secret and recovery code; old keys stop working"
+                onClick={() => void openUsbWindow('rotate')}
+              />
+              <Divider />
+              <SettingRow
+                icon={<Lock size={16} />}
+                label="Turn off"
+                description="Go back to password-only unlock"
+                onClick={() => void openUsbWindow('disable')}
+                danger
+                isLast
+              />
+            </Section>
+
+            <motion.p variants={rowVariant} className="text-[10px] text-center px-2" style={{ color: '#475467' }}>
+              USB unlock protects a locked wallet. It is not a hardware wallet: keys are in memory while unlocked.
+            </motion.p>
+          </>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+
   return (
     <>
       <Show
@@ -1275,6 +1538,8 @@ export const Settings = () => {
             {page === 'export-keys-options' && exportKeyOptionsPage}
 
             {page === 'export-keys-qr' && exportKeysAsQrCodePage}
+
+            {page === 'usb-security' && usbSecurityPage}
           </AnimatePresence>
         </div>
       </Show>

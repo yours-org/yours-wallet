@@ -1,0 +1,6 @@
+/* The USB window is 460px wide; lift the popup-sized cap from index.css. */
+html,
+body,
+#root {
+  max-width: none;
+}

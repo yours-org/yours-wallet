@@ -16,6 +16,8 @@ import { SnackbarProvider } from './contexts/providers/SnackbarProvider';
 import { ThemeProvider } from './contexts/providers/ThemeProvider';
 import { useServiceContext } from './hooks/useServiceContext';
 import { useTheme } from './hooks/useTheme';
+import { getHandle, requestHandlePermission } from './services/UsbKey.service';
+import { enforceUsbPresence, type UsbPresence } from './services/usbPresence';
 import { CounterpartyPermissionRequestPage } from './pages/requests/CounterpartyPermissionRequest';
 import { GroupedPermissionRequestPage } from './pages/requests/GroupedPermissionRequest';
 import { OneSatPermissionRequestPage } from './pages/requests/OneSatPermissionRequest';
@@ -37,14 +39,22 @@ type PromptScreen =
   | { kind: 'permission'; requestID: string; payload: PermissionRequest & { requestID: string } }
   | { kind: 'groupedPermission'; requestID: string; payload: GroupedPermissionRequest }
   | { kind: 'counterpartyPermission'; requestID: string; payload: CounterpartyPermissionRequest }
-  | { kind: 'oneSatPermission'; requestID: string; payload: OneSatPromptStorageEntry };
+  | { kind: 'oneSatPermission'; requestID: string; payload: OneSatPromptStorageEntry }
+  /** USB key security is on and no registered stick reads: hold the request until one does. */
+  | { kind: 'usbAbsent'; presence: UsbPresence; pending: PendingRequest };
+
+type PendingRequest = Extract<
+  PromptScreen,
+  { kind: 'permission' | 'groupedPermission' | 'counterpartyPermission' | 'oneSatPermission' }
+>;
 
 const WAITING_CLOSE_MS = 10000;
 const EXPIRED_CLOSE_MS = 2000;
+const USB_RECHECK_MS = 2000;
 
 const PromptApp = () => {
   const { theme } = useTheme();
-  const { isLocked, isReady } = useServiceContext();
+  const { isLocked, isReady, chromeStorageService, lockWallet } = useServiceContext();
   const [screen, setScreen] = useState<PromptScreen>({ kind: 'loading' });
   const waitingTimer = useRef<number | undefined>(undefined);
   const advanceRef = useRef<(() => Promise<void>) | undefined>(undefined);
@@ -56,26 +66,81 @@ const PromptApp = () => {
     }
   };
 
-  const loadPrompt = useCallback(async (kind: PromptKind, requestID: string) => {
-    clearWaitingTimer();
-    setScreen({ kind: 'loading' });
-    let res: { success: boolean; data?: unknown } | undefined;
-    try {
-      res = await sendMessageAsync<{ success: boolean; data?: unknown }>({
-        action: 'GET_PROMPT_PAYLOAD',
-        kind,
-        requestID,
-      });
-    } catch {
-      res = undefined;
+  /** Two consecutive misses while a request is held: the stick was pulled, so lock. */
+  const onUsbRemoved = useCallback(() => {
+    setScreen({ kind: 'unlock' });
+    void lockWallet();
+  }, [lockWallet]);
+
+  /**
+   * Gate a fetched request on USB presence. With the feature off this is a
+   * no-op. The request is never answered or closed while we wait.
+   */
+  const gateOnUsb = useCallback(
+    async (pending: PendingRequest) => {
+      const presence = await enforceUsbPresence(chromeStorageService, onUsbRemoved);
+      if (presence === 'present' || presence === 'disabled') setScreen(pending);
+      else setScreen({ kind: 'usbAbsent', presence, pending });
+    },
+    [chromeStorageService, onUsbRemoved],
+  );
+
+  const loadPrompt = useCallback(
+    async (kind: PromptKind, requestID: string) => {
+      clearWaitingTimer();
+      setScreen({ kind: 'loading' });
+      let res: { success: boolean; data?: unknown } | undefined;
+      try {
+        res = await sendMessageAsync<{ success: boolean; data?: unknown }>({
+          action: 'GET_PROMPT_PAYLOAD',
+          kind,
+          requestID,
+        });
+      } catch {
+        res = undefined;
+      }
+      if (res?.success && res.data) {
+        await gateOnUsb({ kind, requestID, payload: res.data } as PendingRequest);
+      } else {
+        setScreen({ kind: 'expired' });
+        window.setTimeout(() => void advanceRef.current?.(), EXPIRED_CLOSE_MS);
+      }
+    },
+    [gateOnUsb],
+  );
+
+  // While a request is held for the USB key, re-check every couple of seconds
+  // and render it as soon as a registered stick reads.
+  useEffect(() => {
+    if (screen.kind !== 'usbAbsent') return;
+    const { pending } = screen;
+    let cancelled = false;
+    const tick = async () => {
+      const presence = await enforceUsbPresence(chromeStorageService, onUsbRemoved);
+      if (cancelled) return;
+      if (presence === 'present' || presence === 'disabled') setScreen(pending);
+      else
+        setScreen((prev) => (prev.kind === 'usbAbsent' && prev.presence !== presence ? { ...prev, presence } : prev));
+    };
+    const timer = window.setInterval(() => void tick(), USB_RECHECK_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [screen, chromeStorageService, onUsbRemoved]);
+
+  /** Needs a user gesture: Chrome shows a permission bubble for each saved handle. */
+  const allowUsbAccess = async () => {
+    if (screen.kind !== 'usbAbsent') return;
+    const usb = chromeStorageService.getUsbSecurity();
+    for (const stick of usb?.sticks ?? []) {
+      const handle = await getHandle(stick.id);
+      if (handle) await requestHandlePermission(handle);
     }
-    if (res?.success && res.data) {
-      setScreen({ kind, requestID, payload: res.data } as PromptScreen);
-    } else {
-      setScreen({ kind: 'expired' });
-      window.setTimeout(() => void advanceRef.current?.(), EXPIRED_CLOSE_MS);
-    }
-  }, []);
+    const presence = await enforceUsbPresence(chromeStorageService, onUsbRemoved);
+    if (presence === 'present' || presence === 'disabled') setScreen(screen.pending);
+    else setScreen({ ...screen, presence });
+  };
 
   /**
    * Ask the background to close this window. It closes only if nothing is
@@ -182,6 +247,31 @@ const PromptApp = () => {
           </p>
         )}
         {screen.kind === 'unlock' && <UnlockWallet onUnlock={() => void advance()} />}
+        {screen.kind === 'usbAbsent' && (
+          <div className="flex flex-col items-center gap-3 px-8 text-center">
+            <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: theme.color.global.gray }} />
+            <p className="text-sm font-semibold" style={{ color: theme.color.global.contrast }}>
+              {screen.presence === 'permission' ? 'Allow access to your USB key' : 'Insert your USB key to continue'}
+            </p>
+            <p className="text-xs" style={{ color: theme.color.global.gray }}>
+              This request will open as soon as a registered USB key is detected.
+            </p>
+            {screen.presence === 'permission' && (
+              <button
+                type="button"
+                onClick={() => void allowUsbAccess()}
+                className="text-xs font-semibold rounded-lg px-3 py-1.5 border-none cursor-pointer outline-none"
+                style={{
+                  backgroundColor: `${theme.color.component.primaryButtonLeftGradient}22`,
+                  color: theme.color.component.primaryButtonLeftGradient,
+                  fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+                }}
+              >
+                Allow USB access
+              </button>
+            )}
+          </div>
+        )}
         {screen.kind === 'permission' && (
           <PermissionRequestPage request={screen.payload} onResponse={() => void advance()} />
         )}

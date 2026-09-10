@@ -6,15 +6,18 @@ import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import { createContext } from '@1sat/actions';
 import { fetchExchangeRate } from '../../utils/wallet';
 import { createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
+import { gateWalletOnUsb } from '../../services/usbPresence';
 
-const initializeServices = async () => {
+const initializeServices = async (onUsbRemoved: () => void) => {
   const chromeStorageService = new ChromeStorageService();
   await chromeStorageService.getAndSetStorage();
 
   const keysService = new KeysService(chromeStorageService);
 
   // Create context using ChromeCWI (communicates with service worker via chrome.runtime.sendMessage)
-  const chromeCWI = createChromeCWI();
+  // USB key security: spend/sign calls from this page first confirm a
+  // registered stick is present; two misses in a row lock the wallet.
+  const chromeCWI = gateWalletOnUsb(createChromeCWI(), chromeStorageService, onUsbRemoved);
   const chain = 'main' as const;
   const services = new OneSatServices(chain);
   // chromeCWI is the gated background wallet — module owns apply.
@@ -37,6 +40,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [isReady, setIsReady] = useState<boolean>(false);
   const [isSwitchingAccount, setIsSwitchingAccount] = useState<boolean>(false);
   const prevIsLockedRef = useRef<boolean | null>(null);
+  const lockRef = useRef<() => void>(() => setIsLocked(true));
   useEffect(() => {
     if (services?.chromeStorageService) {
       const timestamp = Date.now();
@@ -54,7 +58,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
   useEffect(() => {
     const initServices = async () => {
       try {
-        const initializedServices = await initializeServices();
+        const initializedServices = await initializeServices(() => lockRef.current());
         const { chromeStorageService, apiContext } = initializedServices;
         const { account, lastActiveTime } = chromeStorageService.getCurrentAccountObject();
 
@@ -97,6 +101,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (!isReady) return;
     setIsLocked(true);
   }, [isReady]);
+  lockRef.current = () => setIsLocked(true);
 
   useEffect(() => {
     const checkLockState = async () => {

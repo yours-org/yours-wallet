@@ -17,6 +17,7 @@ import {
 } from '../utils/constants';
 import { decrypt, encrypt } from '../utils/crypto';
 import { derivePassKey, type UsbUnlockMaterial } from './passKey';
+import { probeSticks } from './UsbKey.service';
 import { Keys } from '../utils/keys';
 import { deepMerge } from './serviceHelpers';
 import {
@@ -27,25 +28,34 @@ import {
   UsbSecurity,
 } from './types/chromeStorage.types';
 
+// passKey lives in chrome.storage.session (in-memory only, survives service worker idle,
+// cleared on browser close, not written to disk, not accessible to content scripts).
+// The cache is module-level, shared by every instance in this context: the
+// background creates a fresh service on account switch, and a per-instance
+// cache would let one instance keep a key another instance has replaced.
+let cachedPassKey: string | undefined;
+
+// A re-key (USB key security) replaces the session value from one context.
+// Without this every other context would keep signing, or worse encrypting,
+// with the old key until it restarted.
+try {
+  chrome.storage.onChanged.addListener((changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+    if (area !== 'session' || !('passKey' in changes)) return;
+    cachedPassKey = changes.passKey.newValue as string | undefined;
+  });
+} catch {
+  // Not in an extension context (tests).
+}
+
 export class ChromeStorageService {
   storage: Partial<ChromeStorageObject> | undefined;
 
-  // passKey lives in chrome.storage.session (in-memory only, survives service worker idle,
-  // cleared on browser close, not written to disk, not accessible to content scripts).
-  private cachedPassKey: string | undefined;
+  private get cachedPassKey(): string | undefined {
+    return cachedPassKey;
+  }
 
-  constructor() {
-    // Every context (popup, prompt window, service worker) caches the passKey.
-    // A re-key in one context replaces the session value; without this every
-    // other context would keep signing (or worse, encrypting) with the old key.
-    try {
-      chrome.storage.onChanged.addListener((changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-        if (area !== 'session' || !('passKey' in changes)) return;
-        this.cachedPassKey = changes.passKey.newValue as string | undefined;
-      });
-    } catch {
-      // Not in an extension context (tests).
-    }
+  private set cachedPassKey(value: string | undefined) {
+    cachedPassKey = value;
   }
 
   setPassKey = async (passKey: string): Promise<void> => {
@@ -434,6 +444,10 @@ export class ChromeStorageService {
    */
   update = async (obj: Partial<ChromeStorageObject>): Promise<void> => {
     try {
+      if ('accounts' in obj) {
+        const { keyRekey } = await this.get(['keyRekey']);
+        if (keyRekey) throw new Error('Wallet keys are being re-encrypted; try again in a moment');
+      }
       const entries = Object.entries(obj) as [string, unknown][];
       const isPlainObject = (v: unknown): v is Record<string, unknown> =>
         typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -527,15 +541,22 @@ export class ChromeStorageService {
   getUsbSecurity = (): UsbSecurity | undefined => this.storage?.usbSecurity;
 
   /**
-   * With USB key security on, `material` (the master factor unwrapped from an
-   * inserted stick or decoded from the recovery code) is required; without it
-   * this returns false before touching the password.
+   * With USB key security on, the master factor is required. Callers that have
+   * it (the unlock screen: unwrapped from an inserted stick or decoded from the
+   * recovery code) pass it as `material`; every other page-side caller
+   * (settings confirmations, key export, account creation) gets it by probing
+   * the registered sticks here. No stick, no verification: this returns false
+   * before touching the password. Never called from the service worker.
    */
   verifyPassword = async (password: string, material?: UsbUnlockMaterial): Promise<boolean> => {
     const { salt, account, selectedAccount } = this.getCurrentAccountObject();
     if (!salt || !account?.encryptedKeys) return false;
     const usbSecurity = this.getUsbSecurity();
-    if (usbSecurity?.enabled && !material?.master) return false;
+    if (usbSecurity?.enabled && !material?.master) {
+      const probe = await probeSticks(usbSecurity).catch(() => null);
+      if (probe?.status !== 'ok') return false;
+      material = { master: probe.master };
+    }
     // Once USB security is on every blob has been rewritten as v2 by the
     // re-key; the unauthenticated legacy path must not be reachable.
     if (usbSecurity?.enabled && !account.encryptedKeys.startsWith('v2:')) return false;

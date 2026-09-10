@@ -241,3 +241,26 @@ export const adoptPickedDrive = async (
   await saveHandle(opened.entry.id, drive);
   return { status: 'ok', stickId: opened.entry.id, master: opened.master, handle: drive };
 };
+
+// --- The dedicated USB window ---
+
+export type UsbWindowMode = 'enroll' | 'add' | 'repick' | 'rotate' | 'disable';
+
+/**
+ * Picker and permission prompts must run in a page that survives focus loss.
+ * The browser-action popup closes on blur, so every such flow opens usb.html
+ * as its own window. Pages call this directly; it needs no background help.
+ */
+export const openUsbWindow = async (mode: UsbWindowMode): Promise<void> => {
+  const url = chrome.runtime.getURL('usb.html') + `?mode=${mode}`;
+  const existing = (await chrome.windows.getAll({ populate: true })).find((w) =>
+    w.tabs?.some((t) => t.url?.startsWith(chrome.runtime.getURL('usb.html'))),
+  );
+  if (existing?.id) {
+    const tab = existing.tabs?.find((t) => t.url?.startsWith(chrome.runtime.getURL('usb.html')));
+    if (tab?.id) await chrome.tabs.update(tab.id, { url });
+    await chrome.windows.update(existing.id, { focused: true });
+    return;
+  }
+  await chrome.windows.create({ url, type: 'popup', width: 460, height: 640 });
+};

@@ -1,6 +1,6 @@
 # USB key security
 
-Status: design v2, revised after two security reviews (cryptography; browser platform and lockout). Not yet implemented.
+Status: design v2, revised after two security reviews (cryptography; browser platform and lockout). Implemented on branch `dan/OPL-4678-usb-key-security`; see "Implementation notes" at the end for where the code deviates from the text above.
 
 ## Goal
 
@@ -197,3 +197,16 @@ Toggle off, password confirm, stick present. Re-key routine back to `passKey = p
 ## Review history
 
 - v1 reviewed 2026-09-10 by a cryptography reviewer (verdict: changes required) and a platform/lockout reviewer (verdict: sign off with changes). v2 incorporates every blocking finding: rotation wording, coordinated re-key with epochs and a stale-cache broadcast, single derivation function, restore clears `usbSecurity`, backup export fails closed and warns, recovery forces rotation, `M` not held in session, enrollment moved out of the action popup, locked-screen re-pick, backup-not-seed gate with typed-back recovery code, presence check unwraps `M`, hidden directory with size cap, opt-in erase with multi-install warning, SHA-256 pinned, `kdfVersion`, legacy decrypt disabled when enabled.
+
+## Implementation notes
+
+Where the code differs from the design text above, the code is authoritative.
+
+- **Epoch lives at the storage root.** `keyEpoch`, `keyRekey` (the in-progress marker) and `keyRecovery` (the previous passKey wrapped under the current one) are root keys, not fields of `usbSecurity`, so they survive disabling the feature and a disable that is interrupted can still be repaired.
+- **`M` is never in session.** Pages that need it (settings confirmations, key export, account creation) probe the inserted stick inside `ChromeStorageService.verifyPassword` when no material is passed. The unlock screen passes material explicitly so it can tell "wrong password" from "no stick".
+- **The passKey cache is module-level** in `ChromeStorage.service.ts` and follows `chrome.storage.session` changes, which is how every context learns about a re-key. There is no separate broadcast message.
+- **Rotation keeps one stick.** Wrapping a new master under a stick needs that stick's secret, which only exists on the stick, so a rotation registers only the drive picked during the flow and drops the rest. Other sticks are re-added from Settings afterwards. The lost-every-stick recovery goes straight into this rotation.
+- **Backups always carry password-only blobs.** `MASTER_BACKUP` now carries the password the user just confirmed; the background re-encrypts each account under the password key for the archive. Restore refuses while the feature is on and strips any USB state from the archive.
+- **Recovery code must be typed back** during enrolment and rotation, and enrolment requires a master backup exported in the current session (`usbBackupConfirmedAt` in session storage).
+- **Presence policy** (`src/services/usbPresence.ts`): the popup's wallet is wrapped so spend/sign/reveal calls probe first; the prompt window probes before rendering a request; two consecutive misses lock. Read-only calls are not gated.
+- **Sign-out** already clears all local storage and every IndexedDB database, which covers the handle store, so nothing extra is needed there.
