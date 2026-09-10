@@ -61,6 +61,12 @@ export interface Account {
   icon: string;
   network: NetWork;
   encryptedKeys: string; // See Keys type
+  /**
+   * Key epoch `encryptedKeys` was written under. Absent = 0 = password-only.
+   * Bumped by every re-key (USB security enable/disable/rotate). Compared
+   * against the root `keyEpoch` to detect an account a stale writer reverted.
+   */
+  keyEpoch?: number;
   derivationTags: TaggedDerivationResponse[];
   settings: Settings;
   addresses: Addresses;
@@ -70,6 +76,47 @@ export interface Account {
   mneeBalance: MNEEBalance;
   pubKeys: PubKeys;
   storageConfig?: StorageConfig;
+}
+
+/** One registered USB drive. The matching secret lives only in the file on the drive. */
+export interface UsbStickEntry {
+  /** Matches the id inside `.yours/usb-key.json` on the drive. */
+  id: string;
+  /** User-given, e.g. "Blue Kingston". */
+  label: string;
+  /** Master factor encrypted under a key derived from this stick's secret. */
+  wrappedMaster: string;
+  addedAt: string;
+}
+
+/**
+ * USB key security (docs/usb-key-security.md). Present only while enabled.
+ * The master factor is never stored unwrapped: each stick holds one wrapper.
+ */
+export interface UsbSecurity {
+  enabled: true;
+  version: 1;
+  kdfVersion: 1;
+  /** HKDF(master) verifier so a recovery-code typo reads differently from a wrong password. */
+  masterCheck: string;
+  sticks: UsbStickEntry[];
+}
+
+/** Written first and cleared last by the re-key routine. Other account writers refuse while set. */
+export interface KeyRekeyMarker {
+  fromEpoch: number;
+  toEpoch: number;
+  startedAt: string;
+}
+
+/**
+ * Kept from the moment a re-key commits until read-back verifies every account
+ * is on the new epoch. Lets a stale account be repaired at the next unlock.
+ */
+export interface KeyRecovery {
+  toEpoch: number;
+  /** Previous passKey, encrypted (v2) under the current passKey. */
+  wrappedPreviousPassKey: string;
 }
 
 export type ExchangeRateCache = {
@@ -99,6 +146,12 @@ export interface ChromeStorageObject {
   storageIdentityKey?: string;
   showWelcome?: boolean;
   broadcastRequest?: Broadcast;
+  /** USB key security; absent when off. */
+  usbSecurity?: UsbSecurity;
+  /** Current key epoch for `accounts[*].encryptedKeys`. Absent = 0. */
+  keyEpoch?: number;
+  keyRekey?: KeyRekeyMarker;
+  keyRecovery?: KeyRecovery;
 }
 
 export type CurrentAccountObject = Omit<ChromeStorageObject, 'accounts' | 'popupWindowId' | 'broadcastRequest'> & {

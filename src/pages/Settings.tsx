@@ -519,7 +519,7 @@ export const Settings = () => {
         addSnackbar('Invalid password!', 'error');
         return;
       }
-      handleMasterBackup();
+      handleMasterBackup(password);
       setDecisionType(undefined);
       setShowSpeedBump(false);
     }
@@ -590,7 +590,7 @@ export const Settings = () => {
     await chromeStorageService.updateNested(key, update);
   }, [lockTimeout, chromeStorageService, addSnackbar]);
 
-  const handleMasterBackup = async () => {
+  const handleMasterBackup = async (password?: string) => {
     // Populate overlay with all accounts
     const allAccounts = chromeStorageService.getAllAccounts();
     setBackupAccounts(allAccounts.map((a) => ({ name: a.name, icon: a.icon || '', status: 'pending' })));
@@ -601,25 +601,31 @@ export const Settings = () => {
     setMasterBackupEventText('Preparing backup...');
 
     try {
-      await streamDataToZip(chromeStorageService, (e: MasterBackupProgressEvent) => {
-        setMasterBackupEventText(e.message);
-        const progress = e.endValue && e.value ? Math.ceil((e.value / e.endValue) * 100) : 0;
-        setMasterBackupProgress(progress);
+      await streamDataToZip(
+        chromeStorageService,
+        (e: MasterBackupProgressEvent) => {
+          setMasterBackupEventText(e.message);
+          const progress = e.endValue && e.value ? Math.ceil((e.value / e.endValue) * 100) : 0;
+          setMasterBackupProgress(progress);
 
-        // Update per-account status based on accountIndex
-        if (e.accountIndex !== undefined && e.totalAccounts !== undefined) {
-          setBackupAccounts((prev) =>
-            prev.map((a, i) => ({
-              ...a,
-              status: i < e.accountIndex! ? 'done' : i === e.accountIndex! ? 'active' : 'pending',
-            })),
-          );
-        }
+          // Update per-account status based on accountIndex
+          if (e.accountIndex !== undefined && e.totalAccounts !== undefined) {
+            setBackupAccounts((prev) =>
+              prev.map((a, i) => ({
+                ...a,
+                status: i < e.accountIndex! ? 'done' : i === e.accountIndex! ? 'active' : 'pending',
+              })),
+            );
+          }
 
-        if (e.stage === 'complete') {
-          setBackupAccounts((prev) => prev.map((a) => ({ ...a, status: 'done' })));
-        }
-      });
+          if (e.stage === 'complete') {
+            setBackupAccounts((prev) => prev.map((a) => ({ ...a, status: 'done' })));
+          }
+        },
+        password,
+      );
+      // USB key security enrolment requires a fresh backup this session.
+      await chrome.storage.session.set({ usbBackupConfirmedAt: Date.now() });
       setBackupDone(true);
       setMasterBackupEventText('Backup complete! File downloaded.');
       setMasterBackupProgress(100);

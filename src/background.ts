@@ -49,6 +49,8 @@ import type { PromptKind } from './promptProtocol';
 import { initWallet, openAccountStorageForBackup, type AccountContext } from './initWallet';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
+import { repairStaleAccounts, usbRekey, type UsbRekeyRequest } from './services/usbRekeyBackground';
+import { USB_HANDLE_DB_NAME } from './services/UsbKey.service';
 
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
@@ -116,6 +118,13 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   console.log('[background] initializeWallet: starting, current accountContext:', !!accountContext);
   if (accountContext) {
     dropWalletContext('before-init');
+  }
+  // USB key security: finish any re-key whose read-back never ran, so no
+  // account is left under a previous epoch's key.
+  try {
+    await repairStaleAccounts(chromeStorageService);
+  } catch (err) {
+    console.error('[background] repairStaleAccounts failed:', err);
   }
 
   console.log('[background] initializeWallet: calling initWallet...');
@@ -694,6 +703,8 @@ if (isInServiceWorker) {
       // Master backup/restore
       'MASTER_BACKUP',
       'MASTER_RESTORE',
+      // USB key security (popup / USB window internal)
+      'USB_REKEY',
       // Storage management (popup internal)
       'STORAGE_GET_INFO',
       'STORAGE_SYNC_BACKUPS',
@@ -875,7 +886,12 @@ if (isInServiceWorker) {
           });
           return true;
         case 'MASTER_BACKUP':
-          processMasterBackup(sendResponse);
+          processMasterBackup(message.password, sendResponse);
+          return true;
+        case 'USB_REKEY':
+          usbRekey(chromeStorageService, message as UsbRekeyRequest)
+            .then((res) => sendResponse({ type: 'USB_REKEY', ...res }))
+            .catch((err: Error) => sendResponse({ type: 'USB_REKEY', success: false, error: err.message }));
           return true;
         case 'MASTER_RESTORE':
           processMasterRestore(message, sendResponse);
@@ -1802,7 +1818,7 @@ if (isInServiceWorker) {
 
   // MASTER BACKUP/RESTORE HANDLERS ********************************
 
-  const processMasterBackup = async (sendResponse: CallbackResponse) => {
+  const processMasterBackup = async (password: string | undefined, sendResponse: CallbackResponse) => {
     // Remember where the user started so we can restore even if export fails.
     const originalSelectedAccount = chromeStorageService.getCurrentAccountObject().selectedAccount || '';
 
@@ -1912,6 +1928,7 @@ if (isInServiceWorker) {
             close: opened.close,
           };
         },
+        password,
         broadcastProgress,
       );
 
@@ -1994,6 +2011,13 @@ if (isInServiceWorker) {
       }
 
       console.log('[MasterRestore] Restoring from backup...', legacy ? '(legacy)' : '(v1/v2)');
+
+      await chromeStorageService.getAndSetStorage();
+      if (chromeStorageService.getUsbSecurity()?.enabled) {
+        throw new Error('Turn off USB key security before restoring a backup');
+      }
+      // Any handles from a previous enrolment on this profile are meaningless for restored keys.
+      indexedDB.deleteDatabase(USB_HANDLE_DB_NAME);
 
       const manifest = await WalletBackupService.restoreFromExtractedData(
         chromeStorageService,

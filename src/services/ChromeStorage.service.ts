@@ -15,10 +15,17 @@ import {
   INACTIVITY_LIMIT,
   MAINNET_ADDRESS_PREFIX,
 } from '../utils/constants';
-import { decrypt, deriveKey, encrypt } from '../utils/crypto';
+import { decrypt, encrypt } from '../utils/crypto';
+import { derivePassKey, type UsbUnlockMaterial } from './passKey';
 import { Keys } from '../utils/keys';
 import { deepMerge } from './serviceHelpers';
-import { Account, ChromeStorageObject, CurrentAccountObject, DeprecatedStorage } from './types/chromeStorage.types';
+import {
+  Account,
+  ChromeStorageObject,
+  CurrentAccountObject,
+  DeprecatedStorage,
+  UsbSecurity,
+} from './types/chromeStorage.types';
 
 export class ChromeStorageService {
   storage: Partial<ChromeStorageObject> | undefined;
@@ -26,6 +33,20 @@ export class ChromeStorageService {
   // passKey lives in chrome.storage.session (in-memory only, survives service worker idle,
   // cleared on browser close, not written to disk, not accessible to content scripts).
   private cachedPassKey: string | undefined;
+
+  constructor() {
+    // Every context (popup, prompt window, service worker) caches the passKey.
+    // A re-key in one context replaces the session value; without this every
+    // other context would keep signing (or worse, encrypting) with the old key.
+    try {
+      chrome.storage.onChanged.addListener((changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+        if (area !== 'session' || !('passKey' in changes)) return;
+        this.cachedPassKey = changes.passKey.newValue as string | undefined;
+      });
+    } catch {
+      // Not in an extension context (tests).
+    }
+  }
 
   setPassKey = async (passKey: string): Promise<void> => {
     this.cachedPassKey = passKey;
@@ -43,6 +64,13 @@ export class ChromeStorageService {
     this.cachedPassKey = undefined;
     await chrome.storage.session.remove('passKey');
   };
+
+  /**
+   * Write top-level keys exactly as given, with no read-merge. Only for callers
+   * that hold a complete value (the re-key routine writes the whole `accounts`
+   * object it just verified). Everything else should use `update`.
+   */
+  replaceTopLevel = async (obj: Partial<ChromeStorageObject>): Promise<void> => this.set(obj);
 
   private set = async (obj: Partial<ChromeStorageObject>): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
@@ -363,7 +391,12 @@ export class ChromeStorageService {
     update: Partial<ChromeStorageObject[K]>,
   ): Promise<void> => {
     try {
-      const result = await this.get([key]);
+      const result = await this.get(key === 'accounts' ? [key, 'keyRekey'] : [key]);
+      if (key === 'accounts' && result.keyRekey) {
+        // A re-key is rewriting every account. A snapshot merged now would land
+        // on top of it and revert one account to the previous key.
+        throw new Error('Wallet keys are being re-encrypted; try again in a moment');
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const existingObject = (result[key] ?? {}) as Record<string, any>;
       const mergedObject = deepMerge(existingObject, update);
@@ -490,11 +523,24 @@ export class ChromeStorageService {
    * On success, stores the passKey in session storage so the wallet can initialize.
    * On failure, passKey remains absent — keys stay inaccessible.
    */
-  verifyPassword = async (password: string): Promise<boolean> => {
+  /** USB key security settings, or undefined when off. */
+  getUsbSecurity = (): UsbSecurity | undefined => this.storage?.usbSecurity;
+
+  /**
+   * With USB key security on, `material` (the master factor unwrapped from an
+   * inserted stick or decoded from the recovery code) is required; without it
+   * this returns false before touching the password.
+   */
+  verifyPassword = async (password: string, material?: UsbUnlockMaterial): Promise<boolean> => {
     const { salt, account, selectedAccount } = this.getCurrentAccountObject();
     if (!salt || !account?.encryptedKeys) return false;
+    const usbSecurity = this.getUsbSecurity();
+    if (usbSecurity?.enabled && !material?.master) return false;
+    // Once USB security is on every blob has been rewritten as v2 by the
+    // re-key; the unauthenticated legacy path must not be reachable.
+    if (usbSecurity?.enabled && !account.encryptedKeys.startsWith('v2:')) return false;
     try {
-      const derivedKey = deriveKey(password, salt);
+      const derivedKey = await derivePassKey(password, salt, usbSecurity, material);
       // Attempt decryption — throws if password is wrong
       const decrypted = await decrypt(account.encryptedKeys, derivedKey);
       JSON.parse(decrypted); // Verify it's valid JSON

@@ -7,7 +7,8 @@ import {
   SWEEP_PATH,
   CHROME_STORAGE_OBJECT_VERSION,
 } from '../utils/constants';
-import { decrypt, deriveKey, encrypt, generateRandomSalt } from '../utils/crypto';
+import { decrypt, encrypt, generateRandomSalt } from '../utils/crypto';
+import { derivePassKey } from './passKey';
 import { generateKeysFromTag, getKeys, getKeysFromWifs, Keys } from '../utils/keys';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { ChromeStorageObject } from './types/chromeStorage.types';
@@ -82,7 +83,9 @@ export class KeysService {
     } else {
       const acctObj = this.chromeStorageService.getCurrentAccountObject();
       salt = acctObj?.salt || generateRandomSalt();
-      passKey = deriveKey(password, salt);
+      // A brand-new wallet can't have USB security on; if storage says it is,
+      // refuse rather than write an account under a password-only key.
+      passKey = await derivePassKey(password, salt, this.chromeStorageService.getUsbSecurity());
     }
 
     if (!salt) throw new Error('Salt not found');

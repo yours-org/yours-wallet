@@ -10,7 +10,8 @@ import type { WalletStorageManager, sdk } from '@bsv/wallet-toolbox-client';
 import type { ChromeStorageService } from '../services/ChromeStorage.service';
 import type { Account } from '../services/types/chromeStorage.types';
 import type { Theme } from '../theme.types';
-import { decrypt, deriveKey } from '../utils/crypto';
+import { decrypt, encrypt } from '../utils/crypto';
+import { derivePasswordKey } from '../services/passKey';
 
 type Chain = 'main' | 'test';
 type SyncChunk = sdk.SyncChunk;
@@ -195,9 +196,15 @@ export class WalletBackupService {
     openAccount: (
       account: BackupAccountDescriptor,
     ) => Promise<{ storage: WalletStorageManager; close: () => Promise<void> }>,
+    password: string | undefined,
     onProgress: (event: MultiAccountProgressEvent) => void,
   ): Promise<Blob> {
     onProgress({ stage: 'preparing', message: 'Preparing backup...', totalAccounts: accounts.length });
+
+    // A backup must never depend on a USB drive. With USB security on, the
+    // stored blobs are under the combined key; the archive gets copies under
+    // the password-only key, which is exactly what restore derives.
+    const exportAccounts = await this.accountsForExport(chromeStorageService, password);
 
     // Capture before openAccount switches selectedAccount for each wallet.
     const initialChromeStorage = await chromeStorageService.getAndSetStorage();
@@ -315,7 +322,7 @@ export class WalletBackupService {
     });
     const chromeStorage = await chromeStorageService.getAndSetStorage();
     const backupChromeStorage: BackupChromeStorage = {
-      accounts: chromeStorage?.accounts || {},
+      accounts: exportAccounts,
       selectedAccount: originalSelectedAccount || chromeStorage?.selectedAccount || '',
       accountNumber: chromeStorage?.accountNumber || 1,
       salt: chromeStorage?.salt || '',
@@ -386,7 +393,7 @@ export class WalletBackupService {
       // ── Legacy restore (keys only) ──────────────────────────────
       onProgress({ stage: 'importing', message: 'Detected older backup format. Restoring account keys...' });
 
-      const legacyStorage = JSON.parse(chromeStorageJson) as LegacyChromeStorage;
+      const legacyStorage = this.stripUsbState(JSON.parse(chromeStorageJson) as LegacyChromeStorage);
       const passKey = await this.verifyPasswordAndDeriveKey(legacyStorage, password);
 
       onProgress({ stage: 'importing', message: 'Restoring account settings...' });
@@ -418,7 +425,7 @@ export class WalletBackupService {
       throw new Error(`Unsupported backup version: ${(manifest as { version: number }).version}`);
     }
 
-    const backupChromeStorage = JSON.parse(chromeStorageJson) as BackupChromeStorage;
+    const backupChromeStorage = this.stripUsbState(JSON.parse(chromeStorageJson) as BackupChromeStorage);
     const passKey = await this.verifyPasswordAndDeriveKey(backupChromeStorage, password);
 
     onProgress({ stage: 'importing', message: 'Restoring account settings...' });
@@ -486,6 +493,55 @@ export class WalletBackupService {
   }
 
   /**
+   * Account blobs as they should appear in an archive: always under the
+   * password-only key. Fails closed if USB security is on and the combined
+   * key (session) or the password is unavailable.
+   */
+  private static async accountsForExport(
+    chromeStorageService: ChromeStorageService,
+    password: string | undefined,
+  ): Promise<Record<string, Account>> {
+    const storage = await chromeStorageService.getAndSetStorage();
+    const accounts = storage?.accounts || {};
+    const usbSecurity = storage?.usbSecurity;
+    if (!usbSecurity?.enabled) return accounts;
+    if (!password) throw new Error('Password required to back up while USB key security is on');
+    if (!storage?.salt) throw new Error('Wallet salt missing');
+    const combinedKey = await chromeStorageService.getPassKey();
+    if (!combinedKey) throw new Error('Wallet is locked');
+    const passwordKey = derivePasswordKey(password, storage.salt);
+    const out: Record<string, Account> = {};
+    for (const [id, account] of Object.entries(accounts)) {
+      if (!account?.encryptedKeys) {
+        out[id] = account;
+        continue;
+      }
+      const plain = await decrypt(account.encryptedKeys, combinedKey);
+      const reEncrypted = await encrypt(plain, passwordKey);
+      if ((await decrypt(reEncrypted, passwordKey)) !== plain) throw new Error(`Backup verification failed for ${id}`);
+      const { keyEpoch: _epoch, ...rest } = account;
+      out[id] = { ...rest, encryptedKeys: reEncrypted };
+    }
+    return out;
+  }
+
+  /** Archives never carry USB state, but strip defensively so a hand-edited file can't smuggle it in. */
+  private static stripUsbState<T extends { accounts: Record<string, Account> }>(storage: T): T {
+    const cleaned = { ...storage } as T & Record<string, unknown>;
+    delete cleaned.usbSecurity;
+    delete cleaned.keyEpoch;
+    delete cleaned.keyRekey;
+    delete cleaned.keyRecovery;
+    const accounts: Record<string, Account> = {};
+    for (const [id, account] of Object.entries(storage.accounts || {})) {
+      const { keyEpoch: _epoch, ...rest } = account;
+      accounts[id] = rest as Account;
+    }
+    cleaned.accounts = accounts;
+    return cleaned;
+  }
+
+  /**
    * Verify the password against the backup's encrypted keys and return the derived passKey.
    */
   private static async verifyPasswordAndDeriveKey(
@@ -497,7 +553,7 @@ export class WalletBackupService {
       throw new Error('Invalid backup file: missing salt');
     }
 
-    const passKey = deriveKey(password, salt);
+    const passKey = derivePasswordKey(password, salt);
 
     const account = accounts[selectedAccount];
     if (!account?.encryptedKeys) {
