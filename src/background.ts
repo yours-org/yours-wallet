@@ -2335,8 +2335,7 @@ if (isInServiceWorker) {
       const adminOriginator = `chrome-extension://${chrome.runtime.id}`;
       const isAdmin = message.originator === adminOriginator;
       const usesSendAllSentinel = message.params.outputs?.some((o) => o.satoshis === 2099999999999999) === true;
-      const signer =
-        isAdmin && usesSendAllSentinel && accountContext?.baseWallet ? accountContext.baseWallet : w;
+      const signer = isAdmin && usesSendAllSentinel && accountContext?.baseWallet ? accountContext.baseWallet : w;
 
       const result = await signer.createAction(message.params, message.originator);
       console.log('[createAction] Success');
