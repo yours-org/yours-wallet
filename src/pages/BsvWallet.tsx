@@ -304,7 +304,7 @@ export const BsvWallet = () => {
 
   const MNEE_FETCH_RETRIES = 2;
 
-  const updateMneeBalance = async (attempt = 0): Promise<void> => {
+  const updateMneeBalance = async (attempt = 0): Promise<number | undefined> => {
     if (!receiveAddress || !apiContext) return;
     try {
       // Aggregate MNEE balance across all derived deposit addresses for this account,
@@ -330,7 +330,7 @@ export const BsvWallet = () => {
 
       // Update MNEE balance in Chrome storage
       const { account } = chromeStorageService.getCurrentAccountObject();
-      if (!account) return;
+      if (!account) return totalDecimal;
 
       const key: keyof ChromeStorageObject = 'accounts';
       const update: Partial<ChromeStorageObject['accounts']> = {
@@ -343,6 +343,7 @@ export const BsvWallet = () => {
         },
       };
       await chromeStorageService.updateNested(key, update);
+      return totalDecimal;
     } catch (error) {
       console.error(`Failed to update MNEE balance (attempt ${attempt + 1}):`, error);
       // The first fetch can race service-worker initialization (e.g. storage migration
@@ -351,6 +352,7 @@ export const BsvWallet = () => {
       if (attempt < MNEE_FETCH_RETRIES) {
         setTimeout(() => void updateMneeBalance(attempt + 1), 2000 * (attempt + 1));
       }
+      return undefined;
     }
   };
 
@@ -358,11 +360,19 @@ export const BsvWallet = () => {
     setRecipients((prev) => [...prev.map((r) => ({ ...r, error: undefined }))]);
   };
 
-  const getAndSetAccountAndBsv21s = async () => {
+  const getAndSetAccountAndBsv21s = async (): Promise<Bsv21Balance[]> => {
     const res = await getBsv21Balances.execute(apiContext, {});
     setBsv21s(res);
     setAccount(chromeStorageService.getCurrentAccountObject().account);
+    return res;
   };
+
+  /** Order-independent fingerprint of token balances, for change detection. */
+  const bsv21Signature = (tokens: Bsv21Balance[]) =>
+    tokens
+      .map((t) => `${t.id}:${t.amt}`)
+      .sort()
+      .join('|');
 
   useEffect(() => {
     if (!bsv21s || !account) return;
@@ -420,12 +430,13 @@ export const BsvWallet = () => {
     setIsSendAllBsv(satSendAmount === bsvBalanceInSats);
   }, [satSendAmount, bsvBalance]);
 
-  const getAndSetBsvBalance = async () => {
+  const getAndSetBsvBalance = async (): Promise<number> => {
     const satoshis = await getWalletBalance();
     setBsvBalance(satoshis / 100_000_000);
     const rate = await fetchExchangeRate(apiContext.chain, apiContext.wocApiKey);
     setExchangeRate(rate);
     setBalanceLoading(false);
+    return satoshis;
   };
 
   useEffect(() => {
@@ -535,11 +546,22 @@ export const BsvWallet = () => {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  /** Re-sync addresses, then reload BSV, MNEE, and BSV-21 balances. */
-  const refreshUtxos = async (showLoad = false) => {
+  /**
+   * Re-sync addresses, then reload BSV, MNEE, and BSV-21 balances.
+   * With `notifyIfUnchanged`, tell the user when nothing moved so a manual refresh
+   * that finds no new funds does not look like it silently failed.
+   */
+  const refreshUtxos = async ({ showLoad = false, notifyIfUnchanged = false } = {}) => {
     if (isRefreshing) return;
     setIsRefreshing(true);
     showLoad && setIsProcessing(true);
+    // Snapshot before: BSV in satoshis (not USD, so a rate tick is not "a change").
+    const before = {
+      sats: Math.round(bsvBalance * 100_000_000),
+      mnee: mneeBalance,
+      tokens: bsv21Signature(bsv21s),
+    };
+    let synced = true;
     try {
       const { account: acct } = chromeStorageService.getCurrentAccountObject();
       const count = (acct?.settings?.maxKeyIndex ?? 4) + 1;
@@ -547,11 +569,21 @@ export const BsvWallet = () => {
         await syncAddresses.execute(apiContext, { count });
       }
     } catch (err) {
+      synced = false;
       console.error('[refreshUtxos] syncAddresses failed:', err);
     }
     try {
-      await Promise.all([getAndSetBsvBalance(), updateMneeBalance(), getAndSetAccountAndBsv21s()]);
+      const [sats, mnee, tokens] = await Promise.all([
+        getAndSetBsvBalance(),
+        updateMneeBalance(),
+        getAndSetAccountAndBsv21s(),
+      ]);
       loadLocks && loadLocks();
+      const unchanged =
+        sats === before.sats && mnee !== undefined && mnee === before.mnee && bsv21Signature(tokens) === before.tokens;
+      if (notifyIfUnchanged && synced && unchanged) {
+        addSnackbar('Balances are up to date. Incoming transactions can take one confirmation to appear.', 'info');
+      }
     } finally {
       showLoad && setIsProcessing(false);
       setIsRefreshing(false);
@@ -1182,7 +1214,7 @@ export const BsvWallet = () => {
               <motion.button
                 whileHover={{ opacity: 1 }}
                 whileTap={{ scale: 0.9 }}
-                onClick={() => refreshUtxos()}
+                onClick={() => refreshUtxos({ notifyIfUnchanged: true })}
                 disabled={isRefreshing}
                 title="Refresh balances"
                 className="flex items-center justify-center border-0 outline-none bg-transparent p-1 cursor-pointer"
