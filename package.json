@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@1sat/actions": "0.0.211",
+    "@1sat/actions": "0.0.212",
     "@1sat/client": "0.0.51",
     "@1sat/connect": "0.0.89",
     "@1sat/permission-module": "0.0.52",
