@@ -33,7 +33,7 @@ import { SweepMigration } from './pages/SweepMigration';
 
 export const App = () => {
   const { theme } = useTheme();
-  const { isLocked, isReady, chromeStorageService, setIsLocked } = useServiceContext();
+  const { isLocked, isReady, chromeStorageService, setIsLocked, isSwitchingAccount } = useServiceContext();
   const menuContext = useContext(BottomMenuContext);
   const {
     sendMNEERequest,
@@ -102,85 +102,96 @@ export const App = () => {
               <SnackbarProvider>
                 <SyncingBlocks />
                 <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
-                  <Router>
-                    <Routes>
-                      <Route path="/" element={<Start />} />
-                      <Route path="/create-wallet" element={<CreateAccount onNavigateBack={() => null} newWallet />} />
-                      <Route
-                        path="/restore-wallet"
-                        element={<RestoreAccount onNavigateBack={() => null} newWallet />}
-                      />
-                      <Route path="/import-wallet" element={<ImportAccount onNavigateBack={() => null} newWallet />} />
-                      <Route path="/master-restore" element={<MasterRestore />} />
-                      <Route path="/sweep" element={<SweepMigration />} />
-                      <Route
-                        path="/bsv-wallet"
-                        element={
-                          <Show
-                            when={
-                              !sendMNEERequest &&
-                              !groupedPermissionRequest &&
-                              !counterpartyPermissionRequest &&
-                              !permissionRequest &&
-                              !transactionApprovalRequest &&
-                              !oneSatPermissionRequest
-                            }
-                            whenFalseContent={
-                              <>
-                                <Show when={!!sendMNEERequest}>
-                                  <MNEESendRequest
-                                    request={sendMNEERequest!}
-                                    onResponse={() => clearRequest('sendMNEERequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!groupedPermissionRequest}>
-                                  <GroupedPermissionRequestPage
-                                    request={groupedPermissionRequest!}
-                                    onResponse={() => clearRequest('groupedPermissionRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!counterpartyPermissionRequest}>
-                                  <CounterpartyPermissionRequestPage
-                                    request={counterpartyPermissionRequest!}
-                                    onResponse={() => clearRequest('counterpartyPermissionRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!permissionRequest}>
-                                  <PermissionRequestPage
-                                    request={permissionRequest!}
-                                    onResponse={() => clearRequest('permissionRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!transactionApprovalRequest}>
-                                  <TransactionApprovalRequest
-                                    request={transactionApprovalRequest!}
-                                    onResponse={() => clearRequest('transactionApprovalRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                                <Show when={!!oneSatPermissionRequest}>
-                                  <OneSatPermissionRequestPage
-                                    request={oneSatPermissionRequest!}
-                                    onResponse={() => clearRequest('oneSatPermissionRequest')}
-                                    popupId={popupId}
-                                  />
-                                </Show>
-                              </>
-                            }
-                          >
-                            <BsvWallet />
-                          </Show>
-                        }
-                      />
-                      <Route path="/ord-wallet" element={<OrdWallet />} />
-                      <Route path="/tools" element={<AppsAndTools />} />
-                      <Route path="/settings" element={<Settings />} />
-                    </Routes>
-                  </Router>
+                  <Show
+                    when={!isSwitchingAccount}
+                    whenFalseContent={<PageLoader message="Switching account..." theme={theme} />}
+                  >
+                    <Router>
+                      <Routes>
+                        <Route path="/" element={<Start />} />
+                        <Route
+                          path="/create-wallet"
+                          element={<CreateAccount onNavigateBack={() => null} newWallet />}
+                        />
+                        <Route
+                          path="/restore-wallet"
+                          element={<RestoreAccount onNavigateBack={() => null} newWallet />}
+                        />
+                        <Route
+                          path="/import-wallet"
+                          element={<ImportAccount onNavigateBack={() => null} newWallet />}
+                        />
+                        <Route path="/master-restore" element={<MasterRestore />} />
+                        <Route path="/sweep" element={<SweepMigration />} />
+                        <Route
+                          path="/bsv-wallet"
+                          element={
+                            <Show
+                              when={
+                                !sendMNEERequest &&
+                                !groupedPermissionRequest &&
+                                !counterpartyPermissionRequest &&
+                                !permissionRequest &&
+                                !transactionApprovalRequest &&
+                                !oneSatPermissionRequest
+                              }
+                              whenFalseContent={
+                                <>
+                                  <Show when={!!sendMNEERequest}>
+                                    <MNEESendRequest
+                                      request={sendMNEERequest!}
+                                      onResponse={() => clearRequest('sendMNEERequest')}
+                                      popupId={popupId}
+                                    />
+                                  </Show>
+                                  <Show when={!!groupedPermissionRequest}>
+                                    <GroupedPermissionRequestPage
+                                      request={groupedPermissionRequest!}
+                                      onResponse={() => clearRequest('groupedPermissionRequest')}
+                                      popupId={popupId}
+                                    />
+                                  </Show>
+                                  <Show when={!!counterpartyPermissionRequest}>
+                                    <CounterpartyPermissionRequestPage
+                                      request={counterpartyPermissionRequest!}
+                                      onResponse={() => clearRequest('counterpartyPermissionRequest')}
+                                      popupId={popupId}
+                                    />
+                                  </Show>
+                                  <Show when={!!permissionRequest}>
+                                    <PermissionRequestPage
+                                      request={permissionRequest!}
+                                      onResponse={() => clearRequest('permissionRequest')}
+                                      popupId={popupId}
+                                    />
+                                  </Show>
+                                  <Show when={!!transactionApprovalRequest}>
+                                    <TransactionApprovalRequest
+                                      request={transactionApprovalRequest!}
+                                      onResponse={() => clearRequest('transactionApprovalRequest')}
+                                      popupId={popupId}
+                                    />
+                                  </Show>
+                                  <Show when={!!oneSatPermissionRequest}>
+                                    <OneSatPermissionRequestPage
+                                      request={oneSatPermissionRequest!}
+                                      onResponse={() => clearRequest('oneSatPermissionRequest')}
+                                      popupId={popupId}
+                                    />
+                                  </Show>
+                                </>
+                              }
+                            >
+                              <BsvWallet />
+                            </Show>
+                          }
+                        />
+                        <Route path="/ord-wallet" element={<OrdWallet />} />
+                        <Route path="/tools" element={<AppsAndTools />} />
+                        <Route path="/settings" element={<Settings />} />
+                      </Routes>
+                    </Router>
+                  </Show>
                 </Show>
               </SnackbarProvider>
             </div>

@@ -35,6 +35,7 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [services, setServices] = useState<Partial<ServiceContextProps>>({});
   const [isLocked, setIsLocked] = useState<boolean>(true); // Start locked until checkLockState runs
   const [isReady, setIsReady] = useState<boolean>(false);
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState<boolean>(false);
   const prevIsLockedRef = useRef<boolean | null>(null);
   useEffect(() => {
     if (services?.chromeStorageService) {
@@ -143,6 +144,8 @@ export const ServiceProvider: React.FC<{ children: ReactNode }> = ({ children })
           setIsLocked,
           isReady,
           lockWallet,
+          isSwitchingAccount,
+          setIsSwitchingAccount,
         } as ServiceContextProps
       }
     >

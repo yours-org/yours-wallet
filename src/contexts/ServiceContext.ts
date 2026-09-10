@@ -40,6 +40,14 @@ export interface ServiceContextProps {
   apiContext: OneSatContext;
   /** Legacy wallet interface. Optional because current BRC-100 setups don't wire it. */
   wallet?: LegacyWallet;
+  /**
+   * True from the moment an account switch starts until the popup reloads.
+   * While set, the app renders a loader instead of the routes so the outgoing
+   * page cannot run balance, lock, or unlock effects against the incoming
+   * account's wallet in the service worker.
+   */
+  isSwitchingAccount: boolean;
+  setIsSwitchingAccount: (switching: boolean) => void;
 }
 
 export const ServiceContext = createContext<ServiceContextProps | undefined>(undefined);

@@ -7,14 +7,12 @@ import activeCircle from '../assets/active-circle.png';
 import { truncate } from '../utils/format';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useServiceContext } from '../hooks/useServiceContext';
-import { useNavigate } from 'react-router-dom';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 
 export const TopNav = () => {
   const { theme } = useTheme();
-  const { chromeStorageService, wallet } = useServiceContext();
+  const { chromeStorageService, wallet, setIsSwitchingAccount } = useServiceContext();
   const { handleSelect } = useBottomMenu();
-  const navigate = useNavigate();
   const { addSnackbar } = useSnackbar();
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
@@ -34,11 +32,23 @@ export const TopNav = () => {
   const handleSwitchAccount = async (identityAddress: string) => {
     if (switchingTo) return;
     setSwitchingTo(identityAddress);
+    // Unmount the wallet UI for the whole switch. The service worker drops the
+    // old account context immediately and rebuilds for the new one, so anything
+    // the outgoing page did in the meantime (balance refreshes, lock checks,
+    // auto-unlock) would run against the wrong account.
+    setIsSwitchingAccount(true);
     wallet?.close?.();
-    await chromeStorageService.switchAccount(identityAddress);
-    setSwitchingTo(null);
-    setDropdownVisible(false);
-    navigate('/bsv-wallet?reload=true');
+    try {
+      await chromeStorageService.switchAccount(identityAddress);
+    } catch (err) {
+      console.error('[TopNav] account switch failed:', err);
+      setIsSwitchingAccount(false);
+      setSwitchingTo(null);
+      addSnackbar('Failed to switch account. Please try again.', 'error');
+      return;
+    }
+    // Full reload; the in-memory router restarts at "/" and Start redirects to the wallet.
+    window.location.reload();
   };
 
   const toggleDropdown = (event: React.MouseEvent) => {

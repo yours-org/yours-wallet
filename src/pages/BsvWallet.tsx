@@ -163,6 +163,7 @@ export const BsvWallet = () => {
 
   // Legacy MNEE sweep state
   const [legacyMneeBalance, setLegacyMneeBalance] = useState(0);
+  const [legacyMneeAddress, setLegacyMneeAddress] = useState('');
   const [legacyMneeSweeping, setLegacyMneeSweeping] = useState(false);
   const [legacyMneeSweepMsg, setLegacyMneeSweepMsg] = useState('');
   const [showLegacyMneePrompt, setShowLegacyMneePrompt] = useState(false);
@@ -463,6 +464,7 @@ export const BsvWallet = () => {
         const keys: Keys = JSON.parse(decrypted);
         if (!keys.walletWif) return;
         const legacyAddr = PrivateKey.fromWif(keys.walletWif).toPublicKey().toAddress();
+        setLegacyMneeAddress(legacyAddr);
         const balance = await getLegacyMneeBalance(apiContext.services!.mnee, legacyAddr);
         setLegacyMneeBalance(balance);
       } catch (err) {
@@ -2015,7 +2017,7 @@ export const BsvWallet = () => {
                   <h2 className="text-xl font-bold mb-2" style={{ color: theme.color.global.contrast }}>
                     Legacy MNEE Found
                   </h2>
-                  <p className="text-sm mb-6 leading-relaxed" style={{ color: theme.color.global.gray }}>
+                  <p className="text-sm mb-2 leading-relaxed" style={{ color: theme.color.global.gray }}>
                     You have{' '}
                     <span className="font-semibold" style={{ color: theme.color.global.contrast }}>
                       $
@@ -2026,6 +2028,18 @@ export const BsvWallet = () => {
                       MNEE
                     </span>{' '}
                     at your legacy address. Move it to your new wallet?
+                  </p>
+                  <p
+                    className="text-[0.65rem] font-mono break-all mb-6 cursor-pointer"
+                    style={{ color: theme.color.global.gray }}
+                    title="Copy legacy address"
+                    onClick={() => {
+                      navigator.clipboard
+                        .writeText(legacyMneeAddress)
+                        .then(() => addSnackbar('Legacy address copied!', 'success'));
+                    }}
+                  >
+                    {legacyMneeAddress}
                   </p>
                   <div className="flex items-center gap-3 w-[87%]">
                     <div className="flex-1">

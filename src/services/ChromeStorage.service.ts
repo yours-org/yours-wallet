@@ -359,11 +359,32 @@ export class ChromeStorageService {
     }
   };
 
+  /**
+   * Update top-level keys. Only the keys present in `obj` are written:
+   * chrome.storage.local.set merges per top-level key, so concurrent writers of
+   * other keys are never clobbered. Object values are deep-merged into the
+   * freshly read value of that key (so partial nested updates still work);
+   * scalars are written as-is.
+   *
+   * The previous implementation read the entire storage object, merged, and
+   * wrote everything back. Any write that landed between that read and write
+   * was lost — e.g. the activity detector's `lastActiveTime` write racing an
+   * account switch would revert `selectedAccount` to the previous account.
+   */
   update = async (obj: Partial<ChromeStorageObject>): Promise<void> => {
     try {
-      const result = await this.get(null); // Get all storage
-      const mergedObject = deepMerge(result, obj);
-      await this.set(mergedObject);
+      const entries = Object.entries(obj) as [string, unknown][];
+      const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+        typeof v === 'object' && v !== null && !Array.isArray(v);
+      const objectKeys = entries.filter(([, v]) => isPlainObject(v)).map(([k]) => k);
+      const existing = objectKeys.length ? ((await this.get(objectKeys)) as Record<string, unknown>) : {};
+      const data: Record<string, unknown> = {};
+      for (const [key, value] of entries) {
+        data[key] = isPlainObject(value)
+          ? deepMerge((existing[key] as Record<string, unknown> | undefined) ?? {}, value)
+          : value;
+      }
+      await this.set(data as Partial<ChromeStorageObject>);
     } catch (error) {
       throw new Error(`Failed to update storage: ${error}`);
     }
