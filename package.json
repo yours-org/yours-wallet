@@ -4,17 +4,17 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@1sat/actions": "0.0.199",
-    "@1sat/client": "0.0.50",
+    "@1sat/actions": "0.0.209",
+    "@1sat/client": "0.0.51",
     "@1sat/connect": "0.0.89",
     "@1sat/permission-module": "0.0.52",
     "@1sat/permission-module-ui": "0.0.47",
     "@1sat/sweep-ui": "0.0.86",
-    "@1sat/templates": "0.0.31",
-    "@1sat/types": "0.0.40",
-    "@1sat/utils": "0.0.33",
-    "@1sat/wallet": "0.0.104",
-    "@1sat/wallet-browser": "0.0.90",
+    "@1sat/templates": "0.0.33",
+    "@1sat/types": "0.0.42",
+    "@1sat/utils": "0.0.34",
+    "@1sat/wallet": "0.0.106",
+    "@1sat/wallet-browser": "0.0.92",
     "@bsv/sdk": "^2.2.0",
     "@bsv/wallet-toolbox-client": "2.4.4",
     "@fortawesome/react-fontawesome": "^0.2.2",
@@ -85,5 +85,12 @@
     "typescript": "^5.5.4",
     "vite": "^7.3.0",
     "vite-plugin-node-polyfills": "^0.24.0"
+  },
+  "overrides": {
+    "@1sat/client": "0.0.51",
+    "@1sat/types": "0.0.42",
+    "@1sat/templates": "0.0.33",
+    "@1sat/utils": "0.0.34",
+    "@1sat/wallet": "0.0.106"
   }
 }

@@ -14,6 +14,7 @@ import {
   ArrowUpDown,
   ExternalLink,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import bsvCoin from '../assets/bsv-coin.svg';
 import { Button } from '../components/Button';
@@ -46,6 +47,7 @@ import {
   getLockData,
   sendAllBsv,
   sendBsv,
+  syncAddresses,
   unlockBsv,
   type Bsv21Balance,
   type LockData,
@@ -64,6 +66,7 @@ import { AssetPicker, type PickableAsset } from '../components/AssetPicker';
 import { SendConfirmation, type SendLineItem } from '../components/SendConfirmation';
 import { CoinHistory } from '../components/CoinHistory';
 import { getMneeBalance, sendMnee, deriveDepositAddresses, ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
+import { MNEE_PROTOCOLS, mneeKeyDerivations } from '../utils/mneeDerivations';
 import { MneeClient } from '@1sat/client';
 import { PrivateKey } from '@bsv/sdk';
 import { getLegacyMneeBalance, sweepLegacyMnee } from '../utils/sweepLegacyMnee';
@@ -265,19 +268,23 @@ export const BsvWallet = () => {
     let scanStart = knownMaxKeyIndex + 1;
 
     for (let scan = 0; scan < MNEE_MAX_GAP_SCANS; scan++) {
-      const { derivations } = await deriveDepositAddresses.execute(apiContext, {
-        startIndex: scanStart,
-        count: MNEE_GAP_LIMIT,
-      });
-      const batchAddresses = derivations.map((d) => d.address);
-      const res = await getMneeBalance.execute(apiContext, { addresses: batchAddresses });
-      const fundedIndices = (res.balances ?? [])
-        .filter((b) => b.decimalAmount > 0)
-        .map((b) => batchAddresses.indexOf(b.address))
-        .filter((i) => i >= 0)
-        .map((i) => scanStart + i);
+      const fundedIndices: number[] = [];
+      for (const protocolID of MNEE_PROTOCOLS) {
+        const { derivations } = await deriveDepositAddresses.execute(apiContext, {
+          startIndex: scanStart,
+          count: MNEE_GAP_LIMIT,
+          protocolID,
+        });
+        const batchAddresses = derivations.map((d) => d.address);
+        const res = await getMneeBalance.execute(apiContext, { addresses: batchAddresses });
+        for (const b of res.balances ?? []) {
+          if (b.decimalAmount <= 0) continue;
+          const i = batchAddresses.indexOf(b.address);
+          if (i >= 0) fundedIndices.push(scanStart + i);
+        }
+      }
 
-      if (fundedIndices.length === 0) break; // full gap with no activity — stop probing
+      if (fundedIndices.length === 0) break;
 
       maxKeyIndex = Math.max(maxKeyIndex, ...fundedIndices);
       scanStart += MNEE_GAP_LIMIT;
@@ -304,16 +311,20 @@ export const BsvWallet = () => {
       const { account: acctForMnee } = chromeStorageService.getCurrentAccountObject();
       const knownMaxKeyIndex = acctForMnee?.settings?.maxKeyIndex ?? 4; // default: 0-4 = 5 addresses
       const maxKeyIndex = await discoverMneeMaxKeyIndex(knownMaxKeyIndex);
-      const { derivations } = await deriveDepositAddresses.execute(apiContext, {
-        startIndex: 0,
-        count: maxKeyIndex + 1,
-      });
-      const addresses = derivations.map((d) => d.address);
+      const derivations = mneeKeyDerivations(0, maxKeyIndex + 1);
+      const res = await getMneeBalance.execute(apiContext, { derivations });
+      const seen = new Set((res.balances ?? []).map((b) => b.address));
+      let totalDecimal = res.totalDecimal;
+      let totalAtomic = res.totalAtomic;
+      if (receiveAddress && !seen.has(receiveAddress)) {
+        const extra = await getMneeBalance.execute(apiContext, { addresses: [receiveAddress] });
+        totalDecimal += extra.totalDecimal;
+        totalAtomic += extra.totalAtomic;
+        for (const b of extra.balances ?? []) seen.add(b.address);
+      }
+      const addresses = [...seen];
       setMneeAddresses(addresses.length ? addresses : [receiveAddress]);
-      const res = await getMneeBalance.execute(apiContext, {
-        addresses: addresses.length ? addresses : [receiveAddress],
-      });
-      setMneeBalance(res.totalDecimal);
+      setMneeBalance(totalDecimal);
 
       // Update MNEE balance in Chrome storage
       const { account } = chromeStorageService.getCurrentAccountObject();
@@ -324,8 +335,8 @@ export const BsvWallet = () => {
         [identityAddress]: {
           ...account,
           mneeBalance: {
-            amount: res.totalAtomic,
-            decimalAmount: res.totalDecimal,
+            amount: totalAtomic,
+            decimalAmount: totalDecimal,
           },
         },
       };
@@ -452,8 +463,6 @@ export const BsvWallet = () => {
         const keys: Keys = JSON.parse(decrypted);
         if (!keys.walletWif) return;
         const legacyAddr = PrivateKey.fromWif(keys.walletWif).toPublicKey().toAddress();
-        // Skip if legacy address matches new receive address (same derivation)
-        if (legacyAddr === receiveAddress) return;
         const balance = await getLegacyMneeBalance(apiContext.services!.mnee, legacyAddr);
         setLegacyMneeBalance(balance);
       } catch (err) {
@@ -508,10 +517,18 @@ export const BsvWallet = () => {
 
   const refreshUtxos = async (showLoad = false) => {
     showLoad && setIsProcessing(true);
+    try {
+      const { account: acct } = chromeStorageService.getCurrentAccountObject();
+      const count = (acct?.settings?.maxKeyIndex ?? 4) + 1;
+      if (apiContext) {
+        await syncAddresses.execute(apiContext, { count });
+      }
+    } catch (err) {
+      console.error('[refreshUtxos] syncAddresses failed:', err);
+    }
     await getAndSetBsvBalance();
     loadLocks && loadLocks();
-    // Note: BRC-100 on-chain sync is driven by the service worker
-    // (Monitor + syncAddresses). The UI only needs to re-read current state.
+    await updateMneeBalance();
     showLoad && setIsProcessing(false);
   };
 
@@ -657,16 +674,14 @@ export const BsvWallet = () => {
         setIsProcessing(true);
 
         try {
-          const derivationResult = await deriveDepositAddresses.execute(apiContext, {
-            startIndex: 0,
-            count: 5,
-          });
+          const { account: acctForSend } = chromeStorageService.getCurrentAccountObject();
+          const sendCount = (acctForSend?.settings?.maxKeyIndex ?? 4) + 1;
 
           addSnackbar('Transaction initiated. Processing...', 'info');
 
           const res = await sendMnee.execute(apiContext, {
             recipients: mneeRecipients.map((r) => ({ address: r.address, amount: r.amount as number })),
-            derivations: derivationResult.derivations,
+            derivations: mneeKeyDerivations(0, sendCount),
           });
 
           if (res.error) {
@@ -757,7 +772,10 @@ export const BsvWallet = () => {
         if (isSendAllBsv) {
           const r = sendRecipients[0];
           const destination = r.address ?? r.paymail ?? '';
-          sendRes = await sendAllBsv.execute(apiContext, { destination });
+          sendRes = await sendAllBsv.execute(apiContext, {
+            destination,
+            satsPerKb: chromeStorageService.getCustomFeeRate(),
+          });
         } else {
           sendRes = await sendBsv.execute(apiContext, { requests: sendRecipients });
         }
@@ -910,6 +928,15 @@ export const BsvWallet = () => {
         <h2 className="text-base font-bold tracking-tight flex-1" style={{ color: theme.color.global.contrast }}>
           Receive Assets
         </h2>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={() => refreshUtxos(true)}
+          className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
+          style={{ background: '#17191E' }}
+          title="Refresh balance"
+        >
+          <RefreshCw size={16} style={{ color: '#FFFFFF' }} />
+        </motion.button>
       </div>
 
       {/* QR code */}
