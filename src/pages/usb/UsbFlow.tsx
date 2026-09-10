@@ -17,16 +17,16 @@ import { EnrollFlow } from './EnrollFlow';
 import { RepickFlow } from './RepickFlow';
 import { RotateFlow } from './RotateFlow';
 import { UsbShell } from './UsbLayout';
-import { BlockedStep } from './steps';
+import { BlockedStep, DoneStep } from './steps';
 
-const MODES: UsbWindowMode[] = ['enroll', 'add', 'repick', 'rotate', 'disable'];
+const MODES: UsbWindowMode[] = ['enroll', 'add', 'repick', 'rotate', 'disable', 'unlock'];
 
 const readMode = (): UsbWindowMode | null => {
   const m = new URLSearchParams(window.location.search).get('mode');
   return MODES.includes(m as UsbWindowMode) ? (m as UsbWindowMode) : null;
 };
 
-const needsUnlock = (mode: UsbWindowMode): boolean => mode !== 'repick';
+const needsUnlock = (mode: UsbWindowMode): boolean => mode !== 'repick' && mode !== 'unlock';
 const needsEnabled = (mode: UsbWindowMode): boolean => mode !== 'enroll';
 
 export const UsbFlow = () => {
@@ -34,6 +34,24 @@ export const UsbFlow = () => {
   const { chromeStorageService, isLocked, isReady, setIsLocked } = useServiceContext();
   const [mode] = useState<UsbWindowMode | null>(readMode);
   const [usbSecurity, setUsbSecurity] = useState<UsbSecurity | undefined | 'loading'>('loading');
+  const [unlockedHere, setUnlockedHere] = useState(false);
+
+  /**
+   * The action popup can't hold a drive grant (Chrome drops it when the last
+   * extension page closes, and the popup closes on any focus change), so with
+   * USB unlock on the popup hands off to this window. After a successful
+   * unlock, try to reopen the popup; Chrome only allows that in some
+   * contexts, so the done screen also tells the user to click the icon.
+   */
+  const finishUnlock = () => {
+    setIsLocked(false);
+    setUnlockedHere(true);
+    const action = (chrome as unknown as { action?: { openPopup?: () => Promise<void> } }).action;
+    action
+      ?.openPopup?.()
+      .then(() => window.close())
+      .catch(() => {});
+  };
 
   useEffect(() => {
     if (!isReady) return;
@@ -64,6 +82,18 @@ export const UsbFlow = () => {
     body = <BlockedStep title="USB unlock is off" message="Turn it on from Settings → Security." />;
   } else if (mode === 'enroll' && usbSecurity?.enabled) {
     body = <BlockedStep title="USB unlock is already on" message="Manage it from Settings → Security." />;
+  } else if (mode === 'unlock') {
+    if (unlockedHere || !isLocked) {
+      body = <DoneStep title="Unlocked" message="Click the Yours icon to open your wallet." />;
+    } else {
+      return (
+        <UsbShell>
+          <div className="flex items-center justify-center w-full flex-1">
+            <UnlockWallet onUnlock={finishUnlock} />
+          </div>
+        </UsbShell>
+      );
+    }
   } else if (needsUnlock(mode) && isLocked) {
     return (
       <UsbShell>

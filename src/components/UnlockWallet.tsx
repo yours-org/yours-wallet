@@ -8,8 +8,10 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursIcon } from './YoursIcon';
 import { sendMessageAsync } from '../utils/chromeHelpers';
 import {
+  adoptPickedDrive,
   getHandle,
   openUsbWindow,
+  pickDrive,
   probeSticks,
   requestHandlePermission,
   type StickProbe,
@@ -23,6 +25,13 @@ export type UnlockWalletProps = {
 };
 
 const USB_PROBE_INTERVAL_MS = 2000;
+
+/**
+ * The action popup closes on any focus change and Chrome drops drive grants
+ * when the last extension page closes, so it can never complete a USB unlock
+ * itself. The prompt window and the USB window are real windows and can.
+ */
+const IN_STANDALONE_WINDOW = /\/(usb|prompt)\.html$/.test(window.location.pathname);
 
 export const UnlockWallet = (props: UnlockWalletProps) => {
   const { onUnlock } = props;
@@ -85,6 +94,20 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       return result;
     } catch {
       return { status: 'absent' };
+    }
+  };
+
+  /** Standalone windows only: pick the drive right here, then carry on unlocking. */
+  const findKeyInline = async () => {
+    if (!usbSecurity) return;
+    try {
+      const handle = await pickDrive();
+      const result = await adoptPickedDrive(handle, usbSecurity);
+      probeRef.current = result;
+      setProbe(result);
+      setErrorText(result.status === 'ok' ? '' : "That drive doesn't hold a registered key");
+    } catch {
+      // Picker dismissed.
     }
   };
 
@@ -209,9 +232,11 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
               drive is plugged in until access is granted and a read is attempted on Unlock. */}
           <span>Insert your USB key</span>
           <span className="flex items-center gap-3">
-            <button type="button" className={linkClass} style={linkStyle} onClick={() => void openUsbWindow('repick')}>
-              Find my USB key
-            </button>
+            {IN_STANDALONE_WINDOW && (
+              <button type="button" className={linkClass} style={linkStyle} onClick={() => void findKeyInline()}>
+                Find my USB key
+              </button>
+            )}
             <button
               type="button"
               className={linkClass}
@@ -230,6 +255,11 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   );
 
   const canSubmit = password !== '' && (!recoveryMode || recoveryCode.trim() !== '');
+
+  // In the action popup a USB unlock has to happen in the standalone window.
+  // Recovery-code unlock needs no drive access, so it stays inline everywhere.
+  const handOffToWindow =
+    usbEnabled && !IN_STANDALONE_WINDOW && !recoveryMode && probe !== undefined && probe.status !== 'ok';
 
   return (
     <div
@@ -275,80 +305,109 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
 
       {usbStatus}
 
-      {/* Form */}
-      <motion.form
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.24, duration: 0.3 }}
-        onSubmit={handleUnlock}
-        className="flex flex-col items-center w-full gap-3"
-      >
-        {usbEnabled && recoveryMode && (
-          <Input
-            theme={theme}
-            placeholder="Recovery code"
-            type="text"
-            value={recoveryCode}
-            onChange={(e) => setRecoveryCode(e.target.value)}
-            shake={verificationFailed ? 'true' : 'false'}
-            autoComplete="off"
-            spellCheck={false}
-            onKeyDown={(e) => e.stopPropagation()}
-          />
-        )}
-
-        <Input
-          theme={theme}
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          shake={verificationFailed ? 'true' : 'false'}
-          autoFocus
-          onKeyDown={(e) => e.stopPropagation()}
-        />
-
-        {usbEnabled && errorText && (
-          <motion.p
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-xs -mt-1"
-            style={{ color: danger }}
-          >
-            {errorText}
-          </motion.p>
-        )}
-
-        <div className="flex justify-center w-full">
+      {handOffToWindow ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.24, duration: 0.3 }}
+          className="flex justify-center w-full"
+        >
           <motion.div
-            whileHover={!isProcessing && canSubmit ? { scale: 1.02 } : undefined}
-            whileTap={!isProcessing && canSubmit ? { scale: 0.98 } : undefined}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
             className="flex items-center w-[87%] p-px rounded-xl"
             style={{ background: `linear-gradient(135deg, ${outlineLeft}, ${outlineRight})` }}
           >
             <button
-              type="submit"
-              disabled={isProcessing || !canSubmit}
-              className="relative inline-flex items-center justify-center w-full font-bold text-sm rounded-xl h-10 px-4 outline-none select-none cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none gap-2"
+              type="button"
+              onClick={() => void openUsbWindow('unlock')}
+              className="relative inline-flex items-center justify-center w-full font-bold text-sm rounded-xl h-10 px-4 outline-none select-none cursor-pointer border-none"
               style={{
                 backgroundColor: bg,
                 color: contrast,
                 fontFamily: "'Inter', Arial, Helvetica, sans-serif",
               }}
             >
-              {isProcessing ? (
-                <>
-                  <Loader2 size={15} className="animate-spin" />
-                  Unlocking...
-                </>
-              ) : (
-                'Unlock'
-              )}
+              Unlock with USB key
             </button>
           </motion.div>
-        </div>
-      </motion.form>
+        </motion.div>
+      ) : (
+        <motion.form
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.24, duration: 0.3 }}
+          onSubmit={handleUnlock}
+          className="flex flex-col items-center w-full gap-3"
+        >
+          {usbEnabled && recoveryMode && (
+            <Input
+              theme={theme}
+              placeholder="Recovery code"
+              type="text"
+              value={recoveryCode}
+              onChange={(e) => setRecoveryCode(e.target.value)}
+              shake={verificationFailed ? 'true' : 'false'}
+              autoComplete="off"
+              spellCheck={false}
+              onKeyDown={(e) => e.stopPropagation()}
+            />
+          )}
+
+          <Input
+            theme={theme}
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            shake={verificationFailed ? 'true' : 'false'}
+            autoFocus
+            onKeyDown={(e) => e.stopPropagation()}
+          />
+
+          {usbEnabled && errorText && (
+            <motion.p
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-xs -mt-1"
+              style={{ color: danger }}
+            >
+              {errorText}
+            </motion.p>
+          )}
+
+          <div className="flex justify-center w-full">
+            <motion.div
+              whileHover={!isProcessing && canSubmit ? { scale: 1.02 } : undefined}
+              whileTap={!isProcessing && canSubmit ? { scale: 0.98 } : undefined}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="flex items-center w-[87%] p-px rounded-xl"
+              style={{ background: `linear-gradient(135deg, ${outlineLeft}, ${outlineRight})` }}
+            >
+              <button
+                type="submit"
+                disabled={isProcessing || !canSubmit}
+                className="relative inline-flex items-center justify-center w-full font-bold text-sm rounded-xl h-10 px-4 outline-none select-none cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none gap-2"
+                style={{
+                  backgroundColor: bg,
+                  color: contrast,
+                  fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+                }}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    Unlocking...
+                  </>
+                ) : (
+                  'Unlock'
+                )}
+              </button>
+            </motion.div>
+          </div>
+        </motion.form>
+      )}
     </div>
   );
 };
