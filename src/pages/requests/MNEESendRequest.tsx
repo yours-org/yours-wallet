@@ -14,9 +14,8 @@ import { useServiceContext } from '../../hooks/useServiceContext';
 import { getErrorMessage } from '../../utils/tools';
 import { MNEE_DECIMALS, MNEE_ICON_URL } from '../../utils/constants';
 import { ChromeStorageObject } from '../../services/types/chromeStorage.types';
-import { sendMnee, deriveDepositAddresses, getMneeBalance } from '@1sat/actions';
-
-const DEPOSIT_ADDRESS_COUNT = 5;
+import { sendMnee, getMneeBalance } from '@1sat/actions';
+import { mneeKeyDerivations } from '../../utils/mneeDerivations';
 
 export type MNEESendRequestProps = {
   request: SendMNEE[];
@@ -50,15 +49,12 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
         return;
       }
 
-      const derivationResult = await deriveDepositAddresses.execute(apiContext, {
-        startIndex: 0,
-        count: DEPOSIT_ADDRESS_COUNT,
-      });
+      const { account } = chromeStorageService.getCurrentAccountObject();
+      const count = (account?.settings?.maxKeyIndex ?? 4) + 1;
+      const derivations = mneeKeyDerivations(0, count);
 
-      // Check balance before sending
       const totalRequested = request.reduce((sum, r) => sum + r.amount, 0);
-      const derivedAddresses = derivationResult.derivations.map((d) => d.address);
-      const balanceRes = await getMneeBalance.execute(apiContext, { addresses: derivedAddresses });
+      const balanceRes = await getMneeBalance.execute(apiContext, { derivations });
       if (totalRequested > balanceRes.totalDecimal) {
         addSnackbar('Insufficient MNEE balance!', 'error');
         setIsProcessing(false);
@@ -69,7 +65,7 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
 
       const sendRes = await sendMnee.execute(apiContext, {
         recipients: request.map((r) => ({ address: r.address, amount: r.amount })),
-        derivations: derivationResult.derivations,
+        derivations,
       });
 
       if (sendRes.error) {
@@ -84,9 +80,8 @@ export const MNEESendRequest = (props: MNEESendRequestProps) => {
 
       addSnackbar('Transaction Successful!', 'success');
 
-      const addresses = derivationResult.derivations.map((d) => d.address);
       try {
-        const balanceRes = await getMneeBalance.execute(apiContext, { addresses });
+        const balanceRes = await getMneeBalance.execute(apiContext, { derivations });
         const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
         if (account && selectedAccount) {
           const key: keyof ChromeStorageObject = 'accounts';
