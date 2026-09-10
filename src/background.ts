@@ -326,6 +326,11 @@ let popupWindowId: number | undefined;
 // In-flight dApp CWI requests that may have opened (or reused) the floating popup.
 let inFlightDappRequests = 0;
 
+// Window ids the background closed itself. windows.onRemoved treats any other
+// close of the prompt window as the user dismissing it and denies every pending
+// prompt; a background-initiated close already checked that nothing was pending.
+const selfClosedWindowIds = new Set<number>();
+
 const hasQueuedDappUi = (): boolean =>
   pendingPermissionRequests.size > 0 ||
   pendingGroupedPermissionRequests.size > 0 ||
@@ -334,6 +339,7 @@ const hasQueuedDappUi = (): boolean =>
 
 const closeDappPopup = (): void => {
   if (!popupWindowId) return;
+  selfClosedWindowIds.add(popupWindowId);
   removeWindow(popupWindowId);
   popupWindowId = undefined;
   chrome.storage.local.remove('popupWindowId');
@@ -347,6 +353,7 @@ const closeDappPopup = (): void => {
  */
 const closeDappPopupIfNoUi = (): void => {
   if (!popupWindowId) return;
+  if (pendingWalletWaiters.length > 0) return;
   if (hasQueuedDappUi()) return;
   closeDappPopup();
 };
@@ -568,8 +575,9 @@ if (isInServiceWorker) {
 
     // Check if any popup window with our extension URL is already open
     chrome.windows.getAll({ populate: true }, (windows) => {
+      const promptUrl = chrome.runtime.getURL('prompt.html');
       const existingPopup = windows.find(
-        (w) => w.type === 'popup' && w.tabs?.some((tab) => tab.url?.startsWith(chrome.runtime.getURL(''))),
+        (w) => w.type === 'popup' && w.tabs?.some((tab) => tab.url?.startsWith(promptUrl)),
       );
 
       if (existingPopup) {
@@ -673,6 +681,7 @@ if (isInServiceWorker) {
       // Prompt window flow queries
       'GET_PROMPT_PAYLOAD',
       'GET_NEXT_PROMPT',
+      'CLOSE_PROMPT_WINDOW',
       // Internal UI requests (no external domain)
       YoursEventName.GET_BALANCE,
       YoursEventName.GET_PUB_KEYS,
@@ -770,6 +779,33 @@ if (isInServiceWorker) {
           });
           return true;
         }
+        // The prompt window never closes itself. It asks here, and the background
+        // closes it only if nothing is pending at that instant; otherwise it hands
+        // back the next prompt to render. This removes the race where a prompt
+        // queued between "nothing pending" and the actual close was denied as a
+        // user dismissal by windows.onRemoved.
+        case 'CLOSE_PROMPT_WINDOW': {
+          const next = getNextPendingPrompt();
+          if (next) {
+            sendResponse({ type: 'CLOSE_PROMPT_WINDOW', success: false, data: { prompt: next } });
+            return true;
+          }
+          if (pendingWalletWaiters.length > 0) {
+            sendResponse({ type: 'CLOSE_PROMPT_WINDOW', success: false, data: { prompt: { kind: 'unlock' } } });
+            return true;
+          }
+          const windowId = popupWindowId ?? sender.tab?.windowId;
+          if (windowId !== undefined) {
+            selfClosedWindowIds.add(windowId);
+            removeWindow(windowId);
+            if (windowId === popupWindowId) {
+              popupWindowId = undefined;
+              chrome.storage.local.remove('popupWindowId');
+            }
+          }
+          sendResponse({ type: 'CLOSE_PROMPT_WINDOW', success: true });
+          return true;
+        }
         // Internal UI requests (no external domain, direct from popup)
         case YoursEventName.GET_BALANCE:
           processGetBalanceRequest(sendResponse);
@@ -823,8 +859,11 @@ if (isInServiceWorker) {
                 // Close the unlock popup only once fully idle: in-flight dApp
                 // calls resumed by this unlock may still raise an approval
                 // screen in this window; silent calls close it via their
-                // completion hook moments later.
-                closeDappPopupIfIdle();
+                // completion hook moments later. Deferred so the resumed
+                // handlers (microtasks behind the waiters above) can register
+                // as in-flight before the idle check runs; a synchronous check
+                // always saw zero and closed the window under the next prompt.
+                setTimeout(closeDappPopupIfIdle, 50);
               })
               .catch((error: Error) => {
                 console.error('Failed to initialize wallet:', error);
@@ -2678,6 +2717,19 @@ if (isInServiceWorker) {
   // HANDLE WINDOW CLOSE *****************************************
   chrome.windows.onRemoved.addListener((closedWindowId) => {
     console.log('Window closed: ', closedWindowId);
+
+    if (selfClosedWindowIds.delete(closedWindowId)) {
+      // Background closed it after checking nothing was pending. If a prompt was
+      // queued in the meantime, it was sent to a dying window: reopen for it.
+      if (closedWindowId === popupWindowId) {
+        popupWindowId = undefined;
+        chromeStorageService.remove('popupWindowId');
+      }
+      const next = getNextPendingPrompt();
+      if (next) showPromptUi(next.kind, next.requestID);
+      else if (pendingWalletWaiters.length > 0) showUnlockUi();
+      return;
+    }
 
     if (closedWindowId === popupWindowId) {
       // Deny any pending permission requests when popup is closed

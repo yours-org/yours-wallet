@@ -47,6 +47,7 @@ const PromptApp = () => {
   const { isLocked, isReady } = useServiceContext();
   const [screen, setScreen] = useState<PromptScreen>({ kind: 'loading' });
   const waitingTimer = useRef<number | undefined>(undefined);
+  const advanceRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   const clearWaitingTimer = () => {
     if (waitingTimer.current !== undefined) {
@@ -72,9 +73,37 @@ const PromptApp = () => {
       setScreen({ kind, requestID, payload: res.data } as PromptScreen);
     } else {
       setScreen({ kind: 'expired' });
-      window.setTimeout(() => window.close(), EXPIRED_CLOSE_MS);
+      window.setTimeout(() => void advanceRef.current?.(), EXPIRED_CLOSE_MS);
     }
   }, []);
+
+  /**
+   * Ask the background to close this window. It closes only if nothing is
+   * pending at that instant; otherwise it returns the prompt to render next.
+   * The window never calls window.close() itself while the background is
+   * reachable, because the background treats an unexplained close as the
+   * user dismissing every pending prompt.
+   */
+  const requestClose = useCallback(async () => {
+    clearWaitingTimer();
+    let res: { success: boolean; data?: { prompt?: { kind: PromptKind; requestID?: string } } } | undefined;
+    try {
+      res = await sendMessageAsync<{ success: boolean; data?: { prompt?: { kind: PromptKind; requestID?: string } } }>({
+        action: 'CLOSE_PROMPT_WINDOW',
+      });
+    } catch {
+      res = undefined;
+    }
+    if (res === undefined) {
+      // Background unreachable (e.g. service worker gone): nothing to deny.
+      window.close();
+      return;
+    }
+    const next = res.data?.prompt;
+    if (!next) return; // background is closing us
+    if (next.kind === 'unlock') setScreen({ kind: 'unlock' });
+    else if (next.requestID) await loadPrompt(next.kind, next.requestID);
+  }, [loadPrompt]);
 
   const advance = useCallback(async () => {
     clearWaitingTimer();
@@ -97,11 +126,13 @@ const PromptApp = () => {
     }
     if (res?.data?.busy) {
       setScreen({ kind: 'waiting' });
-      waitingTimer.current = window.setTimeout(() => window.close(), WAITING_CLOSE_MS);
+      waitingTimer.current = window.setTimeout(() => void requestClose(), WAITING_CLOSE_MS);
       return;
     }
-    window.close();
-  }, [loadPrompt]);
+    await requestClose();
+  }, [loadPrompt, requestClose]);
+
+  advanceRef.current = advance;
 
   useEffect(() => {
     if (!isReady) return;
