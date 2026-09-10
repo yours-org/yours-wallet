@@ -774,7 +774,6 @@ export const BsvWallet = () => {
           const destination = r.address ?? r.paymail ?? '';
           sendRes = await sendAllBsv.execute(apiContext, {
             destination,
-            satsPerKb: chromeStorageService.getCustomFeeRate(),
           });
         } else {
           sendRes = await sendBsv.execute(apiContext, { requests: sendRecipients });

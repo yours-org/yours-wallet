@@ -4,14 +4,14 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@1sat/actions": "0.0.209",
+    "@1sat/actions": "0.0.211",
     "@1sat/client": "0.0.51",
     "@1sat/connect": "0.0.89",
     "@1sat/permission-module": "0.0.52",
     "@1sat/permission-module-ui": "0.0.47",
     "@1sat/sweep-ui": "0.0.86",
     "@1sat/templates": "0.0.33",
-    "@1sat/types": "0.0.42",
+    "@1sat/types": "0.0.43",
     "@1sat/utils": "0.0.34",
     "@1sat/wallet": "0.0.106",
     "@1sat/wallet-browser": "0.0.92",
@@ -88,7 +88,7 @@
   },
   "overrides": {
     "@1sat/client": "0.0.51",
-    "@1sat/types": "0.0.42",
+    "@1sat/types": "0.0.43",
     "@1sat/templates": "0.0.33",
     "@1sat/utils": "0.0.34",
     "@1sat/wallet": "0.0.106"
