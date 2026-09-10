@@ -7,8 +7,10 @@ import {
   StorageClient,
   LocalWalletPermissionsManager,
   IndexedDbPermissionStore,
+  type Monitor,
 } from '@1sat/wallet-browser';
 import {
+  buildAddressSyncTask,
   syncAddresses,
   syncMessages,
   createContext as createActionContext,
@@ -81,6 +83,7 @@ export interface AccountContext {
   remoteStorage?: StorageClient;
   setActiveStorage: (target: 'local' | string) => Promise<void>;
   addRemote: (url: string) => Promise<void>;
+  monitor: Monitor;
   /** Call to stop sync and destroy wallet */
   close: () => Promise<void>;
 }
@@ -216,6 +219,7 @@ export const initWallet = async (
     remoteStorage,
     setActiveStorage,
     addRemote,
+    monitor,
   } = await createWebWallet(walletConfig);
 
   // 3. Build the IndexedDB-backed permission store used by
@@ -296,25 +300,33 @@ export const initWallet = async (
       });
   };
 
-  console.log('[initWallet] Starting address sync...');
-  sendSyncStatus({ status: 'start', addressCount: maxKeyIndex + 1 });
-
-  syncAddresses
-    .execute(actionCtx, {
-      count: maxKeyIndex + 1,
-      onProgress: (progress) => {
-        sendSyncStatus({ status: 'progress', ...progress });
+  monitor.addTask(
+    buildAddressSyncTask(monitor, 60_000, {
+      run: async () => {
+        sendSyncStatus({ status: 'start', addressCount: maxKeyIndex + 1 });
+        try {
+          const result = await syncAddresses.execute(actionCtx, {
+            count: maxKeyIndex + 1,
+            onProgress: (progress) => {
+              sendSyncStatus({ status: 'progress', ...progress });
+            },
+          });
+          sendSyncStatus({ status: 'complete', ...result });
+          console.log('[initWallet] Address sync complete:', result);
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          sendSyncStatus({ status: 'error', message });
+          console.error('[initWallet] Address sync failed:', error);
+          throw error;
+        }
       },
-    })
-    .then((result) => {
-      sendSyncStatus({ status: 'complete', ...result });
-      console.log('[initWallet] Address sync complete:', result);
-    })
-    .catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      sendSyncStatus({ status: 'error', message });
-      console.error('[initWallet] Address sync failed:', error);
-    });
+    }) as Parameters<Monitor['addTask']>[0],
+  );
+
+  console.log('[initWallet] Starting monitor runOnce (includes address sync)...');
+  monitor.runOnce().catch((error: unknown) => {
+    console.error('[initWallet] monitor.runOnce failed:', error);
+  });
 
   // Sync incoming paymail payments from the message box (fire-and-forget)
   syncMessages
@@ -341,6 +353,7 @@ export const initWallet = async (
     remoteStorage,
     setActiveStorage,
     addRemote,
+    monitor,
     close,
   };
 };

@@ -356,7 +356,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     dropWalletContext('inactivity');
     await chromeStorageService.clearPassKey();
     await chromeStorageService.update({ isLocked: true });
+    return;
   }
+  accountContext.monitor.runOnce().catch((err) => {
+    console.error('[background] monitor.runOnce on alarm failed:', err);
+  });
 });
 
 // Forward declaration for launchPopUp (defined inside isInServiceWorker block)
