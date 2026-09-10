@@ -5,7 +5,7 @@ import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
+import { sendMessage } from '../../utils/chromeHelpers';
 import { protocolLabel } from '../../utils/protocols';
 import type {
   GroupedPermissionRequest as GroupedPermissionRequestType,
@@ -14,12 +14,11 @@ import type {
 
 export type GroupedPermissionRequestProps = {
   request: GroupedPermissionRequestType;
-  popupId: number | undefined;
   onResponse: () => void;
 };
 
 export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProps) => {
-  const { request, onResponse, popupId } = props;
+  const { request, onResponse } = props;
   const { theme } = useTheme();
   const { handleSelect, hideMenu } = useBottomMenu();
   const { addSnackbar } = useSnackbar();
@@ -63,7 +62,6 @@ export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProp
         granted: buildGranted(),
       });
       onResponse();
-      window.close();
     } catch (error) {
       addSnackbar(error instanceof Error ? error.message : String(error), 'error');
       setIsProcessing(false);
@@ -78,17 +76,6 @@ export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProp
       granted: null,
     });
     onResponse();
-    window.close();
-  };
-
-  const handleCancel = async () => {
-    sendMessage({
-      action: 'GROUPED_PERMISSION_RESPONSE',
-      requestID: request.requestID,
-      granted: null,
-    });
-    if (popupId) removeWindow(popupId);
-    window.location.reload();
   };
 
   const toggleProtocol = (i: number) => setProtocolChecked((prev) => prev.map((v, j) => (j === i ? !v : v)));

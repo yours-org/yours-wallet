@@ -384,23 +384,15 @@ export const BsvWallet = () => {
     (async () => {
       const obj = await chromeStorageService.getAndSetStorage();
       setShowWelcome(!!obj?.showWelcome);
-      // Show backup promo only when launched directly (not from a dApp popup)
-      // and only if not previously dismissed (per-account) and no active remote
-      const isPopup = !!(
-        obj?.permissionRequest ||
-        obj?.groupedPermissionRequest ||
-        obj?.counterpartyPermissionRequest ||
-        obj?.transactionApprovalRequest ||
-        obj?.oneSatPermissionRequest
-      );
-      if (!isPopup) {
-        const acct = obj?.accounts?.[obj?.selectedAccount ?? ''];
-        const dismissed = !!acct?.settings?.dismissedBackupPromo;
-        const hasRemotes = (acct?.storageConfig?.remotes?.length ?? 0) > 0;
-        setKeysAlreadyBackedUp(!!acct?.settings?.keysBackedUp);
-        setShowBackupPromo(!dismissed && !hasRemotes);
-        setShowMigrationBanner(!acct?.settings?.sweepStarted && !acct?.settings?.sweepCompleted);
-      }
+      // Show backup promo only if not previously dismissed (per-account)
+      // and no active remote. dApp prompts live in a separate prompt window,
+      // so this page is always the browser-action popup.
+      const acct = obj?.accounts?.[obj?.selectedAccount ?? ''];
+      const dismissed = !!acct?.settings?.dismissedBackupPromo;
+      const hasRemotes = (acct?.storageConfig?.remotes?.length ?? 0) > 0;
+      setKeysAlreadyBackedUp(!!acct?.settings?.keysBackedUp);
+      setShowBackupPromo(!dismissed && !hasRemotes);
+      setShowMigrationBanner(!acct?.settings?.sweepStarted && !acct?.settings?.sweepCompleted);
       if (obj?.selectedAccount) {
         await getAndSetAccountAndBsv21s();
       }

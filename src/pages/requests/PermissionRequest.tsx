@@ -5,13 +5,12 @@ import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { useTheme } from '../../hooks/useTheme';
-import { sendMessage, removeWindow } from '../../utils/chromeHelpers';
+import { sendMessage } from '../../utils/chromeHelpers';
 import { knownProtocol, protocolLabel, securityLevelLabel } from '../../utils/protocols';
 import type { PermissionRequest as PermissionRequestType } from '@bsv/wallet-toolbox-client';
 
 export type PermissionRequestProps = {
   request: PermissionRequestType & { requestID: string };
-  popupId: number | undefined;
   onResponse: () => void;
 };
 
@@ -56,7 +55,7 @@ const formatSatoshis = (sats: number): string => {
 };
 
 export const PermissionRequestPage = (props: PermissionRequestProps) => {
-  const { request, onResponse, popupId } = props;
+  const { request, onResponse } = props;
   const { theme } = useTheme();
   const { handleSelect, hideMenu } = useBottomMenu();
   const { addSnackbar } = useSnackbar();
@@ -76,7 +75,6 @@ export const PermissionRequestPage = (props: PermissionRequestProps) => {
         granted: true,
       });
       onResponse();
-      window.close();
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       addSnackbar(errorMsg, 'error');
@@ -92,17 +90,6 @@ export const PermissionRequestPage = (props: PermissionRequestProps) => {
       granted: false,
     });
     onResponse();
-    window.close();
-  };
-
-  const handleCancel = async () => {
-    sendMessage({
-      action: 'PERMISSION_RESPONSE',
-      requestID: request.requestID,
-      granted: false,
-    });
-    if (popupId) removeWindow(popupId);
-    window.location.reload();
   };
 
   return (
