@@ -533,7 +533,12 @@ export const BsvWallet = () => {
     }
   };
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  /** Re-sync addresses, then reload BSV, MNEE, and BSV-21 balances. */
   const refreshUtxos = async (showLoad = false) => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
     showLoad && setIsProcessing(true);
     try {
       const { account: acct } = chromeStorageService.getCurrentAccountObject();
@@ -544,10 +549,13 @@ export const BsvWallet = () => {
     } catch (err) {
       console.error('[refreshUtxos] syncAddresses failed:', err);
     }
-    await getAndSetBsvBalance();
-    loadLocks && loadLocks();
-    await updateMneeBalance();
-    showLoad && setIsProcessing(false);
+    try {
+      await Promise.all([getAndSetBsvBalance(), updateMneeBalance(), getAndSetAccountAndBsv21s()]);
+      loadLocks && loadLocks();
+    } finally {
+      showLoad && setIsProcessing(false);
+      setIsRefreshing(false);
+    }
   };
 
   useEffect(() => {
@@ -945,15 +953,6 @@ export const BsvWallet = () => {
         <h2 className="text-base font-bold tracking-tight flex-1" style={{ color: theme.color.global.contrast }}>
           Receive Assets
         </h2>
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          onClick={() => refreshUtxos(true)}
-          className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
-          style={{ background: '#17191E' }}
-          title="Refresh balance"
-        >
-          <RefreshCw size={16} style={{ color: '#FFFFFF' }} />
-        </motion.button>
       </div>
 
       {/* QR code */}
@@ -1179,6 +1178,19 @@ export const BsvWallet = () => {
                 </motion.div>
               )}
             </AnimatePresence>
+            {!isSyncing && !balanceLoading && (
+              <motion.button
+                whileHover={{ opacity: 1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => refreshUtxos()}
+                disabled={isRefreshing}
+                title="Refresh balances"
+                className="flex items-center justify-center border-0 outline-none bg-transparent p-1 cursor-pointer"
+                style={{ color: theme.color.global.gray, opacity: 0.55 }}
+              >
+                <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+              </motion.button>
+            )}
           </div>
         </motion.div>
 
