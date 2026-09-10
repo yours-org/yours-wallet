@@ -187,9 +187,14 @@ const startupInitPromise = chromeStorageService
   .getAndSetStorage()
   .then(async () => {
     // Close any orphaned extension popup windows from a previous session/reload.
+    // The USB key window is a user-driven multi-step flow, not a prompt: the
+    // worker idles out and restarts while the user reads or writes a recovery
+    // code, and closing it here would abort enrolment mid-way.
     const extOrigin = chrome.runtime.getURL('');
+    const usbUrl = chrome.runtime.getURL('usb.html');
     const allWindows = await chrome.windows.getAll({ populate: true });
     for (const w of allWindows) {
+      if (w.tabs?.some((t) => t.url?.startsWith(usbUrl))) continue;
       if (w.type === 'popup' && w.id && w.tabs?.some((t) => t.url?.startsWith(extOrigin))) {
         try {
           await chrome.windows.remove(w.id);
@@ -705,6 +710,7 @@ if (isInServiceWorker) {
       'MASTER_RESTORE',
       // USB key security (popup / USB window internal)
       'USB_REKEY',
+      'USB_PING',
       // Storage management (popup internal)
       'STORAGE_GET_INFO',
       'STORAGE_SYNC_BACKUPS',
@@ -887,6 +893,10 @@ if (isInServiceWorker) {
           return true;
         case 'MASTER_BACKUP':
           processMasterBackup(message.password, sendResponse);
+          return true;
+        case 'USB_PING':
+          // Keeps the worker from idling out while the USB window is open.
+          sendResponse({ type: 'USB_PING', success: true });
           return true;
         case 'USB_REKEY':
           usbRekey(chromeStorageService, message as UsbRekeyRequest)
