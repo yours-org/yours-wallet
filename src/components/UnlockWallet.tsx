@@ -64,14 +64,28 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
     return () => window.clearInterval(timer);
   }, [usbEnabled, runProbe]);
 
-  /** Needs a user gesture: Chrome shows a permission bubble per handle. */
-  const handleAllowUsbAccess = async () => {
-    if (probe?.status !== 'permission') return;
-    for (const id of probe.stickIds) {
+  /**
+   * After a browser restart Chrome wants the user to re-confirm access to the
+   * saved drive handles. That needs a user gesture, and the Unlock click is
+   * one, so this runs inside the unlock handler instead of behind a separate
+   * button. Returns the fresh probe.
+   */
+  const grantUsbAccessIfNeeded = async (): Promise<StickProbe | undefined> => {
+    const latest = probeRef.current;
+    if (latest?.status !== 'permission') return latest;
+    for (const id of latest.stickIds) {
       const handle = await getHandle(id);
       if (handle) await requestHandlePermission(handle);
     }
-    await runProbe();
+    // Probe directly rather than via runProbe so an in-flight timer probe can't make us skip it.
+    try {
+      const result = usbSecurity ? await probeSticks(usbSecurity) : undefined;
+      probeRef.current = result;
+      setProbe(result);
+      return result;
+    } catch {
+      return { status: 'absent' };
+    }
   };
 
   const failUnlock = (message: string) => {
@@ -106,10 +120,12 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
         material = { master };
         unlockedViaRecovery = true;
       } else {
-        const latest = probeRef.current;
+        const latest = await grantUsbAccessIfNeeded();
         if (latest?.status !== 'ok') {
           // Missing key is not a wrong password: shake, say so, and leave the password alone.
-          failUnlock(latest?.status === 'permission' ? 'Allow access to your USB key' : 'Insert your USB key');
+          failUnlock(
+            latest?.status === 'permission' ? 'Access to your USB key was not allowed' : 'Insert your USB key',
+          );
           return;
         }
         material = { master: latest.master };
@@ -191,23 +207,10 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           USB key detected: {stickLabel(probe.stickId)}
         </span>
       ) : probe.status === 'permission' ? (
-        <>
-          <span>Allow access to your USB key</span>
-          <motion.button
-            type="button"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => void handleAllowUsbAccess()}
-            className="text-xs font-semibold rounded-lg px-3 py-1.5 border-none cursor-pointer outline-none"
-            style={{
-              backgroundColor: `${accent}22`,
-              color: accent,
-              fontFamily: "'Inter', Arial, Helvetica, sans-serif",
-            }}
-          >
-            Allow USB access
-          </motion.button>
-        </>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accent }} />
+          USB key found. Chrome will ask to allow access when you unlock.
+        </span>
       ) : (
         <>
           <span className="inline-flex items-center gap-1.5">
