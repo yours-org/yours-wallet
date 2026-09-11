@@ -2,6 +2,11 @@ import {
   deriveDepositAddresses as sdkDeriveDepositAddresses,
   syncAddresses as sdkSyncAddresses,
   ProcessedTxStoreIdb,
+  internalizeBeef,
+  sweepDeposit,
+  ONESAT_PROTOCOL,
+  LEGACY_ONESAT_PROTOCOL,
+  type OutputDerivation,
   type OneSatContext,
   type DeriveDepositAddressesInput,
   type DeriveDepositAddressesResult,
@@ -9,52 +14,11 @@ import {
   type SyncAddressesResult,
 } from '@1sat/actions';
 import type { PromptRequest } from '@1sat/permission-module';
-import { PrivateKey, PublicKey } from '@bsv/sdk';
+import type { SyncOutput } from '@1sat/types';
 import { getNetwork, isValidAddress, toNetworkAddress, type Chain } from './network';
 import { NetWork } from '../services/types/provider.types';
 
-type StoreProto = { getDb: () => Promise<unknown>; dbName: string };
-
-const originalPublicToAddress = PublicKey.prototype.toAddress;
-const originalPrivateToAddress = PrivateKey.prototype.toAddress;
-const storeProto = ProcessedTxStoreIdb.prototype as unknown as StoreProto;
-const originalGetDb = storeProto.getDb;
-
-let chainAwareDepth = 0;
-
-const installChainAwareSdk = (chain: Chain) => {
-  const network = getNetwork(chain);
-  PublicKey.prototype.toAddress = function (prefix) {
-    return originalPublicToAddress.call(this, prefix ?? network);
-  };
-  PrivateKey.prototype.toAddress = function (prefix) {
-    return originalPrivateToAddress.call(this, prefix ?? network);
-  };
-  storeProto.getDb = function (this: StoreProto) {
-    if (this.dbName.startsWith('sync-processed-') && !this.dbName.startsWith('sync-processed-test-')) {
-      this.dbName = this.dbName.replace('sync-processed-', 'sync-processed-test-');
-    }
-    return originalGetDb.call(this);
-  };
-};
-
-const uninstallChainAwareSdk = () => {
-  PublicKey.prototype.toAddress = originalPublicToAddress;
-  PrivateKey.prototype.toAddress = originalPrivateToAddress;
-  storeProto.getDb = originalGetDb;
-};
-
-/** @1sat/actions 0.0.212 encodes P2PKH as mainnet and shares the sync cursor by identity key. */
-export const withChainAwareSdk = async <T>(chain: Chain, fn: () => Promise<T>): Promise<T> => {
-  if (chain !== 'test') return fn();
-  if (chainAwareDepth++ === 0) installChainAwareSdk(chain);
-  try {
-    return await fn();
-  } finally {
-    if (--chainAwareDepth === 0) uninstallChainAwareSdk();
-  }
-};
-
+/** @1sat/actions 0.0.212 returns mainnet addresses regardless of the context chain. */
 export const deriveDepositAddresses = {
   ...sdkDeriveDepositAddresses,
   execute: async (ctx: OneSatContext, input: DeriveDepositAddressesInput): Promise<DeriveDepositAddressesResult> => {
@@ -70,10 +34,63 @@ export const deriveDepositAddresses = {
   },
 };
 
+/** Use SDK derivation and internalization with an explicit chain and a separate sync cursor. */
 export const syncAddresses = {
   ...sdkSyncAddresses,
-  execute: (ctx: OneSatContext, input: SyncAddressesInput): Promise<SyncAddressesResult> =>
-    withChainAwareSdk(ctx.chain, () => sdkSyncAddresses.execute(ctx, input)),
+  execute: async (ctx: OneSatContext, input: SyncAddressesInput): Promise<SyncAddressesResult> => {
+    const { services, wallet, chain } = ctx;
+    if (!services) throw new Error('syncAddresses requires services in context');
+    const { publicKey: identityKey } = await wallet.getPublicKey({ identityKey: true });
+    const addressDerivations = new Map<string, OutputDerivation>();
+    for (const protocolID of [ONESAT_PROTOCOL, LEGACY_ONESAT_PROTOCOL]) {
+      const { derivations } = await deriveDepositAddresses.execute(ctx, { ...input, protocolID });
+      for (const derivation of derivations) {
+        addressDerivations.set(derivation.address, { ...derivation, outputIndex: 0, protocolID, counterparty: 'self' });
+      }
+    }
+    const addresses = [...addressDerivations.keys()];
+    const store = new ProcessedTxStoreIdb(chain === 'test' ? `test-${identityKey}` : identityKey);
+    try {
+      const { height } = await wallet.getHeight({});
+      const lastScore = await store.getLastScore();
+      let maxSafeScore = lastScore;
+      const transactions = new Map<string, SyncOutput[]>();
+      for await (const output of services.owner.sync(addresses, lastScore || undefined, input.onProgress)) {
+        const txid = output.outpoint.substring(0, 64);
+        const outputs = transactions.get(txid) ?? [];
+        outputs.push(output);
+        transactions.set(txid, outputs);
+        if (height - Math.floor(output.score) >= 6) maxSafeScore = Math.max(maxSafeScore, output.score);
+      }
+      let processed = 0;
+      let failed = 0;
+      for (const [txid, outputs] of transactions) {
+        if (await store.has(txid)) continue;
+        try {
+          if (!outputs.every((output) => output.spendTxid)) {
+            const beef = await services.beef.getBeef(txid);
+            if (!beef) throw new Error(`Failed to load BEEF for ${txid}`);
+            await internalizeBeef({ beef, addressDerivations, wallet, services, chain });
+          }
+          await store.add(txid);
+          processed++;
+        } catch (error) {
+          console.error(`[syncAddresses] Failed to process ${txid}:`, error);
+          failed++;
+        }
+      }
+      // Failed transactions must be fetched again; only advance beyond fully processed outputs.
+      if (failed === 0 && maxSafeScore > lastScore) await store.setLastScore(maxSafeScore);
+      try {
+        await sweepDeposit.execute(ctx, {});
+      } catch (error) {
+        console.error('[syncAddresses] sweepDeposit failed:', error);
+      }
+      return { processed, failed, lastScore: maxSafeScore, addresses };
+    } finally {
+      await store.close();
+    }
+  },
 };
 
 const MAINNET_P2PKH = /1[a-km-zA-HJ-NP-Z1-9]{25,33}/g;

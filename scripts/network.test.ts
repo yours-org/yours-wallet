@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { PrivateKey, P2PKH, Transaction } from '@bsv/sdk';
-import { ProcessedTxStoreIdb } from '@1sat/actions';
+import { test, type TestContext } from 'node:test';
+import { PrivateKey, PublicKey, P2PKH, Transaction } from '@bsv/sdk';
+import { ProcessedTxStoreIdb, type OneSatContext } from '@1sat/actions';
 import { OneSatServices } from '@1sat/wallet-browser';
 import { NetWork } from '../src/services/types/provider.types';
 import { getKeys, getKeysFromWifs } from '../src/utils/keys';
-import { deriveDepositAddresses, remapPromptRequest, withChainAwareSdk } from '../src/utils/chainActions';
+import { deriveDepositAddresses, remapPromptRequest, syncAddresses } from '../src/utils/chainActions';
 import { getChainConfig, getNetworkConfig, isValidAddress, resolveContentUrl, type Chain } from '../src/utils/network';
 import { fetchExchangeRate } from '../src/utils/wallet';
 import { parseRawTransaction } from '../src/utils/tools';
@@ -99,18 +99,77 @@ test('deposit derivation remaps SDK mainnet addresses onto the account chain', a
   assertNetworkAddress(derivations[0].address, 'test');
 });
 
-test('testnet SDK workarounds default to testnet addresses and isolate the sync store', async () => {
-  await withChainAwareSdk('test', async () => {
-    assert.equal(publicKey.toAddress(), testAddress);
-    assert.equal(key.toAddress(), testAddress);
-    const store = new ProcessedTxStoreIdb('identity-key') as unknown as {
-      dbName: string;
-      getDb: () => Promise<unknown>;
-    };
-    await store.getDb().catch(() => undefined);
-    assert.equal(store.dbName, 'sync-processed-test-identity-key');
-  });
-  assert.equal(publicKey.toAddress(), mainAddress);
+const mockSyncStore = (t: TestContext) => {
+  t.mock.method(ProcessedTxStoreIdb.prototype, 'getLastScore', async () => 0);
+  t.mock.method(ProcessedTxStoreIdb.prototype, 'has', async () => false);
+  t.mock.method(ProcessedTxStoreIdb.prototype, 'add', async () => {});
+  const setScore = t.mock.method(ProcessedTxStoreIdb.prototype, 'setLastScore', async () => {});
+  const close = t.mock.method(ProcessedTxStoreIdb.prototype, 'close', async () => {});
+  return { setScore, close };
+};
+
+const syncWallet = {
+  getPublicKey: async () => ({ publicKey: publicKeyHex }),
+  getHeight: async () => ({ height: 110 }),
+  listOutputs: async () => ({ outputs: [] }),
+};
+
+test("overlapping syncs keep SDK defaults and each network's addresses separate", async (t) => {
+  const { close } = mockSyncStore(t);
+  const publicToAddress = PublicKey.prototype.toAddress;
+  const privateToAddress = PrivateKey.prototype.toAddress;
+  const run = async (chain: Chain) => {
+    const ctx = {
+      wallet: syncWallet,
+      chain,
+      isBaseWallet: true,
+      services: {
+        owner: {
+          async *sync(addresses: string[]) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            addresses.forEach((address) => assertNetworkAddress(address, chain));
+            assert.equal(publicKey.toAddress(), mainAddress);
+            assert.equal(PublicKey.prototype.toAddress, publicToAddress);
+            assert.equal(PrivateKey.prototype.toAddress, privateToAddress);
+          },
+        },
+      },
+    } as unknown as OneSatContext;
+    return syncAddresses.execute(ctx, { count: 1 });
+  };
+  const [main, testnet] = await Promise.all([run('main'), run('test')]);
+  assert.deepEqual(main.addresses, [mainAddress]);
+  assert.deepEqual(testnet.addresses, [testAddress]);
+  assert.equal(close.mock.callCount(), 2);
+});
+
+test('sync retries failed transactions before advancing its cursor', async (t) => {
+  const { setScore, close } = mockSyncStore(t);
+  t.mock.method(console, 'error', () => {});
+  let spent = false;
+  const ctx = {
+    wallet: syncWallet,
+    chain: 'test',
+    isBaseWallet: true,
+    services: {
+      owner: {
+        async *sync() {
+          yield { outpoint: `${'a'.repeat(64)}_0`, score: 100, spendTxid: spent ? 'spent' : undefined };
+        },
+      },
+      beef: {
+        getBeef: async () => {
+          throw new Error('Unavailable');
+        },
+      },
+    },
+  } as unknown as OneSatContext;
+  assert.equal((await syncAddresses.execute(ctx, {})).failed, 1);
+  assert.equal(setScore.mock.callCount(), 0);
+  spent = true;
+  assert.equal((await syncAddresses.execute(ctx, {})).processed, 1);
+  assert.deepEqual(setScore.mock.calls[0].arguments, [100]);
+  assert.equal(close.mock.callCount(), 2);
 });
 
 test('permission prompts remap mainnet recipient addresses onto testnet', () => {
