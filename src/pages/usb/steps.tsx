@@ -50,7 +50,10 @@ export const ChooseDriveStep = ({ title = 'Choose your USB drive', subtitle, onP
   return (
     <StepBody stepKey="choose-drive">
       <Heading title={title} subtitle={subtitle} />
-      <Note>Pick the drive itself, not a folder. The dialog will name Yours Wallet.</Note>
+      <Note>
+        Pick the drive itself, not a folder. Chrome then asks in a small bubble; choose &ldquo;Allow on every
+        visit&rdquo; and it will not ask again for this drive.
+      </Note>
       <div
         className="flex items-center justify-center w-full rounded-xl py-6 mb-3"
         style={{ backgroundColor: theme.color.global.row }}
@@ -58,6 +61,7 @@ export const ChooseDriveStep = ({ title = 'Choose your USB drive', subtitle, onP
         <HardDrive size={40} style={{ color: MUTED }} />
       </div>
       <Button theme={theme} type="primary" label="Choose USB drive" onClick={() => void choose()} loading={busy} />
+      {busy && <Note tone="warn">Waiting for Chrome. If you do not see its bubble, it may be behind this window.</Note>}
       <ErrorText>{error}</ErrorText>
     </StepBody>
   );
