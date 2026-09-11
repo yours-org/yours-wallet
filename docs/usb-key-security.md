@@ -157,9 +157,12 @@ Deletes that stick's wrapper entry and handle. Removing the last stick is blocke
 
 Generates a new `M`, runs the re-key routine, rewraps the new `M` under every remaining stick's secret, shows a new recovery code (typed back). Copy is explicit: rotation protects **future** storage from a copied stick. An attacker who already holds a copy of the stick file **and** a storage dump from before rotation can still decrypt that dump with the password. If both are suspected, sweep to a new seed.
 
-### Lost every stick
+### Lost every stick, or just not carrying it
 
-Unlock screen → "Lost your USB key?" → recovery code + password. `derivePassKey` takes the code as `M`, checks `masterCheck` first (typo vs wrong password), decrypts. On success the user is walked into **rotation**, not reuse: new `M`, new code, new stick. The lost sticks' secrets no longer unwrap anything current.
+"Lost my USB key" on the unlock screen takes the recovery code plus the password. The code is the master factor itself, so this is cryptographically the same unlock as inserting a key. The screen then asks why:
+
+- **"I don't have it with me"** unlocks for this session only. A session marker (`usbRecoverySessionAt`, cleared with the session key on lock) stands in for the key in every presence check: the popup gate, the send flows, the Approve buttons, and the background's dApp check. The popup shows "Unlocked with recovery code · USB key not checked this session". Nothing is rotated; the key works again next time. The next unlock needs the key or the code again.
+- **"I lost it or it may be copied"** opens the rotate flow directly on code entry (the code is typed once more as the rotation's own confirmation, since secrets never travel between windows), and the user leaves with a new key and a new code. The old code stops working.
 
 ### Lost sticks and no recovery code
 

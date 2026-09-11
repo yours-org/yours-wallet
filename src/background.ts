@@ -51,7 +51,12 @@ import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
 import { repairStaleAccounts, usbRekey, type UsbRekeyRequest } from './services/usbRekeyBackground';
 import { USB_HANDLE_DB_NAME } from './services/UsbKey.service';
-import { readUsbLastSeen, USB_KEY_ABSENT_MESSAGE, USB_SEEN_MAX_AGE_MS } from './services/usbPresence';
+import {
+  isUsbRecoverySession,
+  readUsbLastSeen,
+  USB_KEY_ABSENT_MESSAGE,
+  USB_SEEN_MAX_AGE_MS,
+} from './services/usbPresence';
 import {
   closeUsbBackupReader,
   usbBackupChunk,
@@ -2553,6 +2558,7 @@ if (isInServiceWorker) {
     if (!chromeStorageService.getUsbSecurity()?.enabled) return;
     const seen = await readUsbLastSeen();
     if (seen !== undefined && Date.now() - seen < USB_SEEN_MAX_AGE_MS) return;
+    if (await isUsbRecoverySession()) return;
     if (usbCheckInFlight) return usbCheckInFlight;
     const requestID = `usb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     usbCheckInFlight = new Promise<void>((resolve, reject) => {

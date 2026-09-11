@@ -32,6 +32,29 @@ export const markUsbSeen = async (): Promise<void> => {
   }
 };
 
+/**
+ * A session opened with the recovery code and "I don't have my key with me".
+ * The code is the same secret the key holds, so for this one session it
+ * stands in for the key everywhere a presence check would otherwise refuse.
+ * Cleared with the session key on lock.
+ */
+export const startUsbRecoverySession = async (): Promise<void> => {
+  try {
+    await chrome.storage.session.set({ usbRecoverySessionAt: Date.now() });
+  } catch {
+    // Session storage unavailable (tests): nothing to record.
+  }
+};
+
+export const isUsbRecoverySession = async (): Promise<boolean> => {
+  try {
+    const r = await chrome.storage.session.get('usbRecoverySessionAt');
+    return typeof r.usbRecoverySessionAt === 'number';
+  } catch {
+    return false;
+  }
+};
+
 export const readUsbLastSeen = async (): Promise<number | undefined> => {
   try {
     const r = await chrome.storage.session.get('usbLastSeenAt');
@@ -54,6 +77,7 @@ export const resetUsbPresence = (): void => {
 export const checkUsbPresence = async (chromeStorageService: ChromeStorageService): Promise<UsbPresence> => {
   const usbSecurity = chromeStorageService.getUsbSecurity();
   if (!usbSecurity?.enabled) return 'disabled';
+  if (await isUsbRecoverySession()) return 'present';
   const probe = await probeSticks(usbSecurity);
   if (probe.status === 'ok') return 'present';
   if (probe.status === 'permission') return 'permission';
@@ -93,6 +117,7 @@ export const confirmUsbForApproval = async (
 ): Promise<{ ok: true } | { ok: false; message: string }> => {
   const usbSecurity = chromeStorageService.getUsbSecurity();
   if (!usbSecurity?.enabled) return { ok: true };
+  if (await isUsbRecoverySession()) return { ok: true };
   let probe = await probeSticks(usbSecurity);
   if (probe.status === 'permission') {
     // One key per click: Chrome consumes the gesture on the first request.

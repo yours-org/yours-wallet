@@ -15,7 +15,7 @@ import {
   probeSticks,
   requestNextStickPermission,
 } from '../services/UsbKey.service';
-import { markUsbSeen, resetUsbPresence } from '../services/usbPresence';
+import { markUsbSeen, resetUsbPresence, startUsbRecoverySession } from '../services/usbPresence';
 import { decodeRecoveryCode, verifyMasterCheck } from '../utils/usbCrypto';
 import type { UsbUnlockMaterial } from '../services/passKey';
 
@@ -51,6 +51,8 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   // closed the popup under its bubble, or access was refused).
   const [grantFailed, setGrantFailed] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
+  /** Why the code is being used: the key is gone (rotate) or just not at hand (this session only). */
+  const [recoveryIntent, setRecoveryIntent] = useState<'lost' | 'session' | null>(null);
   const [errorText, setErrorText] = useState('');
 
   const runProbe = useCallback(async () => {
@@ -191,9 +193,11 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
         console.error('Wallet unlock error:', error);
       }
 
+      // The code stands in for the key this session when the key is merely
+      // elsewhere; when it is gone, walk the user into rotation right away.
+      if (unlockedViaRecovery && recoveryIntent === 'session') await startUsbRecoverySession();
       onUnlock();
-      // Recovery means every registered stick is gone: walk the user into rotation right away.
-      if (unlockedViaRecovery) void openUsbWindow('rotate', { viaRecovery: true });
+      if (unlockedViaRecovery && recoveryIntent === 'lost') void openUsbWindow('rotate', { viaRecovery: true });
     } else {
       failUnlock(usbEnabled ? 'Incorrect password' : '');
     }
@@ -273,7 +277,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
     </motion.div>
   );
 
-  const canSubmit = password !== '' && (!recoveryMode || recoveryCode.trim() !== '');
+  const canSubmit = password !== '' && (!recoveryMode || (recoveryCode.trim() !== '' && recoveryIntent !== null));
 
   // The popup reads the drive itself, including asking Chrome for access on
   // the Unlock click. It hands off to the standalone window only when it
@@ -431,17 +435,68 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           className="flex flex-col items-center w-full gap-3"
         >
           {usbEnabled && recoveryMode && (
-            <Input
-              theme={theme}
-              placeholder="Recovery code"
-              type="text"
-              value={recoveryCode}
-              onChange={(e) => setRecoveryCode(e.target.value)}
-              shake={verificationFailed ? 'true' : 'false'}
-              autoComplete="off"
-              spellCheck={false}
-              onKeyDown={(e) => e.stopPropagation()}
-            />
+            <>
+              <Input
+                theme={theme}
+                placeholder="Recovery code"
+                type="text"
+                value={recoveryCode}
+                onChange={(e) => setRecoveryCode(e.target.value)}
+                shake={verificationFailed ? 'true' : 'false'}
+                autoComplete="off"
+                spellCheck={false}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+              <div className="flex flex-col gap-1.5 w-[87%]" role="radiogroup" aria-label="Why use the code">
+                {(
+                  [
+                    {
+                      id: 'session',
+                      label: "I don't have it with me",
+                      note: 'Unlock for this session only. Your key still works.',
+                    },
+                    {
+                      id: 'lost',
+                      label: 'I lost it or it may be copied',
+                      note: 'Replace it with a new key and a new code.',
+                    },
+                  ] as const
+                ).map((opt) => {
+                  const selected = recoveryIntent === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setRecoveryIntent(opt.id)}
+                      className="flex items-start gap-2.5 text-left rounded-xl px-3 py-2 cursor-pointer outline-none"
+                      style={{
+                        backgroundColor: theme.color.global.row,
+                        border: `1px solid ${selected ? contrast : gray + '40'}`,
+                        fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+                      }}
+                    >
+                      <span
+                        className="mt-0.5 inline-block w-3 h-3 rounded-full shrink-0"
+                        style={{
+                          border: `2px solid ${selected ? contrast : gray}`,
+                          backgroundColor: selected ? contrast : 'transparent',
+                        }}
+                      />
+                      <span className="flex flex-col gap-0.5">
+                        <span className="text-xs font-semibold" style={{ color: contrast }}>
+                          {opt.label}
+                        </span>
+                        <span className="text-[10px] leading-snug" style={{ color: gray }}>
+                          {opt.note}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           )}
 
           <Input

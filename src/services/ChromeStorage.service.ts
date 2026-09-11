@@ -72,7 +72,8 @@ export class ChromeStorageService {
 
   clearPassKey = async (): Promise<void> => {
     this.cachedPassKey = undefined;
-    await chrome.storage.session.remove('passKey');
+    // The USB presence markers describe this session; they go with it.
+    await chrome.storage.session.remove(['passKey', 'usbLastSeenAt', 'usbRecoverySessionAt']);
   };
 
   /**

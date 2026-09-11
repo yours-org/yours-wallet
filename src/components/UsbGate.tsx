@@ -4,7 +4,7 @@ import { Loader2, Usb } from 'lucide-react';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useTheme } from '../hooks/useTheme';
 import { openUsbWindow, probeSticks, requestNextStickPermission, type StickProbe } from '../services/UsbKey.service';
-import { markUsbSeen } from '../services/usbPresence';
+import { isUsbRecoverySession, markUsbSeen } from '../services/usbPresence';
 import { PageLoader } from './PageLoader';
 
 const RECHECK_MS = 5000;
@@ -25,6 +25,16 @@ export const UsbGate = ({ children }: { children: ReactNode }) => {
   const enabled = !!usbSecurity?.enabled;
   const [probe, setProbe] = useState<StickProbe | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  // Unlocked with the recovery code and no key at hand: no probing this
+  // session, and a visible reminder that the key was not checked.
+  const [recovery, setRecovery] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    if (!enabled) {
+      setRecovery(false);
+      return;
+    }
+    void isUsbRecoverySession().then(setRecovery);
+  }, [enabled]);
   const probing = useRef(false);
   const misses = useRef(0);
 
@@ -56,11 +66,11 @@ export const UsbGate = ({ children }: { children: ReactNode }) => {
   }, [usbSecurity, lockWallet]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || recovery !== false) return;
     void check();
     const timer = window.setInterval(() => void check(), RECHECK_MS);
     return () => window.clearInterval(timer);
-  }, [enabled, check]);
+  }, [enabled, recovery, check]);
 
   const allow = async () => {
     if (probe?.status !== 'permission' || busy) return;
@@ -76,7 +86,32 @@ export const UsbGate = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  if (!enabled || probe?.status === 'ok') return <>{children}</>;
+  if (!enabled) return <>{children}</>;
+  if (recovery === undefined) return <PageLoader message="Checking USB key..." theme={theme} />;
+  if (recovery) {
+    return (
+      <>
+        <div
+          className="absolute left-0 right-0 top-14 z-[8] flex justify-center px-4 pointer-events-none"
+          aria-live="polite"
+        >
+          <span
+            className="text-[10px] font-medium rounded-full px-2.5 py-0.5"
+            style={{
+              color: '#FBBF24',
+              backgroundColor: theme.color.global.row,
+              border: '1px solid #FBBF2440',
+              fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+            }}
+          >
+            Unlocked with recovery code · USB key not checked this session
+          </span>
+        </div>
+        {children}
+      </>
+    );
+  }
+  if (probe?.status === 'ok') return <>{children}</>;
 
   if (probe === undefined || probe.status === 'absent') {
     return <PageLoader message="Checking USB key..." theme={theme} />;
