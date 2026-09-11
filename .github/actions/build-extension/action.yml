@@ -26,6 +26,10 @@ runs:
       shell: bash
       run: bun run typecheck
 
+    - name: Test network support
+      shell: bash
+      run: bun run test:network
+
     - name: Build
       shell: bash
       run: bun run build
