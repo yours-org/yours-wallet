@@ -1,0 +1,12 @@
+diff --git a/dist/handlers.js b/dist/handlers.js
+index b0ad0d7d2a196e95a8578f989778af538b809513..e76f2b8a08c9df0231fc9b00cae6232cf21982ce 100644
+--- a/dist/handlers.js
++++ b/dist/handlers.js
+@@ -19,6 +19,7 @@ export async function handleCreateActionRequest(deps, args, originator) {
+     const admin = isAdmin(deps, originator);
+     if (!admin) {
+         const enriched = await enrichIntent(deps.wallet, args, {
++            chain: (await deps.wallet.getNetwork({})).network === 'test' ? 'testnet' : 'mainnet',
+             services: deps.services,
+         });
+         const contentUrls = buildContentUrlMap(enriched);

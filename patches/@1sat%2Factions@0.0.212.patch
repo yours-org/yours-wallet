@@ -1,0 +1,35 @@
+diff --git a/dist/addresses/index.js b/dist/addresses/index.js
+index 0fc5c03ec8be9adb6bfafc9014c427c70462f251..831597dbc6707601fad9bd5b509f0ad2e4635c30 100644
+--- a/dist/addresses/index.js
++++ b/dist/addresses/index.js
+@@ -62,7 +62,7 @@ export const deriveDepositAddresses = {
+                 forSelf: true,
+             });
+             derivations.push({
+-                address: PublicKey.fromString(publicKey).toAddress(),
++                address: PublicKey.fromString(publicKey).toAddress(ctx.chain === 'test' ? 'testnet' : 'mainnet'),
+                 index: i,
+                 derivationPrefix: prefix,
+                 derivationSuffix,
+diff --git a/dist/sync/index.js b/dist/sync/index.js
+index 96579b32e14f6799868d3faca6cadab521e77449..f78b25ad7b38c9594014efbfaad37bc2c4b0de11 100644
+--- a/dist/sync/index.js
++++ b/dist/sync/index.js
+@@ -88,7 +88,7 @@ export const syncAddresses = {
+                     forSelf: true,
+                 });
+                 derivations.push({
+-                    address: PublicKey.fromString(publicKey).toAddress(),
++                    address: PublicKey.fromString(publicKey).toAddress(ctx.chain === 'test' ? 'testnet' : 'mainnet'),
+                     index: i,
+                     derivationPrefix: prefix,
+                     derivationSuffix,
+@@ -101,7 +101,7 @@ export const syncAddresses = {
+         const addresses = derivations.map((d) => d.address);
+         const addressMap = new Map(derivations.map((d) => [d.address, d]));
+         // 2. Open processed-tx store
+-        const store = await openStore(identityKey, ctx.dataDir);
++        const store = await openStore(ctx.chain === 'test' ? `test-${identityKey}` : identityKey, ctx.dataDir);
+         try {
+             // 3. Get current block height and last score
+             const { height: currentHeight } = await ctx.wallet.getHeight({});

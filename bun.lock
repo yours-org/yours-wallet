@@ -77,6 +77,10 @@
       },
     },
   },
+  "patchedDependencies": {
+    "@1sat/permission-module@0.0.52": "patches/@1sat%2Fpermission-module@0.0.52.patch",
+    "@1sat/actions@0.0.212": "patches/@1sat%2Factions@0.0.212.patch",
+  },
   "overrides": {
     "@1sat/client": "0.0.51",
     "@1sat/templates": "0.0.33",
