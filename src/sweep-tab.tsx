@@ -1,12 +1,14 @@
 import { Buffer } from 'buffer';
+import type { WalletInterface } from '@bsv/sdk';
 import process from 'process';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { SweepApp, configureServices, type LegacyKeys } from '@1sat/sweep-ui';
 import { createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
 import { createContext } from '@1sat/actions';
 import { decrypt } from './utils/crypto';
 import { cancelOwnedOrdLockListings } from './utils/cancelOrdLockListings';
+import { createAccountBoundContext, WALLET_OPERATION_STOPPED } from './utils/accountBoundWallet';
 import './sweep-tab.css';
 
 global.Buffer = Buffer;
@@ -20,14 +22,33 @@ function SweepTab() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [wallet] = useState(() => createChromeCWI());
+  const [delistingComplete, setDelistingComplete] = useState(false);
+  const [delistingError, setDelistingError] = useState<string | null>(null);
+  const [delistingProgress, setDelistingProgress] = useState('Cancelling listings...');
+  const [delistingAttempt, setDelistingAttempt] = useState(0);
+  const operationControllerRef = useRef(new AbortController());
+  const [sweepWallet, setSweepWallet] = useState<WalletInterface | null>(null);
 
   useEffect(() => {
     configureServices(SERVICES_BASE_URL);
+    let active = true;
+    const accountChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area !== 'local' || (!changes.selectedAccount && !changes.isLocked?.newValue)) return;
+      active = false;
+      operationControllerRef.current.abort();
+      setDelistingComplete(false);
+      setSweepWallet(null);
+      setKeys(null);
+      setLoading(false);
+      setError(WALLET_OPERATION_STOPPED);
+    };
+    chrome.storage.onChanged.addListener(accountChanged);
 
     chrome.storage.local.get(null, async (storage) => {
       try {
         // Check for an externally-provided WIF (e.g. from Sweep Private Key in Tools)
         const sessionData = await chrome.storage.session.get('sweepExternalWif');
+        if (!active) return;
         const externalWif = sessionData.sweepExternalWif as string | undefined;
         if (externalWif) {
           // Clear it immediately so it doesn't persist
@@ -42,6 +63,7 @@ function SweepTab() {
 
         // passKey lives in session storage (memory-only), not local storage
         const session = await chrome.storage.session.get('passKey');
+        if (!active) return;
         const passKey = session.passKey as string | undefined;
 
         if (isLocked || !passKey) {
@@ -64,6 +86,7 @@ function SweepTab() {
         }
 
         const decrypted = JSON.parse(await decrypt(account.encryptedKeys, passKey));
+        if (!active) return;
         if (!decrypted.walletWif && !decrypted.ordWif) {
           setError('No legacy keys found in this account.');
           setLoading(false);
@@ -76,36 +99,50 @@ function SweepTab() {
           identityPk: decrypted.identityWif || undefined,
         });
       } catch (e) {
+        if (!active) return;
         setError(e instanceof Error ? e.message : 'Failed to load keys');
       }
-      setLoading(false);
+      if (active) setLoading(false);
     });
+    return () => {
+      active = false;
+      operationControllerRef.current.abort();
+      chrome.storage.onChanged.removeListener(accountChanged);
+    };
   }, []);
 
-  // OPL-4696: cancel wallet-owned OrdLock listings once when sweep tab unlocks.
-  // Hooks must run unconditionally (before early returns).
+  // Do not expose fee-spending sweep actions until owner delisting completes.
   useEffect(() => {
     if (loading || error || !keys) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const services = new OneSatServices('main');
-        const apiContext = createContext(wallet, { chain: 'main', services, isBaseWallet: false });
-        if (cancelled) return;
-        const res = await cancelOwnedOrdLockListings(apiContext, {
-          sessionKey: 'sweep-tab-load',
+    let active = true;
+    const controller = new AbortController();
+    operationControllerRef.current = controller;
+    setDelistingComplete(false);
+    setSweepWallet(null);
+    const services = new OneSatServices('main');
+    const apiContext = createContext(wallet, { chain: 'main', services, isBaseWallet: false });
+    void createAccountBoundContext(apiContext, controller.signal)
+      .then(async (context) => {
+        await cancelOwnedOrdLockListings(context, {
+          signal: controller.signal,
+          requireComplete: true,
+          onProgress: ({ attempted, skipped, total }) =>
+            setDelistingProgress(`Cancelling listings: ${attempted + skipped} of ${total}`),
         });
-        if (res.cancelled > 0) {
-          console.log('[sweep-tab] auto-cancelled OrdLock listings', res);
+        controller.signal.throwIfAborted();
+        if (active) {
+          setSweepWallet(context.wallet);
+          setDelistingComplete(true);
         }
-      } catch (err) {
-        console.warn('[sweep-tab] OrdLock auto-cancel failed (continuing)', err);
-      }
-    })();
+      })
+      .catch((err) => {
+        if (active) setDelistingError(err instanceof Error ? err.message : 'Listing cancellation failed.');
+      });
     return () => {
-      cancelled = true;
+      active = false;
+      controller.abort();
     };
-  }, [loading, error, keys, wallet]);
+  }, [loading, error, keys, wallet, delistingAttempt]);
 
   if (loading) {
     return (
@@ -137,7 +174,26 @@ function SweepTab() {
 
   if (!keys) return null;
 
-  return <SweepApp legacyKeys={keys} wallet={wallet} sweepOnly />;
+  if (!delistingComplete || !sweepWallet) {
+    return (
+      <div style={{ padding: '2rem', color: '#a1a1aa', textAlign: 'center' }}>
+        <p role={delistingError ? 'alert' : 'status'}>{delistingError || delistingProgress}</p>
+        {delistingError && (
+          <button
+            onClick={() => {
+              setDelistingError(null);
+              setDelistingProgress('Cancelling listings...');
+              setDelistingAttempt((attempt) => attempt + 1);
+            }}
+          >
+            Retry listing cancellation
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return <SweepApp legacyKeys={keys} wallet={sweepWallet} sweepOnly />;
 }
 
 const root = document.getElementById('root');

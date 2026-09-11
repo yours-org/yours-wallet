@@ -1,5 +1,5 @@
 import { validate } from 'bitcoin-address-validation';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   List,
@@ -70,6 +70,7 @@ import { MneeClient } from '@1sat/client';
 import { PrivateKey } from '@bsv/sdk';
 import { getLegacyMneeBalance, sweepLegacyMnee } from '../utils/sweepLegacyMnee';
 import { cancelOwnedOrdLockListings } from '../utils/cancelOrdLockListings';
+import { createAccountBoundContext } from '../utils/accountBoundWallet';
 import { decrypt } from '../utils/crypto';
 import type { Keys } from '../utils/keys';
 
@@ -88,6 +89,13 @@ export type Recipient = {
 };
 
 export const BsvWallet = () => {
+  const operationControllerRef = useRef(new AbortController());
+  useEffect(() => {
+    const controller = new AbortController();
+    operationControllerRef.current = controller;
+    return () => controller.abort();
+  }, []);
+
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -823,18 +831,18 @@ export const BsvWallet = () => {
         if (isSendAllBsv) {
           const r = sendRecipients[0];
           const destination = r.address ?? r.paymail ?? '';
-          // OPL-4696: cancel OrdLock listings before send-all / BSV sweep (fail soft).
+          // Preserve fee funds until all owned listings have been cancelled.
           try {
-            await cancelOwnedOrdLockListings(apiContext, {
-              force: true,
-              sessionKey: 'bsv-send-all',
-            });
+            const signal = operationControllerRef.current.signal;
+            const spendContext = await createAccountBoundContext(apiContext, signal);
+            await cancelOwnedOrdLockListings(spendContext, { requireComplete: true, signal });
+            signal.throwIfAborted();
+            sendRes = await sendAllBsv.execute(spendContext, { destination });
           } catch (err) {
-            console.warn('[BsvWallet] OrdLock auto-cancel before sendAll failed', err);
+            addSnackbar(err instanceof Error ? err.message : 'Listing cancellation failed. Please retry.', 'error');
+            setIsProcessing(false);
+            return;
           }
-          sendRes = await sendAllBsv.execute(apiContext, {
-            destination,
-          });
         } else {
           sendRes = await sendBsv.execute(apiContext, { requests: sendRecipients });
         }

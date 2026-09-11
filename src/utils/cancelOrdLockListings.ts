@@ -1,117 +1,128 @@
-/**
- * ORDLOCK transition helper — cancel wallet-owned OrdLock listings and recover
- * the ordinals into the wallet. Shared by OrdWallet load/refresh and BSV
- * sweep/send-all paths (OPL-4696).
- *
- * Create of new OrdLock listings is disabled elsewhere (ORDLOCK_LISTING_DISABLED).
- * Buy of others' listings and manual cancel stay enabled.
- */
+/** Owner delisting for the OrdLock deprecation, shared by ordinal and sweep views. */
 import type { WalletOutput } from '@bsv/sdk';
 import { cancelOrdinalListing, listOrdinals, type OneSatContext } from '@1sat/actions';
 import { readAssetIdTag } from '@1sat/types';
+import { createAccountBoundContext } from './accountBoundWallet';
 
 export const ORDLOCK_LISTING_DISABLED_MESSAGE =
   'OrdLock listing creation is deprecated pending a replacement contract. Existing listings can still be cancelled or bought.';
 
-const ORDLOCK_TAG = 'ordlock';
+export const ORDLOCK_CANCEL_INCOMPLETE_MESSAGE =
+  'Listing cancellation is incomplete. Retry delisting before sending or sweeping funds.';
 
-/** Sessions that already ran auto-cancel (avoids re-cancel spam on re-render). */
-const ranSessions = new Set<string>();
-
-export type CancelOrdLockResult = {
+export type CancelOrdLockProgress = {
+  total: number;
   attempted: number;
   cancelled: number;
   skipped: number;
+};
+
+export type CancelOrdLockResult = CancelOrdLockProgress & {
+  cancelledOutpoints: string[];
   errors: string[];
 };
 
 export function isOrdLockListed(output: WalletOutput): boolean {
-  return output.tags?.includes(ORDLOCK_TAG) ?? false;
-}
-
-function trackingId(output: WalletOutput): string | undefined {
-  return readAssetIdTag(output.tags);
+  return output.tags?.includes('ordlock') ?? false;
 }
 
 /**
- * Cancel OrdLock-listed outputs the wallet controls.
- * Fail soft: logs and collects errors; never throws for individual cancel failures.
- *
- * @param sessionKey When set, only runs once per key for this JS realm (e.g. per unlock/load).
- *                   Pass a stable id like identity address + 'ord-load' or 'bsv-sweep'.
+ * Take a complete snapshot before cancelling: spending while paging would shift
+ * offsets and skip listings. Each unique output is attempted once per invocation;
+ * callers retry explicitly using a fresh discovery or the remaining selection.
  */
 export async function cancelOwnedOrdLockListings(
   apiContext: OneSatContext,
   options?: {
-    /** Pre-fetched outputs; when omitted, lists ordinals from the wallet. */
+    /** A complete manual selection; omit to discover all wallet-owned listings. */
     outputs?: WalletOutput[];
-    /** Dedup key — skip if this session already ran. */
-    sessionKey?: string;
-    /** Force run even if sessionKey already executed. */
-    force?: boolean;
-    /** Max listings to cancel in one pass (default 25). */
-    limit?: number;
+    /** Abort the pass when its view closes or its account changes. */
+    signal?: AbortSignal;
+    onProgress?: (progress: CancelOrdLockProgress) => void;
+    /** Stop the calling send/sweep when discovery or any cancellation fails. */
+    requireComplete?: boolean;
   },
 ): Promise<CancelOrdLockResult> {
-  const result: CancelOrdLockResult = { attempted: 0, cancelled: 0, skipped: 0, errors: [] };
-
-  const sessionKey = options?.sessionKey;
-  if (sessionKey && !options?.force && ranSessions.has(sessionKey)) {
-    return result;
-  }
-  if (sessionKey) ranSessions.add(sessionKey);
+  const result: CancelOrdLockResult = {
+    total: 0,
+    attempted: 0,
+    cancelled: 0,
+    skipped: 0,
+    cancelledOutpoints: [],
+    errors: [],
+  };
+  const progress = () => {
+    const { total, attempted, cancelled, skipped } = result;
+    options?.onProgress?.({ total, attempted, cancelled, skipped });
+  };
 
   try {
-    let outputs = options?.outputs;
-    if (!outputs) {
-      const { outputs: listed } = await listOrdinals.execute(apiContext, {
-        limit: options?.limit ?? 100,
-        offset: 0,
-      });
-      outputs = listed;
+    const context = await createAccountBoundContext(apiContext, options?.signal);
+    const assertCurrent = async () => {
+      options?.signal?.throwIfAborted();
+      await context.wallet.getPublicKey({ identityKey: true });
+      options?.signal?.throwIfAborted();
+    };
+    const outputs = new Map<string, WalletOutput>();
+    if (options?.outputs) {
+      for (const output of options.outputs) outputs.set(output.outpoint, output);
+    } else {
+      let offset = 0;
+      while (true) {
+        await assertCurrent();
+        const page = await listOrdinals.execute(context, { tags: ['ordlock'], limit: 100, offset });
+        if (page.outputs.length === 0) {
+          if (page.totalOutputs !== undefined && offset < page.totalOutputs) {
+            throw new Error('Listing discovery ended before all outputs were returned.');
+          }
+          break;
+        }
+        const previousSize = outputs.size;
+        for (const output of page.outputs) outputs.set(output.outpoint, output);
+        if (outputs.size === previousSize) throw new Error('Listing discovery did not advance. Retry delisting.');
+        offset += page.outputs.length;
+        if (page.totalOutputs !== undefined && offset >= page.totalOutputs) {
+          if (outputs.size < page.totalOutputs) throw new Error('Listing discovery returned an incomplete snapshot.');
+          break;
+        }
+      }
     }
 
-    const listed = outputs.filter(isOrdLockListed);
-    if (listed.length === 0) return result;
-
-    const cap = options?.limit ?? 25;
-    const toCancel = listed.slice(0, cap);
-
-    for (const output of toCancel) {
-      const id = trackingId(output);
+    const listings = [...outputs.values()].filter(isOrdLockListed);
+    result.total = listings.length;
+    progress();
+    for (const output of listings) {
+      await assertCurrent();
+      const id = readAssetIdTag(output.tags);
       if (!id) {
         result.skipped += 1;
-        console.warn('[cancelOwnedOrdLockListings] listed output missing tracking id, skipping', output.outpoint);
+        result.errors.push(`${output.outpoint}: missing tracking id`);
+        progress();
         continue;
       }
 
       result.attempted += 1;
       try {
-        const cancelRes = await cancelOrdinalListing.execute(apiContext, { id });
-        if (!cancelRes.txid || cancelRes.error) {
-          const msg = cancelRes.error ?? 'cancel-failed';
-          result.errors.push(`${output.outpoint}: ${msg}`);
-          console.warn('[cancelOwnedOrdLockListings] cancel failed', output.outpoint, msg);
-          continue;
+        const cancellation = await cancelOrdinalListing.execute(context, { id });
+        await assertCurrent();
+        if (!cancellation.txid || cancellation.error) {
+          result.errors.push(`${output.outpoint}: ${cancellation.error || 'cancel-failed'}`);
+        } else {
+          result.cancelled += 1;
+          result.cancelledOutpoints.push(output.outpoint);
         }
-        result.cancelled += 1;
-        console.log('[cancelOwnedOrdLockListings] cancelled', output.outpoint, cancelRes.txid);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        result.errors.push(`${output.outpoint}: ${msg}`);
-        console.warn('[cancelOwnedOrdLockListings] cancel exception', output.outpoint, err);
+        result.errors.push(`${output.outpoint}: ${err instanceof Error ? err.message : String(err)}`);
       }
+      progress();
     }
+    await assertCurrent();
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    result.errors.push(msg);
-    console.warn('[cancelOwnedOrdLockListings] session failed', err);
+    result.errors.push(err instanceof Error ? err.message : String(err));
   }
 
+  if (options?.requireComplete && (result.errors.length > 0 || result.cancelled !== result.total)) {
+    throw new Error(ORDLOCK_CANCEL_INCOMPLETE_MESSAGE);
+  }
   return result;
-}
-
-/** Test/helper: clear session dedup (not used in production UI). */
-export function resetOrdLockCancelSessions(): void {
-  ranSessions.clear();
 }

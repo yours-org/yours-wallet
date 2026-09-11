@@ -49,6 +49,7 @@ import type { PromptKind } from './promptProtocol';
 import { initWallet, openAccountStorageForBackup, type AccountContext } from './initWallet';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
+import { callAccountBoundWallet } from './utils/accountBoundWallet';
 
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
@@ -663,6 +664,35 @@ if (isInServiceWorker) {
         sendResponse({ type: message.action, success: false, error: 'Invalid origin' });
         return true;
       }
+    }
+
+    // Account-bound CWI is extension-page-only; content scripts share our ID,
+    // but retain the web page origin and must never enter this admin path.
+    if (message.expectedIdentityKey !== undefined) {
+      if (sender.origin !== `chrome-extension://${chrome.runtime.id}`) {
+        sendResponse({ type: message.action, success: false, error: 'Unauthorized' });
+        return true;
+      }
+      if (!chromeStorageService.getCurrentAccountObject().account?.encryptedKeys) {
+        sendResponse({ type: message.action, success: false, error: 'Wallet not available' });
+        return true;
+      }
+      void ensureWallet(true)
+        .then(async (wallet) => {
+          const captured = accountContext;
+          return callAccountBoundWallet({
+            wallet,
+            baseWallet: captured?.baseWallet,
+            expectedIdentityKey: message.expectedIdentityKey,
+            action: message.action,
+            params: message.params,
+            originator: `chrome-extension://${chrome.runtime.id}`,
+            isCurrent: () => !!captured && accountContext === captured && captured.wallet === wallet,
+          });
+        })
+        .then((data) => sendResponse({ type: message.action, success: true, data }))
+        .catch((error) => sendResponse({ type: message.action, success: false, error: String(error) }));
+      return true;
     }
 
     // Actions that don't require authorization

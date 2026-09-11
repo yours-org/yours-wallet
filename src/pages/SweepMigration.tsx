@@ -1,8 +1,9 @@
-import { useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PrivateKey } from '@bsv/sdk';
 import { prepareSweepInputs, sweepBsv, sweepOrdinals, sweepBsv21 } from '@1sat/actions';
 import { cancelOwnedOrdLockListings } from '../utils/cancelOrdLockListings';
+import { createAccountBoundContext } from '../utils/accountBoundWallet';
 import { scanAddress, type ScannedAssets, type EnrichedOrdinal, type TokenBalance } from '../sweep/scanner';
 import type { IndexedOutput } from '@1sat/types';
 import { Button } from '../components/Button';
@@ -58,6 +59,13 @@ const staggerContainer = {
 };
 
 export const SweepMigration = () => {
+  const operationControllerRef = useRef(new AbortController());
+  useEffect(() => {
+    const controller = new AbortController();
+    operationControllerRef.current = controller;
+    return () => controller.abort();
+  }, []);
+
   const { theme } = useTheme();
   const navigate = useNavigate();
   const menuContext = useContext(BottomMenuContext);
@@ -240,27 +248,39 @@ export const SweepMigration = () => {
     if (!legacyKeys) return;
     setStep('sweeping');
     const results: SweepTxResult[] = [];
+    const signal = operationControllerRef.current.signal;
+    let sweepContext: typeof apiContext;
 
-    // OPL-4696: cancel wallet-owned OrdLock listings before sweep (fail soft).
+    // Keep fee funds available until owner delisting completes.
     try {
       setCurrentSweepOp('Cancelling OrdLock listings...');
-      const cancelRes = await cancelOwnedOrdLockListings(apiContext, {
-        force: true,
-        sessionKey: 'sweep-migration',
+      sweepContext = await createAccountBoundContext(apiContext, signal);
+      await cancelOwnedOrdLockListings(sweepContext, {
+        signal,
+        requireComplete: true,
+        onProgress: ({ attempted, skipped, total }) =>
+          setCurrentSweepOp(`Cancelling listings: ${attempted + skipped} of ${total}`),
       });
-      if (cancelRes.cancelled > 0) {
-        console.log('[SweepMigration] auto-cancelled OrdLock listings', cancelRes);
-      }
     } catch (err) {
-      console.warn('[SweepMigration] OrdLock auto-cancel failed (continuing sweep)', err);
+      setSweepResults([
+        {
+          type: 'ordinals',
+          label: 'Listing cancellation',
+          error: err instanceof Error ? err.message : String(err),
+        },
+      ]);
+      setStep('results');
+      return;
     }
 
     if (selection.sweepBsv && assets.funding.length > 0) {
       setCurrentSweepOp('Sweeping BSV...');
       try {
-        const inputs = await prepareSweepInputs(apiContext, toSweepInputs(assets.funding));
+        signal.throwIfAborted();
+        await sweepContext.wallet.getPublicKey({ identityKey: true });
+        const inputs = await prepareSweepInputs(sweepContext, toSweepInputs(assets.funding));
         const payKey = PrivateKey.fromWif(legacyKeys.walletWif);
-        const resp = await sweepBsv.execute(apiContext, {
+        const resp = await sweepBsv.execute(sweepContext, {
           inputs,
           keys: inputs.map(() => payKey),
           amount: selection.bsvAmount,
@@ -276,13 +296,16 @@ export const SweepMigration = () => {
       }
     }
 
+    if (signal.aborted) return;
     if (selection.selectedOrdinals.size > 0) {
       setCurrentSweepOp('Sweeping Ordinals...');
       try {
         const selectedOutputs = assets.ordinals.filter((o) => selection.selectedOrdinals.has(o.outpoint));
-        const inputs = await prepareSweepInputs(apiContext, toSweepInputs(selectedOutputs));
+        signal.throwIfAborted();
+        await sweepContext.wallet.getPublicKey({ identityKey: true });
+        const inputs = await prepareSweepInputs(sweepContext, toSweepInputs(selectedOutputs));
         const ordKey = PrivateKey.fromWif(legacyKeys.ordWif);
-        const resp = await sweepOrdinals.execute(apiContext, { inputs, keys: inputs.map(() => ordKey) });
+        const resp = await sweepOrdinals.execute(sweepContext, { inputs, keys: inputs.map(() => ordKey) });
         results.push({
           type: 'ordinals',
           label: `Ordinals (${selection.selectedOrdinals.size})`,
@@ -295,13 +318,16 @@ export const SweepMigration = () => {
     }
 
     for (const token of assets.bsv21Tokens) {
+      if (signal.aborted) return;
       if (!selection.selectedBsv21TokenIds.has(token.tokenId)) continue;
       const label = token.symbol || token.tokenId.slice(0, 8);
       setCurrentSweepOp(`Sweeping ${label}...`);
       try {
-        const inputs = await prepareSweepInputs(apiContext, toSweepInputs(token.outputs));
+        signal.throwIfAborted();
+        await sweepContext.wallet.getPublicKey({ identityKey: true });
+        const inputs = await prepareSweepInputs(sweepContext, toSweepInputs(token.outputs));
         const tokenKey = PrivateKey.fromWif(legacyKeys.ordWif);
-        const resp = await sweepBsv21.execute(apiContext, {
+        const resp = await sweepBsv21.execute(sweepContext, {
           inputs: inputs.map((inp) => ({ ...inp, tokenId: token.tokenId, amount: token.totalAmount.toString() })),
           keys: inputs.map(() => tokenKey),
         });
@@ -332,7 +358,7 @@ export const SweepMigration = () => {
   };
 
   const handleDone = async () => {
-    await persistSweepFlag('sweepCompleted');
+    if (!sweepResults.some((result) => result.error && !result.txid)) await persistSweepFlag('sweepCompleted');
     navigate('/bsv-wallet');
   };
 
@@ -1166,6 +1192,9 @@ export const SweepMigration = () => {
             </motion.div>
 
             <motion.div variants={fadeUp} className="w-full">
+              {failures.length > 0 && successes.length === 0 && (
+                <Button theme={theme} type="primary" label="Retry" onClick={() => setStep('review')} />
+              )}
               <Button theme={theme} type="primary" label="Done" onClick={handleDone} />
             </motion.div>
           </motion.div>
