@@ -1,7 +1,7 @@
 /** Owner delisting for the OrdLock deprecation, shared by ordinal and sweep views. */
 import type { WalletOutput } from '@bsv/sdk';
 import { cancelOrdinalListing, cancelOpnsListing, listOrdinals, listOpns, type OneSatContext } from '@1sat/actions';
-import { readAssetIdTag } from '@1sat/types';
+import { readAssetIdTag, TOKEN_CONTENT_TYPE } from '@1sat/types';
 import { createAccountBoundContext } from './accountBoundWallet';
 
 export const ORDLOCK_LISTING_DISABLED_MESSAGE =
@@ -25,6 +25,15 @@ export type CancelOrdLockResult = CancelOrdLockProgress & {
 
 export function isOrdLockListed(output: WalletOutput): boolean {
   return output.tags?.includes('ordlock') ?? false;
+}
+
+function isTokenListing(output: WalletOutput): boolean {
+  const tags = output.tags ?? [];
+  if (tags.includes(`type:${TOKEN_CONTENT_TYPE}`)) return true;
+  return tags.some(
+    (tag) =>
+      tag.startsWith('bsv21:') && tag !== 'bsv21:deploy' && tag !== 'bsv21:auth',
+  );
 }
 
 /**
@@ -134,6 +143,15 @@ export async function cancelOwnedOrdLockListings(
       if (!id) {
         result.skipped += 1;
         result.errors.push(`${output.outpoint}: missing tracking id`);
+        progress();
+        continue;
+      }
+
+      if (isTokenListing(output)) {
+        result.skipped += 1;
+        result.errors.push(
+          `${output.outpoint}: token listing cannot be cancelled as an ordinal`,
+        );
         progress();
         continue;
       }
