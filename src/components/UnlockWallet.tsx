@@ -179,6 +179,10 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       setVerificationFailed(false);
       setErrorText('');
       if (usbEnabled) resetUsbPresence();
+      // The code stands in for the key this session when the key is merely
+      // elsewhere. Recorded before anything can flip the popup to unlocked,
+      // so the gate never sees an unlocked wallet without the marker.
+      if (unlockedViaRecovery && recoveryIntent === 'session') await startUsbRecoverySession();
       const timestamp = Date.now();
       await chromeStorageService.update({ lastActiveTime: timestamp });
 
@@ -193,10 +197,8 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
         console.error('Wallet unlock error:', error);
       }
 
-      // The code stands in for the key this session when the key is merely
-      // elsewhere; when it is gone, walk the user into rotation right away.
-      if (unlockedViaRecovery && recoveryIntent === 'session') await startUsbRecoverySession();
       onUnlock();
+      // The key is gone: walk the user into rotation right away.
       if (unlockedViaRecovery && recoveryIntent === 'lost') void openUsbWindow('rotate', { viaRecovery: true });
     } else {
       failUnlock(usbEnabled ? 'Incorrect password' : '');

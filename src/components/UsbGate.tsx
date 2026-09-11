@@ -33,7 +33,17 @@ export const UsbGate = ({ children }: { children: ReactNode }) => {
       setRecovery(false);
       return;
     }
-    void isUsbRecoverySession().then(setRecovery);
+    void isUsbRecoverySession().then((v) => {
+      console.log('[UsbGate] recovery session:', v);
+      setRecovery(v);
+    });
+    // Follow the marker: it is written by the unlock screen and removed on lock.
+    const onChanged = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
+      if (area !== 'session' || !('usbRecoverySessionAt' in changes)) return;
+      setRecovery(typeof changes.usbRecoverySessionAt.newValue === 'number');
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
   }, [enabled]);
   const probing = useRef(false);
   const misses = useRef(0);
