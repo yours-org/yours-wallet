@@ -51,7 +51,6 @@ export default defineConfig({
         'sweep-tab': resolve(__dirname, 'sweep-tab.html'),
         'prompt-tab': resolve(__dirname, 'prompt.html'),
         'usb-tab': resolve(__dirname, 'usb.html'),
-        offscreen: resolve(__dirname, 'offscreen.html'),
       },
       output: {
         entryFileNames: 'assets/[name]-[hash].js',
