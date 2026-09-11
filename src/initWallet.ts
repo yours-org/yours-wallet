@@ -143,14 +143,17 @@ export const openAccountStorageForBackup = async (
   const { activeRemote, backups } = resolveStorageConfig(account?.storageConfig);
   const storageIdentityKey = await ensureStorageIdentityKey(chromeStorageService);
 
+  const chain = chromeStorageService.getChain();
   const { storage, destroy, monitor } = await createWebWallet({
     privateKey: keys.identityWif,
-    chain: 'main',
+    chain,
     feeModel: { model: 'sat/kb', value: chromeStorageService.getCustomFeeRate() },
     activeRemote,
     backups,
     storageIdentityKey,
-    taskStateStore: createIndexedDbTaskStateStore(),
+    taskStateStore: createIndexedDbTaskStateStore({
+      scope: chain === 'test' ? 'test' : undefined,
+    }),
   });
 
   // Stop monitor work so BackupSync/runOnce does not contend with getSyncChunk.
@@ -190,7 +193,7 @@ export const initWallet = async (
     throw new Error('No identity key found in decrypted keys');
   }
 
-  const chain = 'main' as const;
+  const chain = chromeStorageService.getChain();
 
   // 2. Create wallet using browser factory. Storage topology comes from the
   // current account's persisted storageConfig. storageIdentityKey is
@@ -206,11 +209,14 @@ export const initWallet = async (
     activeRemote,
     backups,
     storageIdentityKey,
-    taskStateStore: createIndexedDbTaskStateStore(),
+    taskStateStore: createIndexedDbTaskStateStore({
+      scope: chain === 'test' ? 'test' : undefined,
+    }),
   };
 
   const {
     wallet: baseWallet,
+    services,
     destroy: destroyWallet,
     storage,
     remoteStorage,
@@ -220,13 +226,16 @@ export const initWallet = async (
 
   // 3. Build the IndexedDB-backed permission store used by
   //    LocalWalletPermissionsManager for basket/cert/spending grants.
-  const permissionStore = new IndexedDbPermissionStore({ scope: 'yours-wallet' });
+  const permissionStore = new IndexedDbPermissionStore({
+    scope: chain === 'test' ? 'yours-wallet-test' : 'yours-wallet',
+  });
 
   // 4. Build per-asset permission modules (1sat / opns / bsv21 / lock).
   //    Shared toolkit; separate BRC-99 scheme ids. Base wallet is used for
   //    internal apply crypto so createSignature does not re-prompt.
   const assetModules = createAssetPermissionModules({
     wallet: baseWallet,
+    services,
     promptHandler: showOneSatPrompt,
     adminOriginator: ADMIN_ORIGINATOR,
     // Reuse the same permission store the LocalWalletPermissionsManager
@@ -317,16 +326,18 @@ export const initWallet = async (
     });
 
   // Sync incoming paymail payments from the message box (fire-and-forget)
-  syncMessages
-    .execute(actionCtx, { messageboxUrl: MESSAGEBOX_URL })
-    .then((result) => {
-      if (result.processed > 0 || result.failed > 0) {
-        console.log('[initWallet] Message box sync complete:', result);
-      }
-    })
-    .catch((error: unknown) => {
-      console.error('[initWallet] Message box sync failed:', error);
-    });
+  if (chain === 'main') {
+    syncMessages
+      .execute(actionCtx, { messageboxUrl: MESSAGEBOX_URL })
+      .then((result) => {
+        if (result.processed > 0 || result.failed > 0) {
+          console.log('[initWallet] Message box sync complete:', result);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('[initWallet] Message box sync failed:', error);
+      });
+  }
 
   // Create close function
   const close = async () => {

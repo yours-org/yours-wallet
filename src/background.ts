@@ -142,7 +142,10 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
     const { account: currentAccount } = chromeStorageService.getCurrentAccountObject();
     const currentIdentityKey = currentAccount?.pubKeys?.identityPubKey || '';
     if (currentIdentityKey) {
-      const hasPending = await WalletBackupService.hasPendingRestore(currentIdentityKey);
+      const hasPending = await WalletBackupService.hasPendingRestore(
+        currentIdentityKey,
+        chromeStorageService.getChain(),
+      );
       console.log(
         '[background] initializeWallet: hasPendingRestore for',
         currentIdentityKey.slice(0, 8) + '...:',
@@ -964,7 +967,7 @@ if (isInServiceWorker) {
               const am = accountContext.syncContext.addressManager;
               const newIndex = am.getMaxKeyIndex() + 1;
               const { derivations } = await deriveDepositAddresses.execute(
-                { wallet: accountContext.baseWallet, chain: 'main', isBaseWallet: true },
+                { wallet: accountContext.baseWallet, chain: chromeStorageService.getChain(), isBaseWallet: true },
                 { startIndex: newIndex, count: 1 },
               );
               const newDerivation = derivations[0];
@@ -1872,7 +1875,7 @@ if (isInServiceWorker) {
         return;
       }
 
-      const chain = 'main' as const;
+      const chain = chromeStorageService.getChain();
 
       // Same order as Settings backup overlay (getAllAccounts).
       const accountsList = chromeStorageService

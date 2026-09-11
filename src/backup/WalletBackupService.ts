@@ -1,3 +1,4 @@
+import { getNetworkConfig, type Chain } from '../utils/network';
 import {
   FileRestoreReader,
   Zip,
@@ -12,7 +13,6 @@ import type { Account } from '../services/types/chromeStorage.types';
 import type { Theme } from '../theme.types';
 import { decrypt, deriveKey } from '../utils/crypto';
 
-type Chain = 'main' | 'test';
 type SyncChunk = sdk.SyncChunk;
 type RequestSyncChunkArgs = sdk.RequestSyncChunkArgs;
 
@@ -160,7 +160,10 @@ interface AccountPendingRestore {
   chunkCount: number;
 }
 
-// IndexedDB name for storing pending restore data
+// Preserve existing mainnet restore keys.
+const pendingRestoreKey = (identityKey: string, chain: BackupManifest['chain']) =>
+  chain === 'test' ? `${identityKey}:test` : identityKey;
+
 const PENDING_RESTORE_DB = 'yours-wallet-pending-restore';
 const PENDING_RESTORE_STORE = 'pending';
 
@@ -454,7 +457,7 @@ export class WalletBackupService {
         const v1Compat: BackupManifest = {
           version: 1,
           createdAt: manifest.createdAt,
-          chain: manifest.chain,
+          chain: getNetworkConfig(backupChromeStorage.accounts[acct.identityAddress]?.network).chain,
           identityKey: acct.identityKey,
           chunkCount: acct.chunkCount,
         };
@@ -532,7 +535,8 @@ export class WalletBackupService {
     identityKey: string,
     onProgress: BackupProgressCallback,
   ): Promise<void> {
-    const pending = await this.getAccountPendingRestore(identityKey);
+    const restoreKey = pendingRestoreKey(identityKey, storage.getSettings().chain);
+    const pending = await this.getAccountPendingRestore(restoreKey);
     if (!pending) {
       return;
     }
@@ -546,7 +550,7 @@ export class WalletBackupService {
     await storage.syncFromReader(identityKey, reader);
 
     // Remove only this account's pending data — others stay for when they're activated
-    await this.clearAccountPendingRestore(identityKey);
+    await this.clearAccountPendingRestore(restoreKey);
 
     onProgress({ stage: 'complete', message: 'Wallet data imported!' });
   }
@@ -554,8 +558,8 @@ export class WalletBackupService {
   /**
    * Check if there's pending wallet data for a specific account.
    */
-  static async hasPendingRestore(identityKey: string): Promise<boolean> {
-    const pending = await this.getAccountPendingRestore(identityKey);
+  static async hasPendingRestore(identityKey: string, chain: Chain = 'main'): Promise<boolean> {
+    const pending = await this.getAccountPendingRestore(pendingRestoreKey(identityKey, chain));
     return pending !== null;
   }
 
@@ -566,7 +570,7 @@ export class WalletBackupService {
     const tx = db.transaction(PENDING_RESTORE_STORE, 'readwrite');
     const store = tx.objectStore(PENDING_RESTORE_STORE);
     await new Promise<void>((resolve, reject) => {
-      const request = store.put(data, identityKey);
+      const request = store.put(data, pendingRestoreKey(identityKey, data.manifest.chain));
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });

@@ -16,6 +16,7 @@ import {
   type Txo,
 } from '@1sat/wallet-browser';
 import type { OneSatContext } from '@1sat/actions';
+import { getNetwork } from './network';
 import { LOCKUP_PREFIX, LOCKUP_SUFFIX } from './constants';
 
 export const getCurrentUtcTimestamp = (): number => {
@@ -50,7 +51,7 @@ export const getTxFromRawTxFormat = (rawTx: string | number[], format: Transacti
 export const parseRawTransaction = async (tx: Transaction, apiContext: OneSatContext): Promise<ParseContext> => {
   const services = apiContext.services;
   if (!services) throw new Error('services unavailable');
-  const network = 'mainnet' as const;
+  const network = getNetwork(apiContext.chain);
 
   // Hydrate source transactions (needed so inputs can be decoded into spends)
   for (const input of tx.inputs) {

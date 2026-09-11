@@ -5,6 +5,7 @@ import { YoursEventName } from '../inject';
 let exchangeRateCache: { rate: number; timestamp: number } | null = null;
 
 export async function fetchExchangeRate(chain: string, wocApiKey?: string): Promise<number> {
+  if (chain === 'test') return 0;
   if (exchangeRateCache && Date.now() - exchangeRateCache.timestamp < EXCHANGE_RATE_CACHE_TTL) {
     return exchangeRateCache.rate;
   }

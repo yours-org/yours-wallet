@@ -1,5 +1,5 @@
 import * as bip39 from 'bip39';
-import { DerivationTag } from '../services/types/provider.types';
+import { DerivationTag, NetWork } from '../services/types/provider.types';
 import { WifKeys } from '../services/types/keys.types';
 import { DEFAULT_IDENTITY_PATH, DEFAULT_ORD_PATH, DEFAULT_WALLET_PATH } from './constants';
 import { BigNumber, Hash, HD, Mnemonic, PrivateKey, Utils } from '@bsv/sdk';
@@ -30,11 +30,11 @@ const getWifAndDerivation = (seedPhrase: string, derivationPath: string) => {
   return { wif, derivationPath };
 };
 
-export const generateKeysFromTag = (mnemonic: string, derivation: string) => {
+export const generateKeysFromTag = (mnemonic: string, derivation: string, network = NetWork.Mainnet) => {
   const wifAndDp = getWifAndDerivation(mnemonic, derivation);
   const privKey = PrivateKey.fromWif(wifAndDp.wif);
   const pubKey = privKey.toPublicKey();
-  const address = pubKey.toAddress();
+  const address = pubKey.toAddress(network);
   return {
     wif: wifAndDp.wif,
     derivationPath: wifAndDp.derivationPath,
@@ -49,15 +49,16 @@ export const getKeys = (
   walletDerivation: string | null = null,
   ordDerivation: string | null = null,
   identityDerivation: string | null = null,
+  network = NetWork.Mainnet,
 ) => {
   if (validMnemonic) {
     const isValid = bip39.validateMnemonic(validMnemonic);
     if (!isValid) throw new Error('Invalid Mnemonic!');
   }
   const mnemonic = validMnemonic ?? bip39.generateMnemonic();
-  const wallet = generateKeysFromTag(mnemonic, walletDerivation || DEFAULT_WALLET_PATH);
-  const ord = generateKeysFromTag(mnemonic, ordDerivation || DEFAULT_ORD_PATH);
-  const identity = generateKeysFromTag(mnemonic, identityDerivation || DEFAULT_IDENTITY_PATH);
+  const wallet = generateKeysFromTag(mnemonic, walletDerivation || DEFAULT_WALLET_PATH, network);
+  const ord = generateKeysFromTag(mnemonic, ordDerivation || DEFAULT_ORD_PATH, network);
+  const identity = generateKeysFromTag(mnemonic, identityDerivation || DEFAULT_IDENTITY_PATH, network);
 
   const keys: Keys = {
     mnemonic,
@@ -78,14 +79,14 @@ export const getKeys = (
   return keys;
 };
 
-export const getKeysFromWifs = (wifs: WifKeys) => {
+export const getKeysFromWifs = (wifs: WifKeys, network = NetWork.Mainnet) => {
   const walletPrivKey = PrivateKey.fromWif(wifs.payPk);
   const walletPubKey = walletPrivKey.toPublicKey();
-  const walletAddress = walletPubKey.toAddress();
+  const walletAddress = walletPubKey.toAddress(network);
 
   const ordPrivKey = PrivateKey.fromWif(wifs.ordPk);
   const ordPubKey = ordPrivKey.toPublicKey();
-  const ordAddress = ordPubKey.toAddress();
+  const ordAddress = ordPubKey.toAddress(network);
 
   let identityPrivKey: PrivateKey | undefined;
   if (wifs.identityPk) {
@@ -104,7 +105,7 @@ export const getKeysFromWifs = (wifs: WifKeys) => {
   }
 
   const identityPubKey = identityPrivKey.toPublicKey();
-  const identityAddress = identityPubKey.toAddress();
+  const identityAddress = identityPubKey.toAddress(network);
 
   const keys: Partial<Keys> = {
     walletWif: wifs.payPk,

@@ -1,7 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const chrome: any;
 
-import { Utils } from '@bsv/sdk';
 import { NetWork } from './types/provider.types';
 import { YoursEventName } from '../inject';
 import { sendMessage, sendMessageAsync } from '../utils/chromeHelpers';
@@ -13,10 +12,10 @@ import {
   FEE_PER_KB,
   HOSTED_YOURS_IMAGE,
   INACTIVITY_LIMIT,
-  MAINNET_ADDRESS_PREFIX,
 } from '../utils/constants';
 import { decrypt, deriveKey, encrypt } from '../utils/crypto';
 import { Keys } from '../utils/keys';
+import { getNetworkConfig, toNetworkAddress } from '../utils/network';
 import { deepMerge } from './serviceHelpers';
 import { Account, ChromeStorageObject, CurrentAccountObject, DeprecatedStorage } from './types/chromeStorage.types';
 
@@ -182,20 +181,13 @@ export class ChromeStorageService {
       const d = await decrypt(encryptedKeys, passKey);
       const keys: Keys = JSON.parse(d);
 
-      const walletAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.walletAddress).data as number[], [
-        MAINNET_ADDRESS_PREFIX,
-      ]);
-
-      const ordAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.ordAddress).data as number[], [
-        MAINNET_ADDRESS_PREFIX,
-      ]);
+      const walletAddr = toNetworkAddress(keys.walletAddress, NetWork.Mainnet);
+      const ordAddr = toNetworkAddress(keys.ordAddress, NetWork.Mainnet);
 
       let identityAddr = '';
       let identityPubKey = '';
       if (keys.identityAddress) {
-        identityAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.identityAddress).data as number[], [
-          MAINNET_ADDRESS_PREFIX,
-        ]);
+        identityAddr = toNetworkAddress(keys.identityAddress, NetWork.Mainnet);
 
         identityPubKey = keys.identityPubKey;
       }
@@ -436,6 +428,8 @@ export class ChromeStorageService {
     };
   };
 
+  getChain = () => getNetworkConfig(this.getNetwork()).chain;
+
   getNetwork = (): NetWork => {
     if (this.storage === null || this.storage === undefined) {
       throw new Error('Storage is not initialized.');
@@ -444,9 +438,7 @@ export class ChromeStorageService {
     if (!accounts || !selectedAccount) {
       return NetWork.Mainnet;
     }
-    const account = accounts[selectedAccount];
-    const { network } = account;
-    return network ?? NetWork.Mainnet;
+    return accounts[selectedAccount]?.network ?? NetWork.Mainnet;
   };
 
   getCustomFeeRate = (): number => {

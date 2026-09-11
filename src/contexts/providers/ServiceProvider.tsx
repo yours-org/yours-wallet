@@ -15,7 +15,7 @@ const initializeServices = async () => {
 
   // Create context using ChromeCWI (communicates with service worker via chrome.runtime.sendMessage)
   const chromeCWI = createChromeCWI();
-  const chain = 'main' as const;
+  const chain = chromeStorageService.getChain();
   const services = new OneSatServices(chain);
   // chromeCWI is the gated background wallet — module owns apply.
   const apiContext = createContext(chromeCWI, {

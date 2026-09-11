@@ -3,7 +3,6 @@ import {
   DEFAULT_RELAYX_ORD_PATH,
   DEFAULT_TWETCH_WALLET_PATH,
   DEFAULT_ACCOUNT,
-  MAINNET_ADDRESS_PREFIX,
   SWEEP_PATH,
   CHROME_STORAGE_OBJECT_VERSION,
 } from '../utils/constants';
@@ -12,8 +11,9 @@ import { generateKeysFromTag, getKeys, getKeysFromWifs, Keys } from '../utils/ke
 import { ChromeStorageService } from './ChromeStorage.service';
 import { ChromeStorageObject } from './types/chromeStorage.types';
 import { SupportedWalletImports, WifKeys } from './types/keys.types';
-import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction, Utils } from '@bsv/sdk';
+import { P2PKH, PrivateKey, SatoshisPerKilobyte, Transaction } from '@bsv/sdk';
 import { OneSatServices } from '@1sat/wallet-browser';
+import { getNetworkConfig, toNetworkAddress } from '../utils/network';
 
 export class KeysService {
   bsvAddress: string;
@@ -31,7 +31,13 @@ export class KeysService {
     this.identityPubKey = '';
   }
 
-  private storeEncryptedKeys = async (passKey: string, salt: string, keys: Keys, encryptedKeys: string) => {
+  private storeEncryptedKeys = async (
+    passKey: string,
+    salt: string,
+    keys: Keys,
+    encryptedKeys: string,
+    network: NetWork,
+  ) => {
     const currentChromeObj = await this.chromeStorageService.getAndSetStorage();
     const totalAccounts = this.chromeStorageService.getAllAccounts().length;
     const accountNumber = currentChromeObj?.accountNumber ? currentChromeObj.accountNumber + 1 : totalAccounts + 1;
@@ -49,7 +55,8 @@ export class KeysService {
     const update: Partial<ChromeStorageObject['accounts']> = {
       [keys.identityAddress]: {
         ...DEFAULT_ACCOUNT,
-        network: NetWork.Mainnet,
+        network,
+        storageConfig: network === NetWork.Testnet ? {} : DEFAULT_ACCOUNT.storageConfig,
         name: `Account ${accountNumber}`,
         addresses: {
           bsvAddress: keys.walletAddress,
@@ -93,6 +100,7 @@ export class KeysService {
   generateSeedAndStoreEncrypted = async (
     password: string,
     isNewWallet: boolean,
+    network = NetWork.Mainnet,
     mnemonic?: string,
     walletDerivation: string | null = null,
     ordDerivation: string | null = null,
@@ -109,12 +117,12 @@ export class KeysService {
         break;
     }
 
-    const keys = getKeys(mnemonic, walletDerivation, ordDerivation, identityDerivation);
+    const keys = getKeys(mnemonic, walletDerivation, ordDerivation, identityDerivation, network);
     if (mnemonic) {
-      this.sweepLegacy(keys);
+      this.sweepLegacy(keys, network);
     }
     const encryptedKeys = await encrypt(JSON.stringify(keys), passKey);
-    await this.storeEncryptedKeys(passKey, salt, keys, encryptedKeys);
+    await this.storeEncryptedKeys(passKey, salt, keys, encryptedKeys, network);
     return keys;
   };
 
@@ -125,10 +133,10 @@ export class KeysService {
    *
    * Fire-and-forget — failures are logged but don't block onboarding.
    */
-  private sweepLegacy = async (keys: Keys) => {
+  private sweepLegacy = async (keys: Keys, network: NetWork) => {
     try {
-      const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
-      const services = new OneSatServices('main');
+      const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH, network);
+      const services = new OneSatServices(getNetworkConfig(network).chain);
 
       // Trigger the indexer to process this address before querying
       for await (const event of services.owner.getTxos(sweepWallet.address, { refresh: true, limit: 1 })) {
@@ -170,11 +178,16 @@ export class KeysService {
     }
   };
 
-  generateKeysFromWifAndStoreEncrypted = async (password: string, wifs: WifKeys, isNewWallet: boolean) => {
+  generateKeysFromWifAndStoreEncrypted = async (
+    password: string,
+    wifs: WifKeys,
+    isNewWallet: boolean,
+    network = NetWork.Mainnet,
+  ) => {
     const { passKey, salt } = await this.getPassKeyAndSalt(password, isNewWallet);
-    const keys = getKeysFromWifs(wifs);
+    const keys = getKeysFromWifs(wifs, network);
     const encryptedKeys = await encrypt(JSON.stringify(keys), passKey);
-    await this.storeEncryptedKeys(passKey, salt, keys as Keys, encryptedKeys);
+    await this.storeEncryptedKeys(passKey, salt, keys as Keys, encryptedKeys, network);
     return keys;
   };
 
@@ -194,32 +207,22 @@ export class KeysService {
       const d = await decrypt(encryptedKeys, passKey);
       const keys: Keys = JSON.parse(d);
 
-      const walletAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.walletAddress).data as number[], [
-        MAINNET_ADDRESS_PREFIX,
-      ]);
-
-      const ordAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.ordAddress).data as number[], [
-        MAINNET_ADDRESS_PREFIX,
-      ]);
+      const network = account.network ?? NetWork.Mainnet;
+      const walletAddr = toNetworkAddress(keys.walletAddress, network);
+      const ordAddr = toNetworkAddress(keys.ordAddress, network);
+      const identityAddr = keys.identityAddress ? toNetworkAddress(keys.identityAddress, network) : '';
 
       this.bsvAddress = walletAddr;
       this.ordAddress = ordAddr;
+      this.identityAddress = identityAddr;
       this.bsvPubKey = keys.walletPubKey;
       this.ordPubKey = keys.ordPubKey;
-
-      // identity address not available with wif or 1sat import
-      if (keys.identityAddress) {
-        const identityAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.identityAddress).data as number[], [
-          MAINNET_ADDRESS_PREFIX,
-        ]);
-
-        this.identityAddress = identityAddr;
-        this.identityPubKey = keys.identityPubKey;
-      }
+      this.identityPubKey = keys.identityPubKey ?? '';
 
       return Object.assign({}, keys, {
         ordAddress: ordAddr,
         walletAddress: walletAddr,
+        ...(identityAddr ? { identityAddress: identityAddr } : {}),
       });
     } catch (error) {
       console.error('Error in retrieveKeys:', error instanceof Error ? error.message : 'Unknown error');
