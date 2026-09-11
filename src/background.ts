@@ -800,6 +800,7 @@ if (isInServiceWorker) {
       'USB_REKEY',
       'USB_PING',
       'USB_PRESENCE',
+      'USB_GET_CONFIG',
       // Storage management (popup internal)
       'STORAGE_GET_INFO',
       'STORAGE_SYNC_BACKUPS',
@@ -986,6 +987,15 @@ if (isInServiceWorker) {
         case 'USB_PING':
           // Keeps the worker from idling out while the USB window is open.
           sendResponse({ type: 'USB_PING', success: true });
+          return true;
+        case 'USB_GET_CONFIG':
+          // The offscreen keeper has no chrome.storage; it asks for the settings.
+          chromeStorageService
+            .getAndSetStorage()
+            .then(() =>
+              sendResponse({ type: 'USB_GET_CONFIG', success: true, data: chromeStorageService.getUsbSecurity() }),
+            )
+            .catch((err: Error) => sendResponse({ type: 'USB_GET_CONFIG', success: false, error: err.message }));
           return true;
         case 'USB_PRESENCE':
           onUsbPresence(message.state);
