@@ -145,6 +145,7 @@ export type UsbBackupEvent =
   | { phase: 'start'; stickId: string; totalAccounts: number }
   | { phase: 'account'; stickId: string; accountName: string; accountIndex: number; totalAccounts: number }
   | { phase: 'chunk'; stickId: string; accountName: string; chunkIndex: number }
+  /** One per run, after every key and any queued follow-up run. stickId is 'all'. */
   | { phase: 'done'; stickId: string; changed: boolean }
   | { phase: 'error'; stickId?: string; message: string }
   | { phase: 'idle' };
@@ -265,14 +266,18 @@ export const runUsbBackup = async (chromeStorageService: ChromeStorageService): 
       return { ran: false, sticks: 0, changed: false, errors: [message] };
     } finally {
       inFlight = null;
-      emit({ phase: 'idle' });
     }
   })();
   const result = await inFlight;
   if (pendingRun) {
+    // A wallet change arrived mid-run: go again before declaring anything
+    // up to date, so the UI shows one continuous sync, not two.
     pendingRun = false;
-    return runUsbBackup(chromeStorageService);
+    const again = await runUsbBackup(chromeStorageService);
+    return { ...again, changed: result.changed || again.changed, errors: [...result.errors, ...again.errors] };
   }
+  if (result.ran && result.errors.length === 0) emit({ phase: 'done', stickId: 'all', changed: result.changed });
+  emit({ phase: 'idle' });
   return result;
 };
 
@@ -300,7 +305,6 @@ const syncAllSticks = async (chromeStorageService: ChromeStorageService): Promis
       const message = err instanceof Error ? err.message : String(err);
       result.errors.push(message);
       emit({ phase: 'error', stickId, message });
-      emit({ phase: 'done', stickId, changed: false });
     }
   }
   return result;
@@ -477,7 +481,6 @@ const syncStick = async (
   }
 
   await saveManifest();
-  emit({ phase: 'done', stickId, changed });
   return { changed, errors };
 };
 
