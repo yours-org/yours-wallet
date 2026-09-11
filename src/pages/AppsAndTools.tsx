@@ -406,21 +406,23 @@ export const AppsAndTools = () => {
             description="Decode raw transactions for inspection"
             onClick={() => setPage('tx-decoder')}
           />
-          <MenuRow
-            icon={<ArrowRightLeft size={18} />}
-            title="Migrate Legacy Assets"
-            description="Opens the migration tool to move old assets to BRC-100"
-            onClick={() => {
-              menuContext?.clearSelection();
-              navigate('/sweep');
-            }}
-          />
-          <MenuRow
-            icon={<KeyRound size={18} />}
-            title="Sweep Private Key"
-            description="Scan and sweep assets from an external WIF key"
-            onClick={() => setPage('sweep-wif')}
-          />
+          <Show when={apiContext.chain === 'main'}>
+            <MenuRow
+              icon={<ArrowRightLeft size={18} />}
+              title="Migrate Legacy Assets"
+              description="Opens the migration tool to move old assets to BRC-100"
+              onClick={() => {
+                menuContext?.clearSelection();
+                navigate('/sweep');
+              }}
+            />
+            <MenuRow
+              icon={<KeyRound size={18} />}
+              title="Sweep Private Key"
+              description="Scan and sweep assets from an external WIF key"
+              onClick={() => setPage('sweep-wif')}
+            />
+          </Show>
         </RowGroup>
 
         {/* Apps section — temporarily hidden, may return in a different form */}
@@ -441,7 +443,7 @@ export const AppsAndTools = () => {
         {/* Support section */}
         <SectionLabel>Support</SectionLabel>
         <RowGroup>
-          <Show when={theme.settings.walletName === 'Yours'}>
+          <Show when={apiContext.chain === 'main' && theme.settings.walletName === 'Yours'}>
             <MenuRow
               icon={<Heart size={18} />}
               title="Support Yours"

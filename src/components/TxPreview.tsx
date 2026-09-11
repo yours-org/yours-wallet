@@ -1,3 +1,4 @@
+import { getChainConfig } from '../utils/network';
 import { useTheme } from '../hooks/useTheme';
 import { KNOWN_BURN_ADDRESSES } from '../utils/constants';
 import { convertAtomicValueToReadableTokenValue, formatNumberWithCommasAndDecimals, truncate } from '../utils/format';
@@ -5,7 +6,6 @@ import { Show } from './Show';
 import lockImage from '../assets/lock.svg';
 import { Flame } from 'lucide-react';
 import type { ParseContext, Txo } from '@1sat/wallet-browser';
-import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { isUri } from '../utils/uri';
 
@@ -39,7 +39,7 @@ const TxPreview = ({ txData, inputsToSign }: TxPreviewProps) => {
   const { theme } = useTheme();
   const { apiContext } = useServiceContext();
   const labelMaxLength = 20;
-  const baseUrl = apiContext?.services?.baseUrl ?? ONESAT_MAINNET_CONTENT_URL;
+  const baseUrl = getChainConfig(apiContext.chain).contentUrl;
 
   const contrast = theme.color.global.contrast;
   const gray = theme.color.global.gray;

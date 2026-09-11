@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle, Upload } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
+import { NetworkPicker } from '../../components/NetworkPicker';
 import { PageLoader } from '../../components/PageLoader';
 import wifWallet from '../../assets/wif-wallet.svg';
 import { Show } from '../../components/Show';
@@ -12,6 +13,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { WifKeys } from '../../services/types/keys.types';
+import { NetWork } from '../../services/types/provider.types';
 import { useNavigate } from 'react-router-dom';
 import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
 
@@ -29,6 +31,7 @@ const stepVariants = {
 export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccountProps) => {
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const [network, setNetwork] = useState(NetWork.Mainnet);
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [step, setStep] = useState(1);
@@ -87,6 +90,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
           identityPk,
         },
         newWallet,
+        network,
       );
       if (!keys) {
         addSnackbar('An error occurred while creating the account! Make sure your password is correct.', 'error');
@@ -230,6 +234,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
       </p>
 
       <form onSubmit={handleImport} className="flex flex-col items-center w-full">
+        <NetworkPicker value={network} onChange={setNetwork} />
         <Input
           theme={theme}
           placeholder="Account Name"

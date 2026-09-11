@@ -2,18 +2,16 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Coins } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { DragDropContext, Draggable, Droppable, DropResult } from '@hello-pangea/dnd';
-import { ONESAT_MAINNET_CONTENT_URL, type Bsv21Balance } from '@1sat/actions';
+import { type Bsv21Balance } from '@1sat/actions';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { Theme } from '../theme.types';
 import { BSV_DECIMAL_CONVERSION, GENERIC_TOKEN_ICON } from '../utils/constants';
 import { showAmount, truncate } from '../utils/format';
-import { isUri } from '../utils/uri';
+import { resolveContentUrl } from '../utils/network';
 import { fetchExchangeRate } from '../utils/wallet';
 import { AssetRow } from './AssetRow';
 import { Show } from './Show';
-
-const resolveIcon = (icon: string) => (isUri(icon) ? icon : `${ONESAT_MAINNET_CONTENT_URL}/${icon}`);
 
 type PriceData = {
   id: string;
@@ -32,6 +30,7 @@ const getTokenName = (b: Bsv21Balance): string => b.sym || 'Null';
 export const Bsv21TokensList = (props: Bsv21TokensListProps) => {
   const { tokens: tokensProp, theme, onTokenClick, hideStatusLabels = false } = props;
   const { chromeStorageService, apiContext } = useServiceContext();
+  const resolveIcon = (icon: string) => resolveContentUrl(icon, apiContext.chain);
   const [priceData, setPriceData] = useState<PriceData[]>([]);
   const [tokens, setTokens] = useState<Bsv21Balance[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(0);

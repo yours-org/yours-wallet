@@ -1,4 +1,4 @@
-import { validate } from 'bitcoin-address-validation';
+import { isValidAddress, resolveContentUrl } from '../utils/network';
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -35,7 +35,6 @@ import {
 } from '../utils/constants';
 import { formatNumberWithCommasAndDecimals, formatUSD } from '../utils/format';
 import { sleep } from '../utils/sleep';
-import { isUri } from '../utils/uri';
 import { AssetRow } from '../components/AssetRow';
 import { BackupPromo } from '../components/BackupPromo';
 import lockIcon from '../assets/lock.svg';
@@ -64,7 +63,7 @@ import { SendBsv21View } from '../components/SendBsv21View';
 import { AssetPicker, type PickableAsset } from '../components/AssetPicker';
 import { SendConfirmation, type SendLineItem } from '../components/SendConfirmation';
 import { CoinHistory } from '../components/CoinHistory';
-import { getMneeBalance, sendMnee, deriveDepositAddresses, ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
+import { getMneeBalance, sendMnee, deriveDepositAddresses } from '@1sat/actions';
 import { MNEE_PROTOCOLS, mneeKeyDerivations } from '../utils/mneeDerivations';
 import { MneeClient } from '@1sat/client';
 import { PrivateKey } from '@bsv/sdk';
@@ -100,6 +99,7 @@ export const BsvWallet = () => {
   const [satSendAmount, setSatSendAmount] = useState<number | null>(null);
   const { addSnackbar } = useSnackbar();
   const { chromeStorageService, apiContext, keysService } = useServiceContext();
+  const isMainnet = apiContext.chain === 'main';
   const { profile: identityProfile } = useIdentity(apiContext, chromeStorageService);
   const avatarUrl = useMemo(() => {
     if (!identityProfile.image || !apiContext.services) return '';
@@ -305,6 +305,7 @@ export const BsvWallet = () => {
   const MNEE_FETCH_RETRIES = 2;
 
   const updateMneeBalance = async (attempt = 0): Promise<number | undefined> => {
+    if (!isMainnet) return 0;
     if (!receiveAddress || !apiContext) return;
     try {
       // Aggregate MNEE balance across all derived deposit addresses for this account,
@@ -391,8 +392,8 @@ export const BsvWallet = () => {
       const dismissed = !!acct?.settings?.dismissedBackupPromo;
       const hasRemotes = (acct?.storageConfig?.remotes?.length ?? 0) > 0;
       setKeysAlreadyBackedUp(!!acct?.settings?.keysBackedUp);
-      setShowBackupPromo(!dismissed && !hasRemotes);
-      setShowMigrationBanner(!acct?.settings?.sweepStarted && !acct?.settings?.sweepCompleted);
+      setShowBackupPromo(isMainnet && !dismissed && !hasRemotes);
+      setShowMigrationBanner(isMainnet && !acct?.settings?.sweepStarted && !acct?.settings?.sweepCompleted);
       if (obj?.selectedAccount) {
         await getAndSetAccountAndBsv21s();
       }
@@ -473,7 +474,7 @@ export const BsvWallet = () => {
 
   // Check for legacy MNEE balance (old address) once wallet is ready
   useEffect(() => {
-    if (!apiContext?.services?.mnee) return;
+    if (!isMainnet || !apiContext?.services?.mnee) return;
     (async () => {
       try {
         const { account } = chromeStorageService.getCurrentAccountObject();
@@ -494,7 +495,7 @@ export const BsvWallet = () => {
   }, [receiveAddress, apiContext?.services?.mnee]);
 
   const handleSweepLegacyMnee = async () => {
-    if (!apiContext?.services?.mnee) return;
+    if (!isMainnet || !apiContext?.services?.mnee) return;
     setLegacyMneeSweeping(true);
     setLegacyMneeSweepMsg('Starting...');
     try {
@@ -683,7 +684,7 @@ export const BsvWallet = () => {
         addSnackbar('All recipients must have an address and amount!', 'info');
         return;
       }
-      if (!isValidEmail(r.address) && !validate(r.address)) {
+      if (!isValidEmail(r.address) && !isValidAddress(r.address, apiContext.chain)) {
         addSnackbar('All recipients must have a valid BSV or Paymail address!', 'info');
         return;
       }
@@ -768,9 +769,18 @@ export const BsvWallet = () => {
 
     //? multi-send validate all recipients
     for (const recipient of recipients) {
-      if (!isValidEmail(recipient.address) && !validate(recipient.address)) {
-        updateRecipient(recipient.id, 'error', 'Provide a valid BSV or Paymail address.');
-        addSnackbar('All recipients must have valid BSV or Paymail addresses.', 'info');
+      if (!(isMainnet && isValidEmail(recipient.address)) && !isValidAddress(recipient.address, apiContext.chain)) {
+        updateRecipient(
+          recipient.id,
+          'error',
+          isMainnet ? 'Provide a valid BSV or Paymail address.' : 'Provide a valid testnet BSV address.',
+        );
+        addSnackbar(
+          isMainnet
+            ? 'All recipients must have valid BSV or Paymail addresses.'
+            : 'All recipients must have valid testnet BSV addresses.',
+          'info',
+        );
         return;
       }
 
@@ -1184,7 +1194,9 @@ export const BsvWallet = () => {
                 className="text-4xl font-bold tracking-tight select-none"
                 style={{ color: theme.color.global.contrast, letterSpacing: '-0.02em' }}
               >
-                {formatUSD(bsvBalance * exchangeRate + (services.mnee ? mneeBalance : 0))}
+                {isMainnet
+                  ? formatUSD(bsvBalance * exchangeRate + (services.mnee ? mneeBalance : 0))
+                  : `${bsvBalance} BSV`}
               </h1>
             )}
             <AnimatePresence>
@@ -1283,7 +1295,7 @@ export const BsvWallet = () => {
               setPageState('send');
             }}
           />
-          <Show when={services.mnee}>
+          <Show when={isMainnet && services.mnee}>
             <AssetRow
               balance={mneeBalance}
               icon={MNEE_ICON_URL}
@@ -1380,7 +1392,7 @@ export const BsvWallet = () => {
       balance: bsvBalance,
       usdBalance: bsvBalance * exchangeRate,
     },
-    ...(services.mnee
+    ...(isMainnet && services.mnee
       ? [
           {
             kind: 'mnee' as const,
@@ -1399,11 +1411,7 @@ export const BsvWallet = () => {
               ({
                 kind: 'bsv21' as const,
                 token: t,
-                icon: t.icon
-                  ? isUri(t.icon)
-                    ? t.icon
-                    : `${ONESAT_MAINNET_CONTENT_URL}/${t.icon}`
-                  : GENERIC_TOKEN_ICON,
+                icon: t.icon ? resolveContentUrl(t.icon, apiContext.chain) : GENERIC_TOKEN_ICON,
               }) as PickableAsset,
           )
       : []),
@@ -1790,7 +1798,7 @@ export const BsvWallet = () => {
               {/* Address input */}
               <Input
                 theme={theme}
-                placeholder="Enter Address or Paymail"
+                placeholder={isMainnet ? 'Enter Address or Paymail' : 'Enter Testnet Address'}
                 type="text"
                 onChange={(e) => updateRecipient(recipient.id, 'address', e.target.value)}
                 value={recipient.address}
@@ -1853,6 +1861,7 @@ export const BsvWallet = () => {
                 <motion.button
                   whileTap={{ scale: 0.93 }}
                   type="button"
+                  disabled={!isMainnet}
                   onClick={() => toggleRecipientAmountType(recipient.id)}
                   className="flex items-center gap-1 px-2.5 py-1.5 mr-1.5 rounded-lg border-0 outline-none cursor-pointer shrink-0"
                   style={{ background: `${theme.color.component.primaryButtonLeftGradient}18` }}

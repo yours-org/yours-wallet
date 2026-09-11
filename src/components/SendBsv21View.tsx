@@ -1,4 +1,4 @@
-import validate from 'bitcoin-address-validation';
+import { getChainConfig, isValidAddress } from '../utils/network';
 import { useEffect, useRef, useState } from 'react';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useSnackbar } from '../hooks/useSnackbar';
@@ -12,7 +12,7 @@ import { Input } from './Input';
 import { SendConfirmation, type SendLineItem } from './SendConfirmation';
 import { Show } from './Show';
 import { CoinHistory } from './CoinHistory';
-import { ONESAT_MAINNET_CONTENT_URL, sendBsv21, type Bsv21Balance } from '@1sat/actions';
+import { sendBsv21, type Bsv21Balance } from '@1sat/actions';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ShoppingCart, Send, Copy, Check, Plus, Trash2 } from 'lucide-react';
 
@@ -60,7 +60,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
   const [successTxId, setSuccessTxId] = useState('');
   const sentAtomicRef = useRef<bigint>(0n);
   const [copied, setCopied] = useState(false);
-  const baseUrl = ONESAT_MAINNET_CONTENT_URL;
+  const baseUrl = getChainConfig(apiContext.chain).contentUrl;
 
   const maxAmount = token.isConfirmed ? token.info.all.confirmed : token.info.all.pending;
   const maxDisplay = showAmount(maxAmount, token.info.dec);
@@ -131,7 +131,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
     let total = 0n;
 
     for (const r of recipients) {
-      if (!validate(r.address)) {
+      if (!isValidAddress(r.address, apiContext.chain)) {
         addSnackbar('All recipients must have a valid 1Sat Ordinal address.', 'info');
         return;
       }

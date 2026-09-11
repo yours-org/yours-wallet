@@ -10,6 +10,7 @@ import wifWallet from '../../assets/wif-wallet.svg';
 import masterWallet from '../../assets/master-wallet.svg';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
+import { NetworkPicker } from '../../components/NetworkPicker';
 import { PageLoader } from '../../components/PageLoader';
 import { Show } from '../../components/Show';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
@@ -20,6 +21,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { SupportedWalletImports } from '../../services/types/keys.types';
+import { NetWork } from '../../services/types/provider.types';
 import { SettingsPage } from '../Settings';
 import { YoursIcon } from '../../components/YoursIcon';
 import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
@@ -38,6 +40,7 @@ const stepVariants = {
 export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAccountProps) => {
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const [network, setNetwork] = useState(NetWork.Mainnet);
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [step, setStep] = useState(1);
@@ -110,6 +113,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
       const keys = await keysService.generateSeedAndStoreEncrypted(
         password,
         newWallet,
+        network,
         seedWords,
         walletDerivation,
         ordDerivation,
@@ -429,6 +433,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
       </p>
 
       <form onSubmit={handleRestore} className="flex flex-col items-center w-full">
+        <NetworkPicker value={network} onChange={setNetwork} />
         <Input
           theme={theme}
           placeholder="Account Name"

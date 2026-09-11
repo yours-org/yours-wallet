@@ -1,3 +1,4 @@
+import { NetWork } from './services/types/provider.types';
 import { Buffer } from 'buffer';
 import process from 'process';
 import { useState, useEffect } from 'react';
@@ -20,10 +21,12 @@ function SweepTab() {
   const [wallet] = useState(() => createChromeCWI());
 
   useEffect(() => {
-    configureServices(SERVICES_BASE_URL);
-
     chrome.storage.local.get(null, async (storage) => {
       try {
+        if (storage.accounts?.[storage.selectedAccount]?.network === NetWork.Testnet) {
+          throw new Error('The legacy sweep tool is only available on mainnet.');
+        }
+        configureServices(SERVICES_BASE_URL);
         // Check for an externally-provided WIF (e.g. from Sweep Private Key in Tools)
         const sessionData = await chrome.storage.session.get('sweepExternalWif');
         const externalWif = sessionData.sweepExternalWif as string | undefined;

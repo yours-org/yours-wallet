@@ -1,3 +1,4 @@
+import type { Chain } from '../utils/network';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Server, ChevronDown, ChevronUp, Loader2, WifiOff } from 'lucide-react';
@@ -29,6 +30,8 @@ export const KNOWN_PROVIDERS: StorageProvider[] = [
   },
 ];
 
+export const getKnownProviders = (chain: Chain) => (chain === 'main' ? KNOWN_PROVIDERS : []);
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function formatBytes(bytes: number): string {
@@ -52,6 +55,7 @@ function formatRate(pricing: RemoteStatus['pricing'], exchangeRate: number): str
 // ── Props ──────────────────────────────────────────────────────────────────
 
 type Props = {
+  chain: Chain;
   theme: Theme;
   wallet: WalletInterface;
   existingRemotes: string[];
@@ -64,6 +68,7 @@ type Props = {
 // ── Component ──────────────────────────────────────────────────────────────
 
 export const ProviderPicker = ({
+  chain,
   theme,
   wallet,
   existingRemotes,
@@ -72,6 +77,7 @@ export const ProviderPicker = ({
   onClose,
   busy,
 }: Props) => {
+  const providers = getKnownProviders(chain);
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
   const [customUrl, setCustomUrl] = useState('');
   const [customError, setCustomError] = useState('');
@@ -86,7 +92,7 @@ export const ProviderPicker = ({
       setFetching(true);
       const authFetch = new AuthFetch(wallet);
       const results = await Promise.all(
-        KNOWN_PROVIDERS.map(async (p): Promise<[string, RemoteStatusResult]> => {
+        providers.map(async (p): Promise<[string, RemoteStatusResult]> => {
           try {
             const res = await authFetch.fetch(`${p.url.replace(/\/$/, '')}/account/status`, { method: 'GET' });
             if (!res.ok) return [p.url, { status: 'error', error: `HTTP ${res.status}` }];
@@ -184,7 +190,7 @@ export const ProviderPicker = ({
             </p>
 
             {/* Known providers */}
-            {KNOWN_PROVIDERS.map((provider) => {
+            {providers.map((provider) => {
               const alreadyAdded = existingRemotes.includes(provider.url);
               const isExpanded = expandedProvider === provider.id;
               const result = statusMap[provider.url];

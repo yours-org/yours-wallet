@@ -1,4 +1,4 @@
-import validate from 'bitcoin-address-validation';
+import { isValidAddress } from '../utils/network';
 import { useCallback, useEffect, useState } from 'react';
 import type { WalletOutput } from '@bsv/sdk';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -423,13 +423,16 @@ export const OrdWallet = () => {
     refreshOrdinals();
   };
 
-  const handleAddressChange = useCallback((outpoint: string, address: string) => {
-    setAddresses((prev) => ({ ...prev, [outpoint]: address }));
-    setAddressErrors((prev) => ({
-      ...prev,
-      [outpoint]: validate(address) ? '' : 'Invalid 1sat address format',
-    }));
-  }, []);
+  const handleAddressChange = useCallback(
+    (outpoint: string, address: string) => {
+      setAddresses((prev) => ({ ...prev, [outpoint]: address }));
+      setAddressErrors((prev) => ({
+        ...prev,
+        [outpoint]: isValidAddress(address, apiContext.chain) ? '' : 'Invalid 1sat address format',
+      }));
+    },
+    [apiContext.chain],
+  );
 
   const handleCommonAddressChange = useCallback(
     (address: string) => {
@@ -443,7 +446,7 @@ export const OrdWallet = () => {
       }
 
       if (address) {
-        const isValid = validate(address);
+        const isValid = isValidAddress(address, apiContext.chain);
         setAddressErrors(
           selectedOrdinals.reduce<Addresses>((acc, ordinal) => {
             acc[ordinal.outpoint] = isValid ? '' : 'Invalid 1sat address format';
@@ -452,7 +455,7 @@ export const OrdWallet = () => {
         );
       }
     },
-    [useSameAddress, selectedOrdinals],
+    [useSameAddress, selectedOrdinals, apiContext.chain],
   );
 
   const toggleUseSameAddress = useCallback(() => {

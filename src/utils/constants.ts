@@ -1,9 +1,6 @@
 import { NetWork } from '../services/types/provider.types';
 import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 
-export const URL_WHATSONCHAIN = 'https://whatsonchain.com/tx/';
-
-export const MAINNET_ADDRESS_PREFIX = 0x00;
 export const BSV_DECIMAL_CONVERSION = 100000000;
 export const FEE_PER_KB = 100;
 export const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes

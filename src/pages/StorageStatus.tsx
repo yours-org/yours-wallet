@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { PageLoader } from '../components/PageLoader';
-import { ProviderPicker, KNOWN_PROVIDERS } from '../components/ProviderPicker';
+import { ProviderPicker, getKnownProviders } from '../components/ProviderPicker';
 import { SpeedBump } from '../components/SpeedBump';
 import { useTheme } from '../hooks/useTheme';
 import { useSnackbar } from '../hooks/useSnackbar';
@@ -131,7 +131,7 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
   const remotes = info?.storageConfig?.remotes ?? [];
   const remotesKey = remotes.join(',');
   const stableRemotes = useMemo(() => remotes, [remotesKey]);
-  const stableKnownUrls = useMemo(() => KNOWN_PROVIDERS.map((p) => p.url), []);
+  const stableKnownUrls = useMemo(() => getKnownProviders(apiContext.chain).map((p) => p.url), [apiContext.chain]);
   const { statusMap, loading: statusLoading } = useRemoteStatus(
     apiContext.wallet as any,
     stableRemotes,
@@ -945,6 +945,7 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
       {/* Provider picker overlay */}
       {showProviderPicker && (
         <ProviderPicker
+          chain={apiContext.chain}
           theme={theme}
           wallet={apiContext.wallet as any}
           existingRemotes={remotes}

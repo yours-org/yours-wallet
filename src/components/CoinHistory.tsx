@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
 import { useTheme } from '../hooks/useTheme';
-import { URL_WHATSONCHAIN } from '../utils/constants';
+import { getChainConfig } from '../utils/network';
 import { fetchBsv21History, fetchBsvHistory, fetchMneeHistory, type CoinTxSummary } from '../utils/coinHistory';
 import { truncate } from '../utils/format';
 import { Show } from './Show';
@@ -45,7 +45,7 @@ export const CoinHistory = ({ filter, pageSize = 25, refreshKey }: CoinHistoryPr
     rootMargin: '120px',
   });
 
-  const wocBaseUrl = URL_WHATSONCHAIN;
+  const wocBaseUrl = getChainConfig(apiContext.chain).explorerUrl;
 
   const contrast = theme.color.global.contrast;
   const gray = theme.color.global.gray;

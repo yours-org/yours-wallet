@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Copy, Check, CheckCircle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
+import { NetworkPicker } from '../../components/NetworkPicker';
 import { PageLoader } from '../../components/PageLoader';
 import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
@@ -13,6 +14,7 @@ import { useServiceContext } from '../../hooks/useServiceContext';
 import { useNavigate } from 'react-router-dom';
 import { YoursIcon } from '../../components/YoursIcon';
 import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
+import { NetWork } from '../../services/types/provider.types';
 
 export type CreateAccountProps = {
   onNavigateBack: () => void;
@@ -31,6 +33,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
   const { theme } = useTheme();
   const navigate = useNavigate();
   const { addSnackbar } = useSnackbar();
+  const [network, setNetwork] = useState(NetWork.Mainnet);
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [step, setStep] = useState(1);
@@ -66,7 +69,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
 
       await sleep(50);
 
-      const keys = await keysService.generateSeedAndStoreEncrypted(password, newWallet);
+      const keys = await keysService.generateSeedAndStoreEncrypted(password, newWallet, network);
 
       if (!keys?.mnemonic) {
         addSnackbar('An error occurred while creating the wallet!', 'error');
@@ -136,6 +139,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
       </p>
 
       <form onSubmit={handleKeyGeneration} className="flex flex-col items-center w-full gap-0">
+        <NetworkPicker value={network} onChange={setNetwork} />
         <Input
           theme={theme}
           placeholder="Account Name"

@@ -1,5 +1,4 @@
 import type { Bsv21Balance } from '@1sat/actions';
-import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Search, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -7,11 +6,9 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { Theme } from '../theme.types';
 import { GENERIC_TOKEN_ICON } from '../utils/constants';
 import { truncate } from '../utils/format';
-import { isUri } from '../utils/uri';
+import { resolveContentUrl } from '../utils/network';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { ToggleSwitch } from './ToggleSwitch';
-
-const resolveIcon = (icon: string) => (isUri(icon) ? icon : `${ONESAT_MAINNET_CONTENT_URL}/${icon}`);
 
 export type ManageTokensProps = {
   tokens: Bsv21Balance[];
@@ -21,7 +18,8 @@ export type ManageTokensProps = {
 
 export const ManageTokens = (props: ManageTokensProps) => {
   const { tokens: tokensProp, theme, onBack } = props;
-  const { chromeStorageService } = useServiceContext();
+  const { chromeStorageService, apiContext } = useServiceContext();
+  const resolveIcon = (icon: string) => resolveContentUrl(icon, apiContext.chain);
   const [favoriteTokens, setFavoriteTokens] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 

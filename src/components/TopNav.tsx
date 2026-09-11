@@ -2,12 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Copy, Github, Check, Loader2 } from 'lucide-react';
 import logo from '../assets/logos/horizontal-logo.png';
+import { Show } from './Show';
 import { useTheme } from '../hooks/useTheme';
 import activeCircle from '../assets/active-circle.png';
 import { truncate } from '../utils/format';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useBottomMenu } from '../hooks/useBottomMenu';
+import { NetWork } from '../services/types/provider.types';
 
 export const TopNav = () => {
   const { theme } = useTheme();
@@ -108,6 +110,10 @@ export const TopNav = () => {
           </motion.div>
         </div>
 
+        <Show when={accountObj.account?.network === NetWork.Testnet}>
+          <span className="text-[10px] rounded px-1.5 py-0.5 bg-amber-400/15 text-amber-300">Testnet</span>
+        </Show>
+
         {/* Dropdown */}
         <AnimatePresence>
           {dropdownVisible && (
@@ -148,6 +154,7 @@ export const TopNav = () => {
                       )}
                       <span className="text-sm font-semibold" style={{ color: theme.color.global.contrast }}>
                         {account.name}
+                        {account.network === NetWork.Testnet ? ' (Testnet)' : ''}
                       </span>
                     </div>
                     {account.primaryAddress && (
