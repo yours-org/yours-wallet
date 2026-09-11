@@ -629,20 +629,6 @@ export class WalletBackupService {
       await localStore.makeAvailable();
       mark('local findOrInsertUser');
       await localStore.findOrInsertUser(identityKey);
-      // Time the two calls syncFromReader makes on the store, so a stall names itself.
-      const timed = <T extends (...a: never[]) => Promise<unknown>>(name: string, fn: T): T =>
-        (async (...args: Parameters<T>) => {
-          mark(`${name} start`);
-          const r = await fn(...args);
-          mark(`${name} done`);
-          return r;
-        }) as T;
-      const store = localStore as unknown as {
-        processSyncChunk: (...a: never[]) => Promise<unknown>;
-        findOrInsertSyncStateAuth: (...a: never[]) => Promise<unknown>;
-      };
-      store.processSyncChunk = timed('processSyncChunk', store.processSyncChunk.bind(store));
-      store.findOrInsertSyncStateAuth = timed('findOrInsertSyncStateAuth', store.findOrInsertSyncStateAuth.bind(store));
       mark('syncFromReader into local');
       await storage.syncFromReader(identityKey, reader, localStore as unknown as sdk.WalletStorageSync);
       mark('syncFromReader done');
