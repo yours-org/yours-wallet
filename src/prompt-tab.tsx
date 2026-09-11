@@ -251,7 +251,7 @@ const PromptApp = () => {
           <div className="flex flex-col items-center gap-3 px-8 text-center">
             <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: theme.color.global.gray }} />
             <p className="text-sm font-semibold" style={{ color: theme.color.global.contrast }}>
-              {screen.presence === 'permission' ? 'Allow access to your USB key' : 'Insert your USB key to continue'}
+              Insert your USB key to continue
             </p>
             <p className="text-xs" style={{ color: theme.color.global.gray }}>
               This request will open as soon as a registered USB key is detected.
@@ -260,14 +260,10 @@ const PromptApp = () => {
               <button
                 type="button"
                 onClick={() => void allowUsbAccess()}
-                className="text-xs font-semibold rounded-lg px-3 py-1.5 border-none cursor-pointer outline-none"
-                style={{
-                  backgroundColor: `${theme.color.component.primaryButtonLeftGradient}22`,
-                  color: theme.color.component.primaryButtonLeftGradient,
-                  fontFamily: "'Inter', Arial, Helvetica, sans-serif",
-                }}
+                className="text-xs underline underline-offset-2 bg-transparent border-none p-0 cursor-pointer"
+                style={{ color: theme.color.global.gray, fontFamily: "'Inter', Arial, Helvetica, sans-serif" }}
               >
-                Allow USB access
+                Plugged in but not detected? Check again
               </button>
             )}
           </div>

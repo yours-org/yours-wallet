@@ -190,6 +190,33 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
 const USB_KEEPER_URL = 'offscreen.html';
 const USB_REMOVAL_GRACE_MS = 5000;
 let usbRemovalTimer: ReturnType<typeof setTimeout> | undefined;
+let lastUsbState: 'present' | 'absent' | 'permission' | 'off' | undefined;
+const USB_KEY_ABSENT_MESSAGE = 'Insert your USB key to continue';
+
+/** dApp calls that spend, sign, or reveal. Refused with a clear error when the key is out. */
+const USB_GATED_CWI_ACTIONS = new Set<string>([
+  CWIEventName.CREATE_ACTION,
+  CWIEventName.SIGN_ACTION,
+  CWIEventName.INTERNALIZE_ACTION,
+  CWIEventName.CREATE_SIGNATURE,
+  CWIEventName.CREATE_HMAC,
+  CWIEventName.ENCRYPT,
+  CWIEventName.DECRYPT,
+  CWIEventName.RELINQUISH_OUTPUT,
+  CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE,
+  CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE,
+  CWIEventName.ACQUIRE_CERTIFICATE,
+  CWIEventName.PROVE_CERTIFICATE,
+  CWIEventName.RELINQUISH_CERTIFICATE,
+]);
+
+/**
+ * While unlocked, the keeper's last report is authoritative: 'absent' and
+ * 'permission' both mean the drive is not readable right now. Unknown (keeper
+ * not yet reported) never blocks.
+ */
+const usbKeyMissing = (): boolean =>
+  !!chromeStorageService.getUsbSecurity()?.enabled && (lastUsbState === 'absent' || lastUsbState === 'permission');
 
 const hasUsbKeeper = async (): Promise<boolean> => {
   try {
@@ -221,7 +248,8 @@ const ensureUsbKeeper = async (): Promise<void> => {
 };
 
 const onUsbPresence = (state: 'present' | 'absent' | 'permission' | 'off') => {
-  if (state === 'absent' && accountContext) {
+  lastUsbState = state;
+  if ((state === 'absent' || state === 'permission') && accountContext) {
     if (usbRemovalTimer) return;
     usbRemovalTimer = setTimeout(async () => {
       usbRemovalTimer = undefined;
@@ -1128,6 +1156,13 @@ if (isInServiceWorker) {
           void closeDappPopupIfIdle();
         });
     };
+
+    // USB unlock: a spend/sign from a dApp while the key is out gets a clear
+    // refusal instead of a permission prompt that can never be satisfied.
+    if (USB_GATED_CWI_ACTIONS.has(message.action) && accountContext && usbKeyMissing()) {
+      sendResponse({ type: message.action, success: false, error: USB_KEY_ABSENT_MESSAGE });
+      return true;
+    }
 
     ensureWallet(isFromExtension)
       .then(() => {

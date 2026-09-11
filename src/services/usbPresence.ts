@@ -68,9 +68,14 @@ export const USB_GATED_WALLET_METHODS = new Set([
   'relinquishOutput',
 ]);
 
+/** Shown wherever a spend or sign is refused because no registered drive reads. */
+export const USB_KEY_ABSENT_MESSAGE = 'Insert your USB key to continue';
+
 export class UsbKeyAbsentError extends Error {
-  constructor(presence: UsbPresence) {
-    super(presence === 'permission' ? 'Allow access to your USB key to continue' : 'Insert your USB key to continue');
+  constructor(_presence: UsbPresence) {
+    // While unlocked, Chrome reports an unplugged drive as "needs permission",
+    // so both states mean the same thing to the user: the key is not there.
+    super(USB_KEY_ABSENT_MESSAGE);
     this.name = 'UsbKeyAbsentError';
   }
 }

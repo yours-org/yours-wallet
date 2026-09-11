@@ -192,7 +192,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
         } catch (error) {
           console.error('[SendBsv21View] sendBsv21.execute threw:', error);
           setIsProcessing(false);
-          addSnackbar(getErrorMessage(undefined), 'error');
+          addSnackbar(getErrorMessage(error), 'error');
           return;
         }
 
