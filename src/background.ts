@@ -958,6 +958,18 @@ if (isInServiceWorker) {
                 sendResponse({ type: message.action, success: false, error: 'Wallet is locked' });
                 return;
               }
+              // Never open a second connection to the local database while the
+              // wallet is initialising: a pending backup import writes to it
+              // then, and a competing open can stall those transactions.
+              if (initInFlight || reinitPromise) {
+                sendResponse({
+                  type: message.action,
+                  success: false,
+                  error: 'Wallet is starting up',
+                  data: { busy: true },
+                });
+                return;
+              }
               const res =
                 message.action === 'USB_BACKUP_CHUNK'
                   ? await usbBackupChunk(storageIdentityKey, message as UsbBackupChunkRequest)

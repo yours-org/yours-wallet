@@ -390,9 +390,16 @@ const syncStick = async (
     manifestDirty = true;
     changed = true;
   }
-  const settingsRes = await sendMessageAsync<{ success: boolean; settingsData?: string; error?: string }>({
-    action: 'USB_BACKUP_SETTINGS',
-  });
+  const settingsRes = await sendMessageAsync<{
+    success: boolean;
+    settingsData?: string;
+    error?: string;
+    data?: { busy?: boolean };
+  }>({ action: 'USB_BACKUP_SETTINGS' });
+  if (settingsRes?.data?.busy) {
+    // Wallet still initialising: quietly try again on the next trigger.
+    return { changed: false, errors: [] };
+  }
   if (!settingsRes?.success || !settingsRes.settingsData) {
     throw new Error(settingsRes?.error ?? 'Could not read storage settings');
   }
