@@ -5,6 +5,7 @@ import { useTheme } from '../hooks/useTheme';
 import { onUsbBackup } from '../services/usbBackup';
 
 const DONE_VISIBLE_MS = 2500;
+const REVEAL_DELAY_MS = 1500;
 const AMBER = '#FBBF24';
 
 type PillState =
@@ -23,20 +24,40 @@ export const UsbBackupPill = () => {
   const progressDismissed = useRef(false);
   const dismissedError = useRef<string | undefined>(undefined);
   const doneTimer = useRef<number | undefined>(undefined);
+  // A run that finds nothing to write is over in a second or two. Hold the
+  // progress pill back briefly so those never flash; a run that is still
+  // going after the delay is worth showing.
+  const revealTimer = useRef<number | undefined>(undefined);
+  const latestSyncing = useRef<PillState | null>(null);
+  const revealed = useRef(false);
 
   useEffect(() => {
     const clearDoneTimer = () => {
       if (doneTimer.current) window.clearTimeout(doneTimer.current);
       doneTimer.current = undefined;
     };
+    const clearRevealTimer = () => {
+      if (revealTimer.current) window.clearTimeout(revealTimer.current);
+      revealTimer.current = undefined;
+    };
+    const showSyncing = (next: PillState) => {
+      latestSyncing.current = next;
+      if (revealed.current) setState(next);
+    };
     const unsubscribe = onUsbBackup((e) => {
       switch (e.phase) {
         case 'start':
           clearDoneTimer();
-          setState({ kind: 'syncing', accountIndex: 0, totalAccounts: e.totalAccounts });
+          clearRevealTimer();
+          revealed.current = false;
+          latestSyncing.current = { kind: 'syncing', accountIndex: 0, totalAccounts: e.totalAccounts };
+          revealTimer.current = window.setTimeout(() => {
+            revealed.current = true;
+            if (latestSyncing.current && !progressDismissed.current) setState(latestSyncing.current);
+          }, REVEAL_DELAY_MS);
           break;
         case 'account':
-          setState({
+          showSyncing({
             kind: 'syncing',
             accountName: e.accountName,
             accountIndex: e.accountIndex,
@@ -44,14 +65,17 @@ export const UsbBackupPill = () => {
           });
           break;
         case 'chunk':
-          setState((prev) =>
-            prev?.kind === 'syncing'
-              ? { ...prev, accountName: e.accountName }
-              : { kind: 'syncing', accountName: e.accountName, accountIndex: 0, totalAccounts: 1 },
-          );
+          showSyncing({
+            ...(latestSyncing.current?.kind === 'syncing'
+              ? latestSyncing.current
+              : { kind: 'syncing' as const, accountIndex: 0, totalAccounts: 1 }),
+            accountName: e.accountName,
+          });
           break;
         case 'done':
           clearDoneTimer();
+          clearRevealTimer();
+          latestSyncing.current = null;
           if (!e.changed || progressDismissed.current) {
             setState(null);
             break;
@@ -61,6 +85,7 @@ export const UsbBackupPill = () => {
           break;
         case 'error':
           clearDoneTimer();
+          clearRevealTimer();
           if (dismissedError.current === e.message) {
             setState(null);
             break;
@@ -68,6 +93,8 @@ export const UsbBackupPill = () => {
           setState({ kind: 'error', message: e.message });
           break;
         case 'idle':
+          clearRevealTimer();
+          latestSyncing.current = null;
           // A run that produced no start (no readable key) or was mid-progress
           // leaves nothing to show; a done flash or error stays on screen.
           setState((prev) => (prev?.kind === 'syncing' ? null : prev));
