@@ -9,12 +9,11 @@ import { Loader2, Usb } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { useTheme } from '../../hooks/useTheme';
 import {
+  type StickProbe,
   adoptPickedDrive,
-  getHandle,
   pickDrive,
   probeSticks,
-  requestHandlePermission,
-  type StickProbe,
+  requestNextStickPermission,
 } from '../../services/UsbKey.service';
 import type { UsbSecurity } from '../../services/types/chromeStorage.types';
 import { decodeRecoveryCode, verifyMasterCheck } from '../../utils/usbCrypto';
@@ -71,10 +70,7 @@ export const useStickProbe = (usbSecurity: UsbSecurity, onOk: (probe: PresentSti
     setBusy(true);
     setError(null);
     try {
-      for (const id of probe.stickIds) {
-        const handle = await getHandle(id);
-        if (handle) await requestHandlePermission(handle);
-      }
+      await requestNextStickPermission(probe.stickIds);
     } finally {
       setBusy(false);
       retry();

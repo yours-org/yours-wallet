@@ -8,13 +8,12 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursIcon } from './YoursIcon';
 import { sendMessageAsync } from '../utils/chromeHelpers';
 import {
+  type StickProbe,
   adoptPickedDrive,
-  getHandle,
   openUsbWindow,
   pickDrive,
   probeSticks,
-  requestHandlePermission,
-  type StickProbe,
+  requestNextStickPermission,
 } from '../services/UsbKey.service';
 import { resetUsbPresence } from '../services/usbPresence';
 import { decodeRecoveryCode, verifyMasterCheck } from '../utils/usbCrypto';
@@ -100,10 +99,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
     if (!IN_STANDALONE_WINDOW) {
       await chrome.storage.session.set({ usbGrantAttemptAt: Date.now() }).catch(() => {});
     }
-    for (const id of latest.stickIds) {
-      const handle = await getHandle(id);
-      if (handle) await requestHandlePermission(handle);
-    }
+    await requestNextStickPermission(latest.stickIds);
     if (!IN_STANDALONE_WINDOW) {
       await chrome.storage.session.remove('usbGrantAttemptAt').catch(() => {});
     }

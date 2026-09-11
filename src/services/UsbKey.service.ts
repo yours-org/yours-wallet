@@ -116,6 +116,56 @@ export const queryHandlePermission = async (handle: FileSystemDirectoryHandle): 
   }
 };
 
+// Which registered key last read successfully, and which one we last asked
+// Chrome about. Chrome grants one handle per user gesture and shows its bubble
+// even for a drive that is not mounted, so when several keys need access the
+// choice of which to ask for decides whether the click succeeds. localStorage
+// is shared by every extension page and survives popup restarts.
+const LAST_PRESENT_KEY = 'yours-usb-last-present';
+const LAST_ATTEMPT_KEY = 'yours-usb-last-attempt';
+
+const lsGet = (key: string): string | undefined => {
+  try {
+    return localStorage.getItem(key) ?? undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const lsSet = (key: string, value: string | undefined): void => {
+  try {
+    if (value === undefined) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    // Storage unavailable; ordering just falls back to list order.
+  }
+};
+
+/**
+ * Ask Chrome for access to ONE of the given keys, the one most likely to be
+ * plugged in: the key that last read successfully, unless that is the key we
+ * just asked about without success, in which case move on to the next. Each
+ * call must run inside a user gesture. Callers re-probe afterwards.
+ */
+export const requestNextStickPermission = async (stickIds: string[]): Promise<void> => {
+  if (stickIds.length === 0) return;
+  const lastPresent = lsGet(LAST_PRESENT_KEY);
+  const lastAttempt = lsGet(LAST_ATTEMPT_KEY);
+  let ordered = [...stickIds];
+  // Still needing permission after we asked means that request did not stick
+  // (drive not mounted, or the bubble dismissed): try another key first.
+  if (lastAttempt && ordered.length > 1 && ordered.includes(lastAttempt)) {
+    ordered = [...ordered.filter((id) => id !== lastAttempt), lastAttempt];
+  }
+  if (lastPresent && lastPresent !== lastAttempt && ordered.includes(lastPresent)) {
+    ordered = [lastPresent, ...ordered.filter((id) => id !== lastPresent)];
+  }
+  const id = ordered[0];
+  lsSet(LAST_ATTEMPT_KEY, id);
+  const handle = await getHandle(id);
+  if (handle) await requestHandlePermission(handle);
+};
+
 /** Needs a user gesture. Returns true when access is granted. */
 export const requestHandlePermission = async (handle: FileSystemDirectoryHandle): Promise<boolean> => {
   try {
@@ -220,7 +270,11 @@ export const probeSticks = async (usbSecurity: UsbSecurity): Promise<StickProbe>
     const file = await readStickFile(handle);
     if (!file) continue;
     const opened = await unwrapFromFile(file, usbSecurity);
-    if (opened) return { status: 'ok', stickId: opened.entry.id, master: opened.master, handle };
+    if (opened) {
+      lsSet(LAST_PRESENT_KEY, opened.entry.id);
+      lsSet(LAST_ATTEMPT_KEY, undefined);
+      return { status: 'ok', stickId: opened.entry.id, master: opened.master, handle };
+    }
   }
   if (needPermission.length > 0) return { status: 'permission', stickIds: needPermission };
   return { status: 'absent' };

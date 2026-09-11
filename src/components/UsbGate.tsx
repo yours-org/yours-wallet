@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Loader2, Usb } from 'lucide-react';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useTheme } from '../hooks/useTheme';
-import { getHandle, probeSticks, requestHandlePermission, type StickProbe } from '../services/UsbKey.service';
+import { probeSticks, requestNextStickPermission, type StickProbe } from '../services/UsbKey.service';
 import { PageLoader } from './PageLoader';
 
 const RECHECK_MS = 5000;
@@ -49,10 +49,7 @@ export const UsbGate = ({ children }: { children: ReactNode }) => {
     if (probe?.status !== 'permission' || busy) return;
     setBusy(true);
     try {
-      for (const id of probe.stickIds) {
-        const handle = await getHandle(id);
-        if (handle) await requestHandlePermission(handle);
-      }
+      await requestNextStickPermission(probe.stickIds);
       const result = usbSecurity ? await probeSticks(usbSecurity) : undefined;
       setProbe(result);
       if (result?.status !== 'ok') await lockWallet();

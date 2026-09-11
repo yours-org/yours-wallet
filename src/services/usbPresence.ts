@@ -8,7 +8,7 @@
  * count as removed, and the page locks the wallet.
  */
 import type { ChromeStorageService } from './ChromeStorage.service';
-import { getHandle, probeSticks, requestHandlePermission } from './UsbKey.service';
+import { probeSticks, requestNextStickPermission } from './UsbKey.service';
 
 export type UsbPresence = 'disabled' | 'present' | 'absent' | 'permission';
 
@@ -67,10 +67,8 @@ export const confirmUsbForApproval = async (
   if (!usbSecurity?.enabled) return { ok: true };
   let probe = await probeSticks(usbSecurity);
   if (probe.status === 'permission') {
-    for (const id of probe.stickIds) {
-      const handle = await getHandle(id);
-      if (handle) await requestHandlePermission(handle);
-    }
+    // One key per click: Chrome consumes the gesture on the first request.
+    await requestNextStickPermission(probe.stickIds);
     probe = await probeSticks(usbSecurity);
   }
   if (probe.status === 'ok') {
