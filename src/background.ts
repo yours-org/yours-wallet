@@ -121,6 +121,9 @@ const initializeWallet = (): Promise<WalletInterface | null> => {
   });
 };
 
+/** Set by the service-worker block so the pending import can stream progress to a restore window. */
+let restoreProgressFn: ((message: string) => void) | undefined;
+
 const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   console.log('[background] initializeWallet: starting, current accountContext:', !!accountContext);
   if (accountContext) {
@@ -135,6 +138,49 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   }
 
   console.log('[background] initializeWallet: calling initWallet...');
+  // Pending restore data for the CURRENT account (Phase 2 of two-phase restore).
+  // Each account's data is stored separately — syncFromReader only accepts the
+  // authenticated account's identityKey. Other accounts' data stays in IndexedDB
+  // until they are switched to and initializeWallet runs again.
+  //
+  // This runs via `beforeSync`, i.e. before initWallet starts the address and
+  // message syncs. The import needs the toolbox's exclusive sync lock, which
+  // waits for all reader/writer locks; once the address sync is running it
+  // holds those almost continuously and the import never starts, and every
+  // wallet read (balance, storage info) then queues behind it.
+  const importPendingRestore = async ({
+    storage,
+  }: {
+    storage: import('@1sat/wallet-browser').WalletStorageManager;
+  }) => {
+    const { account: currentAccount } = chromeStorageService.getCurrentAccountObject();
+    const currentIdentityKey = currentAccount?.pubKeys?.identityPubKey || '';
+    if (!currentIdentityKey) return;
+    const hasPending = await WalletBackupService.hasPendingRestore(currentIdentityKey);
+    console.log(
+      '[background] initializeWallet: hasPendingRestore for',
+      currentIdentityKey.slice(0, 8) + '...:',
+      hasPending,
+    );
+    if (!hasPending) return;
+    console.log('[background] initializeWallet: Found pending restore data, importing...');
+    try {
+      await WalletBackupService.importPendingWalletData(
+        storage as unknown as Parameters<typeof WalletBackupService.importPendingWalletData>[0],
+        currentIdentityKey,
+        (event) => {
+          console.log('[background] PendingRestore:', event.message);
+          restoreProgressFn?.(event.message);
+        },
+      );
+      console.log('[background] initializeWallet: Pending restore complete');
+    } catch (error) {
+      console.error('[background] initializeWallet: Pending restore failed:', error);
+      // Clear only this account's pending data to avoid repeated failures
+      await WalletBackupService.clearAllPendingRestores();
+    }
+  };
+
   accountContext = await initWallet(chromeStorageService, {
     onTransactionBroadcasted: (txid: string) => {
       console.log('[background] Transaction broadcasted:', txid);
@@ -144,45 +190,13 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
       console.log('[background] Transaction proven:', txid);
       notifyBalanceUpdate();
     },
+    beforeSync: importPendingRestore,
   });
   console.log('[background] initializeWallet: initWallet returned, accountContext:', !!accountContext);
 
   if (accountContext) {
     bindPermissionCallbacks(accountContext.wallet);
     console.log('[background] initializeWallet: bound permission callbacks');
-
-    // Check for pending restore data for the CURRENT account (Phase 2 of two-phase restore).
-    // Each account's data is stored separately — syncFromReader only accepts the
-    // authenticated account's identityKey. Other accounts' data stays in IndexedDB
-    // until they are switched to and initializeWallet runs again.
-    const { account: currentAccount } = chromeStorageService.getCurrentAccountObject();
-    const currentIdentityKey = currentAccount?.pubKeys?.identityPubKey || '';
-    if (currentIdentityKey) {
-      const hasPending = await WalletBackupService.hasPendingRestore(currentIdentityKey);
-      console.log(
-        '[background] initializeWallet: hasPendingRestore for',
-        currentIdentityKey.slice(0, 8) + '...:',
-        hasPending,
-      );
-      if (hasPending) {
-        console.log('[background] initializeWallet: Found pending restore data, importing...');
-        try {
-          const storage = accountContext.storage as unknown as Parameters<
-            typeof WalletBackupService.importPendingWalletData
-          >[0];
-          if (storage) {
-            await WalletBackupService.importPendingWalletData(storage, currentIdentityKey, (event) => {
-              console.log('[background] PendingRestore:', event.message);
-            });
-            console.log('[background] initializeWallet: Pending restore complete');
-          }
-        } catch (error) {
-          console.error('[background] initializeWallet: Pending restore failed:', error);
-          // Clear only this account's pending data to avoid repeated failures
-          await WalletBackupService.clearAllPendingRestores();
-        }
-      }
-    }
   }
 
   return accountContext?.wallet ?? null;
@@ -2026,6 +2040,7 @@ if (isInServiceWorker) {
   const restoreProgress = (message: string, stage: 'importing' | 'complete' = 'importing') => {
     chrome.runtime.sendMessage({ action: 'MASTER_RESTORE_PROGRESS', data: { message, stage } }).catch(() => {});
   };
+  restoreProgressFn = (message) => restoreProgress(message);
 
   const processMasterRestore = async (
     message: {

@@ -123,6 +123,14 @@ const ensureStorageIdentityKey = async (chromeStorageService: ChromeStorageServi
 export interface InitWalletOptions {
   onTransactionBroadcasted?: (txid: string) => void;
   onTransactionProven?: (txid: string) => void;
+  /**
+   * Runs once the wallet and storage are ready but BEFORE the address and
+   * message syncs start. Work that needs the toolbox's exclusive sync lock
+   * (a pending backup import) must happen here: the address sync holds
+   * reader/writer locks almost continuously and the sync lock waits for all
+   * of them, so an import started after it never gets in.
+   */
+  beforeSync?: (ctx: { storage: WalletStorageManager }) => Promise<void>;
 }
 
 /**
@@ -295,6 +303,14 @@ export const initWallet = async (
         // Ignore errors if popup is not open
       });
   };
+
+  if (options?.beforeSync) {
+    try {
+      await options.beforeSync({ storage });
+    } catch (err) {
+      console.error('[initWallet] beforeSync failed:', err);
+    }
+  }
 
   console.log('[initWallet] Starting address sync...');
   sendSyncStatus({ status: 'start', addressCount: maxKeyIndex + 1 });
