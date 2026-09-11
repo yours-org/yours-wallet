@@ -26,7 +26,7 @@ Ordinals:
 - [getOrdinals](./actions/get-ordinals.md), [transferOrdinals](./actions/transfer-ordinals.md), [inscribe](./actions/inscribe.md), [burnOrdinals](./actions/burn-ordinals.md)
 
 Marketplace (OrdLock):
-- [listOrdinal](./actions/list-ordinal.md), [purchaseOrdinal](./actions/purchase-ordinal.md), [cancelListing](./actions/cancel-listing.md), [deriveCancelAddress](./actions/derive-cancel-address.md)
+- [listOrdinal](./actions/list-ordinal.md) (currently disabled: fails closed, OPL-4694), [purchaseOrdinal](./actions/purchase-ordinal.md), [cancelListing](./actions/cancel-listing.md), [deriveCancelAddress](./actions/derive-cancel-address.md)
 
 Collections:
 - [mintCollection](./actions/mint-collection.md), [mintCollectionItem](./actions/mint-collection-item.md)
@@ -72,7 +72,7 @@ Sweep / Import:
 
 ## Cookbook
 
-- [Mint & List Ordinal](./cookbook/mint-and-list-ordinal.md): Full inscribe → fetch → list flow.
+- [Mint & List Ordinal](./cookbook/mint-and-list-ordinal.md): Full inscribe → fetch → list flow (listing step currently disabled).
 - [Sweep Paper Wallet](./cookbook/sweep-paper-wallet.md): Import BSV / ordinals / BSV-21 from a WIF key.
 - [MNEE Send Flow](./cookbook/mnee-send-flow.md): Derive → balance → sendMnee (with `Number(...)` rule).
 - [BAP Identity Setup](./cookbook/bap-identity-setup.md): Publish profile with avatar.

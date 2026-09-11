@@ -1,5 +1,5 @@
 ---
-description: Full end-to-end flow — inscribe a new ordinal, then list it on the marketplace.
+description: Full end-to-end flow — inscribe a new ordinal, then list it on the marketplace. Listing is currently disabled.
 icon: tags
 ---
 
@@ -65,6 +65,10 @@ if (!ordinal) throw new Error('Mint not yet tracked — retry getOrdinals');
 ```
 
 ### 5. List it for sale
+
+{% hint style="danger" %}
+**Listing creation is currently disabled in Yours Wallet** (OPL-4694). Calling `listOrdinal` through the wallet fails closed with a deprecation error until the replacement listing contract ships. Buying others' listings and cancelling your own still work. Steps 1–4 still apply; this step is kept for when listing returns. See `docs/ordlock-listing-disable.md` in the repo.
+{% endhint %}
 
 ```tsx
 import { listOrdinal } from '@1sat/actions';
