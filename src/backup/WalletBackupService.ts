@@ -597,7 +597,28 @@ export class WalletBackupService {
     });
 
     const reader = new FileRestoreReader(pending.chunks, pending.manifest);
-    await storage.syncFromReader(identityKey, reader);
+
+    // Where the chunks go depends on what is active. A local active store
+    // takes them through the manager under its sync lock. A remote active
+    // store already holds this account's data (it is the active store), and
+    // pushing a backup chunk at it over the network has been seen to hang
+    // forever while holding the lock that every other read waits on. In that
+    // case the chunks go straight into the local backup store, lock-free, as
+    // an offline copy the user can switch to if the remote ever goes away.
+    if (storage.getActive().isStorageProvider()) {
+      await storage.syncFromReader(identityKey, reader);
+    } else {
+      const local = (storage as unknown as { _backups?: Array<{ storage: sdk.WalletStorageProvider }> })._backups?.find(
+        (b) => b.storage.isStorageProvider(),
+      );
+      if (!local) {
+        onProgress({ stage: 'importing', message: 'Remote storage is active; nothing to import locally.' });
+        await this.clearAccountPendingRestore(identityKey);
+        return;
+      }
+      onProgress({ stage: 'importing', message: 'Remote storage is active; keeping an offline copy locally...' });
+      await storage.syncFromReader(identityKey, reader, local.storage as unknown as sdk.WalletStorageSync);
+    }
 
     // Remove only this account's pending data — others stay for when they're activated
     await this.clearAccountPendingRestore(identityKey);

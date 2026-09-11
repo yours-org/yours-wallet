@@ -54,6 +54,8 @@ export interface UsbBackupChunkResponse {
   /** Newest `updated_at` among the returned rows, ISO, or undefined if none. */
   newestUpdatedAt?: string;
   hasData?: boolean;
+  /** The local database holds nothing for this account yet (never opened on this install). */
+  noLocalData?: boolean;
 }
 
 let reader: StorageIdb | null = null;
@@ -145,6 +147,12 @@ export const usbBackupChunk = async (
 ): Promise<UsbBackupChunkResponse> => {
   try {
     const idb = await openReader(storageIdentityKey);
+    // An account that has never been active on this install has no user row
+    // locally (e.g. right after a restore, before it is switched to). Nothing
+    // to back up yet; the caller leaves its cursor untouched.
+    if (!(await idb.findUserByIdentityKey(req.identityKey))) {
+      return { success: true, noLocalData: true, hasData: false, counts: {}, chunkData: '' };
+    }
     const args: sdk.RequestSyncChunkArgs = {
       identityKey: req.identityKey,
       fromStorageIdentityKey: readerSettings?.storageIdentityKey ?? storageIdentityKey,

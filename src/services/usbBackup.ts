@@ -438,6 +438,7 @@ const syncStick = async (
       const passStart = new Date().toISOString();
       const since = entry.since;
       let wroteAny = false;
+      let skipped = false;
 
       for (;;) {
         const res = await sendMessageAsync<UsbBackupChunkResponse>({
@@ -447,7 +448,13 @@ const syncStick = async (
           offsets: entry.offsets,
           toStorageIdentityKey: `usb-${stickId}`,
         });
-        if (!res?.success || !res.chunkData || !res.counts) throw new Error(res?.error ?? 'Could not read wallet data');
+        if (!res?.success) throw new Error(res?.error ?? 'Could not read wallet data');
+        if (res.noLocalData) {
+          // Not on this install yet: skip without touching the cursor or status.
+          skipped = true;
+          break;
+        }
+        if (!res.chunkData || !res.counts) throw new Error('Could not read wallet data');
         // Every entity query honours `since` (inclusive), so a pass with no
         // changes returns no rows. Rows updated during a pass are picked up
         // next time because the cursor moves to this pass's start, not its end.
@@ -464,6 +471,7 @@ const syncStick = async (
         await saveManifest();
       }
 
+      if (skipped) continue;
       const wasIncomplete = !entry.complete;
       entry = finishPass(entry, passStart, wroteAny, new Date().toISOString());
       manifest.accounts[identityAddress] = entry;
