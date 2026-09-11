@@ -601,38 +601,21 @@ export class WalletBackupService {
     const mark = (step: string) => onProgress({ stage: 'importing', message: `+${Date.now() - t0}ms ${step}` });
 
     // Where the chunks go depends on what is active. A local active store
-    // takes them through the manager under its sync lock. A remote active
-    // store already holds this account's data (it is the active store), and
-    // pushing a backup chunk at it over the network has been seen to hang
-    // forever while holding the lock that every other read waits on. In that
-    // case the chunks go straight into the local backup store, lock-free, as
-    // an offline copy the user can switch to if the remote ever goes away.
-    if (storage.getActive().isStorageProvider()) {
-      mark('local active: syncFromReader via manager');
-      await storage.syncFromReader(identityKey, reader);
-      mark('syncFromReader done');
-    } else {
-      const local = (storage as unknown as { _backups?: Array<{ storage: sdk.WalletStorageProvider }> })._backups?.find(
-        (b) => b.storage.isStorageProvider(),
-      );
-      if (!local) {
-        onProgress({ stage: 'importing', message: 'Remote storage is active; nothing to import locally.' });
-        await this.clearAccountPendingRestore(identityKey);
-        return;
-      }
-      onProgress({ stage: 'importing', message: 'Remote storage is active; keeping an offline copy locally...' });
-      // Each step logged: whichever one never returns is the culprit.
-      const localStore = local.storage;
-      mark('getAuth');
-      await storage.getAuth();
-      mark('local makeAvailable');
-      await localStore.makeAvailable();
-      mark('local findOrInsertUser');
-      await localStore.findOrInsertUser(identityKey);
-      mark('syncFromReader into local');
-      await storage.syncFromReader(identityKey, reader, localStore as unknown as sdk.WalletStorageSync);
-      mark('syncFromReader done');
+    // takes them through the manager under its sync lock: the chunks ARE the
+    // wallet. A remote active store already holds this account (it is the
+    // active store), the local mirror fills from it on the toolbox's own
+    // schedule, and pushing a backup chunk at either store here has been
+    // observed to never complete. So with a remote active the parked chunks
+    // are dropped. A future "restore as local-only" path (for when the remote
+    // is gone) is the right home for that data.
+    if (!storage.getActive().isStorageProvider()) {
+      onProgress({ stage: 'importing', message: 'Remote storage is active; it already holds this account.' });
+      await this.clearAccountPendingRestore(identityKey);
+      return;
     }
+    mark('local active: syncFromReader via manager');
+    await storage.syncFromReader(identityKey, reader);
+    mark('syncFromReader done');
 
     // Remove only this account's pending data — others stay for when they're activated
     await this.clearAccountPendingRestore(identityKey);

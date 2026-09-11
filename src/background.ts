@@ -196,12 +196,10 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   };
 
   /**
-   * Whether a pending import must finish before the wallet is usable. Only
-   * when the local store is active: then the stick's data IS the wallet. With
-   * a remote active, the wallet's state comes from the server and the import
-   * is merely an offline copy, so it runs after init, off the critical path.
+   * Runs before the address sync (see initWallet's beforeSync). With a local
+   * active store the parked chunks are the wallet and must land first. With a
+   * remote active store the import is a no-op that clears the parked data.
    */
-  let deferredImport: { storage: import('@1sat/wallet-browser').WalletStorageManager; identityKey: string } | undefined;
   const importPendingRestore = async ({
     storage,
   }: {
@@ -217,12 +215,7 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
       hasPending,
     );
     if (!hasPending) return;
-    if (storage.getActive().isStorageProvider()) {
-      await runPendingImport(storage, currentIdentityKey);
-    } else {
-      console.log('[background] initializeWallet: remote is active; offline copy will import after init');
-      deferredImport = { storage, identityKey: currentIdentityKey };
-    }
+    await runPendingImport(storage, currentIdentityKey);
   };
 
   accountContext = await initWallet(chromeStorageService, {
@@ -241,13 +234,6 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   if (accountContext) {
     bindPermissionCallbacks(accountContext.wallet);
     console.log('[background] initializeWallet: bound permission callbacks');
-    if (deferredImport) {
-      // Lock-free write into the local backup store; the wallet is already usable.
-      const { storage, identityKey } = deferredImport;
-      void runPendingImport(storage, identityKey).catch((err) =>
-        console.error('[background] deferred offline-copy import failed:', err),
-      );
-    }
   }
 
   return accountContext?.wallet ?? null;
