@@ -30,7 +30,22 @@ export interface PreparedDrive {
   existed: boolean;
   /** Set when the existing file belongs to a stick already registered on this wallet. */
   registered?: UsbStickEntry;
+  /**
+   * `fresh` mode only: the new file is NOT written yet. Call `commitFreshFile`
+   * once the change it belongs to has succeeded, and `restorePreviousFile`
+   * if it fails after the write, so a cancelled or failed rotation never
+   * leaves the drive with a secret nothing is wrapped under.
+   */
+  previous?: { id: string; secret: string };
+  pendingWrite?: boolean;
 }
+
+export const commitFreshFile = (drive: PreparedDrive): Promise<void> =>
+  writeStickFile(drive.handle, makeStickFile(drive.id, drive.secret));
+
+export const restorePreviousFile = async (drive: PreparedDrive): Promise<void> => {
+  if (drive.previous) await writeStickFile(drive.handle, makeStickFile(drive.previous.id, drive.previous.secret));
+};
 
 /**
  * Read the picked drive. Reuse an existing valid key file (its id and secret)
@@ -40,11 +55,31 @@ export interface PreparedDrive {
 export const prepareDrive = async (
   handle: FileSystemDirectoryHandle,
   usbSecurity?: UsbSecurity,
+  options?: {
+    /**
+     * Always write a new secret, even if the drive already carries one.
+     * Rotation uses this: a rotation that kept the drive's secret would still
+     * match any copy of the old key file, which is what rotation is for.
+     */
+    fresh?: boolean;
+  },
 ): Promise<PreparedDrive> => {
   const file = await readStickFile(handle);
-  if (file) {
+  if (file && !options?.fresh) {
     const registered = usbSecurity?.sticks.find((s) => s.id === file.id);
     return { handle, id: file.id, secret: file.secret, existed: true, registered };
+  }
+  if (file) {
+    const registered = usbSecurity?.sticks.find((s) => s.id === file.id);
+    return {
+      handle,
+      id: newStickId(),
+      secret: newStickSecret(),
+      existed: true,
+      registered,
+      previous: { id: file.id, secret: file.secret },
+      pendingWrite: true,
+    };
   }
   const id = newStickId();
   const secret = newStickSecret();

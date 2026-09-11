@@ -2,14 +2,22 @@ import { useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { derivePasswordKey } from '../../services/passKey';
-import { deleteHandle, saveHandle } from '../../services/UsbKey.service';
+import { deleteHandle, getHandle, listPresentSticks, saveHandle } from '../../services/UsbKey.service';
+import { wipeUsbBackup } from '../../services/usbBackup';
+import { endUsbRecoverySession } from '../../services/usbPresence';
 import type { UsbSecurity } from '../../services/types/chromeStorage.types';
 import { sendMessageAsync } from '../../utils/chromeHelpers';
 import { computeMasterCheck, newMaster, wrapMaster } from '../../utils/usbCrypto';
 import { Note, Stepper } from './UsbLayout';
 import { IdentityStep } from './presence';
 import { ChooseDriveStep, DoneStep, LabelStep, PasswordStep, RecoveryCodeStep } from './steps';
-import { prepareDrive, type PreparedDrive, type RekeyResponse } from './usbHelpers';
+import {
+  commitFreshFile,
+  prepareDrive,
+  restorePreviousFile,
+  type PreparedDrive,
+  type RekeyResponse,
+} from './usbHelpers';
 
 const STEPS = ['Confirm', 'Choose drive', 'Name', 'Recovery code', 'Password', 'Done'];
 
@@ -25,7 +33,9 @@ export const RotateFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
   const [master] = useState(() => newMaster());
 
   const onPicked = async (handle: FileSystemDirectoryHandle) => {
-    const prepared = await prepareDrive(handle, usbSecurity);
+    // A new secret on the drive, always: reusing the old one would leave any
+    // copy of the old key file able to open the rotated wallet.
+    const prepared = await prepareDrive(handle, usbSecurity, { fresh: true });
     setDrive(prepared);
     if (prepared.registered) setLabel(prepared.registered.label);
     setStep(2);
@@ -44,10 +54,15 @@ export const RotateFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
       masterCheck,
       sticks: [{ id: drive.id, label, wrappedMaster, addedAt: new Date().toISOString() }],
     };
+    // Keys reachable now, before their handles go: their backups are under the
+    // old key and get erased below. Keys not inserted keep theirs.
+    const { present } = await listPresentSticks(usbSecurity);
     // Save the handle first: if the window closes between the commit and this
     // write, the new key would otherwise be registered with no way to read it.
     const wasRegistered = usbSecurity.sticks.some((s) => s.id === drive.id);
     await saveHandle(drive.id, drive.handle);
+    // The drive's new secret goes on only now that the password is confirmed.
+    if (drive.pendingWrite) await commitFreshFile(drive);
     let res: RekeyResponse | undefined;
     try {
       res = await sendMessageAsync<RekeyResponse>({
@@ -62,22 +77,31 @@ export const RotateFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
     }
     if (!res?.success) {
       if (!wasRegistered) await deleteHandle(drive.id);
+      // Nothing was re-keyed: put the drive's previous secret back so it still opens this wallet.
+      if (drive.pendingWrite) await restorePreviousFile(drive).catch(() => {});
       return res?.error ?? 'Rotation failed';
     }
+    // Old backups are under the old master: erase what can be reached. The
+    // kept drive gets a fresh one on the next sync.
+    for (const stickId of present) {
+      const handle = await getHandle(stickId);
+      if (handle) await wipeUsbBackup(handle);
+    }
+    await wipeUsbBackup(drive.handle);
     for (const s of usbSecurity.sticks) {
       if (s.id !== drive.id) await deleteHandle(s.id);
     }
     await chromeStorageService.getAndSetStorage();
+    // A recovery-code session ends here: there is a key to check again.
+    await endUsbRecoverySession();
     if (!res.relocked) setIsLocked(false);
     setStep(5);
     return null;
   };
 
-  const driveNote = drive?.registered
-    ? `Registered as "${drive.registered.label}". It stays registered.`
-    : drive?.existed
-      ? 'This drive already has a Yours key file. It will be reused.'
-      : undefined;
+  const driveNote = drive?.existed
+    ? 'This drive now holds a new secret. Any other wallet or Chrome profile that used it must add it again.'
+    : undefined;
 
   return (
     <>

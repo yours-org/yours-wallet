@@ -179,10 +179,12 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       setVerificationFailed(false);
       setErrorText('');
       if (usbEnabled) resetUsbPresence();
-      // The code stands in for the key this session when the key is merely
-      // elsewhere. Recorded before anything can flip the popup to unlocked,
-      // so the gate never sees an unlocked wallet without the marker.
-      if (unlockedViaRecovery && recoveryIntent === 'session') await startUsbRecoverySession();
+      // The code stands in for the key this session: for good when the key is
+      // merely elsewhere, and until rotation completes when it is lost (so the
+      // popup is usable while a new drive is found). Recorded before anything
+      // can flip the popup to unlocked, so the gate never sees an unlocked
+      // wallet without the marker.
+      if (unlockedViaRecovery) await startUsbRecoverySession();
       const timestamp = Date.now();
       await chromeStorageService.update({ lastActiveTime: timestamp });
 

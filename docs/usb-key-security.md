@@ -155,7 +155,7 @@ Deletes that stick's wrapper entry and handle. Removing the last stick is blocke
 
 ### Rotate ("Lost this stick?" or "I think a stick was copied")
 
-Generates a new `M`, runs the re-key routine, rewraps the new `M` under every remaining stick's secret, shows a new recovery code (typed back). Copy is explicit: rotation protects **future** storage from a copied stick. An attacker who already holds a copy of the stick file **and** a storage dump from before rotation can still decrypt that dump with the password. If both are suspected, sweep to a new seed.
+Generates a new `M`, writes a **new secret** to the chosen drive (even one that already carries a key file: a rotation that kept the drive secret would still match any copy of the old file), runs the re-key routine, wraps the new `M` under it, shows a new recovery code (typed back), and erases the old-key backup folders from every drive it can reach. Consequence: any other wallet or Chrome profile that shared that drive must add it again. Copy is explicit: rotation protects **future** storage from a copied stick. An attacker who already holds a copy of the stick file **and** a storage dump from before rotation can still decrypt that dump with the password. If both are suspected, sweep to a new seed.
 
 ### Lost every stick, or just not carrying it
 

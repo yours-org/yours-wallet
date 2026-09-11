@@ -46,6 +46,15 @@ export const startUsbRecoverySession = async (): Promise<void> => {
   }
 };
 
+/** Rotation completed with a key in hand: presence checks apply again. */
+export const endUsbRecoverySession = async (): Promise<void> => {
+  try {
+    await chrome.storage.session.remove('usbRecoverySessionAt');
+  } catch {
+    // Nothing to clear.
+  }
+};
+
 export const isUsbRecoverySession = async (): Promise<boolean> => {
   try {
     const r = await chrome.storage.session.get('usbRecoverySessionAt');
