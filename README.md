@@ -24,6 +24,14 @@ Yours Wallet manages BSV, 1Sat Ordinals, BSV-21 tokens, and MNEE stablecoins fro
 - **BSV-21 tokens** — View balances, send tokens with full decimal precision.
 - **MNEE stablecoin** — Native MNEE USD support with send and receive.
 
+## Testnet
+
+Choose **Testnet** in the Network field when creating an account, restoring a seed phrase, or importing WIF keys. Switch accounts from the top bar; testnet accounts are labeled. To use an existing seed on testnet, restore it as a separate testnet account.
+
+Testnet accounts use local storage by default and keep wallet data and permissions separate from mainnet. Custom remote storage providers must serve the test chain. MNEE, paymail, fiat amounts, and the legacy sweep tool are available only on mainnet.
+
+Syncing, broadcasting, and asset queries use the 1Sat SDK's testnet services and require those services to be available. Run the network regression checks with `bun run test:network`.
+
 ## Architecture
 
 ```
