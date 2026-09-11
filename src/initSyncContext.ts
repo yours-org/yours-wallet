@@ -8,7 +8,7 @@
 
 import type { WalletInterface } from '@bsv/sdk';
 import { OneSatServices, AddressManager } from '@1sat/wallet-browser';
-import { deriveDepositAddresses } from '@1sat/actions';
+import { deriveDepositAddresses } from './utils/chainActions';
 
 export interface SyncContextOptions {
   /** Underlying BRC-100 wallet (not the WPM wrapper). */

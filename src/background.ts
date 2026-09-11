@@ -35,7 +35,7 @@ import type {
   CounterpartyPermissions,
 } from '@bsv/wallet-toolbox-client';
 import type { LocalWalletPermissionsManager } from '@1sat/wallet-browser';
-import { deriveDepositAddresses } from '@1sat/actions';
+import { deriveDepositAddresses } from './utils/chainActions';
 import { removeWindow } from './utils/chromeHelpers';
 import { Account, ChromeStorageObject, StorageConfig } from './services/types/chromeStorage.types';
 import { ChromeStorageService } from './services/ChromeStorage.service';

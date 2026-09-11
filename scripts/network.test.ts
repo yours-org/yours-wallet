@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PrivateKey, P2PKH, Transaction } from '@bsv/sdk';
+import { PrivateKey, PublicKey, P2PKH, Transaction } from '@bsv/sdk';
+import { ProcessedTxStoreIdb } from '@1sat/actions';
 import { OneSatServices } from '@1sat/wallet-browser';
 import { NetWork } from '../src/services/types/provider.types';
 import { getKeys, getKeysFromWifs } from '../src/utils/keys';
+import { deriveDepositAddresses, withChainAwareSdk } from '../src/utils/chainActions';
 import { getChainConfig, getNetworkConfig, isValidAddress, resolveContentUrl } from '../src/utils/network';
 import { fetchExchangeRate } from '../src/utils/wallet';
 import { parseRawTransaction } from '../src/utils/tools';
@@ -50,6 +52,37 @@ test('transaction parsing uses testnet addresses and services', async () => {
   assert.equal(getNetworkConfig().chain, 'main');
   assert.equal(resolveContentUrl('https://example.com/icon.png', 'test'), 'https://example.com/icon.png');
   assert.match(resolveContentUrl('abc_0', 'test'), /testnet.*abc_0/);
+});
+
+test('deposit derivation remaps SDK mainnet addresses onto the account chain', async () => {
+  const key = PrivateKey.fromString('1');
+  const publicKey = key.toPublicKey().toString();
+  const wallet = {
+    getPublicKey: async () => ({ publicKey }),
+  };
+  const { derivations } = await deriveDepositAddresses.execute(
+    { wallet, chain: 'test', isBaseWallet: true } as Parameters<typeof deriveDepositAddresses.execute>[0],
+    { count: 1 },
+  );
+  assert.equal(derivations[0].address, PublicKey.fromString(publicKey).toAddress('testnet'));
+  assert.ok(isValidAddress(derivations[0].address, 'test'));
+});
+
+test('testnet SDK workarounds default to testnet addresses and isolate the sync store', async () => {
+  const key = PrivateKey.fromString('1');
+  const mainnetAddress = key.toPublicKey().toAddress();
+  const testnetAddress = key.toPublicKey().toAddress('testnet');
+  await withChainAwareSdk('test', async () => {
+    assert.equal(key.toPublicKey().toAddress(), testnetAddress);
+    assert.equal(key.toAddress(), testnetAddress);
+    const store = new ProcessedTxStoreIdb('identity-key') as unknown as {
+      dbName: string;
+      getDb: () => Promise<unknown>;
+    };
+    await store.getDb().catch(() => undefined);
+    assert.equal(store.dbName, 'sync-processed-test-identity-key');
+  });
+  assert.equal(key.toPublicKey().toAddress(), mainnetAddress);
 });
 
 test('testnet never uses a fiat exchange rate, including a cached mainnet rate', async () => {

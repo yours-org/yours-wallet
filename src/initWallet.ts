@@ -8,12 +8,8 @@ import {
   LocalWalletPermissionsManager,
   IndexedDbPermissionStore,
 } from '@1sat/wallet-browser';
-import {
-  syncAddresses,
-  syncMessages,
-  createContext as createActionContext,
-  migrateLegacyP1SatBaskets,
-} from '@1sat/actions';
+import { syncMessages, createContext as createActionContext, migrateLegacyP1SatBaskets } from '@1sat/actions';
+import { syncAddresses } from './utils/chainActions';
 import { createAssetPermissionModules } from '@1sat/permission-module';
 import type { WalletInterface } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';

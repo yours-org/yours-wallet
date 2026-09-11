@@ -45,7 +45,6 @@ import {
   getLockData,
   sendAllBsv,
   sendBsv,
-  syncAddresses,
   unlockBsv,
   type Bsv21Balance,
   type LockData,
@@ -63,7 +62,8 @@ import { SendBsv21View } from '../components/SendBsv21View';
 import { AssetPicker, type PickableAsset } from '../components/AssetPicker';
 import { SendConfirmation, type SendLineItem } from '../components/SendConfirmation';
 import { CoinHistory } from '../components/CoinHistory';
-import { getMneeBalance, sendMnee, deriveDepositAddresses } from '@1sat/actions';
+import { getMneeBalance, sendMnee } from '@1sat/actions';
+import { deriveDepositAddresses, syncAddresses } from '../utils/chainActions';
 import { MNEE_PROTOCOLS, mneeKeyDerivations } from '../utils/mneeDerivations';
 import { MneeClient } from '@1sat/client';
 import { PrivateKey } from '@bsv/sdk';
