@@ -153,8 +153,8 @@ describe('cursor helpers', () => {
   });
 
   test('backupAad names the drive, the role and the place', () => {
-    expect(backupAad('ab', 'chunk', 'd1', 7)).toBe('yours-usb-backup|3|ab|chunk|d1|7');
-    expect(backupAad('ab', 'keys')).toBe('yours-usb-backup|3|ab|keys');
+    expect(backupAad('ab', 'chunk', 'd1', 7)).toBe('yours-usb-backup|1|ab|chunk|d1|7');
+    expect(backupAad('ab', 'keys')).toBe('yours-usb-backup|1|ab|keys');
     expect(backupAad('ab', 'keys')).not.toBe(backupAad('cd', 'keys'));
   });
 });

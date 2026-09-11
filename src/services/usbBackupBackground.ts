@@ -51,8 +51,6 @@ export interface UsbBackupChunkResponse {
   chunkData?: string;
   /** Per-entity counts in this chunk, for advancing offsets. */
   counts?: Record<string, number>;
-  /** Newest `updated_at` among the returned rows, ISO, or undefined if none. */
-  newestUpdatedAt?: string;
   hasData?: boolean;
   /** The local database holds nothing for this account yet (never opened on this install). */
   noLocalData?: boolean;
@@ -111,31 +109,6 @@ const countRows = (chunk: sdk.SyncChunk): Record<string, number> => ({
   provenTxReq: chunk.provenTxReqs?.length ?? 0,
 });
 
-const newestUpdatedAt = (chunk: sdk.SyncChunk): string | undefined => {
-  let newest: number | undefined;
-  const lists: Array<Array<{ updated_at?: Date | string }> | undefined> = [
-    chunk.provenTxs,
-    chunk.outputBaskets,
-    chunk.outputTags,
-    chunk.txLabels,
-    chunk.transactions,
-    chunk.outputs,
-    chunk.txLabelMaps,
-    chunk.outputTagMaps,
-    chunk.certificates,
-    chunk.certificateFields,
-    chunk.commissions,
-    chunk.provenTxReqs,
-  ];
-  for (const list of lists) {
-    for (const row of list ?? []) {
-      const t = row.updated_at ? new Date(row.updated_at).getTime() : NaN;
-      if (!Number.isNaN(t) && (newest === undefined || t > newest)) newest = t;
-    }
-  }
-  return newest === undefined ? undefined : new Date(newest).toISOString();
-};
-
 /**
  * Serve one sync chunk for any account from the shared local database.
  * `storageIdentityKey` is this install's per-device id (the same one the live
@@ -169,7 +142,6 @@ export const usbBackupChunk = async (
       success: true,
       chunkData: bytesToBase64(new Uint8Array(encode(chunk))),
       counts,
-      newestUpdatedAt: newestUpdatedAt(chunk),
       hasData,
     };
   } catch (err) {

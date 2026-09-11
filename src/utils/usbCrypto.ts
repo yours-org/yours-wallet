@@ -11,6 +11,7 @@
  *
  * S_i lives only in a small file on the drive. M is never stored unwrapped.
  */
+import { argon2id } from 'hash-wasm';
 import { bytesToHex, hexToBytes } from './crypto';
 
 export const USB_SECURITY_VERSION = 1;
@@ -103,6 +104,9 @@ export const wrapMaster = async (masterHex: string, stickSecretHex: string, stic
 export const unwrapMaster = async (wrapped: string, stickSecretHex: string, stickId: string): Promise<string> => {
   if (!wrapped.startsWith(WRAPPED_PREFIX)) throw new Error('Unrecognised wrapped master format');
   const payload = wrapped.slice(WRAPPED_PREFIX.length);
+  // iv (12) + master (32) + tag (16) = 60 bytes; anything else is not ours. Checked
+  // before hexToBytes, which would turn stray characters into zero bytes.
+  if (!/^[0-9a-f]{120}$/.test(payload)) throw new Error('Unrecognised wrapped master format');
   const iv = hexToBytes(payload.slice(0, 24));
   const ct = hexToBytes(payload.slice(24));
   const wrapKey = await importAesKey(await hkdf(hexToBytes(stickSecretHex), WRAP_SALT, stickId));
@@ -118,8 +122,17 @@ export const unwrapMaster = async (wrapped: string, stickSecretHex: string, stic
 export const computeMasterCheck = async (masterHex: string): Promise<string> =>
   bytesToHex(await hkdf(hexToBytes(masterHex), '', CHECK_INFO));
 
+/** Constant-time string compare: neither operand is secret here, but it costs nothing to be sure. */
+const equalsConstantTime = (a: string, b: string): boolean => {
+  const x = enc.encode(a);
+  const y = enc.encode(b);
+  let diff = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return diff === 0;
+};
+
 export const verifyMasterCheck = async (masterHex: string, masterCheck: string): Promise<boolean> =>
-  (await computeMasterCheck(masterHex)) === masterCheck;
+  equalsConstantTime(await computeMasterCheck(masterHex), masterCheck);
 
 /** The combined passKey: password-derived key mixed with the master factor. */
 export const combinePassKey = async (pbkdfHex: string, masterHex: string): Promise<string> => {
@@ -210,33 +223,32 @@ export const decodeRecoveryCode = async (code: string): Promise<string | null> =
 
 const BACKUP_SALT = 'yours-usb-backup-v1';
 
-/** Extra PBKDF2 rounds on top of the combined passKey. Native WebCrypto, so cheap for us, costly per guess. */
-export const BACKUP_KDF_ITERATIONS = 600_000;
+/**
+ * Argon2id parameters for the backup key. 64 MiB and 3 passes is the
+ * memory-hard tier OWASP recommends; about a second in the popup, and
+ * GPU-hostile for anyone guessing passwords against a lost drive.
+ */
+export const BACKUP_KDF = { memorySize: 64 * 1024, iterations: 3, parallelism: 1 } as const;
 
 /**
  * Key for files written to the drive. The drive carries the key file too, so
  * for a lost drive the password is the only remaining factor: the backup is
  * an offline guessing target like an exported backup file. This adds a
- * deliberately slow step on top of the passKey to raise the cost per guess.
- * Restore needs exactly what unlock needs: the drive's own secret plus the
- * password. The stick id is mixed in so each drive's files are under their
- * own key: ciphertext from one drive means nothing on another.
+ * deliberately slow, memory-hard step on top of the passKey to raise the
+ * cost per guess. Restore needs exactly what unlock needs: the drive's own
+ * secret plus the password. The stick id is part of the salt so each drive's
+ * files are under their own key: ciphertext from one drive means nothing on
+ * another.
  */
 export const deriveBackupKey = async (passKeyHex: string, stickId: string): Promise<CryptoKey> => {
-  const base = await crypto.subtle.importKey('raw', hexToBytes(passKeyHex).buffer as ArrayBuffer, 'PBKDF2', false, [
-    'deriveBits',
-  ]);
-  const bits = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      hash: 'SHA-256',
-      salt: enc.encode(BACKUP_SALT).buffer as ArrayBuffer,
-      iterations: BACKUP_KDF_ITERATIONS,
-    },
-    base,
-    256,
-  );
-  return importAesKey(await hkdf(new Uint8Array(bits), BACKUP_SALT, `aes|${stickId}`));
+  const stretched = await argon2id({
+    password: hexToBytes(passKeyHex),
+    salt: enc.encode(`${BACKUP_SALT}|${stickId}`),
+    ...BACKUP_KDF,
+    hashLength: 32,
+    outputType: 'binary',
+  });
+  return importAesKey(await hkdf(stretched, BACKUP_SALT, 'aes'));
 };
 
 /**

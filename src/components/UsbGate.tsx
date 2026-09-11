@@ -4,6 +4,7 @@ import { Loader2, Usb } from 'lucide-react';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useTheme } from '../hooks/useTheme';
 import { openUsbWindow, probeSticks, requestNextStickPermission, type StickProbe } from '../services/UsbKey.service';
+import { markUsbSeen } from '../services/usbPresence';
 import { PageLoader } from './PageLoader';
 
 const RECHECK_MS = 5000;
@@ -42,8 +43,10 @@ export const UsbGate = ({ children }: { children: ReactNode }) => {
       // (no grant yet) and 'no-handles' (nothing saved on this profile, e.g.
       // right after a recovery-code unlock while the rotate window is open)
       // say nothing about whether a drive is in, so they never lock.
-      if (result.status === 'ok') misses.current = 0;
-      else if (result.status === 'absent' && ++misses.current >= MISSES_TO_LOCK) {
+      if (result.status === 'ok') {
+        misses.current = 0;
+        await markUsbSeen();
+      } else if (result.status === 'absent' && ++misses.current >= MISSES_TO_LOCK) {
         misses.current = 0;
         await lockWallet();
       }

@@ -15,6 +15,32 @@ export type UsbPresence = 'disabled' | 'present' | 'absent' | 'permission';
 const FAILURES_TO_LOCK = 2;
 let consecutiveFailures = 0;
 
+/**
+ * How long a successful read from any wallet window vouches for the key.
+ * The popup gate probes every 5 s while open, so this only bites when no
+ * window is open; then a dApp call with a standing grant gets a one-click
+ * "confirm your USB key" prompt instead of going through unchecked.
+ */
+export const USB_SEEN_MAX_AGE_MS = 60_000;
+
+/** Record in session that a registered key was just read. The background reads this before gated dApp calls. */
+export const markUsbSeen = async (): Promise<void> => {
+  try {
+    await chrome.storage.session.set({ usbLastSeenAt: Date.now() });
+  } catch {
+    // Session storage unavailable (tests): nothing to record.
+  }
+};
+
+export const readUsbLastSeen = async (): Promise<number | undefined> => {
+  try {
+    const r = await chrome.storage.session.get('usbLastSeenAt');
+    return typeof r.usbLastSeenAt === 'number' ? r.usbLastSeenAt : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export const resetUsbPresence = (): void => {
   consecutiveFailures = 0;
 };
@@ -45,7 +71,10 @@ export const enforceUsbPresence = async (
   const presence = await checkUsbPresence(chromeStorageService);
   // Counted here, not in checkUsbPresence: a probe from a screen that never
   // locks (a settings confirmation) must not arm the next gated call.
-  if (presence === 'present') consecutiveFailures = 0;
+  if (presence === 'present') {
+    consecutiveFailures = 0;
+    await markUsbSeen();
+  }
   if (presence === 'absent' && ++consecutiveFailures >= FAILURES_TO_LOCK) {
     consecutiveFailures = 0;
     await onRemoved();
@@ -72,6 +101,7 @@ export const confirmUsbForApproval = async (
   }
   if (probe.status === 'ok') {
     consecutiveFailures = 0;
+    await markUsbSeen();
     return { ok: true };
   }
   return { ok: false, message: USB_KEY_ABSENT_MESSAGE };

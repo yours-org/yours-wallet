@@ -45,12 +45,13 @@ import {
   handleOneSatPermissionResponse,
   initOneSatPromptBridge,
 } from './services/oneSatPrompt';
-import type { PromptKind } from './promptProtocol';
+import type { PromptKind, UsbCheckRequest } from './promptProtocol';
 import { initWallet, openAccountStorageForBackup, type AccountContext } from './initWallet';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
 import { repairStaleAccounts, usbRekey, type UsbRekeyRequest } from './services/usbRekeyBackground';
 import { USB_HANDLE_DB_NAME } from './services/UsbKey.service';
+import { readUsbLastSeen, USB_KEY_ABSENT_MESSAGE, USB_SEEN_MAX_AGE_MS } from './services/usbPresence';
 import {
   closeUsbBackupReader,
   usbBackupChunk,
@@ -354,6 +355,7 @@ export const getWallet = (): WalletInterface | null => {
  */
 const ensureWallet = async (suppressPopup = false): Promise<WalletInterface> => {
   await startupInitPromise;
+  if (masterBackupInFlight) throw new Error('Wallet is busy with a master backup; try again in a moment');
   if (accountContext?.wallet) {
     return accountContext.wallet;
   }
@@ -412,6 +414,23 @@ const pendingWalletWaiters: {
   resolve: (wallet: WalletInterface) => void;
   reject: (error: Error) => void;
 }[] = [];
+
+/**
+ * Gated dApp calls (sign, spend, reveal) waiting for the user to confirm a
+ * registered USB key is present. One prompt serves every call queued behind it.
+ */
+const pendingUsbChecks = new Map<
+  string,
+  { request: UsbCheckRequest; resolve: () => void; reject: (e: Error) => void }
+>();
+let usbCheckInFlight: Promise<void> | null = null;
+
+/**
+ * A master backup closes the live wallet and walks every account's storage
+ * in turn. Nothing else may bring a wallet up meanwhile: a dApp call landing
+ * then would initialise whichever account the export had selected last.
+ */
+let masterBackupInFlight = false;
 
 const pendingGroupedPermissionRequests = new Map<
   string,
@@ -491,6 +510,8 @@ const getPendingPromptPayload = (kind: string, requestID?: string): unknown => {
       return requestID ? pendingCounterpartyPermissionRequests.get(requestID)?.request : undefined;
     case 'oneSatPermission':
       return getPendingOneSatPrompt(requestID);
+    case 'usbCheck':
+      return requestID ? pendingUsbChecks.get(requestID)?.request : undefined;
     default:
       return undefined;
   }
@@ -498,6 +519,9 @@ const getPendingPromptPayload = (kind: string, requestID?: string): unknown => {
 
 /** The oldest queued prompt, if any, for the prompt window to render next. */
 const getNextPendingPrompt = (): { kind: PromptKind; requestID: string } | undefined => {
+  // A key check is holding up a call that already passed permission: first.
+  const usbCheck = pendingUsbChecks.keys().next();
+  if (!usbCheck.done) return { kind: 'usbCheck', requestID: usbCheck.value };
   const permission = pendingPermissionRequests.keys().next();
   if (!permission.done) return { kind: 'permission', requestID: permission.value };
   const grouped = pendingGroupedPermissionRequests.keys().next();
@@ -788,6 +812,7 @@ if (isInServiceWorker) {
       'GROUPED_PERMISSION_RESPONSE',
       'COUNTERPARTY_PERMISSION_RESPONSE',
       'ONE_SAT_PERMISSION_RESPONSE',
+      'USB_CHECK_RESPONSE',
       // Prompt window flow queries
       'GET_PROMPT_PAYLOAD',
       'GET_NEXT_PROMPT',
@@ -876,6 +901,17 @@ if (isInServiceWorker) {
           const { requestID, approved } = message as { requestID: string; approved: boolean };
           const handled = handleOneSatPermissionResponse(requestID, !!approved);
           sendResponse({ type: 'ONE_SAT_PERMISSION_RESPONSE', success: handled });
+          return true;
+        }
+        case 'USB_CHECK_RESPONSE': {
+          const { requestID, ok } = message as { requestID: string; ok: boolean };
+          const pending = pendingUsbChecks.get(requestID);
+          pendingUsbChecks.delete(requestID);
+          if (pending) {
+            if (ok) pending.resolve();
+            else pending.reject(new Error(USB_KEY_ABSENT_MESSAGE));
+          }
+          sendResponse({ type: 'USB_CHECK_RESPONSE', success: !!pending });
           return true;
         }
         // Prompt window payload/flow queries
@@ -1011,11 +1047,11 @@ if (isInServiceWorker) {
               // Never open a second connection to the local database while the
               // wallet is initialising: a pending backup import writes to it
               // then, and a competing open can stall those transactions.
-              if (initInFlight || reinitPromise) {
+              if (initInFlight || reinitPromise || masterBackupInFlight) {
                 sendResponse({
                   type: message.action,
                   success: false,
-                  error: 'Wallet is starting up',
+                  error: masterBackupInFlight ? 'Master backup in progress' : 'Wallet is starting up',
                   data: { busy: true },
                 });
                 return;
@@ -1987,6 +2023,8 @@ if (isInServiceWorker) {
       accountContext = null;
       if (!ctx) return;
       console.log(`[MasterBackup] closing live wallet (${reason})`);
+      // The USB backup reader shares the database the export is about to walk.
+      await closeUsbBackupReader();
       try {
         await ctx.close();
       } catch (err) {
@@ -1995,6 +2033,7 @@ if (isInServiceWorker) {
     };
 
     const restoreOriginalAccount = async () => {
+      masterBackupInFlight = false;
       try {
         if (originalSelectedAccount) {
           await chromeStorageService.update({ selectedAccount: originalSelectedAccount });
@@ -2028,6 +2067,7 @@ if (isInServiceWorker) {
         });
         return;
       }
+      masterBackupInFlight = true;
 
       const chain = 'main' as const;
 
@@ -2470,6 +2510,30 @@ if (isInServiceWorker) {
     return true;
   };
 
+  /**
+   * USB key security, dApp side. The popup and the prompt window check the
+   * key themselves; a dApp with a standing grant reaches the wallet with no
+   * window open at all. So before any call that signs, spends, or reveals,
+   * require that some wallet window has read a registered key within
+   * USB_SEEN_MAX_AGE_MS; otherwise open the prompt window for one click.
+   * Calls arriving while that prompt is up share it.
+   */
+  const ensureUsbSeen = async (reason: string, originator?: string): Promise<void> => {
+    await chromeStorageService.getAndSetStorage();
+    if (!chromeStorageService.getUsbSecurity()?.enabled) return;
+    const seen = await readUsbLastSeen();
+    if (seen !== undefined && Date.now() - seen < USB_SEEN_MAX_AGE_MS) return;
+    if (usbCheckInFlight) return usbCheckInFlight;
+    const requestID = `usb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    usbCheckInFlight = new Promise<void>((resolve, reject) => {
+      pendingUsbChecks.set(requestID, { request: { requestID, reason, originator }, resolve, reject });
+      showPromptUi('usbCheck', requestID);
+    }).finally(() => {
+      usbCheckInFlight = null;
+    });
+    return usbCheckInFlight;
+  };
+
   const processCWICreateHmac = async (
     message: { params: CreateHmacArgs; originator?: string },
     sendResponse: CallbackResponse,
@@ -2482,6 +2546,7 @@ if (isInServiceWorker) {
     );
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('sign with your keys', message.originator);
       console.log('[background] processCWICreateHmac: wallet obtained, calling w.createHmac...');
       const result = await w.createHmac(message.params, message.originator);
       console.log('[background] processCWICreateHmac: success');
@@ -2535,6 +2600,7 @@ if (isInServiceWorker) {
     try {
       console.log('[background] processCWICreateSignature: entering, originator:', message.originator);
       const w = await ensureWallet();
+      await ensureUsbSeen('sign with your keys', message.originator);
       console.log('[background] processCWICreateSignature: ensureWallet resolved, calling w.createSignature...');
       const result = await w.createSignature(message.params, message.originator);
       console.log('[background] processCWICreateSignature: success');
@@ -2560,6 +2626,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('encrypt data with your keys', message.originator);
 
       const result = await w.encrypt(message.params, message.originator);
       sendResponse({
@@ -2583,6 +2650,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('decrypt data with your keys', message.originator);
 
       const result = await w.decrypt(message.params, message.originator);
       sendResponse({
@@ -2606,6 +2674,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('build and sign a transaction', message.originator);
 
       console.log('[createAction] Starting with originator:', message.originator);
       console.log(
@@ -2653,6 +2722,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('sign a transaction', message.originator);
 
       const result = await w.signAction(message.params, message.originator);
       console.log('[signAction] Success', result?.txid ? `txid=${result.txid}` : '');
@@ -2708,6 +2778,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('accept a payment into the wallet', message.originator);
       const result = await w.internalizeAction(message.params, message.originator);
       sendResponse({
         type: CWIEventName.INTERNALIZE_ACTION,
@@ -2730,6 +2801,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('release an output', message.originator);
       const result = await w.relinquishOutput(message.params, message.originator);
       sendResponse({
         type: CWIEventName.RELINQUISH_OUTPUT,
@@ -2752,6 +2824,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('reveal key linkage', message.originator);
       const result = await w.revealCounterpartyKeyLinkage(message.params, message.originator);
       sendResponse({
         type: CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE,
@@ -2774,6 +2847,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('reveal key linkage', message.originator);
       const result = await w.revealSpecificKeyLinkage(message.params, message.originator);
       sendResponse({
         type: CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE,
@@ -2796,6 +2870,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('acquire a certificate', message.originator);
       const result = await w.acquireCertificate(message.params, message.originator);
       sendResponse({
         type: CWIEventName.ACQUIRE_CERTIFICATE,
@@ -2840,6 +2915,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('prove a certificate', message.originator);
       const result = await w.proveCertificate(message.params, message.originator);
       sendResponse({
         type: CWIEventName.PROVE_CERTIFICATE,
@@ -2862,6 +2938,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('relinquish a certificate', message.originator);
       const result = await w.relinquishCertificate(message.params, message.originator);
       sendResponse({
         type: CWIEventName.RELINQUISH_CERTIFICATE,
@@ -2960,6 +3037,9 @@ if (isInServiceWorker) {
       pendingCounterpartyPermissionRequests.clear();
 
       denyAllOneSatPrompts();
+
+      for (const pending of pendingUsbChecks.values()) pending.reject(new Error(USB_KEY_ABSENT_MESSAGE));
+      pendingUsbChecks.clear();
 
       // Reject any CWI handlers waiting for wallet unlock
       for (const waiter of pendingWalletWaiters.splice(0)) {

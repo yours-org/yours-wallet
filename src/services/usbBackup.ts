@@ -87,8 +87,8 @@ const dec = new TextDecoder();
 // --- On-drive formats ---
 
 /** Bump whenever `deriveBackupKey`, the AAD scheme, or the file layout changes. Older backups are rebuilt, not read. */
-export const USB_BACKUP_FORMAT_VERSION = 3;
-const MANIFEST_VERSION = 2;
+export const USB_BACKUP_FORMAT_VERSION = 1;
+const MANIFEST_VERSION = 1;
 
 /** Plaintext bootstrap. Carries nothing the drive's own key file does not already imply. */
 interface RestoreJson {

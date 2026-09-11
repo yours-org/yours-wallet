@@ -15,7 +15,7 @@ import {
   probeSticks,
   requestNextStickPermission,
 } from '../services/UsbKey.service';
-import { resetUsbPresence } from '../services/usbPresence';
+import { markUsbSeen, resetUsbPresence } from '../services/usbPresence';
 import { decodeRecoveryCode, verifyMasterCheck } from '../utils/usbCrypto';
 import type { UsbUnlockMaterial } from '../services/passKey';
 
@@ -168,6 +168,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           return;
         }
         material = { master: latest.master };
+        await markUsbSeen();
       }
     }
 
