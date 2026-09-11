@@ -5,7 +5,14 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import type { WalletOutput } from '@bsv/sdk';
-import { cancelOrdinalListing, cancelOpnsListing, listOrdinals, listOpns, type OneSatContext } from '@1sat/actions';
+import {
+  cancelOrdinalListing,
+  cancelOpnsListing,
+  cancelTokenListing,
+  listOrdinals,
+  listOpns,
+  type OneSatContext,
+} from '@1sat/actions';
 import { cancelOwnedOrdLockListings, ORDLOCK_CANCEL_INCOMPLETE_MESSAGE } from '../src/utils/cancelOrdLockListings';
 
 import {
@@ -38,6 +45,18 @@ const listing = (index: number): WalletOutput => ({
   satoshis: 1,
   spendable: true,
   tags: ['ordlock', `id:ordinal-${index}`],
+});
+const tokenListing = (index: number): WalletOutput => ({
+  outpoint: `${index.toString(16).padStart(64, '0')}.0`,
+  satoshis: 1,
+  spendable: true,
+  tags: [
+    'ordlock',
+    `id:token-${index}`,
+    'type:application/bsv-20',
+    `bsv21:${'ab'.repeat(32)}_0`,
+    'amt:1111',
+  ],
 });
 const success = { txid: 'offline-cancellation' };
 afterEach(() => mock.restoreAll());
@@ -113,6 +132,22 @@ test('manual selection cancels more than 25, preserves failures, and retries onl
   const retried = await cancelOwnedOrdLockListings(context, { outputs: remaining });
   assert.deepEqual(calls, ['ordinal-3', 'ordinal-7']);
   assert.equal(retried.cancelled, 2);
+});
+
+test('token listings use cancelTokenListing, not ordinal cancel', async () => {
+  mock.method(listOrdinals, 'execute', async () => ({
+    outputs: [tokenListing(1), listing(2)],
+    totalOutputs: 2,
+  }));
+  const ordinal = mock.method(cancelOrdinalListing, 'execute', async () => success);
+  const token = mock.method(cancelTokenListing, 'execute', async () => ({
+    txid: 'token-cancellation',
+  }));
+  const result = await cancelOwnedOrdLockListings(context);
+  assert.equal(ordinal.mock.callCount(), 1);
+  assert.equal(token.mock.callCount(), 1);
+  assert.equal(result.cancelled, 2);
+  assert.equal(result.errors.length, 0);
 });
 
 test('discovery failure cancels nothing and a later invocation can retry', async () => {

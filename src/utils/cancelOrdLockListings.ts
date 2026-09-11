@@ -1,6 +1,13 @@
 /** Owner delisting for the OrdLock deprecation, shared by ordinal and sweep views. */
 import type { WalletOutput } from '@bsv/sdk';
-import { cancelOrdinalListing, cancelOpnsListing, listOrdinals, listOpns, type OneSatContext } from '@1sat/actions';
+import {
+  cancelOrdinalListing,
+  cancelOpnsListing,
+  cancelTokenListing,
+  listOrdinals,
+  listOpns,
+  type OneSatContext,
+} from '@1sat/actions';
 import { readAssetIdTag, TOKEN_CONTENT_TYPE } from '@1sat/types';
 import { createAccountBoundContext } from './accountBoundWallet';
 
@@ -78,7 +85,10 @@ export async function cancelOwnedOrdLockListings(
     };
     const outputs = new Map<
       string,
-      { output: WalletOutput; cancel: typeof cancelOrdinalListing | typeof cancelOpnsListing }
+      {
+        output: WalletOutput
+        cancel: typeof cancelOrdinalListing | typeof cancelOpnsListing | typeof cancelTokenListing
+      }
     >();
     if (options?.outputs) {
       const cancel = options.basket === 'opns' ? cancelOpnsListing : cancelOrdinalListing;
@@ -147,18 +157,14 @@ export async function cancelOwnedOrdLockListings(
         continue;
       }
 
-      if (isTokenListing(output)) {
-        result.skipped += 1;
-        result.errors.push(
-          `${output.outpoint}: token listing cannot be cancelled as an ordinal`,
-        );
-        progress();
-        continue;
-      }
+      const action =
+        cancel === cancelOrdinalListing && isTokenListing(output)
+          ? cancelTokenListing
+          : cancel
 
       result.attempted += 1;
       try {
-        const cancellation = await cancel.execute(context, { id });
+        const cancellation = await action.execute(context, { id });
         if (cancellation.txid?.trim()) result.txids.push(cancellation.txid.trim());
         await assertCurrent();
         if (!cancellation.txid?.trim() || cancellation.error) {
