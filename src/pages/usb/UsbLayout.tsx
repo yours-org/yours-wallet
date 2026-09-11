@@ -126,6 +126,26 @@ export const Bullets = ({ items }: { items: ReactNode[] }) => (
   </ul>
 );
 
+/** Numbered overview of what a flow will ask for. Left-aligned, full width. */
+export const StepList = ({ items }: { items: ReactNode[] }) => {
+  const { theme } = useTheme();
+  return (
+    <ol className="m-0 p-0 list-none w-full mb-4 space-y-2">
+      {items.map((it, i) => (
+        <li key={i} className="flex items-center gap-3 text-sm" style={{ color: theme.color.global.contrast }}>
+          <span
+            className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold shrink-0"
+            style={{ backgroundColor: theme.color.global.row, color: MUTED }}
+          >
+            {i + 1}
+          </span>
+          {it}
+        </li>
+      ))}
+    </ol>
+  );
+};
+
 /** Small text-only action under the main buttons. */
 export const TextLink = ({ label, onClick, disabled }: { label: string; onClick: () => void; disabled?: boolean }) => (
   <button

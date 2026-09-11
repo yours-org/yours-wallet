@@ -8,7 +8,7 @@ import { deleteHandle, saveHandle } from '../../services/UsbKey.service';
 import type { UsbSecurity } from '../../services/types/chromeStorage.types';
 import { sendMessageAsync } from '../../utils/chromeHelpers';
 import { combinePassKey, computeMasterCheck, newMaster, wrapMaster } from '../../utils/usbCrypto';
-import { Bullets, Heading, Note, StepBody, Stepper, TextLink } from './UsbLayout';
+import { Heading, Note, StepBody, StepList, Stepper, TextLink } from './UsbLayout';
 import { ChooseDriveStep, DoneStep, LabelStep, PasswordStep, RecoveryCodeStep } from './steps';
 import { prepareDrive, type PreparedDrive, type RekeyResponse } from './usbHelpers';
 
@@ -37,7 +37,7 @@ const OverviewStep = ({ onContinue }: { onContinue: () => void }) => {
         title="Turn on USB unlock"
         subtitle="Two-factor unlock: your password plus a USB drive. Takes about a minute."
       />
-      <Bullets items={['Pick any USB drive', 'Save a recovery code', 'Confirm your password']} />
+      <StepList items={['Pick any USB drive', 'Save a recovery code', 'Confirm your password']} />
       {backedUp === false && (
         <Note tone="warn">
           <p className="m-0 mb-1 font-semibold">Back up first</p>
