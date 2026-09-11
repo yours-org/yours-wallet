@@ -1308,33 +1308,15 @@ export const Settings = () => {
                     USB unlock
                   </p>
                   <p className="text-[10px] mt-0.5" style={{ color: '#98A2B3' }}>
-                    Your password plus an ordinary USB drive
+                    Two-factor unlock: your password plus a USB drive
                   </p>
                 </div>
               </div>
               <p className="text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
-                Unlocking needs your password and a registered USB drive. A locked wallet stays locked even if someone
-                knows your password.
+                Any USB drive works. Unlocking needs it plugged in, so your password alone is never enough. You get a
+                recovery code in case the drive is lost.
               </p>
             </motion.div>
-
-            <Section title="What it does not do">
-              <div className="px-4 py-3 bg-[#17191E] space-y-2">
-                {[
-                  'Keys are in memory while unlocked, as today.',
-                  'A copied key file plus your password still opens it.',
-                  'No drive and no recovery code means restoring from backup.',
-                  'Not a hardware wallet. Nothing is signed on the drive.',
-                ].map((line) => (
-                  <div key={line} className="flex items-start gap-2">
-                    <Minus size={12} className="mt-0.5 shrink-0" style={{ color: '#98A2B3' }} />
-                    <p className="text-xs leading-snug" style={{ color: '#98A2B3' }}>
-                      {line}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </Section>
 
             <motion.div
               variants={rowVariant}
@@ -1343,7 +1325,7 @@ export const Settings = () => {
             >
               <AlertTriangle size={14} className="mt-0.5 shrink-0" style={{ color: '#FBBF24' }} />
               <p className="text-xs leading-snug" style={{ color: '#FBBF24' }}>
-                Make a fresh master backup first. It is your only way back without a drive or the recovery code.
+                Make a master backup first.
               </p>
             </motion.div>
 

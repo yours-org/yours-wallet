@@ -33,16 +33,11 @@ const OverviewStep = ({ onContinue }: { onContinue: () => void }) => {
 
   return (
     <StepBody stepKey="overview">
-      <Heading title="Turn on USB unlock" subtitle="Unlock with your password and a USB drive." />
-      <Note>
-        <p className="m-0 mb-1 font-semibold">Protects against</p>
-        <Bullets items={['Someone with your password on your computer.', 'Copies of your wallet data.']} />
-      </Note>
-      <Note tone="warn">
-        <p className="m-0 mb-1 font-semibold">Does not protect against</p>
-        <Bullets items={['Malware while the wallet is unlocked.', 'Someone with the drive and your password.']} />
-        <p className="m-0 mt-2">No USB key and no recovery code means restoring from backup.</p>
-      </Note>
+      <Heading
+        title="Turn on USB unlock"
+        subtitle="Two-factor unlock: your password plus a USB drive. Takes about a minute."
+      />
+      <Bullets items={['Pick any USB drive', 'Save a recovery code', 'Confirm your password']} />
       {backedUp === false && (
         <Note tone="warn">
           <p className="m-0 mb-1 font-semibold">Back up first</p>
