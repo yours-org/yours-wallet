@@ -1,11 +1,10 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PrivateKey } from '@bsv/sdk';
-import { prepareSweepInputs, sweepBsv, sweepOrdinals, sweepBsv21 } from '@1sat/actions';
 import { cancelOwnedOrdLockListings } from '../utils/cancelOrdLockListings';
 import { createAccountBoundContext } from '../utils/accountBoundWallet';
-import { scanAddress, type ScannedAssets, type EnrichedOrdinal, type TokenBalance } from '../sweep/scanner';
-import type { IndexedOutput } from '@1sat/types';
+import { scanAddress, scanAddresses, type ScannedAssets } from '../sweep/scanner';
+import { importedKeyMap, sweepImportedAssets } from '../sweep/imported';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Warning } from '../components/Reusable';
@@ -60,6 +59,7 @@ const staggerContainer = {
 
 export const SweepMigration = () => {
   const operationControllerRef = useRef(new AbortController());
+  const completedImportedOutputsRef = useRef(new Set<string>());
   useEffect(() => {
     const controller = new AbortController();
     operationControllerRef.current = controller;
@@ -78,6 +78,7 @@ export const SweepMigration = () => {
   const [legacyKeys, setLegacyKeys] = useState<Keys | null>(null);
 
   const [scanStatuses, setScanStatuses] = useState<AddressScanStatus[]>([]);
+  const [scanFailed, setScanFailed] = useState(false);
   const [assets, setAssets] = useState<ScannedAssets>({
     funding: [],
     ordinals: [],
@@ -85,6 +86,8 @@ export const SweepMigration = () => {
     bsv21Tokens: [],
     bsv20Tokens: [],
     locked: [],
+    run: [],
+    listings: [],
     totalBsv: 0,
   });
 
@@ -142,6 +145,10 @@ export const SweepMigration = () => {
 
   const runScan = useCallback(async () => {
     if (!legacyKeys || !apiContext.services) return;
+    const signal = operationControllerRef.current.signal;
+    if (signal.aborted) return;
+    setScanFailed(false);
+    let failed = false;
 
     const addresses: { address: string; label: string; wif: string }[] = [];
     if (legacyKeys.walletWif) {
@@ -169,17 +176,27 @@ export const SweepMigration = () => {
     const results: ScannedAssets[] = [];
     const promises = addresses.map(async (addr, i) => {
       try {
+        signal.throwIfAborted();
         const result = await scanAddress(apiContext.services!, addr.address, (p) => {
+          if (signal.aborted) return;
           setScanStatuses((prev) => prev.map((s, j) => (j === i ? { ...s, status: 'scanning', error: p.detail } : s)));
         });
+        if (signal.aborted) return;
         results[i] = result;
         setScanStatuses((prev) => prev.map((s, j) => (j === i ? { ...s, status: 'done' } : s)));
       } catch (err) {
+        if (signal.aborted) return;
+        failed = true;
         setScanStatuses((prev) => prev.map((s, j) => (j === i ? { ...s, status: 'error', error: String(err) } : s)));
       }
     });
 
     await Promise.all(promises);
+    if (signal.aborted) return;
+    if (failed) {
+      setScanFailed(true);
+      return;
+    }
 
     // Merge results from all addresses
     const merged: ScannedAssets = {
@@ -189,6 +206,8 @@ export const SweepMigration = () => {
       bsv21Tokens: [],
       bsv20Tokens: [],
       locked: [],
+      run: [],
+      listings: [],
       totalBsv: 0,
     };
     for (const r of results) {
@@ -199,6 +218,8 @@ export const SweepMigration = () => {
       merged.bsv21Tokens.push(...r.bsv21Tokens);
       merged.bsv20Tokens.push(...r.bsv20Tokens);
       merged.locked.push(...r.locked);
+      merged.run.push(...r.run);
+      merged.listings.push(...r.listings);
       merged.totalBsv += r.totalBsv;
     }
 
@@ -229,7 +250,10 @@ export const SweepMigration = () => {
     });
 
   const hasSelection =
-    selection.sweepBsv || selection.selectedOrdinals.size > 0 || selection.selectedBsv21TokenIds.size > 0;
+    assets.listings.length > 0 ||
+    selection.sweepBsv ||
+    selection.selectedOrdinals.size > 0 ||
+    selection.selectedBsv21TokenIds.size > 0;
 
   const hasAnyAssets =
     assets.funding.length > 0 ||
@@ -237,17 +261,15 @@ export const SweepMigration = () => {
     assets.opnsNames.length > 0 ||
     assets.bsv21Tokens.length > 0 ||
     assets.bsv20Tokens.length > 0 ||
-    assets.locked.length > 0;
-
-  // Convert IndexedOutput to the shape prepareSweepInputs expects.
-  // `score` is required by IndexedOutput but unused for sweep preparation, so 0 is fine.
-  const toSweepInputs = (outputs: IndexedOutput[]): IndexedOutput[] =>
-    outputs.map((o) => ({ outpoint: o.outpoint, satoshis: o.satoshis ?? 0, score: 0 }));
+    assets.locked.length > 0 ||
+    assets.run.length > 0 ||
+    assets.listings.length > 0;
 
   const executeSweeps = async () => {
     if (!legacyKeys) return;
     setStep('sweeping');
-    const results: SweepTxResult[] = [];
+    const results: SweepTxResult[] = sweepResults.filter((result) => result.txid?.trim());
+    setSweepResults(results);
     const signal = operationControllerRef.current.signal;
     let sweepContext: typeof apiContext;
 
@@ -262,7 +284,9 @@ export const SweepMigration = () => {
           setCurrentSweepOp(`Cancelling listings: ${attempted + skipped} of ${total}`),
       });
     } catch (err) {
+      if (signal.aborted) return;
       setSweepResults([
+        ...results,
         {
           type: 'ordinals',
           label: 'Listing cancellation',
@@ -273,70 +297,31 @@ export const SweepMigration = () => {
       return;
     }
 
-    if (selection.sweepBsv && assets.funding.length > 0) {
-      setCurrentSweepOp('Sweeping BSV...');
-      try {
-        signal.throwIfAborted();
-        await sweepContext.wallet.getPublicKey({ identityKey: true });
-        const inputs = await prepareSweepInputs(sweepContext, toSweepInputs(assets.funding));
-        const payKey = PrivateKey.fromWif(legacyKeys.walletWif);
-        const resp = await sweepBsv.execute(sweepContext, {
-          inputs,
-          keys: inputs.map(() => payKey),
-          amount: selection.bsvAmount,
-        });
-        results.push({
-          type: 'bsv',
-          label: `BSV (${assets.totalBsv.toLocaleString()} sats)`,
-          txid: resp.txid,
-          error: resp.error,
-        });
-      } catch (err) {
-        results.push({ type: 'bsv', label: 'BSV', error: String(err) });
-      }
-    }
-
-    if (signal.aborted) return;
-    if (selection.selectedOrdinals.size > 0) {
-      setCurrentSweepOp('Sweeping Ordinals...');
-      try {
-        const selectedOutputs = assets.ordinals.filter((o) => selection.selectedOrdinals.has(o.outpoint));
-        signal.throwIfAborted();
-        await sweepContext.wallet.getPublicKey({ identityKey: true });
-        const inputs = await prepareSweepInputs(sweepContext, toSweepInputs(selectedOutputs));
-        const ordKey = PrivateKey.fromWif(legacyKeys.ordWif);
-        const resp = await sweepOrdinals.execute(sweepContext, { inputs, keys: inputs.map(() => ordKey) });
-        results.push({
-          type: 'ordinals',
-          label: `Ordinals (${selection.selectedOrdinals.size})`,
-          txid: resp.txid,
-          error: resp.error,
-        });
-      } catch (err) {
-        results.push({ type: 'ordinals', label: 'Ordinals', error: String(err) });
-      }
-    }
-
-    for (const token of assets.bsv21Tokens) {
+    try {
+      signal.throwIfAborted();
+      const keys = importedKeyMap(legacyKeys);
+      if (!sweepContext.services) throw new Error('Services required for imported asset scanning.');
+      setCurrentSweepOp('Refreshing imported owner listings...');
+      const currentAssets = await scanAddresses(sweepContext.services, [...keys.keys()]);
+      signal.throwIfAborted();
+      await sweepImportedAssets(sweepContext, currentAssets, keys, selection, {
+        signal,
+        completed: completedImportedOutputsRef.current,
+        onProgress: setCurrentSweepOp,
+        onResult: (result) => {
+          results.push(result);
+          setSweepResults([...results]);
+        },
+      });
+    } catch (error) {
       if (signal.aborted) return;
-      if (!selection.selectedBsv21TokenIds.has(token.tokenId)) continue;
-      const label = token.symbol || token.tokenId.slice(0, 8);
-      setCurrentSweepOp(`Sweeping ${label}...`);
-      try {
-        signal.throwIfAborted();
-        await sweepContext.wallet.getPublicKey({ identityKey: true });
-        const inputs = await prepareSweepInputs(sweepContext, toSweepInputs(token.outputs));
-        const tokenKey = PrivateKey.fromWif(legacyKeys.ordWif);
-        const resp = await sweepBsv21.execute(sweepContext, {
-          inputs: inputs.map((inp) => ({ ...inp, tokenId: token.tokenId, amount: token.totalAmount.toString() })),
-          keys: inputs.map(() => tokenKey),
-        });
-        results.push({ type: 'bsv21', label: `${label} (${token.totalAmount})`, txid: resp.txid, error: resp.error });
-      } catch (err) {
-        results.push({ type: 'bsv21', label, error: String(err) });
-      }
+      results.push({
+        type: 'ordinals',
+        label: 'Imported asset sweep',
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
-
+    if (signal.aborted) return;
     setSweepResults(results);
     setStep('results');
   };
@@ -358,7 +343,8 @@ export const SweepMigration = () => {
   };
 
   const handleDone = async () => {
-    if (!sweepResults.some((result) => result.error && !result.txid)) await persistSweepFlag('sweepCompleted');
+    if (sweepResults.length > 0 && sweepResults.every((result) => result.txid?.trim() && !result.error))
+      await persistSweepFlag('sweepCompleted');
     navigate('/bsv-wallet');
   };
 
@@ -640,7 +626,7 @@ export const SweepMigration = () => {
               <PageLoader message="Preparing scan..." theme={theme} />
             </Show>
 
-            <Show when={scanStatuses.length > 0 && !allDone}>
+            <Show when={scanStatuses.length > 0 && !allDone && !scanFailed}>
               <div className="w-full rounded-2xl p-4 flex items-center gap-3" style={{ background: rowBg }}>
                 <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}>
                   <Loader2 size={18} style={{ color: accent }} />
@@ -659,6 +645,10 @@ export const SweepMigration = () => {
                   />
                 </div>
               </div>
+            </Show>
+            <Show when={scanFailed}>
+              <Warning theme={theme}>Scanning did not complete. Retry all addresses before sweeping.</Warning>
+              <Button theme={theme} type="primary" label="Retry Scan" onClick={runScan} />
             </Show>
           </motion.div>
         </div>
@@ -916,6 +906,27 @@ export const SweepMigration = () => {
                   </div>
                 </Show>
 
+                <Show when={assets.listings.length > 0}>
+                  <div className="rounded-2xl p-4" style={{ background: rowBg, border: `1px solid ${contrast}10` }}>
+                    <p className="text-sm font-semibold mb-2" style={{ color: contrast }}>
+                      OrdLock listings ({assets.listings.length})
+                    </p>
+                    <p className="text-xs leading-relaxed" style={{ color: gray }}>
+                      These deprecated listings will be cancelled into your wallet before selected assets are swept.
+                    </p>
+                  </div>
+                </Show>
+                <Show when={assets.run.length > 0}>
+                  <div className="rounded-2xl p-4" style={{ background: rowBg }}>
+                    <p className="text-sm font-semibold" style={{ color: contrast }}>
+                      Other contract outputs ({assets.run.length})
+                    </p>
+                    <p className="text-xs" style={{ color: gray }}>
+                      These outputs are preserved and excluded from this sweep.
+                    </p>
+                  </div>
+                </Show>
+
                 {/* Non-sweepable: BSV-20 */}
                 <Show when={assets.bsv20Tokens.length > 0}>
                   <div
@@ -1044,7 +1055,7 @@ export const SweepMigration = () => {
             {/* Completed so far */}
             <motion.div variants={staggerContainer} className="w-full flex flex-col gap-2">
               {sweepResults.map((r, i) => {
-                const ok = !!r.txid;
+                const ok = !!r.txid?.trim() && !r.error;
                 return (
                   <motion.div
                     key={i}
@@ -1080,9 +1091,9 @@ export const SweepMigration = () => {
 
   // Step: Results
   if (step === 'results') {
-    const successes = sweepResults.filter((r) => r.txid);
-    const failures = sweepResults.filter((r) => r.error && !r.txid);
-    const allGood = failures.length === 0;
+    const successes = sweepResults.filter((r) => r.txid?.trim() && !r.error);
+    const failures = sweepResults.filter((r) => r.error || !r.txid?.trim());
+    const allGood = failures.length === 0 && successes.length > 0;
 
     return (
       <div className="min-h-screen flex flex-col" style={{ background: '#010101' }}>
@@ -1132,7 +1143,7 @@ export const SweepMigration = () => {
               style={{ maxHeight: '18rem' }}
             >
               {sweepResults.map((r, i) => {
-                const ok = !!r.txid;
+                const ok = !!r.txid?.trim() && !r.error;
                 return (
                   <motion.div
                     key={i}
@@ -1169,7 +1180,7 @@ export const SweepMigration = () => {
                           <ExternalLink size={10} />
                         </a>
                       )}
-                      {r.error && !r.txid && (
+                      {r.error && (
                         <p className="text-xs mt-0.5" style={{ color: errorColor }}>
                           {r.error}
                         </p>
@@ -1192,7 +1203,7 @@ export const SweepMigration = () => {
             </motion.div>
 
             <motion.div variants={fadeUp} className="w-full">
-              {failures.length > 0 && successes.length === 0 && (
+              {failures.length > 0 && (
                 <Button theme={theme} type="primary" label="Retry" onClick={() => setStep('review')} />
               )}
               <Button theme={theme} type="primary" label="Done" onClick={handleDone} />

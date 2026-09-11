@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import type { WalletOutput } from '@bsv/sdk';
-import { cancelOrdinalListing, listOrdinals, type OneSatContext } from '@1sat/actions';
+import { cancelOrdinalListing, cancelOpnsListing, listOrdinals, listOpns, type OneSatContext } from '@1sat/actions';
 import { cancelOwnedOrdLockListings, ORDLOCK_CANCEL_INCOMPLETE_MESSAGE } from '../src/utils/cancelOrdLockListings';
 
 import {
@@ -18,6 +18,7 @@ let currentIdentityKey = 'account-a';
 const context = { wallet: { getPublicKey: async () => ({ publicKey: currentIdentityKey }) } } as OneSatContext;
 const operationControllerRef = { current: new AbortController() };
 beforeEach(() => {
+  mock.method(listOpns, 'execute', async () => ({ outputs: [], totalOutputs: 0 }));
   currentIdentityKey = 'account-a';
   operationControllerRef.current = new AbortController();
   globalThis.chrome = {
@@ -141,6 +142,7 @@ test('a completed invocation never hides listings from a different wallet', asyn
 test('repeated pages and premature end cannot be mistaken for complete discovery', async () => {
   for (const repeated of [true, false]) {
     mock.restoreAll();
+    mock.method(listOpns, 'execute', async () => ({ outputs: [], totalOutputs: 0 }));
     mock.method(listOrdinals, 'execute', async (_ctx, { offset }) => ({
       outputs: offset === 0 || repeated ? [listing(1)] : [],
       totalOutputs: 3,
@@ -156,6 +158,7 @@ test('repeated pages and premature end cannot be mistaken for complete discovery
 test('missing tracking ids and cancellation failures block a funding continuation', async () => {
   for (const missingId of [true, false]) {
     mock.restoreAll();
+    mock.method(listOpns, 'execute', async () => ({ outputs: [], totalOutputs: 0 }));
     const output = missingId ? { ...listing(1), tags: ['ordlock'] } : listing(1);
     mock.method(cancelOrdinalListing, 'execute', async () => ({ error: 'offline cancellation failure' }));
     const spendFunds = mock.fn();
@@ -248,6 +251,7 @@ test('real migration handler stops every sweep and reports delisting failure', a
   let results: { error?: string }[] = [];
   const execute = handler('pages/SweepMigration.tsx', 'executeSweeps', {
     legacyKeys: {},
+    sweepResults: [],
     apiContext: context,
     createAccountBoundContext,
     operationControllerRef,
@@ -438,6 +442,7 @@ test('empty ordinal pages clear the scroll cursor instead of triggering another 
 test('account change or disposal during cancellation stops the pass without success or funding', async () => {
   for (const stop of ['account', 'dispose']) {
     mock.restoreAll();
+    mock.method(listOpns, 'execute', async () => ({ outputs: [], totalOutputs: 0 }));
     currentIdentityKey = 'account-a';
     const controller = new AbortController();
     mock.method(listOrdinals, 'execute', async () => ({ outputs: [listing(1), listing(2)], totalOutputs: 2 }));
@@ -598,5 +603,171 @@ test('real background listener rejects account-bound calls from content-script w
     );
     assert.equal(response.success, false);
     assert.equal(response.error, 'Unauthorized');
+  }
+});
+
+test('real migration preview refuses partial address scans and allows an explicit complete retry', async () => {
+  const emptyAssets = {
+    funding: [],
+    ordinals: [],
+    opnsNames: [],
+    bsv21Tokens: [],
+    bsv20Tokens: [],
+    locked: [],
+    run: [],
+    listings: [],
+    totalBsv: 0,
+  };
+  let failIdentity = true;
+  const scanned: string[] = [];
+  const steps: string[] = [];
+  const failures: boolean[] = [];
+  const setAssets = mock.fn();
+  const scan = handler('pages/SweepMigration.tsx', 'runScan', {
+    legacyKeys: { walletWif: 'pay', ordWif: 'ord', identityWif: 'identity' },
+    apiContext: { services: {} },
+    operationControllerRef,
+    useCallback: (callback: unknown) => callback,
+    PrivateKey: { fromWif: (wif: string) => ({ toPublicKey: () => ({ toAddress: () => wif }) }) },
+    scanAddress: async (_services: unknown, owner: string) => {
+      scanned.push(owner);
+      if (owner === 'identity' && failIdentity) throw new Error('incomplete scan');
+      return emptyAssets;
+    },
+    setScanStatuses() {},
+    setScanFailed: (failed: boolean) => failures.push(failed),
+    setAssets,
+    setStep: (step: string) => steps.push(step),
+  });
+  await scan();
+  assert.equal(setAssets.mock.callCount(), 0);
+  assert.deepEqual(steps, []);
+  assert.deepEqual(failures, [false, true]);
+  failIdentity = false;
+  await scan();
+  assert.equal(setAssets.mock.callCount(), 1);
+  assert.deepEqual(steps, ['review']);
+  assert.deepEqual(scanned, ['pay', 'ord', 'identity', 'pay', 'ord', 'identity']);
+});
+
+test('real migration execution refreshes imported inventory and retains earlier transaction receipts', async () => {
+  mock.method(listOrdinals, 'execute', async () => ({ outputs: [], totalOutputs: 0 }));
+  const fresh = { listings: [{ outpoint: 'fresh-listing' }] };
+  const completed = new Set(['previous-output']);
+  const keys = new Map([
+    ['pay', {}],
+    ['ord', {}],
+    ['identity', {}],
+  ]);
+  let results: Array<{ txid?: string }> = [];
+  const operations: string[] = [];
+  const execute = handler('pages/SweepMigration.tsx', 'executeSweeps', {
+    legacyKeys: {},
+    sweepResults: [{ type: 'ordinals', label: 'Earlier cancellation', txid: 'earlier-receipt' }],
+    apiContext: { ...context, services: {} },
+    operationControllerRef,
+    createAccountBoundContext,
+    cancelOwnedOrdLockListings,
+    importedKeyMap: () => keys,
+    scanAddresses: async (_services: unknown, owners: string[]) => {
+      assert.deepEqual([...owners], ['pay', 'ord', 'identity']);
+      operations.push('scan');
+      return fresh;
+    },
+    sweepImportedAssets: async (
+      _ctx: unknown,
+      assets: unknown,
+      receivedKeys: unknown,
+      _selection: unknown,
+      options: { completed: unknown; onResult: (result: unknown) => void },
+    ) => {
+      assert.equal(assets, fresh);
+      assert.equal(receivedKeys, keys);
+      assert.equal(options.completed, completed);
+      operations.push('sweep');
+      options.onResult({ type: 'ordinals', label: 'Imported cancellation', txid: 'new-receipt' });
+    },
+    completedImportedOutputsRef: { current: completed },
+    selection: {},
+    setStep() {},
+    setCurrentSweepOp() {},
+    setSweepResults: (value: typeof results) => {
+      results = value;
+    },
+  });
+  await execute();
+  assert.deepEqual(operations, ['scan', 'sweep']);
+  assert.deepEqual(
+    Array.from(results, (result) => result.txid),
+    ['earlier-receipt', 'new-receipt'],
+  );
+});
+
+test('OpNS-only and mixed basket listings use their native cancellation actions', async () => {
+  for (const mixed of [false, true]) {
+    mock.restoreAll();
+    const discovered: string[] = [];
+    mock.method(listOrdinals, 'execute', async () => {
+      discovered.push('1sat');
+      return { outputs: mixed ? [listing(1)] : [], totalOutputs: mixed ? 1 : 0 };
+    });
+    mock.method(listOpns, 'execute', async () => {
+      discovered.push('opns');
+      return { outputs: [listing(2)], totalOutputs: 1 };
+    });
+    const ordinal = mock.method(cancelOrdinalListing, 'execute', async () => {
+      assert.deepEqual(discovered, ['1sat', 'opns']);
+      return { txid: 'ordinal-receipt' };
+    });
+    const opns = mock.method(cancelOpnsListing, 'execute', async (_ctx, { id }) => {
+      assert.deepEqual(discovered, ['1sat', 'opns']);
+      assert.equal(id, 'ordinal-2');
+      return { txid: 'opns-receipt' };
+    });
+    const result = await cancelOwnedOrdLockListings(context, { requireComplete: true });
+    assert.equal(result.cancelled, mixed ? 2 : 1);
+    assert.equal(ordinal.mock.callCount(), mixed ? 1 : 0);
+    assert.equal(opns.mock.callCount(), 1);
+    assert.deepEqual(result.txids, mixed ? ['ordinal-receipt', 'opns-receipt'] : ['opns-receipt']);
+  }
+});
+
+test('OpNS discovery failure blocks all cancellation and funding', async () => {
+  mock.method(listOrdinals, 'execute', async () => ({ outputs: [listing(1)], totalOutputs: 1 }));
+  mock.method(listOpns, 'execute', async () => {
+    throw new Error('retry OpNS discovery');
+  });
+  const cancel = mock.method(cancelOrdinalListing, 'execute', async () => success);
+  const funding = mock.fn();
+  await assert.rejects(cancelOwnedOrdLockListings(context, { requireComplete: true }).then(funding));
+  assert.equal(cancel.mock.callCount(), 0);
+  assert.equal(funding.mock.callCount(), 0);
+});
+
+test('final inventory page requests remaining known count for native toolbox totals', async () => {
+  const outputs = Array.from({ length: 103 }, (_, i) => listing(i));
+  const limits: number[] = [];
+  mock.method(listOrdinals, 'execute', async (_ctx, { offset, limit }) => {
+    limits.push(limit);
+    const page = outputs.slice(offset, offset + limit);
+    return { outputs: page, totalOutputs: page.length < limit ? page.length : outputs.length };
+  });
+  mock.method(cancelOrdinalListing, 'execute', async () => success);
+  assert.equal((await cancelOwnedOrdLockListings(context, { requireComplete: true })).cancelled, 103);
+  assert.deepEqual(limits, [100, 3]);
+});
+
+test('blank native cancellation receipts in either basket block funding', async () => {
+  for (const basket of ['1sat', 'opns'] as const) {
+    const action = basket === 'opns' ? cancelOpnsListing : cancelOrdinalListing;
+    mock.method(action, 'execute', async () => ({ txid: '   ' }));
+    const funding = mock.fn();
+    await assert.rejects(
+      cancelOwnedOrdLockListings(context, { outputs: [listing(1)], basket, requireComplete: true }).then(funding),
+    );
+    assert.equal(funding.mock.callCount(), 0);
+    const result = await cancelOwnedOrdLockListings(context, { outputs: [listing(1)], basket });
+    assert.equal(result.cancelled, 0);
+    assert.deepEqual(result.txids, []);
   }
 });

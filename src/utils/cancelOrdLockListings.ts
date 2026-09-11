@@ -1,6 +1,6 @@
 /** Owner delisting for the OrdLock deprecation, shared by ordinal and sweep views. */
 import type { WalletOutput } from '@bsv/sdk';
-import { cancelOrdinalListing, listOrdinals, type OneSatContext } from '@1sat/actions';
+import { cancelOrdinalListing, cancelOpnsListing, listOrdinals, listOpns, type OneSatContext } from '@1sat/actions';
 import { readAssetIdTag } from '@1sat/types';
 import { createAccountBoundContext } from './accountBoundWallet';
 
@@ -19,6 +19,7 @@ export type CancelOrdLockProgress = {
 
 export type CancelOrdLockResult = CancelOrdLockProgress & {
   cancelledOutpoints: string[];
+  txids: string[];
   errors: string[];
 };
 
@@ -36,6 +37,8 @@ export async function cancelOwnedOrdLockListings(
   options?: {
     /** A complete manual selection; omit to discover all wallet-owned listings. */
     outputs?: WalletOutput[];
+    /** Manual selections default to the Ordinals view's basket. */
+    basket?: '1sat' | 'opns';
     /** Abort the pass when its view closes or its account changes. */
     signal?: AbortSignal;
     onProgress?: (progress: CancelOrdLockProgress) => void;
@@ -49,6 +52,7 @@ export async function cancelOwnedOrdLockListings(
     cancelled: 0,
     skipped: 0,
     cancelledOutpoints: [],
+    txids: [],
     errors: [],
   };
   const progress = () => {
@@ -63,35 +67,68 @@ export async function cancelOwnedOrdLockListings(
       await context.wallet.getPublicKey({ identityKey: true });
       options?.signal?.throwIfAborted();
     };
-    const outputs = new Map<string, WalletOutput>();
+    const outputs = new Map<
+      string,
+      { output: WalletOutput; cancel: typeof cancelOrdinalListing | typeof cancelOpnsListing }
+    >();
     if (options?.outputs) {
-      for (const output of options.outputs) outputs.set(output.outpoint, output);
+      const cancel = options.basket === 'opns' ? cancelOpnsListing : cancelOrdinalListing;
+      for (const output of options.outputs) outputs.set(output.outpoint, { output, cancel });
     } else {
-      let offset = 0;
-      while (true) {
-        await assertCurrent();
-        const page = await listOrdinals.execute(context, { tags: ['ordlock'], limit: 100, offset });
-        if (page.outputs.length === 0) {
-          if (page.totalOutputs !== undefined && offset < page.totalOutputs) {
-            throw new Error('Listing discovery ended before all outputs were returned.');
+      // Keep native basket queries and per-output actions so callers retain live
+      // progress and confirmed outpoints for manual retries.
+      for (const { list, cancel } of [
+        { list: listOrdinals, cancel: cancelOrdinalListing },
+        { list: listOpns, cancel: cancelOpnsListing },
+      ]) {
+        const basketOutputs = new Map<string, WalletOutput>();
+        let offset = 0;
+        let total: number | undefined;
+        while (true) {
+          await assertCurrent();
+          const page = await list.execute(context, {
+            tags: ['ordlock'],
+            limit: total === undefined ? 100 : Math.min(100, total - offset),
+            offset,
+          });
+          await assertCurrent();
+          if (page.totalOutputs !== undefined) {
+            if (
+              !Number.isSafeInteger(page.totalOutputs) ||
+              page.totalOutputs < 0 ||
+              offset + page.outputs.length > page.totalOutputs
+            )
+              throw new Error('Listing discovery returned an invalid total.');
+            if (total !== undefined && total !== page.totalOutputs)
+              throw new Error('Listing inventory changed. Retry delisting.');
+            total = page.totalOutputs;
           }
-          break;
+          if (page.outputs.length === 0) {
+            if (total !== undefined && offset < total)
+              throw new Error('Listing discovery ended before all outputs were returned.');
+            break;
+          }
+          const previousSize = basketOutputs.size;
+          for (const output of page.outputs) basketOutputs.set(output.outpoint, output);
+          if (basketOutputs.size === previousSize)
+            throw new Error('Listing discovery did not advance. Retry delisting.');
+          offset += page.outputs.length;
+          if (total !== undefined && offset >= total) {
+            if (basketOutputs.size < total) throw new Error('Listing discovery returned an incomplete snapshot.');
+            break;
+          }
         }
-        const previousSize = outputs.size;
-        for (const output of page.outputs) outputs.set(output.outpoint, output);
-        if (outputs.size === previousSize) throw new Error('Listing discovery did not advance. Retry delisting.');
-        offset += page.outputs.length;
-        if (page.totalOutputs !== undefined && offset >= page.totalOutputs) {
-          if (outputs.size < page.totalOutputs) throw new Error('Listing discovery returned an incomplete snapshot.');
-          break;
+        for (const output of basketOutputs.values()) {
+          if (outputs.has(output.outpoint)) throw new Error('Listing appeared in multiple baskets. Retry delisting.');
+          outputs.set(output.outpoint, { output, cancel });
         }
       }
     }
 
-    const listings = [...outputs.values()].filter(isOrdLockListed);
+    const listings = [...outputs.values()].filter(({ output }) => isOrdLockListed(output));
     result.total = listings.length;
     progress();
-    for (const output of listings) {
+    for (const { output, cancel } of listings) {
       await assertCurrent();
       const id = readAssetIdTag(output.tags);
       if (!id) {
@@ -103,9 +140,10 @@ export async function cancelOwnedOrdLockListings(
 
       result.attempted += 1;
       try {
-        const cancellation = await cancelOrdinalListing.execute(context, { id });
+        const cancellation = await cancel.execute(context, { id });
+        if (cancellation.txid?.trim()) result.txids.push(cancellation.txid.trim());
         await assertCurrent();
-        if (!cancellation.txid || cancellation.error) {
+        if (!cancellation.txid?.trim() || cancellation.error) {
           result.errors.push(`${output.outpoint}: ${cancellation.error || 'cancel-failed'}`);
         } else {
           result.cancelled += 1;
