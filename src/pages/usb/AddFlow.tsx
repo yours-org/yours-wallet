@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useServiceContext } from '../../hooks/useServiceContext';
-import { saveHandle } from '../../services/UsbKey.service';
+import { deleteHandle, saveHandle } from '../../services/UsbKey.service';
 import type { UsbSecurity, UsbStickEntry } from '../../services/types/chromeStorage.types';
 import { wrapMaster } from '../../utils/usbCrypto';
 import { Stepper } from './UsbLayout';
@@ -17,6 +17,7 @@ export const AddFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
   const [master, setMaster] = useState<string | null>(null);
   const [drive, setDrive] = useState<PreparedDrive | null>(null);
   const [label, setLabel] = useState('');
+  const [replaceId, setReplaceId] = useState<string | undefined>(undefined);
 
   const onPicked = async (handle: FileSystemDirectoryHandle) => {
     const prepared = await prepareDrive(handle, usbSecurity);
@@ -34,8 +35,11 @@ export const AddFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
     const entry: UsbStickEntry = { id: drive.id, label, wrappedMaster, addedAt: new Date().toISOString() };
     await chromeStorageService.updateUsbSecurity((current) => {
       if (current.sticks.some((s) => s.id === entry.id)) throw new Error('This USB key is already registered');
-      return { ...current, sticks: [...current.sticks, entry] };
+      // Replacing: the old entry's drive secret is gone, so drop it in the same write.
+      const kept = replaceId ? current.sticks.filter((s) => s.id !== replaceId) : current.sticks;
+      return { ...current, sticks: [...kept, entry] };
     });
+    if (replaceId) await deleteHandle(replaceId);
     await saveHandle(drive.id, drive.handle);
     await chromeStorageService.getAndSetStorage();
     setStep(4);
@@ -70,8 +74,12 @@ export const AddFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
             key="s2"
             defaultLabel={nextKeyLabel(usbSecurity)}
             note={drive?.existed ? 'This drive already has a Yours key file. It will be reused.' : undefined}
-            onNext={(l) => {
+            // A drive with a key file this wallet does not know is the classic
+            // "rotated elsewhere" case: offer to take over the stale entry.
+            replaceOptions={drive?.existed ? usbSecurity.sticks.map((s) => ({ id: s.id, label: s.label })) : undefined}
+            onNext={(l, r) => {
               setLabel(l);
+              setReplaceId(r);
               setStep(3);
             }}
           />

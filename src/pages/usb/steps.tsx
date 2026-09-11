@@ -73,17 +73,31 @@ export type LabelStepProps = {
   defaultLabel: string;
   note?: string;
   buttonLabel?: string;
+  /**
+   * Registered keys this drive may stand in for (their drive secret was
+   * replaced by a rotation elsewhere, so their entry no longer opens
+   * anything). Picking one removes that entry in the same change.
+   */
+  replaceOptions?: Array<{ id: string; label: string }>;
   /** Throw to show an inline error and stay. */
-  onNext: (label: string) => Promise<void> | void;
+  onNext: (label: string, replaceId?: string) => Promise<void> | void;
 };
 
-export const LabelStep = ({ defaultLabel, note, buttonLabel = 'Continue', onNext }: LabelStepProps) => {
+export const LabelStep = ({ defaultLabel, note, buttonLabel = 'Continue', replaceOptions, onNext }: LabelStepProps) => {
   const { theme } = useTheme();
   const [label, setLabel] = useState(defaultLabel);
+  const [replaceId, setReplaceId] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => setLabel(defaultLabel), [defaultLabel]);
+  // Replacing an entry keeps its name unless the user typed another.
+  const chooseReplace = (id: string) => {
+    setReplaceId(id);
+    const chosen = replaceOptions?.find((o) => o.id === id);
+    if (chosen && (label === defaultLabel || !label.trim())) setLabel(chosen.label);
+    if (!id) setLabel(defaultLabel);
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -92,7 +106,7 @@ export const LabelStep = ({ defaultLabel, note, buttonLabel = 'Continue', onNext
     setError(null);
     setBusy(true);
     try {
-      await onNext(trimmed);
+      await onNext(trimmed, replaceId || undefined);
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -105,6 +119,30 @@ export const LabelStep = ({ defaultLabel, note, buttonLabel = 'Continue', onNext
       <Heading title="Name this USB key" subtitle="So you can tell your keys apart." />
       {note && <Note>{note}</Note>}
       <form onSubmit={(e) => void submit(e)} className="flex flex-col items-center w-full">
+        {replaceOptions && replaceOptions.length > 0 && (
+          <label className="flex flex-col gap-1 w-[85%] mb-2 text-xs" style={{ color: MUTED, fontFamily: INTER }}>
+            Is this a key you already registered? A rotation on another wallet gives a drive a new secret, so its old
+            entry here no longer opens anything.
+            <select
+              value={replaceId}
+              onChange={(e) => chooseReplace(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border text-sm outline-none"
+              style={{
+                backgroundColor: theme.color.global.row,
+                borderColor: theme.color.global.gray + '40',
+                color: theme.color.global.contrast,
+                fontFamily: INTER,
+              }}
+            >
+              <option value="">No, add it as a new key</option>
+              {replaceOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  Yes, it replaces &ldquo;{o.label}&rdquo;
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <Input
           theme={theme}
           value={label}
