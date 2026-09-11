@@ -181,6 +181,65 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   return accountContext?.wallet ?? null;
 };
 
+// --- USB unlock keeper (offscreen document) ---------------------------------
+// Chrome keeps a File System Access grant only while an extension page is
+// open. The invisible offscreen page keeps one open for the whole browser
+// session whenever USB unlock is on, so the grant obtained once in the
+// standalone window survives and the popup can read the drive afterwards. It
+// also probes the drive on a timer and reports presence here.
+const USB_KEEPER_URL = 'offscreen.html';
+const USB_REMOVAL_GRACE_MS = 5000;
+let usbRemovalTimer: ReturnType<typeof setTimeout> | undefined;
+
+const hasUsbKeeper = async (): Promise<boolean> => {
+  try {
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT],
+    });
+    return contexts.length > 0;
+  } catch {
+    return false;
+  }
+};
+
+const ensureUsbKeeper = async (): Promise<void> => {
+  const enabled = !!chromeStorageService.getUsbSecurity()?.enabled;
+  const exists = await hasUsbKeeper();
+  try {
+    if (enabled && !exists) {
+      await chrome.offscreen.createDocument({
+        url: USB_KEEPER_URL,
+        reasons: [chrome.offscreen.Reason.LOCAL_STORAGE],
+        justification: 'Keeps access to the registered USB drive alive and checks that it is still inserted.',
+      });
+    } else if (!enabled && exists) {
+      await chrome.offscreen.closeDocument();
+    }
+  } catch (err) {
+    console.warn('[background] USB keeper:', err instanceof Error ? err.message : err);
+  }
+};
+
+const onUsbPresence = (state: 'present' | 'absent' | 'permission' | 'off') => {
+  if (state === 'absent' && accountContext) {
+    if (usbRemovalTimer) return;
+    usbRemovalTimer = setTimeout(async () => {
+      usbRemovalTimer = undefined;
+      if (!accountContext) return;
+      console.log('[background] USB key removed — locking');
+      dropWalletContext('usb-removed');
+      await chromeStorageService.clearPassKey();
+      await chromeStorageService.update({ isLocked: true });
+    }, USB_REMOVAL_GRACE_MS);
+    return;
+  }
+  // present, permission (unknown), or off: cancel any pending lock.
+  if (usbRemovalTimer) {
+    clearTimeout(usbRemovalTimer);
+    usbRemovalTimer = undefined;
+  }
+};
+
 // Start initialization — clean up stale popup windows then initialize wallet.
 // ensureWallet() awaits this so CWI messages don't launch popups during init.
 const startupInitPromise = chromeStorageService
@@ -219,6 +278,7 @@ const startupInitPromise = chromeStorageService
     // Only initialize wallet if it's within the active session window.
     // If locked (inactive or manual lock), keys stay encrypted until the user unlocks.
     await chromeStorageService.getAndSetStorage();
+    await ensureUsbKeeper();
     const { account, lastActiveTime } = chromeStorageService.getCurrentAccountObject();
     const passKey = await chromeStorageService.getPassKey();
     const isUnlocked =
@@ -711,6 +771,7 @@ if (isInServiceWorker) {
       // USB key security (popup / USB window internal)
       'USB_REKEY',
       'USB_PING',
+      'USB_PRESENCE',
       // Storage management (popup internal)
       'STORAGE_GET_INFO',
       'STORAGE_SYNC_BACKUPS',
@@ -898,9 +959,16 @@ if (isInServiceWorker) {
           // Keeps the worker from idling out while the USB window is open.
           sendResponse({ type: 'USB_PING', success: true });
           return true;
+        case 'USB_PRESENCE':
+          onUsbPresence(message.state);
+          sendResponse({ type: 'USB_PRESENCE', success: true });
+          return true;
         case 'USB_REKEY':
           usbRekey(chromeStorageService, message as UsbRekeyRequest)
-            .then((res) => sendResponse({ type: 'USB_REKEY', ...res }))
+            .then(async (res) => {
+              await ensureUsbKeeper();
+              sendResponse({ type: 'USB_REKEY', ...res });
+            })
             .catch((err: Error) => sendResponse({ type: 'USB_REKEY', success: false, error: err.message }));
           return true;
         case 'MASTER_RESTORE':

@@ -258,8 +258,13 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
 
   // In the action popup a USB unlock has to happen in the standalone window.
   // Recovery-code unlock needs no drive access, so it stays inline everywhere.
+  // Only when the drive can't be read for lack of a grant. 'absent' means the
+  // grant is fine and the drive is simply unplugged: keep polling right here.
   const handOffToWindow =
-    usbEnabled && !IN_STANDALONE_WINDOW && !recoveryMode && probe !== undefined && probe.status !== 'ok';
+    usbEnabled &&
+    !IN_STANDALONE_WINDOW &&
+    !recoveryMode &&
+    (probe?.status === 'permission' || probe?.status === 'no-handles');
 
   return (
     <div
