@@ -16,7 +16,7 @@
         "@1sat/utils": "0.0.34",
         "@1sat/wallet": "0.0.106",
         "@1sat/wallet-browser": "0.0.92",
-        "@bsv/sdk": "^2.2.0",
+        "@bsv/sdk": "2.6.0",
         "@bsv/wallet-toolbox-client": "2.4.4",
         "@fortawesome/react-fontawesome": "^0.2.2",
         "@hello-pangea/dnd": "^18.0.1",
@@ -182,7 +182,7 @@
 
     "@bsv/message-box-client": ["@bsv/message-box-client@2.4.2", "", { "dependencies": { "@bsv/authsocket-client": "^2.1.6" }, "peerDependencies": { "@bsv/sdk": "^2.4.1" } }, "sha512-DD9Yq4+oKTUzHe1Uu57Na/HO6T9hAaHrdM6crdOpa+VIRhYx7oGlrzQZuVC4eNsygB8D6zckSnTxG0xRSlIqOQ=="],
 
-    "@bsv/sdk": ["@bsv/sdk@2.4.2", "", {}, "sha512-UW1eC6YU+GdHBIQEBemuJo24K5S6rJBd6umNfkOpHR0ke5bgi58ymMrpX6Dm1cd4FYXsTDrbzyiKaH//LmJ7kw=="],
+    "@bsv/sdk": ["@bsv/sdk@2.6.0", "", {}, "sha512-sha4uZvrY1PPbbT2HrH03Bbb2ifsNDI768Rz9f2NnQzOE8O85HH1eyeQUmj2qy13yWF8zZh98XuWZTSx4uH0JA=="],
 
     "@bsv/wallet-toolbox-client": ["@bsv/wallet-toolbox-client@2.4.4", "", { "dependencies": { "hash-wasm": "^4.12.0", "idb": "^8.0.3" }, "peerDependencies": { "@bsv/sdk": "^2.1.8" } }, "sha512-B/S08jT98Uy3hlCn2J0o9fDeedbNrsBxbdTfqjNHSlYXUD2uMm3xOyY2SQYpIXaAN4nWRFBLFhuMgdxwhjvz3w=="],
 
@@ -1043,6 +1043,8 @@
     "@better-auth/oauth-provider/zod": ["zod@4.6.1", "", {}, "sha512-341aRWQsve0rvronKNTqZpjmzdbUDlFuzHaI/XLg/Ej82qffDJRRfBTCuv7+9q/rMjB6LSLyEBnW4InJeMtt/Q=="],
 
     "@better-auth/passkey/zod": ["zod@4.6.1", "", {}, "sha512-341aRWQsve0rvronKNTqZpjmzdbUDlFuzHaI/XLg/Ej82qffDJRRfBTCuv7+9q/rMjB6LSLyEBnW4InJeMtt/Q=="],
+
+    "@bopen-io/templates/@bsv/sdk": ["@bsv/sdk@2.4.2", "", {}, "sha512-UW1eC6YU+GdHBIQEBemuJo24K5S6rJBd6umNfkOpHR0ke5bgi58ymMrpX6Dm1cd4FYXsTDrbzyiKaH//LmJ7kw=="],
 
     "@mnee/ts-sdk/@bsv/sdk": ["@bsv/sdk@2.1.4", "", {}, "sha512-FrX5knwUZXPJHVaE9usoevwWqLItiWCFIr2jD20W3Ke6I+IHbDyivMF8MKtrWSeOxeanFx9v8YLeN6/qzAtlzQ=="],
 
