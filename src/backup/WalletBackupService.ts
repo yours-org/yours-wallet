@@ -6,11 +6,11 @@ import {
   type BackupProgressCallback,
 } from '@1sat/wallet-browser';
 import { encode } from '@msgpack/msgpack';
-import type { WalletStorageManager, sdk } from '@bsv/wallet-toolbox-client';
+import { sdk, type WalletStorageManager } from '@bsv/wallet-toolbox-client';
 import type { ChromeStorageService } from '../services/ChromeStorage.service';
 import type { Account } from '../services/types/chromeStorage.types';
 import type { Theme } from '../theme.types';
-import { decrypt, deriveKey } from '../utils/crypto';
+import { decrypt, encrypt } from '../utils/crypto';
 
 type Chain = 'main' | 'test';
 type SyncChunk = sdk.SyncChunk;
@@ -158,6 +158,8 @@ interface AccountPendingRestore {
   // to fflate's `Unzipped` when constructing `FileRestoreReader`.
   chunks: Record<string, Uint8Array<ArrayBuffer>>; // flat chunk keys (chunk-XXXX.bin)
   chunkCount: number;
+  /** Failed import attempts so far; the caller gives up after a few. */
+  attempts?: number;
 }
 
 // IndexedDB name for storing pending restore data
@@ -195,9 +197,15 @@ export class WalletBackupService {
     openAccount: (
       account: BackupAccountDescriptor,
     ) => Promise<{ storage: WalletStorageManager; close: () => Promise<void> }>,
+    passwordKey: string | undefined,
     onProgress: (event: MultiAccountProgressEvent) => void,
   ): Promise<Blob> {
     onProgress({ stage: 'preparing', message: 'Preparing backup...', totalAccounts: accounts.length });
+
+    // A backup must never depend on a USB drive. With USB security on, the
+    // stored blobs are under the combined key; the archive gets copies under
+    // the password-only key, which is exactly what restore derives.
+    const exportAccounts = await this.accountsForExport(chromeStorageService, passwordKey);
 
     // Capture before openAccount switches selectedAccount for each wallet.
     const initialChromeStorage = await chromeStorageService.getAndSetStorage();
@@ -315,7 +323,7 @@ export class WalletBackupService {
     });
     const chromeStorage = await chromeStorageService.getAndSetStorage();
     const backupChromeStorage: BackupChromeStorage = {
-      accounts: chromeStorage?.accounts || {},
+      accounts: exportAccounts,
       selectedAccount: originalSelectedAccount || chromeStorage?.selectedAccount || '',
       accountNumber: chromeStorage?.accountNumber || 1,
       salt: chromeStorage?.salt || '',
@@ -376,7 +384,7 @@ export class WalletBackupService {
       chunks?: Record<string, Uint8Array<ArrayBuffer>>;
       isLegacy: boolean;
     },
-    password: string,
+    passwordKey: string,
     onProgress: BackupProgressCallback,
   ): Promise<AnyBackupManifestOrLegacy> {
     // Parse chromeStorage (shared by all formats)
@@ -386,8 +394,8 @@ export class WalletBackupService {
       // ── Legacy restore (keys only) ──────────────────────────────
       onProgress({ stage: 'importing', message: 'Detected older backup format. Restoring account keys...' });
 
-      const legacyStorage = JSON.parse(chromeStorageJson) as LegacyChromeStorage;
-      const passKey = await this.verifyPasswordAndDeriveKey(legacyStorage, password);
+      const legacyStorage = this.stripUsbState(JSON.parse(chromeStorageJson) as LegacyChromeStorage);
+      const passKey = await this.verifyPasswordKey(legacyStorage, passwordKey);
 
       onProgress({ stage: 'importing', message: 'Restoring account settings...' });
 
@@ -418,8 +426,8 @@ export class WalletBackupService {
       throw new Error(`Unsupported backup version: ${(manifest as { version: number }).version}`);
     }
 
-    const backupChromeStorage = JSON.parse(chromeStorageJson) as BackupChromeStorage;
-    const passKey = await this.verifyPasswordAndDeriveKey(backupChromeStorage, password);
+    const backupChromeStorage = this.stripUsbState(JSON.parse(chromeStorageJson) as BackupChromeStorage);
+    const passKey = await this.verifyPasswordKey(backupChromeStorage, passwordKey);
 
     onProgress({ stage: 'importing', message: 'Restoring account settings...' });
 
@@ -486,32 +494,84 @@ export class WalletBackupService {
   }
 
   /**
+   * Account blobs as they should appear in an archive: always under the
+   * password-only key. Fails closed if USB security is on and the combined
+   * key (session) or the password is unavailable.
+   */
+  private static async accountsForExport(
+    chromeStorageService: ChromeStorageService,
+    passwordKey: string | undefined,
+  ): Promise<Record<string, Account>> {
+    const storage = await chromeStorageService.getAndSetStorage();
+    const accounts = storage?.accounts || {};
+    const usbSecurity = storage?.usbSecurity;
+    if (!usbSecurity?.enabled) return accounts;
+    if (!passwordKey) throw new Error('Password required to back up while USB key security is on');
+    const combinedKey = await chromeStorageService.getPassKey();
+    if (!combinedKey) throw new Error('Wallet is locked');
+    const out: Record<string, Account> = {};
+    for (const [id, account] of Object.entries(accounts)) {
+      if (!account?.encryptedKeys) {
+        out[id] = account;
+        continue;
+      }
+      const plain = await decrypt(account.encryptedKeys, combinedKey);
+      const reEncrypted = await encrypt(plain, passwordKey);
+      if ((await decrypt(reEncrypted, passwordKey)) !== plain) throw new Error(`Backup verification failed for ${id}`);
+      const { keyEpoch: _epoch, ...rest } = account;
+      out[id] = { ...rest, encryptedKeys: reEncrypted };
+    }
+    return out;
+  }
+
+  /** Archives never carry USB state, but strip defensively so a hand-edited file can't smuggle it in. */
+  private static stripUsbState<T extends { accounts: Record<string, Account> }>(storage: T): T {
+    const cleaned = { ...storage } as T & Record<string, unknown>;
+    delete cleaned.usbSecurity;
+    delete cleaned.keyEpoch;
+    delete cleaned.keyRekey;
+    delete cleaned.keyRecovery;
+    const accounts: Record<string, Account> = {};
+    for (const [id, account] of Object.entries(storage.accounts || {})) {
+      const { keyEpoch: _epoch, ...rest } = account;
+      accounts[id] = rest as Account;
+    }
+    cleaned.accounts = accounts;
+    return cleaned;
+  }
+
+  /**
    * Verify the password against the backup's encrypted keys and return the derived passKey.
    */
-  private static async verifyPasswordAndDeriveKey(
+  /**
+   * The page derives PBKDF2(password, backup salt) itself and sends only that,
+   * so the password never crosses the runtime message fan-out. Verified by
+   * opening the selected account's keys.
+   */
+  private static async verifyPasswordKey(
     storage: { salt: string; accounts: Record<string, Account>; selectedAccount: string },
-    password: string,
+    passwordKey: string,
   ): Promise<string> {
     const { salt, accounts, selectedAccount } = storage;
     if (!salt) {
       throw new Error('Invalid backup file: missing salt');
     }
-
-    const passKey = deriveKey(password, salt);
-
+    if (!/^[0-9a-f]{64}$/.test(passwordKey)) {
+      throw new Error('Invalid password key');
+    }
     const account = accounts[selectedAccount];
     if (!account?.encryptedKeys) {
       throw new Error('Invalid backup file: missing encrypted keys');
     }
 
     try {
-      const decryptedKeys = await decrypt(account.encryptedKeys, passKey);
+      const decryptedKeys = await decrypt(account.encryptedKeys, passwordKey);
       JSON.parse(decryptedKeys);
     } catch {
       throw new Error('Invalid password - unable to decrypt wallet keys');
     }
 
-    return passKey;
+    return passwordKey;
   }
 
   /**
@@ -543,12 +603,70 @@ export class WalletBackupService {
     });
 
     const reader = new FileRestoreReader(pending.chunks, pending.manifest);
+    const t0 = Date.now();
+    const mark = (step: string) => onProgress({ stage: 'importing', message: `+${Date.now() - t0}ms ${step}` });
+
+    // Where the chunks go depends on what is active. A local active store
+    // takes them through the manager under its sync lock: the chunks ARE the
+    // wallet. A remote active store already holds this account (it is the
+    // active store), the local mirror fills from it on the toolbox's own
+    // schedule, and pushing a backup chunk at either store here has been
+    // observed to never complete. So with a remote active the parked chunks
+    // are dropped. A future "restore as local-only" path (for when the remote
+    // is gone) is the right home for that data.
+    if (!storage.getActive().isStorageProvider()) {
+      onProgress({ stage: 'importing', message: 'Remote storage is active; it already holds this account.' });
+      await this.clearAccountPendingRestore(identityKey);
+      return;
+    }
+    mark('local active: syncFromReader via manager');
     await storage.syncFromReader(identityKey, reader);
+    mark('syncFromReader done');
 
     // Remove only this account's pending data — others stay for when they're activated
     await this.clearAccountPendingRestore(identityKey);
 
     onProgress({ stage: 'complete', message: 'Wallet data imported!' });
+  }
+
+  /**
+   * After a restore: the backup says which outputs were spendable when it was
+   * written, and any spent since would be picked for a send that fails at
+   * broadcast. Ask the chain (one lookup per change output) and release
+   * them: the toolbox's invalid-change review with `release`. Takes the
+   * manager's exclusive locks, so the caller runs it once the address sync
+   * is done, not in front of it.
+   */
+  static async reviewRestoredUtxos(storage: WalletStorageManager, identityKey: string): Promise<number> {
+    try {
+      const released = await storage.runAsStorageProvider(async (sp) => {
+        const user = (await sp.findUsers({ partial: { identityKey } }))[0];
+        if (!user) return 0;
+        const result = await sp.listOutputs(
+          { userId: user.userId, identityKey: user.identityKey },
+          {
+            basket: sdk.specOpInvalidChange,
+            tags: ['release', 'all'],
+            tagQueryMode: 'all',
+            includeLockingScripts: false,
+            includeTransactions: false,
+            includeCustomInstructions: false,
+            includeTags: false,
+            includeLabels: false,
+            limit: 0,
+            offset: 0,
+            seekPermission: false,
+            knownTxids: [],
+          },
+        );
+        return result.totalOutputs;
+      });
+      console.log(`[WalletBackupService] post-restore UTXO review: ${released} released`);
+      return released;
+    } catch (err) {
+      console.error('[WalletBackupService] post-restore UTXO review failed:', err);
+      return 0;
+    }
   }
 
   /**
@@ -590,7 +708,20 @@ export class WalletBackupService {
     }
   }
 
-  private static async clearAccountPendingRestore(identityKey: string): Promise<void> {
+  /** Record one failed import attempt for this account; returns the new count. */
+  static async notePendingRestoreAttempt(identityKey: string): Promise<number> {
+    const pending = await this.getAccountPendingRestore(identityKey);
+    if (!pending) return 0;
+    const attempts = (pending.attempts ?? 0) + 1;
+    try {
+      await this.storeAccountPendingRestore(identityKey, { ...pending, attempts });
+    } catch {
+      // Best effort: a failed bookkeeping write only delays giving up.
+    }
+    return attempts;
+  }
+
+  static async clearAccountPendingRestore(identityKey: string): Promise<void> {
     try {
       const db = await this.openPendingRestoreDB();
       const tx = db.transaction(PENDING_RESTORE_STORE, 'readwrite');

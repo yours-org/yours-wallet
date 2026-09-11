@@ -45,10 +45,24 @@ import {
   handleOneSatPermissionResponse,
   initOneSatPromptBridge,
 } from './services/oneSatPrompt';
-import type { PromptKind } from './promptProtocol';
+import type { PromptKind, UsbCheckRequest } from './promptProtocol';
 import { initWallet, openAccountStorageForBackup, type AccountContext } from './initWallet';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
+import { repairStaleAccounts, usbRekey, type UsbRekeyRequest } from './services/usbRekeyBackground';
+import { USB_HANDLE_DB_NAME } from './services/UsbKey.service';
+import {
+  isUsbRecoverySession,
+  readUsbLastSeen,
+  USB_KEY_ABSENT_MESSAGE,
+  USB_SEEN_MAX_AGE_MS,
+} from './services/usbPresence';
+import {
+  closeUsbBackupReader,
+  usbBackupChunk,
+  usbBackupSettings,
+  type UsbBackupChunkRequest,
+} from './services/usbBackupBackground';
 
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
@@ -87,7 +101,16 @@ const notifyBalanceUpdate = () => {
 };
 
 // Drop live context immediately; destroy in background (never block lock on hung close).
+/**
+ * Bumped on every lock/drop. An initialisation that started before a lock
+ * must not publish its wallet afterwards: `runInitializeWallet` compares the
+ * generation it started under with the current one before assigning.
+ */
+let lockGeneration = 0;
+
 const dropWalletContext = (reason: string) => {
+  lockGeneration++;
+  void closeUsbBackupReader();
   const ctx = accountContext;
   accountContext = null;
   if (!ctx) return;
@@ -112,14 +135,144 @@ const initializeWallet = (): Promise<WalletInterface | null> => {
   });
 };
 
+/** Set by the service-worker block so the pending import can stream progress to a restore window. */
+let restoreProgressFn: ((message: string) => void) | undefined;
+/** In-flight pending-restore imports by identity key, so a second init joins rather than duplicates. */
+const pendingImports = new Map<string, Promise<void>>();
+
 const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   console.log('[background] initializeWallet: starting, current accountContext:', !!accountContext);
   if (accountContext) {
     dropWalletContext('before-init');
   }
+  // USB key security: finish any re-key whose read-back never ran, so no
+  // account is left under a previous epoch's key.
+  try {
+    await repairStaleAccounts(chromeStorageService);
+  } catch (err) {
+    console.error('[background] repairStaleAccounts failed:', err);
+  }
 
   console.log('[background] initializeWallet: calling initWallet...');
-  accountContext = await initWallet(chromeStorageService, {
+  // Pending restore data for the CURRENT account (Phase 2 of two-phase restore).
+  // Each account's data is stored separately — syncFromReader only accepts the
+  // authenticated account's identityKey. Other accounts' data stays in IndexedDB
+  // until they are switched to and initializeWallet runs again.
+  //
+  // This runs via `beforeSync`, i.e. before initWallet starts the address and
+  // message syncs. The import needs the toolbox's exclusive sync lock, which
+  // waits for all reader/writer locks; once the address sync is running it
+  // holds those almost continuously and the import never starts, and every
+  // wallet read (balance, storage info) then queues behind it.
+  const PENDING_IMPORT_MAX_ATTEMPTS = 3;
+  const runPendingImport = async (
+    storage: import('@1sat/wallet-browser').WalletStorageManager,
+    currentIdentityKey: string,
+  ) => {
+    // A timed-out import keeps running; a later init must join it, not start
+    // a second writer for the same account.
+    const existing = pendingImports.get(currentIdentityKey);
+    if (existing) {
+      console.log('[background] initializeWallet: pending import already running for this account; joining it');
+      await existing.catch(() => undefined);
+      return;
+    }
+    console.log('[background] initializeWallet: Found pending restore data, importing...');
+    // Watchdog: say so every 10 s while the import is in flight, so a hang is visible.
+    const started = Date.now();
+    const watchdog = setInterval(() => {
+      console.warn(`[background] PendingRestore: still importing after ${Math.round((Date.now() - started) / 1000)}s`);
+    }, 10_000);
+    // Hard cap, generous: the import must never take the wallet down with it.
+    // Balance reads queue behind the import anyway (it holds the sync lock),
+    // so a short cap only hides the wait; this one exists for a wedged import.
+    // On timeout the wallet initialises without it and the parked data stays.
+    const IMPORT_TIMEOUT_MS = 10 * 60_000;
+    let timedOut = false;
+    const importPromise = WalletBackupService.importPendingWalletData(
+      storage as unknown as Parameters<typeof WalletBackupService.importPendingWalletData>[0],
+      currentIdentityKey,
+      (event) => {
+        console.log('[background] PendingRestore:', event.message);
+        restoreProgressFn?.(event.message);
+      },
+    ).finally(() => pendingImports.delete(currentIdentityKey));
+    pendingImports.set(currentIdentityKey, importPromise);
+    try {
+      await Promise.race([
+        importPromise,
+        new Promise<void>((resolve) =>
+          setTimeout(() => {
+            timedOut = true;
+            resolve();
+          }, IMPORT_TIMEOUT_MS),
+        ),
+      ]);
+      if (timedOut) {
+        console.error(
+          `[background] initializeWallet: Pending restore timed out after ${IMPORT_TIMEOUT_MS / 1000}s; continuing without it`,
+        );
+      } else {
+        console.log('[background] initializeWallet: Pending restore complete');
+      }
+    } catch (error) {
+      console.error('[background] initializeWallet: Pending restore failed:', error);
+      // The parked chunks may be the whole wallet: keep them for another try
+      // (a transient failure, a worker killed mid-import). Give up only after
+      // repeated failures so a broken backup cannot stall every unlock.
+      const attempts = await WalletBackupService.notePendingRestoreAttempt(currentIdentityKey);
+      if (attempts >= PENDING_IMPORT_MAX_ATTEMPTS) {
+        console.error(`[background] initializeWallet: giving up on pending restore after ${attempts} attempts`);
+        await WalletBackupService.clearAccountPendingRestore(currentIdentityKey);
+      }
+    } finally {
+      clearInterval(watchdog);
+    }
+  };
+
+  /**
+   * Runs before the address sync (see initWallet's beforeSync). With a local
+   * active store the parked chunks are the wallet and must land first. With a
+   * remote active store the import is a no-op that clears the parked data.
+   */
+  const importPendingRestore = async ({
+    storage,
+  }: {
+    storage: import('@1sat/wallet-browser').WalletStorageManager;
+  }) => {
+    const { account: currentAccount } = chromeStorageService.getCurrentAccountObject();
+    const currentIdentityKey = currentAccount?.pubKeys?.identityPubKey || '';
+    if (!currentIdentityKey) return;
+    const hasPending = await WalletBackupService.hasPendingRestore(currentIdentityKey);
+    console.log(
+      '[background] initializeWallet: hasPendingRestore for',
+      currentIdentityKey.slice(0, 8) + '...:',
+      hasPending,
+    );
+    if (!hasPending) return;
+    await runPendingImport(storage, currentIdentityKey);
+    if (!(await WalletBackupService.hasPendingRestore(currentIdentityKey))) pendingUtxoReview.add(currentIdentityKey);
+  };
+
+  /**
+   * Once the address sync has finished after a restore, release outputs the
+   * chain says were spent since the backup. Runs after the sync, not before:
+   * it takes the manager's exclusive locks and does one network lookup per
+   * change output.
+   */
+  const pendingUtxoReview = new Set<string>();
+  const reviewRestoredUtxos = async ({ storage }: { storage: import('@1sat/wallet-browser').WalletStorageManager }) => {
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    const identityKey = account?.pubKeys?.identityPubKey || '';
+    if (!identityKey || !pendingUtxoReview.delete(identityKey)) return;
+    await WalletBackupService.reviewRestoredUtxos(
+      storage as unknown as Parameters<typeof WalletBackupService.reviewRestoredUtxos>[0],
+      identityKey,
+    );
+  };
+
+  const startedUnder = lockGeneration;
+  const ctx = await initWallet(chromeStorageService, {
     onTransactionBroadcasted: (txid: string) => {
       console.log('[background] Transaction broadcasted:', txid);
       notifyBalanceUpdate();
@@ -128,45 +281,22 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
       console.log('[background] Transaction proven:', txid);
       notifyBalanceUpdate();
     },
+    beforeSync: importPendingRestore,
+    afterSync: reviewRestoredUtxos,
   });
+  if (lockGeneration !== startedUnder || !(await chromeStorageService.getPassKey())) {
+    // Locked while we were initialising (a restore's detached init can run
+    // for minutes). Storage and UI say locked; do not hand out a live wallet.
+    console.log('[background] initializeWallet: locked during init; discarding the wallet');
+    await ctx.close().catch((err) => console.error('[background] close after late lock:', err));
+    return null;
+  }
+  accountContext = ctx;
   console.log('[background] initializeWallet: initWallet returned, accountContext:', !!accountContext);
 
   if (accountContext) {
     bindPermissionCallbacks(accountContext.wallet);
     console.log('[background] initializeWallet: bound permission callbacks');
-
-    // Check for pending restore data for the CURRENT account (Phase 2 of two-phase restore).
-    // Each account's data is stored separately — syncFromReader only accepts the
-    // authenticated account's identityKey. Other accounts' data stays in IndexedDB
-    // until they are switched to and initializeWallet runs again.
-    const { account: currentAccount } = chromeStorageService.getCurrentAccountObject();
-    const currentIdentityKey = currentAccount?.pubKeys?.identityPubKey || '';
-    if (currentIdentityKey) {
-      const hasPending = await WalletBackupService.hasPendingRestore(currentIdentityKey);
-      console.log(
-        '[background] initializeWallet: hasPendingRestore for',
-        currentIdentityKey.slice(0, 8) + '...:',
-        hasPending,
-      );
-      if (hasPending) {
-        console.log('[background] initializeWallet: Found pending restore data, importing...');
-        try {
-          const storage = accountContext.storage as unknown as Parameters<
-            typeof WalletBackupService.importPendingWalletData
-          >[0];
-          if (storage) {
-            await WalletBackupService.importPendingWalletData(storage, currentIdentityKey, (event) => {
-              console.log('[background] PendingRestore:', event.message);
-            });
-            console.log('[background] initializeWallet: Pending restore complete');
-          }
-        } catch (error) {
-          console.error('[background] initializeWallet: Pending restore failed:', error);
-          // Clear only this account's pending data to avoid repeated failures
-          await WalletBackupService.clearAllPendingRestores();
-        }
-      }
-    }
   }
 
   return accountContext?.wallet ?? null;
@@ -178,9 +308,14 @@ const startupInitPromise = chromeStorageService
   .getAndSetStorage()
   .then(async () => {
     // Close any orphaned extension popup windows from a previous session/reload.
+    // The USB key window is a user-driven multi-step flow, not a prompt: the
+    // worker idles out and restarts while the user reads or writes a recovery
+    // code, and closing it here would abort enrolment mid-way.
     const extOrigin = chrome.runtime.getURL('');
+    const usbUrl = chrome.runtime.getURL('usb.html');
     const allWindows = await chrome.windows.getAll({ populate: true });
     for (const w of allWindows) {
+      if (w.tabs?.some((t) => t.url?.startsWith(usbUrl))) continue;
       if (w.type === 'popup' && w.id && w.tabs?.some((t) => t.url?.startsWith(extOrigin))) {
         try {
           await chrome.windows.remove(w.id);
@@ -244,6 +379,7 @@ export const getWallet = (): WalletInterface | null => {
  */
 const ensureWallet = async (suppressPopup = false): Promise<WalletInterface> => {
   await startupInitPromise;
+  if (masterBackupInFlight) throw new Error('Wallet is busy with a master backup; try again in a moment');
   if (accountContext?.wallet) {
     return accountContext.wallet;
   }
@@ -303,6 +439,30 @@ const pendingWalletWaiters: {
   reject: (error: Error) => void;
 }[] = [];
 
+/**
+ * Gated dApp calls (sign, spend, reveal) waiting for the user to confirm a
+ * registered USB key is present. One prompt serves every call queued behind it.
+ */
+const pendingUsbChecks = new Map<
+  string,
+  { request: UsbCheckRequest; resolve: () => void; reject: (e: Error) => void }
+>();
+let usbCheckInFlight: Promise<void> | null = null;
+/** No prompt window can answer: refuse every waiting call rather than hold them forever. */
+const failPendingUsbChecks = (message: string) => {
+  for (const pending of pendingUsbChecks.values()) pending.reject(new Error(message));
+  pendingUsbChecks.clear();
+};
+/** A confirm prompt nobody answers must not hold dApp and popup calls open indefinitely. */
+const USB_CHECK_TIMEOUT_MS = 3 * 60_000;
+
+/**
+ * A master backup closes the live wallet and walks every account's storage
+ * in turn. Nothing else may bring a wallet up meanwhile: a dApp call landing
+ * then would initialise whichever account the export had selected last.
+ */
+let masterBackupInFlight = false;
+
 const pendingGroupedPermissionRequests = new Map<
   string,
   {
@@ -332,6 +492,7 @@ let inFlightDappRequests = 0;
 const selfClosedWindowIds = new Set<number>();
 
 const hasQueuedDappUi = (): boolean =>
+  pendingUsbChecks.size > 0 ||
   pendingPermissionRequests.size > 0 ||
   pendingGroupedPermissionRequests.size > 0 ||
   pendingCounterpartyPermissionRequests.size > 0 ||
@@ -381,6 +542,8 @@ const getPendingPromptPayload = (kind: string, requestID?: string): unknown => {
       return requestID ? pendingCounterpartyPermissionRequests.get(requestID)?.request : undefined;
     case 'oneSatPermission':
       return getPendingOneSatPrompt(requestID);
+    case 'usbCheck':
+      return requestID ? pendingUsbChecks.get(requestID)?.request : undefined;
     default:
       return undefined;
   }
@@ -388,6 +551,9 @@ const getPendingPromptPayload = (kind: string, requestID?: string): unknown => {
 
 /** The oldest queued prompt, if any, for the prompt window to render next. */
 const getNextPendingPrompt = (): { kind: PromptKind; requestID: string } | undefined => {
+  // A key check is holding up a call that already passed permission: first.
+  const usbCheck = pendingUsbChecks.keys().next();
+  if (!usbCheck.done) return { kind: 'usbCheck', requestID: usbCheck.value };
   const permission = pendingPermissionRequests.keys().next();
   if (!permission.done) return { kind: 'permission', requestID: permission.value };
   const grouped = pendingGroupedPermissionRequests.keys().next();
@@ -559,6 +725,8 @@ if (isInServiceWorker) {
           chrome.storage.local.set({
             popupWindowId,
           });
+        } else if (kind === 'usbCheck') {
+          failPendingUsbChecks(USB_KEY_ABSENT_MESSAGE);
         }
       },
     );
@@ -678,6 +846,7 @@ if (isInServiceWorker) {
       'GROUPED_PERMISSION_RESPONSE',
       'COUNTERPARTY_PERMISSION_RESPONSE',
       'ONE_SAT_PERMISSION_RESPONSE',
+      'USB_CHECK_RESPONSE',
       // Prompt window flow queries
       'GET_PROMPT_PAYLOAD',
       'GET_NEXT_PROMPT',
@@ -694,6 +863,11 @@ if (isInServiceWorker) {
       // Master backup/restore
       'MASTER_BACKUP',
       'MASTER_RESTORE',
+      // USB key security (popup / USB window internal)
+      'USB_REKEY',
+      'USB_PING',
+      'USB_BACKUP_CHUNK',
+      'USB_BACKUP_SETTINGS',
       // Storage management (popup internal)
       'STORAGE_GET_INFO',
       'STORAGE_SYNC_BACKUPS',
@@ -761,6 +935,17 @@ if (isInServiceWorker) {
           const { requestID, approved } = message as { requestID: string; approved: boolean };
           const handled = handleOneSatPermissionResponse(requestID, !!approved);
           sendResponse({ type: 'ONE_SAT_PERMISSION_RESPONSE', success: handled });
+          return true;
+        }
+        case 'USB_CHECK_RESPONSE': {
+          const { requestID, ok } = message as { requestID: string; ok: boolean };
+          const pending = pendingUsbChecks.get(requestID);
+          pendingUsbChecks.delete(requestID);
+          if (pending) {
+            if (ok) pending.resolve();
+            else pending.reject(new Error(USB_KEY_ABSENT_MESSAGE));
+          }
+          sendResponse({ type: 'USB_CHECK_RESPONSE', success: !!pending });
           return true;
         }
         // Prompt window payload/flow queries
@@ -875,7 +1060,49 @@ if (isInServiceWorker) {
           });
           return true;
         case 'MASTER_BACKUP':
-          processMasterBackup(sendResponse);
+          processMasterBackup(message.passwordKey, sendResponse);
+          return true;
+        case 'USB_PING':
+          // Keeps the worker from idling out while the USB window is open.
+          sendResponse({ type: 'USB_PING', success: true });
+          return true;
+        case 'USB_BACKUP_CHUNK':
+        case 'USB_BACKUP_SETTINGS': {
+          // Read-only view of the shared local database for the popup's USB sync.
+          // Refused while locked: no session, no backup.
+          const storageIdentityKey = chromeStorageService.storage?.storageIdentityKey;
+          chromeStorageService
+            .getPassKey()
+            .then(async (passKey) => {
+              if (!passKey || !storageIdentityKey) {
+                sendResponse({ type: message.action, success: false, error: 'Wallet is locked' });
+                return;
+              }
+              // Never open a second connection to the local database while the
+              // wallet is initialising: a pending backup import writes to it
+              // then, and a competing open can stall those transactions.
+              if (initInFlight || reinitPromise || masterBackupInFlight) {
+                sendResponse({
+                  type: message.action,
+                  success: false,
+                  error: masterBackupInFlight ? 'Master backup in progress' : 'Wallet is starting up',
+                  data: { busy: true },
+                });
+                return;
+              }
+              const res =
+                message.action === 'USB_BACKUP_CHUNK'
+                  ? await usbBackupChunk(storageIdentityKey, message as UsbBackupChunkRequest)
+                  : await usbBackupSettings(storageIdentityKey);
+              sendResponse({ type: message.action, ...res });
+            })
+            .catch((err: Error) => sendResponse({ type: message.action, success: false, error: err.message }));
+          return true;
+        }
+        case 'USB_REKEY':
+          usbRekey(chromeStorageService, message as UsbRekeyRequest, { lockGeneration: () => lockGeneration })
+            .then((res) => sendResponse({ type: 'USB_REKEY', ...res }))
+            .catch((err: Error) => sendResponse({ type: 'USB_REKEY', success: false, error: err.message }));
           return true;
         case 'MASTER_RESTORE':
           processMasterRestore(message, sendResponse);
@@ -1802,7 +2029,7 @@ if (isInServiceWorker) {
 
   // MASTER BACKUP/RESTORE HANDLERS ********************************
 
-  const processMasterBackup = async (sendResponse: CallbackResponse) => {
+  const processMasterBackup = async (passwordKey: string | undefined, sendResponse: CallbackResponse) => {
     // Remember where the user started so we can restore even if export fails.
     const originalSelectedAccount = chromeStorageService.getCurrentAccountObject().selectedAccount || '';
 
@@ -1830,6 +2057,8 @@ if (isInServiceWorker) {
       accountContext = null;
       if (!ctx) return;
       console.log(`[MasterBackup] closing live wallet (${reason})`);
+      // The USB backup reader shares the database the export is about to walk.
+      await closeUsbBackupReader();
       try {
         await ctx.close();
       } catch (err) {
@@ -1838,6 +2067,7 @@ if (isInServiceWorker) {
     };
 
     const restoreOriginalAccount = async () => {
+      masterBackupInFlight = false;
       try {
         if (originalSelectedAccount) {
           await chromeStorageService.update({ selectedAccount: originalSelectedAccount });
@@ -1893,6 +2123,8 @@ if (isInServiceWorker) {
         return;
       }
 
+      // From here until restoreOriginalAccount: no wallet may come up.
+      masterBackupInFlight = true;
       // Release the live wallet so per-account opens own the IDB connection.
       await closeLiveWallet('before-master-backup');
 
@@ -1912,6 +2144,7 @@ if (isInServiceWorker) {
             close: opened.close,
           };
         },
+        passwordKey,
         broadcastProgress,
       );
 
@@ -1965,19 +2198,28 @@ if (isInServiceWorker) {
    * only the extracted entries the background needs. The background never
    * touches the raw ZIP — no sync decompression in the service worker.
    */
+  /** Stream restore stages to whichever page started the restore. Best effort. */
+  const restoreProgress = (message: string, stage: 'importing' | 'complete' = 'importing') => {
+    chrome.runtime.sendMessage({ action: 'MASTER_RESTORE_PROGRESS', data: { message, stage } }).catch(() => {});
+  };
+  restoreProgressFn = (message) => restoreProgress(message);
+
   const processMasterRestore = async (
     message: {
       legacy: boolean;
-      password: string;
+      /** PBKDF2(password, backup salt), hex. Derived on the page so the password never rides the runtime fan-out. */
+      passwordKey: string;
       chromeStorageData: string;
       manifestData?: string;
       settingsData?: string;
       chunksData?: Record<string, string>;
+      /** USB restore only: turn USB unlock back on before the wallet initialises. */
+      usbRekey?: UsbRekeyRequest;
     },
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const { legacy, password, chromeStorageData } = message;
+      const { legacy, passwordKey, chromeStorageData } = message;
 
       // Decode the pre-extracted entries from the popup
       const chromeStorageBytes = fromBase64(chromeStorageData);
@@ -1995,6 +2237,18 @@ if (isInServiceWorker) {
 
       console.log('[MasterRestore] Restoring from backup...', legacy ? '(legacy)' : '(v1/v2)');
 
+      await chromeStorageService.getAndSetStorage();
+      if (chromeStorageService.getUsbSecurity()?.enabled) {
+        throw new Error('Turn off USB key security before restoring a backup');
+      }
+      // Any handles and re-key bookkeeping from a previous enrolment on this
+      // profile are meaningless for restored, password-only keys.
+      await chromeStorageService.remove(['usbSecurity', 'keyEpoch', 'keyRecovery', 'keyRekey']);
+      await new Promise<void>((resolve) => {
+        const req = indexedDB.deleteDatabase(USB_HANDLE_DB_NAME);
+        req.onsuccess = req.onerror = req.onblocked = () => resolve();
+      });
+
       const manifest = await WalletBackupService.restoreFromExtractedData(
         chromeStorageService,
         {
@@ -2004,9 +2258,10 @@ if (isInServiceWorker) {
           chunks,
           isLegacy: legacy,
         },
-        password,
+        passwordKey,
         (event) => {
           console.log('[MasterRestore]', event.message);
+          restoreProgress(event.message);
         },
       );
 
@@ -2014,18 +2269,46 @@ if (isInServiceWorker) {
       await chromeStorageService.getAndSetStorage();
       console.log('[MasterRestore] Chrome storage refreshed');
 
-      // Initialize the wallet so it's ready when the popup reloads.
-      // For v1/v2 this also triggers Phase 2 import of pending wallet data.
-      // For legacy this creates a fresh wallet-toolbox storage that syncs from remote.
-      console.log('[MasterRestore] Initializing wallet...');
-      const wallet = await initializeWallet();
-      console.log('[MasterRestore] Wallet initialized:', !!wallet);
+      // Restored from a USB key: put USB unlock back exactly as it was, with the
+      // same wrappers and recovery code. Done here, before the wallet
+      // initialises, so no account writer races the re-key.
+      if (message.usbRekey) {
+        restoreProgress('Turning the USB security key back on…');
+        const r = await usbRekey(chromeStorageService, message.usbRekey, { lockGeneration: () => lockGeneration });
+        if (!r.success) {
+          // The wallet is restored and usable with the password alone; the
+          // user can turn the security key on again from Settings.
+          console.error('[MasterRestore] USB security key could not be re-enabled:', r.error);
+          restoreProgress(
+            `Restored, but the USB security key could not be re-enabled (${r.error}). Turn it on from Settings.`,
+          );
+        }
+        await chromeStorageService.getAndSetStorage();
+      }
 
+      // Keys and settings are in place and every account's data is parked for
+      // import. Reply now: the wallet initialisation that follows can take
+      // minutes on a large wallet, and the caller has nothing to wait for.
       sendResponse({
         type: 'MASTER_RESTORE',
         success: true,
         data: manifest,
       });
+
+      // Initialize the wallet so it's ready when the popup opens. For v1/v2
+      // this also triggers Phase 2 import of pending wallet data. If the
+      // worker is stopped before this finishes, the next popup open resumes it.
+      restoreProgress('Importing wallet data…');
+      console.log('[MasterRestore] Initializing wallet...');
+      initializeWallet()
+        .then((wallet) => {
+          console.log('[MasterRestore] Wallet initialized:', !!wallet);
+          restoreProgress('Restore complete', 'complete');
+        })
+        .catch((err: Error) => {
+          console.error('[MasterRestore] Wallet init after restore failed:', err);
+          restoreProgress(`Wallet will finish importing on next open (${err.message})`, 'complete');
+        });
     } catch (error) {
       console.error('[MasterRestore] Error:', error);
       sendResponse({
@@ -2262,6 +2545,42 @@ if (isInServiceWorker) {
     return true;
   };
 
+  /**
+   * USB key security, dApp side. The popup and the prompt window check the
+   * key themselves; a dApp with a standing grant reaches the wallet with no
+   * window open at all. So before any call that signs, spends, or reveals,
+   * require that some wallet window has read a registered key within
+   * USB_SEEN_MAX_AGE_MS; otherwise open the prompt window for one click.
+   * Calls arriving while that prompt is up share it.
+   */
+  const ensureUsbSeen = async (reason: string, originator?: string): Promise<void> => {
+    await chromeStorageService.getAndSetStorage();
+    if (!chromeStorageService.getUsbSecurity()?.enabled) return;
+    const seen = await readUsbLastSeen();
+    if (seen !== undefined && Date.now() - seen < USB_SEEN_MAX_AGE_MS) return;
+    if (await isUsbRecoverySession()) return;
+    if (usbCheckInFlight) return usbCheckInFlight;
+    const requestID = `usb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    usbCheckInFlight = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (pendingUsbChecks.delete(requestID)) reject(new Error(USB_KEY_ABSENT_MESSAGE));
+      }, USB_CHECK_TIMEOUT_MS);
+      const settle = (fn: () => void) => () => {
+        clearTimeout(timer);
+        fn();
+      };
+      pendingUsbChecks.set(requestID, {
+        request: { requestID, reason, originator },
+        resolve: settle(resolve),
+        reject: (e) => settle(() => reject(e))(),
+      });
+      showPromptUi('usbCheck', requestID);
+    }).finally(() => {
+      usbCheckInFlight = null;
+    });
+    return usbCheckInFlight;
+  };
+
   const processCWICreateHmac = async (
     message: { params: CreateHmacArgs; originator?: string },
     sendResponse: CallbackResponse,
@@ -2274,6 +2593,7 @@ if (isInServiceWorker) {
     );
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('sign with your keys', message.originator);
       console.log('[background] processCWICreateHmac: wallet obtained, calling w.createHmac...');
       const result = await w.createHmac(message.params, message.originator);
       console.log('[background] processCWICreateHmac: success');
@@ -2327,6 +2647,7 @@ if (isInServiceWorker) {
     try {
       console.log('[background] processCWICreateSignature: entering, originator:', message.originator);
       const w = await ensureWallet();
+      await ensureUsbSeen('sign with your keys', message.originator);
       console.log('[background] processCWICreateSignature: ensureWallet resolved, calling w.createSignature...');
       const result = await w.createSignature(message.params, message.originator);
       console.log('[background] processCWICreateSignature: success');
@@ -2352,6 +2673,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('encrypt data with your keys', message.originator);
 
       const result = await w.encrypt(message.params, message.originator);
       sendResponse({
@@ -2375,6 +2697,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('decrypt data with your keys', message.originator);
 
       const result = await w.decrypt(message.params, message.originator);
       sendResponse({
@@ -2398,6 +2721,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('build and sign a transaction', message.originator);
 
       console.log('[createAction] Starting with originator:', message.originator);
       console.log(
@@ -2445,6 +2769,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('sign a transaction', message.originator);
 
       const result = await w.signAction(message.params, message.originator);
       console.log('[signAction] Success', result?.txid ? `txid=${result.txid}` : '');
@@ -2500,6 +2825,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('accept a payment into the wallet', message.originator);
       const result = await w.internalizeAction(message.params, message.originator);
       sendResponse({
         type: CWIEventName.INTERNALIZE_ACTION,
@@ -2522,6 +2848,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('release an output', message.originator);
       const result = await w.relinquishOutput(message.params, message.originator);
       sendResponse({
         type: CWIEventName.RELINQUISH_OUTPUT,
@@ -2544,6 +2871,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('reveal key linkage', message.originator);
       const result = await w.revealCounterpartyKeyLinkage(message.params, message.originator);
       sendResponse({
         type: CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE,
@@ -2566,6 +2894,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('reveal key linkage', message.originator);
       const result = await w.revealSpecificKeyLinkage(message.params, message.originator);
       sendResponse({
         type: CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE,
@@ -2588,6 +2917,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('acquire a certificate', message.originator);
       const result = await w.acquireCertificate(message.params, message.originator);
       sendResponse({
         type: CWIEventName.ACQUIRE_CERTIFICATE,
@@ -2632,6 +2962,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('prove a certificate', message.originator);
       const result = await w.proveCertificate(message.params, message.originator);
       sendResponse({
         type: CWIEventName.PROVE_CERTIFICATE,
@@ -2654,6 +2985,7 @@ if (isInServiceWorker) {
   ) => {
     try {
       const w = await ensureWallet();
+      await ensureUsbSeen('relinquish a certificate', message.originator);
       const result = await w.relinquishCertificate(message.params, message.originator);
       sendResponse({
         type: CWIEventName.RELINQUISH_CERTIFICATE,
@@ -2752,6 +3084,8 @@ if (isInServiceWorker) {
       pendingCounterpartyPermissionRequests.clear();
 
       denyAllOneSatPrompts();
+
+      failPendingUsbChecks(USB_KEY_ABSENT_MESSAGE);
 
       // Reject any CWI handlers waiting for wallet unlock
       for (const waiter of pendingWalletWaiters.splice(0)) {

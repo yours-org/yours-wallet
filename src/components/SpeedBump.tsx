@@ -9,6 +9,7 @@ import { Button } from './Button';
 import { Input } from './Input';
 import { PageLoader } from './PageLoader';
 import { Show } from './Show';
+import { checkUsbPresence } from '../services/usbPresence';
 
 export type SpeedBumpProps = {
   message: string;
@@ -25,7 +26,7 @@ export const SpeedBump = (props: SpeedBumpProps) => {
   const [password, setPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const { addSnackbar } = useSnackbar();
-  const { keysService } = useServiceContext();
+  const { keysService, chromeStorageService } = useServiceContext();
 
   const handleConfirm = async () => {
     if (!withPassword) {
@@ -38,6 +39,17 @@ export const SpeedBump = (props: SpeedBumpProps) => {
 
       if (!password) {
         addSnackbar('You must enter a password!', 'error');
+        return;
+      }
+
+      // USB key security: say which factor is missing instead of blaming the password.
+      const presence = await checkUsbPresence(chromeStorageService);
+      if (presence === 'absent') {
+        addSnackbar('Insert your USB key to continue', 'error');
+        return;
+      }
+      if (presence === 'permission') {
+        addSnackbar('Allow access to your USB key from the unlock screen, then try again', 'error');
         return;
       }
 
@@ -72,8 +84,8 @@ export const SpeedBump = (props: SpeedBumpProps) => {
           style={{
             position: 'absolute',
             inset: 0,
-            width: '22.5rem',
-            height: '33.75rem',
+            width: '100%',
+            height: '100%',
             backgroundColor: bg,
             zIndex: 100,
           }}

@@ -50,6 +50,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         'sweep-tab': resolve(__dirname, 'sweep-tab.html'),
         'prompt-tab': resolve(__dirname, 'prompt.html'),
+        'usb-tab': resolve(__dirname, 'usb.html'),
       },
       output: {
         entryFileNames: 'assets/[name]-[hash].js',

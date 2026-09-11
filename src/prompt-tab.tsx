@@ -20,9 +20,10 @@ import { CounterpartyPermissionRequestPage } from './pages/requests/Counterparty
 import { GroupedPermissionRequestPage } from './pages/requests/GroupedPermissionRequest';
 import { OneSatPermissionRequestPage } from './pages/requests/OneSatPermissionRequest';
 import { PermissionRequestPage } from './pages/requests/PermissionRequest';
+import { UsbCheckRequestPage } from './pages/requests/UsbCheckRequest';
 import type { OneSatPromptStorageEntry } from './services/oneSatPrompt';
 import { sendMessageAsync } from './utils/chromeHelpers';
-import type { PromptKind } from './promptProtocol';
+import type { PromptKind, UsbCheckRequest } from './promptProtocol';
 import './index.css';
 
 global.Buffer = Buffer;
@@ -37,7 +38,8 @@ type PromptScreen =
   | { kind: 'permission'; requestID: string; payload: PermissionRequest & { requestID: string } }
   | { kind: 'groupedPermission'; requestID: string; payload: GroupedPermissionRequest }
   | { kind: 'counterpartyPermission'; requestID: string; payload: CounterpartyPermissionRequest }
-  | { kind: 'oneSatPermission'; requestID: string; payload: OneSatPromptStorageEntry };
+  | { kind: 'oneSatPermission'; requestID: string; payload: OneSatPromptStorageEntry }
+  | { kind: 'usbCheck'; requestID: string; payload: UsbCheckRequest };
 
 const WAITING_CLOSE_MS = 10000;
 const EXPIRED_CLOSE_MS = 2000;
@@ -70,6 +72,8 @@ const PromptApp = () => {
       res = undefined;
     }
     if (res?.success && res.data) {
+      // USB unlock is checked by the Approve button itself (confirmUsbForApproval),
+      // so the request renders immediately.
       setScreen({ kind, requestID, payload: res.data } as PromptScreen);
     } else {
       setScreen({ kind: 'expired' });
@@ -193,6 +197,9 @@ const PromptApp = () => {
         )}
         {screen.kind === 'oneSatPermission' && (
           <OneSatPermissionRequestPage request={screen.payload} onResponse={() => void advance()} />
+        )}
+        {screen.kind === 'usbCheck' && (
+          <UsbCheckRequestPage request={screen.payload} onResponse={() => void advance()} />
         )}
       </div>
     </MemoryRouter>

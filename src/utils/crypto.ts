@@ -9,6 +9,10 @@ export const deriveKey = (password: string, salt: string) => {
   const key = CryptoJS.PBKDF2(password, salt, {
     keySize: 256 / 32,
     iterations: 100000,
+    // crypto-js 4.2 defaults to SHA-256 but 4.1.x defaulted to SHA-1 and the
+    // dependency range spans both. Pin it so a resolver change can't silently
+    // invalidate every stored password.
+    hasher: CryptoJS.algo.SHA256,
   });
 
   return key.toString(CryptoJS.enc.Hex);
@@ -20,7 +24,7 @@ export const generateRandomSalt = (length = 16) => {
 
 // --- Hex conversion helpers ---
 
-const hexToBytes = (hex: string): Uint8Array => {
+export const hexToBytes = (hex: string): Uint8Array => {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
@@ -28,7 +32,7 @@ const hexToBytes = (hex: string): Uint8Array => {
   return bytes;
 };
 
-const bytesToHex = (bytes: Uint8Array): string => {
+export const bytesToHex = (bytes: Uint8Array): string => {
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
