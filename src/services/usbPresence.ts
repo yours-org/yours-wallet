@@ -8,7 +8,7 @@
  * count as removed, and the page locks the wallet.
  */
 import type { ChromeStorageService } from './ChromeStorage.service';
-import { probeSticks } from './UsbKey.service';
+import { getHandle, probeSticks, requestHandlePermission } from './UsbKey.service';
 
 export type UsbPresence = 'disabled' | 'present' | 'absent' | 'permission';
 
@@ -52,6 +52,32 @@ export const enforceUsbPresence = async (
     await onRemoved();
   }
   return presence;
+};
+
+/**
+ * The check behind every Approve button in the prompt window. Runs inside the
+ * click, which is the user gesture Chrome requires to grant drive access, so a
+ * fresh window costs one browser bubble and no extra screen of ours. With the
+ * feature off it returns ok immediately.
+ */
+export const confirmUsbForApproval = async (
+  chromeStorageService: ChromeStorageService,
+): Promise<{ ok: true } | { ok: false; message: string }> => {
+  const usbSecurity = chromeStorageService.getUsbSecurity();
+  if (!usbSecurity?.enabled) return { ok: true };
+  let probe = await probeSticks(usbSecurity);
+  if (probe.status === 'permission') {
+    for (const id of probe.stickIds) {
+      const handle = await getHandle(id);
+      if (handle) await requestHandlePermission(handle);
+    }
+    probe = await probeSticks(usbSecurity);
+  }
+  if (probe.status === 'ok') {
+    consecutiveFailures = 0;
+    return { ok: true };
+  }
+  return { ok: false, message: USB_KEY_ABSENT_MESSAGE };
 };
 
 /** Wallet methods that spend, sign, or reveal. Everything else stays readable without the stick. */

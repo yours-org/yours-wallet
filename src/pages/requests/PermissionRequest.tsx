@@ -8,6 +8,8 @@ import { useTheme } from '../../hooks/useTheme';
 import { sendMessage } from '../../utils/chromeHelpers';
 import { knownProtocol, protocolLabel, securityLevelLabel } from '../../utils/protocols';
 import type { PermissionRequest as PermissionRequestType } from '@bsv/wallet-toolbox-client';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { confirmUsbForApproval } from '../../services/usbPresence';
 
 export type PermissionRequestProps = {
   request: PermissionRequestType & { requestID: string };
@@ -60,6 +62,8 @@ export const PermissionRequestPage = (props: PermissionRequestProps) => {
   const { handleSelect, hideMenu } = useBottomMenu();
   const { addSnackbar } = useSnackbar();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [usbError, setUsbError] = useState('');
+  const { chromeStorageService } = useServiceContext();
 
   useEffect(() => {
     handleSelect('bsv');
@@ -68,7 +72,15 @@ export const PermissionRequestPage = (props: PermissionRequestProps) => {
 
   const handleGrant = async () => {
     setIsProcessing(true);
+    setUsbError('');
     try {
+      // USB unlock: nothing is approved without the key. Runs inside the click.
+      const usb = await confirmUsbForApproval(chromeStorageService);
+      if (!usb.ok) {
+        setUsbError(usb.message);
+        setIsProcessing(false);
+        return;
+      }
       sendMessage({
         action: 'PERMISSION_RESPONSE',
         requestID: request.requestID,
@@ -271,6 +283,11 @@ export const PermissionRequestPage = (props: PermissionRequestProps) => {
 
       {/* Actions */}
       <div className="flex flex-col gap-3 mt-auto">
+        {usbError && (
+          <p className="text-xs text-center m-0" style={{ color: '#ef4444' }}>
+            {usbError}
+          </p>
+        )}
         <motion.button
           className="w-full py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
           style={{
