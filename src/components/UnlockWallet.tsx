@@ -48,6 +48,9 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const probeRef = useRef<StickProbe | undefined>(undefined);
   const probing = useRef(false);
   const [recoveryMode, setRecoveryMode] = useState(false);
+  // True when a recent grant attempt from this popup didn't stick (Chrome
+  // closed the popup under its bubble, or access was refused).
+  const [grantFailed, setGrantFailed] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
   const [errorText, setErrorText] = useState('');
 
@@ -67,6 +70,14 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   }, [usbSecurity]);
 
   useEffect(() => {
+    if (!usbEnabled || IN_STANDALONE_WINDOW) return;
+    void chrome.storage.session.get('usbGrantAttemptAt').then((r) => {
+      const at = r.usbGrantAttemptAt as number | undefined;
+      if (at && Date.now() - at < 60_000) setGrantFailed(true);
+    });
+  }, [usbEnabled]);
+
+  useEffect(() => {
     if (!usbEnabled) return;
     void runProbe();
     const timer = window.setInterval(() => void runProbe(), USB_PROBE_INTERVAL_MS);
@@ -82,6 +93,11 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const grantUsbAccessIfNeeded = async (): Promise<StickProbe | undefined> => {
     const latest = probeRef.current;
     if (latest?.status !== 'permission') return latest;
+    // If Chrome's bubble closes the action popup, this attempt is what tells the
+    // next popup to offer the standalone window instead of looping.
+    if (!IN_STANDALONE_WINDOW) {
+      await chrome.storage.session.set({ usbGrantAttemptAt: Date.now() }).catch(() => {});
+    }
     for (const id of latest.stickIds) {
       const handle = await getHandle(id);
       if (handle) await requestHandlePermission(handle);
@@ -146,9 +162,11 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
         const latest = await grantUsbAccessIfNeeded();
         if (latest?.status !== 'ok') {
           // Missing key is not a wrong password: shake, say so, and leave the password alone.
+          if (latest?.status === 'permission') setGrantFailed(true);
           failUnlock(latest?.status === 'permission' ? 'USB access not allowed' : 'Insert your USB key');
           return;
         }
+        if (!IN_STANDALONE_WINDOW) void chrome.storage.session.remove('usbGrantAttemptAt').catch(() => {});
         material = { master: latest.master };
       }
     }
@@ -256,15 +274,15 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
 
   const canSubmit = password !== '' && (!recoveryMode || recoveryCode.trim() !== '');
 
-  // In the action popup a USB unlock has to happen in the standalone window.
-  // Recovery-code unlock needs no drive access, so it stays inline everywhere.
-  // Only when the drive can't be read for lack of a grant. 'absent' means the
-  // grant is fine and the drive is simply unplugged: keep polling right here.
+  // The popup reads the drive itself, including asking Chrome for access on
+  // the Unlock click. It hands off to the standalone window only when it
+  // can't: no saved handle (the folder picker closes the popup), or a grant
+  // attempt from here didn't stick.
   const handOffToWindow =
     usbEnabled &&
     !IN_STANDALONE_WINDOW &&
     !recoveryMode &&
-    (probe?.status === 'permission' || probe?.status === 'no-handles');
+    (probe?.status === 'no-handles' || (probe?.status === 'permission' && grantFailed));
 
   return (
     <div
