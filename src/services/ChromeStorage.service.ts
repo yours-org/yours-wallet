@@ -548,7 +548,7 @@ export class ChromeStorageService {
   updateUsbSecurity = async (mutate: (current: UsbSecurity) => UsbSecurity): Promise<void> => {
     const { usbSecurity, keyRekey } = await this.get(['usbSecurity', 'keyRekey']);
     if (keyRekey) throw new Error('Wallet keys are being re-encrypted; try again in a moment');
-    if (!usbSecurity?.enabled) throw new Error('USB unlock is off');
+    if (!usbSecurity?.enabled) throw new Error('USB security key is off');
     await this.set({ usbSecurity: mutate(usbSecurity) });
   };
 

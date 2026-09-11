@@ -32,7 +32,7 @@ export const DisableFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
     } catch (e) {
       res = { success: false, error: e instanceof Error ? e.message : String(e) };
     }
-    if (!res?.success) return res?.error ?? 'Could not turn off USB unlock';
+    if (!res?.success) return res?.error ?? 'Could not turn off the USB security key';
     if (erase && identity.handle) await deleteStickFile(identity.handle);
     await clearHandles();
     await chromeStorageService.getAndSetStorage();
@@ -49,7 +49,7 @@ export const DisableFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
           <IdentityStep
             key="s0"
             usbSecurity={usbSecurity}
-            title="Turn off USB unlock"
+            title="Turn off USB security key"
             subtitle="Insert a registered USB key or enter your recovery code."
             onIdentified={(id) => {
               setIdentity(id);
@@ -61,7 +61,7 @@ export const DisableFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
           <PasswordStep
             key="s1"
             subtitle="Enter your password to finish."
-            buttonLabel="Turn off USB unlock"
+            buttonLabel="Turn off security key"
             extra={
               identity?.handle ? (
                 <Checkbox
@@ -76,7 +76,7 @@ export const DisableFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
           />
         )}
         {step === 2 && (
-          <DoneStep key="s2" title="USB unlock is off" message="Your password alone unlocks the wallet." />
+          <DoneStep key="s2" title="USB security key is off" message="Your password alone unlocks the wallet." />
         )}
       </AnimatePresence>
     </>

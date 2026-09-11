@@ -111,8 +111,8 @@ export const RestoreFlow = () => {
             title="Wallet restored"
             message={
               partial.length > 0
-                ? `Keys restored and USB unlock is on with this key. History is importing in the background; open the Yours icon to unlock. ${partial.length} account(s) had an incomplete backup on this key (${partial.join(', ')}).`
-                : 'Keys restored and USB unlock is on with this key. History is importing in the background; open the Yours icon to unlock. Other registered keys need "Find my USB key" once on this computer.'
+                ? `Keys restored and this USB security key is on. History is importing in the background; open the Yours icon to unlock. ${partial.length} account(s) had an incomplete backup on this key (${partial.join(', ')}).`
+                : 'Keys restored and this USB security key is on. History is importing in the background; open the Yours icon to unlock. Other registered keys need "Find my USB key" once on this computer.'
             }
           />
         )}

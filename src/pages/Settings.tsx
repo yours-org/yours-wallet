@@ -347,7 +347,7 @@ export const Settings = () => {
   const handleRemoveUsbStickIntent = (stickId: string) => {
     if (!usbSecurity) return;
     if (usbSecurity.sticks.length <= 1) {
-      addSnackbar('Add another key first, or turn USB unlock off', 'error');
+      addSnackbar('Add another key first, or turn the USB security key off', 'error');
       return;
     }
     const label = usbSecurity.sticks.find((s) => s.id === stickId)?.label ?? 'this key';
@@ -364,7 +364,7 @@ export const Settings = () => {
     if (!usb || !id || usb.sticks.length <= 1) return;
     try {
       await chromeStorageService.updateUsbSecurity((current) => {
-        if (current.sticks.length <= 1) throw new Error('Add another key first, or turn USB unlock off');
+        if (current.sticks.length <= 1) throw new Error('Add another key first, or turn the USB security key off');
         return { ...current, sticks: current.sticks.filter((s) => s.id !== id) };
       });
     } catch (err) {
@@ -859,11 +859,11 @@ export const Settings = () => {
             <Divider />
             <SettingRow
               icon={<Usb size={16} />}
-              label="USB Unlock"
+              label="USB Security Key"
               description={
                 usbSecurity?.enabled
                   ? `${usbSecurity.sticks.length} key${usbSecurity.sticks.length === 1 ? '' : 's'} registered${usbBackupOverdue ? ' · backup overdue' : ''}`
-                  : 'Require a USB drive to unlock'
+                  : 'Two-factor unlock with any USB drive'
               }
               right={
                 usbBackupOverdue ? (
@@ -1356,7 +1356,7 @@ export const Settings = () => {
       exit="exit"
       className="w-full px-4 pb-24"
     >
-      <SubPageHeader title="USB Unlock" onBack={() => setPage('main')} />
+      <SubPageHeader title="USB Security Key" onBack={() => setPage('main')} />
       <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-4">
         {!usbSecurity?.enabled ? (
           <>
@@ -1377,7 +1377,7 @@ export const Settings = () => {
                 </div>
                 <div>
                   <p className="text-sm font-semibold" style={{ color: '#FFFFFF' }}>
-                    USB unlock
+                    USB security key
                   </p>
                   <p className="text-[10px] mt-0.5" style={{ color: '#98A2B3' }}>
                     Two-factor unlock: your password plus a USB drive

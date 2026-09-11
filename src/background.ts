@@ -2173,9 +2173,9 @@ if (isInServiceWorker) {
       // same wrappers and recovery code. Done here, before the wallet
       // initialises, so no account writer races the re-key.
       if (message.usbRekey) {
-        restoreProgress('Turning USB unlock back on…');
+        restoreProgress('Turning the USB security key back on…');
         const r = await usbRekey(chromeStorageService, message.usbRekey);
-        if (!r.success) throw new Error(`Restored, but USB unlock could not be re-enabled: ${r.error}`);
+        if (!r.success) throw new Error(`Restored, but the USB security key could not be re-enabled: ${r.error}`);
         await chromeStorageService.getAndSetStorage();
       }
 

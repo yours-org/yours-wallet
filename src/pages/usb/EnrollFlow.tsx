@@ -34,7 +34,7 @@ const OverviewStep = ({ onContinue }: { onContinue: () => void }) => {
   return (
     <StepBody stepKey="overview">
       <Heading
-        title="Turn on USB unlock"
+        title="Turn on USB security key"
         subtitle="Two-factor unlock: your password plus a USB drive. Takes about a minute."
       />
       <StepList items={['Pick any USB drive', 'Save a recovery code', 'Confirm your password']} />
@@ -88,7 +88,7 @@ export const EnrollFlow = () => {
     }
     if (!res?.success) {
       await deleteHandle(drive.id);
-      return res?.error ?? 'Could not turn on USB unlock';
+      return res?.error ?? 'Could not turn on the USB security key';
     }
     await chromeStorageService.getAndSetStorage();
     setIsLocked(false);
@@ -118,12 +118,12 @@ export const EnrollFlow = () => {
           <PasswordStep
             key="s4"
             subtitle="Enter your password to finish."
-            buttonLabel="Turn on USB unlock"
+            buttonLabel="Turn on security key"
             onConfirm={confirmPassword}
           />
         )}
         {step === 5 && (
-          <DoneStep key="s5" title="USB unlock is on" message="Unlocking needs this USB key and your password." />
+          <DoneStep key="s5" title="USB security key is on" message="Unlocking needs this USB key and your password." />
         )}
       </AnimatePresence>
     </>

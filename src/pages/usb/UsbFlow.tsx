@@ -79,13 +79,13 @@ export const UsbFlow = () => {
   if (!mode) {
     body = <BlockedStep title="Nothing to do" message="This window was opened without a USB key action." />;
   } else if (!isUsbSupported()) {
-    body = <BlockedStep title="USB unlock isn't available here" message="It needs Chrome or Edge." />;
+    body = <BlockedStep title="USB security key isn't available here" message="It needs Chrome or Edge." />;
   } else if (mode === 'restore') {
     body = <RestoreFlow />;
   } else if (needsEnabled(mode) && !usbSecurity?.enabled) {
-    body = <BlockedStep title="USB unlock is off" message="Turn it on from Settings → Security." />;
+    body = <BlockedStep title="USB security key is off" message="Turn it on from Settings → Security." />;
   } else if (mode === 'enroll' && usbSecurity?.enabled) {
-    body = <BlockedStep title="USB unlock is already on" message="Manage it from Settings → Security." />;
+    body = <BlockedStep title="USB security key is already on" message="Manage it from Settings → Security." />;
   } else if (mode === 'unlock') {
     if (unlockedHere || !isLocked) {
       body = <DoneStep title="Unlocked" message="Click the Yours icon to open your wallet." />;
