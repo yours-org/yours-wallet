@@ -93,14 +93,19 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const grantUsbAccessIfNeeded = async (): Promise<StickProbe | undefined> => {
     const latest = probeRef.current;
     if (latest?.status !== 'permission') return latest;
-    // If Chrome's bubble closes the action popup, this attempt is what tells the
-    // next popup to offer the standalone window instead of looping.
+    // If Chrome's bubble closes the action popup, this marker is what tells the
+    // next popup to offer the standalone window instead of looping. It is
+    // cleared as soon as the request returns, because returning at all means
+    // the popup survived.
     if (!IN_STANDALONE_WINDOW) {
       await chrome.storage.session.set({ usbGrantAttemptAt: Date.now() }).catch(() => {});
     }
     for (const id of latest.stickIds) {
       const handle = await getHandle(id);
       if (handle) await requestHandlePermission(handle);
+    }
+    if (!IN_STANDALONE_WINDOW) {
+      await chrome.storage.session.remove('usbGrantAttemptAt').catch(() => {});
     }
     // Probe directly rather than via runProbe so an in-flight timer probe can't make us skip it.
     try {
@@ -162,11 +167,10 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
         const latest = await grantUsbAccessIfNeeded();
         if (latest?.status !== 'ok') {
           // Missing key is not a wrong password: shake, say so, and leave the password alone.
-          if (latest?.status === 'permission') setGrantFailed(true);
-          failUnlock(latest?.status === 'permission' ? 'USB access not allowed' : 'Insert your USB key');
+          // Still 'permission' after a request means Chrome had no drive to grant: it is not plugged in.
+          failUnlock('Insert your USB key');
           return;
         }
-        if (!IN_STANDALONE_WINDOW) void chrome.storage.session.remove('usbGrantAttemptAt').catch(() => {});
         material = { master: latest.master };
       }
     }
@@ -292,9 +296,12 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
   const handleAllowAccess = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
+    setErrorText('');
     try {
       const result = await grantUsbAccessIfNeeded();
-      if (result?.status === 'permission') setGrantFailed(true);
+      // Chrome can't grant access to a drive that isn't there, so a request that
+      // comes back still 'permission' means: not plugged in.
+      if (result?.status !== 'ok') setErrorText('Insert your USB key, then allow access');
     } finally {
       setIsProcessing(false);
     }
@@ -349,7 +356,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.24, duration: 0.3 }}
-          className="flex justify-center w-full"
+          className="flex flex-col items-center w-full"
         >
           <motion.div
             whileHover={!isProcessing ? { scale: 1.02 } : undefined}
@@ -379,6 +386,16 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
               )}
             </button>
           </motion.div>
+          {errorText && (
+            <motion.p
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-xs mt-3"
+              style={{ color: danger }}
+            >
+              {errorText}
+            </motion.p>
+          )}
         </motion.div>
       ) : handOffToWindow ? (
         <motion.div
