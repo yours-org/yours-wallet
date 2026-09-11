@@ -229,13 +229,14 @@ export const IdentityStep = ({ usbSecurity, title, subtitle, startWithCode, onId
         title={title ?? 'Confirm it’s you'}
         subtitle={subtitle ?? 'Insert a registered USB key or enter your recovery code.'}
       />
-      <PresenceBody {...state} />
-      {!showCode && state.probe?.status !== 'ok' && (
+      {/* Opened from a recovery unlock: the user has no key, so only the code is offered. */}
+      {!startWithCode && <PresenceBody {...state} />}
+      {!startWithCode && !showCode && state.probe?.status !== 'ok' && (
         <TextLink label="Use my recovery code instead" onClick={() => setShowCode(true)} />
       )}
-      {showCode && state.probe?.status !== 'ok' && (
+      {showCode && (startWithCode || state.probe?.status !== 'ok') && (
         <form onSubmit={(e) => void submitCode(e)} className="flex flex-col items-center w-full mt-3">
-          <Note>Enter the code you wrote down.</Note>
+          {!startWithCode && <Note>Enter the code you wrote down.</Note>}
           <textarea
             value={code}
             onChange={(e) => setCode(e.target.value)}
