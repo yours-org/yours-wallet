@@ -1047,7 +1047,7 @@ export const BsvWallet = () => {
         <p className="text-xs text-center mt-4 mb-2 max-w-[16rem]" style={{ color: theme.color.global.gray }}>
           You may safely send{' '}
           <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
-            BSV, MNEE, and Ordinals
+            {isMainnet ? 'BSV, MNEE, and Ordinals' : 'testnet BSV and Ordinals'}
           </span>{' '}
           to this address.
         </p>

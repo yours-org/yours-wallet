@@ -24,7 +24,7 @@ const ctx = createContext(wallet, { chain: 'main', services });
 ```
 
 - `wallet` is the BRC-100 `WalletInterface` from `useWallet()`.
-- `chain` is `'main'` for BSV mainnet or `'test'` for a Yours testnet account. Match it to the network returned by `wallet.getNetwork({})`.
+- `chain` is `'main'` for BSV mainnet or `'test'` for a Yours testnet account. Map the network returned by `wallet.getNetwork({})`: `mainnet` → `main`, `testnet` → `test`.
 - `services` is a `OneSatServices` instance from `@1sat/client` that handles backend lookups (UTXO scans, ORDFS, broadcast).
 
 ## The React pattern

@@ -61,14 +61,14 @@ console.log('Header at 890000:', header);
 ## getNetwork
 
 ```ts
-wallet.getNetwork(input: {}): Promise<{ network: 'main' | 'test' }>
+wallet.getNetwork(input: {}): Promise<{ network: 'mainnet' | 'testnet' }>
 ```
 
 ### Example
 
 ```tsx
 const { network } = await wallet.getNetwork({});
-if (network !== 'main') console.warn('Not on mainnet');
+if (network !== 'mainnet') console.warn('Not on mainnet');
 ```
 
 ---
