@@ -227,6 +227,25 @@ export const probeSticks = async (usbSecurity: UsbSecurity): Promise<StickProbe>
 };
 
 /**
+ * Every registered stick that currently reads and opens the master. For the
+ * settings list, where more than one key may be plugged in at once;
+ * `probeSticks` stops at the first match because that is all unlock needs.
+ */
+export const listPresentSticks = async (usbSecurity: UsbSecurity): Promise<string[]> => {
+  const handles = await getAllHandles();
+  const registered = new Set(usbSecurity.sticks.map((s) => s.id));
+  const present: string[] = [];
+  for (const [stickId, handle] of handles) {
+    if (!registered.has(stickId)) continue;
+    if ((await queryHandlePermission(handle)) !== 'granted') continue;
+    const file = await readStickFile(handle);
+    if (!file || file.id !== stickId) continue;
+    if (await unwrapFromFile(file, usbSecurity)) present.push(stickId);
+  }
+  return present;
+};
+
+/**
  * Open a freshly picked drive and, if it carries a file for a registered
  * stick, save the handle under that id and unwrap. Used by "Find my USB key".
  */

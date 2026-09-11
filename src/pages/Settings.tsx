@@ -40,7 +40,7 @@ import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
 import { FEE_PER_KB } from '../utils/constants';
 import { ChromeStorageObject, UsbSecurity } from '../services/types/chromeStorage.types';
-import { deleteHandle, isUsbSupported, openUsbWindow, probeSticks, type StickProbe } from '../services/UsbKey.service';
+import { deleteHandle, isUsbSupported, listPresentSticks, openUsbWindow } from '../services/UsbKey.service';
 import { AvatarPicker } from '../components/AvatarPicker';
 import { CreateAccount } from './onboarding/CreateAccount';
 import { RestoreAccount } from './onboarding/RestoreAccount';
@@ -260,7 +260,7 @@ export const Settings = () => {
   // --- USB key security ---
   const usbSupported = isUsbSupported();
   const [usbSecurity, setUsbSecurity] = useState<UsbSecurity | undefined>(() => chromeStorageService.getUsbSecurity());
-  const [usbProbe, setUsbProbe] = useState<StickProbe | undefined>();
+  const [presentSticks, setPresentSticks] = useState<string[]>([]);
   const [pendingRemoveStickId, setPendingRemoveStickId] = useState<string | undefined>();
   const usbProbing = useRef(false);
 
@@ -269,14 +269,14 @@ export const Settings = () => {
     const latest = chromeStorageService.getUsbSecurity();
     setUsbSecurity(latest);
     if (!latest?.enabled || usbProbing.current) {
-      if (!latest?.enabled) setUsbProbe(undefined);
+      if (!latest?.enabled) setPresentSticks([]);
       return;
     }
     usbProbing.current = true;
     try {
-      setUsbProbe(await probeSticks(latest));
+      setPresentSticks(await listPresentSticks(latest));
     } catch {
-      setUsbProbe({ status: 'absent' });
+      setPresentSticks([]);
     } finally {
       usbProbing.current = false;
     }
@@ -1347,7 +1347,7 @@ export const Settings = () => {
           <>
             <Section title="Registered keys">
               {usbSecurity.sticks.map((stick, i) => {
-                const inserted = usbProbe?.status === 'ok' && usbProbe.stickId === stick.id;
+                const inserted = presentSticks.includes(stick.id);
                 return (
                   <div key={stick.id}>
                     {i > 0 && <Divider />}
