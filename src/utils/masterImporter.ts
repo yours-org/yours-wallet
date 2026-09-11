@@ -1,5 +1,6 @@
 import { unzip, type Unzipped } from 'fflate';
 import { ChromeStorageService } from '../services/ChromeStorage.service';
+import { derivePasswordKey } from '../services/passKey';
 
 export type MasterBackupProgressEvent = {
   message: string;
@@ -55,6 +56,17 @@ export const restoreMasterFromZip = async (
     const manifestRaw = unzipped['manifest.json'];
     const isLegacy = !manifestRaw;
 
+    // Only the derived key goes to the background: chrome.runtime messages
+    // reach every extension page, and the password should not.
+    let salt: unknown;
+    try {
+      salt = (JSON.parse(new TextDecoder().decode(chromeStorageRaw)) as { salt?: unknown }).salt;
+    } catch {
+      throw new Error('Invalid backup file: chromeStorage.json is unreadable');
+    }
+    if (typeof salt !== 'string' || !salt) throw new Error('Invalid backup file: missing salt');
+    const passwordKey = derivePasswordKey(password, salt);
+
     if (isLegacy) {
       // Legacy backup — only chromeStorage.json matters
       progress({ message: 'Restoring account keys...' });
@@ -63,7 +75,7 @@ export const restoreMasterFromZip = async (
         action: 'MASTER_RESTORE',
         legacy: true,
         chromeStorageData: toBase64(chromeStorageRaw),
-        password,
+        passwordKey,
       });
 
       if (!response.success) {
@@ -93,7 +105,7 @@ export const restoreMasterFromZip = async (
         chromeStorageData: toBase64(chromeStorageRaw),
         settingsData: toBase64(settingsRaw),
         chunksData: chunks,
-        password,
+        passwordKey,
       });
 
       if (!response.success) {

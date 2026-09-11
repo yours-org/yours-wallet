@@ -6,16 +6,17 @@ import type { UsbSecurity, UsbStickEntry } from '../../services/types/chromeStor
 import { wrapMaster } from '../../utils/usbCrypto';
 import { Stepper } from './UsbLayout';
 import { PresenceStep } from './presence';
-import { ChooseDriveStep, DoneStep, LabelStep } from './steps';
+import { ChooseDriveStep, DoneStep, LabelStep, PasswordStep } from './steps';
 import { nextKeyLabel, prepareDrive, type PreparedDrive } from './usbHelpers';
 
-const STEPS = ['Confirm key', 'Choose drive', 'Name', 'Done'];
+const STEPS = ['Confirm key', 'Choose drive', 'Name', 'Password', 'Done'];
 
 export const AddFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
   const { chromeStorageService } = useServiceContext();
   const [step, setStep] = useState(0);
   const [master, setMaster] = useState<string | null>(null);
   const [drive, setDrive] = useState<PreparedDrive | null>(null);
+  const [label, setLabel] = useState('');
 
   const onPicked = async (handle: FileSystemDirectoryHandle) => {
     const prepared = await prepareDrive(handle, usbSecurity);
@@ -24,8 +25,11 @@ export const AddFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
     setStep(2);
   };
 
-  const register = async (label: string) => {
-    if (!drive || !master) throw new Error('Missing USB key material');
+  // A new key is a permanent second factor: adding one takes the password,
+  // like every other change to the registered set.
+  const register = async (password: string): Promise<string | null> => {
+    if (!drive || !master) return 'Missing USB key material';
+    if (!(await chromeStorageService.verifyPassword(password, { master }))) return 'Incorrect password';
     const wrappedMaster = await wrapMaster(master, drive.secret, drive.id);
     const entry: UsbStickEntry = { id: drive.id, label, wrappedMaster, addedAt: new Date().toISOString() };
     await chromeStorageService.updateUsbSecurity((current) => {
@@ -34,7 +38,8 @@ export const AddFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
     });
     await saveHandle(drive.id, drive.handle);
     await chromeStorageService.getAndSetStorage();
-    setStep(3);
+    setStep(4);
+    return null;
   };
 
   return (
@@ -65,11 +70,21 @@ export const AddFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
             key="s2"
             defaultLabel={nextKeyLabel(usbSecurity)}
             note={drive?.existed ? 'This drive already has a Yours key file. It will be reused.' : undefined}
-            buttonLabel="Add USB key"
-            onNext={register}
+            onNext={(l) => {
+              setLabel(l);
+              setStep(3);
+            }}
           />
         )}
-        {step === 3 && <DoneStep key="s3" title="USB key added" message="Both keys unlock this wallet." />}
+        {step === 3 && (
+          <PasswordStep
+            key="s3"
+            subtitle={`Enter your password to add "${label}".`}
+            buttonLabel="Add USB key"
+            onConfirm={register}
+          />
+        )}
+        {step === 4 && <DoneStep key="s4" title="USB key added" message="Both keys unlock this wallet." />}
       </AnimatePresence>
     </>
   );

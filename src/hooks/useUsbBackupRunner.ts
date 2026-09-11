@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { YoursEventName } from '../inject';
-import { requestUsbBackup, runUsbBackup, usbBackupEnabled } from '../services/usbBackup';
+import { requestUsbBackup, runUsbBackup, usbBackupEnabled, usbBackupWipePending } from '../services/usbBackup';
 import type { UsbSecurity } from '../services/types/chromeStorage.types';
 import { useServiceContext } from './useServiceContext';
 import type { SyncStatusMessage } from './useSyncTracker';
@@ -26,14 +26,17 @@ const COOLDOWN_MS = 20_000;
  */
 export const useUsbBackupRunner = () => {
   const { chromeStorageService } = useServiceContext();
-  const [enabled, setEnabled] = useState(() => usbBackupEnabled(chromeStorageService.getUsbSecurity()));
+  // Active while backup is on, and also while a switched-off backup still has
+  // copies to erase from keys as they are inserted (runUsbBackup does both).
+  const isActive = (usb: UsbSecurity | undefined) => usbBackupEnabled(usb) || usbBackupWipePending(usb);
+  const [enabled, setEnabled] = useState(() => isActive(chromeStorageService.getUsbSecurity()));
 
   // Settings can flip the feature while the popup is open; follow storage so
   // the loop starts or stops without a reopen.
   useEffect(() => {
     const onChanged = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
       if (area !== 'local' || !('usbSecurity' in changes)) return;
-      setEnabled(usbBackupEnabled(changes.usbSecurity.newValue as UsbSecurity | undefined));
+      setEnabled(isActive(changes.usbSecurity.newValue as UsbSecurity | undefined));
     };
     chrome.storage.onChanged.addListener(onChanged);
     return () => chrome.storage.onChanged.removeListener(onChanged);

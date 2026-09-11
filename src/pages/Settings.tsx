@@ -46,6 +46,7 @@ import {
   isUsbSupported,
   listPresentSticks,
   openUsbWindow,
+  queryHandlePermission,
   requestHandlePermission,
 } from '../services/UsbKey.service';
 import { AvatarPicker } from '../components/AvatarPicker';
@@ -62,7 +63,15 @@ import ProgressBar from '@ramonak/react-progress-bar';
 
 import { derivePasswordKey } from '../services/passKey';
 import { ToggleSwitch } from '../components/ToggleSwitch';
-import { runUsbBackup, summariseUsbBackup, usbBackupEnabled } from '../services/usbBackup';
+import {
+  runUsbBackup,
+  summariseUsbBackup,
+  USB_BACKUP_WARN_BYTES,
+  usbBackupEnabled,
+  usbBackupTotalBytes,
+  wipePendingUsbBackups,
+  wipeUsbBackup,
+} from '../services/usbBackup';
 
 export type SettingsPage =
   | 'main'
@@ -87,7 +96,8 @@ type DecisionType =
   | 'delete-account'
   | 'inscribe-avatar'
   | 'save-profile'
-  | 'remove-usb-stick';
+  | 'remove-usb-stick'
+  | 'disable-usb-backup';
 
 // --- Animation variants ---
 const pageVariants = {
@@ -294,6 +304,8 @@ export const Settings = () => {
   const usbBackupOn = usbBackupEnabled(usbSecurity);
   const usbBackupSummary = summariseUsbBackup(usbSecurity, usbBackupStatus);
   const usbBackupOverdue = usbBackupOn && usbBackupSummary.some((s) => s.stale);
+  const usbBackupBytes = usbBackupTotalBytes(usbBackupStatus);
+  const usbBackupLarge = usbBackupOn && usbBackupBytes >= USB_BACKUP_WARN_BYTES;
 
   const refreshUsbSecurity = useCallback(async () => {
     await chromeStorageService.getAndSetStorage();
@@ -352,7 +364,9 @@ export const Settings = () => {
     }
     const label = usbSecurity.sticks.find((s) => s.id === stickId)?.label ?? 'this key';
     setPendingRemoveStickId(stickId);
-    setSpeedBumpMessage(`Remove "${label}"? It will no longer unlock this wallet.`);
+    setSpeedBumpMessage(
+      `Remove "${label}"? It will no longer unlock this wallet. Its backup copy is erased now if the key is inserted; otherwise it stays on the drive.`,
+    );
     setDecisionType('remove-usb-stick');
     setShowSpeedBump(true);
   };
@@ -371,8 +385,12 @@ export const Settings = () => {
       addSnackbar(err instanceof Error ? err.message : 'Could not remove the USB key', 'error');
       return;
     }
+    // The encrypted wallet copy should not outlive the key's registration
+    // when the drive is here to erase it from.
+    const handle = await getHandle(id);
+    const wiped = !!handle && (await queryHandlePermission(handle)) === 'granted' && (await wipeUsbBackup(handle));
     await deleteHandle(id);
-    addSnackbar('USB key removed', 'success');
+    addSnackbar(wiped ? 'USB key removed and its backup erased' : 'USB key removed', 'success');
     await refreshUsbSecurity();
   };
 
@@ -396,14 +414,43 @@ export const Settings = () => {
   };
 
   const handleToggleUsbBackup = async () => {
-    const enabled = !usbBackupOn;
+    if (usbBackupOn) {
+      setSpeedBumpMessage(
+        'Turn off USB backup? The encrypted wallet copy is erased from your USB keys: inserted keys now, others the next time they are inserted while the wallet is open.',
+      );
+      setDecisionType('disable-usb-backup');
+      setShowSpeedBump(true);
+      return;
+    }
     try {
-      await chromeStorageService.updateUsbSecurity((current) => ({ ...current, backup: { enabled } }));
+      await chromeStorageService.updateUsbSecurity((current) => ({ ...current, backup: { enabled: true } }));
     } catch (err) {
       addSnackbar(err instanceof Error ? err.message : 'Could not update USB backup', 'error');
       return;
     }
     await refreshUsbSecurity();
+  };
+
+  const handleDisableUsbBackup = async () => {
+    try {
+      await chromeStorageService.updateUsbSecurity((current) => ({
+        ...current,
+        backup: { enabled: false, wipeAt: new Date().toISOString() },
+      }));
+      // Inserted keys are erased right away; the rest as they turn up.
+      await wipePendingUsbBackups(chromeStorageService);
+    } catch (err) {
+      addSnackbar(err instanceof Error ? err.message : 'Could not turn off USB backup', 'error');
+      return;
+    }
+    await refreshUsbSecurity();
+    const usb = chromeStorageService.getUsbSecurity();
+    const wipeAt = usb?.backup?.wipeAt ?? '';
+    const remaining = usb?.sticks.filter((s) => !s.backupWipedAt || s.backupWipedAt < wipeAt).length ?? 0;
+    addSnackbar(
+      remaining > 0 ? `USB backup off. ${remaining} key(s) will be erased when inserted` : 'USB backup off and erased',
+      'success',
+    );
   };
 
   // React to query deep-links (e.g. clicking "+ Add New Account" in the TopNav
@@ -701,6 +748,11 @@ export const Settings = () => {
       setDecisionType(undefined);
       setShowSpeedBump(false);
       await handleRemoveUsbStick();
+    }
+    if (decisionType === 'disable-usb-backup') {
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+      await handleDisableUsbBackup();
     }
   };
 
@@ -1495,7 +1547,11 @@ export const Settings = () => {
               <SettingRow
                 icon={<HardDrive size={16} />}
                 label="USB backup"
-                description="Encrypted copy on each key. Key + password restores it"
+                description={
+                  usbBackupLarge
+                    ? `Large (${Math.round(usbBackupBytes / (1024 * 1024))} MB). Keep a master backup file too`
+                    : 'Encrypted copy on each key. Key + password restores it'
+                }
                 right={<ToggleSwitch theme={theme} on={usbBackupOn} onChange={() => void handleToggleUsbBackup()} />}
                 isFirst
               />

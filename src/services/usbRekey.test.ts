@@ -64,3 +64,28 @@ describe('findStaleAccounts / allAccountsDecrypt', () => {
     expect(await allAccountsDecrypt(mixed, key)).toBe(false);
   });
 });
+
+describe('validateUsbSecurity', () => {
+  const good = {
+    enabled: true,
+    version: 1,
+    kdfVersion: 1,
+    masterCheck: 'a'.repeat(64),
+    sticks: [{ id: '0123456789abcdef', label: 'Blue', wrappedMaster: 'v1:abc', addedAt: '2026-09-01T00:00:00Z' }],
+  };
+  test('accepts a well-formed object, with or without backup settings', async () => {
+    const { validateUsbSecurity } = await import('./usbRekey');
+    expect(validateUsbSecurity(good)).toBeNull();
+    expect(validateUsbSecurity({ ...good, backup: { enabled: false, wipeAt: 'x' } })).toBeNull();
+  });
+  test('rejects a disabled, malformed, empty or duplicated set', async () => {
+    const { validateUsbSecurity } = await import('./usbRekey');
+    expect(validateUsbSecurity(null)).not.toBeNull();
+    expect(validateUsbSecurity({ ...good, enabled: false })).not.toBeNull();
+    expect(validateUsbSecurity({ ...good, masterCheck: 'zz' })).not.toBeNull();
+    expect(validateUsbSecurity({ ...good, sticks: [] })).not.toBeNull();
+    expect(validateUsbSecurity({ ...good, sticks: [good.sticks[0], good.sticks[0]] })).not.toBeNull();
+    expect(validateUsbSecurity({ ...good, sticks: [{ ...good.sticks[0], id: 'short' }] })).not.toBeNull();
+    expect(validateUsbSecurity({ ...good, backup: { enabled: 'yes' } })).not.toBeNull();
+  });
+});

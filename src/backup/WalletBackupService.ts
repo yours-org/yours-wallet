@@ -6,7 +6,7 @@ import {
   type BackupProgressCallback,
 } from '@1sat/wallet-browser';
 import { encode } from '@msgpack/msgpack';
-import type { WalletStorageManager, sdk } from '@bsv/wallet-toolbox-client';
+import { sdk, type WalletStorageManager } from '@bsv/wallet-toolbox-client';
 import type { ChromeStorageService } from '../services/ChromeStorage.service';
 import type { Account } from '../services/types/chromeStorage.types';
 import type { Theme } from '../theme.types';
@@ -159,6 +159,8 @@ interface AccountPendingRestore {
   // to fflate's `Unzipped` when constructing `FileRestoreReader`.
   chunks: Record<string, Uint8Array<ArrayBuffer>>; // flat chunk keys (chunk-XXXX.bin)
   chunkCount: number;
+  /** Failed import attempts so far; the caller gives up after a few. */
+  attempts?: number;
 }
 
 // IndexedDB name for storing pending restore data
@@ -383,7 +385,7 @@ export class WalletBackupService {
       chunks?: Record<string, Uint8Array<ArrayBuffer>>;
       isLegacy: boolean;
     },
-    password: string,
+    passwordKey: string,
     onProgress: BackupProgressCallback,
   ): Promise<AnyBackupManifestOrLegacy> {
     // Parse chromeStorage (shared by all formats)
@@ -394,7 +396,7 @@ export class WalletBackupService {
       onProgress({ stage: 'importing', message: 'Detected older backup format. Restoring account keys...' });
 
       const legacyStorage = this.stripUsbState(JSON.parse(chromeStorageJson) as LegacyChromeStorage);
-      const passKey = await this.verifyPasswordAndDeriveKey(legacyStorage, password);
+      const passKey = await this.verifyPasswordKey(legacyStorage, passwordKey);
 
       onProgress({ stage: 'importing', message: 'Restoring account settings...' });
 
@@ -426,7 +428,7 @@ export class WalletBackupService {
     }
 
     const backupChromeStorage = this.stripUsbState(JSON.parse(chromeStorageJson) as BackupChromeStorage);
-    const passKey = await this.verifyPasswordAndDeriveKey(backupChromeStorage, password);
+    const passKey = await this.verifyPasswordKey(backupChromeStorage, passwordKey);
 
     onProgress({ stage: 'importing', message: 'Restoring account settings...' });
 
@@ -542,30 +544,35 @@ export class WalletBackupService {
   /**
    * Verify the password against the backup's encrypted keys and return the derived passKey.
    */
-  private static async verifyPasswordAndDeriveKey(
+  /**
+   * The page derives PBKDF2(password, backup salt) itself and sends only that,
+   * so the password never crosses the runtime message fan-out. Verified by
+   * opening the selected account's keys.
+   */
+  private static async verifyPasswordKey(
     storage: { salt: string; accounts: Record<string, Account>; selectedAccount: string },
-    password: string,
+    passwordKey: string,
   ): Promise<string> {
     const { salt, accounts, selectedAccount } = storage;
     if (!salt) {
       throw new Error('Invalid backup file: missing salt');
     }
-
-    const passKey = derivePasswordKey(password, salt);
-
+    if (!/^[0-9a-f]{64}$/.test(passwordKey)) {
+      throw new Error('Invalid password key');
+    }
     const account = accounts[selectedAccount];
     if (!account?.encryptedKeys) {
       throw new Error('Invalid backup file: missing encrypted keys');
     }
 
     try {
-      const decryptedKeys = await decrypt(account.encryptedKeys, passKey);
+      const decryptedKeys = await decrypt(account.encryptedKeys, passwordKey);
       JSON.parse(decryptedKeys);
     } catch {
       throw new Error('Invalid password - unable to decrypt wallet keys');
     }
 
-    return passKey;
+    return passwordKey;
   }
 
   /**
@@ -621,6 +628,50 @@ export class WalletBackupService {
     await this.clearAccountPendingRestore(identityKey);
 
     onProgress({ stage: 'complete', message: 'Wallet data imported!' });
+
+    // The backup says which outputs were spendable when it was written. Any
+    // spent since would be picked for a send and fail at broadcast. Ask the
+    // chain and release them; in the background, behind the wallet's own
+    // queues, so init is not held up.
+    void this.reviewRestoredUtxos(storage, identityKey, onProgress);
+  }
+
+  /** Mark outputs the chain says are spent as unspendable (the toolbox's invalid-change review, with release). */
+  private static async reviewRestoredUtxos(
+    storage: WalletStorageManager,
+    identityKey: string,
+    onProgress: BackupProgressCallback,
+  ): Promise<void> {
+    try {
+      const released = await storage.runAsStorageProvider(async (sp) => {
+        const user = (await sp.findUsers({ partial: { identityKey } }))[0];
+        if (!user) return 0;
+        const result = await sp.listOutputs(
+          { userId: user.userId, identityKey: user.identityKey },
+          {
+            basket: sdk.specOpInvalidChange,
+            tags: ['release', 'all'],
+            tagQueryMode: 'all',
+            includeLockingScripts: false,
+            includeTransactions: false,
+            includeCustomInstructions: false,
+            includeTags: false,
+            includeLabels: false,
+            limit: 0,
+            offset: 0,
+            seekPermission: false,
+            knownTxids: [],
+          },
+        );
+        return result.totalOutputs;
+      });
+      if (released > 0) {
+        onProgress({ stage: 'importing', message: `Released ${released} output(s) spent since the backup` });
+      }
+      console.log(`[WalletBackupService] post-restore UTXO review: ${released} released`);
+    } catch (err) {
+      console.error('[WalletBackupService] post-restore UTXO review failed:', err);
+    }
   }
 
   /**
@@ -660,6 +711,19 @@ export class WalletBackupService {
     } catch {
       return null;
     }
+  }
+
+  /** Record one failed import attempt for this account; returns the new count. */
+  static async notePendingRestoreAttempt(identityKey: string): Promise<number> {
+    const pending = await this.getAccountPendingRestore(identityKey);
+    if (!pending) return 0;
+    const attempts = (pending.attempts ?? 0) + 1;
+    try {
+      await this.storeAccountPendingRestore(identityKey, { ...pending, attempts });
+    } catch {
+      // Best effort: a failed bookkeeping write only delays giving up.
+    }
+    return attempts;
   }
 
   static async clearAccountPendingRestore(identityKey: string): Promise<void> {

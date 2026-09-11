@@ -87,6 +87,8 @@ export interface UsbStickEntry {
   /** Master factor encrypted under a key derived from this stick's secret. */
   wrappedMaster: string;
   addedAt: string;
+  /** Set once this key's backup folder was erased after backup was turned off (>= `backup.wipeAt`). */
+  backupWipedAt?: string;
 }
 
 /**
@@ -100,8 +102,12 @@ export interface UsbSecurity {
   /** HKDF(master) verifier so a recovery-code typo reads differently from a wrong password. */
   masterCheck: string;
   sticks: UsbStickEntry[];
-  /** USB backup sync (OPL-4685). Absent = on, for wallets enrolled before the option existed. */
-  backup?: { enabled: boolean };
+  /**
+   * USB backup sync (OPL-4685). Absent = on, for wallets enrolled before the
+   * option existed. `wipeAt` is set when backup is turned off: every key
+   * whose `backupWipedAt` is older has its backup folder erased when next seen.
+   */
+  backup?: { enabled: boolean; wipeAt?: string };
 }
 
 /** Per-account record of the most recent completed USB backup, across all keys. */
@@ -109,6 +115,8 @@ export interface UsbBackupAccountStatus {
   lastBackupAt: string;
   /** Which registered keys hold a copy as of `lastBackupAt`. */
   stickIds: string[];
+  /** Plaintext bytes of this account's current backup generation (largest across keys). */
+  bytes?: number;
 }
 
 /** Written first and cleared last by the re-key routine. Other account writers refuse while set. */

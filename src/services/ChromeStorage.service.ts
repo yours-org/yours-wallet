@@ -419,7 +419,12 @@ export class ChromeStorageService {
 
   removeNested = async <K extends keyof ChromeStorageObject>(key: K, nestedKey: string): Promise<void> => {
     try {
-      const result = await this.get([key]);
+      const result = await this.get(key === 'accounts' ? [key, 'keyRekey'] : [key]);
+      if (key === 'accounts' && result.keyRekey) {
+        // Same read-merge-write as updateNested: it would revert every other
+        // account to the previous key mid re-key.
+        throw new Error('Wallet keys are being re-encrypted; try again in a moment');
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const existingObject = (result[key] ?? {}) as Record<string, any>;
       delete existingObject[nestedKey];

@@ -158,6 +158,7 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   // waits for all reader/writer locks; once the address sync is running it
   // holds those almost continuously and the import never starts, and every
   // wallet read (balance, storage info) then queues behind it.
+  const PENDING_IMPORT_MAX_ATTEMPTS = 3;
   const runPendingImport = async (
     storage: import('@1sat/wallet-browser').WalletStorageManager,
     currentIdentityKey: string,
@@ -176,9 +177,11 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
     const watchdog = setInterval(() => {
       console.warn(`[background] PendingRestore: still importing after ${Math.round((Date.now() - started) / 1000)}s`);
     }, 10_000);
-    // Hard cap: the import must never take the wallet down with it. On timeout
-    // the wallet initialises without it and the parked data stays for a retry.
-    const IMPORT_TIMEOUT_MS = 45_000;
+    // Hard cap, generous: the import must never take the wallet down with it.
+    // Balance reads queue behind the import anyway (it holds the sync lock),
+    // so a short cap only hides the wait; this one exists for a wedged import.
+    // On timeout the wallet initialises without it and the parked data stays.
+    const IMPORT_TIMEOUT_MS = 10 * 60_000;
     let timedOut = false;
     const importPromise = WalletBackupService.importPendingWalletData(
       storage as unknown as Parameters<typeof WalletBackupService.importPendingWalletData>[0],
@@ -208,8 +211,14 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
       }
     } catch (error) {
       console.error('[background] initializeWallet: Pending restore failed:', error);
-      // Clear only this account's pending data to avoid repeated failures
-      await WalletBackupService.clearAccountPendingRestore(currentIdentityKey);
+      // The parked chunks may be the whole wallet: keep them for another try
+      // (a transient failure, a worker killed mid-import). Give up only after
+      // repeated failures so a broken backup cannot stall every unlock.
+      const attempts = await WalletBackupService.notePendingRestoreAttempt(currentIdentityKey);
+      if (attempts >= PENDING_IMPORT_MAX_ATTEMPTS) {
+        console.error(`[background] initializeWallet: giving up on pending restore after ${attempts} attempts`);
+        await WalletBackupService.clearAccountPendingRestore(currentIdentityKey);
+      }
     } finally {
       clearInterval(watchdog);
     }
@@ -1021,7 +1030,7 @@ if (isInServiceWorker) {
           return true;
         }
         case 'USB_REKEY':
-          usbRekey(chromeStorageService, message as UsbRekeyRequest)
+          usbRekey(chromeStorageService, message as UsbRekeyRequest, { lockGeneration: () => lockGeneration })
             .then((res) => sendResponse({ type: 'USB_REKEY', ...res }))
             .catch((err: Error) => sendResponse({ type: 'USB_REKEY', success: false, error: err.message }));
           return true;
@@ -2123,7 +2132,8 @@ if (isInServiceWorker) {
   const processMasterRestore = async (
     message: {
       legacy: boolean;
-      password: string;
+      /** PBKDF2(password, backup salt), hex. Derived on the page so the password never rides the runtime fan-out. */
+      passwordKey: string;
       chromeStorageData: string;
       manifestData?: string;
       settingsData?: string;
@@ -2134,7 +2144,7 @@ if (isInServiceWorker) {
     sendResponse: CallbackResponse,
   ) => {
     try {
-      const { legacy, password, chromeStorageData } = message;
+      const { legacy, passwordKey, chromeStorageData } = message;
 
       // Decode the pre-extracted entries from the popup
       const chromeStorageBytes = fromBase64(chromeStorageData);
@@ -2173,7 +2183,7 @@ if (isInServiceWorker) {
           chunks,
           isLegacy: legacy,
         },
-        password,
+        passwordKey,
         (event) => {
           console.log('[MasterRestore]', event.message);
           restoreProgress(event.message);
@@ -2189,7 +2199,7 @@ if (isInServiceWorker) {
       // initialises, so no account writer races the re-key.
       if (message.usbRekey) {
         restoreProgress('Turning the USB security key back on…');
-        const r = await usbRekey(chromeStorageService, message.usbRekey);
+        const r = await usbRekey(chromeStorageService, message.usbRekey, { lockGeneration: () => lockGeneration });
         if (!r.success) {
           // The wallet is restored and usable with the password alone; the
           // user can turn the security key on again from Settings.

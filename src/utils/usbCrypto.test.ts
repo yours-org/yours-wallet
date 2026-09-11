@@ -142,13 +142,33 @@ describe('stick file', () => {
 describe('backup bytes', () => {
   test('round-trips under the backup key and fails under another', async () => {
     const { deriveBackupKey, encryptBytes, decryptBytes, bytesToBase64, base64ToBytes } = await import('./usbCrypto');
-    const key = await deriveBackupKey(deriveKey('pw', 'salt'));
+    const key = await deriveBackupKey(deriveKey('pw', 'salt'), 'stick-a');
     const plain = new TextEncoder().encode('hello chunk');
     const enc = await encryptBytes(key, plain);
     expect(enc.length).toBe(12 + plain.length + 16);
     expect(new TextDecoder().decode(await decryptBytes(key, enc))).toBe('hello chunk');
-    const other = await deriveBackupKey(deriveKey('pw2', 'salt'));
+    const other = await deriveBackupKey(deriveKey('pw2', 'salt'), 'stick-a');
     await expect(decryptBytes(other, enc)).rejects.toBeDefined();
     expect(base64ToBytes(bytesToBase64(enc))).toEqual(enc);
+  });
+
+  test('the key is per drive: the same passKey on another stick id does not open the bytes', async () => {
+    const { deriveBackupKey, encryptBytes, decryptBytes } = await import('./usbCrypto');
+    const a = await deriveBackupKey(deriveKey('pw', 'salt'), 'stick-a');
+    const b = await deriveBackupKey(deriveKey('pw', 'salt'), 'stick-b');
+    const enc = await encryptBytes(a, new TextEncoder().encode('x'));
+    await expect(decryptBytes(b, enc)).rejects.toBeDefined();
+  });
+
+  test('additional data binds a file to its place: wrong role, folder or index fails', async () => {
+    const { deriveBackupKey, encryptBytes, decryptBytes } = await import('./usbCrypto');
+    const key = await deriveBackupKey(deriveKey('pw', 'salt'), 'stick-a');
+    const plain = new TextEncoder().encode('chunk 3 of dir d1');
+    const enc = await encryptBytes(key, plain, 'v3|stick-a|chunk|d1|3');
+    expect(await decryptBytes(key, enc, 'v3|stick-a|chunk|d1|3')).toEqual(plain);
+    await expect(decryptBytes(key, enc, 'v3|stick-a|chunk|d1|4')).rejects.toBeDefined();
+    await expect(decryptBytes(key, enc, 'v3|stick-a|chunk|d2|3')).rejects.toBeDefined();
+    await expect(decryptBytes(key, enc, 'v3|stick-a|keys')).rejects.toBeDefined();
+    await expect(decryptBytes(key, enc)).rejects.toBeDefined();
   });
 });

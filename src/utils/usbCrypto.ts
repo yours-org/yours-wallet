@@ -219,9 +219,10 @@ export const BACKUP_KDF_ITERATIONS = 600_000;
  * an offline guessing target like an exported backup file. This adds a
  * deliberately slow step on top of the passKey to raise the cost per guess.
  * Restore needs exactly what unlock needs: the drive's own secret plus the
- * password.
+ * password. The stick id is mixed in so each drive's files are under their
+ * own key: ciphertext from one drive means nothing on another.
  */
-export const deriveBackupKey = async (passKeyHex: string): Promise<CryptoKey> => {
+export const deriveBackupKey = async (passKeyHex: string, stickId: string): Promise<CryptoKey> => {
   const base = await crypto.subtle.importKey('raw', hexToBytes(passKeyHex).buffer as ArrayBuffer, 'PBKDF2', false, [
     'deriveBits',
   ]);
@@ -235,25 +236,39 @@ export const deriveBackupKey = async (passKeyHex: string): Promise<CryptoKey> =>
     base,
     256,
   );
-  return importAesKey(await hkdf(new Uint8Array(bits), BACKUP_SALT, 'aes'));
+  return importAesKey(await hkdf(new Uint8Array(bits), BACKUP_SALT, `aes|${stickId}`));
 };
 
-/** iv (12 bytes) || ciphertext. */
-export const encryptBytes = async (key: CryptoKey, plain: Uint8Array): Promise<Uint8Array> => {
+/**
+ * iv (12 bytes) || ciphertext. `aad` names what the file is (drive, role,
+ * account, chunk index) so a ciphertext moved to another name or slot fails
+ * to open instead of being taken for the file it replaced.
+ */
+export const encryptBytes = async (key: CryptoKey, plain: Uint8Array, aad = ''): Promise<Uint8Array> => {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain.buffer as ArrayBuffer));
+  const ct = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv, additionalData: enc.encode(aad).buffer as ArrayBuffer },
+      key,
+      plain.buffer as ArrayBuffer,
+    ),
+  );
   const out = new Uint8Array(iv.length + ct.length);
   out.set(iv, 0);
   out.set(ct, iv.length);
   return out;
 };
 
-export const decryptBytes = async (key: CryptoKey, data: Uint8Array): Promise<Uint8Array> => {
+export const decryptBytes = async (key: CryptoKey, data: Uint8Array, aad = ''): Promise<Uint8Array> => {
   if (data.length < 13) throw new Error('Encrypted data too short');
   const iv = data.slice(0, 12);
   const ct = data.slice(12);
   return new Uint8Array(
-    await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv.buffer as ArrayBuffer }, key, ct.buffer as ArrayBuffer),
+    await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer, additionalData: enc.encode(aad).buffer as ArrayBuffer },
+      key,
+      ct.buffer as ArrayBuffer,
+    ),
   );
 };
 

@@ -70,8 +70,8 @@ export const RestoreFlow = () => {
         action: 'MASTER_RESTORE',
         legacy: false,
         ...data,
-        password,
-        usbRekey: { newPassKey: usb.combinedPassKey, usbSecurity: usb.usbSecurity },
+        passwordKey: usb.passwordKey,
+        usbRekey: { passwordKey: usb.passwordKey, newMaster: usb.master, usbSecurity: usb.usbSecurity },
       });
     } catch (e) {
       res = { success: false, error: errorText(e) };

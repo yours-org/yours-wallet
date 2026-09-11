@@ -68,3 +68,41 @@ export const allAccountsDecrypt = async (accounts: Record<string, Account>, pass
   }
   return true;
 };
+
+const HEX_64 = /^[0-9a-f]{64}$/;
+const HEX_16 = /^[0-9a-f]{16}$/;
+
+/**
+ * Strict shape check for a `UsbSecurity` object that arrived from outside the
+ * background's own storage (a re-key request, a backup on a drive). Returns
+ * the reason it is unacceptable, or null when it is well-formed.
+ */
+export const validateUsbSecurity = (value: unknown): string | null => {
+  if (typeof value !== 'object' || value === null) return 'USB settings are missing';
+  const v = value as Record<string, unknown>;
+  if (v.enabled !== true) return 'USB settings are not enabled';
+  if (v.version !== 1 || v.kdfVersion !== 1) return 'Unsupported USB settings version';
+  if (typeof v.masterCheck !== 'string' || !HEX_64.test(v.masterCheck)) return 'USB settings verifier is malformed';
+  if (!Array.isArray(v.sticks) || v.sticks.length === 0) return 'USB settings list no keys';
+  const seen = new Set<string>();
+  for (const s of v.sticks as unknown[]) {
+    if (typeof s !== 'object' || s === null) return 'A registered key entry is malformed';
+    const e = s as Record<string, unknown>;
+    if (typeof e.id !== 'string' || !HEX_16.test(e.id)) return 'A registered key id is malformed';
+    if (seen.has(e.id)) return 'A registered key is listed twice';
+    seen.add(e.id);
+    if (typeof e.label !== 'string' || e.label.length === 0 || e.label.length > 64) return 'A key label is malformed';
+    if (typeof e.wrappedMaster !== 'string' || e.wrappedMaster.length === 0 || e.wrappedMaster.length > 512) {
+      return 'A key wrapper is malformed';
+    }
+    if (typeof e.addedAt !== 'string') return 'A key entry is missing its date';
+    if (e.backupWipedAt !== undefined && typeof e.backupWipedAt !== 'string') return 'A key entry is malformed';
+  }
+  if (v.backup !== undefined) {
+    if (typeof v.backup !== 'object' || v.backup === null) return 'USB backup settings are malformed';
+    const b = v.backup as Record<string, unknown>;
+    if (typeof b.enabled !== 'boolean') return 'USB backup settings are malformed';
+    if (b.wipeAt !== undefined && typeof b.wipeAt !== 'string') return 'USB backup settings are malformed';
+  }
+  return null;
+};

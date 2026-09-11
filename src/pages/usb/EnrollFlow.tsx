@@ -7,7 +7,7 @@ import { derivePasswordKey } from '../../services/passKey';
 import { deleteHandle, saveHandle } from '../../services/UsbKey.service';
 import type { UsbSecurity } from '../../services/types/chromeStorage.types';
 import { sendMessageAsync } from '../../utils/chromeHelpers';
-import { combinePassKey, computeMasterCheck, newMaster, wrapMaster } from '../../utils/usbCrypto';
+import { computeMasterCheck, newMaster, wrapMaster } from '../../utils/usbCrypto';
 import { Heading, Note, StepBody, StepList, Stepper, TextLink } from './UsbLayout';
 import { ChooseDriveStep, DoneStep, LabelStep, PasswordStep, RecoveryCodeStep } from './steps';
 import { prepareDrive, type PreparedDrive, type RekeyResponse } from './usbHelpers';
@@ -68,8 +68,7 @@ export const EnrollFlow = () => {
     if (!(await chromeStorageService.verifyPassword(password))) return 'Incorrect password';
     const { salt } = chromeStorageService.getCurrentAccountObject();
     if (!salt) return 'Wallet salt is missing';
-    const pbkdf = derivePasswordKey(password, salt);
-    const newPassKey = await combinePassKey(pbkdf, master);
+    const passwordKey = derivePasswordKey(password, salt);
     const wrappedMaster = await wrapMaster(master, drive.secret, drive.id);
     const masterCheck = await computeMasterCheck(master);
     const usbSecurity: UsbSecurity = {
@@ -82,7 +81,7 @@ export const EnrollFlow = () => {
     await saveHandle(drive.id, drive.handle);
     let res: RekeyResponse | undefined;
     try {
-      res = await sendMessageAsync<RekeyResponse>({ action: 'USB_REKEY', newPassKey, usbSecurity });
+      res = await sendMessageAsync<RekeyResponse>({ action: 'USB_REKEY', passwordKey, newMaster: master, usbSecurity });
     } catch (e) {
       res = { success: false, error: e instanceof Error ? e.message : String(e) };
     }
