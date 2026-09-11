@@ -55,9 +55,12 @@ const dec = new TextDecoder();
 
 // --- On-drive formats ---
 
+/** Bump whenever `deriveBackupKey` or the file layout changes. Older backups are rebuilt, not read. */
+export const USB_BACKUP_FORMAT_VERSION = 2;
+
 interface RestoreJson {
   format: 'yours-usb-backup';
-  version: 1;
+  version: number;
   chain: 'main';
   salt: string;
   /** Wrappers and verifier only; no secrets. Restore unwraps with the drive's own file. */
@@ -324,19 +327,31 @@ const syncStick = async (
   // secrets, rewritten only when the content differs.
   const restore: RestoreJson = {
     format: 'yours-usb-backup',
-    version: 1,
+    version: USB_BACKUP_FORMAT_VERSION,
     chain: 'main',
     salt: storage.salt,
     usbSecurity: usb,
   };
   const restoreBytes = enc.encode(JSON.stringify(restore, null, 2));
-  if (!bytesEqual(await readFileBytes(dir, RESTORE_FILE), restoreBytes)) {
+  const existingRestore = await readFileBytes(dir, RESTORE_FILE);
+  let previousVersion: number | undefined;
+  if (existingRestore) {
+    try {
+      previousVersion = (JSON.parse(dec.decode(existingRestore)) as RestoreJson).version;
+    } catch {
+      previousVersion = undefined;
+    }
+  }
+  if (!bytesEqual(existingRestore, restoreBytes)) {
     await writeFile(dir, RESTORE_FILE, restoreBytes);
     changed = true;
   }
 
   const now = new Date().toISOString();
-  const manifest: Manifest = (await readEncryptedJson<Manifest>(key, dir, MANIFEST_FILE)) ?? {
+  // A backup written by an older format (different key derivation or layout)
+  // is unreadable here by design: start over rather than trust any of it.
+  const oldFormat = previousVersion !== undefined && previousVersion !== USB_BACKUP_FORMAT_VERSION;
+  const manifest: Manifest = (oldFormat ? null : await readEncryptedJson<Manifest>(key, dir, MANIFEST_FILE)) ?? {
     version: 1,
     createdAt: now,
     updatedAt: now,
@@ -533,6 +548,11 @@ export const readUsbBackup = async (drive: FileSystemDirectoryHandle, password: 
   if (!restoreRaw) throw new Error('No backup found on this drive');
   const restore = JSON.parse(dec.decode(restoreRaw)) as RestoreJson;
   if (restore.format !== 'yours-usb-backup') throw new Error('Unrecognised backup format');
+  if (restore.version !== USB_BACKUP_FORMAT_VERSION) {
+    throw new Error(
+      'This backup was written by an older version of Yours. Open the wallet with this key inserted to refresh it, then try again.',
+    );
+  }
 
   const entry = restore.usbSecurity.sticks.find((s) => s.id === stick.id);
   if (!entry) throw new Error('This backup was not written by this USB key');
