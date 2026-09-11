@@ -1592,8 +1592,9 @@ export const Settings = () => {
                   : `Exporting wallet data for ${backupAccounts.length} account${backupAccounts.length === 1 ? '' : 's'}`}
             </p>
 
-            {/* Per-account status list */}
-            <div className="w-full max-w-xs space-y-2 mb-5">
+            {/* Per-account status list. Scrolls within a fixed height so the
+                progress bar and Done button stay on screen with many accounts. */}
+            <div className="w-full max-w-xs space-y-2 mb-5 overflow-y-auto pr-1" style={{ maxHeight: '11rem' }}>
               {backupAccounts.map((acct, i) => (
                 <div
                   key={i}
