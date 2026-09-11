@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { driveHasUsbBackup, readUsbBackup } from '../../services/usbBackup';
+import { saveHandle } from '../../services/UsbKey.service';
 import { sendMessageAsync } from '../../utils/chromeHelpers';
 import { Stepper } from './UsbLayout';
 import { BlockedStep, ChooseDriveStep, DoneStep, PasswordStep } from './steps';
@@ -60,11 +61,20 @@ export const RestoreFlow = () => {
     setProgress(`Restoring ${Object.keys(payload.chunksData).length} data chunks…`);
     let res: RestoreResponse | undefined;
     try {
-      res = await sendMessageAsync<RestoreResponse>({ action: 'MASTER_RESTORE', legacy: false, ...payload, password });
+      const { usb, partialAccounts: _p, ...data } = payload;
+      res = await sendMessageAsync<RestoreResponse>({
+        action: 'MASTER_RESTORE',
+        legacy: false,
+        ...data,
+        password,
+        usbRekey: { newPassKey: usb.combinedPassKey, usbSecurity: usb.usbSecurity },
+      });
     } catch (e) {
       res = { success: false, error: errorText(e) };
     }
     if (!res?.success) return res?.error ?? 'Restore failed';
+    // This drive is now a registered key on this computer too.
+    await saveHandle(payload.usb.stickId, drive);
     setPartial(payload.partialAccounts);
     setStep(2);
     return null;
@@ -97,8 +107,8 @@ export const RestoreFlow = () => {
             title="Wallet restored"
             message={
               partial.length > 0
-                ? `Keys restored. History is importing in the background; open the Yours icon to unlock. ${partial.length} account(s) had an incomplete backup on this key (${partial.join(', ')}). USB unlock is off until you turn it on again.`
-                : 'Keys restored. History is importing in the background; open the Yours icon to unlock. USB unlock is off until you turn it on again.'
+                ? `Keys restored and USB unlock is on with this key. History is importing in the background; open the Yours icon to unlock. ${partial.length} account(s) had an incomplete backup on this key (${partial.join(', ')}).`
+                : 'Keys restored and USB unlock is on with this key. History is importing in the background; open the Yours icon to unlock. Other registered keys need "Find my USB key" once on this computer.'
             }
           />
         )}

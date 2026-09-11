@@ -530,6 +530,8 @@ export interface UsbRestorePayload {
   chunksData: Record<string, string>;
   /** Accounts whose backup on this drive never completed a full pass. */
   partialAccounts: string[];
+  /** For turning USB unlock back on right after restore, with the same key and recovery code. */
+  usb: { stickId: string; usbSecurity: UsbSecurity; combinedPassKey: string };
 }
 
 /**
@@ -618,6 +620,7 @@ export const readUsbBackup = async (drive: FileSystemDirectoryHandle, password: 
     settingsData: bytesToBase64(settings),
     chunksData,
     partialAccounts,
+    usb: { stickId: stick.id, usbSecurity: restore.usbSecurity, combinedPassKey: combined },
   };
 };
 

@@ -2035,6 +2035,8 @@ if (isInServiceWorker) {
       manifestData?: string;
       settingsData?: string;
       chunksData?: Record<string, string>;
+      /** USB restore only: turn USB unlock back on before the wallet initialises. */
+      usbRekey?: UsbRekeyRequest;
     },
     sendResponse: CallbackResponse,
   ) => {
@@ -2088,6 +2090,16 @@ if (isInServiceWorker) {
       // Refresh chrome storage service to pick up restored data (including passKey)
       await chromeStorageService.getAndSetStorage();
       console.log('[MasterRestore] Chrome storage refreshed');
+
+      // Restored from a USB key: put USB unlock back exactly as it was, with the
+      // same wrappers and recovery code. Done here, before the wallet
+      // initialises, so no account writer races the re-key.
+      if (message.usbRekey) {
+        restoreProgress('Turning USB unlock back on…');
+        const r = await usbRekey(chromeStorageService, message.usbRekey);
+        if (!r.success) throw new Error(`Restored, but USB unlock could not be re-enabled: ${r.error}`);
+        await chromeStorageService.getAndSetStorage();
+      }
 
       // Keys and settings are in place and every account's data is parked for
       // import. Reply now: the wallet initialisation that follows can take
