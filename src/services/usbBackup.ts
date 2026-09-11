@@ -48,7 +48,7 @@ export const COMPACT_AFTER_CHUNKS = 40;
 /** A key not refreshed for this long shows as stale. */
 export const USB_BACKUP_STALE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Chrome runtime messages have a hard size limit; refuse well below it with a clear message. */
-const MAX_RESTORE_PAYLOAD_BYTES = 48 * 1024 * 1024;
+const MAX_RESTORE_PAYLOAD_BYTES = 32 * 1024 * 1024;
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
