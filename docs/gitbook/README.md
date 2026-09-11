@@ -49,7 +49,7 @@ Use the [SUMMARY](SUMMARY.md) sidebar for the complete index, or jump to:
 
 - Payments — [sendBsv](actions/send-bsv.md), [sendAllBsv](actions/send-all-bsv.md), [listOutputs](actions/list-outputs.md)
 - Ordinals — [getOrdinals](actions/get-ordinals.md), [transferOrdinals](actions/transfer-ordinals.md), [inscribe](actions/inscribe.md), [burnOrdinals](actions/burn-ordinals.md)
-- Marketplace — [listOrdinal](actions/list-ordinal.md), [purchaseOrdinal](actions/purchase-ordinal.md), [cancelListing](actions/cancel-listing.md)
+- Marketplace — [listOrdinal](actions/list-ordinal.md) (currently disabled), [purchaseOrdinal](actions/purchase-ordinal.md), [cancelListing](actions/cancel-listing.md)
 - BSV-21 — [getBsv21Balances](actions/get-bsv21-balances.md), [sendBsv21](actions/send-bsv21.md)
 - MNEE — [deriveDepositAddresses](actions/derive-deposit-addresses.md), [sendMnee](actions/send-mnee.md), [getMneeBalance](actions/get-mnee-balance.md)
 - Identity — [getProfile](actions/get-profile.md), [updateProfile](actions/update-profile.md), [publishIdentity](actions/publish-identity.md)
