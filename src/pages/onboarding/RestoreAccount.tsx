@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CheckCircle, ChevronRight, Upload } from 'lucide-react';
+import { ArrowLeft, CheckCircle, ChevronRight, Upload, Usb } from 'lucide-react';
+import { isUsbSupported, openUsbWindow } from '../../services/UsbKey.service';
 import relayXLogo from '../../assets/relayx.svg';
 import twetchLogo from '../../assets/twetch.svg';
 import yoursWhiteLogo from '../../assets/logos/white-logo.png';
@@ -147,6 +148,12 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
       navigate('/master-restore');
       return;
     }
+    if (newWallet && wallet === ('usb' as SupportedWalletImports)) {
+      // The folder picker needs a window that survives focus loss, so this
+      // runs in the standalone USB window rather than the popup.
+      void openUsbWindow('restore');
+      return;
+    }
     setStep(2);
   };
 
@@ -219,6 +226,22 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
               </div>
             ),
           },
+          ...(isUsbSupported()
+            ? [
+                {
+                  id: 'usb' as SupportedWalletImports,
+                  label: 'Restore from USB key',
+                  logo: (
+                    <div
+                      className="flex items-center justify-center rounded-lg"
+                      style={{ backgroundColor: '#000', width: '2.25rem', height: '2.25rem' }}
+                    >
+                      <Usb size={18} color="#A1FF8B" />
+                    </div>
+                  ),
+                },
+              ]
+            : []),
         ]
       : []),
     {
@@ -282,7 +305,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   );
 
   const selectImportWallet = (
-    <div className="flex flex-col items-center w-full pb-20">
+    <div className={`flex flex-col items-center w-full ${newWallet ? 'pb-6' : 'pb-20'}`}>
       <PageHeader
         title="Restore a Wallet"
         onClick={() => (newWallet ? navigate('/') : onNavigateBack('manage-accounts'))}
@@ -314,7 +337,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   );
 
   const enterSeedStep = (
-    <div className="flex flex-col items-center w-full pb-20">
+    <div className={`flex flex-col items-center w-full ${newWallet ? 'pb-6' : 'pb-20'}`}>
       <SubStepHeader title={getRestoreTitle()} onBack={() => setStep(1)} />
       <p className="text-xs mb-4 text-center px-4" style={{ color: gray }}>
         {getRestoreDescription()}
@@ -422,7 +445,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   );
 
   const passwordStep = (
-    <div className="flex flex-col items-center w-full pb-20">
+    <div className={`flex flex-col items-center w-full ${newWallet ? 'pb-6' : 'pb-20'}`}>
       <SubStepHeader title={newWallet ? 'Create Password' : 'Import Account'} onBack={() => setStep(2)} />
       <p className="text-xs mb-4 text-center" style={{ color: gray }}>
         {newWallet ? 'This will be used to unlock your wallet.' : 'Enter your existing password.'}

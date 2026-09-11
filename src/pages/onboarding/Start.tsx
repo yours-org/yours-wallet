@@ -6,7 +6,6 @@ import { Show } from '../../components/Show';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useTheme } from '../../hooks/useTheme';
 import { useServiceContext } from '../../hooks/useServiceContext';
-import { isUsbSupported, openUsbWindow } from '../../services/UsbKey.service';
 import { YoursIcon } from '../../components/YoursIcon';
 
 const fadeUp = {
@@ -128,22 +127,6 @@ export const Start = () => {
               Restore Wallet
             </button>
           </motion.div>
-
-          {/* Tertiary: restore from a USB key backup (Chrome/Edge only) */}
-          {isUsbSupported() && (
-            <motion.button
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              custom={0.4}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => void openUsbWindow('restore')}
-              className="text-xs bg-transparent border-none cursor-pointer select-none hover:underline"
-              style={{ color: gray, padding: 0 }}
-            >
-              Restore from USB key
-            </motion.button>
-          )}
 
           {/* GitHub link */}
           <motion.button
