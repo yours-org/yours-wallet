@@ -539,7 +539,8 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
 
   return (
     <Show when={!loading} whenFalseContent={<PageLoader theme={theme} message="Restoring..." />}>
-      <div className="flex flex-col items-center w-full px-2 pt-4 pb-4">
+      {/* my-auto: centred when short, top-aligned (not clipped) when taller than the wallet box. */}
+      <div className="flex flex-col items-center w-full px-2 pt-4 pb-4 my-auto">
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div
