@@ -28,8 +28,10 @@ export const AddFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
     if (!drive || !master) throw new Error('Missing USB key material');
     const wrappedMaster = await wrapMaster(master, drive.secret, drive.id);
     const entry: UsbStickEntry = { id: drive.id, label, wrappedMaster, addedAt: new Date().toISOString() };
-    const newUsb: UsbSecurity = { ...usbSecurity, sticks: [...usbSecurity.sticks, entry] };
-    await chromeStorageService.replaceTopLevel({ usbSecurity: newUsb });
+    await chromeStorageService.updateUsbSecurity((current) => {
+      if (current.sticks.some((s) => s.id === entry.id)) throw new Error('This USB key is already registered');
+      return { ...current, sticks: [...current.sticks, entry] };
+    });
     await saveHandle(drive.id, drive.handle);
     await chromeStorageService.getAndSetStorage();
     setStep(3);

@@ -3,10 +3,12 @@ import { motion } from 'framer-motion';
 import { Loader2, Usb } from 'lucide-react';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useTheme } from '../hooks/useTheme';
-import { probeSticks, requestNextStickPermission, type StickProbe } from '../services/UsbKey.service';
+import { openUsbWindow, probeSticks, requestNextStickPermission, type StickProbe } from '../services/UsbKey.service';
 import { PageLoader } from './PageLoader';
 
 const RECHECK_MS = 5000;
+/** A single failed read is ignored (sleep/wake, flaky readers); two in a row means the key is out. */
+const MISSES_TO_LOCK = 2;
 
 /**
  * USB unlock: the popup checks for the key as soon as it opens on an unlocked
@@ -23,16 +25,28 @@ export const UsbGate = ({ children }: { children: ReactNode }) => {
   const [probe, setProbe] = useState<StickProbe | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const probing = useRef(false);
+  const misses = useRef(0);
 
   const check = useCallback(async () => {
     if (!usbSecurity?.enabled || probing.current) return;
     probing.current = true;
     try {
-      const result = await probeSticks(usbSecurity);
+      let result: StickProbe;
+      try {
+        result = await probeSticks(usbSecurity);
+      } catch {
+        result = { status: 'absent' };
+      }
       setProbe(result);
-      if (result.status === 'absent' || result.status === 'no-handles') await lockWallet();
-    } catch {
-      await lockWallet();
+      // Only a failed read under a live grant counts as removal. 'permission'
+      // (no grant yet) and 'no-handles' (nothing saved on this profile, e.g.
+      // right after a recovery-code unlock while the rotate window is open)
+      // say nothing about whether a drive is in, so they never lock.
+      if (result.status === 'ok') misses.current = 0;
+      else if (result.status === 'absent' && ++misses.current >= MISSES_TO_LOCK) {
+        misses.current = 0;
+        await lockWallet();
+      }
     } finally {
       probing.current = false;
     }
@@ -52,6 +66,7 @@ export const UsbGate = ({ children }: { children: ReactNode }) => {
       await requestNextStickPermission(probe.stickIds);
       const result = usbSecurity ? await probeSticks(usbSecurity) : undefined;
       setProbe(result);
+      // Still not readable after a grant: the drive is not there.
       if (result?.status !== 'ok') await lockWallet();
     } finally {
       setBusy(false);
@@ -60,9 +75,11 @@ export const UsbGate = ({ children }: { children: ReactNode }) => {
 
   if (!enabled || probe?.status === 'ok') return <>{children}</>;
 
-  if (probe === undefined || probe.status !== 'permission') {
+  if (probe === undefined || probe.status === 'absent') {
     return <PageLoader message="Checking USB key..." theme={theme} />;
   }
+
+  const noHandles = probe.status === 'no-handles';
 
   const contrast = theme.color.global.contrast;
   const gray = theme.color.global.gray;
@@ -78,9 +95,9 @@ export const UsbGate = ({ children }: { children: ReactNode }) => {
     >
       <Usb size={32} style={{ color: gray }} />
       <div>
-        <p className="text-base font-bold m-0">Confirm your USB key</p>
+        <p className="text-base font-bold m-0">{noHandles ? 'Register a USB key' : 'Confirm your USB key'}</p>
         <p className="text-xs m-0 mt-1" style={{ color: gray }}>
-          Chrome needs access to read it.
+          {noHandles ? 'No USB key is set up on this computer yet.' : 'Chrome needs access to read it.'}
         </p>
       </div>
       <motion.div
@@ -92,7 +109,7 @@ export const UsbGate = ({ children }: { children: ReactNode }) => {
         <button
           type="button"
           disabled={busy}
-          onClick={() => void allow()}
+          onClick={() => (noHandles ? void openUsbWindow('repick') : void allow())}
           className="relative inline-flex items-center justify-center w-full font-bold text-sm rounded-xl h-10 px-4 outline-none select-none cursor-pointer border-none disabled:opacity-50 gap-2"
           style={{
             backgroundColor: theme.color.global.walletBackground,
@@ -105,6 +122,8 @@ export const UsbGate = ({ children }: { children: ReactNode }) => {
               <Loader2 size={15} className="animate-spin" />
               Checking...
             </>
+          ) : noHandles ? (
+            'Find my USB key'
           ) : (
             'Allow USB access'
           )}

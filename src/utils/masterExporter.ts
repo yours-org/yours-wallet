@@ -23,7 +23,8 @@ type MasterBackupProgress = (event: MasterBackupProgressEvent) => void;
 export const streamDataToZip = async (
   _chromeStorageService: ChromeStorageService,
   progress: MasterBackupProgress,
-  password?: string,
+  /** Password-only key (PBKDF2 of the password). With USB unlock on, export needs it to re-encrypt. */
+  passwordKey?: string,
 ) => {
   progress({ message: 'Starting backup...', stage: 'preparing' });
 
@@ -46,7 +47,7 @@ export const streamDataToZip = async (
   chrome.runtime.onMessage.addListener(progressListener);
 
   try {
-    const response = await chrome.runtime.sendMessage({ action: 'MASTER_BACKUP', password });
+    const response = await chrome.runtime.sendMessage({ action: 'MASTER_BACKUP', passwordKey });
 
     chrome.runtime.onMessage.removeListener(progressListener);
 

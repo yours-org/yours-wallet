@@ -196,7 +196,7 @@ export class WalletBackupService {
     openAccount: (
       account: BackupAccountDescriptor,
     ) => Promise<{ storage: WalletStorageManager; close: () => Promise<void> }>,
-    password: string | undefined,
+    passwordKey: string | undefined,
     onProgress: (event: MultiAccountProgressEvent) => void,
   ): Promise<Blob> {
     onProgress({ stage: 'preparing', message: 'Preparing backup...', totalAccounts: accounts.length });
@@ -204,7 +204,7 @@ export class WalletBackupService {
     // A backup must never depend on a USB drive. With USB security on, the
     // stored blobs are under the combined key; the archive gets copies under
     // the password-only key, which is exactly what restore derives.
-    const exportAccounts = await this.accountsForExport(chromeStorageService, password);
+    const exportAccounts = await this.accountsForExport(chromeStorageService, passwordKey);
 
     // Capture before openAccount switches selectedAccount for each wallet.
     const initialChromeStorage = await chromeStorageService.getAndSetStorage();
@@ -499,17 +499,15 @@ export class WalletBackupService {
    */
   private static async accountsForExport(
     chromeStorageService: ChromeStorageService,
-    password: string | undefined,
+    passwordKey: string | undefined,
   ): Promise<Record<string, Account>> {
     const storage = await chromeStorageService.getAndSetStorage();
     const accounts = storage?.accounts || {};
     const usbSecurity = storage?.usbSecurity;
     if (!usbSecurity?.enabled) return accounts;
-    if (!password) throw new Error('Password required to back up while USB key security is on');
-    if (!storage?.salt) throw new Error('Wallet salt missing');
+    if (!passwordKey) throw new Error('Password required to back up while USB key security is on');
     const combinedKey = await chromeStorageService.getPassKey();
     if (!combinedKey) throw new Error('Wallet is locked');
-    const passwordKey = derivePasswordKey(password, storage.salt);
     const out: Record<string, Account> = {};
     for (const [id, account] of Object.entries(accounts)) {
       if (!account?.encryptedKeys) {

@@ -892,7 +892,7 @@ if (isInServiceWorker) {
           });
           return true;
         case 'MASTER_BACKUP':
-          processMasterBackup(message.password, sendResponse);
+          processMasterBackup(message.passwordKey, sendResponse);
           return true;
         case 'USB_PING':
           // Keeps the worker from idling out while the USB window is open.
@@ -1828,7 +1828,7 @@ if (isInServiceWorker) {
 
   // MASTER BACKUP/RESTORE HANDLERS ********************************
 
-  const processMasterBackup = async (password: string | undefined, sendResponse: CallbackResponse) => {
+  const processMasterBackup = async (passwordKey: string | undefined, sendResponse: CallbackResponse) => {
     // Remember where the user started so we can restore even if export fails.
     const originalSelectedAccount = chromeStorageService.getCurrentAccountObject().selectedAccount || '';
 
@@ -1938,7 +1938,7 @@ if (isInServiceWorker) {
             close: opened.close,
           };
         },
-        password,
+        passwordKey,
         broadcastProgress,
       );
 
@@ -2026,8 +2026,13 @@ if (isInServiceWorker) {
       if (chromeStorageService.getUsbSecurity()?.enabled) {
         throw new Error('Turn off USB key security before restoring a backup');
       }
-      // Any handles from a previous enrolment on this profile are meaningless for restored keys.
-      indexedDB.deleteDatabase(USB_HANDLE_DB_NAME);
+      // Any handles and re-key bookkeeping from a previous enrolment on this
+      // profile are meaningless for restored, password-only keys.
+      await chromeStorageService.remove(['usbSecurity', 'keyEpoch', 'keyRecovery', 'keyRekey']);
+      await new Promise<void>((resolve) => {
+        const req = indexedDB.deleteDatabase(USB_HANDLE_DB_NAME);
+        req.onsuccess = req.onerror = req.onblocked = () => resolve();
+      });
 
       const manifest = await WalletBackupService.restoreFromExtractedData(
         chromeStorageService,

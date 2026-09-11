@@ -60,6 +60,8 @@ import { YoursIcon } from '../components/YoursIcon';
 import activeCircle from '../assets/active-circle.png';
 import ProgressBar from '@ramonak/react-progress-bar';
 
+import { derivePasswordKey } from '../services/passKey';
+
 export type SettingsPage =
   | 'main'
   | 'manage-accounts'
@@ -338,9 +340,15 @@ export const Settings = () => {
     const id = pendingRemoveStickId;
     setPendingRemoveStickId(undefined);
     if (!usb || !id || usb.sticks.length <= 1) return;
-    await chromeStorageService.replaceTopLevel({
-      usbSecurity: { ...usb, sticks: usb.sticks.filter((s) => s.id !== id) },
-    });
+    try {
+      await chromeStorageService.updateUsbSecurity((current) => {
+        if (current.sticks.length <= 1) throw new Error('Add another key first, or turn USB unlock off');
+        return { ...current, sticks: current.sticks.filter((s) => s.id !== id) };
+      });
+    } catch (err) {
+      addSnackbar(err instanceof Error ? err.message : 'Could not remove the USB key', 'error');
+      return;
+    }
     await deleteHandle(id);
     addSnackbar('USB key removed', 'success');
     await refreshUsbSecurity();
@@ -690,6 +698,10 @@ export const Settings = () => {
   }, [lockTimeout, chromeStorageService, addSnackbar]);
 
   const handleMasterBackup = async (password?: string) => {
+    // Derive here: runtime messages fan out to every open extension page, so
+    // the plaintext password never leaves this one. The worker only needs the key.
+    const { salt } = chromeStorageService.getCurrentAccountObject();
+    const passwordKey = password && salt ? derivePasswordKey(password, salt) : undefined;
     // Populate overlay with all accounts
     const allAccounts = chromeStorageService.getAllAccounts();
     setBackupAccounts(allAccounts.map((a) => ({ name: a.name, icon: a.icon || '', status: 'pending' })));
@@ -721,7 +733,7 @@ export const Settings = () => {
             setBackupAccounts((prev) => prev.map((a) => ({ ...a, status: 'done' })));
           }
         },
-        password,
+        passwordKey,
       );
       // USB key security enrolment requires a fresh backup this session.
       await chrome.storage.session.set({ usbBackupConfirmedAt: Date.now() });

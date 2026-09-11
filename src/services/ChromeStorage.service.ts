@@ -538,7 +538,19 @@ export class ChromeStorageService {
    * On failure, passKey remains absent — keys stay inaccessible.
    */
   /** USB key security settings, or undefined when off. */
-  getUsbSecurity = (): UsbSecurity | undefined => this.storage?.usbSecurity;
+  getUsbSecurity = (): UsbSecurity | undefined => this.storage?.usbSecurity ?? undefined;
+
+  /**
+   * Change the USB settings without a re-key (add or remove a stick). Re-reads
+   * storage first so a value captured when a window opened can't clobber a
+   * newer one, and refuses while a re-key is rewriting everything.
+   */
+  updateUsbSecurity = async (mutate: (current: UsbSecurity) => UsbSecurity): Promise<void> => {
+    const { usbSecurity, keyRekey } = await this.get(['usbSecurity', 'keyRekey']);
+    if (keyRekey) throw new Error('Wallet keys are being re-encrypted; try again in a moment');
+    if (!usbSecurity?.enabled) throw new Error('USB unlock is off');
+    await this.set({ usbSecurity: mutate(usbSecurity) });
+  };
 
   /**
    * With USB key security on, the master factor is required. Callers that have
@@ -553,6 +565,9 @@ export class ChromeStorageService {
     if (!salt || !account?.encryptedKeys) return false;
     const usbSecurity = this.getUsbSecurity();
     if (usbSecurity?.enabled && !material?.master) {
+      // Probing needs a document (File System Access handles). The worker
+      // never verifies passwords; if it ever does, fail closed rather than probe.
+      if (typeof document === 'undefined') return false;
       const probe = await probeSticks(usbSecurity).catch(() => null);
       if (probe?.status !== 'ok') return false;
       material = { master: probe.master };
@@ -568,11 +583,17 @@ export class ChromeStorageService {
       // Password correct — store passKey in session (memory-only, not on disk)
       await this.setPassKey(derivedKey);
 
-      // Upgrade legacy encryption to v2 (AES-256-GCM) if needed
+      // Upgrade legacy encryption to v2 (AES-256-GCM) if needed. Best effort:
+      // the password has already verified, so a refused write (for example
+      // during a re-key) must not turn a correct password into "invalid".
       if (selectedAccount && !account.encryptedKeys.startsWith('v2:')) {
-        const reEncrypted = await encrypt(decrypted, derivedKey);
-        const key: keyof ChromeStorageObject = 'accounts';
-        await this.updateNested(key, { [selectedAccount]: { ...account, encryptedKeys: reEncrypted } });
+        try {
+          const reEncrypted = await encrypt(decrypted, derivedKey);
+          const key: keyof ChromeStorageObject = 'accounts';
+          await this.updateNested(key, { [selectedAccount]: { ...account, encryptedKeys: reEncrypted } });
+        } catch (err) {
+          console.warn('[ChromeStorageService] legacy key upgrade deferred:', err);
+        }
       }
 
       return true;

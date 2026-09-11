@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { OneSatPermissionPrompt } from '@1sat/permission-module-ui';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useServiceContext } from '../../hooks/useServiceContext';
@@ -32,16 +32,21 @@ export const OneSatPermissionRequestPage = ({ request, onResponse }: OneSatPermi
   }, [handleSelect, hideMenu]);
 
   const [usbError, setUsbError] = useState('');
+  const inFlight = useRef(false);
 
   const respond = async (approved: boolean) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     if (approved) {
       setUsbError('');
       const usb = await confirmUsbForApproval(chromeStorageService);
       if (!usb.ok) {
         setUsbError(usb.message);
+        inFlight.current = false; // refused: let the user try again once the key is in
         return;
       }
     }
+    // A sent response ends this page, so the guard stays set.
     sendMessage({
       action: 'ONE_SAT_PERMISSION_RESPONSE',
       requestID: request.requestID,

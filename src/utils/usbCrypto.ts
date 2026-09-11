@@ -173,6 +173,9 @@ const base32Decode = (text: string, expectedBytes: number): Uint8Array | null =>
       bits -= 8;
     }
   }
+  // The last character's unused low bits must be zero, so exactly one string
+  // encodes a given master.
+  if (bits > 0 && (value & ((1 << bits) - 1)) !== 0) return null;
   return idx === expectedBytes ? bytes : null;
 };
 

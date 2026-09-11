@@ -48,13 +48,12 @@ const run = async (storage: ChromeStorageService, req: UsbRekeyRequest): Promise
   if (!oldPassKey) return { success: false, error: 'Wallet is locked' };
   if (!/^[0-9a-f]{64}$/.test(req.newPassKey)) return { success: false, error: 'Invalid new key' };
 
+  // Finish anything a previous re-key left behind (a committed write whose
+  // read-back never ran, or a stale marker) before starting another.
+  await repairStaleAccounts(storage);
   const current = await rawGet(['accounts', 'keyEpoch', 'keyRekey', 'keyRecovery']);
   const accounts = current.accounts ?? {};
   if (current.keyRekey) return { success: false, error: 'A re-key is already in progress' };
-  if (current.keyRecovery) {
-    // A previous re-key never finished its read-back. Finish it before starting another.
-    await repairStaleAccounts(storage);
-  }
 
   const fromEpoch = current.keyEpoch ?? 0;
   const toEpoch = fromEpoch + 1;
@@ -71,13 +70,18 @@ const run = async (storage: ChromeStorageService, req: UsbRekeyRequest): Promise
     const wrappedPreviousPassKey = await encrypt(oldPassKey, req.newPassKey);
 
     // 5. One write. `accounts` is the complete, verified object: no merge.
+    // Removals ride in the same set as nulls, so a worker killed right after
+    // this line still leaves storage self-consistent: new blobs, new epoch,
+    // new (or no) USB settings, and no in-progress marker. Readers treat
+    // null as absent. The remove below is only tidying.
     await storage.replaceTopLevel({
       accounts: rekeyed,
       keyEpoch: toEpoch,
       keyRecovery: { toEpoch, wrappedPreviousPassKey },
-      ...(req.usbSecurity ? { usbSecurity: req.usbSecurity } : {}),
+      usbSecurity: req.usbSecurity ?? null,
+      keyRekey: null,
     });
-    await rawRemove(['keyRekey', ...(req.usbSecurity ? [] : ['usbSecurity'])]);
+    await rawRemove(['keyRekey', ...(req.usbSecurity ? [] : ['usbSecurity'])]).catch(() => {});
 
     // 6. Session. Every context's cache follows via storage.onChanged.
     await storage.setPassKey(req.newPassKey);
@@ -120,6 +124,10 @@ export const repairStaleAccounts = async (storage: ChromeStorageService): Promis
   if (state.keyRekey && !state.keyRecovery) {
     // Crashed before the commit: nothing was rewritten. Clear the marker.
     await rawRemove(['keyRekey']);
+  } else if (state.keyRekey && state.keyRecovery && state.keyRekey.toEpoch === epoch) {
+    // The commit landed (epoch advanced) but the marker survived: clear it so
+    // account writers and future re-keys are not blocked forever.
+    await rawRemove(['keyRekey']);
   }
   if (!state.keyRecovery) return;
 
@@ -141,6 +149,6 @@ export const repairStaleAccounts = async (storage: ChromeStorageService): Promis
 
   const after = (await rawGet(['accounts'])).accounts ?? {};
   if (findStaleAccounts(after, epoch).length === 0 && (await allAccountsDecrypt(after, passKey))) {
-    await rawRemove(['keyRecovery']);
+    await rawRemove(['keyRecovery', 'keyRekey']);
   }
 };

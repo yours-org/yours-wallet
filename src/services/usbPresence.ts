@@ -29,12 +29,8 @@ export const checkUsbPresence = async (chromeStorageService: ChromeStorageServic
   const usbSecurity = chromeStorageService.getUsbSecurity();
   if (!usbSecurity?.enabled) return 'disabled';
   const probe = await probeSticks(usbSecurity);
-  if (probe.status === 'ok') {
-    consecutiveFailures = 0;
-    return 'present';
-  }
+  if (probe.status === 'ok') return 'present';
   if (probe.status === 'permission') return 'permission';
-  consecutiveFailures++;
   return 'absent';
 };
 
@@ -47,7 +43,10 @@ export const enforceUsbPresence = async (
   onRemoved: () => void | Promise<void>,
 ): Promise<UsbPresence> => {
   const presence = await checkUsbPresence(chromeStorageService);
-  if (presence === 'absent' && consecutiveFailures >= FAILURES_TO_LOCK) {
+  // Counted here, not in checkUsbPresence: a probe from a screen that never
+  // locks (a settings confirmation) must not arm the next gated call.
+  if (presence === 'present') consecutiveFailures = 0;
+  if (presence === 'absent' && ++consecutiveFailures >= FAILURES_TO_LOCK) {
     consecutiveFailures = 0;
     await onRemoved();
   }
@@ -99,7 +98,7 @@ export const USB_GATED_WALLET_METHODS = new Set([
 export const USB_KEY_ABSENT_MESSAGE = 'Insert your USB key to continue';
 
 export class UsbKeyAbsentError extends Error {
-  constructor(_presence: UsbPresence) {
+  constructor() {
     // While unlocked, Chrome reports an unplugged drive as "needs permission",
     // so both states mean the same thing to the user: the key is not there.
     super(USB_KEY_ABSENT_MESSAGE);
@@ -123,7 +122,7 @@ export const gateWalletOnUsb = <T extends object>(
       if (typeof value !== 'function' || !USB_GATED_WALLET_METHODS.has(String(prop))) return value;
       return async (...args: unknown[]) => {
         const presence = await enforceUsbPresence(chromeStorageService, onRemoved);
-        if (presence !== 'present' && presence !== 'disabled') throw new UsbKeyAbsentError(presence);
+        if (presence !== 'present' && presence !== 'disabled') throw new UsbKeyAbsentError();
         return (value as (...a: unknown[]) => unknown).apply(target, args);
       };
     },

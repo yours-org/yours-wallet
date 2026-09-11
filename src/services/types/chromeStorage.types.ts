@@ -146,12 +146,13 @@ export interface ChromeStorageObject {
   storageIdentityKey?: string;
   showWelcome?: boolean;
   broadcastRequest?: Broadcast;
-  /** USB key security; absent when off. */
-  usbSecurity?: UsbSecurity;
+  /** USB key security; absent (or null, written by a re-key commit) when off. */
+  usbSecurity?: UsbSecurity | null;
   /** Current key epoch for `accounts[*].encryptedKeys`. Absent = 0. */
   keyEpoch?: number;
-  keyRekey?: KeyRekeyMarker;
-  keyRecovery?: KeyRecovery;
+  /** null is written by the re-key commit itself so the marker clears in the same set. */
+  keyRekey?: KeyRekeyMarker | null;
+  keyRecovery?: KeyRecovery | null;
 }
 
 export type CurrentAccountObject = Omit<ChromeStorageObject, 'accounts' | 'popupWindowId' | 'broadcastRequest'> & {

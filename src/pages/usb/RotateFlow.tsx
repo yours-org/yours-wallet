@@ -41,17 +41,23 @@ export const RotateFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
       masterCheck,
       sticks: [{ id: drive.id, label, wrappedMaster, addedAt: new Date().toISOString() }],
     };
+    // Save the handle first: if the window closes between the commit and this
+    // write, the new key would otherwise be registered with no way to read it.
+    const wasRegistered = usbSecurity.sticks.some((s) => s.id === drive.id);
+    await saveHandle(drive.id, drive.handle);
     let res: RekeyResponse | undefined;
     try {
       res = await sendMessageAsync<RekeyResponse>({ action: 'USB_REKEY', newPassKey, usbSecurity: next });
     } catch (e) {
       res = { success: false, error: e instanceof Error ? e.message : String(e) };
     }
-    if (!res?.success) return res?.error ?? 'Rotation failed';
+    if (!res?.success) {
+      if (!wasRegistered) await deleteHandle(drive.id);
+      return res?.error ?? 'Rotation failed';
+    }
     for (const s of usbSecurity.sticks) {
       if (s.id !== drive.id) await deleteHandle(s.id);
     }
-    await saveHandle(drive.id, drive.handle);
     await chromeStorageService.getAndSetStorage();
     setIsLocked(false);
     setStep(5);
