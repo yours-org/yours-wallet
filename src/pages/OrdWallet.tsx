@@ -16,10 +16,7 @@ import { TopNav } from '../components/TopNav';
 import { getErrorMessage } from '../utils/tools';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
 import { getTagValue, getOutputName, hasTag, resolveOriginOutpoint } from '../utils/format';
-import {
-  cancelOwnedOrdLockListings,
-  ORDLOCK_LISTING_DISABLED_MESSAGE,
-} from '../utils/cancelOrdLockListings';
+import { cancelOwnedOrdLockListings, ORDLOCK_LISTING_DISABLED_MESSAGE } from '../utils/cancelOrdLockListings';
 
 type Addresses = Record<string, string>;
 type PageState = 'main' | 'transfer' | 'list' | 'cancel';
@@ -190,7 +187,6 @@ export const OrdWallet = () => {
   const { apiContext } = useServiceContext();
   // ORDLOCK_LISTING_DISABLED — auto-cancel session guard (once per OrdWallet mount).
   const ordLockCancelSessionRef = useRef<string | null>(null);
-
 
   /** Build an ORDFS content URL via the 1sat client. Pass the outpoint through
    *  in its native `txid.vout` form. */

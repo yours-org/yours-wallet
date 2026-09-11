@@ -81,10 +81,7 @@ export async function cancelOwnedOrdLockListings(
       const id = trackingId(output);
       if (!id) {
         result.skipped += 1;
-        console.warn(
-          '[cancelOwnedOrdLockListings] listed output missing tracking id, skipping',
-          output.outpoint,
-        );
+        console.warn('[cancelOwnedOrdLockListings] listed output missing tracking id, skipping', output.outpoint);
         continue;
       }
 
