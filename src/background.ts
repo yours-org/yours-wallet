@@ -164,6 +164,11 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
     );
     if (!hasPending) return;
     console.log('[background] initializeWallet: Found pending restore data, importing...');
+    // Watchdog: say so every 10 s while the import is in flight, so a hang is visible.
+    const started = Date.now();
+    const watchdog = setInterval(() => {
+      console.warn(`[background] PendingRestore: still importing after ${Math.round((Date.now() - started) / 1000)}s`);
+    }, 10_000);
     try {
       await WalletBackupService.importPendingWalletData(
         storage as unknown as Parameters<typeof WalletBackupService.importPendingWalletData>[0],
@@ -178,6 +183,8 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
       console.error('[background] initializeWallet: Pending restore failed:', error);
       // Clear only this account's pending data to avoid repeated failures
       await WalletBackupService.clearAllPendingRestores();
+    } finally {
+      clearInterval(watchdog);
     }
   };
 
