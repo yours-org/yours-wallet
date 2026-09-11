@@ -274,7 +274,12 @@ export const runUsbBackup = async (chromeStorageService: ChromeStorageService): 
     // up to date, so the UI shows one continuous sync, not two.
     pendingRun = false;
     const again = await runUsbBackup(chromeStorageService);
-    return { ...again, changed: result.changed || again.changed, errors: [...result.errors, ...again.errors] };
+    const merged = { ...again, changed: result.changed || again.changed, errors: [...result.errors, ...again.errors] };
+    // The inner call already emitted done/idle for its own result; re-emit with the merged one.
+    if (merged.ran && merged.errors.length === 0 && result.changed && !again.changed) {
+      emit({ phase: 'done', stickId: 'all', changed: true });
+    }
+    return merged;
   }
   if (result.ran && result.errors.length === 0) emit({ phase: 'done', stickId: 'all', changed: result.changed });
   emit({ phase: 'idle' });
@@ -398,7 +403,7 @@ const syncStick = async (
   }>({ action: 'USB_BACKUP_SETTINGS' });
   if (settingsRes?.data?.busy) {
     // Wallet still initialising: quietly try again on the next trigger.
-    return { changed: false, errors: [] };
+    return { changed, errors: [] };
   }
   if (!settingsRes?.success || !settingsRes.settingsData) {
     throw new Error(settingsRes?.error ?? 'Could not read storage settings');
@@ -541,7 +546,11 @@ export const summariseUsbBackup = (
     for (const st of Object.values(status ?? {})) {
       if (st.stickIds.includes(s.id) && (!newest || st.lastBackupAt > newest)) newest = st.lastBackupAt;
     }
-    const stale = !newest || now - new Date(newest).getTime() > USB_BACKUP_STALE_MS;
+    // Never backed up counts as stale only once the key has been registered
+    // long enough that a pass should have happened (fresh installs whose
+    // accounts have no local data yet are not "overdue").
+    const reference = newest ?? s.addedAt;
+    const stale = !reference || now - new Date(reference).getTime() > USB_BACKUP_STALE_MS;
     return { stickId: s.id, lastBackupAt: newest, stale };
   });
 
@@ -611,6 +620,11 @@ export const readUsbBackup = async (drive: FileSystemDirectoryHandle, password: 
 
   const chunksData: Record<string, string> = {};
   const partialAccounts: string[] = [];
+  // Accounts whose keys are on the drive but which never got a data pass
+  // (never opened on the backing-up install, or failed every pass).
+  for (const [id, account] of Object.entries(keys.accounts)) {
+    if (!manifest.accounts[id] && account?.name) partialAccounts.push(account.name);
+  }
   const manifestAccounts: Array<{ identityKey: string; identityAddress: string; name: string; chunkCount: number }> =
     [];
   let totalBytes = 0;

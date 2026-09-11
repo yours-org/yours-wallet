@@ -662,7 +662,7 @@ export class WalletBackupService {
     }
   }
 
-  private static async clearAccountPendingRestore(identityKey: string): Promise<void> {
+  static async clearAccountPendingRestore(identityKey: string): Promise<void> {
     try {
       const db = await this.openPendingRestoreDB();
       const tx = db.transaction(PENDING_RESTORE_STORE, 'readwrite');

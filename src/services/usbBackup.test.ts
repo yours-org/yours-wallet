@@ -72,3 +72,21 @@ describe('cursor helpers', () => {
     expect(needsCompaction({ ...e, chunkCount: COMPACT_AFTER_CHUNKS, complete: true })).toBe(true);
   });
 });
+
+describe('summariseUsbBackup: never backed up', () => {
+  test('a recently registered key is not overdue; an old one with no backups is', () => {
+    const now = Date.parse('2026-09-10T12:00:00Z');
+    const recent = new Date(now - 60_000).toISOString();
+    const long = new Date(now - USB_BACKUP_STALE_MS - 1).toISOString();
+    const u: UsbSecurity = {
+      ...usb,
+      sticks: [
+        { id: 'new', label: 'New', wrappedMaster: '', addedAt: recent },
+        { id: 'old', label: 'Old', wrappedMaster: '', addedAt: long },
+      ],
+    };
+    const [n, o] = summariseUsbBackup(u, undefined, now);
+    expect(n.stale).toBe(false);
+    expect(o.stale).toBe(true);
+  });
+});

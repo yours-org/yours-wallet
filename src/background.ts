@@ -95,7 +95,15 @@ const notifyBalanceUpdate = () => {
 };
 
 // Drop live context immediately; destroy in background (never block lock on hung close).
+/**
+ * Bumped on every lock/drop. An initialisation that started before a lock
+ * must not publish its wallet afterwards: `runInitializeWallet` compares the
+ * generation it started under with the current one before assigning.
+ */
+let lockGeneration = 0;
+
 const dropWalletContext = (reason: string) => {
+  lockGeneration++;
   void closeUsbBackupReader();
   const ctx = accountContext;
   accountContext = null;
@@ -123,6 +131,8 @@ const initializeWallet = (): Promise<WalletInterface | null> => {
 
 /** Set by the service-worker block so the pending import can stream progress to a restore window. */
 let restoreProgressFn: ((message: string) => void) | undefined;
+/** In-flight pending-restore imports by identity key, so a second init joins rather than duplicates. */
+const pendingImports = new Map<string, Promise<void>>();
 
 const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   console.log('[background] initializeWallet: starting, current accountContext:', !!accountContext);
@@ -152,6 +162,14 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
     storage: import('@1sat/wallet-browser').WalletStorageManager,
     currentIdentityKey: string,
   ) => {
+    // A timed-out import keeps running; a later init must join it, not start
+    // a second writer for the same account.
+    const existing = pendingImports.get(currentIdentityKey);
+    if (existing) {
+      console.log('[background] initializeWallet: pending import already running for this account; joining it');
+      await existing.catch(() => undefined);
+      return;
+    }
     console.log('[background] initializeWallet: Found pending restore data, importing...');
     // Watchdog: say so every 10 s while the import is in flight, so a hang is visible.
     const started = Date.now();
@@ -162,16 +180,18 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
     // the wallet initialises without it and the parked data stays for a retry.
     const IMPORT_TIMEOUT_MS = 45_000;
     let timedOut = false;
+    const importPromise = WalletBackupService.importPendingWalletData(
+      storage as unknown as Parameters<typeof WalletBackupService.importPendingWalletData>[0],
+      currentIdentityKey,
+      (event) => {
+        console.log('[background] PendingRestore:', event.message);
+        restoreProgressFn?.(event.message);
+      },
+    ).finally(() => pendingImports.delete(currentIdentityKey));
+    pendingImports.set(currentIdentityKey, importPromise);
     try {
       await Promise.race([
-        WalletBackupService.importPendingWalletData(
-          storage as unknown as Parameters<typeof WalletBackupService.importPendingWalletData>[0],
-          currentIdentityKey,
-          (event) => {
-            console.log('[background] PendingRestore:', event.message);
-            restoreProgressFn?.(event.message);
-          },
-        ),
+        importPromise,
         new Promise<void>((resolve) =>
           setTimeout(() => {
             timedOut = true;
@@ -189,7 +209,7 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
     } catch (error) {
       console.error('[background] initializeWallet: Pending restore failed:', error);
       // Clear only this account's pending data to avoid repeated failures
-      await WalletBackupService.clearAllPendingRestores();
+      await WalletBackupService.clearAccountPendingRestore(currentIdentityKey);
     } finally {
       clearInterval(watchdog);
     }
@@ -218,7 +238,8 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
     await runPendingImport(storage, currentIdentityKey);
   };
 
-  accountContext = await initWallet(chromeStorageService, {
+  const startedUnder = lockGeneration;
+  const ctx = await initWallet(chromeStorageService, {
     onTransactionBroadcasted: (txid: string) => {
       console.log('[background] Transaction broadcasted:', txid);
       notifyBalanceUpdate();
@@ -229,6 +250,14 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
     },
     beforeSync: importPendingRestore,
   });
+  if (lockGeneration !== startedUnder || !(await chromeStorageService.getPassKey())) {
+    // Locked while we were initialising (a restore's detached init can run
+    // for minutes). Storage and UI say locked; do not hand out a live wallet.
+    console.log('[background] initializeWallet: locked during init; discarding the wallet');
+    await ctx.close().catch((err) => console.error('[background] close after late lock:', err));
+    return null;
+  }
+  accountContext = ctx;
   console.log('[background] initializeWallet: initWallet returned, accountContext:', !!accountContext);
 
   if (accountContext) {
@@ -2161,7 +2190,14 @@ if (isInServiceWorker) {
       if (message.usbRekey) {
         restoreProgress('Turning the USB security key back on…');
         const r = await usbRekey(chromeStorageService, message.usbRekey);
-        if (!r.success) throw new Error(`Restored, but the USB security key could not be re-enabled: ${r.error}`);
+        if (!r.success) {
+          // The wallet is restored and usable with the password alone; the
+          // user can turn the security key on again from Settings.
+          console.error('[MasterRestore] USB security key could not be re-enabled:', r.error);
+          restoreProgress(
+            `Restored, but the USB security key could not be re-enabled (${r.error}). Turn it on from Settings.`,
+          );
+        }
         await chromeStorageService.getAndSetStorage();
       }
 
