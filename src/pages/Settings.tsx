@@ -250,6 +250,8 @@ export const Settings = () => {
   const { query, handleSelect } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { chromeStorageService, keysService, lockWallet, wallet, apiContext } = useServiceContext();
+  // The USB Security Key page is reachable from two places; back returns to whichever opened it.
+  const [usbBackTo, setUsbBackTo] = useState<SettingsPage>('main');
   const [page, setPage] = useState<SettingsPage>(() => {
     if (query === 'manage-accounts') return 'manage-accounts';
     if (query === 'create-account') return 'create-account';
@@ -925,7 +927,10 @@ export const Settings = () => {
                   </div>
                 ) : undefined
               }
-              onClick={() => setPage('usb-security')}
+              onClick={() => {
+                setUsbBackTo('main');
+                setPage('usb-security');
+              }}
               isLast
             />
           </>
@@ -1151,6 +1156,34 @@ export const Settings = () => {
               isFirst
             />
           </motion.div>
+          {usbSupported && (
+            <>
+              <Divider />
+              <SettingRow
+                icon={<Usb size={16} />}
+                label="USB Security Key"
+                description={
+                  usbSecurity?.enabled
+                    ? usbBackupOn
+                      ? `Encrypted copy kept on ${usbSecurity.sticks.length} key${usbSecurity.sticks.length === 1 ? '' : 's'}${usbBackupOverdue ? ' · backup overdue' : ''}`
+                      : 'USB backup is off'
+                    : 'Two-factor unlock with an encrypted copy on each key'
+                }
+                right={
+                  usbBackupOverdue ? (
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle size={14} style={{ color: '#FBBF24' }} />
+                      <ChevronRight size={16} color="#98A2B3" />
+                    </div>
+                  ) : undefined
+                }
+                onClick={() => {
+                  setUsbBackTo('export-keys-options');
+                  setPage('usb-security');
+                }}
+              />
+            </>
+          )}
           <Divider />
           <SettingRow
             icon={<Download size={16} />}
@@ -1408,7 +1441,7 @@ export const Settings = () => {
       exit="exit"
       className="w-full px-4 pb-24"
     >
-      <SubPageHeader title="USB Security Key" onBack={() => setPage('main')} />
+      <SubPageHeader title="USB Security Key" onBack={() => setPage(usbBackTo)} />
       <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-4">
         {!usbSecurity?.enabled ? (
           <>
