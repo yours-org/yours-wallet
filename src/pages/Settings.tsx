@@ -39,7 +39,7 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
 import { FEE_PER_KB } from '../utils/constants';
-import { ChromeStorageObject, UsbSecurity } from '../services/types/chromeStorage.types';
+import { ChromeStorageObject, UsbBackupAccountStatus, UsbSecurity } from '../services/types/chromeStorage.types';
 import {
   deleteHandle,
   getHandle,
@@ -61,6 +61,8 @@ import activeCircle from '../assets/active-circle.png';
 import ProgressBar from '@ramonak/react-progress-bar';
 
 import { derivePasswordKey } from '../services/passKey';
+import { ToggleSwitch } from '../components/ToggleSwitch';
+import { onUsbBackup, runUsbBackup, summariseUsbBackup, usbBackupEnabled } from '../services/usbBackup';
 
 export type SettingsPage =
   | 'main'
@@ -108,7 +110,7 @@ const rowVariant = {
 type SettingRowProps = {
   icon: React.ReactNode;
   label: string;
-  description?: string;
+  description?: React.ReactNode;
   right?: React.ReactNode;
   onClick?: () => void;
   isFirst?: boolean;
@@ -152,6 +154,17 @@ const SettingRow = ({ icon, label, description, right, onClick, isFirst, isLast,
 };
 
 const Divider = () => <div className="h-px mx-4" style={{ backgroundColor: 'rgba(152,162,179,0.1)' }} />;
+
+const formatBackupFreshness = (iso?: string): string => {
+  if (!iso) return 'Never backed up';
+  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (min < 1) return 'Backed up just now';
+  if (min < 60) return `Backed up ${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `Backed up ${hr} hr ago`;
+  const days = Math.floor(hr / 24);
+  return `Backed up ${days} day${days === 1 ? '' : 's'} ago`;
+};
 
 type SectionProps = {
   title: string;
@@ -273,11 +286,20 @@ export const Settings = () => {
   const [uncheckedSticks, setUncheckedSticks] = useState<string[]>([]);
   const [pendingRemoveStickId, setPendingRemoveStickId] = useState<string | undefined>();
   const usbProbing = useRef(false);
+  // --- USB backup (OPL-4685) ---
+  const [usbBackupStatus, setUsbBackupStatus] = useState<Record<string, UsbBackupAccountStatus> | undefined>(
+    () => chromeStorageService.storage?.usbBackupStatus,
+  );
+  const [usbBackingUp, setUsbBackingUp] = useState(false);
+  const usbBackupOn = usbBackupEnabled(usbSecurity);
+  const usbBackupSummary = summariseUsbBackup(usbSecurity, usbBackupStatus);
+  const usbBackupOverdue = usbBackupOn && usbBackupSummary.some((s) => s.stale);
 
   const refreshUsbSecurity = useCallback(async () => {
     await chromeStorageService.getAndSetStorage();
     const latest = chromeStorageService.getUsbSecurity();
     setUsbSecurity(latest);
+    setUsbBackupStatus(chromeStorageService.storage?.usbBackupStatus);
     if (!latest?.enabled || usbProbing.current) {
       if (!latest?.enabled) {
         setPresentSticks([]);
@@ -303,7 +325,7 @@ export const Settings = () => {
   useEffect(() => {
     if (!usbSupported) return;
     const onChanged = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
-      if (area === 'local' && 'usbSecurity' in changes) void refreshUsbSecurity();
+      if (area === 'local' && ('usbSecurity' in changes || 'usbBackupStatus' in changes)) void refreshUsbSecurity();
     };
     const onFocus = () => void refreshUsbSecurity();
     chrome.storage.onChanged.addListener(onChanged);
@@ -351,6 +373,45 @@ export const Settings = () => {
     }
     await deleteHandle(id);
     addSnackbar('USB key removed', 'success');
+    await refreshUsbSecurity();
+  };
+
+  const handleUsbBackupNow = async () => {
+    if (usbBackingUp) return;
+    if (presentSticks.length === 0) {
+      addSnackbar('Insert a registered USB key first', 'error');
+      return;
+    }
+    setUsbBackingUp(true);
+    const result: { done: boolean; changed: boolean; error?: string } = { done: false, changed: false };
+    const unsubscribe = onUsbBackup((e) => {
+      if (e.phase === 'done') {
+        result.done = true;
+        result.changed = result.changed || e.changed;
+      } else if (e.phase === 'error') {
+        result.error = e.message;
+      }
+    });
+    try {
+      await runUsbBackup(chromeStorageService);
+    } finally {
+      unsubscribe();
+      setUsbBackingUp(false);
+    }
+    await refreshUsbSecurity();
+    if (result.error) addSnackbar(`USB backup failed: ${result.error}`, 'error');
+    else if (!result.done) addSnackbar('No USB key could be read', 'error');
+    else addSnackbar(result.changed ? 'USB backup updated' : 'USB backup up to date', 'success');
+  };
+
+  const handleToggleUsbBackup = async () => {
+    const enabled = !usbBackupOn;
+    try {
+      await chromeStorageService.updateUsbSecurity((current) => ({ ...current, backup: { enabled } }));
+    } catch (err) {
+      addSnackbar(err instanceof Error ? err.message : 'Could not update USB backup', 'error');
+      return;
+    }
     await refreshUsbSecurity();
   };
 
@@ -810,8 +871,16 @@ export const Settings = () => {
               label="USB Unlock"
               description={
                 usbSecurity?.enabled
-                  ? `${usbSecurity.sticks.length} key${usbSecurity.sticks.length === 1 ? '' : 's'} registered`
+                  ? `${usbSecurity.sticks.length} key${usbSecurity.sticks.length === 1 ? '' : 's'} registered${usbBackupOverdue ? ' · backup overdue' : ''}`
                   : 'Require a USB drive to unlock'
+              }
+              right={
+                usbBackupOverdue ? (
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle size={14} style={{ color: '#FBBF24' }} />
+                    <ChevronRight size={16} color="#98A2B3" />
+                  </div>
+                ) : undefined
               }
               onClick={() => setPage('usb-security')}
               isLast
@@ -1357,6 +1426,7 @@ export const Settings = () => {
               {usbSecurity.sticks.map((stick, i) => {
                 const inserted = presentSticks.includes(stick.id);
                 const unchecked = uncheckedSticks.includes(stick.id);
+                const backup = usbBackupSummary.find((s) => s.stickId === stick.id);
                 // Needs a user gesture: one Chrome bubble for this one handle.
                 const checkStick = async () => {
                   const handle = await getHandle(stick.id);
@@ -1369,7 +1439,22 @@ export const Settings = () => {
                     <SettingRow
                       icon={<Usb size={16} />}
                       label={stick.label}
-                      description={`Added ${new Date(stick.addedAt).toLocaleDateString()}`}
+                      description={
+                        <span className="flex flex-col gap-0.5">
+                          <span>Added {new Date(stick.addedAt).toLocaleDateString()}</span>
+                          {usbBackupOn && backup && (
+                            <span className="inline-flex items-center gap-1.5">
+                              {backup.stale && (
+                                <span
+                                  className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: '#FBBF24' }}
+                                />
+                              )}
+                              {formatBackupFreshness(backup.lastBackupAt)}
+                            </span>
+                          )}
+                        </span>
+                      }
                       isFirst={i === 0}
                       isLast={i === usbSecurity.sticks.length - 1}
                       right={
@@ -1417,11 +1502,35 @@ export const Settings = () => {
 
             <Section title="Manage">
               <SettingRow
+                icon={<HardDrive size={16} />}
+                label="USB backup"
+                description="Keep an encrypted backup on your USB keys"
+                right={<ToggleSwitch theme={theme} on={usbBackupOn} onChange={() => void handleToggleUsbBackup()} />}
+                isFirst
+              />
+              {usbBackupOn && (
+                <>
+                  <Divider />
+                  <SettingRow
+                    icon={usbBackingUp ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                    label="Back up now"
+                    description={
+                      usbBackingUp
+                        ? 'Backing up...'
+                        : presentSticks.length > 0
+                          ? 'Sync inserted keys'
+                          : 'Insert a registered key'
+                    }
+                    onClick={() => void handleUsbBackupNow()}
+                  />
+                </>
+              )}
+              <Divider />
+              <SettingRow
                 icon={<Plus size={16} />}
                 label="Add another USB key"
                 description="Needs a registered key inserted"
                 onClick={() => void openUsbWindow('add')}
-                isFirst
               />
               <Divider />
               <SettingRow

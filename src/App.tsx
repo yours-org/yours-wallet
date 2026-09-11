@@ -4,6 +4,8 @@ import { MemoryRouter as Router, Route, Routes } from 'react-router-dom';
 import { Show } from './components/Show';
 import { UnlockWallet } from './components/UnlockWallet';
 import { UsbGate } from './components/UsbGate';
+import { UsbBackupPill } from './components/UsbBackupPill';
+import { useUsbBackupRunner } from './hooks/useUsbBackupRunner';
 import { BottomMenuContext } from './contexts/BottomMenuContext';
 import { useActivityDetector } from './hooks/useActivityDetector';
 import { useTheme } from './hooks/useTheme';
@@ -24,6 +26,12 @@ import { SyncProvider } from './contexts/providers/SyncProvider';
 import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
 import { SnackbarProvider } from './contexts/providers/SnackbarProvider';
 import { SweepMigration } from './pages/SweepMigration';
+
+/** Mounted inside the USB gate so the backup loop only runs while a key reads. */
+const UsbBackupRunner = () => {
+  useUsbBackupRunner();
+  return null;
+};
 
 export const App = () => {
   const { theme } = useTheme();
@@ -81,6 +89,8 @@ export const App = () => {
                 <SyncingBlocks />
                 <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
                   <UsbGate>
+                    <UsbBackupRunner />
+                    <UsbBackupPill />
                     <Show
                       when={!isSwitchingAccount}
                       whenFalseContent={<PageLoader message="Switching account..." theme={theme} />}

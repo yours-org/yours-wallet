@@ -5,7 +5,7 @@
  */
 import { FormEvent, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, CheckCircle2, Copy, HardDrive } from 'lucide-react';
+import { Check, CheckCircle2, Copy, HardDrive, Loader2 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useTheme } from '../../hooks/useTheme';
@@ -257,6 +257,7 @@ export type PasswordStepProps = {
   title?: string;
   subtitle?: string;
   buttonLabel: string;
+  /** Shown under the button while `onConfirm` runs, for slow work like a restore. */
   busyLabel?: string;
   /** Extra controls rendered between the input and the button (e.g. a checkbox). */
   extra?: React.ReactNode;
@@ -268,6 +269,7 @@ export const PasswordStep = ({
   title = 'Enter your password',
   subtitle,
   buttonLabel,
+  busyLabel,
   extra,
   onConfirm,
 }: PasswordStepProps) => {
@@ -315,6 +317,18 @@ export const PasswordStep = ({
           <Button theme={theme} type="primary" label={buttonLabel} isSubmit disabled={!password} loading={busy} />
         </div>
       </form>
+      {busy && busyLabel && (
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center gap-1.5 text-xs m-0 mt-3"
+          style={{ color: MUTED }}
+          role="status"
+        >
+          <Loader2 size={13} className="animate-spin" />
+          {busyLabel}
+        </motion.p>
+      )}
       <ErrorText>{error}</ErrorText>
     </StepBody>
   );

@@ -327,7 +327,7 @@ export const adoptPickedDrive = async (
 
 // --- The dedicated USB window ---
 
-export type UsbWindowMode = 'enroll' | 'add' | 'repick' | 'rotate' | 'disable' | 'unlock';
+export type UsbWindowMode = 'enroll' | 'add' | 'repick' | 'rotate' | 'disable' | 'unlock' | 'restore';
 
 /**
  * Picker and permission prompts must run in a page that survives focus loss.

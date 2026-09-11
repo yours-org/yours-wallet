@@ -15,19 +15,21 @@ import { AddFlow } from './AddFlow';
 import { DisableFlow } from './DisableFlow';
 import { EnrollFlow } from './EnrollFlow';
 import { RepickFlow } from './RepickFlow';
+import { RestoreFlow } from './RestoreFlow';
 import { RotateFlow } from './RotateFlow';
 import { UsbShell } from './UsbLayout';
 import { BlockedStep, DoneStep } from './steps';
 
-const MODES: UsbWindowMode[] = ['enroll', 'add', 'repick', 'rotate', 'disable', 'unlock'];
+const MODES: UsbWindowMode[] = ['enroll', 'add', 'repick', 'rotate', 'disable', 'unlock', 'restore'];
 
 const readMode = (): UsbWindowMode | null => {
   const m = new URLSearchParams(window.location.search).get('mode');
   return MODES.includes(m as UsbWindowMode) ? (m as UsbWindowMode) : null;
 };
 
-const needsUnlock = (mode: UsbWindowMode): boolean => mode !== 'repick' && mode !== 'unlock';
-const needsEnabled = (mode: UsbWindowMode): boolean => mode !== 'enroll';
+// 'restore' runs on a fresh install: no wallet, no session, feature off.
+const needsUnlock = (mode: UsbWindowMode): boolean => mode !== 'repick' && mode !== 'unlock' && mode !== 'restore';
+const needsEnabled = (mode: UsbWindowMode): boolean => mode !== 'enroll' && mode !== 'restore';
 
 export const UsbFlow = () => {
   const { theme } = useTheme();
@@ -78,6 +80,8 @@ export const UsbFlow = () => {
     body = <BlockedStep title="Nothing to do" message="This window was opened without a USB key action." />;
   } else if (!isUsbSupported()) {
     body = <BlockedStep title="USB unlock isn't available here" message="It needs Chrome or Edge." />;
+  } else if (mode === 'restore') {
+    body = <RestoreFlow />;
   } else if (needsEnabled(mode) && !usbSecurity?.enabled) {
     body = <BlockedStep title="USB unlock is off" message="Turn it on from Settings → Security." />;
   } else if (mode === 'enroll' && usbSecurity?.enabled) {
