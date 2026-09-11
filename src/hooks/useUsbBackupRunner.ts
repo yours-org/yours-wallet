@@ -38,7 +38,7 @@ export const useUsbBackupRunner = () => {
       if (message.data?.status === 'complete') requestUsbBackup(chromeStorageService);
     };
     chrome.runtime.onMessage.addListener(onMessage);
-    const timer = window.setInterval(() => requestUsbBackup(chromeStorageService, 0), USB_BACKUP_INTERVAL_MS);
+    const timer = window.setInterval(() => void runUsbBackup(chromeStorageService), USB_BACKUP_INTERVAL_MS);
 
     return () => {
       chrome.runtime.onMessage.removeListener(onMessage);

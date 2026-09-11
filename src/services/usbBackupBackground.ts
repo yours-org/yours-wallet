@@ -12,6 +12,7 @@ import type { sdk } from '@bsv/wallet-toolbox-client';
 import { encode } from '@msgpack/msgpack';
 import { bytesToBase64 } from '../utils/usbCrypto';
 
+/** Passed to migrate(); the toolbox derives the real IndexedDB name from it plus the chain. */
 const DATABASE_NAME = 'wallet';
 const MAX_ROUGH_SIZE = 2_000_000;
 const MAX_ITEMS = 500;
@@ -57,19 +58,36 @@ export interface UsbBackupChunkResponse {
 
 let reader: StorageIdb | null = null;
 let readerSettings: Awaited<ReturnType<StorageIdb['makeAvailable']>> | null = null;
+let opening: Promise<StorageIdb> | null = null;
+/** Bumped by every close so an open that was in flight during a lock discards its result. */
+let generation = 0;
 
 const openReader = async (storageIdentityKey: string): Promise<StorageIdb> => {
   if (reader) return reader;
-  const options = StorageProvider.createStorageBaseOptions('main');
-  const idb = new StorageIdb(options);
-  await idb.migrate(DATABASE_NAME, storageIdentityKey);
-  readerSettings = await idb.makeAvailable();
-  reader = idb;
-  return idb;
+  if (opening) return opening;
+  const gen = generation;
+  opening = (async () => {
+    const options = StorageProvider.createStorageBaseOptions('main');
+    const idb = new StorageIdb(options);
+    await idb.migrate(DATABASE_NAME, storageIdentityKey);
+    const settings = await idb.makeAvailable();
+    if (gen !== generation) {
+      // Locked while opening: do not keep a connection past the lock.
+      await idb.destroy().catch(() => {});
+      throw new Error('Wallet is locked');
+    }
+    reader = idb;
+    readerSettings = settings;
+    return idb;
+  })().finally(() => {
+    opening = null;
+  });
+  return opening;
 };
 
 /** Drop the read-only connection (on lock or sign-out). Safe to call any time. */
 export const closeUsbBackupReader = async (): Promise<void> => {
+  generation++;
   const r = reader;
   reader = null;
   readerSettings = null;

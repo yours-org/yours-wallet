@@ -62,7 +62,7 @@ import ProgressBar from '@ramonak/react-progress-bar';
 
 import { derivePasswordKey } from '../services/passKey';
 import { ToggleSwitch } from '../components/ToggleSwitch';
-import { onUsbBackup, runUsbBackup, summariseUsbBackup, usbBackupEnabled } from '../services/usbBackup';
+import { runUsbBackup, summariseUsbBackup, usbBackupEnabled } from '../services/usbBackup';
 
 export type SettingsPage =
   | 'main'
@@ -383,24 +383,15 @@ export const Settings = () => {
       return;
     }
     setUsbBackingUp(true);
-    const result: { done: boolean; changed: boolean; error?: string } = { done: false, changed: false };
-    const unsubscribe = onUsbBackup((e) => {
-      if (e.phase === 'done') {
-        result.done = true;
-        result.changed = result.changed || e.changed;
-      } else if (e.phase === 'error') {
-        result.error = e.message;
-      }
-    });
+    let result: Awaited<ReturnType<typeof runUsbBackup>>;
     try {
-      await runUsbBackup(chromeStorageService);
+      result = await runUsbBackup(chromeStorageService);
     } finally {
-      unsubscribe();
       setUsbBackingUp(false);
     }
     await refreshUsbSecurity();
-    if (result.error) addSnackbar(`USB backup failed: ${result.error}`, 'error');
-    else if (!result.done) addSnackbar('No USB key could be read', 'error');
+    if (!result.ran) addSnackbar('No USB key could be read', 'error');
+    else if (result.errors.length > 0) addSnackbar(`USB backup failed: ${result.errors[0]}`, 'error');
     else addSnackbar(result.changed ? 'USB backup updated' : 'USB backup up to date', 'success');
   };
 
@@ -1504,7 +1495,7 @@ export const Settings = () => {
               <SettingRow
                 icon={<HardDrive size={16} />}
                 label="USB backup"
-                description="Keep an encrypted backup on your USB keys"
+                description="Encrypted copy on each key. Key + password restores it"
                 right={<ToggleSwitch theme={theme} on={usbBackupOn} onChange={() => void handleToggleUsbBackup()} />}
                 isFirst
               />

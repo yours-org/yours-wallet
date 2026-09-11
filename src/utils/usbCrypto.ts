@@ -210,13 +210,33 @@ export const decodeRecoveryCode = async (code: string): Promise<string | null> =
 
 const BACKUP_SALT = 'yours-usb-backup-v1';
 
+/** Extra PBKDF2 rounds on top of the combined passKey. Native WebCrypto, so cheap for us, costly per guess. */
+export const BACKUP_KDF_ITERATIONS = 600_000;
+
 /**
- * Key for files written to the drive. Derived from the combined passKey, so a
- * lost drive reveals nothing, and restore needs exactly what unlock needs:
- * the drive's own secret plus the password.
+ * Key for files written to the drive. The drive carries the key file too, so
+ * for a lost drive the password is the only remaining factor: the backup is
+ * an offline guessing target like an exported backup file. This adds a
+ * deliberately slow step on top of the passKey to raise the cost per guess.
+ * Restore needs exactly what unlock needs: the drive's own secret plus the
+ * password.
  */
-export const deriveBackupKey = async (passKeyHex: string): Promise<CryptoKey> =>
-  importAesKey(await hkdf(hexToBytes(passKeyHex), BACKUP_SALT, ''));
+export const deriveBackupKey = async (passKeyHex: string): Promise<CryptoKey> => {
+  const base = await crypto.subtle.importKey('raw', hexToBytes(passKeyHex).buffer as ArrayBuffer, 'PBKDF2', false, [
+    'deriveBits',
+  ]);
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt: enc.encode(BACKUP_SALT).buffer as ArrayBuffer,
+      iterations: BACKUP_KDF_ITERATIONS,
+    },
+    base,
+    256,
+  );
+  return importAesKey(await hkdf(new Uint8Array(bits), BACKUP_SALT, 'aes'));
+};
 
 /** iv (12 bytes) || ciphertext. */
 export const encryptBytes = async (key: CryptoKey, plain: Uint8Array): Promise<Uint8Array> => {
@@ -239,7 +259,10 @@ export const decryptBytes = async (key: CryptoKey, data: Uint8Array): Promise<Ui
 
 export const bytesToBase64 = (bytes: Uint8Array): string => {
   let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  const step = 8192;
+  for (let i = 0; i < bytes.length; i += step) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + step));
+  }
   return btoa(binary);
 };
 

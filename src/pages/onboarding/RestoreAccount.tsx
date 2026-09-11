@@ -236,7 +236,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
                       className="flex items-center justify-center rounded-lg"
                       style={{ backgroundColor: '#000', width: '2.25rem', height: '2.25rem' }}
                     >
-                      <Usb size={18} color="#A1FF8B" />
+                      <Usb size={18} color="#FFFFFF" />
                     </div>
                   ),
                 },

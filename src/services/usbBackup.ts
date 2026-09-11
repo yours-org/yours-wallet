@@ -14,6 +14,11 @@
  *   keys.enc                encrypted JSON: the chrome-storage subset restore needs
  *   settings.enc            encrypted msgpack: storage settings
  *   <identityAddress>/chunk-NNNN.enc   encrypted msgpack SyncChunk
+ *
+ * Threat model note: the drive carries the key file AND the backup. A lost
+ * drive is therefore an offline password-guessing target, exactly like an
+ * exported backup file. The password is the remaining factor, which is why
+ * `deriveBackupKey` adds a deliberately slow step on top of the passKey.
  */
 import type { ChromeStorageService } from './ChromeStorage.service';
 import type { Account, UsbBackupAccountStatus, UsbSecurity } from './types/chromeStorage.types';
@@ -30,6 +35,7 @@ import {
   unwrapMaster,
   USB_FILE_DIR,
 } from '../utils/usbCrypto';
+import { bytesToHex } from '../utils/crypto';
 import { derivePasswordKey } from './passKey';
 
 export const USB_BACKUP_DIR = 'backup';
@@ -38,9 +44,11 @@ const MANIFEST_FILE = 'manifest.enc';
 const KEYS_FILE = 'keys.enc';
 const SETTINGS_FILE = 'settings.enc';
 /** After this many increments an account's chunks are rebuilt from scratch. */
-const COMPACT_AFTER_CHUNKS = 40;
+export const COMPACT_AFTER_CHUNKS = 40;
 /** A key not refreshed for this long shows as stale. */
 export const USB_BACKUP_STALE_MS = 7 * 24 * 60 * 60 * 1000;
+/** Chrome runtime messages have a hard size limit; refuse well below it with a clear message. */
+const MAX_RESTORE_PAYLOAD_BYTES = 48 * 1024 * 1024;
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -56,7 +64,7 @@ interface RestoreJson {
   usbSecurity: UsbSecurity;
 }
 
-interface ManifestAccount {
+export interface ManifestAccount {
   identityKey: string;
   identityAddress: string;
   name: string;
@@ -74,6 +82,9 @@ interface Manifest {
   createdAt: string;
   updatedAt: string;
   accounts: Record<string, ManifestAccount>;
+  /** Content hashes so unchanged files are not rewritten every pass. */
+  keysHash?: string;
+  settingsHash?: string;
 }
 
 export interface KeysFile {
@@ -86,6 +97,44 @@ export interface KeysFile {
   deviceId?: string;
   version?: number;
 }
+
+// --- Pure cursor logic (unit-tested) ---
+
+export const newManifestEntry = (identityKey: string, identityAddress: string, name: string): ManifestAccount => ({
+  identityKey,
+  identityAddress,
+  name,
+  chunkCount: 0,
+  offsets: initialOffsets(),
+  complete: false,
+});
+
+/** A written chunk: one more file, offsets advanced by what it held. */
+export const applyChunkToEntry = (entry: ManifestAccount, counts: Record<string, number>): ManifestAccount => ({
+  ...entry,
+  chunkCount: entry.chunkCount + 1,
+  offsets: entry.offsets.map((o) => ({ name: o.name, offset: o.offset + (counts[o.name] ?? 0) })),
+});
+
+/**
+ * A pass ended (the toolbox returned no rows). Next pass starts from this
+ * pass's start time, so rows written during the pass are picked up next time.
+ */
+export const finishPass = (
+  entry: ManifestAccount,
+  passStart: string,
+  wroteAny: boolean,
+  now: string,
+): ManifestAccount => ({
+  ...entry,
+  since: passStart,
+  offsets: initialOffsets(),
+  complete: true,
+  lastBackupAt: wroteAny || !entry.lastBackupAt ? now : entry.lastBackupAt,
+});
+
+export const needsCompaction = (entry: ManifestAccount): boolean =>
+  entry.complete && entry.chunkCount >= COMPACT_AFTER_CHUNKS;
 
 // --- Progress ---
 
@@ -104,6 +153,14 @@ export const onUsbBackup = (l: Listener): (() => void) => {
   return () => listeners.delete(l);
 };
 const emit = (e: UsbBackupEvent) => listeners.forEach((l) => l(e));
+
+export interface UsbBackupRunResult {
+  /** False when nothing could run: feature off, locked, or no readable key. */
+  ran: boolean;
+  sticks: number;
+  changed: boolean;
+  errors: string[];
+}
 
 // --- Drive helpers ---
 
@@ -131,6 +188,12 @@ const readFileBytes = async (dir: FileSystemDirectoryHandle, name: string): Prom
   }
 };
 
+const bytesEqual = (a: Uint8Array | null, b: Uint8Array): boolean =>
+  !!a && a.length === b.length && a.every((v, i) => v === b[i]);
+
+const sha256Hex = async (bytes: Uint8Array): Promise<string> =>
+  bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes.buffer as ArrayBuffer)));
+
 const writeEncryptedJson = (key: CryptoKey, dir: FileSystemDirectoryHandle, name: string, value: unknown) =>
   encryptBytes(key, enc.encode(JSON.stringify(value))).then((b) => writeFile(dir, name, b));
 
@@ -150,9 +213,17 @@ const readEncryptedJson = async <T>(
 
 const chunkName = (i: number) => `chunk-${String(i).padStart(4, '0')}.enc`;
 
+const removeAccountDir = async (dir: FileSystemDirectoryHandle, name: string) => {
+  try {
+    await dir.removeEntry(name, { recursive: true });
+  } catch {
+    // Already gone.
+  }
+};
+
 // --- The sync ---
 
-let inFlight: Promise<void> | null = null;
+let inFlight: Promise<UsbBackupRunResult> | null = null;
 let pendingRun = false;
 let debounceTimer: number | undefined;
 
@@ -172,47 +243,64 @@ export const requestUsbBackup = (chromeStorageService: ChromeStorageService, del
   }, delayMs);
 };
 
-/** Run now (serialised). Resolves when this run, and any queued follow-up, finish. */
-export const runUsbBackup = async (chromeStorageService: ChromeStorageService): Promise<void> => {
+/**
+ * Run now (serialised). If a run is in progress, waits for it and then runs
+ * once more, so a caller always gets a result that reflects the current state.
+ */
+export const runUsbBackup = async (chromeStorageService: ChromeStorageService): Promise<UsbBackupRunResult> => {
   if (inFlight) {
     pendingRun = true;
-    return inFlight;
+    await inFlight.catch(() => undefined);
+    return runUsbBackup(chromeStorageService);
   }
   inFlight = (async () => {
     try {
-      await syncAllSticks(chromeStorageService);
+      return await syncAllSticks(chromeStorageService);
     } catch (err) {
-      emit({ phase: 'error', message: err instanceof Error ? err.message : String(err) });
+      const message = err instanceof Error ? err.message : String(err);
+      emit({ phase: 'error', message });
+      return { ran: false, sticks: 0, changed: false, errors: [message] };
     } finally {
       inFlight = null;
       emit({ phase: 'idle' });
     }
-    if (pendingRun) {
-      pendingRun = false;
-      await runUsbBackup(chromeStorageService);
-    }
   })();
-  return inFlight;
+  const result = await inFlight;
+  if (pendingRun) {
+    pendingRun = false;
+    return runUsbBackup(chromeStorageService);
+  }
+  return result;
 };
 
-const syncAllSticks = async (chromeStorageService: ChromeStorageService): Promise<void> => {
+const syncAllSticks = async (chromeStorageService: ChromeStorageService): Promise<UsbBackupRunResult> => {
+  const none: UsbBackupRunResult = { ran: false, sticks: 0, changed: false, errors: [] };
   await chromeStorageService.getAndSetStorage();
   const usb = chromeStorageService.getUsbSecurity();
-  if (!usbBackupEnabled(usb)) return;
+  if (!usbBackupEnabled(usb)) return none;
   const passKey = await chromeStorageService.getPassKey();
-  if (!passKey) return;
+  if (!passKey) return none;
+  // Only handles Chrome has already granted are used: the loop never prompts.
   const { present } = await listPresentSticks(usb);
-  if (present.length === 0) return;
+  if (present.length === 0) return none;
   const key = await deriveBackupKey(passKey);
+  const result: UsbBackupRunResult = { ran: true, sticks: 0, changed: false, errors: [] };
   for (const stickId of present) {
     const handle = await getHandle(stickId);
     if (!handle) continue;
+    result.sticks++;
     try {
-      await syncStick(chromeStorageService, usb, key, stickId, handle);
+      const r = await syncStick(chromeStorageService, usb, key, stickId, handle);
+      result.changed = result.changed || r.changed;
+      result.errors.push(...r.errors);
     } catch (err) {
-      emit({ phase: 'error', stickId, message: err instanceof Error ? err.message : String(err) });
+      const message = err instanceof Error ? err.message : String(err);
+      result.errors.push(message);
+      emit({ phase: 'error', stickId, message });
+      emit({ phase: 'done', stickId, changed: false });
     }
   }
+  return result;
 };
 
 const syncStick = async (
@@ -221,14 +309,19 @@ const syncStick = async (
   key: CryptoKey,
   stickId: string,
   drive: FileSystemDirectoryHandle,
-): Promise<void> => {
+): Promise<{ changed: boolean; errors: string[] }> => {
   const storage = chromeStorageService.storage;
-  if (!storage?.accounts || !storage.salt || !storage.storageIdentityKey) return;
+  if (!storage?.accounts || !storage.salt || !storage.storageIdentityKey) {
+    throw new Error('Wallet storage is not ready');
+  }
   const dir = await backupDir(drive, true);
   const accounts = Object.entries(storage.accounts).filter(([, a]) => a?.pubKeys?.identityPubKey);
   emit({ phase: 'start', stickId, totalAccounts: accounts.length });
+  let changed = false;
+  const errors: string[] = [];
 
-  // Restore needs these before it can decrypt anything else.
+  // Restore needs these before it can decrypt anything else. Plaintext, no
+  // secrets, rewritten only when the content differs.
   const restore: RestoreJson = {
     format: 'yours-usb-backup',
     version: 1,
@@ -236,10 +329,29 @@ const syncStick = async (
     salt: storage.salt,
     usbSecurity: usb,
   };
-  await writeFile(dir, RESTORE_FILE, enc.encode(JSON.stringify(restore, null, 2)));
+  const restoreBytes = enc.encode(JSON.stringify(restore, null, 2));
+  if (!bytesEqual(await readFileBytes(dir, RESTORE_FILE), restoreBytes)) {
+    await writeFile(dir, RESTORE_FILE, restoreBytes);
+    changed = true;
+  }
 
-  // Keys and settings are small; rewrite them every pass so labels, icons, and
-  // settings on the drive never lag.
+  const now = new Date().toISOString();
+  const manifest: Manifest = (await readEncryptedJson<Manifest>(key, dir, MANIFEST_FILE)) ?? {
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    accounts: {},
+  };
+  let manifestDirty = false;
+  const saveManifest = async () => {
+    if (!manifestDirty) return;
+    manifest.updatedAt = new Date().toISOString();
+    await writeEncryptedJson(key, dir, MANIFEST_FILE, manifest);
+    manifestDirty = false;
+  };
+
+  // Keys and settings are small. Rewrite them only when their content changed
+  // (compared by hash of the plaintext, since ciphertext differs every time).
   const keys: KeysFile = {
     accounts: storage.accounts,
     selectedAccount: storage.selectedAccount ?? '',
@@ -250,117 +362,124 @@ const syncStick = async (
     deviceId: storage.deviceId,
     version: storage.version,
   };
-  await writeEncryptedJson(key, dir, KEYS_FILE, keys);
-  if (!(await readFileBytes(dir, SETTINGS_FILE))) {
-    const res = await sendMessageAsync<{ success: boolean; settingsData?: string; error?: string }>({
-      action: 'USB_BACKUP_SETTINGS',
-    });
-    if (!res?.success || !res.settingsData) throw new Error(res?.error ?? 'Could not read storage settings');
-    await writeFile(dir, SETTINGS_FILE, await encryptBytes(key, base64ToBytes(res.settingsData)));
+  const keysHash = await sha256Hex(enc.encode(JSON.stringify(keys)));
+  if (manifest.keysHash !== keysHash || !(await readFileBytes(dir, KEYS_FILE))) {
+    await writeEncryptedJson(key, dir, KEYS_FILE, keys);
+    manifest.keysHash = keysHash;
+    manifestDirty = true;
+    changed = true;
   }
+  const settingsRes = await sendMessageAsync<{ success: boolean; settingsData?: string; error?: string }>({
+    action: 'USB_BACKUP_SETTINGS',
+  });
+  if (!settingsRes?.success || !settingsRes.settingsData) {
+    throw new Error(settingsRes?.error ?? 'Could not read storage settings');
+  }
+  const settingsBytes = base64ToBytes(settingsRes.settingsData);
+  const settingsHash = await sha256Hex(settingsBytes);
+  if (manifest.settingsHash !== settingsHash || !(await readFileBytes(dir, SETTINGS_FILE))) {
+    await writeFile(dir, SETTINGS_FILE, await encryptBytes(key, settingsBytes));
+    manifest.settingsHash = settingsHash;
+    manifestDirty = true;
+    changed = true;
+  }
+  await saveManifest();
 
-  const now = new Date().toISOString();
-  const manifest: Manifest = (await readEncryptedJson<Manifest>(key, dir, MANIFEST_FILE)) ?? {
-    version: 1,
-    createdAt: now,
-    updatedAt: now,
-    accounts: {},
-  };
-  const saveManifest = async () => {
-    manifest.updatedAt = new Date().toISOString();
-    await writeEncryptedJson(key, dir, MANIFEST_FILE, manifest);
-  };
-
-  let changed = false;
   for (let i = 0; i < accounts.length; i++) {
     const [identityAddress, account] = accounts[i];
     const identityKey = account.pubKeys.identityPubKey;
     emit({ phase: 'account', stickId, accountName: account.name, accountIndex: i, totalAccounts: accounts.length });
+    try {
+      let entry = manifest.accounts[identityAddress];
+      if (!entry || entry.identityKey !== identityKey) {
+        // New account, or the address now maps to different keys: start over.
+        entry = newManifestEntry(identityKey, identityAddress, account.name);
+        manifest.accounts[identityAddress] = entry;
+        manifestDirty = true;
+        await saveManifest();
+        await removeAccountDir(dir, identityAddress);
+      }
+      if (entry.name !== account.name) {
+        entry.name = account.name;
+        manifestDirty = true;
+      }
 
-    let entry = manifest.accounts[identityAddress];
-    if (!entry || entry.identityKey !== identityKey) {
-      entry = {
-        identityKey,
-        identityAddress,
-        name: account.name,
-        chunkCount: 0,
-        offsets: initialOffsets(),
-        complete: false,
-      };
+      // Compaction. The manifest is reset and committed BEFORE the directory
+      // goes, so a crash in between can never leave a manifest that claims
+      // chunks that no longer exist.
+      if (needsCompaction(entry)) {
+        entry = newManifestEntry(identityKey, identityAddress, account.name);
+        manifest.accounts[identityAddress] = entry;
+        manifestDirty = true;
+        await saveManifest();
+        await removeAccountDir(dir, identityAddress);
+      }
+
+      const accountDir = await dir.getDirectoryHandle(identityAddress, { create: true });
+      const passStart = new Date().toISOString();
+      const since = entry.since;
+      let wroteAny = false;
+
+      for (;;) {
+        const res = await sendMessageAsync<UsbBackupChunkResponse>({
+          action: 'USB_BACKUP_CHUNK',
+          identityKey,
+          since,
+          offsets: entry.offsets,
+          toStorageIdentityKey: `usb-${stickId}`,
+        });
+        if (!res?.success || !res.chunkData || !res.counts) throw new Error(res?.error ?? 'Could not read wallet data');
+        // Every entity query honours `since` (inclusive), so a pass with no
+        // changes returns no rows. Rows updated during a pass are picked up
+        // next time because the cursor moves to this pass's start, not its end.
+        if (!res.hasData) break;
+
+        const bytes = await encryptBytes(key, base64ToBytes(res.chunkData));
+        await writeFile(accountDir, chunkName(entry.chunkCount), bytes);
+        entry = applyChunkToEntry(entry, res.counts);
+        manifest.accounts[identityAddress] = entry;
+        manifestDirty = true;
+        wroteAny = true;
+        changed = true;
+        emit({ phase: 'chunk', stickId, accountName: account.name, chunkIndex: entry.chunkCount });
+        await saveManifest();
+      }
+
+      const wasIncomplete = !entry.complete;
+      entry = finishPass(entry, passStart, wroteAny, new Date().toISOString());
       manifest.accounts[identityAddress] = entry;
-    }
-    entry.name = account.name;
-
-    // Compaction: too many increments, or a previous full pass never finished.
-    if (entry.complete && entry.chunkCount >= COMPACT_AFTER_CHUNKS) {
-      await removeAccountDir(dir, identityAddress);
-      entry.chunkCount = 0;
-      entry.since = undefined;
-      entry.offsets = initialOffsets();
-      entry.complete = false;
+      manifestDirty = true;
       await saveManifest();
+      if (wroteAny || wasIncomplete) {
+        await recordStatus(chromeStorageService, usb, identityAddress, stickId, entry.lastBackupAt ?? passStart);
+      }
+    } catch (err) {
+      // One account must not stop the rest: report and move on.
+      const message = `${account.name}: ${err instanceof Error ? err.message : String(err)}`;
+      errors.push(message);
+      emit({ phase: 'error', stickId, message });
     }
-
-    const accountDir = await dir.getDirectoryHandle(identityAddress, { create: true });
-    const passStart = new Date().toISOString();
-    const since = entry.since;
-    let wroteAny = false;
-
-    for (;;) {
-      const res = await sendMessageAsync<UsbBackupChunkResponse>({
-        action: 'USB_BACKUP_CHUNK',
-        identityKey,
-        since,
-        offsets: entry.offsets,
-        toStorageIdentityKey: `usb-${stickId}`,
-      });
-      if (!res?.success || !res.chunkData || !res.counts) throw new Error(res?.error ?? 'Could not read wallet data');
-      // The toolbox returns rows updated at or after `since`, so an increment
-      // always includes at least one row already seen. Only newer rows count.
-      const isNew = !since || (res.newestUpdatedAt !== undefined && res.newestUpdatedAt > since);
-      if (!res.hasData || !isNew) break;
-
-      const bytes = await encryptBytes(key, base64ToBytes(res.chunkData));
-      await writeFile(accountDir, chunkName(entry.chunkCount), bytes);
-      entry.chunkCount++;
-      entry.offsets = entry.offsets.map((o) => ({ name: o.name, offset: o.offset + (res.counts?.[o.name] ?? 0) }));
-      wroteAny = true;
-      changed = true;
-      emit({ phase: 'chunk', stickId, accountName: account.name, chunkIndex: entry.chunkCount });
-      await saveManifest();
-    }
-
-    // Pass complete: next time, only rows updated since this pass started.
-    entry.since = passStart;
-    entry.offsets = initialOffsets();
-    entry.complete = true;
-    if (wroteAny || !entry.lastBackupAt) entry.lastBackupAt = new Date().toISOString();
-    await saveManifest();
-    await recordStatus(chromeStorageService, identityAddress, stickId, entry.lastBackupAt);
   }
 
+  await saveManifest();
   emit({ phase: 'done', stickId, changed });
-};
-
-const removeAccountDir = async (dir: FileSystemDirectoryHandle, name: string) => {
-  try {
-    await dir.removeEntry(name, { recursive: true });
-  } catch {
-    // Already gone.
-  }
+  return { changed, errors };
 };
 
 const recordStatus = async (
   chromeStorageService: ChromeStorageService,
+  usb: UsbSecurity,
   identityAddress: string,
   stickId: string,
   lastBackupAt: string,
 ) => {
-  const current = chromeStorageService.storage?.usbBackupStatus ?? {};
-  const prev = current[identityAddress];
-  const stickIds = Array.from(new Set([...(prev?.stickIds ?? []), stickId]));
-  const next: Record<string, UsbBackupAccountStatus> = { ...current, [identityAddress]: { lastBackupAt, stickIds } };
-  await chromeStorageService.replaceTopLevel({ usbBackupStatus: next });
+  await chromeStorageService.getAndSetStorage();
+  const prev = chromeStorageService.storage?.usbBackupStatus?.[identityAddress];
+  const registered = new Set(usb.sticks.map((s) => s.id));
+  const stickIds = Array.from(new Set([...(prev?.stickIds ?? []), stickId])).filter((id) => registered.has(id));
+  const entry: UsbBackupAccountStatus = { lastBackupAt, stickIds };
+  // Per-key merge: concurrent writers of other accounts are not clobbered.
+  await chromeStorageService.update({ usbBackupStatus: { [identityAddress]: entry } });
 };
 
 // --- Status helpers for the UI ---
@@ -394,6 +513,8 @@ export interface UsbRestorePayload {
   chromeStorageData: string;
   settingsData: string;
   chunksData: Record<string, string>;
+  /** Accounts whose backup on this drive never completed a full pass. */
+  partialAccounts: string[];
 }
 
 /**
@@ -443,18 +564,24 @@ export const readUsbBackup = async (drive: FileSystemDirectoryHandle, password: 
   const chromeStorage = { ...keys, accounts };
 
   const chunksData: Record<string, string> = {};
+  const partialAccounts: string[] = [];
   const manifestAccounts: Array<{ identityKey: string; identityAddress: string; name: string; chunkCount: number }> =
     [];
+  let totalBytes = 0;
   for (const acct of Object.values(manifest.accounts)) {
-    if (!acct.complete && acct.chunkCount === 0) continue;
+    if (!acct.complete) partialAccounts.push(acct.name);
+    if (acct.chunkCount === 0) continue;
     const accountDir = await dir.getDirectoryHandle(acct.identityAddress).catch(() => null);
-    if (!accountDir) continue;
+    if (!accountDir) throw new Error(`Backup is missing the data folder for ${acct.name}`);
     for (let i = 0; i < acct.chunkCount; i++) {
       const bytes = await readFileBytes(accountDir, chunkName(i));
       if (!bytes) throw new Error(`Backup is missing a chunk for ${acct.name}`);
-      chunksData[`${acct.identityAddress}/chunk-${String(i).padStart(4, '0')}.bin`] = bytesToBase64(
-        await decryptBytes(key, bytes),
-      );
+      const plain = await decryptBytes(key, bytes);
+      totalBytes += plain.length;
+      if (totalBytes > MAX_RESTORE_PAYLOAD_BYTES) {
+        throw new Error('This backup is too large to restore in one step. Restore from a master backup file instead.');
+      }
+      chunksData[`${acct.identityAddress}/chunk-${String(i).padStart(4, '0')}.bin`] = bytesToBase64(plain);
     }
     manifestAccounts.push({
       identityKey: acct.identityKey,
@@ -470,10 +597,11 @@ export const readUsbBackup = async (drive: FileSystemDirectoryHandle, password: 
     chromeStorageData: bytesToBase64(enc.encode(JSON.stringify(chromeStorage))),
     settingsData: bytesToBase64(settings),
     chunksData,
+    partialAccounts,
   };
 };
 
-/** Cheap check used by the start screen: does this drive carry a Yours backup at all? */
+/** Cheap check used by the restore options: does this drive carry a Yours backup at all? */
 export const driveHasUsbBackup = async (drive: FileSystemDirectoryHandle): Promise<boolean> => {
   const dir = await backupDir(drive, false).catch(() => null);
   if (!dir) return false;

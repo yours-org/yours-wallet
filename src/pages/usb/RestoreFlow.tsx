@@ -20,6 +20,7 @@ type RestoreResponse = { success: boolean; error?: string };
 export const RestoreFlow = () => {
   const { chromeStorageService } = useServiceContext();
   const [step, setStep] = useState(0);
+  const [partial, setPartial] = useState<string[]>([]);
   const [drive, setDrive] = useState<FileSystemDirectoryHandle | null>(null);
 
   if (chromeStorageService.getAllAccounts().length > 0) {
@@ -52,6 +53,7 @@ export const RestoreFlow = () => {
       res = { success: false, error: errorText(e) };
     }
     if (!res?.success) return res?.error ?? 'Restore failed';
+    setPartial(payload.partialAccounts);
     setStep(2);
     return null;
   };
@@ -81,7 +83,11 @@ export const RestoreFlow = () => {
           <DoneStep
             key="s2"
             title="Wallet restored"
-            message="Open the Yours icon to unlock your wallet. USB unlock is off until you turn it on again."
+            message={
+              partial.length > 0
+                ? `Open the Yours icon to unlock your wallet. Note: ${partial.length} account(s) had an incomplete backup on this key (${partial.join(', ')}); their history may be partial. USB unlock is off until you turn it on again.`
+                : 'Open the Yours icon to unlock your wallet. USB unlock is off until you turn it on again.'
+            }
           />
         )}
       </AnimatePresence>
