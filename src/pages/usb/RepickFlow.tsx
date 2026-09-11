@@ -29,7 +29,9 @@ export const RepickFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
       }
       const result = await adoptPickedDrive(handle, usbSecurity);
       if (result.status !== 'ok') {
-        setError("That drive doesn't hold a registered key.");
+        setError(
+          'That drive isn’t registered on this wallet. To use it here: Settings → USB Security Key → Add another USB key.',
+        );
         return;
       }
       setFound(usbSecurity.sticks.find((s) => s.id === result.stickId)?.label ?? 'USB key');

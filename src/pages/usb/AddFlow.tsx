@@ -5,7 +5,7 @@ import { deleteHandle, saveHandle } from '../../services/UsbKey.service';
 import type { UsbSecurity, UsbStickEntry } from '../../services/types/chromeStorage.types';
 import { wrapMaster } from '../../utils/usbCrypto';
 import { Stepper } from './UsbLayout';
-import { PresenceStep } from './presence';
+import { IdentityStep } from './presence';
 import { ChooseDriveStep, DoneStep, LabelStep, PasswordStep } from './steps';
 import { nextKeyLabel, prepareDrive, type PreparedDrive } from './usbHelpers';
 
@@ -51,12 +51,13 @@ export const AddFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
       <Stepper steps={STEPS} current={step} />
       <AnimatePresence mode="wait">
         {step === 0 && (
-          <PresenceStep
+          <IdentityStep
             key="s0"
             usbSecurity={usbSecurity}
-            subtitle="Insert a key you already registered."
-            onPresent={(p) => {
-              setMaster(p.master);
+            title="Confirm it’s you"
+            subtitle="Insert a key you already registered, or enter your recovery code."
+            onIdentified={({ master: m }) => {
+              setMaster(m);
               setStep(1);
             }}
           />

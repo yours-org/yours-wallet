@@ -95,7 +95,9 @@ export const useStickProbe = (usbSecurity: UsbSecurity, onOk: (probe: PresentSti
         onOkRef.current(result);
         return;
       }
-      setError("That drive doesn't hold a registered key.");
+      setError(
+        'That drive isn’t registered on this wallet. To use it here: Settings → USB Security Key → Add another USB key.',
+      );
       retry();
     } catch (e) {
       setError(errorText(e));

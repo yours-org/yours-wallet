@@ -124,7 +124,11 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
       const result = await adoptPickedDrive(handle, usbSecurity);
       probeRef.current = result;
       setProbe(result);
-      setErrorText(result.status === 'ok' ? '' : "That drive doesn't hold a registered key");
+      setErrorText(
+        result.status === 'ok'
+          ? ''
+          : 'That drive isn’t registered on this wallet. To use it here: Settings → USB Security Key → Add another USB key.',
+      );
     } catch {
       // Picker dismissed.
     }
