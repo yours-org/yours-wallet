@@ -215,8 +215,7 @@ const USB_GATED_CWI_ACTIONS = new Set<string>([
  * 'permission' both mean the drive is not readable right now. Unknown (keeper
  * not yet reported) never blocks.
  */
-const usbKeyMissing = (): boolean =>
-  !!chromeStorageService.getUsbSecurity()?.enabled && (lastUsbState === 'absent' || lastUsbState === 'permission');
+const usbKeyMissing = (): boolean => !!chromeStorageService.getUsbSecurity()?.enabled && lastUsbState === 'absent';
 
 const hasUsbKeeper = async (): Promise<boolean> => {
   try {
@@ -249,7 +248,10 @@ const ensureUsbKeeper = async (): Promise<void> => {
 
 const onUsbPresence = (state: 'present' | 'absent' | 'permission' | 'off') => {
   lastUsbState = state;
-  if ((state === 'absent' || state === 'permission') && accountContext) {
+  // 'permission' means the keeper has no grant, which happens whenever the
+  // last real window closes; it says nothing about whether the drive is in.
+  // Only a failed read under a live grant counts as removal.
+  if (state === 'absent' && accountContext) {
     if (usbRemovalTimer) return;
     usbRemovalTimer = setTimeout(async () => {
       usbRemovalTimer = undefined;
