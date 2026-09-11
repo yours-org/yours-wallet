@@ -34,7 +34,11 @@ export const RestoreFlow = () => {
     return () => chrome.runtime.onMessage.removeListener(listener);
   }, []);
 
-  if (chromeStorageService.getAllAccounts().length > 0) {
+  // Decided once when the flow opens. The restore itself writes accounts, and
+  // the page's storage view refreshes while the flow is still on screen; a
+  // check on every render would replace the done screen with this block.
+  const [hadWallet] = useState(() => chromeStorageService.getAllAccounts().length > 0);
+  if (hadWallet) {
     return (
       <BlockedStep
         title="This browser already has a wallet"
