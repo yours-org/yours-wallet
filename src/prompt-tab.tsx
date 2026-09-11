@@ -8,6 +8,8 @@ import type {
   GroupedPermissionRequest,
   PermissionRequest,
 } from '@bsv/wallet-toolbox-client';
+import { Usb } from 'lucide-react';
+import { Button } from './components/Button';
 import { UnlockWallet } from './components/UnlockWallet';
 import { PageLoader } from './components/PageLoader';
 import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
@@ -247,7 +249,23 @@ const PromptApp = () => {
           </p>
         )}
         {screen.kind === 'unlock' && <UnlockWallet onUnlock={() => void advance()} />}
-        {screen.kind === 'usbAbsent' && (
+        {screen.kind === 'usbAbsent' && screen.presence === 'permission' && (
+          <div className="flex flex-col items-center gap-4 px-8 text-center w-full">
+            <Usb size={28} style={{ color: theme.color.global.gray }} />
+            <div>
+              <p className="text-sm font-semibold m-0" style={{ color: theme.color.global.contrast }}>
+                Confirm your USB key
+              </p>
+              <p className="text-xs m-0 mt-1" style={{ color: theme.color.global.gray }}>
+                Chrome needs access to read it before this request opens.
+              </p>
+            </div>
+            <div className="w-[87%]">
+              <Button theme={theme} type="primary" label="Allow USB access" onClick={() => void allowUsbAccess()} />
+            </div>
+          </div>
+        )}
+        {screen.kind === 'usbAbsent' && screen.presence !== 'permission' && (
           <div className="flex flex-col items-center gap-3 px-8 text-center">
             <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: theme.color.global.gray }} />
             <p className="text-sm font-semibold" style={{ color: theme.color.global.contrast }}>
@@ -256,16 +274,6 @@ const PromptApp = () => {
             <p className="text-xs" style={{ color: theme.color.global.gray }}>
               This request will open as soon as a registered USB key is detected.
             </p>
-            {screen.presence === 'permission' && (
-              <button
-                type="button"
-                onClick={() => void allowUsbAccess()}
-                className="text-xs underline underline-offset-2 bg-transparent border-none p-0 cursor-pointer"
-                style={{ color: theme.color.global.gray, fontFamily: "'Inter', Arial, Helvetica, sans-serif" }}
-              >
-                Plugged in but not detected? Check again
-              </button>
-            )}
           </div>
         )}
         {screen.kind === 'permission' && (

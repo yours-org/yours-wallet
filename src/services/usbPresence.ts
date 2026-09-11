@@ -20,8 +20,10 @@ export const resetUsbPresence = (): void => {
 };
 
 /**
- * One probe. `absent` and `permission` both count as a failure for locking
- * purposes; the distinction lets UI copy say which button to show.
+ * One probe. Only `absent` (a read that failed under a live grant) counts
+ * toward locking. `permission` means this page has no grant yet, which is the
+ * normal state of every freshly opened window, and says nothing about whether
+ * the drive is in: the page must ask Chrome (a click), not lock.
  */
 export const checkUsbPresence = async (chromeStorageService: ChromeStorageService): Promise<UsbPresence> => {
   const usbSecurity = chromeStorageService.getUsbSecurity();
@@ -31,8 +33,9 @@ export const checkUsbPresence = async (chromeStorageService: ChromeStorageServic
     consecutiveFailures = 0;
     return 'present';
   }
+  if (probe.status === 'permission') return 'permission';
   consecutiveFailures++;
-  return probe.status === 'permission' ? 'permission' : 'absent';
+  return 'absent';
 };
 
 /**
@@ -44,7 +47,7 @@ export const enforceUsbPresence = async (
   onRemoved: () => void | Promise<void>,
 ): Promise<UsbPresence> => {
   const presence = await checkUsbPresence(chromeStorageService);
-  if (presence !== 'present' && presence !== 'disabled' && consecutiveFailures >= FAILURES_TO_LOCK) {
+  if (presence === 'absent' && consecutiveFailures >= FAILURES_TO_LOCK) {
     consecutiveFailures = 0;
     await onRemoved();
   }
