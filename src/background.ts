@@ -148,21 +148,10 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   // waits for all reader/writer locks; once the address sync is running it
   // holds those almost continuously and the import never starts, and every
   // wallet read (balance, storage info) then queues behind it.
-  const importPendingRestore = async ({
-    storage,
-  }: {
-    storage: import('@1sat/wallet-browser').WalletStorageManager;
-  }) => {
-    const { account: currentAccount } = chromeStorageService.getCurrentAccountObject();
-    const currentIdentityKey = currentAccount?.pubKeys?.identityPubKey || '';
-    if (!currentIdentityKey) return;
-    const hasPending = await WalletBackupService.hasPendingRestore(currentIdentityKey);
-    console.log(
-      '[background] initializeWallet: hasPendingRestore for',
-      currentIdentityKey.slice(0, 8) + '...:',
-      hasPending,
-    );
-    if (!hasPending) return;
+  const runPendingImport = async (
+    storage: import('@1sat/wallet-browser').WalletStorageManager,
+    currentIdentityKey: string,
+  ) => {
     console.log('[background] initializeWallet: Found pending restore data, importing...');
     // Watchdog: say so every 10 s while the import is in flight, so a hang is visible.
     const started = Date.now();
@@ -206,6 +195,36 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
     }
   };
 
+  /**
+   * Whether a pending import must finish before the wallet is usable. Only
+   * when the local store is active: then the stick's data IS the wallet. With
+   * a remote active, the wallet's state comes from the server and the import
+   * is merely an offline copy, so it runs after init, off the critical path.
+   */
+  let deferredImport: { storage: import('@1sat/wallet-browser').WalletStorageManager; identityKey: string } | undefined;
+  const importPendingRestore = async ({
+    storage,
+  }: {
+    storage: import('@1sat/wallet-browser').WalletStorageManager;
+  }) => {
+    const { account: currentAccount } = chromeStorageService.getCurrentAccountObject();
+    const currentIdentityKey = currentAccount?.pubKeys?.identityPubKey || '';
+    if (!currentIdentityKey) return;
+    const hasPending = await WalletBackupService.hasPendingRestore(currentIdentityKey);
+    console.log(
+      '[background] initializeWallet: hasPendingRestore for',
+      currentIdentityKey.slice(0, 8) + '...:',
+      hasPending,
+    );
+    if (!hasPending) return;
+    if (storage.getActive().isStorageProvider()) {
+      await runPendingImport(storage, currentIdentityKey);
+    } else {
+      console.log('[background] initializeWallet: remote is active; offline copy will import after init');
+      deferredImport = { storage, identityKey: currentIdentityKey };
+    }
+  };
+
   accountContext = await initWallet(chromeStorageService, {
     onTransactionBroadcasted: (txid: string) => {
       console.log('[background] Transaction broadcasted:', txid);
@@ -222,6 +241,13 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   if (accountContext) {
     bindPermissionCallbacks(accountContext.wallet);
     console.log('[background] initializeWallet: bound permission callbacks');
+    if (deferredImport) {
+      // Lock-free write into the local backup store; the wallet is already usable.
+      const { storage, identityKey } = deferredImport;
+      void runPendingImport(storage, identityKey).catch((err) =>
+        console.error('[background] deferred offline-copy import failed:', err),
+      );
+    }
   }
 
   return accountContext?.wallet ?? null;
