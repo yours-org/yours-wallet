@@ -54,6 +54,7 @@
     "preview": "vite preview",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "test:network": "node --import tsx --test scripts/network.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "verify:build": "tsx scripts/verify-build.ts",
     "package": "tsx scripts/package.ts",
