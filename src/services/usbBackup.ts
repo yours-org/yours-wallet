@@ -326,6 +326,8 @@ const syncStick = async (
   emit({ phase: 'start', stickId, totalAccounts: accounts.length });
   let changed = false;
   const errors: string[] = [];
+  /** Accounts whose pass completed this run, whether or not anything was written. */
+  const verified: string[] = [];
 
   // Restore needs these before it can decrypt anything else. Plaintext, no
   // secrets, rewritten only when the content differs.
@@ -472,14 +474,11 @@ const syncStick = async (
       }
 
       if (skipped) continue;
-      const wasIncomplete = !entry.complete;
       entry = finishPass(entry, passStart, wroteAny, new Date().toISOString());
       manifest.accounts[identityAddress] = entry;
       manifestDirty = true;
       await saveManifest();
-      if (wroteAny || wasIncomplete) {
-        await recordStatus(chromeStorageService, usb, identityAddress, stickId, entry.lastBackupAt ?? passStart);
-      }
+      verified.push(identityAddress);
     } catch (err) {
       // One account must not stop the rest: report and move on.
       const message = `${account.name}: ${err instanceof Error ? err.message : String(err)}`;
@@ -489,23 +488,30 @@ const syncStick = async (
   }
 
   await saveManifest();
+  // "Backed up N ago" means "last verified current on this key", so every
+  // completed pass counts, written or not. One local write per run.
+  if (verified.length > 0) await recordStatus(chromeStorageService, usb, verified, stickId);
   return { changed, errors };
 };
 
 const recordStatus = async (
   chromeStorageService: ChromeStorageService,
   usb: UsbSecurity,
-  identityAddress: string,
+  identityAddresses: string[],
   stickId: string,
-  lastBackupAt: string,
 ) => {
   await chromeStorageService.getAndSetStorage();
-  const prev = chromeStorageService.storage?.usbBackupStatus?.[identityAddress];
+  const current = chromeStorageService.storage?.usbBackupStatus ?? {};
   const registered = new Set(usb.sticks.map((s) => s.id));
-  const stickIds = Array.from(new Set([...(prev?.stickIds ?? []), stickId])).filter((id) => registered.has(id));
-  const entry: UsbBackupAccountStatus = { lastBackupAt, stickIds };
+  const now = new Date().toISOString();
+  const patch: Record<string, UsbBackupAccountStatus> = {};
+  for (const identityAddress of identityAddresses) {
+    const prev = current[identityAddress];
+    const stickIds = Array.from(new Set([...(prev?.stickIds ?? []), stickId])).filter((id) => registered.has(id));
+    patch[identityAddress] = { lastBackupAt: now, stickIds };
+  }
   // Per-key merge: concurrent writers of other accounts are not clobbered.
-  await chromeStorageService.update({ usbBackupStatus: { [identityAddress]: entry } });
+  await chromeStorageService.update({ usbBackupStatus: patch });
 };
 
 // --- Status helpers for the UI ---
