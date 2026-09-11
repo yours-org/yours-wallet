@@ -8,8 +8,10 @@ import {
   type SyncAddressesInput,
   type SyncAddressesResult,
 } from '@1sat/actions';
+import type { PromptRequest } from '@1sat/permission-module';
 import { PrivateKey, PublicKey } from '@bsv/sdk';
-import { getNetwork, toNetworkAddress, type Chain } from './network';
+import { getNetwork, isValidAddress, toNetworkAddress, type Chain } from './network';
+import { NetWork } from '../services/types/provider.types';
 
 type StoreProto = { getDb: () => Promise<unknown>; dbName: string };
 
@@ -72,4 +74,33 @@ export const syncAddresses = {
   ...sdkSyncAddresses,
   execute: (ctx: OneSatContext, input: SyncAddressesInput): Promise<SyncAddressesResult> =>
     withChainAwareSdk(ctx.chain, () => sdkSyncAddresses.execute(ctx, input)),
+};
+
+const MAINNET_P2PKH = /1[a-km-zA-HJ-NP-Z1-9]{25,33}/g;
+
+const remapAddressText = (value: string, network: NetWork): string => {
+  if (isValidAddress(value, 'main')) return toNetworkAddress(value, network);
+  return value.replace(MAINNET_P2PKH, (address) =>
+    isValidAddress(address, 'main') ? toNetworkAddress(address, network) : address,
+  );
+};
+
+const remapValue = (value: unknown, network: NetWork): unknown => {
+  if (typeof value === 'string') return remapAddressText(value, network);
+  if (Array.isArray(value)) return value.map((item) => remapValue(item, network));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, remapValue(item, network)]));
+  }
+  return value;
+};
+
+/** @1sat/permission-module 0.0.52 decodes prompt recipients as mainnet unless chain is passed. */
+export const remapPromptRequest = (request: PromptRequest, chain: Chain): PromptRequest => {
+  if (chain !== 'test') return request;
+  const network = getNetwork(chain);
+  return {
+    ...request,
+    summary: remapAddressText(request.summary, network),
+    payload: remapValue(request.payload, network) as PromptRequest['payload'],
+  };
 };

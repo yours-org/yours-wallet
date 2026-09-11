@@ -9,7 +9,7 @@ import {
   IndexedDbPermissionStore,
 } from '@1sat/wallet-browser';
 import { syncMessages, createContext as createActionContext, migrateLegacyP1SatBaskets } from '@1sat/actions';
-import { syncAddresses } from './utils/chainActions';
+import { remapPromptRequest, syncAddresses } from './utils/chainActions';
 import { createAssetPermissionModules } from '@1sat/permission-module';
 import type { WalletInterface } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';
@@ -232,7 +232,7 @@ export const initWallet = async (
   const assetModules = createAssetPermissionModules({
     wallet: baseWallet,
     services,
-    promptHandler: showOneSatPrompt,
+    promptHandler: (request) => showOneSatPrompt(remapPromptRequest(request, chain)),
     adminOriginator: ADMIN_ORIGINATOR,
     // Reuse the same permission store the LocalWalletPermissionsManager
     // uses, so basket grants persisted via the grouped-permission popup

@@ -93,8 +93,5 @@
     "@1sat/templates": "0.0.33",
     "@1sat/utils": "0.0.34",
     "@1sat/wallet": "0.0.106"
-  },
-  "patchedDependencies": {
-    "@1sat/permission-module@0.0.52": "patches/@1sat%2Fpermission-module@0.0.52.patch"
   }
 }
