@@ -181,93 +181,6 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
   return accountContext?.wallet ?? null;
 };
 
-// --- USB unlock keeper (offscreen document) ---------------------------------
-// Chrome keeps a File System Access grant only while an extension page is
-// open. The invisible offscreen page keeps one open for the whole browser
-// session whenever USB unlock is on, so the grant obtained once in the
-// standalone window survives and the popup can read the drive afterwards. It
-// also probes the drive on a timer and reports presence here.
-const USB_KEEPER_URL = 'offscreen.html';
-const USB_REMOVAL_GRACE_MS = 5000;
-let usbRemovalTimer: ReturnType<typeof setTimeout> | undefined;
-let lastUsbState: 'present' | 'absent' | 'permission' | 'off' | undefined;
-const USB_KEY_ABSENT_MESSAGE = 'Insert your USB key to continue';
-
-/** dApp calls that spend, sign, or reveal. Refused with a clear error when the key is out. */
-const USB_GATED_CWI_ACTIONS = new Set<string>([
-  CWIEventName.CREATE_ACTION,
-  CWIEventName.SIGN_ACTION,
-  CWIEventName.INTERNALIZE_ACTION,
-  CWIEventName.CREATE_SIGNATURE,
-  CWIEventName.CREATE_HMAC,
-  CWIEventName.ENCRYPT,
-  CWIEventName.DECRYPT,
-  CWIEventName.RELINQUISH_OUTPUT,
-  CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE,
-  CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE,
-  CWIEventName.ACQUIRE_CERTIFICATE,
-  CWIEventName.PROVE_CERTIFICATE,
-  CWIEventName.RELINQUISH_CERTIFICATE,
-]);
-
-/**
- * While unlocked, the keeper's last report is authoritative: 'absent' and
- * 'permission' both mean the drive is not readable right now. Unknown (keeper
- * not yet reported) never blocks.
- */
-const usbKeyMissing = (): boolean =>
-  !!chromeStorageService.getUsbSecurity()?.enabled && (lastUsbState === 'absent' || lastUsbState === 'permission');
-
-const hasUsbKeeper = async (): Promise<boolean> => {
-  try {
-    const contexts = await chrome.runtime.getContexts({
-      contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT],
-    });
-    return contexts.length > 0;
-  } catch {
-    return false;
-  }
-};
-
-const ensureUsbKeeper = async (): Promise<void> => {
-  const enabled = !!chromeStorageService.getUsbSecurity()?.enabled;
-  const exists = await hasUsbKeeper();
-  try {
-    if (enabled && !exists) {
-      await chrome.offscreen.createDocument({
-        url: USB_KEEPER_URL,
-        reasons: [chrome.offscreen.Reason.LOCAL_STORAGE],
-        justification: 'Keeps access to the registered USB drive alive and checks that it is still inserted.',
-      });
-    } else if (!enabled && exists) {
-      await chrome.offscreen.closeDocument();
-    }
-  } catch (err) {
-    console.warn('[background] USB keeper:', err instanceof Error ? err.message : err);
-  }
-};
-
-const onUsbPresence = (state: 'present' | 'absent' | 'permission' | 'off') => {
-  lastUsbState = state;
-  if ((state === 'absent' || state === 'permission') && accountContext) {
-    if (usbRemovalTimer) return;
-    usbRemovalTimer = setTimeout(async () => {
-      usbRemovalTimer = undefined;
-      if (!accountContext) return;
-      console.log('[background] USB key removed — locking');
-      dropWalletContext('usb-removed');
-      await chromeStorageService.clearPassKey();
-      await chromeStorageService.update({ isLocked: true });
-    }, USB_REMOVAL_GRACE_MS);
-    return;
-  }
-  // present, permission (unknown), or off: cancel any pending lock.
-  if (usbRemovalTimer) {
-    clearTimeout(usbRemovalTimer);
-    usbRemovalTimer = undefined;
-  }
-};
-
 // Start initialization — clean up stale popup windows then initialize wallet.
 // ensureWallet() awaits this so CWI messages don't launch popups during init.
 const startupInitPromise = chromeStorageService
@@ -306,7 +219,6 @@ const startupInitPromise = chromeStorageService
     // Only initialize wallet if it's within the active session window.
     // If locked (inactive or manual lock), keys stay encrypted until the user unlocks.
     await chromeStorageService.getAndSetStorage();
-    await ensureUsbKeeper();
     const { account, lastActiveTime } = chromeStorageService.getCurrentAccountObject();
     const passKey = await chromeStorageService.getPassKey();
     const isUnlocked =
@@ -799,7 +711,6 @@ if (isInServiceWorker) {
       // USB key security (popup / USB window internal)
       'USB_REKEY',
       'USB_PING',
-      'USB_PRESENCE',
       // Storage management (popup internal)
       'STORAGE_GET_INFO',
       'STORAGE_SYNC_BACKUPS',
@@ -987,16 +898,9 @@ if (isInServiceWorker) {
           // Keeps the worker from idling out while the USB window is open.
           sendResponse({ type: 'USB_PING', success: true });
           return true;
-        case 'USB_PRESENCE':
-          onUsbPresence(message.state);
-          sendResponse({ type: 'USB_PRESENCE', success: true });
-          return true;
         case 'USB_REKEY':
           usbRekey(chromeStorageService, message as UsbRekeyRequest)
-            .then(async (res) => {
-              await ensureUsbKeeper();
-              sendResponse({ type: 'USB_REKEY', ...res });
-            })
+            .then((res) => sendResponse({ type: 'USB_REKEY', ...res }))
             .catch((err: Error) => sendResponse({ type: 'USB_REKEY', success: false, error: err.message }));
           return true;
         case 'MASTER_RESTORE':
@@ -1156,13 +1060,6 @@ if (isInServiceWorker) {
           void closeDappPopupIfIdle();
         });
     };
-
-    // USB unlock: a spend/sign from a dApp while the key is out gets a clear
-    // refusal instead of a permission prompt that can never be satisfied.
-    if (USB_GATED_CWI_ACTIONS.has(message.action) && accountContext && usbKeyMissing()) {
-      sendResponse({ type: message.action, success: false, error: USB_KEY_ABSENT_MESSAGE });
-      return true;
-    }
 
     ensureWallet(isFromExtension)
       .then(() => {
