@@ -205,3 +205,47 @@ export const decodeRecoveryCode = async (code: string): Promise<string | null> =
   if (payload[32] !== expected[0] || payload[33] !== expected[1]) return null;
   return bytesToHex(master);
 };
+
+// --- USB backup: bytes encrypted under a key derived from the session passKey ---
+
+const BACKUP_SALT = 'yours-usb-backup-v1';
+
+/**
+ * Key for files written to the drive. Derived from the combined passKey, so a
+ * lost drive reveals nothing, and restore needs exactly what unlock needs:
+ * the drive's own secret plus the password.
+ */
+export const deriveBackupKey = async (passKeyHex: string): Promise<CryptoKey> =>
+  importAesKey(await hkdf(hexToBytes(passKeyHex), BACKUP_SALT, ''));
+
+/** iv (12 bytes) || ciphertext. */
+export const encryptBytes = async (key: CryptoKey, plain: Uint8Array): Promise<Uint8Array> => {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain.buffer as ArrayBuffer));
+  const out = new Uint8Array(iv.length + ct.length);
+  out.set(iv, 0);
+  out.set(ct, iv.length);
+  return out;
+};
+
+export const decryptBytes = async (key: CryptoKey, data: Uint8Array): Promise<Uint8Array> => {
+  if (data.length < 13) throw new Error('Encrypted data too short');
+  const iv = data.slice(0, 12);
+  const ct = data.slice(12);
+  return new Uint8Array(
+    await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv.buffer as ArrayBuffer }, key, ct.buffer as ArrayBuffer),
+  );
+};
+
+export const bytesToBase64 = (bytes: Uint8Array): string => {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+};
+
+export const base64ToBytes = (b64: string): Uint8Array => {
+  const binary = atob(b64);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+  return out;
+};

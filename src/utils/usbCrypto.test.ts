@@ -138,3 +138,17 @@ describe('stick file', () => {
     expect(parseStickFile('{"a":"' + 'x'.repeat(5000) + '"}')).toBeNull();
   });
 });
+
+describe('backup bytes', () => {
+  test('round-trips under the backup key and fails under another', async () => {
+    const { deriveBackupKey, encryptBytes, decryptBytes, bytesToBase64, base64ToBytes } = await import('./usbCrypto');
+    const key = await deriveBackupKey(deriveKey('pw', 'salt'));
+    const plain = new TextEncoder().encode('hello chunk');
+    const enc = await encryptBytes(key, plain);
+    expect(enc.length).toBe(12 + plain.length + 16);
+    expect(new TextDecoder().decode(await decryptBytes(key, enc))).toBe('hello chunk');
+    const other = await deriveBackupKey(deriveKey('pw2', 'salt'));
+    await expect(decryptBytes(other, enc)).rejects.toBeDefined();
+    expect(base64ToBytes(bytesToBase64(enc))).toEqual(enc);
+  });
+});

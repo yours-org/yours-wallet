@@ -100,6 +100,15 @@ export interface UsbSecurity {
   /** HKDF(master) verifier so a recovery-code typo reads differently from a wrong password. */
   masterCheck: string;
   sticks: UsbStickEntry[];
+  /** USB backup sync (OPL-4685). Absent = on, for wallets enrolled before the option existed. */
+  backup?: { enabled: boolean };
+}
+
+/** Per-account record of the most recent completed USB backup, across all keys. */
+export interface UsbBackupAccountStatus {
+  lastBackupAt: string;
+  /** Which registered keys hold a copy as of `lastBackupAt`. */
+  stickIds: string[];
 }
 
 /** Written first and cleared last by the re-key routine. Other account writers refuse while set. */
@@ -153,6 +162,8 @@ export interface ChromeStorageObject {
   /** null is written by the re-key commit itself so the marker clears in the same set. */
   keyRekey?: KeyRekeyMarker | null;
   keyRecovery?: KeyRecovery | null;
+  /** identityAddress → last USB backup. Written by the popup's sync loop. */
+  usbBackupStatus?: Record<string, UsbBackupAccountStatus>;
 }
 
 export type CurrentAccountObject = Omit<ChromeStorageObject, 'accounts' | 'popupWindowId' | 'broadcastRequest'> & {

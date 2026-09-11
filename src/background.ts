@@ -51,6 +51,12 @@ import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
 import { repairStaleAccounts, usbRekey, type UsbRekeyRequest } from './services/usbRekeyBackground';
 import { USB_HANDLE_DB_NAME } from './services/UsbKey.service';
+import {
+  closeUsbBackupReader,
+  usbBackupChunk,
+  usbBackupSettings,
+  type UsbBackupChunkRequest,
+} from './services/usbBackupBackground';
 
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
@@ -90,6 +96,7 @@ const notifyBalanceUpdate = () => {
 
 // Drop live context immediately; destroy in background (never block lock on hung close).
 const dropWalletContext = (reason: string) => {
+  void closeUsbBackupReader();
   const ctx = accountContext;
   accountContext = null;
   if (!ctx) return;
@@ -711,6 +718,8 @@ if (isInServiceWorker) {
       // USB key security (popup / USB window internal)
       'USB_REKEY',
       'USB_PING',
+      'USB_BACKUP_CHUNK',
+      'USB_BACKUP_SETTINGS',
       // Storage management (popup internal)
       'STORAGE_GET_INFO',
       'STORAGE_SYNC_BACKUPS',
@@ -898,6 +907,27 @@ if (isInServiceWorker) {
           // Keeps the worker from idling out while the USB window is open.
           sendResponse({ type: 'USB_PING', success: true });
           return true;
+        case 'USB_BACKUP_CHUNK':
+        case 'USB_BACKUP_SETTINGS': {
+          // Read-only view of the shared local database for the popup's USB sync.
+          // Refused while locked: no session, no backup.
+          const storageIdentityKey = chromeStorageService.storage?.storageIdentityKey;
+          chromeStorageService
+            .getPassKey()
+            .then(async (passKey) => {
+              if (!passKey || !storageIdentityKey) {
+                sendResponse({ type: message.action, success: false, error: 'Wallet is locked' });
+                return;
+              }
+              const res =
+                message.action === 'USB_BACKUP_CHUNK'
+                  ? await usbBackupChunk(storageIdentityKey, message as UsbBackupChunkRequest)
+                  : await usbBackupSettings(storageIdentityKey);
+              sendResponse({ type: message.action, ...res });
+            })
+            .catch((err: Error) => sendResponse({ type: message.action, success: false, error: err.message }));
+          return true;
+        }
         case 'USB_REKEY':
           usbRekey(chromeStorageService, message as UsbRekeyRequest)
             .then((res) => sendResponse({ type: 'USB_REKEY', ...res }))
