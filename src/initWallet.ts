@@ -131,6 +131,8 @@ export interface InitWalletOptions {
    * of them, so an import started after it never gets in.
    */
   beforeSync?: (ctx: { storage: WalletStorageManager }) => Promise<void>;
+  /** Runs once the address sync has completed (not on its failure). Errors are logged, never thrown. */
+  afterSync?: (ctx: { storage: WalletStorageManager }) => Promise<void>;
 }
 
 /**
@@ -334,9 +336,16 @@ export const initWallet = async (
         sendSyncStatus({ status: 'progress', ...progress });
       },
     })
-    .then((result) => {
+    .then(async (result) => {
       sendSyncStatus({ status: 'complete', ...result });
       console.log('[initWallet] Address sync complete:', result);
+      if (options?.afterSync) {
+        try {
+          await options.afterSync({ storage });
+        } catch (err) {
+          console.error('[initWallet] afterSync failed:', err);
+        }
+      }
     })
     .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);

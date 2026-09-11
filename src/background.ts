@@ -246,6 +246,24 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
     );
     if (!hasPending) return;
     await runPendingImport(storage, currentIdentityKey);
+    if (!(await WalletBackupService.hasPendingRestore(currentIdentityKey))) pendingUtxoReview.add(currentIdentityKey);
+  };
+
+  /**
+   * Once the address sync has finished after a restore, release outputs the
+   * chain says were spent since the backup. Runs after the sync, not before:
+   * it takes the manager's exclusive locks and does one network lookup per
+   * change output.
+   */
+  const pendingUtxoReview = new Set<string>();
+  const reviewRestoredUtxos = async ({ storage }: { storage: import('@1sat/wallet-browser').WalletStorageManager }) => {
+    const { account } = chromeStorageService.getCurrentAccountObject();
+    const identityKey = account?.pubKeys?.identityPubKey || '';
+    if (!identityKey || !pendingUtxoReview.delete(identityKey)) return;
+    await WalletBackupService.reviewRestoredUtxos(
+      storage as unknown as Parameters<typeof WalletBackupService.reviewRestoredUtxos>[0],
+      identityKey,
+    );
   };
 
   const startedUnder = lockGeneration;
@@ -259,6 +277,7 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
       notifyBalanceUpdate();
     },
     beforeSync: importPendingRestore,
+    afterSync: reviewRestoredUtxos,
   });
   if (lockGeneration !== startedUnder || !(await chromeStorageService.getPassKey())) {
     // Locked while we were initialising (a restore's detached init can run
@@ -424,6 +443,13 @@ const pendingUsbChecks = new Map<
   { request: UsbCheckRequest; resolve: () => void; reject: (e: Error) => void }
 >();
 let usbCheckInFlight: Promise<void> | null = null;
+/** No prompt window can answer: refuse every waiting call rather than hold them forever. */
+const failPendingUsbChecks = (message: string) => {
+  for (const pending of pendingUsbChecks.values()) pending.reject(new Error(message));
+  pendingUsbChecks.clear();
+};
+/** A confirm prompt nobody answers must not hold dApp and popup calls open indefinitely. */
+const USB_CHECK_TIMEOUT_MS = 3 * 60_000;
 
 /**
  * A master backup closes the live wallet and walks every account's storage
@@ -461,6 +487,7 @@ let inFlightDappRequests = 0;
 const selfClosedWindowIds = new Set<number>();
 
 const hasQueuedDappUi = (): boolean =>
+  pendingUsbChecks.size > 0 ||
   pendingPermissionRequests.size > 0 ||
   pendingGroupedPermissionRequests.size > 0 ||
   pendingCounterpartyPermissionRequests.size > 0 ||
@@ -693,6 +720,8 @@ if (isInServiceWorker) {
           chrome.storage.local.set({
             popupWindowId,
           });
+        } else if (kind === 'usbCheck') {
+          failPendingUsbChecks(USB_KEY_ABSENT_MESSAGE);
         }
       },
     );
@@ -2067,7 +2096,6 @@ if (isInServiceWorker) {
         });
         return;
       }
-      masterBackupInFlight = true;
 
       const chain = 'main' as const;
 
@@ -2090,6 +2118,8 @@ if (isInServiceWorker) {
         return;
       }
 
+      // From here until restoreOriginalAccount: no wallet may come up.
+      masterBackupInFlight = true;
       // Release the live wallet so per-account opens own the IDB connection.
       await closeLiveWallet('before-master-backup');
 
@@ -2526,7 +2556,18 @@ if (isInServiceWorker) {
     if (usbCheckInFlight) return usbCheckInFlight;
     const requestID = `usb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     usbCheckInFlight = new Promise<void>((resolve, reject) => {
-      pendingUsbChecks.set(requestID, { request: { requestID, reason, originator }, resolve, reject });
+      const timer = setTimeout(() => {
+        if (pendingUsbChecks.delete(requestID)) reject(new Error(USB_KEY_ABSENT_MESSAGE));
+      }, USB_CHECK_TIMEOUT_MS);
+      const settle = (fn: () => void) => () => {
+        clearTimeout(timer);
+        fn();
+      };
+      pendingUsbChecks.set(requestID, {
+        request: { requestID, reason, originator },
+        resolve: settle(resolve),
+        reject: (e) => settle(() => reject(e))(),
+      });
       showPromptUi('usbCheck', requestID);
     }).finally(() => {
       usbCheckInFlight = null;
@@ -3038,8 +3079,7 @@ if (isInServiceWorker) {
 
       denyAllOneSatPrompts();
 
-      for (const pending of pendingUsbChecks.values()) pending.reject(new Error(USB_KEY_ABSENT_MESSAGE));
-      pendingUsbChecks.clear();
+      failPendingUsbChecks(USB_KEY_ABSENT_MESSAGE);
 
       // Reject any CWI handlers waiting for wallet unlock
       for (const waiter of pendingWalletWaiters.splice(0)) {

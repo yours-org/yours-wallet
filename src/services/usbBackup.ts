@@ -278,9 +278,12 @@ const writeFile = async (dir: FileSystemDirectoryHandle, name: string, bytes: Ui
   const w = await fh.createWritable();
   try {
     await w.write(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
-  } finally {
-    await w.close();
+  } catch (err) {
+    // Abort discards the partial write; close would commit a truncated file.
+    await w.abort().catch(() => {});
+    throw err;
   }
+  await w.close();
   const back = new Uint8Array(await (await fh.getFile()).arrayBuffer());
   if (!bytesEqual(back, bytes)) throw new Error(`The drive did not store ${name} correctly`);
 };
@@ -359,15 +362,35 @@ const collectGarbage = async (dir: FileSystemDirectoryHandle, manifest: Manifest
   for (const name of stray) await removeDir(dir, name);
 };
 
-/** Erase the whole backup folder from a drive. True when it is gone (or never existed). */
-export const wipeUsbBackup = async (drive: FileSystemDirectoryHandle): Promise<boolean> => {
+export type WipeResult = 'removed' | 'absent' | 'failed';
+
+/** Erase the whole backup folder from a drive. */
+export const wipeUsbBackup = async (drive: FileSystemDirectoryHandle): Promise<WipeResult> => {
   try {
     const yours = await drive.getDirectoryHandle(USB_FILE_DIR);
     await yours.removeEntry(USB_BACKUP_DIR, { recursive: true });
-    return true;
+    return 'removed';
   } catch (e) {
-    return (e as { name?: string })?.name === 'NotFoundError';
+    return (e as { name?: string })?.name === 'NotFoundError' ? 'absent' : 'failed';
   }
+};
+
+/**
+ * Argon2id takes most of a second on the popup's main thread. One key per
+ * (passKey, drive) per session: derived once, reused by every run until the
+ * wallet locks (a new session key misses the cache by construction).
+ */
+const backupKeys = new Map<string, Promise<CryptoKey>>();
+const backupKeyFor = (passKey: string, stickId: string): Promise<CryptoKey> => {
+  const id = `${passKey}|${stickId}`;
+  let key = backupKeys.get(id);
+  if (!key) {
+    if (backupKeys.size > 16) backupKeys.clear();
+    key = deriveBackupKey(passKey, stickId);
+    backupKeys.set(id, key);
+    key.catch(() => backupKeys.delete(id));
+  }
+  return key;
 };
 
 // --- The sync ---
@@ -452,7 +475,7 @@ export const wipePendingUsbBackups = async (chromeStorageService: ChromeStorageS
     const entry = usb.sticks.find((s) => s.id === stickId);
     if (!entry || (entry.backupWipedAt && entry.backupWipedAt >= wipeAt)) continue;
     const handle = await getHandle(stickId);
-    if (!handle || !(await wipeUsbBackup(handle))) continue;
+    if (!handle || (await wipeUsbBackup(handle)) === 'failed') continue;
     const now = new Date().toISOString();
     await chromeStorageService.updateUsbSecurity((current) => ({
       ...current,
@@ -480,7 +503,7 @@ const syncAllSticks = async (chromeStorageService: ChromeStorageService): Promis
     if (!handle) continue;
     result.sticks++;
     try {
-      const key = await deriveBackupKey(passKey, stickId);
+      const key = await backupKeyFor(passKey, stickId);
       const r = await syncStick(chromeStorageService, usb, key, stickId, handle);
       result.changed = result.changed || r.changed;
       result.errors.push(...r.errors);
@@ -590,7 +613,9 @@ const syncStick = async (
     data?: { busy?: boolean };
   }>({ action: 'USB_BACKUP_SETTINGS' });
   if (settingsRes?.data?.busy) {
-    // Wallet still initialising: quietly try again on the next trigger.
+    // Wallet still initialising: quietly try again on the next trigger,
+    // keeping what was already decided (hashes, settings) so it is not redone.
+    await saveManifest();
     return { changed, errors: [] };
   }
   if (!settingsRes?.success || !settingsRes.settingsData) {
@@ -603,6 +628,21 @@ const syncStick = async (
     manifest.settingsHash = settingsHash;
     manifestDirty = true;
     changed = true;
+  }
+  // Accounts deleted from the wallet leave the backup too: their entries go
+  // now and their folders at the garbage collection below.
+  const known = new Set(accounts.map(([identityAddress]) => identityAddress));
+  for (const addr of Object.keys(manifest.accounts)) {
+    if (!known.has(addr)) {
+      delete manifest.accounts[addr];
+      manifestDirty = true;
+    }
+  }
+  for (const addr of Object.keys(manifest.rebuild ?? {})) {
+    if (!known.has(addr)) {
+      delete manifest.rebuild?.[addr];
+      manifestDirty = true;
+    }
   }
   await saveManifest();
 
@@ -647,7 +687,7 @@ const syncStick = async (
       if (target.name !== account.name) commit({ ...target, name: account.name });
       // Pin the pass start on the drive before any chunk: a resumed pass must
       // move its cursor to when it began, not to when it resumed.
-      commit(startPass(target, new Date().toISOString()));
+      if (!target.passStartedAt) commit(startPass(target, new Date().toISOString()));
       await saveManifest();
 
       const accountDir = await dir.getDirectoryHandle(target.dir, { create: true });
@@ -740,6 +780,14 @@ const recordStatus = async (
   }
   // Per-key merge: concurrent writers of other accounts are not clobbered.
   await chromeStorageService.update({ usbBackupStatus: patch });
+  // Deleted accounts should not count toward size or freshness.
+  const live = new Set(Object.keys(chromeStorageService.storage?.accounts ?? {}));
+  const stale = Object.keys(current).filter((addr) => !live.has(addr) && !(addr in patch));
+  if (stale.length > 0) {
+    const pruned: Record<string, UsbBackupAccountStatus> = {};
+    for (const [addr, st] of Object.entries({ ...current, ...patch })) if (live.has(addr)) pruned[addr] = st;
+    await chromeStorageService.replaceTopLevel({ usbBackupStatus: pruned });
+  }
 };
 
 // --- Status helpers for the UI ---

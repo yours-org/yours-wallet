@@ -90,7 +90,7 @@ export const EnrollFlow = () => {
       return res?.error ?? 'Could not turn on the USB security key';
     }
     await chromeStorageService.getAndSetStorage();
-    setIsLocked(false);
+    if (!res.relocked) setIsLocked(false);
     setStep(5);
     return null;
   };

@@ -65,7 +65,7 @@ export const RotateFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
       if (s.id !== drive.id) await deleteHandle(s.id);
     }
     await chromeStorageService.getAndSetStorage();
-    setIsLocked(false);
+    if (!res.relocked) setIsLocked(false);
     setStep(5);
     return null;
   };

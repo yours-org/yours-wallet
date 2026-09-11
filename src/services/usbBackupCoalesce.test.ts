@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { sdk } from '@bsv/wallet-toolbox-client';
-import { coalesceSyncChunks, countChunkRows } from './usbBackupCoalesce';
+import { coalesceSyncChunks, countChunkRows, ENTITY_ORDER } from './usbBackupCoalesce';
 
 const header = { fromStorageIdentityKey: 'from', toStorageIdentityKey: 'to', userIdentityKey: 'user' };
 const chunk = (parts: Partial<sdk.SyncChunk>): sdk.SyncChunk => ({ ...header, ...parts }) as sdk.SyncChunk;
@@ -15,7 +15,8 @@ describe('coalesceSyncChunks', () => {
       chunk({ transactions: [{ transactionId: 5, updated_at: at('2026-09-01T00:00:01Z') }] as never }),
     ];
     const out = coalesceSyncChunks(chunks);
-    expect(out).toHaveLength(1);
+    // Data chunk plus the all-empty terminator the toolbox's loop needs to stop.
+    expect(out).toHaveLength(2);
     expect(out[0].transactions?.map((t) => t.transactionId)).toEqual([5]);
     expect(out[0].outputs?.map((o) => o.outputId)).toEqual([9]);
     // Transactions precede outputs in the emitted chunk.
@@ -58,7 +59,7 @@ describe('coalesceSyncChunks', () => {
     const user = { userId: 1, identityKey: 'user' } as never;
     const chunks = [chunk({ outputs: outputs as never }), chunk({ transactions: transactions as never, user })];
     const out = coalesceSyncChunks(chunks, 4);
-    expect(out.map(countChunkRows)).toEqual([4, 4, 4]);
+    expect(out.map(countChunkRows)).toEqual([4, 4, 4, 0]);
     expect(out[0].transactions?.length).toBe(4);
     expect(out[1].transactions?.length).toBe(3);
     expect(out[1].outputs?.length).toBe(1);
@@ -84,6 +85,16 @@ describe('coalesceSyncChunks', () => {
       { txLabelId: 1, transactionId: 3 },
     ] as never);
     expect(coalesceSyncChunks([])).toEqual([]);
-    expect(coalesceSyncChunks([chunk({})])).toEqual([chunk({})]);
+    // No rows: just the terminator, with every list present and empty.
+    const [only] = coalesceSyncChunks([chunk({})]);
+    expect(coalesceSyncChunks([chunk({})])).toHaveLength(1);
+    for (const { list } of ENTITY_ORDER) expect(only[list]).toEqual([]);
+  });
+
+  test('every emitted chunk names every entity list, and the last one is all-empty', () => {
+    const out = coalesceSyncChunks([chunk({ outputs: [{ outputId: 1, transactionId: 1, vout: 0 }] as never })]);
+    expect(out).toHaveLength(2);
+    for (const c of out) for (const { list } of ENTITY_ORDER) expect(Array.isArray(c[list])).toBe(true);
+    expect(countChunkRows(out[1])).toBe(0);
   });
 });

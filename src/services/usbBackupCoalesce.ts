@@ -123,9 +123,21 @@ export const coalesceSyncChunks = (
       rowsInCurrent++;
     }
   }
-  if (out.length === 0) open();
+  // The toolbox's import loop ends only on a chunk where EVERY entity list is
+  // present and empty; a missing list means "not reported" and keeps it
+  // looping. So the set always ends with an explicit all-empty terminator,
+  // and every data chunk carries every list too.
+  for (const c of out) fillLists(c);
+  const terminator = { ...header };
+  fillLists(terminator);
+  out.push(terminator);
   if (user) out[0].user = user;
   return out;
+};
+
+const fillLists = (chunk: sdk.SyncChunk): void => {
+  const c = chunk as unknown as Record<string, unknown>;
+  for (const { list } of ENTITY_ORDER) if (c[list] === undefined) c[list] = [];
 };
 
 /** Total rows across a chunk's entity lists. */

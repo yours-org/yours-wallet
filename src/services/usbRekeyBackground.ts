@@ -151,6 +151,12 @@ const run = async (
     const relocked = options.lockGeneration() !== startedUnder || (await storage.getPassKey()) !== oldPassKey;
     if (!relocked) {
       await storage.setPassKey(newPassKey);
+      if (options.lockGeneration() !== startedUnder) {
+        // A lock landed between the check and the write: undo the write.
+        await storage.clearPassKey();
+        await storage.getAndSetStorage();
+        return { success: true, epoch: toEpoch, accounts: count, relocked: true };
+      }
       // 7. Read back.
       await repairStaleAccounts(storage);
     }

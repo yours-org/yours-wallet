@@ -54,4 +54,5 @@ export const prepareDrive = async (
 
 export const nextKeyLabel = (usbSecurity?: UsbSecurity): string => `USB key ${(usbSecurity?.sticks.length ?? 0) + 1}`;
 
-export type RekeyResponse = { success: boolean; error?: string; epoch?: number };
+/** `relocked`: the wallet locked while the re-key ran; storage is re-keyed but there is no session. */
+export type RekeyResponse = { success: boolean; error?: string; epoch?: number; relocked?: boolean };

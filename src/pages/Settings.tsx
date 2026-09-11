@@ -390,7 +390,7 @@ export const Settings = () => {
     const handle = await getHandle(id);
     const wiped = !!handle && (await queryHandlePermission(handle)) === 'granted' && (await wipeUsbBackup(handle));
     await deleteHandle(id);
-    addSnackbar(wiped ? 'USB key removed and its backup erased' : 'USB key removed', 'success');
+    addSnackbar(wiped === 'removed' ? 'USB key removed and its backup erased' : 'USB key removed', 'success');
     await refreshUsbSecurity();
   };
 

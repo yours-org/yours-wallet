@@ -46,14 +46,20 @@ export const DisableFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
     let wiped = 0;
     for (const stickId of present) {
       const handle = await getHandle(stickId);
-      if (handle && (await wipeUsbBackup(handle))) wiped++;
+      if (handle && (await wipeUsbBackup(handle)) === 'removed') wiped++;
     }
-    if (identity.handle && !present.includes(identity.stickId ?? '') && (await wipeUsbBackup(identity.handle))) wiped++;
+    if (
+      identity.handle &&
+      !present.includes(identity.stickId ?? '') &&
+      (await wipeUsbBackup(identity.handle)) === 'removed'
+    ) {
+      wiped++;
+    }
     setWipedCount(wiped);
     if (erase && identity.handle) await deleteStickFile(identity.handle);
     await clearHandles();
     await chromeStorageService.getAndSetStorage();
-    setIsLocked(false);
+    if (!res.relocked) setIsLocked(false);
     setStep(2);
     return null;
   };

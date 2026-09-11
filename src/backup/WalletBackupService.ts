@@ -11,7 +11,6 @@ import type { ChromeStorageService } from '../services/ChromeStorage.service';
 import type { Account } from '../services/types/chromeStorage.types';
 import type { Theme } from '../theme.types';
 import { decrypt, encrypt } from '../utils/crypto';
-import { derivePasswordKey } from '../services/passKey';
 
 type Chain = 'main' | 'test';
 type SyncChunk = sdk.SyncChunk;
@@ -628,20 +627,17 @@ export class WalletBackupService {
     await this.clearAccountPendingRestore(identityKey);
 
     onProgress({ stage: 'complete', message: 'Wallet data imported!' });
-
-    // The backup says which outputs were spendable when it was written. Any
-    // spent since would be picked for a send and fail at broadcast. Ask the
-    // chain and release them; in the background, behind the wallet's own
-    // queues, so init is not held up.
-    void this.reviewRestoredUtxos(storage, identityKey, onProgress);
   }
 
-  /** Mark outputs the chain says are spent as unspendable (the toolbox's invalid-change review, with release). */
-  private static async reviewRestoredUtxos(
-    storage: WalletStorageManager,
-    identityKey: string,
-    onProgress: BackupProgressCallback,
-  ): Promise<void> {
+  /**
+   * After a restore: the backup says which outputs were spendable when it was
+   * written, and any spent since would be picked for a send that fails at
+   * broadcast. Ask the chain (one lookup per change output) and release
+   * them: the toolbox's invalid-change review with `release`. Takes the
+   * manager's exclusive locks, so the caller runs it once the address sync
+   * is done, not in front of it.
+   */
+  static async reviewRestoredUtxos(storage: WalletStorageManager, identityKey: string): Promise<number> {
     try {
       const released = await storage.runAsStorageProvider(async (sp) => {
         const user = (await sp.findUsers({ partial: { identityKey } }))[0];
@@ -665,12 +661,11 @@ export class WalletBackupService {
         );
         return result.totalOutputs;
       });
-      if (released > 0) {
-        onProgress({ stage: 'importing', message: `Released ${released} output(s) spent since the backup` });
-      }
       console.log(`[WalletBackupService] post-restore UTXO review: ${released} released`);
+      return released;
     } catch (err) {
       console.error('[WalletBackupService] post-restore UTXO review failed:', err);
+      return 0;
     }
   }
 
