@@ -187,16 +187,18 @@ export type IdentityStepProps = {
   usbSecurity: UsbSecurity;
   title?: string;
   subtitle?: string;
+  /** Open with the code entry showing (the user just unlocked with it and has no key to insert). */
+  startWithCode?: boolean;
   onIdentified: (result: Identified) => void;
 };
 
 /** Rotate/disable step (a): a registered stick, or the current recovery code. */
-export const IdentityStep = ({ usbSecurity, title, subtitle, onIdentified }: IdentityStepProps) => {
+export const IdentityStep = ({ usbSecurity, title, subtitle, startWithCode, onIdentified }: IdentityStepProps) => {
   const { theme } = useTheme();
   const state = useStickProbe(usbSecurity, (p) =>
     onIdentified({ master: p.master, handle: p.handle, stickId: p.stickId }),
   );
-  const [showCode, setShowCode] = useState(false);
+  const [showCode, setShowCode] = useState(!!startWithCode);
   const [code, setCode] = useState('');
   const [codeBusy, setCodeBusy] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);

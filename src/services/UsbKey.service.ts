@@ -334,8 +334,8 @@ export type UsbWindowMode = 'enroll' | 'add' | 'repick' | 'rotate' | 'disable' |
  * The browser-action popup closes on blur, so every such flow opens usb.html
  * as its own window. Pages call this directly; it needs no background help.
  */
-export const openUsbWindow = async (mode: UsbWindowMode): Promise<void> => {
-  const url = chrome.runtime.getURL('usb.html') + `?mode=${mode}`;
+export const openUsbWindow = async (mode: UsbWindowMode, options?: { viaRecovery?: boolean }): Promise<void> => {
+  const url = chrome.runtime.getURL('usb.html') + `?mode=${mode}${options?.viaRecovery ? '&via=recovery' : ''}`;
   const existing = (await chrome.windows.getAll({ populate: true })).find((w) =>
     w.tabs?.some((t) => t.url?.startsWith(chrome.runtime.getURL('usb.html'))),
   );

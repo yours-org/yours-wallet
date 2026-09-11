@@ -15,6 +15,9 @@ const STEPS = ['Confirm', 'Choose drive', 'Name', 'Recovery code', 'Password', '
 
 export const RotateFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
   const { chromeStorageService, setIsLocked } = useServiceContext();
+  // Opened by a recovery-code unlock: the user has no key to insert, so the
+  // confirm step starts on code entry and says why it is asked for again.
+  const [viaRecovery] = useState(() => new URLSearchParams(window.location.search).get('via') === 'recovery');
   const [step, setStep] = useState(0);
   const [oldMaster, setOldMaster] = useState<string | null>(null);
   const [drive, setDrive] = useState<PreparedDrive | null>(null);
@@ -90,6 +93,13 @@ export const RotateFlow = ({ usbSecurity }: { usbSecurity: UsbSecurity }) => {
           <IdentityStep
             key="s0"
             usbSecurity={usbSecurity}
+            title={viaRecovery ? 'Set up a new USB key' : undefined}
+            subtitle={
+              viaRecovery
+                ? 'You unlocked with your recovery code. Enter it once more to confirm, then pick a drive for your new key.'
+                : undefined
+            }
+            startWithCode={viaRecovery}
             onIdentified={({ master: m }) => {
               setOldMaster(m);
               setStep(1);

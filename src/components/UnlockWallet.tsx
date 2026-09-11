@@ -193,7 +193,7 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
 
       onUnlock();
       // Recovery means every registered stick is gone: walk the user into rotation right away.
-      if (unlockedViaRecovery) void openUsbWindow('rotate');
+      if (unlockedViaRecovery) void openUsbWindow('rotate', { viaRecovery: true });
     } else {
       failUnlock(usbEnabled ? 'Incorrect password' : '');
     }
