@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { driveHasUsbBackup, readUsbBackup } from '../../services/usbBackup';
@@ -22,6 +22,16 @@ export const RestoreFlow = () => {
   const [step, setStep] = useState(0);
   const [partial, setPartial] = useState<string[]>([]);
   const [drive, setDrive] = useState<FileSystemDirectoryHandle | null>(null);
+  const [progress, setProgress] = useState('Reading the backup…');
+
+  // The background streams its stages while it restores; show them instead of a static label.
+  useEffect(() => {
+    const listener = (message: { action?: string; data?: { message?: string } }) => {
+      if (message?.action === 'MASTER_RESTORE_PROGRESS' && message.data?.message) setProgress(message.data.message);
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    return () => chrome.runtime.onMessage.removeListener(listener);
+  }, []);
 
   if (chromeStorageService.getAllAccounts().length > 0) {
     return (
@@ -41,11 +51,13 @@ export const RestoreFlow = () => {
   const confirmPassword = async (password: string): Promise<string | null> => {
     if (!drive) return 'No USB drive chosen';
     let payload;
+    setProgress('Reading and decrypting the backup…');
     try {
       payload = await readUsbBackup(drive, password);
     } catch (e) {
       return errorText(e, 'Could not read the backup');
     }
+    setProgress(`Restoring ${Object.keys(payload.chunksData).length} data chunks…`);
     let res: RestoreResponse | undefined;
     try {
       res = await sendMessageAsync<RestoreResponse>({ action: 'MASTER_RESTORE', legacy: false, ...payload, password });
@@ -75,7 +87,7 @@ export const RestoreFlow = () => {
             key="s1"
             subtitle="Enter the wallet password used with this key."
             buttonLabel="Restore wallet"
-            busyLabel="Restoring… this can take a minute"
+            busyLabel={progress}
             onConfirm={confirmPassword}
           />
         )}
@@ -85,8 +97,8 @@ export const RestoreFlow = () => {
             title="Wallet restored"
             message={
               partial.length > 0
-                ? `Open the Yours icon to unlock your wallet. Note: ${partial.length} account(s) had an incomplete backup on this key (${partial.join(', ')}); their history may be partial. USB unlock is off until you turn it on again.`
-                : 'Open the Yours icon to unlock your wallet. USB unlock is off until you turn it on again.'
+                ? `Keys restored. History is importing in the background; open the Yours icon to unlock. ${partial.length} account(s) had an incomplete backup on this key (${partial.join(', ')}). USB unlock is off until you turn it on again.`
+                : 'Keys restored. History is importing in the background; open the Yours icon to unlock. USB unlock is off until you turn it on again.'
             }
           />
         )}

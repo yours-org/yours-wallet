@@ -2022,6 +2022,11 @@ if (isInServiceWorker) {
    * only the extracted entries the background needs. The background never
    * touches the raw ZIP — no sync decompression in the service worker.
    */
+  /** Stream restore stages to whichever page started the restore. Best effort. */
+  const restoreProgress = (message: string, stage: 'importing' | 'complete' = 'importing') => {
+    chrome.runtime.sendMessage({ action: 'MASTER_RESTORE_PROGRESS', data: { message, stage } }).catch(() => {});
+  };
+
   const processMasterRestore = async (
     message: {
       legacy: boolean;
@@ -2076,6 +2081,7 @@ if (isInServiceWorker) {
         password,
         (event) => {
           console.log('[MasterRestore]', event.message);
+          restoreProgress(event.message);
         },
       );
 
@@ -2083,18 +2089,29 @@ if (isInServiceWorker) {
       await chromeStorageService.getAndSetStorage();
       console.log('[MasterRestore] Chrome storage refreshed');
 
-      // Initialize the wallet so it's ready when the popup reloads.
-      // For v1/v2 this also triggers Phase 2 import of pending wallet data.
-      // For legacy this creates a fresh wallet-toolbox storage that syncs from remote.
-      console.log('[MasterRestore] Initializing wallet...');
-      const wallet = await initializeWallet();
-      console.log('[MasterRestore] Wallet initialized:', !!wallet);
-
+      // Keys and settings are in place and every account's data is parked for
+      // import. Reply now: the wallet initialisation that follows can take
+      // minutes on a large wallet, and the caller has nothing to wait for.
       sendResponse({
         type: 'MASTER_RESTORE',
         success: true,
         data: manifest,
       });
+
+      // Initialize the wallet so it's ready when the popup opens. For v1/v2
+      // this also triggers Phase 2 import of pending wallet data. If the
+      // worker is stopped before this finishes, the next popup open resumes it.
+      restoreProgress('Importing wallet data…');
+      console.log('[MasterRestore] Initializing wallet...');
+      initializeWallet()
+        .then((wallet) => {
+          console.log('[MasterRestore] Wallet initialized:', !!wallet);
+          restoreProgress('Restore complete', 'complete');
+        })
+        .catch((err: Error) => {
+          console.error('[MasterRestore] Wallet init after restore failed:', err);
+          restoreProgress(`Wallet will finish importing on next open (${err.message})`, 'complete');
+        });
     } catch (error) {
       console.error('[MasterRestore] Error:', error);
       sendResponse({
