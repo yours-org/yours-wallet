@@ -18,4 +18,5 @@ export interface ApprovalContext {
   originalRequest?: unknown;
 }
 
+// ORDLOCK_LISTING_DISABLED — `listOrdinal` approval must fail closed until replacement ships.
 export type YoursApprovalType = 'sendBsv' | 'sendAllBsv' | 'transferOrdinal' | 'listOrdinal' | 'inscribe' | 'lockBsv';

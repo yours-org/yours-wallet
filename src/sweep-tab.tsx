@@ -3,8 +3,10 @@ import process from 'process';
 import { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { SweepApp, configureServices, type LegacyKeys } from '@1sat/sweep-ui';
-import { createChromeCWI } from '@1sat/wallet-browser';
+import { createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
+import { createContext } from '@1sat/actions';
 import { decrypt } from './utils/crypto';
+import { cancelOwnedOrdLockListings } from './utils/cancelOrdLockListings';
 import './sweep-tab.css';
 
 global.Buffer = Buffer;
@@ -79,6 +81,31 @@ function SweepTab() {
       setLoading(false);
     });
   }, []);
+
+  // OPL-4696: cancel wallet-owned OrdLock listings once when sweep tab unlocks.
+  // Hooks must run unconditionally (before early returns).
+  useEffect(() => {
+    if (loading || error || !keys) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const services = new OneSatServices('main');
+        const apiContext = createContext(wallet, { chain: 'main', services, isBaseWallet: false });
+        if (cancelled) return;
+        const res = await cancelOwnedOrdLockListings(apiContext, {
+          sessionKey: 'sweep-tab-load',
+        });
+        if (res.cancelled > 0) {
+          console.log('[sweep-tab] auto-cancelled OrdLock listings', res);
+        }
+      } catch (err) {
+        console.warn('[sweep-tab] OrdLock auto-cancel failed (continuing)', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, error, keys, wallet]);
 
   if (loading) {
     return (

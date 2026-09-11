@@ -69,6 +69,7 @@ import { MNEE_PROTOCOLS, mneeKeyDerivations } from '../utils/mneeDerivations';
 import { MneeClient } from '@1sat/client';
 import { PrivateKey } from '@bsv/sdk';
 import { getLegacyMneeBalance, sweepLegacyMnee } from '../utils/sweepLegacyMnee';
+import { cancelOwnedOrdLockListings } from '../utils/cancelOrdLockListings';
 import { decrypt } from '../utils/crypto';
 import type { Keys } from '../utils/keys';
 
@@ -822,6 +823,15 @@ export const BsvWallet = () => {
         if (isSendAllBsv) {
           const r = sendRecipients[0];
           const destination = r.address ?? r.paymail ?? '';
+          // OPL-4696: cancel OrdLock listings before send-all / BSV sweep (fail soft).
+          try {
+            await cancelOwnedOrdLockListings(apiContext, {
+              force: true,
+              sessionKey: 'bsv-send-all',
+            });
+          } catch (err) {
+            console.warn('[BsvWallet] OrdLock auto-cancel before sendAll failed', err);
+          }
           sendRes = await sendAllBsv.execute(apiContext, {
             destination,
           });
