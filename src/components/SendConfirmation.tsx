@@ -46,8 +46,8 @@ export const SendConfirmation = (props: SendConfirmationProps) => {
           style={{
             position: 'absolute',
             inset: 0,
-            width: '22.5rem',
-            height: '33.75rem',
+            width: '100%',
+            height: '100%',
             backgroundColor: bg,
             zIndex: 100,
           }}
