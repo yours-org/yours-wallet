@@ -231,18 +231,28 @@ export const probeSticks = async (usbSecurity: UsbSecurity): Promise<StickProbe>
  * settings list, where more than one key may be plugged in at once;
  * `probeSticks` stops at the first match because that is all unlock needs.
  */
-export const listPresentSticks = async (usbSecurity: UsbSecurity): Promise<string[]> => {
+export const listPresentSticks = async (
+  usbSecurity: UsbSecurity,
+): Promise<{ present: string[]; needPermission: string[] }> => {
   const handles = await getAllHandles();
   const registered = new Set(usbSecurity.sticks.map((s) => s.id));
   const present: string[] = [];
+  const needPermission: string[] = [];
   for (const [stickId, handle] of handles) {
     if (!registered.has(stickId)) continue;
-    if ((await queryHandlePermission(handle)) !== 'granted') continue;
+    const perm = await queryHandlePermission(handle);
+    if (perm === 'prompt') {
+      // Chrome grants one handle per user gesture, so a second key often sits
+      // here until the user clicks for it specifically.
+      needPermission.push(stickId);
+      continue;
+    }
+    if (perm !== 'granted') continue;
     const file = await readStickFile(handle);
     if (!file || file.id !== stickId) continue;
     if (await unwrapFromFile(file, usbSecurity)) present.push(stickId);
   }
-  return present;
+  return { present, needPermission };
 };
 
 /**

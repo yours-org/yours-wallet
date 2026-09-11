@@ -40,7 +40,14 @@ import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
 import { FEE_PER_KB } from '../utils/constants';
 import { ChromeStorageObject, UsbSecurity } from '../services/types/chromeStorage.types';
-import { deleteHandle, isUsbSupported, listPresentSticks, openUsbWindow } from '../services/UsbKey.service';
+import {
+  deleteHandle,
+  getHandle,
+  isUsbSupported,
+  listPresentSticks,
+  openUsbWindow,
+  requestHandlePermission,
+} from '../services/UsbKey.service';
 import { AvatarPicker } from '../components/AvatarPicker';
 import { CreateAccount } from './onboarding/CreateAccount';
 import { RestoreAccount } from './onboarding/RestoreAccount';
@@ -261,6 +268,7 @@ export const Settings = () => {
   const usbSupported = isUsbSupported();
   const [usbSecurity, setUsbSecurity] = useState<UsbSecurity | undefined>(() => chromeStorageService.getUsbSecurity());
   const [presentSticks, setPresentSticks] = useState<string[]>([]);
+  const [uncheckedSticks, setUncheckedSticks] = useState<string[]>([]);
   const [pendingRemoveStickId, setPendingRemoveStickId] = useState<string | undefined>();
   const usbProbing = useRef(false);
 
@@ -269,14 +277,20 @@ export const Settings = () => {
     const latest = chromeStorageService.getUsbSecurity();
     setUsbSecurity(latest);
     if (!latest?.enabled || usbProbing.current) {
-      if (!latest?.enabled) setPresentSticks([]);
+      if (!latest?.enabled) {
+        setPresentSticks([]);
+        setUncheckedSticks([]);
+      }
       return;
     }
     usbProbing.current = true;
     try {
-      setPresentSticks(await listPresentSticks(latest));
+      const { present, needPermission } = await listPresentSticks(latest);
+      setPresentSticks(present);
+      setUncheckedSticks(needPermission);
     } catch {
       setPresentSticks([]);
+      setUncheckedSticks([]);
     } finally {
       usbProbing.current = false;
     }
@@ -1348,6 +1362,13 @@ export const Settings = () => {
             <Section title="Registered keys">
               {usbSecurity.sticks.map((stick, i) => {
                 const inserted = presentSticks.includes(stick.id);
+                const unchecked = uncheckedSticks.includes(stick.id);
+                // Needs a user gesture: one Chrome bubble for this one handle.
+                const checkStick = async () => {
+                  const handle = await getHandle(stick.id);
+                  if (handle) await requestHandlePermission(handle);
+                  await refreshUsbSecurity();
+                };
                 return (
                   <div key={stick.id}>
                     {i > 0 && <Divider />}
@@ -1370,6 +1391,19 @@ export const Settings = () => {
                               />
                               Inserted
                             </span>
+                          )}
+                          {!inserted && unchecked && (
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void checkStick();
+                              }}
+                              className="text-[10px] font-semibold rounded-full px-2 py-0.5 border-none cursor-pointer"
+                              style={{ backgroundColor: 'rgba(161,255,139,0.12)', color: '#A1FF8B' }}
+                            >
+                              Check
+                            </motion.button>
                           )}
                           <motion.button
                             whileTap={{ scale: 0.95 }}
