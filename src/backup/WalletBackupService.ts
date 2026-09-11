@@ -597,6 +597,8 @@ export class WalletBackupService {
     });
 
     const reader = new FileRestoreReader(pending.chunks, pending.manifest);
+    const t0 = Date.now();
+    const mark = (step: string) => onProgress({ stage: 'importing', message: `+${Date.now() - t0}ms ${step}` });
 
     // Where the chunks go depends on what is active. A local active store
     // takes them through the manager under its sync lock. A remote active
@@ -606,7 +608,9 @@ export class WalletBackupService {
     // case the chunks go straight into the local backup store, lock-free, as
     // an offline copy the user can switch to if the remote ever goes away.
     if (storage.getActive().isStorageProvider()) {
+      mark('local active: syncFromReader via manager');
       await storage.syncFromReader(identityKey, reader);
+      mark('syncFromReader done');
     } else {
       const local = (storage as unknown as { _backups?: Array<{ storage: sdk.WalletStorageProvider }> })._backups?.find(
         (b) => b.storage.isStorageProvider(),
@@ -617,7 +621,17 @@ export class WalletBackupService {
         return;
       }
       onProgress({ stage: 'importing', message: 'Remote storage is active; keeping an offline copy locally...' });
-      await storage.syncFromReader(identityKey, reader, local.storage as unknown as sdk.WalletStorageSync);
+      // Each step logged: whichever one never returns is the culprit.
+      const localStore = local.storage;
+      mark('getAuth');
+      await storage.getAuth();
+      mark('local makeAvailable');
+      await localStore.makeAvailable();
+      mark('local findOrInsertUser');
+      await localStore.findOrInsertUser(identityKey);
+      mark('syncFromReader into local');
+      await storage.syncFromReader(identityKey, reader, localStore as unknown as sdk.WalletStorageSync);
+      mark('syncFromReader done');
     }
 
     // Remove only this account's pending data — others stay for when they're activated

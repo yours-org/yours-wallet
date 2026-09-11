@@ -169,16 +169,34 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
     const watchdog = setInterval(() => {
       console.warn(`[background] PendingRestore: still importing after ${Math.round((Date.now() - started) / 1000)}s`);
     }, 10_000);
+    // Hard cap: the import must never take the wallet down with it. On timeout
+    // the wallet initialises without it and the parked data stays for a retry.
+    const IMPORT_TIMEOUT_MS = 45_000;
+    let timedOut = false;
     try {
-      await WalletBackupService.importPendingWalletData(
-        storage as unknown as Parameters<typeof WalletBackupService.importPendingWalletData>[0],
-        currentIdentityKey,
-        (event) => {
-          console.log('[background] PendingRestore:', event.message);
-          restoreProgressFn?.(event.message);
-        },
-      );
-      console.log('[background] initializeWallet: Pending restore complete');
+      await Promise.race([
+        WalletBackupService.importPendingWalletData(
+          storage as unknown as Parameters<typeof WalletBackupService.importPendingWalletData>[0],
+          currentIdentityKey,
+          (event) => {
+            console.log('[background] PendingRestore:', event.message);
+            restoreProgressFn?.(event.message);
+          },
+        ),
+        new Promise<void>((resolve) =>
+          setTimeout(() => {
+            timedOut = true;
+            resolve();
+          }, IMPORT_TIMEOUT_MS),
+        ),
+      ]);
+      if (timedOut) {
+        console.error(
+          `[background] initializeWallet: Pending restore timed out after ${IMPORT_TIMEOUT_MS / 1000}s; continuing without it`,
+        );
+      } else {
+        console.log('[background] initializeWallet: Pending restore complete');
+      }
     } catch (error) {
       console.error('[background] initializeWallet: Pending restore failed:', error);
       // Clear only this account's pending data to avoid repeated failures
