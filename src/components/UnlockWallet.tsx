@@ -244,10 +244,10 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
           <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: '#34D399' }} />
           USB key: {stickLabel(probe.stickId)}
         </span>
+      ) : probe.status === 'permission' && !recoveryMode ? (
+        <span>Chrome needs access to your USB key</span>
       ) : (
         <>
-          {/* 'permission' looks identical to 'absent' from here: Chrome can't tell whether the
-              drive is plugged in until access is granted and a read is attempted on Unlock. */}
           <span>Insert your USB key</span>
           <span className="flex items-center gap-3">
             {IN_STANDALONE_WINDOW && (
@@ -283,6 +283,22 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
     !IN_STANDALONE_WINDOW &&
     !recoveryMode &&
     (probe?.status === 'no-handles' || (probe?.status === 'permission' && grantFailed));
+
+  // Two clicks by design: "Allow USB access" gets Chrome's grant (a gesture is
+  // required, and the button says what is actually happening), then the
+  // password form appears with the key confirmed.
+  const needsAllowStep = usbEnabled && !recoveryMode && !handOffToWindow && probe?.status === 'permission';
+
+  const handleAllowAccess = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    try {
+      const result = await grantUsbAccessIfNeeded();
+      if (result?.status === 'permission') setGrantFailed(true);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div
@@ -328,7 +344,43 @@ export const UnlockWallet = (props: UnlockWalletProps) => {
 
       {usbStatus}
 
-      {handOffToWindow ? (
+      {needsAllowStep ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.24, duration: 0.3 }}
+          className="flex justify-center w-full"
+        >
+          <motion.div
+            whileHover={!isProcessing ? { scale: 1.02 } : undefined}
+            whileTap={!isProcessing ? { scale: 0.98 } : undefined}
+            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            className="flex items-center w-[87%] p-px rounded-xl"
+            style={{ background: `linear-gradient(135deg, ${outlineLeft}, ${outlineRight})` }}
+          >
+            <button
+              type="button"
+              disabled={isProcessing}
+              onClick={() => void handleAllowAccess()}
+              className="relative inline-flex items-center justify-center w-full font-bold text-sm rounded-xl h-10 px-4 outline-none select-none cursor-pointer border-none disabled:opacity-50 gap-2"
+              style={{
+                backgroundColor: bg,
+                color: contrast,
+                fontFamily: "'Inter', Arial, Helvetica, sans-serif",
+              }}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                'Allow USB access'
+              )}
+            </button>
+          </motion.div>
+        </motion.div>
+      ) : handOffToWindow ? (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
