@@ -278,48 +278,16 @@ export const OrdWallet = () => {
   }, [isIntersecting, from, loadOrdinals, isProcessing]);
 
   useEffect(() => {
+    loadOrdinals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiContext]);
+
+  useEffect(() => {
     if (!successTxId) return;
     resetSendState();
     setPageState('main');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message]);
-
-  // Discover every owned listing independently of the visible 50-item page.
-  // A failed pass is retried by the user's next delist action, never a render loop.
-  useEffect(() => {
-    if (!apiContext) return;
-    let active = true;
-    setIsProcessing(true);
-    const controller = new AbortController();
-    operationControllerRef.current = controller;
-    void cancelOwnedOrdLockListings(apiContext, {
-      signal: controller.signal,
-      onProgress: ({ attempted, skipped, total }) =>
-        setCancelProgress(`Cancelling listings: ${attempted + skipped} of ${total}`),
-    })
-      .then(async (res) => {
-        if (!active) return;
-        if (res.cancelled > 0) addSnackbar(`Cancelled ${res.cancelled} listing(s).`, 'success');
-        if (res.errors.length > 0) {
-          addSnackbar('Some listings could not be cancelled. Select the remaining listings to retry.', 'error');
-        }
-        await refreshOrdinals();
-      })
-      .catch((err) => {
-        if (active) addSnackbar(err instanceof Error ? err.message : 'Unable to load listings.', 'error');
-      })
-      .finally(() => {
-        if (active) {
-          setCancelProgress('');
-          setIsProcessing(false);
-        }
-      });
-    return () => {
-      active = false;
-      controller.abort();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiContext]);
 
   // ── state helpers (unchanged) ───────────────────────────────────────────────
 

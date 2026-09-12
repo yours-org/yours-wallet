@@ -502,37 +502,11 @@ test('account change between discovery pages stops before another page or cancel
   assert.ok(result.errors.length > 0);
 });
 
-test('real ordinal effect cleanup aborts the pending pass and suppresses completion UI', async () => {
-  let finish: (result: typeof success) => void = () => assert.fail('cancellation not started');
-  mock.method(listOrdinals, 'execute', async () => ({ outputs: [listing(1), listing(2)], totalOutputs: 2 }));
-  const cancel = mock.method(
-    cancelOrdinalListing,
-    'execute',
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
+test('ordinals tab does not cancel listings on load', () => {
+  assert.throws(
+    () => handler('pages/OrdWallet.tsx', 'autoDelistEffect', { apiContext: context }),
+    /autoDelistEffect exists/,
   );
-  const notify = mock.fn();
-  const refresh = mock.fn();
-  const effect = handler('pages/OrdWallet.tsx', 'autoDelistEffect', {
-    apiContext: context,
-    operationControllerRef,
-    cancelOwnedOrdLockListings,
-    setIsProcessing: () => {},
-    setCancelProgress: () => {},
-    addSnackbar: notify,
-    refreshOrdinals: refresh,
-  }) as unknown as () => () => void;
-  const cleanup = effect();
-  await new Promise((resolve) => setImmediate(resolve));
-  cleanup();
-  finish(success);
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(operationControllerRef.current.signal.aborted, true);
-  assert.equal(cancel.mock.callCount(), 1);
-  assert.equal(notify.mock.callCount(), 0);
-  assert.equal(refresh.mock.callCount(), 0);
 });
 
 test('bound CWI rejects a later operation inside an already-running SDK action after account change', async () => {
