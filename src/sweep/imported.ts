@@ -15,23 +15,13 @@ import type { SweepSelection, SweepTxResult } from './types';
 
 const normalizeOutpoint = (outpoint: string) => outpoint.replace('_', '.');
 
-/** Listed tokens must be cancelled with a transfer inscription, never swept as NFTs. */
+/** Canonical token listings only. `application/bsv20` is invalid MIME and is not a token. */
 export function isTokenLikeListing(output: IndexedOutput): boolean {
   const events = output.events ?? [];
-  if (
-    events.some(
-      (event) =>
-        event.startsWith('bsv21:') || event === 'type:application/bsv-20' || event === 'type:application/bsv20',
-    )
-  )
-    return true;
-  const data = output.data as
-    | { bsv20?: unknown; bsv21?: unknown; insc?: { file?: { type?: string }; json?: { p?: string } } }
-    | undefined;
-  if (data?.bsv20 != null || data?.bsv21 != null) return true;
-  const type = data?.insc?.file?.type ?? '';
-  if (type === 'application/bsv-20' || type === 'application/bsv20') return true;
-  return data?.insc?.json?.p === 'bsv-20';
+  if (events.some((event) => event.startsWith('bsv21:') || event === 'type:application/bsv-20')) return true;
+  const data = output.data as { bsv21?: unknown; insc?: { file?: { type?: string } } } | undefined;
+  if (data?.bsv21 != null) return true;
+  return data?.insc?.file?.type === 'application/bsv-20';
 }
 
 export function importedKeyMap(keys: Pick<Keys, 'walletWif' | 'ordWif' | 'identityWif'>): Map<string, PrivateKey> {

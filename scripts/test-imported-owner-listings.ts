@@ -127,13 +127,26 @@ test('imported token listings are not swept as ordinals', async () => {
   const cancellation = mock.method(sweepOrdinals, 'execute', async () => ({ txid: 'unexpected' }));
   const listed = {
     ...mixed[0],
-    events: [...(mixed[0].events ?? []), 'type:application/bsv20'],
-    data: { insc: { file: { type: 'application/bsv20' }, json: { p: 'bsv-20' } } },
+    events: [...(mixed[0].events ?? []), 'type:application/bsv-20'],
+    data: { insc: { file: { type: 'application/bsv-20' }, json: { p: 'bsv-20' } } },
   };
   const task = run({ ...emptyAssets(), listings: [listed] }, { ...selection, sweepBsv: false });
   await task.promise;
   assert.equal(cancellation.mock.callCount(), 0);
   assert.match(task.results[0].error ?? '', /transfer inscription/);
+});
+
+test('invalid application/bsv20 MIME is not treated as a token listing', async () => {
+  const cancellation = mock.method(sweepOrdinals, 'execute', async () => ({ txid: 'listing-receipt' }));
+  const listed = {
+    ...mixed[0],
+    events: [...(mixed[0].events ?? []), 'type:application/bsv20'],
+    data: { insc: { file: { type: 'application/bsv20' }, json: { p: 'bsv-20' } } },
+  };
+  const task = run({ ...emptyAssets(), listings: [listed] }, { ...selection, sweepBsv: false });
+  await task.promise;
+  assert.equal(cancellation.mock.callCount(), 1);
+  assert.equal(task.results[0].txid, 'listing-receipt');
 });
 
 test('listing-only imports are cancelled with the proper pay, ord and identity keys', async () => {
