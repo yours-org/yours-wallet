@@ -1,10 +1,12 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { groupBsv20Tokens, isListedOutput } from '@1sat/actions';
+import { sweepAllClasses, type SweepStepResult } from '@1sat/sweep-ui';
+import { formatOutpoint, parseOutpoint } from '@1sat/utils';
 import { PrivateKey } from '@bsv/sdk';
 import { pinCwiToIdentity } from '../utils/accountBoundWallet';
 import { scanAddress, scanAddresses, type ScannedAssets } from '../sweep/scanner';
-import { importedKeyMap, sweepImportedAssets } from '../sweep/imported';
+import { importedKeyMap } from '../utils/keys';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Warning } from '../components/Reusable';
@@ -89,6 +91,7 @@ export const SweepMigration = () => {
     run: [],
     listings: [],
     totalBsv: 0,
+    totalFundingSats: 0,
   });
 
   const [selection, setSelection] = useState<SweepSelection>({
@@ -100,6 +103,7 @@ export const SweepMigration = () => {
 
   const [sweepResults, setSweepResults] = useState<SweepTxResult[]>([]);
   const [currentSweepOp, setCurrentSweepOp] = useState('');
+  const [cancelledListings, setCancelledListings] = useState(0);
 
   useEffect(() => {
     menuContext?.clearSelection();
@@ -210,6 +214,7 @@ export const SweepMigration = () => {
       run: [],
       listings: [],
       totalBsv: 0,
+      totalFundingSats: 0,
     };
     for (const r of results) {
       if (!r) continue;
@@ -222,6 +227,7 @@ export const SweepMigration = () => {
       merged.run.push(...r.run);
       merged.listings.push(...r.listings);
       merged.totalBsv += r.totalBsv;
+      merged.totalFundingSats += r.totalFundingSats;
     }
 
     setAssets(merged);
@@ -278,25 +284,62 @@ export const SweepMigration = () => {
     const results: SweepTxResult[] = sweepResults.filter((result) => result.txid?.trim());
     setSweepResults(results);
     const signal = operationControllerRef.current.signal;
-    let sweepContext: typeof apiContext;
 
     try {
       signal.throwIfAborted();
-      sweepContext = await pinCwiToIdentity(apiContext, signal);
+      const sweepContext = await pinCwiToIdentity(apiContext, signal);
       const keys = importedKeyMap(legacyKeys);
       if (!sweepContext.services) throw new Error('Services required for imported asset scanning.');
       setCurrentSweepOp('Refreshing imported inventory...');
       const currentAssets = await scanAddresses(sweepContext.services, [...keys.keys()]);
       signal.throwIfAborted();
-      await sweepImportedAssets(sweepContext, currentAssets, keys, selection, {
-        signal,
-        completed: completedImportedOutputsRef.current,
+      const toTxResult = (step: SweepStepResult): SweepTxResult => ({
+        type: step.sweepClass === 'opns' ? 'ordinals' : step.sweepClass,
+        label: step.sweepClass === 'bsv' ? `BSV (${currentAssets.totalBsv.toLocaleString()} sats)` : step.label,
+        txid: step.txid,
+        error: step.error,
+      });
+      const completed = completedImportedOutputsRef.current;
+      await sweepAllClasses({
+        wallet: sweepContext.wallet,
+        keys,
+        assets: currentAssets,
+        amount: selection.bsvAmount,
         onProgress: setCurrentSweepOp,
-        onResult: (result) => {
-          results.push(result);
+        selection: {
+          sweepBsv: selection.sweepBsv,
+          ordinalOutpoints: selection.selectedOrdinals,
+          opnsOutpoints: selection.selectedOrdinals,
+          bsv20Ticks: selection.selectedBsv20Ticks,
+          bsv21TokenIds: selection.selectedBsv21TokenIds,
+        },
+        completed,
+        signal,
+        onResult: (step) => {
+          results.push(toTxResult(step));
           setSweepResults([...results]);
         },
+        splitListedBsv20: true,
       });
+      const normalize = (outpoint: string) => {
+        try {
+          const { txid, vout } = parseOutpoint(outpoint);
+          return formatOutpoint(txid, vout);
+        } catch {
+          return outpoint;
+        }
+      };
+      const done = new Set([...completed].map(normalize));
+      const sweptOutputs = [
+        ...currentAssets.ordinals,
+        ...currentAssets.opnsNames,
+        ...currentAssets.bsv20Tokens,
+        ...currentAssets.bsv21Tokens.flatMap((token) => token.outputs),
+      ];
+      // Cumulative across retries: every completed listed output canceled into the wallet.
+      setCancelledListings(
+        sweptOutputs.filter((output) => done.has(normalize(output.outpoint)) && isListedOutput(output)).length,
+      );
     } catch (error) {
       if (signal.aborted) return;
       results.push({
@@ -1135,6 +1178,7 @@ export const SweepMigration = () => {
             </motion.h1>
             <motion.p variants={fadeUp} className="text-sm text-center mb-5" style={{ color: gray }}>
               {successes.length} swept{failures.length > 0 ? `, ${failures.length} failed` : ' successfully'}
+              {cancelledListings > 0 && ` · ${cancelledListings} listing${cancelledListings !== 1 ? 's' : ''} canceled`}
             </motion.p>
 
             {/* Result cards */}

@@ -9,10 +9,12 @@ import {
   cancelOrdinalListing,
   cancelOpnsListing,
   cancelTokenListing,
+  isListedOutput,
   listOrdinals,
   listOpns,
   type OneSatContext,
 } from '@1sat/actions';
+import { formatOutpoint, parseOutpoint } from '@1sat/utils';
 import {
   cancelOwnedOrdLockListings,
   ORDLOCK_CANCEL_INCOMPLETE_MESSAGE,
@@ -315,9 +317,10 @@ test('real migration handler reports pin failure and does not sweep', async () =
     operationControllerRef,
     importedKeyMap: () => new Map(),
     scanAddresses: sweep,
-    sweepImportedAssets: sweep,
+    sweepAllClasses: sweep,
     setStep: (step: string) => steps.push(step),
     setCurrentSweepOp: () => {},
+    setCancelledListings: () => {},
     setSweepResults: (value: typeof results) => {
       results = value;
     },
@@ -661,7 +664,17 @@ test('real migration preview refuses partial address scans and allows an explici
 
 test('real migration execution refreshes imported inventory and retains earlier transaction receipts', async () => {
   mock.method(listOrdinals, 'execute', async () => ({ outputs: [], totalOutputs: 0 }));
-  const fresh = { listings: [{ outpoint: 'fresh-listing' }] };
+  const fresh = {
+    funding: [],
+    ordinals: [],
+    opnsNames: [],
+    bsv21Tokens: [],
+    bsv20Tokens: [],
+    locked: [],
+    run: [],
+    listings: [{ outpoint: 'fresh-listing' }],
+    totalBsv: 0,
+  };
   const completed = new Set(['previous-output']);
   const keys = new Map([
     ['pay', {}],
@@ -669,6 +682,7 @@ test('real migration execution refreshes imported inventory and retains earlier 
     ['identity', {}],
   ]);
   let results: Array<{ txid?: string }> = [];
+  let cancelled = -1;
   const operations: string[] = [];
   const execute = handler('pages/SweepMigration.tsx', 'executeSweeps', {
     legacyKeys: {},
@@ -682,26 +696,50 @@ test('real migration execution refreshes imported inventory and retains earlier 
       operations.push('scan');
       return fresh;
     },
-    sweepImportedAssets: async (
-      _ctx: unknown,
-      assets: unknown,
-      receivedKeys: unknown,
-      _selection: unknown,
-      options: { completed: unknown; onResult: (result: unknown) => void },
-    ) => {
-      assert.equal(assets, fresh);
-      assert.equal(receivedKeys, keys);
-      assert.equal(options.completed, completed);
+    sweepAllClasses: async (input: {
+      wallet: unknown;
+      keys: unknown;
+      assets: unknown;
+      amount: unknown;
+      selection: Record<string, unknown>;
+      completed: unknown;
+      signal: unknown;
+      splitListedBsv20: unknown;
+      onResult: (result: unknown) => void;
+    }) => {
+      assert.equal(input.assets, fresh);
+      assert.equal(input.keys, keys);
+      assert.equal(input.completed, completed);
+      assert.equal(input.splitListedBsv20, true);
+      // NOTE: selection Sets come from the VM sandbox realm, so compare by
+      // contents (cross-realm Set identity never matches the host realm).
+      const received = input.selection as Record<string, Set<string> | boolean>;
+      assert.equal(received.sweepBsv, false);
+      for (const key of ['ordinalOutpoints', 'opnsOutpoints', 'bsv20Ticks', 'bsv21TokenIds']) {
+        assert.deepEqual([...(received[key] as Set<string>)], []);
+      }
       operations.push('sweep');
-      options.onResult({ type: 'ordinals', label: 'Imported cancellation', txid: 'new-receipt' });
+      input.onResult({ sweepClass: 'ordinals', label: 'Imported cancellation', txid: 'new-receipt' });
+      return { cancelledListings: [] };
     },
     completedImportedOutputsRef: { current: completed },
-    selection: {},
+    selection: {
+      sweepBsv: false,
+      selectedOrdinals: new Set(),
+      selectedBsv20Ticks: new Set(),
+      selectedBsv21TokenIds: new Set(),
+    },
     setStep() {},
     setCurrentSweepOp() {},
+    setCancelledListings: (value: number) => {
+      cancelled = value;
+    },
     setSweepResults: (value: typeof results) => {
       results = value;
     },
+    isListedOutput,
+    formatOutpoint,
+    parseOutpoint,
   });
   await execute();
   assert.deepEqual(operations, ['scan', 'sweep']);
@@ -709,6 +747,7 @@ test('real migration execution refreshes imported inventory and retains earlier 
     Array.from(results, (result) => result.txid),
     ['earlier-receipt', 'new-receipt'],
   );
+  assert.equal(cancelled, 0);
 });
 
 test('OpNS-only and mixed basket listings use their native cancellation actions', async () => {

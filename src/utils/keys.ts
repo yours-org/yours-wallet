@@ -151,3 +151,14 @@ export const getPrivateKeyFromTag = (tag: DerivationTag, keys: Keys) => {
     return taggedKeys.privKey;
   }
 };
+
+/** Address-keyed map of the legacy import WIFs (pay, ordinals, identity). */
+export function importedKeyMap(keys: Pick<Keys, 'walletWif' | 'ordWif' | 'identityWif'>): Map<string, PrivateKey> {
+  const result = new Map<string, PrivateKey>();
+  for (const wif of [keys.walletWif, keys.ordWif, keys.identityWif]) {
+    if (!wif) continue;
+    const key = PrivateKey.fromWif(wif);
+    result.set(key.toPublicKey().toAddress(), key);
+  }
+  return result;
+}
