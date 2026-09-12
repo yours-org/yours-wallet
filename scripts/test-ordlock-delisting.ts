@@ -13,11 +13,15 @@ import {
   listOpns,
   type OneSatContext,
 } from '@1sat/actions';
-import { cancelOwnedOrdLockListings, ORDLOCK_CANCEL_INCOMPLETE_MESSAGE } from '../src/utils/cancelOrdLockListings';
+import {
+  cancelOwnedOrdLockListings,
+  ORDLOCK_CANCEL_INCOMPLETE_MESSAGE,
+  ORDLOCK_TAG,
+} from '../src/utils/cancelOrdLockListings';
 
 import {
-  createAccountBoundContext,
-  callAccountBoundWallet,
+  pinCwiToIdentity,
+  callPinnedCwi,
   WALLET_OPERATION_STOPPED,
 } from '../src/utils/accountBoundWallet';
 
@@ -44,14 +48,14 @@ const listing = (index: number): WalletOutput => ({
   outpoint: `${index.toString(16).padStart(64, '0')}.0`,
   satoshis: 1,
   spendable: true,
-  tags: ['ordlock', `id:ordinal-${index}`],
+  tags: [ORDLOCK_TAG, `id:ordinal-${index}`],
 });
 const tokenListing = (index: number): WalletOutput => ({
   outpoint: `${index.toString(16).padStart(64, '0')}.0`,
   satoshis: 1,
   spendable: true,
   tags: [
-    'ordlock',
+    ORDLOCK_TAG,
     `id:token-${index}`,
     'type:application/bsv-20',
     `bsv21:${'ab'.repeat(32)}_0`,
@@ -67,7 +71,7 @@ test('snapshots over 100 listings before sequentially cancelling all of them', a
   let active = 0;
   let maxActive = 0;
   mock.method(listOrdinals, 'execute', async (_ctx, input) => {
-    assert.deepEqual(input.tags, ['ordlock']);
+    assert.deepEqual(input.tags, [ORDLOCK_TAG]);
     pages.push(input.offset);
     return { outputs: owned.slice(input.offset, input.offset + input.limit), totalOutputs: owned.length };
   });
@@ -194,7 +198,7 @@ test('missing tracking ids and cancellation failures block a funding continuatio
   for (const missingId of [true, false]) {
     mock.restoreAll();
     mock.method(listOpns, 'execute', async () => ({ outputs: [], totalOutputs: 0 }));
-    const output = missingId ? { ...listing(1), tags: ['ordlock'] } : listing(1);
+    const output = missingId ? { ...listing(1), tags: [ORDLOCK_TAG] } : listing(1);
     mock.method(cancelOrdinalListing, 'execute', async () => ({ error: 'offline cancellation failure' }));
     const spendFunds = mock.fn();
     await assert.rejects(
@@ -288,7 +292,7 @@ test('real migration handler stops every sweep and reports delisting failure', a
     legacyKeys: {},
     sweepResults: [],
     apiContext: context,
-    createAccountBoundContext,
+    pinCwiToIdentity,
     operationControllerRef,
     cancelOwnedOrdLockListings,
     setStep: (step: string) => steps.push(step),
@@ -323,7 +327,7 @@ test('real manual handler sends the full selection and retains only failed listi
     isProcessing: false,
     selectedOrdinals: selected,
     apiContext: context,
-    createAccountBoundContext,
+    pinCwiToIdentity,
     operationControllerRef,
     cancelOwnedOrdLockListings,
     setIsProcessing: () => {},
@@ -390,7 +394,7 @@ test('real sweep tab hides SweepApp until delisting succeeds and supports explic
     useEffect: (effect: () => unknown) => effects.push(effect),
     OneSatServices: class {},
     createContext: () => context,
-    createAccountBoundContext,
+    pinCwiToIdentity,
     WALLET_OPERATION_STOPPED,
     cancelOwnedOrdLockListings,
     SweepApp,
@@ -542,7 +546,7 @@ test('real ordinal effect cleanup aborts the pending pass and suppresses complet
 });
 
 test('bound CWI rejects a later operation inside an already-running SDK action after account change', async () => {
-  const bound = await createAccountBoundContext(context);
+  const bound = await pinCwiToIdentity(context);
   await bound.wallet.getPublicKey({ identityKey: true });
   currentIdentityKey = 'account-b';
   await assert.rejects(bound.wallet.createAction({ description: 'offline test' }), {
@@ -561,7 +565,7 @@ test('background pins the actual wallet across identity lookup and native method
     createAction: create,
   } as unknown as OneSatContext['wallet'];
   let current = true;
-  const pending = callAccountBoundWallet({
+  const pending = callPinnedCwi({
     wallet,
     expectedIdentityKey: 'account-a',
     action: 'createAction',
@@ -581,7 +585,7 @@ test('background pins the actual wallet across identity lookup and native method
     new Promise((resolve) => {
       finishAction = resolve;
     });
-  const accepted = callAccountBoundWallet({
+  const accepted = callPinnedCwi({
     wallet,
     expectedIdentityKey: 'account-a',
     action: 'createAction',
@@ -611,7 +615,7 @@ test('background preserves native permission routing and admin send-all handling
   } as unknown as OneSatContext['wallet'];
   const baseWallet = { createAction: base } as unknown as OneSatContext['wallet'];
   for (const satoshis of [1, 2099999999999999]) {
-    await callAccountBoundWallet({
+    await callPinnedCwi({
       wallet,
       baseWallet,
       expectedIdentityKey: 'account-a',
@@ -701,7 +705,7 @@ test('real migration execution refreshes imported inventory and retains earlier 
     sweepResults: [{ type: 'ordinals', label: 'Earlier cancellation', txid: 'earlier-receipt' }],
     apiContext: { ...context, services: {} },
     operationControllerRef,
-    createAccountBoundContext,
+    pinCwiToIdentity,
     cancelOwnedOrdLockListings,
     importedKeyMap: () => keys,
     scanAddresses: async (_services: unknown, owners: string[]) => {

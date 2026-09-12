@@ -70,7 +70,7 @@ import { MneeClient } from '@1sat/client';
 import { PrivateKey } from '@bsv/sdk';
 import { getLegacyMneeBalance, sweepLegacyMnee } from '../utils/sweepLegacyMnee';
 import { cancelOwnedOrdLockListings } from '../utils/cancelOrdLockListings';
-import { createAccountBoundContext } from '../utils/accountBoundWallet';
+import { pinCwiToIdentity } from '../utils/accountBoundWallet';
 import { decrypt } from '../utils/crypto';
 import type { Keys } from '../utils/keys';
 
@@ -834,7 +834,7 @@ export const BsvWallet = () => {
           // Preserve fee funds until all owned listings have been cancelled.
           try {
             const signal = operationControllerRef.current.signal;
-            const spendContext = await createAccountBoundContext(apiContext, signal);
+            const spendContext = await pinCwiToIdentity(apiContext, signal);
             await cancelOwnedOrdLockListings(spendContext, { requireComplete: true, signal });
             signal.throwIfAborted();
             sendRes = await sendAllBsv.execute(spendContext, { destination });

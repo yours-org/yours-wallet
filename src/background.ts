@@ -49,7 +49,7 @@ import type { PromptKind } from './promptProtocol';
 import { initWallet, openAccountStorageForBackup, type AccountContext } from './initWallet';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
-import { callAccountBoundWallet } from './utils/accountBoundWallet';
+import { callPinnedCwi } from './utils/accountBoundWallet';
 
 let chromeStorageService = new ChromeStorageService();
 const isInServiceWorker = self?.document === undefined;
@@ -666,7 +666,7 @@ if (isInServiceWorker) {
       }
     }
 
-    // Account-bound CWI is extension-page-only; content scripts share our ID,
+    // Identity-pinned CWI is extension-page-only; content scripts share our ID,
     // but retain the web page origin and must never enter this admin path.
     if (message.expectedIdentityKey !== undefined) {
       if (sender.origin !== `chrome-extension://${chrome.runtime.id}`) {
@@ -680,7 +680,7 @@ if (isInServiceWorker) {
       void ensureWallet(true)
         .then(async (wallet) => {
           const captured = accountContext;
-          return callAccountBoundWallet({
+          return callPinnedCwi({
             wallet,
             baseWallet: captured?.baseWallet,
             expectedIdentityKey: message.expectedIdentityKey,

@@ -8,7 +8,7 @@ import { createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
 import { createContext } from '@1sat/actions';
 import { decrypt } from './utils/crypto';
 import { cancelOwnedOrdLockListings } from './utils/cancelOrdLockListings';
-import { createAccountBoundContext, WALLET_OPERATION_STOPPED } from './utils/accountBoundWallet';
+import { pinCwiToIdentity, WALLET_OPERATION_STOPPED } from './utils/accountBoundWallet';
 import './sweep-tab.css';
 
 global.Buffer = Buffer;
@@ -121,7 +121,7 @@ function SweepTab() {
     setSweepWallet(null);
     const services = new OneSatServices('main');
     const apiContext = createContext(wallet, { chain: 'main', services, isBaseWallet: false });
-    void createAccountBoundContext(apiContext, controller.signal)
+    void pinCwiToIdentity(apiContext, controller.signal)
       .then(async (context) => {
         await cancelOwnedOrdLockListings(context, {
           signal: controller.signal,

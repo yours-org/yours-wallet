@@ -16,7 +16,11 @@ import { TopNav } from '../components/TopNav';
 import { getErrorMessage } from '../utils/tools';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
 import { getTagValue, getOutputName, hasTag, resolveOriginOutpoint } from '../utils/format';
-import { cancelOwnedOrdLockListings, ORDLOCK_LISTING_DISABLED_MESSAGE } from '../utils/cancelOrdLockListings';
+import {
+  cancelOwnedOrdLockListings,
+  isOrdLockListed,
+  ORDLOCK_LISTING_DISABLED_MESSAGE,
+} from '../utils/cancelOrdLockListings';
 
 type Addresses = Record<string, string>;
 type PageState = 'main' | 'transfer' | 'list' | 'cancel';
@@ -109,7 +113,7 @@ const OrdCard = ({ output, url, selected, disabled, onClick, theme, index }: Ord
       </AnimatePresence>
 
       {/* Listed badge */}
-      {output.tags?.includes('ordlock') && (
+      {isOrdLockListed(output) && (
         <div
           className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[0.55rem] font-bold"
           style={{ background: '#E5A920', color: '#010101' }}
@@ -199,29 +203,23 @@ export const OrdWallet = () => {
   const { addSnackbar, message } = useSnackbar();
   const [ordinals, setOrdinals] = useState<WalletOutput[]>([]);
   const [from, setFrom] = useState<string>();
-  const listedOrdinals = ordinals.filter((o) => o.tags?.includes('ordlock'));
-  const myOrdinals = ordinals.filter((o) => !o.tags?.includes('ordlock'));
+  const listedOrdinals = ordinals.filter(isOrdLockListed);
+  const myOrdinals = ordinals.filter((o) => !isOrdLockListed(o));
   const [useSameAddress, setUseSameAddress] = useState(false);
   const [addresses, setAddresses] = useState<Addresses>({});
   const [addressErrors, setAddressErrors] = useState<Addresses>({});
   const [commonAddress, setCommonAddress] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
-  // ── selection logic (unchanged) ─────────────────────────────────────────────
-
-  // Selection mode: once you start selecting, you're locked to one type.
-  // 'transfer' = selecting unlisted items, 'cancel' = selecting listed items, null = nothing selected.
-  const isListedOrdinal = (o: WalletOutput) => o.tags?.includes('ordlock') ?? false;
-
   // Selection mode: once you start selecting, you're locked to one type.
   // 'transfer' = selecting unlisted items, 'cancel' = selecting listed items, null = nothing selected.
   const selectionMode: 'transfer' | 'cancel' | null =
-    selectedOrdinals.length === 0 ? null : selectedOrdinals.every(isListedOrdinal) ? 'cancel' : 'transfer';
+    selectedOrdinals.length === 0 ? null : selectedOrdinals.every(isOrdLockListed) ? 'cancel' : 'transfer';
 
   const toggleOrdinalSelection = (ord: WalletOutput) => {
     const outpoint = ord.outpoint;
     const isSelected = selectedOrdinals.some((selected) => selected.outpoint === outpoint);
-    const isListing = isListedOrdinal(ord);
+    const isListing = isOrdLockListed(ord);
 
     if (isSelected) {
       setSelectedOrdinals(selectedOrdinals.filter((selected) => selected.outpoint !== outpoint));
@@ -241,7 +239,7 @@ export const OrdWallet = () => {
 
   const isOrdinalDisabled = (ord: WalletOutput): boolean => {
     if (selectionMode === null) return false;
-    const isListing = isListedOrdinal(ord);
+    const isListing = isOrdLockListed(ord);
     if (selectionMode === 'transfer' && isListing) return true;
     if (selectionMode === 'cancel' && !isListing) return true;
     return false;
@@ -483,8 +481,8 @@ export const OrdWallet = () => {
       const contentType = getTagValue(output.tags, 'type');
       return contentType !== 'application/bsv-20';
     });
-    if (activeFilter === 'listings') return base.filter((o) => o.tags?.includes('ordlock'));
-    if (activeFilter === 'ordinals') return base.filter((o) => !o.tags?.includes('ordlock'));
+    if (activeFilter === 'listings') return base.filter(isOrdLockListed);
+    if (activeFilter === 'ordinals') return base.filter((o) => !isOrdLockListed(o));
     return base;
   })();
 

@@ -4,8 +4,8 @@ import { createCWI, isCWIEventName } from '@1sat/wallet-browser';
 
 export const WALLET_OPERATION_STOPPED = 'Wallet operation stopped. Reopen this view for the current account.';
 
-/** Pin every CWI operation, including operations inside an SDK action, to its starting account. */
-export async function createAccountBoundContext(
+/** Pin every CWI call, including those inside an SDK action, to this identity key. */
+export async function pinCwiToIdentity(
   apiContext: OneSatContext,
   signal?: AbortSignal,
 ): Promise<OneSatContext> {
@@ -28,7 +28,7 @@ export async function createAccountBoundContext(
 }
 
 /** Background-only dispatch: check and invoke the captured wallet without an intervening await. */
-export async function callAccountBoundWallet(options: {
+export async function callPinnedCwi(options: {
   wallet: WalletInterface;
   baseWallet?: WalletInterface;
   expectedIdentityKey: string;

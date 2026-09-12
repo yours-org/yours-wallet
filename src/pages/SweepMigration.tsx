@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PrivateKey } from '@bsv/sdk';
 import { cancelOwnedOrdLockListings } from '../utils/cancelOrdLockListings';
-import { createAccountBoundContext } from '../utils/accountBoundWallet';
+import { pinCwiToIdentity } from '../utils/accountBoundWallet';
 import { scanAddress, scanAddresses, type ScannedAssets } from '../sweep/scanner';
 import { importedKeyMap, sweepImportedAssets } from '../sweep/imported';
 import { Button } from '../components/Button';
@@ -276,7 +276,7 @@ export const SweepMigration = () => {
     // Keep fee funds available until owner delisting completes.
     try {
       setCurrentSweepOp('Cancelling OrdLock listings...');
-      sweepContext = await createAccountBoundContext(apiContext, signal);
+      sweepContext = await pinCwiToIdentity(apiContext, signal);
       await cancelOwnedOrdLockListings(sweepContext, {
         signal,
         requireComplete: true,

@@ -9,7 +9,9 @@ import {
   type OneSatContext,
 } from '@1sat/actions';
 import { readAssetIdTag, TOKEN_CONTENT_TYPE } from '@1sat/types';
-import { createAccountBoundContext } from './accountBoundWallet';
+import { pinCwiToIdentity } from './accountBoundWallet';
+
+export const ORDLOCK_TAG = 'ordlock';
 
 export const ORDLOCK_LISTING_DISABLED_MESSAGE =
   'OrdLock listing creation is deprecated pending a replacement contract. Existing listings can still be cancelled or bought.';
@@ -31,7 +33,7 @@ export type CancelOrdLockResult = CancelOrdLockProgress & {
 };
 
 export function isOrdLockListed(output: WalletOutput): boolean {
-  return output.tags?.includes('ordlock') ?? false;
+  return output.tags?.includes(ORDLOCK_TAG) ?? false;
 }
 
 function isTokenListing(output: WalletOutput): boolean {
@@ -77,7 +79,7 @@ export async function cancelOwnedOrdLockListings(
   };
 
   try {
-    const context = await createAccountBoundContext(apiContext, options?.signal);
+    const context = await pinCwiToIdentity(apiContext, options?.signal);
     const assertCurrent = async () => {
       options?.signal?.throwIfAborted();
       await context.wallet.getPublicKey({ identityKey: true });
@@ -106,7 +108,7 @@ export async function cancelOwnedOrdLockListings(
         while (true) {
           await assertCurrent();
           const page = await list.execute(context, {
-            tags: ['ordlock'],
+            tags: [ORDLOCK_TAG],
             limit: total === undefined ? 100 : Math.min(100, total - offset),
             offset,
           });
