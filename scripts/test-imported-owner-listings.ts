@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, mock, test } from 'node:test';
 import { P2PKH, PrivateKey, Transaction } from '@bsv/sdk';
-import { prepareSweepInputs, sweepBsv, sweepOrdinals, type OneSatContext } from '@1sat/actions';
+import { prepareSweepInputs, sweepBsv, sweepBsv20, sweepOrdinals, type OneSatContext } from '@1sat/actions';
 import type { OneSatServices } from '@1sat/client';
 import type { IndexedOutput } from '@1sat/types';
 import { scanAddress, type ScannedAssets } from '../src/sweep/scanner';
@@ -12,7 +12,12 @@ import type { SweepSelection, SweepTxResult } from '../src/sweep/types';
 const keys = [1, 2, 3].map((value) => PrivateKey.fromString(value.toString(16), 'hex'));
 const addresses = keys.map((key) => key.toPublicKey().toAddress());
 const keyMap = importedKeyMap({ walletWif: keys[0].toWif(), ordWif: keys[1].toWif(), identityWif: keys[2].toWif() });
-const selection: SweepSelection = { sweepBsv: true, selectedOrdinals: new Set(), selectedBsv21TokenIds: new Set() };
+const selection: SweepSelection = {
+  sweepBsv: true,
+  selectedOrdinals: new Set(),
+  selectedBsv20Ticks: new Set(),
+  selectedBsv21TokenIds: new Set(),
+};
 const emptyAssets = (): ScannedAssets => ({
   funding: [],
   ordinals: [],
@@ -64,7 +69,7 @@ function run(
   };
 }
 
-test('native scanner requests OrdLock metadata and preserves listings without public listing events', async () => {
+test('native scanner requests OrdLock metadata and keeps listed 1-sat outputs in their class', async () => {
   let searches = 0;
   const listing = { ...mixed[0], data: { ordlock: { price: 0 } } };
   const services = {
@@ -77,7 +82,13 @@ test('native scanner requests OrdLock metadata and preserves listings without pu
     txo: {
       search: async (_owner: string, options: unknown) => {
         searches++;
-        assert.deepEqual(options, { unspent: true, events: true, tags: ['ordlock'], sats: true, limit: 0 });
+        assert.deepEqual(options, {
+          unspent: true,
+          events: true,
+          tags: ['ordlock', 'insc', 'bsv20', 'bsv21'],
+          sats: true,
+          limit: 0,
+        });
         return [listing];
       },
     },
@@ -85,8 +96,8 @@ test('native scanner requests OrdLock metadata and preserves listings without pu
   const result = await scanAddress(services, addresses[0]);
   assert.equal(searches, 1);
   assert.equal(result.listings.length, 1);
-  assert.deepEqual(result.listings[0].events, listing.events);
-  assert.equal(result.ordinals.length, 0);
+  assert.equal(result.ordinals.length, 1);
+  assert.deepEqual(result.ordinals[0].events, listing.events);
   assert.equal(result.funding.length, 0);
 });
 
@@ -123,96 +134,114 @@ test('owner keys align with native prepared input outpoints after transaction gr
   );
 });
 
-test('imported token listings are not swept as ordinals', async () => {
-  const cancellation = mock.method(sweepOrdinals, 'execute', async () => ({ txid: 'unexpected' }));
-  const listed = {
-    ...mixed[0],
-    events: [...(mixed[0].events ?? []), 'type:application/bsv-20'],
-    data: { insc: { file: { type: 'application/bsv-20' }, json: { p: 'bsv-20' } } },
-  };
-  const task = run({ ...emptyAssets(), listings: [listed] }, { ...selection, sweepBsv: false });
-  await task.promise;
-  assert.equal(cancellation.mock.callCount(), 0);
-  assert.match(task.results[0].error ?? '', /transfer inscription/);
-});
-
-test('listing-only imports are cancelled with the proper pay, ord and identity keys', async () => {
-  const cancellation = mock.method(sweepOrdinals, 'execute', async (_ctx, input) => {
+test('listed ordinals cancel into the destination with pay, ord and identity keys', async () => {
+  const listed = mixed.map((output) => ({
+    ...output,
+    events: [...(output.events ?? []), 'ordlock'],
+  }));
+  const ordinals = mock.method(sweepOrdinals, 'execute', async (_ctx, input) => {
     assert.deepEqual(
       input.keys.map((key) => key.toPublicKey().toAddress()),
       [addresses[0], addresses[2], addresses[1]],
     );
-    return { txid: 'listing-receipt' };
+    return { txid: 'ordinal-receipt' };
   });
   const funding = mock.method(sweepBsv, 'execute', async () => {
     throw new Error('funding must not run');
   });
-  const task = run({ ...emptyAssets(), listings: mixed }, { ...selection, sweepBsv: false });
+  const task = run(
+    { ...emptyAssets(), ordinals: listed },
+    { ...selection, sweepBsv: false, selectedOrdinals: new Set(listed.map((output) => output.outpoint)) },
+  );
   await task.promise;
-  assert.equal(cancellation.mock.callCount(), 1);
+  assert.equal(ordinals.mock.callCount(), 1);
   assert.equal(funding.mock.callCount(), 0);
-  assert.equal(task.results[0].txid, 'listing-receipt');
+  assert.equal(task.results[0].txid, 'ordinal-receipt');
   assert.equal(task.completed.size, 3);
 });
 
-test('missing imported owner cannot invoke cancellation or funding', async () => {
-  const cancellation = mock.method(sweepOrdinals, 'execute', async () => ({ txid: 'unexpected' }));
-  const funding = mock.method(sweepBsv, 'execute', async () => ({ txid: 'unexpected' }));
-  const task = run({ ...emptyAssets(), listings: [{ ...mixed[0], events: [] }], funding: [mixed[1]] });
+test('BSV-20 ticks use sweepBsv20, not ordinal cancel', async () => {
+  const ordinals = mock.method(sweepOrdinals, 'execute', async () => ({ txid: 'unexpected' }));
+  const tokens = mock.method(sweepBsv20, 'execute', async (_ctx, input) => {
+    assert.equal(input.inputs[0].tick, 'TEST');
+    return { txid: 'bsv20-receipt' };
+  });
+  const listed = {
+    ...mixed[0],
+    events: [...(mixed[0].events ?? []), 'tick:TEST', 'type:application/bsv-20'],
+    data: { insc: { file: { type: 'application/bsv-20' }, json: { p: 'bsv-20', op: 'transfer', tick: 'TEST', amt: '10' } } },
+  };
+  const task = run(
+    { ...emptyAssets(), bsv20Tokens: [listed] },
+    { ...selection, sweepBsv: false, selectedBsv20Ticks: new Set(['TEST']) },
+  );
   await task.promise;
-  assert.equal(cancellation.mock.callCount(), 0);
-  assert.equal(funding.mock.callCount(), 0);
+  assert.equal(ordinals.mock.callCount(), 0);
+  assert.equal(tokens.mock.callCount(), 1);
+  assert.equal(task.results[0].txid, 'bsv20-receipt');
+});
+
+test('missing imported owner cannot invoke ordinals', async () => {
+  const ordinals = mock.method(sweepOrdinals, 'execute', async () => ({ txid: 'unexpected' }));
+  const task = run(
+    { ...emptyAssets(), ordinals: [{ ...mixed[0], events: [] }] },
+    { ...selection, sweepBsv: false, selectedOrdinals: new Set([mixed[0].outpoint]) },
+  );
+  await task.promise;
+  assert.equal(ordinals.mock.callCount(), 0);
   assert.match(task.results[0].error!, /Cannot match imported owner/);
 });
 
-test('listing error or missing txid blocks every funding operation', async () => {
-  for (const response of [{ error: 'retry' }, {}, { txid: '  ' }]) {
-    mock.restoreAll();
-    mock.method(sweepOrdinals, 'execute', async () => response);
-    const funding = mock.method(sweepBsv, 'execute', async () => ({ txid: 'unexpected' }));
-    const task = run({ ...emptyAssets(), listings: [mixed[0]], funding: [mixed[1]] });
-    await task.promise;
-    assert.equal(funding.mock.callCount(), 0);
-    assert.ok(task.results[0].error);
-    assert.equal(task.completed.size, 0);
-  }
+test('BSV class error still sweeps selected ordinals', async () => {
+  mock.method(sweepBsv, 'execute', async () => ({ error: 'funding failure' }));
+  const ordinals = mock.method(sweepOrdinals, 'execute', async () => ({ txid: 'ordinal-receipt' }));
+  const task = run(
+    { ...emptyAssets(), funding: [mixed[1]], ordinals: [mixed[0]] },
+    { ...selection, selectedOrdinals: new Set([mixed[0].outpoint]) },
+  );
+  await task.promise;
+  assert.equal(task.results[0].error, 'funding failure');
+  assert.equal(task.results[1].txid, 'ordinal-receipt');
+  assert.equal(ordinals.mock.callCount(), 1);
+  assert.equal(task.completed.size, 1);
 });
 
-test('successful cancellation survives funding failure and retry never repeats completed inputs', async () => {
-  const cancellation = mock.method(sweepOrdinals, 'execute', async () => ({ txid: 'listing-receipt' }));
+test('successful BSV survives ordinal failure and retry never repeats completed inputs', async () => {
   const funding = mock.method(sweepBsv, 'execute', async (_ctx, input) => {
     assert.equal(input.keys[0].toPublicKey().toAddress(), addresses[1]);
-    return { error: 'funding failure' };
+    return { txid: 'funding-receipt' };
   });
-  const assets = { ...emptyAssets(), listings: [mixed[0]], funding: [mixed[1]] };
-  const task = run(assets);
+  const ordinals = mock.method(sweepOrdinals, 'execute', async () => ({ error: 'ordinal failure' }));
+  const assets = { ...emptyAssets(), funding: [mixed[1]], ordinals: [mixed[0]] };
+  const selected = { ...selection, selectedOrdinals: new Set([mixed[0].outpoint]) };
+  const task = run(assets, selected);
   await task.promise;
-  assert.equal(task.results[0].txid, 'listing-receipt');
-  assert.equal(task.results[1].error, 'funding failure');
-  funding.mock.mockImplementation(async () => ({ txid: 'funding-receipt' }));
-  const retry = run(assets, selection, task.completed);
+  assert.equal(task.results[0].txid, 'funding-receipt');
+  assert.equal(task.results[1].error, 'ordinal failure');
+  ordinals.mock.mockImplementation(async () => ({ txid: 'ordinal-receipt' }));
+  const retry = run(assets, selected, task.completed);
   await retry.promise;
-  assert.equal(cancellation.mock.callCount(), 1);
-  assert.equal(funding.mock.callCount(), 2);
-  assert.equal(retry.results[0].txid, 'funding-receipt');
+  assert.equal(funding.mock.callCount(), 1);
+  assert.equal(ordinals.mock.callCount(), 2);
+  assert.equal(retry.results[0].txid, 'ordinal-receipt');
 });
 
-test('abort after an accepted listing transaction retains its receipt and stops funding', async () => {
+test('abort after an accepted BSV transaction retains its receipt and stops ordinals', async () => {
   const controller = new AbortController();
-  mock.method(sweepOrdinals, 'execute', async () => {
+  mock.method(sweepBsv, 'execute', async () => {
     controller.abort();
-    return { txid: 'listing-receipt' };
+    return { txid: 'funding-receipt' };
   });
-  const funding = mock.method(sweepBsv, 'execute', async () => ({ txid: 'unexpected' }));
+  const ordinals = mock.method(sweepOrdinals, 'execute', async () => ({ txid: 'unexpected' }));
   const task = run(
-    { ...emptyAssets(), listings: [mixed[0]], funding: [mixed[1]] },
-    selection,
+    { ...emptyAssets(), funding: [mixed[1]], ordinals: [mixed[0]] },
+    { ...selection, selectedOrdinals: new Set([mixed[0].outpoint]) },
     new Set(),
     controller.signal,
   );
   await assert.rejects(task.promise);
-  assert.equal(task.results[0].txid, 'listing-receipt');
-  assert.equal(funding.mock.callCount(), 0);
+  assert.equal(task.results[0].txid, 'funding-receipt');
+  assert.equal(ordinals.mock.callCount(), 0);
 });
 
 test('selected OpNS outputs use native ordinal sweep and their actual owner key', async () => {
@@ -238,10 +267,10 @@ test('ambiguous imported ownership fails closed before native execution', async 
   );
 });
 
-test('more than 25 imported listings cancel in sequential batches and retry only unfinished batches', async () => {
+test('more than 25 imported ordinals sweep in sequential batches and retry only unfinished batches', async () => {
   const tx = new Transaction();
   for (let i = 0; i < 57; i++) tx.addOutput({ lockingScript: new P2PKH().lock(addresses[i % 3]), satoshis: 1 });
-  const listings = tx.outputs.map((_, i) => row(tx, i, addresses[i % 3]));
+  const ordinals = tx.outputs.map((_, i) => row(tx, i, addresses[i % 3]));
   mock.method(context.services, 'getBeefForTxid', async (txid: string) => ({
     findTxid: () => ({ tx: txid === tx.id('hex') ? tx : txB }),
   }));
@@ -257,16 +286,18 @@ test('more than 25 imported listings cancel in sequential batches and retry only
     return fail && sizes.length === 2 ? { error: 'batch retry' } : { txid: `batch-${sizes.length}` };
   });
   const funding = mock.method(sweepBsv, 'execute', async () => ({ txid: 'funding-receipt' }));
-  const assets = { ...emptyAssets(), listings, funding: [mixed[1]] };
-  const first = run(assets);
+  const assets = { ...emptyAssets(), ordinals, funding: [mixed[1]] };
+  const selected = { ...selection, selectedOrdinals: new Set(ordinals.map((output) => output.outpoint)) };
+  const first = run(assets, selected);
   await first.promise;
   assert.deepEqual(sizes, [25, 25]);
-  assert.equal(first.completed.size, 25);
-  assert.equal(first.results[0].txid, 'batch-1');
-  assert.equal(first.results[1].error, 'batch retry');
-  assert.equal(funding.mock.callCount(), 0);
+  assert.equal(first.completed.size, 26);
+  assert.equal(first.results[0].txid, 'funding-receipt');
+  assert.equal(first.results[1].txid, 'batch-1');
+  assert.equal(first.results[2].error, 'batch retry');
+  assert.equal(funding.mock.callCount(), 1);
   fail = false;
-  const retry = run(assets, selection, first.completed);
+  const retry = run(assets, selected, first.completed);
   await retry.promise;
   assert.deepEqual(sizes, [25, 25, 25, 7]);
   assert.equal(retry.completed.size, 58);

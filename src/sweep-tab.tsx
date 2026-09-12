@@ -7,7 +7,6 @@ import { SweepApp, configureServices, type LegacyKeys } from '@1sat/sweep-ui';
 import { createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
 import { createContext } from '@1sat/actions';
 import { decrypt } from './utils/crypto';
-import { cancelOwnedOrdLockListings } from './utils/cancelOrdLockListings';
 import { pinCwiToIdentity, WALLET_OPERATION_STOPPED } from './utils/accountBoundWallet';
 import './sweep-tab.css';
 
@@ -22,10 +21,6 @@ function SweepTab() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [wallet] = useState(() => createChromeCWI());
-  const [delistingComplete, setDelistingComplete] = useState(false);
-  const [delistingError, setDelistingError] = useState<string | null>(null);
-  const [delistingProgress, setDelistingProgress] = useState('Cancelling listings...');
-  const [delistingAttempt, setDelistingAttempt] = useState(0);
   const operationControllerRef = useRef(new AbortController());
   const [sweepWallet, setSweepWallet] = useState<WalletInterface | null>(null);
 
@@ -36,7 +31,6 @@ function SweepTab() {
       if (area !== 'local' || (!changes.selectedAccount && !changes.isLocked?.newValue)) return;
       active = false;
       operationControllerRef.current.abort();
-      setDelistingComplete(false);
       setSweepWallet(null);
       setKeys(null);
       setLoading(false);
@@ -111,38 +105,27 @@ function SweepTab() {
     };
   }, []);
 
-  // Do not expose fee-spending sweep actions until owner delisting completes.
   useEffect(() => {
     if (loading || error || !keys) return;
     let active = true;
     const controller = new AbortController();
     operationControllerRef.current = controller;
-    setDelistingComplete(false);
     setSweepWallet(null);
     const services = new OneSatServices('main');
     const apiContext = createContext(wallet, { chain: 'main', services, isBaseWallet: false });
     void pinCwiToIdentity(apiContext, controller.signal)
-      .then(async (context) => {
-        await cancelOwnedOrdLockListings(context, {
-          signal: controller.signal,
-          requireComplete: true,
-          onProgress: ({ attempted, skipped, total }) =>
-            setDelistingProgress(`Cancelling listings: ${attempted + skipped} of ${total}`),
-        });
+      .then((context) => {
         controller.signal.throwIfAborted();
-        if (active) {
-          setSweepWallet(context.wallet);
-          setDelistingComplete(true);
-        }
+        if (active) setSweepWallet(context.wallet);
       })
       .catch((err) => {
-        if (active) setDelistingError(err instanceof Error ? err.message : 'Listing cancellation failed.');
+        if (active) setError(err instanceof Error ? err.message : 'Failed to prepare wallet.');
       });
     return () => {
       active = false;
       controller.abort();
     };
-  }, [loading, error, keys, wallet, delistingAttempt]);
+  }, [loading, error, keys, wallet]);
 
   if (loading) {
     return (
@@ -174,21 +157,12 @@ function SweepTab() {
 
   if (!keys) return null;
 
-  if (!delistingComplete || !sweepWallet) {
+  if (!sweepWallet) {
     return (
-      <div style={{ padding: '2rem', color: '#a1a1aa', textAlign: 'center' }}>
-        <p role={delistingError ? 'alert' : 'status'}>{delistingError || delistingProgress}</p>
-        {delistingError && (
-          <button
-            onClick={() => {
-              setDelistingError(null);
-              setDelistingProgress('Cancelling listings...');
-              setDelistingAttempt((attempt) => attempt + 1);
-            }}
-          >
-            Retry listing cancellation
-          </button>
-        )}
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#a1a1aa' }}
+      >
+        Preparing wallet...
       </div>
     );
   }

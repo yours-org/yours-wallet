@@ -10,11 +10,10 @@ listings stay enabled.
   closed with a deprecation toast/error.
 - Sites marked `ORDLOCK_LISTING_DISABLED` (grep that string) should be restored
   when the replacement contract ships.
-- On OrdWallet load/refresh and before BSV sweep / send-all, the wallet
-  auto-cancels OrdLock-listed UTXOs it controls (`tags` include `ordlock`) via
-  `cancelOwnedOrdLockListings` → `cancelOrdinalListing` (cancel→recover into
-  wallet). Runs once per load/sweep session; failures log and do not block the
-  wallet.
+- Manual cancel on OrdWallet still uses `cancelOwnedOrdLockListings` →
+  `cancelOrdinalListing`. Import/sweep does not delist first: listed UTXOs stay
+  in their class and cancel into the destination in that spend, same as
+  `1sat sweep import`.
 
 ## Provider
 

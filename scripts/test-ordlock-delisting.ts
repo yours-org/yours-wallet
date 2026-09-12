@@ -264,11 +264,11 @@ function handler(file: string, name: string, bindings: Record<string, unknown>, 
   return sandbox.subject as unknown as (...args: unknown[]) => Promise<void>;
 }
 
-test('real BSV send-all confirmation returns before spending when delisting fails', async () => {
-  mock.method(listOrdinals, 'execute', async () => {
-    throw new Error('offline discovery failure');
+test('real BSV send-all confirmation spends without owner delisting', async () => {
+  const discovery = mock.method(listOrdinals, 'execute', async () => {
+    throw new Error('offline discovery must not run');
   });
-  const send = mock.fn();
+  const send = mock.fn(async () => ({ txid: 'send-all-receipt' }));
   const processing: boolean[] = [];
   const onConfirm = handler(
     'pages/BsvWallet.tsx',
@@ -278,22 +278,29 @@ test('real BSV send-all confirmation returns before spending when delisting fail
       setIsProcessing: (value: boolean) => processing.push(value),
       isSendAllBsv: true,
       sendRecipients: [{ address: 'offline-destination' }],
-      cancelOwnedOrdLockListings,
       apiContext: context,
+      pinCwiToIdentity,
+      operationControllerRef,
       sendAllBsv: { execute: send },
       addSnackbar: () => {},
+      setBsvBalance: () => {},
+      refreshUtxos: async () => {},
+      resetSendState: () => {},
+      setBsvHistoryRefreshKey: () => {},
+      setPageState: () => {},
+      totalSats: 1,
+      BSV_DECIMAL_CONVERSION: 1e8,
+      getErrorMessage: () => 'err',
     },
     'onConfirm',
   );
   await onConfirm();
-  assert.equal(send.mock.callCount(), 0);
-  assert.deepEqual(processing, [true, false]);
+  assert.equal(discovery.mock.callCount(), 0);
+  assert.equal(send.mock.callCount(), 1);
+  assert.deepEqual(processing, [true]);
 });
 
-test('real migration handler stops every sweep and reports delisting failure', async () => {
-  mock.method(listOrdinals, 'execute', async () => {
-    throw new Error('offline discovery failure');
-  });
+test('real migration handler reports pin failure and does not sweep', async () => {
   const sweep = mock.fn();
   const steps: string[] = [];
   let results: { error?: string }[] = [];
@@ -301,20 +308,24 @@ test('real migration handler stops every sweep and reports delisting failure', a
     legacyKeys: {},
     sweepResults: [],
     apiContext: context,
-    pinCwiToIdentity,
+    pinCwiToIdentity: async () => {
+      throw new Error('offline pin failure');
+    },
     operationControllerRef,
-    cancelOwnedOrdLockListings,
+    importedKeyMap: () => new Map(),
+    scanAddresses: sweep,
+    sweepImportedAssets: sweep,
     setStep: (step: string) => steps.push(step),
     setCurrentSweepOp: () => {},
     setSweepResults: (value: typeof results) => {
       results = value;
     },
-    selection: { sweepBsv: true, selectedOrdinals: new Set(['selected']), selectedBsv21TokenIds: new Set() },
-    assets: { funding: [{}], ordinals: [{}], bsv21Tokens: [] },
-    sweepBsv: { execute: sweep },
-    sweepOrdinals: { execute: sweep },
-    sweepBsv21: { execute: sweep },
-    prepareSweepInputs: sweep,
+    selection: {
+      sweepBsv: true,
+      selectedOrdinals: new Set(['selected']),
+      selectedBsv20Ticks: new Set(),
+      selectedBsv21TokenIds: new Set(),
+    },
   });
   await execute();
   assert.equal(sweep.mock.callCount(), 0);
@@ -358,7 +369,7 @@ test('real manual handler sends the full selection and retains only failed listi
   assert.equal(errors.length, 1);
 });
 
-test('real sweep tab hides SweepApp until delisting succeeds and supports explicit retry', async () => {
+test('real sweep tab pins the wallet then mounts SweepApp without delisting', async () => {
   let accountChanged: (changes: Record<string, unknown>, area: string) => void = () =>
     assert.fail('missing account watcher');
   chrome.storage = {
@@ -370,22 +381,13 @@ test('real sweep tab hides SweepApp until delisting succeeds and supports explic
       removeListener: () => {},
     },
   } as unknown as typeof chrome.storage;
-  const SweepApp = () => assert.fail('must not mount a live sweep component');
+  const SweepApp = (props: { wallet: OneSatContext['wallet'] }) => ({ type: SweepApp, props, children: [] });
   type Element = { type: unknown; props: Record<string, unknown>; children: Element[] };
-  const state: unknown[] = [{ payPk: 'offline' }, null, false, {}, false, null, 'Cancelling listings...', 0];
+  const state: unknown[] = [{ payPk: 'offline' }, null, false, {}, null];
   let stateIndex = 0;
   let effects: (() => unknown)[] = [];
   const task = { current: new AbortController() };
-  let finish: (result: { txid?: string; error?: string }) => void = () => assert.fail('cancellation not started');
-  mock.method(listOrdinals, 'execute', async () => ({ outputs: [listing(1)], totalOutputs: 1 }));
-  const cancellation = mock.method(
-    cancelOrdinalListing,
-    'execute',
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
-  );
+  const cancellation = mock.method(cancelOrdinalListing, 'execute', async () => success);
   const component = handler('sweep-tab.tsx', 'SweepTab', {
     chrome,
     configureServices: () => {},
@@ -405,7 +407,6 @@ test('real sweep tab hides SweepApp until delisting succeeds and supports explic
     createContext: () => context,
     pinCwiToIdentity,
     WALLET_OPERATION_STOPPED,
-    cancelOwnedOrdLockListings,
     SweepApp,
     React: {
       createElement: (type: unknown, props: Record<string, unknown>, ...children: Element[]) => ({
@@ -420,40 +421,25 @@ test('real sweep tab hides SweepApp until delisting succeeds and supports explic
     effects = [];
     return component();
   };
-  assert.notEqual(render().type, SweepApp, 'initial render must wait for delisting');
-  effects[0](); // Observe account changes; keys are already loaded by this harness.
-  effects[1](); // Run the delisting effect after the already-unlocked state setup.
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.notEqual(render().type, SweepApp, 'in-flight cancellation must block sweep');
-  finish({ error: 'offline cancellation failure' });
-  await new Promise((resolve) => setImmediate(resolve));
-  const failedView = render();
-  assert.notEqual(failedView.type, SweepApp, 'failure must keep sweep blocked');
-  assert.equal(cancellation.mock.callCount(), 1, 'rendering a failure must not retry');
-  const retry = failedView.children.find((child) => child.type === 'button');
-  assert.ok(retry, 'explicit retry is available');
-  (retry.props.onClick as () => void)();
-  render();
+  assert.notEqual(render().type, SweepApp, 'initial render must wait for the pinned wallet');
+  effects[0]();
   effects[1]();
   await new Promise((resolve) => setImmediate(resolve));
-  assert.notEqual(render().type, SweepApp, 'retry must still wait for completion');
-  finish(success);
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(render().type, SweepApp, 'successful delisting enables sweep');
-  assert.equal(cancellation.mock.callCount(), 2);
-  const oldWallet = render().props.wallet as OneSatContext['wallet'];
+  assert.equal(cancellation.mock.callCount(), 0);
+  const ready = render();
+  assert.equal(ready.type, SweepApp, 'pin success mounts sweep');
+  const oldWallet = ready.props.wallet as OneSatContext['wallet'];
   currentIdentityKey = 'account-b';
   accountChanged({ selectedAccount: { oldValue: 'account-a', newValue: 'account-b' } }, 'local');
-  assert.notEqual(render().type, SweepApp, 'changing account invalidates the completed gate');
-  assert.equal(state[4], false);
-  assert.equal(state[8], null);
+  assert.notEqual(render().type, SweepApp, 'changing account invalidates the pinned wallet');
+  assert.equal(state[4], null);
   await assert.rejects(
     oldWallet.getPublicKey({ identityKey: true }),
     'the disposed sweep wallet cannot start another operation',
   );
 });
 
-test('real migration Done handler does not mark a failed delisting complete', async () => {
+test('real migration Done handler does not mark a failed sweep complete', async () => {
   const persist = mock.fn();
   const navigate = mock.fn();
   const done = handler('pages/SweepMigration.tsx', 'handleDone', {
@@ -689,7 +675,6 @@ test('real migration execution refreshes imported inventory and retains earlier 
     apiContext: { ...context, services: {} },
     operationControllerRef,
     pinCwiToIdentity,
-    cancelOwnedOrdLockListings,
     importedKeyMap: () => keys,
     scanAddresses: async (_services: unknown, owners: string[]) => {
       assert.deepEqual([...owners], ['pay', 'ord', 'identity']);

@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { groupBsv20Tokens, isListedOutput } from '@1sat/actions';
 import { PrivateKey } from '@bsv/sdk';
-import { cancelOwnedOrdLockListings } from '../utils/cancelOrdLockListings';
 import { pinCwiToIdentity } from '../utils/accountBoundWallet';
 import { scanAddress, scanAddresses, type ScannedAssets } from '../sweep/scanner';
 import { importedKeyMap, sweepImportedAssets } from '../sweep/imported';
@@ -94,6 +94,7 @@ export const SweepMigration = () => {
   const [selection, setSelection] = useState<SweepSelection>({
     sweepBsv: false,
     selectedOrdinals: new Set(),
+    selectedBsv20Ticks: new Set(),
     selectedBsv21TokenIds: new Set(),
   });
 
@@ -248,11 +249,17 @@ export const SweepMigration = () => {
       next.has(tokenId) ? next.delete(tokenId) : next.add(tokenId);
       return { ...s, selectedBsv21TokenIds: next };
     });
+  const toggleBsv20 = (tick: string) =>
+    setSelection((s) => {
+      const next = new Set(s.selectedBsv20Ticks);
+      next.has(tick) ? next.delete(tick) : next.add(tick);
+      return { ...s, selectedBsv20Ticks: next };
+    });
 
   const hasSelection =
-    assets.listings.length > 0 ||
     selection.sweepBsv ||
     selection.selectedOrdinals.size > 0 ||
+    selection.selectedBsv20Ticks.size > 0 ||
     selection.selectedBsv21TokenIds.size > 0;
 
   const hasAnyAssets =
@@ -273,35 +280,12 @@ export const SweepMigration = () => {
     const signal = operationControllerRef.current.signal;
     let sweepContext: typeof apiContext;
 
-    // Keep fee funds available until owner delisting completes.
-    try {
-      setCurrentSweepOp('Cancelling OrdLock listings...');
-      sweepContext = await pinCwiToIdentity(apiContext, signal);
-      await cancelOwnedOrdLockListings(sweepContext, {
-        signal,
-        requireComplete: true,
-        onProgress: ({ attempted, skipped, total }) =>
-          setCurrentSweepOp(`Cancelling listings: ${attempted + skipped} of ${total}`),
-      });
-    } catch (err) {
-      if (signal.aborted) return;
-      setSweepResults([
-        ...results,
-        {
-          type: 'ordinals',
-          label: 'Listing cancellation',
-          error: err instanceof Error ? err.message : String(err),
-        },
-      ]);
-      setStep('results');
-      return;
-    }
-
     try {
       signal.throwIfAborted();
+      sweepContext = await pinCwiToIdentity(apiContext, signal);
       const keys = importedKeyMap(legacyKeys);
       if (!sweepContext.services) throw new Error('Services required for imported asset scanning.');
-      setCurrentSweepOp('Refreshing imported owner listings...');
+      setCurrentSweepOp('Refreshing imported inventory...');
       const currentAssets = await scanAddresses(sweepContext.services, [...keys.keys()]);
       signal.throwIfAborted();
       await sweepImportedAssets(sweepContext, currentAssets, keys, selection, {
@@ -805,6 +789,11 @@ export const SweepMigration = () => {
                               {o.outpoint.slice(0, 8)}...{o.outpoint.slice(-6)}
                             </span>
                           )}
+                          {isListedOutput(o) ? (
+                            <span className="text-[10px] ml-1.5" style={{ color: gray }}>
+                              listed
+                            </span>
+                          ) : null}
                         </span>
                         {o.contentType && (
                           <span
@@ -853,6 +842,55 @@ export const SweepMigration = () => {
                         />
                         <span className="text-sm" style={{ color: contrast }}>
                           {o.name || o.outpoint.slice(0, 12)}
+                          {isListedOutput(o) ? (
+                            <span className="text-[10px] ml-1.5" style={{ color: gray }}>
+                              listed
+                            </span>
+                          ) : null}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </Show>
+
+                <Show when={groupBsv20Tokens(assets.bsv20Tokens).length > 0}>
+                  <div className="rounded-2xl p-4" style={{ background: rowBg, border: `1px solid ${contrast}10` }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center"
+                        style={{ background: `${accent}15` }}
+                      >
+                        <Coins size={14} style={{ color: accent }} />
+                      </div>
+                      <span className="text-sm font-semibold" style={{ color: contrast }}>
+                        BSV-20 Tokens
+                      </span>
+                    </div>
+                    {groupBsv20Tokens(assets.bsv20Tokens).map((t) => (
+                      <label
+                        key={t.tick}
+                        className="flex items-center gap-3 cursor-pointer rounded-xl px-3 py-2 transition-colors hover:bg-white/5"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selection.selectedBsv20Ticks.has(t.tick)}
+                          onChange={() => toggleBsv20(t.tick)}
+                          className="w-4 h-4 rounded flex-shrink-0"
+                          style={{ accentColor: accent }}
+                        />
+                        <span className="text-sm flex-1" style={{ color: contrast }}>
+                          {t.tick}
+                          {t.outputs.some(isListedOutput) ? (
+                            <span className="text-[10px] ml-1.5" style={{ color: gray }}>
+                              listed
+                            </span>
+                          ) : null}
+                        </span>
+                        <span
+                          className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: `${accent}18`, color: accent }}
+                        >
+                          {t.totalAmount.toString()} ({t.outputs.length})
                         </span>
                       </label>
                     ))}
@@ -877,13 +915,11 @@ export const SweepMigration = () => {
                       <label
                         key={t.tokenId}
                         className="flex items-center gap-3 cursor-pointer rounded-xl px-3 py-2 transition-colors hover:bg-white/5"
-                        style={{ opacity: t.isActive ? 1 : 0.45 }}
                       >
                         <input
                           type="checkbox"
                           checked={selection.selectedBsv21TokenIds.has(t.tokenId)}
                           onChange={() => toggleBsv21(t.tokenId)}
-                          disabled={!t.isActive}
                           className="w-4 h-4 rounded flex-shrink-0"
                           style={{ accentColor: accent }}
                         />
@@ -894,6 +930,11 @@ export const SweepMigration = () => {
                               inactive
                             </span>
                           )}
+                          {t.outputs.some(isListedOutput) ? (
+                            <span className="text-[10px] ml-1.5" style={{ color: gray }}>
+                              listed
+                            </span>
+                          ) : null}
                         </span>
                         <span
                           className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
@@ -906,16 +947,6 @@ export const SweepMigration = () => {
                   </div>
                 </Show>
 
-                <Show when={assets.listings.length > 0}>
-                  <div className="rounded-2xl p-4" style={{ background: rowBg, border: `1px solid ${contrast}10` }}>
-                    <p className="text-sm font-semibold mb-2" style={{ color: contrast }}>
-                      OrdLock listings ({assets.listings.length})
-                    </p>
-                    <p className="text-xs leading-relaxed" style={{ color: gray }}>
-                      These deprecated listings will be cancelled into your wallet before selected assets are swept.
-                    </p>
-                  </div>
-                </Show>
                 <Show when={assets.run.length > 0}>
                   <div className="rounded-2xl p-4" style={{ background: rowBg }}>
                     <p className="text-sm font-semibold" style={{ color: contrast }}>
@@ -923,36 +954,6 @@ export const SweepMigration = () => {
                     </p>
                     <p className="text-xs" style={{ color: gray }}>
                       These outputs are preserved and excluded from this sweep.
-                    </p>
-                  </div>
-                </Show>
-
-                {/* Non-sweepable: BSV-20 */}
-                <Show when={assets.bsv20Tokens.length > 0}>
-                  <div
-                    className="rounded-2xl p-4 opacity-60"
-                    style={{ background: rowBg, border: `1px solid ${errorColor}20` }}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <div
-                        className="w-8 h-8 rounded-xl flex items-center justify-center"
-                        style={{ background: '#F87171' + '15' }}
-                      >
-                        <AlertTriangle size={14} style={{ color: errorColor }} />
-                      </div>
-                      <span className="text-sm font-semibold" style={{ color: contrast }}>
-                        BSV-20 Tokens
-                      </span>
-                      <span
-                        className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
-                        style={{ background: `${errorColor}15`, color: errorColor }}
-                      >
-                        {assets.bsv20Tokens.length}
-                      </span>
-                    </div>
-                    <p className="text-xs leading-relaxed px-1" style={{ color: gray }}>
-                      Cannot be swept automatically. Export your legacy keys from Settings to access these with a
-                      compatible wallet.
                     </p>
                   </div>
                 </Show>

@@ -1,28 +1,22 @@
 import {
+  bsv21SweepBatches,
+  groupBsv20Tokens,
   prepareSweepInputs,
+  SWEEP_BATCH_SIZE,
   sweepBsv,
-  sweepOrdinals,
+  sweepBsv20,
   sweepBsv21,
+  sweepOrdinals,
   type OneSatContext,
   type SweepInput,
 } from '@1sat/actions';
 import type { IndexedOutput } from '@1sat/types';
-import { SWEEP_BATCH_SIZE } from '@1sat/sweep-ui';
 import { PrivateKey } from '@bsv/sdk';
 import type { Keys } from '../utils/keys';
 import type { ScannedAssets } from './scanner';
 import type { SweepSelection, SweepTxResult } from './types';
 
 const normalizeOutpoint = (outpoint: string) => outpoint.replace('_', '.');
-
-/** Canonical token listings only. */
-export function isTokenLikeListing(output: IndexedOutput): boolean {
-  const events = output.events ?? [];
-  if (events.some((event) => event.startsWith('bsv21:') || event === 'type:application/bsv-20')) return true;
-  const data = output.data as { bsv21?: unknown; insc?: { file?: { type?: string } } } | undefined;
-  if (data?.bsv21 != null) return true;
-  return data?.insc?.file?.type === 'application/bsv-20';
-}
 
 export function importedKeyMap(keys: Pick<Keys, 'walletWif' | 'ordWif' | 'identityWif'>): Map<string, PrivateKey> {
   const result = new Map<string, PrivateKey>();
@@ -53,7 +47,10 @@ export function keysForPreparedInputs(
   });
 }
 
-/** Cancel imported listings first, preserving native script validation, signing and OpNS routing. */
+/**
+ * Same class order as `1sat sweep import`: BSV, ordinals, OpNS, BSV-20, BSV-21.
+ * Listed OrdLocks stay in their class and cancel into the destination in that spend.
+ */
 export async function sweepImportedAssets(
   context: OneSatContext,
   assets: ScannedAssets,
@@ -92,6 +89,7 @@ export async function sweepImportedAssets(
       for (const output of pending) completed.add(normalizeOutpoint(output.outpoint));
       return true;
     } catch (error) {
+      if (signal.aborted) throw error;
       onResult({ type, label, error: error instanceof Error ? error.message : String(error) });
       return false;
     }
@@ -104,53 +102,60 @@ export async function sweepImportedAssets(
       if (
         !(await perform(
           'ordinals',
-          `${label} (${offset + 1}–${offset + batch.length} of ${pending.length})`,
+          pending.length <= SWEEP_BATCH_SIZE
+            ? label
+            : `${label} (${offset + 1}–${offset + batch.length} of ${pending.length})`,
           batch,
           (inputs, inputKeys) => sweepOrdinals.execute(context, { inputs, keys: inputKeys }),
         ))
       )
-        return false;
+        break;
     }
-    return true;
   };
 
-  const listedTokens = assets.listings.filter(isTokenLikeListing);
-  if (listedTokens.length) {
-    onResult({
-      type: 'ordinals',
-      label: 'Cancel imported listings',
-      error:
-        'Listed tokens must be cancelled with a transfer inscription before sweeping. Use delist, not ordinal sweep.',
-    });
-    return;
-  }
-  if (!(await performOrdinalBatches('Cancel imported listings', assets.listings))) return;
-  signal.throwIfAborted();
-
-  const ordinals = [...assets.ordinals, ...assets.opnsNames].filter((output) =>
-    selection.selectedOrdinals.has(output.outpoint),
-  );
-  await performOrdinalBatches('Ordinals / OpNS', ordinals);
-
-  for (const token of assets.bsv21Tokens) {
-    signal.throwIfAborted();
-    if (!selection.selectedBsv21TokenIds.has(token.tokenId)) continue;
-    await perform('bsv21', token.symbol || token.tokenId, token.outputs, (inputs, inputKeys) => {
-      const amounts = new Map([...token.amounts].map(([outpoint, amount]) => [normalizeOutpoint(outpoint), amount]));
-      return sweepBsv21.execute(context, {
-        inputs: inputs.map((input) => {
-          const amount = amounts.get(normalizeOutpoint(input.outpoint));
-          if (amount === undefined) throw new Error('Token amount was not validated. Rescan before retrying.');
-          return { ...input, tokenId: token.tokenId, amount };
-        }),
-        keys: inputKeys,
-      });
-    });
-  }
   signal.throwIfAborted();
   if (selection.sweepBsv) {
     await perform('bsv', `BSV (${assets.totalBsv.toLocaleString()} sats)`, assets.funding, (inputs, inputKeys) =>
       sweepBsv.execute(context, { inputs, keys: inputKeys, amount: selection.bsvAmount }),
     );
+  }
+
+  const ordinals = assets.ordinals.filter((output) => selection.selectedOrdinals.has(output.outpoint));
+  await performOrdinalBatches('Ordinals', ordinals);
+
+  const opns = assets.opnsNames.filter((output) => selection.selectedOrdinals.has(output.outpoint));
+  await performOrdinalBatches('OpNS', opns);
+
+  for (const token of groupBsv20Tokens(assets.bsv20Tokens)) {
+    signal.throwIfAborted();
+    if (!selection.selectedBsv20Ticks.has(token.tick)) continue;
+    await perform('bsv20', token.tick, token.outputs, (inputs, inputKeys) =>
+      sweepBsv20.execute(context, {
+        inputs: inputs.map((input) => ({
+          ...input,
+          tick: token.tick,
+          amount: token.amounts.get(input.outpoint) ?? token.amounts.get(normalizeOutpoint(input.outpoint)) ?? '0',
+        })),
+        keys: inputKeys,
+      }),
+    );
+  }
+
+  for (const token of assets.bsv21Tokens) {
+    signal.throwIfAborted();
+    if (!selection.selectedBsv21TokenIds.has(token.tokenId)) continue;
+    const amounts = new Map([...token.amounts].map(([outpoint, amount]) => [normalizeOutpoint(outpoint), amount]));
+    for (const batch of bsv21SweepBatches(token.outputs)) {
+      await perform('bsv21', token.symbol || token.tokenId, batch, (inputs, inputKeys) =>
+        sweepBsv21.execute(context, {
+          inputs: inputs.map((input) => {
+            const amount = amounts.get(normalizeOutpoint(input.outpoint));
+            if (amount === undefined) throw new Error('Token amount was not validated. Rescan before retrying.');
+            return { ...input, tokenId: token.tokenId, amount };
+          }),
+          keys: inputKeys,
+        }),
+      );
+    }
   }
 }

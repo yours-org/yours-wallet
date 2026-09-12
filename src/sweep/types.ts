@@ -12,12 +12,13 @@ export type SweepStep = 'intro' | 'password' | 'scanning' | 'review' | 'sweeping
 export interface SweepSelection {
   sweepBsv: boolean;
   bsvAmount?: number; // undefined = sweep all
-  selectedOrdinals: Set<string>; // outpoints
+  selectedOrdinals: Set<string>; // outpoints (ordinals and OpNS)
+  selectedBsv20Ticks: Set<string>;
   selectedBsv21TokenIds: Set<string>; // tokenIds
 }
 
 export interface SweepTxResult {
-  type: 'bsv' | 'ordinals' | 'bsv21';
+  type: 'bsv' | 'ordinals' | 'bsv20' | 'bsv21';
   label: string;
   txid?: string;
   error?: string;

@@ -69,7 +69,6 @@ import { MNEE_PROTOCOLS, mneeKeyDerivations } from '../utils/mneeDerivations';
 import { MneeClient } from '@1sat/client';
 import { PrivateKey } from '@bsv/sdk';
 import { getLegacyMneeBalance, sweepLegacyMnee } from '../utils/sweepLegacyMnee';
-import { cancelOwnedOrdLockListings } from '../utils/cancelOrdLockListings';
 import { pinCwiToIdentity } from '../utils/accountBoundWallet';
 import { decrypt } from '../utils/crypto';
 import type { Keys } from '../utils/keys';
@@ -831,15 +830,13 @@ export const BsvWallet = () => {
         if (isSendAllBsv) {
           const r = sendRecipients[0];
           const destination = r.address ?? r.paymail ?? '';
-          // Preserve fee funds until all owned listings have been cancelled.
           try {
             const signal = operationControllerRef.current.signal;
             const spendContext = await pinCwiToIdentity(apiContext, signal);
-            await cancelOwnedOrdLockListings(spendContext, { requireComplete: true, signal });
             signal.throwIfAborted();
             sendRes = await sendAllBsv.execute(spendContext, { destination });
           } catch (err) {
-            addSnackbar(err instanceof Error ? err.message : 'Listing cancellation failed. Please retry.', 'error');
+            addSnackbar(err instanceof Error ? err.message : 'Send failed. Please retry.', 'error');
             setIsProcessing(false);
             return;
           }
