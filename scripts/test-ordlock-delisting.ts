@@ -144,6 +144,25 @@ test('token listings use cancelTokenListing, not ordinal cancel', async () => {
   assert.equal(result.errors.length, 0);
 });
 
+test('two token listings are two cancelTokenListing calls, never one batched action', async () => {
+  mock.method(listOrdinals, 'execute', async () => ({
+    outputs: [tokenListing(1), tokenListing(2)],
+    totalOutputs: 2,
+  }));
+  const ordinal = mock.method(cancelOrdinalListing, 'execute', async () => success);
+  const ids: string[] = [];
+  const token = mock.method(cancelTokenListing, 'execute', async (_ctx, { id }) => {
+    ids.push(id);
+    return { txid: `token-${id}` };
+  });
+  const result = await cancelOwnedOrdLockListings(context);
+  assert.equal(ordinal.mock.callCount(), 0);
+  assert.equal(token.mock.callCount(), 2);
+  assert.deepEqual(ids, ['token-1', 'token-2']);
+  assert.equal(result.txids.length, 2);
+  assert.equal(result.cancelled, 2);
+});
+
 test('discovery failure cancels nothing and a later invocation can retry', async () => {
   let unavailable = true;
   mock.method(listOrdinals, 'execute', async () => {
