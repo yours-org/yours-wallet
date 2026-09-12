@@ -15,6 +15,25 @@ import type { SweepSelection, SweepTxResult } from './types';
 
 const normalizeOutpoint = (outpoint: string) => outpoint.replace('_', '.');
 
+/** Listed tokens must be cancelled with a transfer inscription, never swept as NFTs. */
+export function isTokenLikeListing(output: IndexedOutput): boolean {
+  const events = output.events ?? [];
+  if (
+    events.some(
+      (event) =>
+        event.startsWith('bsv21:') || event === 'type:application/bsv-20' || event === 'type:application/bsv20',
+    )
+  )
+    return true;
+  const data = output.data as
+    | { bsv20?: unknown; bsv21?: unknown; insc?: { file?: { type?: string }; json?: { p?: string } } }
+    | undefined;
+  if (data?.bsv20 != null || data?.bsv21 != null) return true;
+  const type = data?.insc?.file?.type ?? '';
+  if (type === 'application/bsv-20' || type === 'application/bsv20') return true;
+  return data?.insc?.json?.p === 'bsv-20';
+}
+
 export function importedKeyMap(keys: Pick<Keys, 'walletWif' | 'ordWif' | 'identityWif'>): Map<string, PrivateKey> {
   const result = new Map<string, PrivateKey>();
   for (const wif of [keys.walletWif, keys.ordWif, keys.identityWif]) {
@@ -105,6 +124,16 @@ export async function sweepImportedAssets(
     return true;
   };
 
+  const listedTokens = assets.listings.filter(isTokenLikeListing);
+  if (listedTokens.length) {
+    onResult({
+      type: 'ordinals',
+      label: 'Cancel imported listings',
+      error:
+        'Listed tokens must be cancelled with a transfer inscription before sweeping. Use delist, not ordinal sweep.',
+    });
+    return;
+  }
   if (!(await performOrdinalBatches('Cancel imported listings', assets.listings))) return;
   signal.throwIfAborted();
 
