@@ -15,7 +15,7 @@ import type { SweepSelection, SweepTxResult } from './types';
 
 const normalizeOutpoint = (outpoint: string) => outpoint.replace('_', '.');
 
-/** Canonical token listings only. `application/bsv20` is invalid MIME and is not a token. */
+/** Canonical token listings only. */
 export function isTokenLikeListing(output: IndexedOutput): boolean {
   const events = output.events ?? [];
   if (events.some((event) => event.startsWith('bsv21:') || event === 'type:application/bsv-20')) return true;
