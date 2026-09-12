@@ -61,7 +61,8 @@ test('snapshots over 100 listings before sequentially cancelling all of them', a
   let active = 0;
   let maxActive = 0;
   mock.method(listOrdinals, 'execute', async (_ctx, input) => {
-    assert.deepEqual(input.tags, [ORDLOCK_TAG]);
+    assert.deepEqual(input.tags, [ORDLOCK_TAG, 'ordlock2']);
+    assert.equal(input.tagQueryMode, 'any');
     pages.push(input.offset);
     return { outputs: owned.slice(input.offset, input.offset + input.limit), totalOutputs: owned.length };
   });

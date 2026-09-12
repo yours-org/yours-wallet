@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WalletOutput } from '@bsv/sdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Check, ImageOff, Send, Tag, X } from 'lucide-react';
-import { listOrdinals, sendOrdinals } from '@1sat/actions';
+import { listOrdinals, sellOrdinal, sendOrdinals } from '@1sat/actions';
 import { readAssetIdTag } from '@1sat/types';
 import { Ordinal } from '../components/Ordinal';
 import { PageLoader } from '../components/PageLoader';
@@ -16,11 +16,8 @@ import { TopNav } from '../components/TopNav';
 import { getErrorMessage } from '../utils/tools';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
 import { getTagValue, getOutputName, hasTag, resolveOriginOutpoint } from '../utils/format';
-import {
-  cancelOwnedOrdLockListings,
-  isOrdLockListed,
-  ORDLOCK_LISTING_DISABLED_MESSAGE,
-} from '../utils/cancelOrdLockListings';
+import { cancelOwnedOrdLockListings, isOrdLockListed } from '../utils/cancelOrdLockListings';
+import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 
 type Addresses = Record<string, string>;
 type PageState = 'main' | 'transfer' | 'list' | 'cancel';
@@ -361,14 +358,44 @@ export const OrdWallet = () => {
     }
   };
 
-  // ORDLOCK_LISTING_DISABLED — restore when the replacement listing contract ships.
   const handleListOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
+
     await sleep(25);
-    addSnackbar(ORDLOCK_LISTING_DISABLED_MESSAGE, 'error');
-    setIsProcessing(false);
-    setPageState('main');
+
+    if (Number(bsvListAmount) < 0.00000001) {
+      addSnackbar('Must be more than 1 sat', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    if (!bsvListAmount) {
+      addSnackbar('You must enter a valid BSV amount!', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    const id = requireAssetId(selectedOrdinals[0]);
+    if (!id) {
+      setIsProcessing(false);
+      return;
+    }
+
+    const listRes = await sellOrdinal.execute(apiContext, {
+      id,
+      price: Math.ceil(bsvListAmount * BSV_DECIMAL_CONVERSION),
+    });
+
+    if (!listRes.txid || listRes.error) {
+      addSnackbar(getErrorMessage(listRes.error), 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    setSuccessTxId(listRes.txid);
+    addSnackbar('Listing Successful!', 'success');
+    refreshOrdinals();
   };
 
   const handleCancelListing = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -627,21 +654,22 @@ export const OrdWallet = () => {
                   )}
                 </motion.button>
 
-                {/* ORDLOCK_LISTING_DISABLED — restore List UI when replacement contract ships. */}
                 {selectedOrdinals.length === 1 && (
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={() => {
-                      addSnackbar(ORDLOCK_LISTING_DISABLED_MESSAGE, 'info');
+                      if (!selectedOrdinals.length) {
+                        addSnackbar('You must select an ordinal to list!', 'info');
+                        return;
+                      }
+                      setPageState('list');
                     }}
                     className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm"
                     style={{
                       background: '#17191E',
-                      color: '#98A2B3',
+                      color: '#FFFFFF',
                       border: '1px solid rgba(255,255,255,0.08)',
-                      opacity: 0.7,
                     }}
-                    title={ORDLOCK_LISTING_DISABLED_MESSAGE}
                   >
                     <Tag size={14} />
                     List
@@ -895,12 +923,6 @@ export const OrdWallet = () => {
       />
 
       <form noValidate onSubmit={handleListOrdinal} className="flex flex-col flex-1 overflow-hidden">
-        {/* ORDLOCK_LISTING_DISABLED */}
-        <div className="px-4 pb-2">
-          <p className="text-xs" style={{ color: '#E5A920' }}>
-            {ORDLOCK_LISTING_DISABLED_MESSAGE}
-          </p>
-        </div>
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-4">
           {/* Ordinal preview */}
@@ -967,20 +989,18 @@ export const OrdWallet = () => {
 
         {/* Sticky submit — pb clears the absolute BottomMenu (3.75rem) plus breathing room */}
         <div className="px-4 pt-2 pb-20" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          {/* ORDLOCK_LISTING_DISABLED */}
           <motion.button
             type="submit"
-            disabled
+            disabled={isProcessing}
+            whileTap={{ scale: 0.97 }}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm"
             style={{
-              background: 'rgba(161,255,139,0.25)',
+              background: isProcessing ? 'rgba(161,255,139,0.4)' : 'linear-gradient(135deg, #A1FF8B, #34D399)',
               color: '#010101',
-              cursor: 'not-allowed',
             }}
-            title={ORDLOCK_LISTING_DISABLED_MESSAGE}
           >
             <Tag size={15} />
-            Listing Disabled
+            List Now
           </motion.button>
         </div>
       </form>

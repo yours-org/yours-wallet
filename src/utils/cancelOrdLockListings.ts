@@ -1,4 +1,4 @@
-/** Owner delisting for the OrdLock deprecation, shared by ordinal and sweep views. */
+/** Owner cancel for marketplace listings (OrdLock v1 and v2). */
 import type { WalletOutput } from '@bsv/sdk';
 import {
   cancelOrdinalListing,
@@ -8,13 +8,11 @@ import {
   listOpns,
   type OneSatContext,
 } from '@1sat/actions';
-import { readAssetIdTag, TOKEN_CONTENT_TYPE } from '@1sat/types';
+import { ORDLOCK_V2_TAG, readAssetIdTag, TOKEN_CONTENT_TYPE } from '@1sat/types';
 import { pinCwiToIdentity } from './accountBoundWallet';
 
 export const ORDLOCK_TAG = 'ordlock';
-
-export const ORDLOCK_LISTING_DISABLED_MESSAGE =
-  'OrdLock listing creation is deprecated pending a replacement contract. Existing listings can still be cancelled or bought.';
+export const LISTING_TAGS = [ORDLOCK_TAG, ORDLOCK_V2_TAG];
 
 export const ORDLOCK_CANCEL_INCOMPLETE_MESSAGE =
   'Listing cancellation is incomplete. Retry delisting before sending or sweeping funds.';
@@ -33,7 +31,8 @@ export type CancelOrdLockResult = CancelOrdLockProgress & {
 };
 
 export function isOrdLockListed(output: WalletOutput): boolean {
-  return output.tags?.includes(ORDLOCK_TAG) ?? false;
+  const tags = output.tags ?? [];
+  return tags.includes(ORDLOCK_TAG) || tags.includes(ORDLOCK_V2_TAG);
 }
 
 function isTokenListing(output: WalletOutput): boolean {
@@ -105,7 +104,8 @@ export async function cancelOwnedOrdLockListings(
         while (true) {
           await assertCurrent();
           const page = await list.execute(context, {
-            tags: [ORDLOCK_TAG],
+            tags: LISTING_TAGS,
+            tagQueryMode: 'any',
             limit: total === undefined ? 100 : Math.min(100, total - offset),
             offset,
           });
