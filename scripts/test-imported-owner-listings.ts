@@ -169,7 +169,9 @@ test('BSV-20 ticks use sweepBsv20, not ordinal cancel', async () => {
   const listed = {
     ...mixed[0],
     events: [...(mixed[0].events ?? []), 'tick:TEST', 'type:application/bsv-20'],
-    data: { insc: { file: { type: 'application/bsv-20' }, json: { p: 'bsv-20', op: 'transfer', tick: 'TEST', amt: '10' } } },
+    data: {
+      insc: { file: { type: 'application/bsv-20' }, json: { p: 'bsv-20', op: 'transfer', tick: 'TEST', amt: '10' } },
+    },
   };
   const task = run(
     { ...emptyAssets(), bsv20Tokens: [listed] },
