@@ -39,10 +39,7 @@ export function isOrdLockListed(output: WalletOutput): boolean {
 function isTokenListing(output: WalletOutput): boolean {
   const tags = output.tags ?? [];
   if (tags.includes(`type:${TOKEN_CONTENT_TYPE}`)) return true;
-  return tags.some(
-    (tag) =>
-      tag.startsWith('bsv21:') && tag !== 'bsv21:deploy' && tag !== 'bsv21:auth',
-  );
+  return tags.some((tag) => tag.startsWith('bsv21:') && tag !== 'bsv21:deploy' && tag !== 'bsv21:auth');
 }
 
 /**
@@ -88,8 +85,8 @@ export async function cancelOwnedOrdLockListings(
     const outputs = new Map<
       string,
       {
-        output: WalletOutput
-        cancel: typeof cancelOrdinalListing | typeof cancelOpnsListing | typeof cancelTokenListing
+        output: WalletOutput;
+        cancel: typeof cancelOrdinalListing | typeof cancelOpnsListing | typeof cancelTokenListing;
       }
     >();
     if (options?.outputs) {
@@ -159,10 +156,7 @@ export async function cancelOwnedOrdLockListings(
         continue;
       }
 
-      const action =
-        cancel === cancelOrdinalListing && isTokenListing(output)
-          ? cancelTokenListing
-          : cancel
+      const action = cancel === cancelOrdinalListing && isTokenListing(output) ? cancelTokenListing : cancel;
 
       result.attempted += 1;
       try {

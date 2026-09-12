@@ -19,11 +19,7 @@ import {
   ORDLOCK_TAG,
 } from '../src/utils/cancelOrdLockListings';
 
-import {
-  pinCwiToIdentity,
-  callPinnedCwi,
-  WALLET_OPERATION_STOPPED,
-} from '../src/utils/accountBoundWallet';
+import { pinCwiToIdentity, callPinnedCwi, WALLET_OPERATION_STOPPED } from '../src/utils/accountBoundWallet';
 
 let currentIdentityKey = 'account-a';
 const context = { wallet: { getPublicKey: async () => ({ publicKey: currentIdentityKey }) } } as OneSatContext;
@@ -54,13 +50,7 @@ const tokenListing = (index: number): WalletOutput => ({
   outpoint: `${index.toString(16).padStart(64, '0')}.0`,
   satoshis: 1,
   spendable: true,
-  tags: [
-    ORDLOCK_TAG,
-    `id:token-${index}`,
-    'type:application/bsv-20',
-    `bsv21:${'ab'.repeat(32)}_0`,
-    'amt:1111',
-  ],
+  tags: [ORDLOCK_TAG, `id:token-${index}`, 'type:application/bsv-20', `bsv21:${'ab'.repeat(32)}_0`, 'amt:1111'],
 });
 const success = { txid: 'offline-cancellation' };
 afterEach(() => mock.restoreAll());
