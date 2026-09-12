@@ -128,7 +128,7 @@ test('imported token listings are not swept as ordinals', async () => {
   const listed = {
     ...mixed[0],
     events: [...(mixed[0].events ?? []), 'type:application/bsv-20'],
-    data: { insc: { file: { type: 'application/bsv-20' } } },
+    data: { insc: { file: { type: 'application/bsv-20' }, json: { p: 'bsv-20' } } },
   };
   const task = run({ ...emptyAssets(), listings: [listed] }, { ...selection, sweepBsv: false });
   await task.promise;
