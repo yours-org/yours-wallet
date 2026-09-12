@@ -1,12 +1,12 @@
 ---
-description: List an ordinal for sale via OrdLock at a fixed BSV price. Currently disabled in Yours Wallet.
+description: List an ordinal for sale via OrdLock v2 at a fixed BSV price.
 icon: tag
 ---
 
 # listOrdinal
 
-{% hint style="danger" %}
-**Listing creation is currently disabled in Yours Wallet** (OPL-4694). Calling `listOrdinal` through the wallet fails closed with a deprecation error until the replacement listing contract ships. Buying others' listings and cancelling your own still work. The wallet also cancels any OrdLock listings it owns when the Ordinals tab loads and before a BSV sweep. See `docs/ordlock-listing-disable.md` in the repo.
+{% hint style="info" %}
+New listings use OrdLock v2 via `sellOrdinal` (`@1sat/actions`). Buy and cancel of v1 (`ordlock`) and v2 (`ordlock2`) listings stay enabled. See `docs/ordlock-listings.md` in the repo.
 {% endhint %}
 
 **Package:** `@1sat/actions`
@@ -15,24 +15,24 @@ icon: tag
 ## Signature
 
 ```ts
-listOrdinal.execute(ctx: OneSatContext, input: ListOrdinalInput): Promise<ListOrdinalResult>
+sellOrdinal.execute(ctx: OneSatContext, input: SellOrdinalRequest): Promise<OrdinalOperationResponse>
 ```
 
 ## Input
 
 ```ts
-interface ListOrdinalInput {
-  ordinal: WalletOutput; // output from getOrdinals
-  inputBEEF: number[]; // Array.from(BEEF) from getOrdinals
+interface SellOrdinalRequest {
+  id: string; // tracking id from listOrdinals (see readAssetIdTag)
   price: number; // listing price in SATOSHIS
-  payAddress: string; // address that receives BSV when purchased
+  payAddress?: string; // payment receive address; defaults to P1SAT `1sat 0`
+  map?: Record<string, string>; // optional MAP metadata on the listing output
 }
 ```
 
 ## Output
 
 ```ts
-interface ListOrdinalResult {
+interface OrdinalOperationResponse {
   txid?: string;
   error?: string;
 }
@@ -42,7 +42,7 @@ interface ListOrdinalResult {
 
 - Connected wallet
 - `ctx` from `createContext(wallet, { chain: 'main', services })`
-- You have called `getOrdinals` first to fetch the ordinal + BEEF
+- You have called `listOrdinals` first to fetch the ordinal and its tracking id
 - The ordinal is currently in the wallet (not already listed or transferred)
 
 ## Permission prompts
@@ -52,19 +52,19 @@ interface ListOrdinalResult {
 ## Example
 
 ```tsx
-import { getOrdinals, listOrdinal } from '@1sat/actions';
+import { listOrdinals, sellOrdinal } from '@1sat/actions';
+import { readAssetIdTag } from '@1sat/types';
 
-const { outputs, BEEF } = await getOrdinals.execute(ctx, {});
-if (!BEEF) throw new Error('No BEEF returned');
+const { outputs } = await listOrdinals.execute(ctx, { limit: 50, offset: 0 });
+const output = outputs.find((o) => o.outpoint === targetOutpoint);
+if (!output) throw new Error('Ordinal not found');
 
-const ordinal = outputs.find((o) => o.outpoint === targetOutpoint);
-if (!ordinal) throw new Error('Ordinal not found');
+const id = readAssetIdTag(output.tags);
+if (!id) throw new Error('Ordinal has no tracking id');
 
-const result = await listOrdinal.execute(ctx, {
-  ordinal,
-  inputBEEF: Array.from(BEEF),
+const result = await sellOrdinal.execute(ctx, {
+  id,
   price: 100000, // 0.001 BSV
-  payAddress: '1Seller...',
 });
 if (result.error) throw new Error(result.error);
 console.log('Listed in txid:', result.txid);
@@ -99,5 +99,5 @@ The ordinal is moved to an OrdLock output. To take it back without selling, use 
 - [purchaseOrdinal](./purchase-ordinal.md)
 - [cancelListing](./cancel-listing.md)
 - [deriveCancelAddress](./derive-cancel-address.md)
-- [getOrdinals](./get-ordinals.md) — required first call
+- [getOrdinals](./get-ordinals.md) — wallet inventory; call `listOrdinals` first for the tracking id
 - [Cookbook: Mint & List Ordinal](../cookbook/mint-and-list-ordinal.md)
