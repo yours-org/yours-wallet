@@ -387,7 +387,7 @@ test('real sweep tab pins the wallet then mounts SweepApp without delisting', as
   } as unknown as typeof chrome.storage;
   const SweepApp = (props: { wallet: OneSatContext['wallet'] }) => ({ type: SweepApp, props, children: [] });
   type Element = { type: unknown; props: Record<string, unknown>; children: Element[] };
-  const state: unknown[] = [{ payPk: 'offline' }, null, false, {}, null];
+  const state: unknown[] = [{ payPk: 'offline' }, null, false, null, {}, null];
   let stateIndex = 0;
   let effects: (() => unknown)[] = [];
   const task = { current: new AbortController() };
@@ -431,12 +431,13 @@ test('real sweep tab pins the wallet then mounts SweepApp without delisting', as
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(cancellation.mock.callCount(), 0);
   const ready = render();
-  assert.equal(ready.type, SweepApp, 'pin success mounts sweep');
-  const oldWallet = ready.props.wallet as OneSatContext['wallet'];
+  const sweepElement = ready.children.find((child) => child?.type === SweepApp);
+  assert.ok(sweepElement, 'pin success mounts sweep');
+  const oldWallet = sweepElement.props.wallet as OneSatContext['wallet'];
   currentIdentityKey = 'account-b';
   accountChanged({ selectedAccount: { oldValue: 'account-a', newValue: 'account-b' } }, 'local');
   assert.notEqual(render().type, SweepApp, 'changing account invalidates the pinned wallet');
-  assert.equal(state[4], null);
+  assert.equal(state[5], null);
   await assert.rejects(
     oldWallet.getPublicKey({ identityKey: true }),
     'the disposed sweep wallet cannot start another operation',
@@ -569,11 +570,7 @@ test('background pins the actual wallet across identity lookup and native method
   await new Promise((resolve) => setImmediate(resolve));
   current = false;
   finishAction(success);
-  await assert.rejects(
-    accepted,
-    { message: WALLET_OPERATION_STOPPED },
-    'accepted transactions cannot become completion for a different account',
-  );
+  assert.deepEqual(await accepted, success, 'an accepted transaction receipt must survive an account switch');
 });
 
 test('background preserves native permission routing and admin send-all handling', async () => {

@@ -17,7 +17,8 @@ export async function pinCwiToIdentity(apiContext: OneSatContext, signal?: Abort
       expectedIdentityKey,
       originator: `chrome-extension://${chrome.runtime.id}`,
     });
-    signal?.throwIfAborted();
+    const receiptBearingAction = action === 'createAction' || action === 'signAction';
+    if (!receiptBearingAction) signal?.throwIfAborted();
     if (!response?.success) throw new Error(response?.error || WALLET_OPERATION_STOPPED);
     return response.data as TResult;
   });
@@ -38,6 +39,10 @@ export async function callPinnedCwi(options: {
   if (!isCWIEventName(action) || !expectedIdentityKey || !isCurrent()) throw new Error(WALLET_OPERATION_STOPPED);
   const { publicKey } = await wallet.getPublicKey({ identityKey: true }, originator);
   if (publicKey !== expectedIdentityKey || !isCurrent()) throw new Error(WALLET_OPERATION_STOPPED);
+  // These calls can return a transaction receipt after the account changes.
+  // Keep the receipt so the caller can reconcile the already-authorized
+  // operation; the next operation is still stopped by the account-bound CWI.
+  const receiptBearingAction = action === 'createAction' || action === 'signAction';
   // Preserve the existing extension-admin send-all path through the base wallet.
   const sendAll =
     action === 'createAction' &&
@@ -45,6 +50,6 @@ export async function callPinnedCwi(options: {
   const target = sendAll && options.baseWallet ? options.baseWallet : wallet;
   const method = target[action] as (params: unknown, originator: string) => Promise<unknown>;
   const result = await method.call(target, params, originator);
-  if (!isCurrent()) throw new Error(WALLET_OPERATION_STOPPED);
+  if (!isCurrent() && !receiptBearingAction) throw new Error(WALLET_OPERATION_STOPPED);
   return result;
 }

@@ -7,6 +7,7 @@ import { SweepApp, configureServices, type LegacyKeys } from '@1sat/sweep-ui';
 import { createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
 import { createContext } from '@1sat/actions';
 import { decrypt } from './utils/crypto';
+import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { pinCwiToIdentity, WALLET_OPERATION_STOPPED } from './utils/accountBoundWallet';
 import './sweep-tab.css';
 
@@ -16,10 +17,16 @@ window.Buffer = Buffer;
 
 const SERVICES_BASE_URL = 'https://api.1sat.app';
 
+type SweepAccountProfile = {
+  name: string;
+  avatar: string;
+};
+
 function SweepTab() {
   const [keys, setKeys] = useState<LegacyKeys | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accountProfile, setAccountProfile] = useState<SweepAccountProfile | null>(null);
   const [wallet] = useState(() => createChromeCWI());
   const operationControllerRef = useRef(new AbortController());
   const [sweepWallet, setSweepWallet] = useState<WalletInterface | null>(null);
@@ -33,6 +40,7 @@ function SweepTab() {
       operationControllerRef.current.abort();
       setSweepWallet(null);
       setKeys(null);
+      setAccountProfile(null);
       setLoading(false);
       setError(WALLET_OPERATION_STOPPED);
     };
@@ -78,6 +86,18 @@ function SweepTab() {
           setLoading(false);
           return;
         }
+
+        const socialProfile = account.settings?.socialProfile;
+        setAccountProfile({
+          name:
+            socialProfile?.displayName && socialProfile.displayName !== 'Anonymous'
+              ? socialProfile.displayName
+              : account.name || 'Current account',
+          avatar:
+            socialProfile?.avatar && socialProfile.avatar !== HOSTED_YOURS_IMAGE
+              ? socialProfile.avatar
+              : account.icon || '',
+        });
 
         const decrypted = JSON.parse(await decrypt(account.encryptedKeys, passKey));
         if (!active) return;
@@ -167,7 +187,29 @@ function SweepTab() {
     );
   }
 
-  return <SweepApp legacyKeys={keys} wallet={sweepWallet} sweepOnly />;
+  return (
+    <div className="min-h-screen bg-[#09090b] text-white">
+      {accountProfile && (
+        <div className="mx-auto max-w-lg px-4 pt-4">
+          <div className="flex items-center gap-3 rounded-lg border border-[#27272a] bg-[#18181b] p-3">
+            <img
+              src={accountProfile.avatar || undefined}
+              alt=""
+              className="h-9 w-9 rounded-full object-cover"
+              onError={(event) => {
+                event.currentTarget.style.display = 'none';
+              }}
+            />
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-wide text-[#a1a1aa]">Sweeping account</div>
+              <div className="truncate text-sm font-medium">{accountProfile.name}</div>
+            </div>
+          </div>
+        </div>
+      )}
+      <SweepApp legacyKeys={keys} wallet={sweepWallet} sweepOnly />
+    </div>
+  );
 }
 
 const root = document.getElementById('root');
