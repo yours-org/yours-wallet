@@ -11,6 +11,7 @@ import {
 import { ORDLOCK_V2_TAG, readAssetIdTag, TOKEN_CONTENT_TYPE } from '@1sat/types';
 import { pinCwiToIdentity } from './accountBoundWallet';
 
+// `@1sat/types` exports the v2 tag only, so the v1 tag stays a local const.
 export const ORDLOCK_TAG = 'ordlock';
 export const LISTING_TAGS = [ORDLOCK_TAG, ORDLOCK_V2_TAG];
 
@@ -156,7 +157,9 @@ export async function cancelOwnedOrdLockListings(
         continue;
       }
 
-      const action = cancel === cancelOrdinalListing && isTokenListing(output) ? cancelTokenListing : cancel;
+      // Token listings must always cancel as transfers, never as NFTs,
+      // regardless of which basket discovered them.
+      const action = isTokenListing(output) ? cancelTokenListing : cancel;
 
       result.attempted += 1;
       try {

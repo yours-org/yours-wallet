@@ -2,8 +2,8 @@
 import { scanAddress as scanAddressUtxos, scanAddresses as scanAddressesUtxos, type ScanResult } from '@1sat/actions';
 import type { OneSatServices } from '@1sat/client';
 import type { IndexedOutput } from '@1sat/types';
-export type { TokenBalance, ScanProgress } from '@1sat/actions';
-import type { ScanProgress } from '@1sat/actions';
+import type { ScanProgress, TokenBalance } from '@1sat/actions';
+export type { ScanProgress, TokenBalance };
 
 export interface EnrichedOrdinal extends IndexedOutput {
   origin?: string;

@@ -11,12 +11,17 @@ import {
   type SweepInput,
 } from '@1sat/actions';
 import type { IndexedOutput } from '@1sat/types';
+import { formatOutpoint, parseOutpoint } from '@1sat/utils';
 import { PrivateKey } from '@bsv/sdk';
 import type { Keys } from '../utils/keys';
 import type { ScannedAssets } from './scanner';
 import type { SweepSelection, SweepTxResult } from './types';
 
-const normalizeOutpoint = (outpoint: string) => outpoint.replace('_', '.');
+/** Canonical `txid.vout` form: indexer, overlay, and SDK inputs mix `.` and `_` separators. */
+const normalizeOutpoint = (outpoint: string) => {
+  const { txid, vout } = parseOutpoint(outpoint);
+  return formatOutpoint(txid, vout);
+};
 
 export function importedKeyMap(keys: Pick<Keys, 'walletWif' | 'ordWif' | 'identityWif'>): Map<string, PrivateKey> {
   const result = new Map<string, PrivateKey>();
