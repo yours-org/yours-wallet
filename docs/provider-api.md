@@ -222,23 +222,18 @@ const result = await ctx.wallet.createAction(args);
 
 ## Marketplace (OrdLock)
 
-> **Listing creation is currently disabled** (OPL-4694). `listOrdinal` fails closed with a deprecation error until the replacement listing contract ships. Purchase and cancel still work, and the wallet auto-cancels its own OrdLock listings on Ordinals load and before a BSV sweep. See `docs/ordlock-listing-disable.md`.
+> New listings use OrdLock v2 via `sellOrdinal`. Buy and cancel of v1 (`ordlock`) and v2 (`ordlock2`) listings stay enabled. See `docs/ordlock-listings.md`.
 
-### List for Sale (disabled)
+### List for Sale
 
 ```tsx
-import { getOrdinals, listOrdinal } from '@1sat/actions';
+import { sellOrdinal } from '@1sat/actions';
 
-// Fetch the ordinal + BEEF first
-const { outputs, BEEF } = await getOrdinals.execute(ctx, {});
-if (!BEEF) throw new Error('No BEEF returned');
-const ordinal = outputs.find((o) => o.outpoint === targetOutpoint);
-
-const result = await listOrdinal.execute(ctx, {
-  ordinal,
-  inputBEEF: Array.from(BEEF),
+// `id` is the tracking id from `listOrdinals` (see `readAssetIdTag`).
+const result = await sellOrdinal.execute(ctx, {
+  id,
   price: 100000, // Price in satoshis
-  payAddress: '1Seller...', // Address where payment goes when purchased
+  payAddress: '1Seller...', // Optional; defaults to the P1SAT `1sat 0` address
 });
 ```
 

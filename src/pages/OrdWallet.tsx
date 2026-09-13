@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WalletOutput } from '@bsv/sdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Check, ImageOff, Send, Tag, X } from 'lucide-react';
-import { cancelOrdinalListing, listOrdinals, sendOrdinals } from '@1sat/actions';
+import { listOrdinals, sellOrdinal, sendOrdinals } from '@1sat/actions';
 import { readAssetIdTag } from '@1sat/types';
 import { Ordinal } from '../components/Ordinal';
 import { PageLoader } from '../components/PageLoader';
@@ -16,7 +16,8 @@ import { TopNav } from '../components/TopNav';
 import { getErrorMessage } from '../utils/tools';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
 import { getTagValue, getOutputName, hasTag, resolveOriginOutpoint } from '../utils/format';
-import { cancelOwnedOrdLockListings, ORDLOCK_LISTING_DISABLED_MESSAGE } from '../utils/cancelOrdLockListings';
+import { cancelOwnedOrdLockListings, isOrdLockListed } from '../utils/cancelOrdLockListings';
+import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 
 type Addresses = Record<string, string>;
 type PageState = 'main' | 'transfer' | 'list' | 'cancel';
@@ -109,7 +110,7 @@ const OrdCard = ({ output, url, selected, disabled, onClick, theme, index }: Ord
       </AnimatePresence>
 
       {/* Listed badge */}
-      {output.tags?.includes('ordlock') && (
+      {isOrdLockListed(output) && (
         <div
           className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[0.55rem] font-bold"
           style={{ background: '#E5A920', color: '#010101' }}
@@ -185,8 +186,9 @@ export const OrdWallet = () => {
   const { theme } = useTheme();
   const [pageState, setPageState] = useState<PageState>('main');
   const { apiContext } = useServiceContext();
-  // ORDLOCK_LISTING_DISABLED — auto-cancel session guard (once per OrdWallet mount).
-  const ordLockCancelSessionRef = useRef<string | null>(null);
+  const operationControllerRef = useRef(new AbortController());
+  const [cancelProgress, setCancelProgress] = useState('');
+  const [cancelErrors, setCancelErrors] = useState<string[]>([]);
 
   /** Build an ORDFS content URL via the 1sat client. Pass the outpoint through
    *  in its native `txid.vout` form. */
@@ -198,29 +200,23 @@ export const OrdWallet = () => {
   const { addSnackbar, message } = useSnackbar();
   const [ordinals, setOrdinals] = useState<WalletOutput[]>([]);
   const [from, setFrom] = useState<string>();
-  const listedOrdinals = ordinals.filter((o) => o.tags?.includes('ordlock'));
-  const myOrdinals = ordinals.filter((o) => !o.tags?.includes('ordlock'));
+  const listedOrdinals = ordinals.filter(isOrdLockListed);
+  const myOrdinals = ordinals.filter((o) => !isOrdLockListed(o));
   const [useSameAddress, setUseSameAddress] = useState(false);
   const [addresses, setAddresses] = useState<Addresses>({});
   const [addressErrors, setAddressErrors] = useState<Addresses>({});
   const [commonAddress, setCommonAddress] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
-  // ── selection logic (unchanged) ─────────────────────────────────────────────
-
-  // Selection mode: once you start selecting, you're locked to one type.
-  // 'transfer' = selecting unlisted items, 'cancel' = selecting listed items, null = nothing selected.
-  const isListedOrdinal = (o: WalletOutput) => o.tags?.includes('ordlock') ?? false;
-
   // Selection mode: once you start selecting, you're locked to one type.
   // 'transfer' = selecting unlisted items, 'cancel' = selecting listed items, null = nothing selected.
   const selectionMode: 'transfer' | 'cancel' | null =
-    selectedOrdinals.length === 0 ? null : selectedOrdinals.every(isListedOrdinal) ? 'cancel' : 'transfer';
+    selectedOrdinals.length === 0 ? null : selectedOrdinals.every(isOrdLockListed) ? 'cancel' : 'transfer';
 
   const toggleOrdinalSelection = (ord: WalletOutput) => {
     const outpoint = ord.outpoint;
     const isSelected = selectedOrdinals.some((selected) => selected.outpoint === outpoint);
-    const isListing = isListedOrdinal(ord);
+    const isListing = isOrdLockListed(ord);
 
     if (isSelected) {
       setSelectedOrdinals(selectedOrdinals.filter((selected) => selected.outpoint !== outpoint));
@@ -240,7 +236,7 @@ export const OrdWallet = () => {
 
   const isOrdinalDisabled = (ord: WalletOutput): boolean => {
     if (selectionMode === null) return false;
-    const isListing = isListedOrdinal(ord);
+    const isListing = isOrdLockListed(ord);
     if (selectionMode === 'transfer' && isListing) return true;
     if (selectionMode === 'cancel' && !isListing) return true;
     return false;
@@ -255,39 +251,6 @@ export const OrdWallet = () => {
 
   // ── data loading (unchanged) ────────────────────────────────────────────────
 
-  // ORDLOCK transition (OPL-4696): cancel wallet-owned listings once per OrdWallet mount.
-  const maybeAutoCancelOrdLocks = async (outputs: WalletOutput[]) => {
-    if (!apiContext) return;
-    const listed = outputs.filter((o) => o.tags?.includes('ordlock'));
-    if (listed.length === 0) return;
-    if (!ordLockCancelSessionRef.current) {
-      ordLockCancelSessionRef.current = `ord-load-${Date.now()}`;
-    }
-    const res = await cancelOwnedOrdLockListings(apiContext, {
-      outputs: listed,
-      sessionKey: ordLockCancelSessionRef.current,
-    });
-    if (res.cancelled > 0) {
-      addSnackbar(
-        res.cancelled === 1
-          ? 'Cancelled 1 OrdLock listing and recovered the ordinal.'
-          : `Cancelled ${res.cancelled} OrdLock listings and recovered ordinals.`,
-        'success',
-      );
-      try {
-        const { outputs: again } = await listOrdinals.execute(apiContext, { limit: 50, offset: 0 });
-        const filteredAgain = again.filter((o) => {
-          const contentType = getTagValue(o.tags, 'type');
-          return contentType !== 'panda/tag' && contentType !== 'yours/tag';
-        });
-        setOrdinals(filteredAgain);
-        setFrom(again.length.toString());
-      } catch (err) {
-        console.warn('[OrdWallet] post-cancel refresh failed', err);
-      }
-    }
-  };
-
   const loadOrdinals = useCallback(async () => {
     if (!apiContext) return;
     if (ordinals.length === 0) setIsProcessing(true);
@@ -299,17 +262,22 @@ export const OrdWallet = () => {
       return contentType !== 'panda/tag' && contentType !== 'yours/tag';
     });
 
-    setFrom((offset + outputs.length).toString());
+    setFrom(outputs.length > 0 ? (offset + outputs.length).toString() : undefined);
     setOrdinals((prev) => [...prev, ...filtered]);
     setIsProcessing(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiContext, from]);
 
   useEffect(() => {
-    if (isIntersecting && from) {
+    if (isIntersecting && from && !isProcessing) {
       loadOrdinals();
     }
-  }, [isIntersecting, from, loadOrdinals]);
+  }, [isIntersecting, from, loadOrdinals, isProcessing]);
+
+  useEffect(() => {
+    loadOrdinals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiContext]);
 
   useEffect(() => {
     if (!successTxId) return;
@@ -317,19 +285,6 @@ export const OrdWallet = () => {
     setPageState('main');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId, message]);
-
-  useEffect(() => {
-    loadOrdinals();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Once listed OrdLock outputs appear after load, cancel→recover (session-deduped).
-  useEffect(() => {
-    if (ordinals.some((o) => o.tags?.includes('ordlock'))) {
-      void maybeAutoCancelOrdLocks(ordinals);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordinals]);
 
   // ── state helpers (unchanged) ───────────────────────────────────────────────
 
@@ -340,6 +295,8 @@ export const OrdWallet = () => {
     setSelectedOrdinals([]);
     setUseSameAddress(false);
     setCommonAddress('');
+    setCancelErrors([]);
+    setCancelProgress('');
   };
 
   const refreshOrdinals = async () => {
@@ -351,8 +308,7 @@ export const OrdWallet = () => {
     });
 
     setOrdinals(filtered);
-    setFrom(outputs.length.toString());
-    void maybeAutoCancelOrdLocks(filtered);
+    setFrom(outputs.length > 0 ? outputs.length.toString() : undefined);
   };
 
   const requireAssetId = (output: WalletOutput): string | undefined => {
@@ -402,21 +358,23 @@ export const OrdWallet = () => {
     }
   };
 
-  // ORDLOCK_LISTING_DISABLED — restore when the replacement listing contract ships.
   const handleListOrdinal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
-    await sleep(25);
-    addSnackbar(ORDLOCK_LISTING_DISABLED_MESSAGE, 'error');
-    setIsProcessing(false);
-    setPageState('main');
-  };
-
-  const handleCancelListing = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsProcessing(true);
 
     await sleep(25);
+
+    if (Number(bsvListAmount) < 0.00000001) {
+      addSnackbar('Must be more than 1 sat', 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    if (!bsvListAmount) {
+      addSnackbar('You must enter a valid BSV amount!', 'error');
+      setIsProcessing(false);
+      return;
+    }
 
     const id = requireAssetId(selectedOrdinals[0]);
     if (!id) {
@@ -424,17 +382,52 @@ export const OrdWallet = () => {
       return;
     }
 
-    const cancelRes = await cancelOrdinalListing.execute(apiContext, { id });
+    const listRes = await sellOrdinal.execute(apiContext, {
+      id,
+      price: Math.ceil(bsvListAmount * BSV_DECIMAL_CONVERSION),
+    });
 
-    if (!cancelRes.txid || cancelRes.error) {
-      addSnackbar(getErrorMessage(cancelRes.error), 'error');
+    if (!listRes.txid || listRes.error) {
+      addSnackbar(getErrorMessage(listRes.error), 'error');
       setIsProcessing(false);
       return;
     }
 
-    setSuccessTxId(cancelRes.txid);
-    addSnackbar('Successfully canceled the listing!', 'success');
+    setSuccessTxId(listRes.txid);
+    addSnackbar('Listing Successful!', 'success');
     refreshOrdinals();
+  };
+
+  const handleCancelListing = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (isProcessing || selectedOrdinals.length === 0) return;
+    setIsProcessing(true);
+    setCancelErrors([]);
+    try {
+      const res = await cancelOwnedOrdLockListings(apiContext, {
+        outputs: selectedOrdinals,
+        signal: operationControllerRef.current.signal,
+        onProgress: ({ attempted, skipped, total }) =>
+          setCancelProgress(`Cancelling listings: ${attempted + skipped} of ${total}`),
+      });
+      if (operationControllerRef.current.signal.aborted) return;
+      const cancelled = new Set(res.cancelledOutpoints);
+      setSelectedOrdinals((selected) => selected.filter((output) => !cancelled.has(output.outpoint)));
+      setCancelErrors(res.errors);
+      if (res.cancelled > 0) addSnackbar(`Cancelled ${res.cancelled} listing(s).`, 'success');
+      await refreshOrdinals().catch((err) => {
+        addSnackbar(err instanceof Error ? err.message : 'Unable to refresh listings.', 'error');
+      });
+      if (res.errors.length === 0) {
+        resetSendState();
+        setPageState('main');
+      }
+    } catch (err) {
+      addSnackbar(err instanceof Error ? err.message : 'Unable to refresh listings.', 'error');
+    } finally {
+      setIsProcessing(false);
+      setCancelProgress('');
+    }
   };
 
   const handleAddressChange = useCallback((outpoint: string, address: string) => {
@@ -483,8 +476,8 @@ export const OrdWallet = () => {
       const contentType = getTagValue(output.tags, 'type');
       return contentType !== 'application/bsv-20';
     });
-    if (activeFilter === 'listings') return base.filter((o) => o.tags?.includes('ordlock'));
-    if (activeFilter === 'ordinals') return base.filter((o) => !o.tags?.includes('ordlock'));
+    if (activeFilter === 'listings') return base.filter(isOrdLockListed);
+    if (activeFilter === 'ordinals') return base.filter((o) => !isOrdLockListed(o));
     return base;
   })();
 
@@ -661,21 +654,22 @@ export const OrdWallet = () => {
                   )}
                 </motion.button>
 
-                {/* ORDLOCK_LISTING_DISABLED — restore List UI when replacement contract ships. */}
                 {selectedOrdinals.length === 1 && (
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={() => {
-                      addSnackbar(ORDLOCK_LISTING_DISABLED_MESSAGE, 'info');
+                      if (!selectedOrdinals.length) {
+                        addSnackbar('You must select an ordinal to list!', 'info');
+                        return;
+                      }
+                      setPageState('list');
                     }}
                     className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm"
                     style={{
                       background: '#17191E',
-                      color: '#98A2B3',
+                      color: '#FFFFFF',
                       border: '1px solid rgba(255,255,255,0.08)',
-                      opacity: 0.7,
                     }}
-                    title={ORDLOCK_LISTING_DISABLED_MESSAGE}
                   >
                     <Tag size={14} />
                     List
@@ -929,12 +923,6 @@ export const OrdWallet = () => {
       />
 
       <form noValidate onSubmit={handleListOrdinal} className="flex flex-col flex-1 overflow-hidden">
-        {/* ORDLOCK_LISTING_DISABLED */}
-        <div className="px-4 pb-2">
-          <p className="text-xs" style={{ color: '#E5A920' }}>
-            {ORDLOCK_LISTING_DISABLED_MESSAGE}
-          </p>
-        </div>
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-4">
           {/* Ordinal preview */}
@@ -1001,20 +989,18 @@ export const OrdWallet = () => {
 
         {/* Sticky submit — pb clears the absolute BottomMenu (3.75rem) plus breathing room */}
         <div className="px-4 pt-2 pb-20" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          {/* ORDLOCK_LISTING_DISABLED */}
           <motion.button
             type="submit"
-            disabled
+            disabled={isProcessing}
+            whileTap={{ scale: 0.97 }}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm"
             style={{
-              background: 'rgba(161,255,139,0.25)',
+              background: isProcessing ? 'rgba(161,255,139,0.4)' : 'linear-gradient(135deg, #A1FF8B, #34D399)',
               color: '#010101',
-              cursor: 'not-allowed',
             }}
-            title={ORDLOCK_LISTING_DISABLED_MESSAGE}
           >
             <Tag size={15} />
-            Listing Disabled
+            List Now
           </motion.button>
         </div>
       </form>
@@ -1024,8 +1010,6 @@ export const OrdWallet = () => {
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER — Cancel Listing Flow
   // ═══════════════════════════════════════════════════════════════════════════
-
-  const cancelOriginOutpoint = getTagValue(selectedOrdinals[0]?.tags, 'origin');
 
   const cancelView = (
     <motion.div
@@ -1038,7 +1022,7 @@ export const OrdWallet = () => {
       style={{ height: '100%' }}
     >
       <FlowHeader
-        title="Cancel Listing"
+        title={selectedOrdinals.length > 1 ? `Cancel ${selectedOrdinals.length} Listings` : 'Cancel Listing'}
         onBack={() => {
           setPageState('main');
           resetSendState();
@@ -1048,33 +1032,43 @@ export const OrdWallet = () => {
       <form noValidate onSubmit={handleCancelListing} className="flex flex-col flex-1 overflow-hidden">
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-4">
-          {/* Ordinal preview */}
-          <div
-            className="flex items-center gap-4 p-4 rounded-2xl"
-            style={{ background: '#17191E', border: '1px solid rgba(255,255,255,0.06)' }}
-          >
-            <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
-              <Ordinal
-                theme={theme}
-                output={selectedOrdinals[0]}
-                url={`${getContentUrl(cancelOriginOutpoint || '')}?outpoint=${selectedOrdinals[0]?.outpoint}`}
-                selected
-                isTransfer
-                size="4rem"
-              />
+          {selectedOrdinals.map((output) => (
+            <div
+              key={output.outpoint}
+              className="flex items-center gap-4 p-4 mb-2 rounded-2xl"
+              style={{ background: '#17191E', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
+                <Ordinal
+                  theme={theme}
+                  output={output}
+                  url={`${getContentUrl(getTagValue(output.tags, 'origin') || '')}?outpoint=${output.outpoint}`}
+                  selected
+                  isTransfer
+                  size="4rem"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs mb-0.5" style={{ color: '#98A2B3' }}>
+                  Listed ordinal
+                </p>
+                <p className="text-sm font-semibold text-white truncate">{getOutputName(output, 'Ordinal')}</p>
+                <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
+                  This will cancel your listing
+                </p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs mb-0.5" style={{ color: '#98A2B3' }}>
-                Listed ordinal
-              </p>
-              <p className="text-sm font-semibold text-white truncate">
-                {selectedOrdinals[0] ? getOutputName(selectedOrdinals[0], 'Ordinal') : 'Ordinal'}
-              </p>
-              <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
-                This will cancel your listing
-              </p>
+          ))}
+          {cancelErrors.length > 0 && (
+            <div role="alert" className="text-xs my-3" style={{ color: '#ef4444' }}>
+              <p>These listings could not be cancelled. Retry the remaining selection.</p>
+              {cancelErrors.map((error, index) => (
+                <p key={index} className="break-all mt-1">
+                  {error}
+                </p>
+              ))}
             </div>
-          </div>
+          )}
         </div>
 
         {/* Sticky footer — pb clears the absolute BottomMenu (3.75rem) plus breathing room */}
@@ -1084,7 +1078,7 @@ export const OrdWallet = () => {
         >
           <motion.button
             type="submit"
-            disabled={isProcessing}
+            disabled={isProcessing || selectedOrdinals.length === 0}
             whileTap={{ scale: 0.97 }}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm"
             style={{
@@ -1094,7 +1088,7 @@ export const OrdWallet = () => {
             }}
           >
             <X size={15} />
-            Cancel Listing
+            {selectedOrdinals.length > 1 ? `Cancel ${selectedOrdinals.length} Listings` : 'Cancel Listing'}
           </motion.button>
 
           <motion.button
@@ -1112,7 +1106,7 @@ export const OrdWallet = () => {
               border: '1px solid rgba(255,255,255,0.06)',
             }}
           >
-            Keep Listing
+            {selectedOrdinals.length > 1 ? 'Keep Listings' : 'Keep Listing'}
           </motion.button>
         </div>
       </form>
@@ -1132,7 +1126,7 @@ export const OrdWallet = () => {
 
       {/* Processing overlays */}
       <Show when={isProcessing && pageState === 'main'}>
-        <PageLoader theme={theme} message="Loading ordinals..." />
+        <PageLoader theme={theme} message={cancelProgress || 'Loading ordinals...'} />
       </Show>
       <Show when={isProcessing && pageState === 'transfer'}>
         <PageLoader theme={theme} message="Transferring ordinal..." />
@@ -1141,7 +1135,7 @@ export const OrdWallet = () => {
         <PageLoader theme={theme} message="Listing ordinal..." />
       </Show>
       <Show when={isProcessing && pageState === 'cancel'}>
-        <PageLoader theme={theme} message="Cancelling listing..." />
+        <PageLoader theme={theme} message={cancelProgress || 'Cancelling listings...'} />
       </Show>
 
       {/* Page content — animated transitions */}
