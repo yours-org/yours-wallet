@@ -56,6 +56,26 @@ export const findStaleAccounts = (accounts: Record<string, Account>, expectedEpo
     .filter(([, a]) => a?.encryptedKeys && (a.keyEpoch ?? 0) !== expectedEpoch)
     .map(([id]) => id);
 
+/**
+ * Overlay repaired accounts onto a freshly read map. Keeps accounts added
+ * since the snapshot, does not resurrect ones that were removed, and skips
+ * any id already on `expectedEpoch` (a concurrent writer already moved it).
+ */
+export const mergeRepairedAccounts = (
+  latest: Record<string, Account>,
+  repaired: Record<string, Account>,
+  expectedEpoch: number,
+): Record<string, Account> => {
+  const out: Record<string, Account> = { ...latest };
+  for (const [id, account] of Object.entries(repaired)) {
+    if (!(id in latest)) continue;
+    const current = latest[id];
+    if (current?.encryptedKeys && (current.keyEpoch ?? 0) === expectedEpoch) continue;
+    out[id] = account;
+  }
+  return out;
+};
+
 /** True when every account decrypts under `passKey`. Used for read-back verification. */
 export const allAccountsDecrypt = async (accounts: Record<string, Account>, passKey: string): Promise<boolean> => {
   for (const account of Object.values(accounts)) {

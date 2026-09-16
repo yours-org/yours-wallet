@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { allAccountsDecrypt, findStaleAccounts, rekeyAccounts } from './usbRekey';
+import { allAccountsDecrypt, findStaleAccounts, mergeRepairedAccounts, rekeyAccounts } from './usbRekey';
 import { decrypt, deriveKey, encrypt } from '../utils/crypto';
 import type { Account } from './types/chromeStorage.types';
 
@@ -54,6 +54,20 @@ describe('findStaleAccounts / allAccountsDecrypt', () => {
     };
     expect(findStaleAccounts(accounts, 2).sort()).toEqual(['legacy', 'stale']);
     expect(findStaleAccounts(accounts, 0)).toEqual(['fresh', 'stale']);
+  });
+
+  test('mergeRepairedAccounts keeps concurrent adds, skips already-current and removed', async () => {
+    const key = deriveKey('pw', 'salt');
+    const stale = await account(key, { keyEpoch: 1, name: 'stale' });
+    const repaired = await account(key, { keyEpoch: 2, name: 'repaired' });
+    const added = await account(key, { keyEpoch: 2, name: 'added' });
+    const already = await account(key, { keyEpoch: 2, name: 'already' });
+    const latest = { stale, already, added };
+    const out = mergeRepairedAccounts(latest, { stale: repaired, already, gone: repaired }, 2);
+    expect(out.stale.name).toBe('repaired');
+    expect(out.already.name).toBe('already');
+    expect(out.added.name).toBe('added');
+    expect(out.gone).toBeUndefined();
   });
 
   test('allAccountsDecrypt is true only when every blob opens', async () => {

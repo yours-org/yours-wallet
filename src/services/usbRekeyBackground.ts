@@ -12,13 +12,19 @@
  *   2. write keyRekey marker        7. read back: every account on the new epoch
  *   3. rekeyAccounts (pure)            and decryptable; repair any straggler from
  *   4. wrap the old passKey             keyRecovery; then delete keyRecovery
- *   5. one atomic set
+ *   5. one atomic set (marker stays until 7)
  */
 import { decrypt, encrypt } from '../utils/crypto';
 import { combinePassKey, verifyMasterCheck } from '../utils/usbCrypto';
 import type { ChromeStorageService } from './ChromeStorage.service';
 import type { Account, ChromeStorageObject, UsbSecurity } from './types/chromeStorage.types';
-import { allAccountsDecrypt, findStaleAccounts, rekeyAccounts, validateUsbSecurity } from './usbRekey';
+import {
+  allAccountsDecrypt,
+  findStaleAccounts,
+  mergeRepairedAccounts,
+  rekeyAccounts,
+  validateUsbSecurity,
+} from './usbRekey';
 
 export interface UsbRekeyRequest {
   /** PBKDF2(password, salt), hex. Proves the password: combined with the current master it must equal the session key. */
@@ -132,18 +138,18 @@ const run = async (
     const wrappedPreviousPassKey = await encrypt(oldPassKey, newPassKey);
 
     // 5. One write. `accounts` is the complete, verified object: no merge.
-    // Removals ride in the same set as nulls, so a worker killed right after
-    // this line still leaves storage self-consistent: new blobs, new epoch,
-    // new (or no) USB settings, and no in-progress marker. Readers treat
-    // null as absent. The remove below is only tidying.
+    // Removals ride in the same set as nulls. Leave `keyRekey` set until
+    // read-back finishes so account writers stay refused; a worker killed
+    // here still has new blobs, new epoch, and the marker, and the next
+    // unlock's repair clears it. Readers treat null as absent. The remove
+    // below is only tidying `usbSecurity` on disable.
     await storage.replaceTopLevel({
       accounts: rekeyed,
       keyEpoch: toEpoch,
       keyRecovery: { toEpoch, wrappedPreviousPassKey },
       usbSecurity: req.usbSecurity ?? null,
-      keyRekey: null,
     });
-    await rawRemove(['keyRekey', ...(req.usbSecurity ? [] : ['usbSecurity'])]).catch(() => {});
+    if (!req.usbSecurity) await rawRemove(['usbSecurity']).catch(() => {});
 
     // 6. Session. Every context's cache follows via storage.onChanged. Not
     // if the wallet locked meanwhile: storage is re-keyed either way, but a
@@ -163,9 +169,11 @@ const run = async (
     await storage.getAndSetStorage();
     return { success: true, epoch: toEpoch, accounts: count, relocked };
   } catch (err) {
-    // Nothing after the marker was committed unless step 5 completed, in
-    // which case keyRecovery exists and the next unlock finishes the job.
-    await rawRemove(['keyRekey']).catch(() => {});
+    // If the commit landed, leave the marker so the next unlock's repair
+    // still blocks writers. If it did not, drop the marker so we are not
+    // stuck refusing every account write.
+    const after = await rawGet(['keyRecovery']).catch(() => ({}) as { keyRecovery?: unknown });
+    if (!after.keyRecovery) await rawRemove(['keyRekey']).catch(() => {});
     await storage.getAndSetStorage();
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -200,10 +208,7 @@ export const repairStaleAccounts = async (storage: ChromeStorageService): Promis
   if (state.keyRekey && !state.keyRecovery) {
     // Crashed before the commit: nothing was rewritten. Clear the marker.
     await rawRemove(['keyRekey']);
-  } else if (state.keyRekey && state.keyRecovery && state.keyRekey.toEpoch === epoch) {
-    // The commit landed (epoch advanced) but the marker survived: clear it so
-    // account writers and future re-keys are not blocked forever.
-    await rawRemove(['keyRekey']);
+    return;
   }
   if (!state.keyRecovery) return;
 
@@ -219,7 +224,8 @@ export const repairStaleAccounts = async (storage: ChromeStorageService): Promis
     const subset: Record<string, Account> = {};
     for (const id of stale) subset[id] = accounts[id];
     const { accounts: repaired } = await rekeyAccounts(subset, previousPassKey, passKey, epoch);
-    await storage.replaceTopLevel({ accounts: { ...accounts, ...repaired } });
+    const latest = (await rawGet(['accounts'])).accounts ?? {};
+    await storage.replaceTopLevel({ accounts: mergeRepairedAccounts(latest, repaired, epoch) });
     console.log(`[usbRekey] repaired ${stale.length} account(s) onto epoch ${epoch}`);
   }
 
