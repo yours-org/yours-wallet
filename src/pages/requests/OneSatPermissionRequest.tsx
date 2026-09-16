@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { OneSatPermissionPrompt } from '@1sat/permission-module-ui';
 import { useBottomMenu } from '../../hooks/useBottomMenu';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { useTheme } from '../../hooks/useTheme';
 import { sendMessage } from '../../utils/chromeHelpers';
 import type { OneSatPromptStorageEntry } from '../../services/oneSatPrompt';
+import { confirmUsbForApproval } from '../../services/usbPresence';
 
 export type OneSatPermissionRequestProps = {
   request: OneSatPromptStorageEntry;
@@ -22,7 +23,7 @@ export const OneSatPermissionRequestPage = ({ request, onResponse }: OneSatPermi
   // Live verification runs here rather than in the background module: the
   // request reaches this page through chrome.storage, so it can only carry
   // data. The prompt does its own lookups with the wallet's own services.
-  const { apiContext } = useServiceContext();
+  const { apiContext, chromeStorageService } = useServiceContext();
   const services = apiContext?.services;
 
   useEffect(() => {
@@ -30,7 +31,22 @@ export const OneSatPermissionRequestPage = ({ request, onResponse }: OneSatPermi
     hideMenu();
   }, [handleSelect, hideMenu]);
 
-  const respond = (approved: boolean) => {
+  const [usbError, setUsbError] = useState('');
+  const inFlight = useRef(false);
+
+  const respond = async (approved: boolean) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    if (approved) {
+      setUsbError('');
+      const usb = await confirmUsbForApproval(chromeStorageService);
+      if (!usb.ok) {
+        setUsbError(usb.message);
+        inFlight.current = false; // refused: let the user try again once the key is in
+        return;
+      }
+    }
+    // A sent response ends this page, so the guard stays set.
     sendMessage({
       action: 'ONE_SAT_PERMISSION_RESPONSE',
       requestID: request.requestID,
@@ -53,14 +69,20 @@ export const OneSatPermissionRequestPage = ({ request, onResponse }: OneSatPermi
         height: '100%',
         overflowY: 'auto',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'stretch',
         justifyContent: 'center',
       }}
     >
+      {usbError && (
+        <p className="text-xs text-center m-0 pt-2" style={{ color: '#ef4444' }}>
+          {usbError}
+        </p>
+      )}
       <OneSatPermissionPrompt
         request={request.request}
-        onApprove={() => respond(true)}
-        onReject={() => respond(false)}
+        onApprove={() => void respond(true)}
+        onReject={() => void respond(false)}
         theme={themeProp}
         services={services}
       />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Minus,
+  Usb,
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -38,7 +39,16 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
 import { FEE_PER_KB } from '../utils/constants';
-import { ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { ChromeStorageObject, UsbBackupAccountStatus, UsbSecurity } from '../services/types/chromeStorage.types';
+import {
+  deleteHandle,
+  getHandle,
+  isUsbSupported,
+  listPresentSticks,
+  openUsbWindow,
+  queryHandlePermission,
+  requestHandlePermission,
+} from '../services/UsbKey.service';
 import { AvatarPicker } from '../components/AvatarPicker';
 import { CreateAccount } from './onboarding/CreateAccount';
 import { RestoreAccount } from './onboarding/RestoreAccount';
@@ -50,6 +60,18 @@ import { StorageStatus } from './StorageStatus';
 import { YoursIcon } from '../components/YoursIcon';
 import activeCircle from '../assets/active-circle.png';
 import ProgressBar from '@ramonak/react-progress-bar';
+
+import { derivePasswordKey } from '../services/passKey';
+import { ToggleSwitch } from '../components/ToggleSwitch';
+import {
+  runUsbBackup,
+  summariseUsbBackup,
+  USB_BACKUP_WARN_BYTES,
+  usbBackupEnabled,
+  usbBackupTotalBytes,
+  wipePendingUsbBackups,
+  wipeUsbBackup,
+} from '../services/usbBackup';
 
 export type SettingsPage =
   | 'main'
@@ -63,7 +85,8 @@ export type SettingsPage =
   | 'export-keys-options'
   | 'export-keys-qr'
   | 'storage'
-  | 'permissions';
+  | 'permissions'
+  | 'usb-security';
 
 type DecisionType =
   | 'sign-out'
@@ -72,7 +95,9 @@ type DecisionType =
   | 'export-keys-qr-code'
   | 'delete-account'
   | 'inscribe-avatar'
-  | 'save-profile';
+  | 'save-profile'
+  | 'remove-usb-stick'
+  | 'disable-usb-backup';
 
 // --- Animation variants ---
 const pageVariants = {
@@ -95,7 +120,7 @@ const rowVariant = {
 type SettingRowProps = {
   icon: React.ReactNode;
   label: string;
-  description?: string;
+  description?: React.ReactNode;
   right?: React.ReactNode;
   onClick?: () => void;
   isFirst?: boolean;
@@ -139,6 +164,17 @@ const SettingRow = ({ icon, label, description, right, onClick, isFirst, isLast,
 };
 
 const Divider = () => <div className="h-px mx-4" style={{ backgroundColor: 'rgba(152,162,179,0.1)' }} />;
+
+const formatBackupFreshness = (iso?: string): string => {
+  if (!iso) return 'Never backed up';
+  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (min < 1) return 'Backed up just now';
+  if (min < 60) return `Backed up ${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `Backed up ${hr} hr ago`;
+  const days = Math.floor(hr / 24);
+  return `Backed up ${days} day${days === 1 ? '' : 's'} ago`;
+};
 
 type SectionProps = {
   title: string;
@@ -214,6 +250,8 @@ export const Settings = () => {
   const { query, handleSelect } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { chromeStorageService, keysService, lockWallet, wallet, apiContext } = useServiceContext();
+  // The USB Security Key page is reachable from two places; back returns to whichever opened it.
+  const [usbBackTo, setUsbBackTo] = useState<SettingsPage>('main');
   const [page, setPage] = useState<SettingsPage>(() => {
     if (query === 'manage-accounts') return 'manage-accounts';
     if (query === 'create-account') return 'create-account';
@@ -252,6 +290,170 @@ export const Settings = () => {
   const [customFeeRate, setCustomFeeRate] = useState(currentAccount.account?.settings.customFeeRate ?? FEE_PER_KB);
   const [lockTimeout, setLockTimeout] = useState(currentAccount.account?.settings.lockTimeout ?? 10);
   const [selectedAccountIdentityAddress, setSelectedAccountIdentityAddress] = useState<string | undefined>();
+
+  // --- USB key security ---
+  const usbSupported = isUsbSupported();
+  const [usbSecurity, setUsbSecurity] = useState<UsbSecurity | undefined>(() => chromeStorageService.getUsbSecurity());
+  const [presentSticks, setPresentSticks] = useState<string[]>([]);
+  const [uncheckedSticks, setUncheckedSticks] = useState<string[]>([]);
+  const [pendingRemoveStickId, setPendingRemoveStickId] = useState<string | undefined>();
+  const usbProbing = useRef(false);
+  // --- USB backup (OPL-4685) ---
+  const [usbBackupStatus, setUsbBackupStatus] = useState<Record<string, UsbBackupAccountStatus> | undefined>(
+    () => chromeStorageService.storage?.usbBackupStatus,
+  );
+  const [usbBackingUp, setUsbBackingUp] = useState(false);
+  const usbBackupOn = usbBackupEnabled(usbSecurity);
+  const usbBackupSummary = summariseUsbBackup(usbSecurity, usbBackupStatus);
+  const usbBackupOverdue = usbBackupOn && usbBackupSummary.some((s) => s.stale);
+  const usbBackupBytes = usbBackupTotalBytes(usbBackupStatus);
+  const usbBackupLarge = usbBackupOn && usbBackupBytes >= USB_BACKUP_WARN_BYTES;
+
+  const refreshUsbSecurity = useCallback(async () => {
+    await chromeStorageService.getAndSetStorage();
+    const latest = chromeStorageService.getUsbSecurity();
+    setUsbSecurity(latest);
+    setUsbBackupStatus(chromeStorageService.storage?.usbBackupStatus);
+    if (!latest?.enabled || usbProbing.current) {
+      if (!latest?.enabled) {
+        setPresentSticks([]);
+        setUncheckedSticks([]);
+      }
+      return;
+    }
+    usbProbing.current = true;
+    try {
+      const { present, needPermission } = await listPresentSticks(latest);
+      setPresentSticks(present);
+      setUncheckedSticks(needPermission);
+    } catch {
+      setPresentSticks([]);
+      setUncheckedSticks([]);
+    } finally {
+      usbProbing.current = false;
+    }
+  }, [chromeStorageService]);
+
+  // The USB window writes usbSecurity from another context: follow storage
+  // changes and window focus so this page never shows a stale list.
+  useEffect(() => {
+    if (!usbSupported) return;
+    const onChanged = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
+      if (area === 'local' && ('usbSecurity' in changes || 'usbBackupStatus' in changes)) void refreshUsbSecurity();
+    };
+    const onFocus = () => void refreshUsbSecurity();
+    chrome.storage.onChanged.addListener(onChanged);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      chrome.storage.onChanged.removeListener(onChanged);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [usbSupported, refreshUsbSecurity]);
+
+  // Keep the "Inserted" badge live while the USB page is open.
+  useEffect(() => {
+    if (page !== 'usb-security' || !usbSupported) return;
+    void refreshUsbSecurity();
+    const timer = window.setInterval(() => void refreshUsbSecurity(), 2000);
+    return () => window.clearInterval(timer);
+  }, [page, usbSupported, refreshUsbSecurity]);
+
+  const handleRemoveUsbStickIntent = (stickId: string) => {
+    if (!usbSecurity) return;
+    if (usbSecurity.sticks.length <= 1) {
+      addSnackbar('Add another key first, or turn the USB security key off', 'error');
+      return;
+    }
+    const label = usbSecurity.sticks.find((s) => s.id === stickId)?.label ?? 'this key';
+    setPendingRemoveStickId(stickId);
+    setSpeedBumpMessage(
+      `Remove "${label}"? It will no longer unlock this wallet. Its backup copy is erased now if the key is inserted; otherwise it stays on the drive.`,
+    );
+    setDecisionType('remove-usb-stick');
+    setShowSpeedBump(true);
+  };
+
+  const handleRemoveUsbStick = async () => {
+    const usb = chromeStorageService.getUsbSecurity();
+    const id = pendingRemoveStickId;
+    setPendingRemoveStickId(undefined);
+    if (!usb || !id || usb.sticks.length <= 1) return;
+    try {
+      await chromeStorageService.updateUsbSecurity((current) => {
+        if (current.sticks.length <= 1) throw new Error('Add another key first, or turn the USB security key off');
+        return { ...current, sticks: current.sticks.filter((s) => s.id !== id) };
+      });
+    } catch (err) {
+      addSnackbar(err instanceof Error ? err.message : 'Could not remove the USB key', 'error');
+      return;
+    }
+    // The encrypted wallet copy should not outlive the key's registration
+    // when the drive is here to erase it from.
+    const handle = await getHandle(id);
+    const wiped = !!handle && (await queryHandlePermission(handle)) === 'granted' && (await wipeUsbBackup(handle));
+    await deleteHandle(id);
+    addSnackbar(wiped === 'removed' ? 'USB key removed and its backup erased' : 'USB key removed', 'success');
+    await refreshUsbSecurity();
+  };
+
+  const handleUsbBackupNow = async () => {
+    if (usbBackingUp) return;
+    if (presentSticks.length === 0) {
+      addSnackbar('Insert a registered USB key first', 'error');
+      return;
+    }
+    setUsbBackingUp(true);
+    let result: Awaited<ReturnType<typeof runUsbBackup>>;
+    try {
+      result = await runUsbBackup(chromeStorageService);
+    } finally {
+      setUsbBackingUp(false);
+    }
+    await refreshUsbSecurity();
+    if (!result.ran) addSnackbar('No USB key could be read', 'error');
+    else if (result.errors.length > 0) addSnackbar(`USB backup failed: ${result.errors[0]}`, 'error');
+    else addSnackbar(result.changed ? 'USB backup updated' : 'USB backup up to date', 'success');
+  };
+
+  const handleToggleUsbBackup = async () => {
+    if (usbBackupOn) {
+      setSpeedBumpMessage(
+        'Turn off USB backup? The encrypted wallet copy is erased from your USB keys: inserted keys now, others the next time they are inserted while the wallet is open.',
+      );
+      setDecisionType('disable-usb-backup');
+      setShowSpeedBump(true);
+      return;
+    }
+    try {
+      await chromeStorageService.updateUsbSecurity((current) => ({ ...current, backup: { enabled: true } }));
+    } catch (err) {
+      addSnackbar(err instanceof Error ? err.message : 'Could not update USB backup', 'error');
+      return;
+    }
+    await refreshUsbSecurity();
+  };
+
+  const handleDisableUsbBackup = async () => {
+    try {
+      await chromeStorageService.updateUsbSecurity((current) => ({
+        ...current,
+        backup: { enabled: false, wipeAt: new Date().toISOString() },
+      }));
+      // Inserted keys are erased right away; the rest as they turn up.
+      await wipePendingUsbBackups(chromeStorageService);
+    } catch (err) {
+      addSnackbar(err instanceof Error ? err.message : 'Could not turn off USB backup', 'error');
+      return;
+    }
+    await refreshUsbSecurity();
+    const usb = chromeStorageService.getUsbSecurity();
+    const wipeAt = usb?.backup?.wipeAt ?? '';
+    const remaining = usb?.sticks.filter((s) => !s.backupWipedAt || s.backupWipedAt < wipeAt).length ?? 0;
+    addSnackbar(
+      remaining > 0 ? `USB backup off. ${remaining} key(s) will be erased when inserted` : 'USB backup off and erased',
+      'success',
+    );
+  };
 
   // React to query deep-links (e.g. clicking "+ Add New Account" in the TopNav
   // wallet switcher while already on the Settings page).
@@ -496,6 +698,7 @@ export const Settings = () => {
 
   const handleCancel = () => {
     setShowSpeedBump(false);
+    setPendingRemoveStickId(undefined);
     if (decisionType === 'inscribe-avatar') {
       setAvatarPreview(null);
       setPendingAvatar(null);
@@ -519,7 +722,7 @@ export const Settings = () => {
         addSnackbar('Invalid password!', 'error');
         return;
       }
-      handleMasterBackup();
+      handleMasterBackup(password);
       setDecisionType(undefined);
       setShowSpeedBump(false);
     }
@@ -542,6 +745,16 @@ export const Settings = () => {
       handleSaveProfile();
       setDecisionType(undefined);
       setShowSpeedBump(false);
+    }
+    if (decisionType === 'remove-usb-stick') {
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+      await handleRemoveUsbStick();
+    }
+    if (decisionType === 'disable-usb-backup') {
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+      await handleDisableUsbBackup();
     }
   };
 
@@ -590,7 +803,11 @@ export const Settings = () => {
     await chromeStorageService.updateNested(key, update);
   }, [lockTimeout, chromeStorageService, addSnackbar]);
 
-  const handleMasterBackup = async () => {
+  const handleMasterBackup = async (password?: string) => {
+    // Derive here: runtime messages fan out to every open extension page, so
+    // the plaintext password never leaves this one. The worker only needs the key.
+    const { salt } = chromeStorageService.getCurrentAccountObject();
+    const passwordKey = password && salt ? derivePasswordKey(password, salt) : undefined;
     // Populate overlay with all accounts
     const allAccounts = chromeStorageService.getAllAccounts();
     setBackupAccounts(allAccounts.map((a) => ({ name: a.name, icon: a.icon || '', status: 'pending' })));
@@ -601,25 +818,31 @@ export const Settings = () => {
     setMasterBackupEventText('Preparing backup...');
 
     try {
-      await streamDataToZip(chromeStorageService, (e: MasterBackupProgressEvent) => {
-        setMasterBackupEventText(e.message);
-        const progress = e.endValue && e.value ? Math.ceil((e.value / e.endValue) * 100) : 0;
-        setMasterBackupProgress(progress);
+      await streamDataToZip(
+        chromeStorageService,
+        (e: MasterBackupProgressEvent) => {
+          setMasterBackupEventText(e.message);
+          const progress = e.endValue && e.value ? Math.ceil((e.value / e.endValue) * 100) : 0;
+          setMasterBackupProgress(progress);
 
-        // Update per-account status based on accountIndex
-        if (e.accountIndex !== undefined && e.totalAccounts !== undefined) {
-          setBackupAccounts((prev) =>
-            prev.map((a, i) => ({
-              ...a,
-              status: i < e.accountIndex! ? 'done' : i === e.accountIndex! ? 'active' : 'pending',
-            })),
-          );
-        }
+          // Update per-account status based on accountIndex
+          if (e.accountIndex !== undefined && e.totalAccounts !== undefined) {
+            setBackupAccounts((prev) =>
+              prev.map((a, i) => ({
+                ...a,
+                status: i < e.accountIndex! ? 'done' : i === e.accountIndex! ? 'active' : 'pending',
+              })),
+            );
+          }
 
-        if (e.stage === 'complete') {
-          setBackupAccounts((prev) => prev.map((a) => ({ ...a, status: 'done' })));
-        }
-      });
+          if (e.stage === 'complete') {
+            setBackupAccounts((prev) => prev.map((a) => ({ ...a, status: 'done' })));
+          }
+        },
+        passwordKey,
+      );
+      // USB key security enrolment requires a fresh backup this session.
+      await chrome.storage.session.set({ usbBackupConfirmedAt: Date.now() });
       setBackupDone(true);
       setMasterBackupEventText('Backup complete! File downloaded.');
       setMasterBackupProgress(100);
@@ -683,8 +906,35 @@ export const Settings = () => {
           description="Backup seed, download JSON, or QR code"
           onClick={() => setPage('export-keys-options')}
           isFirst
-          isLast
+          isLast={!usbSupported}
         />
+        {usbSupported && (
+          <>
+            <Divider />
+            <SettingRow
+              icon={<Usb size={16} />}
+              label="USB Security Key"
+              description={
+                usbSecurity?.enabled
+                  ? `${usbSecurity.sticks.length} key${usbSecurity.sticks.length === 1 ? '' : 's'} registered${usbBackupOverdue ? ' · backup overdue' : ''}`
+                  : 'Two-factor unlock with any USB drive'
+              }
+              right={
+                usbBackupOverdue ? (
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle size={14} style={{ color: '#FBBF24' }} />
+                    <ChevronRight size={16} color="#98A2B3" />
+                  </div>
+                ) : undefined
+              }
+              onClick={() => {
+                setUsbBackTo('main');
+                setPage('usb-security');
+              }}
+              isLast
+            />
+          </>
+        )}
       </Section>
 
       {/* Preferences section */}
@@ -906,6 +1156,34 @@ export const Settings = () => {
               isFirst
             />
           </motion.div>
+          {usbSupported && (
+            <>
+              <Divider />
+              <SettingRow
+                icon={<Usb size={16} />}
+                label="USB Security Key"
+                description={
+                  usbSecurity?.enabled
+                    ? usbBackupOn
+                      ? `Encrypted copy kept on ${usbSecurity.sticks.length} key${usbSecurity.sticks.length === 1 ? '' : 's'}${usbBackupOverdue ? ' · backup overdue' : ''}`
+                      : 'USB backup is off'
+                    : 'Two-factor unlock with an encrypted copy on each key'
+                }
+                right={
+                  usbBackupOverdue ? (
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle size={14} style={{ color: '#FBBF24' }} />
+                      <ChevronRight size={16} color="#98A2B3" />
+                    </div>
+                  ) : undefined
+                }
+                onClick={() => {
+                  setUsbBackTo('export-keys-options');
+                  setPage('usb-security');
+                }}
+              />
+            </>
+          )}
           <Divider />
           <SettingRow
             icon={<Download size={16} />}
@@ -1154,6 +1432,213 @@ export const Settings = () => {
     </motion.div>
   );
 
+  const usbSecurityPage = (
+    <motion.div
+      key="usb-security"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-24"
+    >
+      <SubPageHeader title="USB Security Key" onBack={() => setPage(usbBackTo)} />
+      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-4">
+        {!usbSecurity?.enabled ? (
+          <>
+            <motion.div
+              variants={rowVariant}
+              className="rounded-xl p-4"
+              style={{
+                background: 'linear-gradient(135deg, rgba(161,255,139,0.08), rgba(52,211,153,0.04))',
+                border: '1px solid rgba(161,255,139,0.15)',
+              }}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: 'rgba(161,255,139,0.12)' }}
+                >
+                  <Usb size={18} color="#A1FF8B" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: '#FFFFFF' }}>
+                    USB security key
+                  </p>
+                  <p className="text-[10px] mt-0.5" style={{ color: '#98A2B3' }}>
+                    Two-factor unlock: your password plus a USB drive
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: '#98A2B3' }}>
+                Any USB drive works. Unlocking needs it plugged in, so your password alone is never enough. You get a
+                recovery code in case the drive is lost.
+              </p>
+            </motion.div>
+
+            <motion.div
+              variants={rowVariant}
+              className="flex items-start gap-2 rounded-xl px-4 py-3"
+              style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}
+            >
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" style={{ color: '#FBBF24' }} />
+              <p className="text-xs leading-snug" style={{ color: '#FBBF24' }}>
+                Make a master backup first.
+              </p>
+            </motion.div>
+
+            <motion.div variants={rowVariant} className="flex flex-col items-center gap-2">
+              <Button theme={theme} type="primary" label="Turn on" onClick={() => void openUsbWindow('enroll')} />
+              <Button
+                theme={theme}
+                type="secondary-outline"
+                label="Make a backup first"
+                onClick={() => setPage('export-keys-options')}
+              />
+            </motion.div>
+          </>
+        ) : (
+          <>
+            <Section title="Registered keys">
+              {usbSecurity.sticks.map((stick, i) => {
+                const inserted = presentSticks.includes(stick.id);
+                const unchecked = uncheckedSticks.includes(stick.id);
+                const backup = usbBackupSummary.find((s) => s.stickId === stick.id);
+                // Needs a user gesture: one Chrome bubble for this one handle.
+                const checkStick = async () => {
+                  const handle = await getHandle(stick.id);
+                  if (handle) await requestHandlePermission(handle);
+                  await refreshUsbSecurity();
+                };
+                return (
+                  <div key={stick.id}>
+                    {i > 0 && <Divider />}
+                    <SettingRow
+                      icon={<Usb size={16} />}
+                      label={stick.label}
+                      description={
+                        <span className="flex flex-col gap-0.5">
+                          <span>Added {new Date(stick.addedAt).toLocaleDateString()}</span>
+                          {usbBackupOn && backup && (
+                            <span className="inline-flex items-center gap-1.5">
+                              {backup.stale && (
+                                <span
+                                  className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: '#FBBF24' }}
+                                />
+                              )}
+                              {formatBackupFreshness(backup.lastBackupAt)}
+                            </span>
+                          )}
+                        </span>
+                      }
+                      isFirst={i === 0}
+                      isLast={i === usbSecurity.sticks.length - 1}
+                      right={
+                        <div className="flex items-center gap-2">
+                          {inserted && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5"
+                              style={{ backgroundColor: 'rgba(52,211,153,0.15)', color: '#34D399' }}
+                            >
+                              <span
+                                className="inline-block w-1.5 h-1.5 rounded-full"
+                                style={{ backgroundColor: '#34D399' }}
+                              />
+                              Inserted
+                            </span>
+                          )}
+                          {!inserted && unchecked && (
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void checkStick();
+                              }}
+                              className="text-[10px] font-semibold rounded-full px-2 py-0.5 border-none cursor-pointer"
+                              style={{ backgroundColor: 'rgba(161,255,139,0.12)', color: '#A1FF8B' }}
+                            >
+                              Check
+                            </motion.button>
+                          )}
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleRemoveUsbStickIntent(stick.id)}
+                            className="text-[11px] font-semibold rounded-lg px-2 py-1 border-none cursor-pointer outline-none"
+                            style={{ backgroundColor: 'rgba(239,68,68,0.12)', color: '#ef4444' }}
+                          >
+                            Remove
+                          </motion.button>
+                        </div>
+                      }
+                    />
+                  </div>
+                );
+              })}
+            </Section>
+
+            <Section title="Manage">
+              <SettingRow
+                icon={<HardDrive size={16} />}
+                label="USB backup"
+                description={
+                  usbBackupLarge
+                    ? `Large (${Math.round(usbBackupBytes / (1024 * 1024))} MB). Keep a master backup file too`
+                    : 'Encrypted copy on each key. Key + password restores it'
+                }
+                right={<ToggleSwitch theme={theme} on={usbBackupOn} onChange={() => void handleToggleUsbBackup()} />}
+                isFirst
+              />
+              {usbBackupOn && (
+                <>
+                  <Divider />
+                  <SettingRow
+                    icon={usbBackingUp ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                    label="Back up now"
+                    description={
+                      usbBackingUp
+                        ? 'Backing up...'
+                        : presentSticks.length > 0
+                          ? 'Sync inserted keys'
+                          : 'Insert a registered key'
+                    }
+                    onClick={() => void handleUsbBackupNow()}
+                  />
+                </>
+              )}
+              <Divider />
+              <SettingRow
+                icon={<Plus size={16} />}
+                label="Add another USB key"
+                description="Needs a registered key inserted"
+                onClick={() => void openUsbWindow('add')}
+              />
+              <Divider />
+              <SettingRow
+                icon={<AlertTriangle size={16} />}
+                label="Lost a key? Rotate"
+                description="Old keys stop working"
+                onClick={() => void openUsbWindow('rotate')}
+              />
+              <Divider />
+              <SettingRow
+                icon={<Lock size={16} />}
+                label="Turn off"
+                description="Password-only unlock"
+                onClick={() => void openUsbWindow('disable')}
+                danger
+                isLast
+              />
+            </Section>
+
+            <motion.p variants={rowVariant} className="text-[10px] text-center px-2" style={{ color: '#475467' }}>
+              Not a hardware wallet. Keys are in memory while unlocked.
+            </motion.p>
+          </>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+
   return (
     <>
       <Show
@@ -1269,6 +1754,8 @@ export const Settings = () => {
             {page === 'export-keys-options' && exportKeyOptionsPage}
 
             {page === 'export-keys-qr' && exportKeysAsQrCodePage}
+
+            {page === 'usb-security' && usbSecurityPage}
           </AnimatePresence>
         </div>
       </Show>
@@ -1306,8 +1793,9 @@ export const Settings = () => {
                   : `Exporting wallet data for ${backupAccounts.length} account${backupAccounts.length === 1 ? '' : 's'}`}
             </p>
 
-            {/* Per-account status list */}
-            <div className="w-full max-w-xs space-y-2 mb-5">
+            {/* Per-account status list. Scrolls within a fixed height so the
+                progress bar and Done button stay on screen with many accounts. */}
+            <div className="w-full max-w-xs space-y-2 mb-5 overflow-y-auto pr-1" style={{ maxHeight: '11rem' }}>
               {backupAccounts.map((acct, i) => (
                 <div
                   key={i}

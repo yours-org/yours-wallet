@@ -33,6 +33,7 @@ import {
   X,
   ChevronRight,
 } from 'lucide-react';
+import { checkUsbPresence } from '../services/usbPresence';
 
 const EXPLORER_BASE = 'https://bananablocks.com/tx/';
 
@@ -102,6 +103,12 @@ export const SweepMigration = () => {
     setIsProcessing(true);
     setPasswordError('');
 
+    const presence = await checkUsbPresence(chromeStorageService);
+    if (presence === 'absent' || presence === 'permission') {
+      setPasswordError('Insert your USB key to continue');
+      setIsProcessing(false);
+      return;
+    }
     const isVerified = await chromeStorageService.verifyPassword(password);
     if (!isVerified) {
       setPasswordError('Incorrect password');

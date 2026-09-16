@@ -3,6 +3,9 @@ import { useContext, useEffect } from 'react';
 import { MemoryRouter as Router, Route, Routes } from 'react-router-dom';
 import { Show } from './components/Show';
 import { UnlockWallet } from './components/UnlockWallet';
+import { UsbGate } from './components/UsbGate';
+import { UsbBackupPill } from './components/UsbBackupPill';
+import { useUsbBackupRunner } from './hooks/useUsbBackupRunner';
 import { BottomMenuContext } from './contexts/BottomMenuContext';
 import { useActivityDetector } from './hooks/useActivityDetector';
 import { useTheme } from './hooks/useTheme';
@@ -23,6 +26,12 @@ import { SyncProvider } from './contexts/providers/SyncProvider';
 import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
 import { SnackbarProvider } from './contexts/providers/SnackbarProvider';
 import { SweepMigration } from './pages/SweepMigration';
+
+/** Mounted inside the USB gate so the backup loop only runs while a key reads. */
+const UsbBackupRunner = () => {
+  useUsbBackupRunner();
+  return null;
+};
 
 export const App = () => {
   const { theme } = useTheme();
@@ -79,34 +88,38 @@ export const App = () => {
               <SnackbarProvider>
                 <SyncingBlocks />
                 <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
-                  <Show
-                    when={!isSwitchingAccount}
-                    whenFalseContent={<PageLoader message="Switching account..." theme={theme} />}
-                  >
-                    <Router>
-                      <Routes>
-                        <Route path="/" element={<Start />} />
-                        <Route
-                          path="/create-wallet"
-                          element={<CreateAccount onNavigateBack={() => null} newWallet />}
-                        />
-                        <Route
-                          path="/restore-wallet"
-                          element={<RestoreAccount onNavigateBack={() => null} newWallet />}
-                        />
-                        <Route
-                          path="/import-wallet"
-                          element={<ImportAccount onNavigateBack={() => null} newWallet />}
-                        />
-                        <Route path="/master-restore" element={<MasterRestore />} />
-                        <Route path="/sweep" element={<SweepMigration />} />
-                        <Route path="/bsv-wallet" element={<BsvWallet />} />
-                        <Route path="/ord-wallet" element={<OrdWallet />} />
-                        <Route path="/tools" element={<AppsAndTools />} />
-                        <Route path="/settings" element={<Settings />} />
-                      </Routes>
-                    </Router>
-                  </Show>
+                  <UsbGate>
+                    <UsbBackupRunner />
+                    <UsbBackupPill />
+                    <Show
+                      when={!isSwitchingAccount}
+                      whenFalseContent={<PageLoader message="Switching account..." theme={theme} />}
+                    >
+                      <Router>
+                        <Routes>
+                          <Route path="/" element={<Start />} />
+                          <Route
+                            path="/create-wallet"
+                            element={<CreateAccount onNavigateBack={() => null} newWallet />}
+                          />
+                          <Route
+                            path="/restore-wallet"
+                            element={<RestoreAccount onNavigateBack={() => null} newWallet />}
+                          />
+                          <Route
+                            path="/import-wallet"
+                            element={<ImportAccount onNavigateBack={() => null} newWallet />}
+                          />
+                          <Route path="/master-restore" element={<MasterRestore />} />
+                          <Route path="/sweep" element={<SweepMigration />} />
+                          <Route path="/bsv-wallet" element={<BsvWallet />} />
+                          <Route path="/ord-wallet" element={<OrdWallet />} />
+                          <Route path="/tools" element={<AppsAndTools />} />
+                          <Route path="/settings" element={<Settings />} />
+                        </Routes>
+                      </Router>
+                    </Show>
+                  </UsbGate>
                 </Show>
               </SnackbarProvider>
             </div>

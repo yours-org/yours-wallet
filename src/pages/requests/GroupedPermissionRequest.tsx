@@ -11,6 +11,8 @@ import type {
   GroupedPermissionRequest as GroupedPermissionRequestType,
   GroupedPermissions,
 } from '@bsv/wallet-toolbox-client';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { confirmUsbForApproval } from '../../services/usbPresence';
 
 export type GroupedPermissionRequestProps = {
   request: GroupedPermissionRequestType;
@@ -23,6 +25,8 @@ export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProp
   const { handleSelect, hideMenu } = useBottomMenu();
   const { addSnackbar } = useSnackbar();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [usbError, setUsbError] = useState('');
+  const { chromeStorageService } = useServiceContext();
   const { permissions } = request;
 
   const [protocolChecked, setProtocolChecked] = useState<boolean[]>(() =>
@@ -55,7 +59,14 @@ export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProp
 
   const handleGrant = async () => {
     setIsProcessing(true);
+    setUsbError('');
     try {
+      const usb = await confirmUsbForApproval(chromeStorageService);
+      if (!usb.ok) {
+        setUsbError(usb.message);
+        setIsProcessing(false);
+        return;
+      }
       sendMessage({
         action: 'GROUPED_PERMISSION_RESPONSE',
         requestID: request.requestID,
@@ -272,6 +283,11 @@ export const GroupedPermissionRequestPage = (props: GroupedPermissionRequestProp
 
       {/* Actions */}
       <div className="flex flex-col gap-3">
+        {usbError && (
+          <p className="text-xs text-center m-0" style={{ color: '#ef4444' }}>
+            {usbError}
+          </p>
+        )}
         <motion.button
           className="w-full py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
           style={{

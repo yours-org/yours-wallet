@@ -123,6 +123,16 @@ const ensureStorageIdentityKey = async (chromeStorageService: ChromeStorageServi
 export interface InitWalletOptions {
   onTransactionBroadcasted?: (txid: string) => void;
   onTransactionProven?: (txid: string) => void;
+  /**
+   * Runs once the wallet and storage are ready but BEFORE the address and
+   * message syncs start. Work that needs the toolbox's exclusive sync lock
+   * (a pending backup import) must happen here: the address sync holds
+   * reader/writer locks almost continuously and the sync lock waits for all
+   * of them, so an import started after it never gets in.
+   */
+  beforeSync?: (ctx: { storage: WalletStorageManager }) => Promise<void>;
+  /** Runs once the address sync has completed (not on its failure). Errors are logged, never thrown. */
+  afterSync?: (ctx: { storage: WalletStorageManager }) => Promise<void>;
 }
 
 /**
@@ -209,6 +219,9 @@ export const initWallet = async (
     taskStateStore: createIndexedDbTaskStateStore(),
   };
 
+  const t0 = Date.now();
+  const mark = (step: string) => console.log(`[initWallet] +${Date.now() - t0}ms ${step}`);
+  mark(`createWebWallet start (activeRemote=${activeRemote ?? 'local'}, backups=${backups?.length ?? 0})`);
   const {
     wallet: baseWallet,
     destroy: destroyWallet,
@@ -217,6 +230,11 @@ export const initWallet = async (
     setActiveStorage,
     addRemote,
   } = await createWebWallet(walletConfig);
+  mark(
+    `createWebWallet done; active=${storage.getActiveStoreName?.() ?? '?'} stores=${JSON.stringify(
+      storage.getStores?.().map((s) => ({ name: s.storageName, active: s.isActive, enabled: s.isEnabled })) ?? [],
+    )}`,
+  );
 
   // 3. Build the IndexedDB-backed permission store used by
   //    LocalWalletPermissionsManager for basket/cert/spending grants.
@@ -252,8 +270,10 @@ export const initWallet = async (
   // creating mixed-encoding rows that break later reads.
   const adminWallet = withOriginator(wallet, ADMIN_ORIGINATOR);
 
+  mark('permissions + sync context ready');
   const storageVersion = chromeStorageService.storage?.version ?? 0;
   if (storageVersion < WALLET_DATA_MIGRATION_VERSION) {
+    mark('legacy basket migration start');
     try {
       await migrateLegacyP1SatBaskets(baseWallet);
       await chromeStorageService.completeWalletDataMigration();
@@ -296,6 +316,16 @@ export const initWallet = async (
       });
   };
 
+  if (options?.beforeSync) {
+    mark('beforeSync start');
+    try {
+      await options.beforeSync({ storage });
+    } catch (err) {
+      console.error('[initWallet] beforeSync failed:', err);
+    }
+    mark('beforeSync done');
+  }
+
   console.log('[initWallet] Starting address sync...');
   sendSyncStatus({ status: 'start', addressCount: maxKeyIndex + 1 });
 
@@ -306,9 +336,16 @@ export const initWallet = async (
         sendSyncStatus({ status: 'progress', ...progress });
       },
     })
-    .then((result) => {
+    .then(async (result) => {
       sendSyncStatus({ status: 'complete', ...result });
       console.log('[initWallet] Address sync complete:', result);
+      if (options?.afterSync) {
+        try {
+          await options.afterSync({ storage });
+        } catch (err) {
+          console.error('[initWallet] afterSync failed:', err);
+        }
+      }
     })
     .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);

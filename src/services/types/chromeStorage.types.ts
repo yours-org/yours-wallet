@@ -61,6 +61,12 @@ export interface Account {
   icon: string;
   network: NetWork;
   encryptedKeys: string; // See Keys type
+  /**
+   * Key epoch `encryptedKeys` was written under. Absent = 0 = password-only.
+   * Bumped by every re-key (USB security enable/disable/rotate). Compared
+   * against the root `keyEpoch` to detect an account a stale writer reverted.
+   */
+  keyEpoch?: number;
   derivationTags: TaggedDerivationResponse[];
   settings: Settings;
   addresses: Addresses;
@@ -70,6 +76,64 @@ export interface Account {
   mneeBalance: MNEEBalance;
   pubKeys: PubKeys;
   storageConfig?: StorageConfig;
+}
+
+/** One registered USB drive. The matching secret lives only in the file on the drive. */
+export interface UsbStickEntry {
+  /** Matches the id inside `.yours/usb-key.json` on the drive. */
+  id: string;
+  /** User-given, e.g. "Blue Kingston". */
+  label: string;
+  /** Master factor encrypted under a key derived from this stick's secret. */
+  wrappedMaster: string;
+  addedAt: string;
+  /** Set once this key's backup folder was erased after backup was turned off (>= `backup.wipeAt`). */
+  backupWipedAt?: string;
+}
+
+/**
+ * USB key security (docs/usb-key-security.md). Present only while enabled.
+ * The master factor is never stored unwrapped: each stick holds one wrapper.
+ */
+export interface UsbSecurity {
+  enabled: true;
+  version: 1;
+  kdfVersion: 1;
+  /** HKDF(master) verifier so a recovery-code typo reads differently from a wrong password. */
+  masterCheck: string;
+  sticks: UsbStickEntry[];
+  /**
+   * USB backup sync (OPL-4685). Absent = on, for wallets enrolled before the
+   * option existed. `wipeAt` is set when backup is turned off: every key
+   * whose `backupWipedAt` is older has its backup folder erased when next seen.
+   */
+  backup?: { enabled: boolean; wipeAt?: string };
+}
+
+/** Per-account record of the most recent completed USB backup, across all keys. */
+export interface UsbBackupAccountStatus {
+  lastBackupAt: string;
+  /** Which registered keys hold a copy as of `lastBackupAt`. */
+  stickIds: string[];
+  /** Plaintext bytes of this account's current backup generation (largest across keys). */
+  bytes?: number;
+}
+
+/** Written first and cleared last by the re-key routine. Other account writers refuse while set. */
+export interface KeyRekeyMarker {
+  fromEpoch: number;
+  toEpoch: number;
+  startedAt: string;
+}
+
+/**
+ * Kept from the moment a re-key commits until read-back verifies every account
+ * is on the new epoch. Lets a stale account be repaired at the next unlock.
+ */
+export interface KeyRecovery {
+  toEpoch: number;
+  /** Previous passKey, encrypted (v2) under the current passKey. */
+  wrappedPreviousPassKey: string;
 }
 
 export type ExchangeRateCache = {
@@ -99,6 +163,15 @@ export interface ChromeStorageObject {
   storageIdentityKey?: string;
   showWelcome?: boolean;
   broadcastRequest?: Broadcast;
+  /** USB key security; absent (or null, written by a re-key commit) when off. */
+  usbSecurity?: UsbSecurity | null;
+  /** Current key epoch for `accounts[*].encryptedKeys`. Absent = 0. */
+  keyEpoch?: number;
+  /** null is written by the re-key commit itself so the marker clears in the same set. */
+  keyRekey?: KeyRekeyMarker | null;
+  keyRecovery?: KeyRecovery | null;
+  /** identityAddress → last USB backup. Written by the popup's sync loop. */
+  usbBackupStatus?: Record<string, UsbBackupAccountStatus>;
 }
 
 export type CurrentAccountObject = Omit<ChromeStorageObject, 'accounts' | 'popupWindowId' | 'broadcastRequest'> & {

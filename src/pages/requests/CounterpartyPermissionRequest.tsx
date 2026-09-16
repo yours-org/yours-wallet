@@ -10,6 +10,8 @@ import type {
   CounterpartyPermissionRequest as CounterpartyPermissionRequestType,
   CounterpartyPermissions,
 } from '@bsv/wallet-toolbox-client';
+import { useServiceContext } from '../../hooks/useServiceContext';
+import { confirmUsbForApproval } from '../../services/usbPresence';
 
 export type CounterpartyPermissionRequestProps = {
   request: CounterpartyPermissionRequestType;
@@ -22,6 +24,8 @@ export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionR
   const { handleSelect, hideMenu } = useBottomMenu();
   const { addSnackbar } = useSnackbar();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [usbError, setUsbError] = useState('');
+  const { chromeStorageService } = useServiceContext();
   const { permissions } = request;
 
   const [protocolChecked, setProtocolChecked] = useState<boolean[]>(() => permissions.protocols.map(() => true));
@@ -39,7 +43,14 @@ export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionR
 
   const handleGrant = async () => {
     setIsProcessing(true);
+    setUsbError('');
     try {
+      const usb = await confirmUsbForApproval(chromeStorageService);
+      if (!usb.ok) {
+        setUsbError(usb.message);
+        setIsProcessing(false);
+        return;
+      }
       sendMessage({
         action: 'COUNTERPARTY_PERMISSION_RESPONSE',
         requestID: request.requestID,
@@ -163,6 +174,11 @@ export const CounterpartyPermissionRequestPage = (props: CounterpartyPermissionR
 
       {/* Actions */}
       <div className="flex flex-col gap-3 mt-auto">
+        {usbError && (
+          <p className="text-xs text-center m-0" style={{ color: '#ef4444' }}>
+            {usbError}
+          </p>
+        )}
         <motion.button
           className="w-full py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
           style={{
