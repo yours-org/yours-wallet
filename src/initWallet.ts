@@ -12,12 +12,13 @@ import { syncAddresses, syncMessages, createContext as createActionContext } fro
 import { createAssetPermissionModules } from '@1sat/permission-module';
 import type { WalletInterface } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { ACCOUNT_DATA_VERSION, MESSAGEBOX_URL } from './utils/constants';
+import { MESSAGEBOX_URL } from './utils/constants';
 import type { Account, StorageConfig } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
 import { initSyncContext, type SyncContext } from './initSyncContext';
 import { refileLegacyBaskets } from './services/legacyBaskets';
+import { reconcileStorage } from './services/storageReconcileBackground';
 import { showOneSatPrompt } from './services/oneSatPrompt';
 
 // Admin originator for the extension (bypasses all permission checks). The bare
@@ -313,18 +314,42 @@ export const initWallet = async (
     mark('beforeSync done');
   }
 
-  // After beforeSync so a restored backup's baskets are in storage before the check.
-  if ((account?.dataVersion ?? 0) < ACCOUNT_DATA_VERSION) {
+  // Wallet-data migrations. After beforeSync so a restored backup's data is in
+  // storage before they look at it, and before the address sync, whose locks
+  // would keep the reconcile's sync lock waiting.
+  const stampDataVersion = (dataVersion: number) =>
+    chromeStorageService.updateNested('accounts', {
+      [keys.identityAddress]: { dataVersion } as unknown as Account,
+    });
+  // Steps run in order; each stamps its own version (see ACCOUNT_DATA_VERSION).
+  let dataVersion = account?.dataVersion ?? 0;
+
+  if (dataVersion < 1) {
     mark('legacy basket migration start');
     try {
       await refileLegacyBaskets(storage);
-      await chromeStorageService.updateNested('accounts', {
-        [keys.identityAddress]: { dataVersion: ACCOUNT_DATA_VERSION } as unknown as Account,
-      });
+      await stampDataVersion(1);
+      dataVersion = 1;
     } catch (err) {
       console.error('[initWallet] legacy basket migration failed; will retry next open', err);
     }
     mark('legacy basket migration done');
+  }
+
+  // Runs once whatever the outcome: a failed run leaves its record for
+  // Settings > Troubleshooting, where the user can retry. Only a run the
+  // worker never finished (no stamp) is tried again on the next open.
+  if (dataVersion === 1) {
+    const config = account?.storageConfig;
+    const remoteUrl = config?.activeRemote || config?.remotes?.[0];
+    if (remoteUrl) {
+      mark('storage reconcile migration start');
+      await reconcileStorage(storage, syncContext.services, remoteUrl, 'migration').catch((err) =>
+        console.error('[initWallet] storage reconcile migration failed:', err),
+      );
+      mark('storage reconcile migration done');
+    }
+    await stampDataVersion(2);
   }
 
   console.log('[initWallet] Starting address sync...');

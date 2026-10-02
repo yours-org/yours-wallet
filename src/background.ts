@@ -50,7 +50,8 @@ import { ADMIN_ORIGINATOR, initWallet, openAccountStorageForBackup, type Account
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
 import { repairStaleAccounts, usbRekey, type UsbRekeyRequest } from './services/usbRekeyBackground';
-import { reconcileStorage } from './services/storageReconcileBackground';
+import { finishInterruptedReconcile, reconcileStorage } from './services/storageReconcileBackground';
+import { reconcileOutcome } from './services/storageReconcile';
 import { USB_HANDLE_DB_NAME } from './services/UsbKey.service';
 import {
   isUsbRecoverySession,
@@ -308,6 +309,11 @@ const runInitializeWallet = async (): Promise<WalletInterface | null> => {
 const startupInitPromise = chromeStorageService
   .getAndSetStorage()
   .then(async () => {
+    // Before any wallet init can start a new repair run.
+    await finishInterruptedReconcile().catch((err) =>
+      console.error('[background] could not close out an interrupted storage repair:', err),
+    );
+
     // Close any orphaned extension popup windows from a previous session/reload.
     // The USB key window is a user-driven multi-step flow, not a prompt: the
     // worker idles out and restarts while the user reads or writes a recovery
@@ -1520,16 +1526,17 @@ if (isInServiceWorker) {
         return;
       }
 
-      const record = await reconcileStorage(accountContext.storage, accountContext.syncContext.services, remoteUrl);
+      const record = await reconcileStorage(
+        accountContext.storage,
+        accountContext.syncContext.services,
+        remoteUrl,
+        'manual',
+      );
 
       sendResponse({
         type: 'STORAGE_REPAIR_SYNC',
         success: true,
-        data: {
-          unresolved: record.spendConflicts?.filter((c) => c.verdict.kind === 'unresolved').length ?? 0,
-          verified:
-            record.verify?.onlyLocal === 0 && record.verify.onlyRemote === 0 && !record.verify.mismatched.length,
-        },
+        data: { outcome: reconcileOutcome(record) },
       });
     } catch (error) {
       console.error('[STORAGE_REPAIR_SYNC] reconcile failed:', error);

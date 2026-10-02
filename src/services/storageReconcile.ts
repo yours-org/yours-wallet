@@ -6,6 +6,9 @@ import type { sdk } from '@bsv/wallet-toolbox-client';
  * from chain answers. I/O lives in storageReconcileBackground.ts.
  */
 
+/** chrome.storage.local key holding the last reconcile run on this device. */
+export const RECONCILE_RECORD_KEY = 'storageReconcileLastRun';
+
 type TransactionStatus = sdk.TransactionStatus;
 
 /** Wallet statuses where a spend exists only inside the wallet so far. */
@@ -234,10 +237,30 @@ export const matchesVerdict = (index: StoreIndex, outpoint: string, verdict: Spe
   return !o.spendable && spender === null;
 };
 
+export type ReconcileTrigger = 'migration' | 'manual';
+
+export type ReconcilePhase =
+  | 'read-local'
+  | 'read-remote'
+  | 'check-chain'
+  | 'push-to-remote'
+  | 'push-to-local'
+  | 'apply-corrections'
+  | 'push-corrections'
+  | 'verify';
+
 export interface ReconcileRecord {
   startedAt: string;
   finishedAt?: string;
+  trigger: ReconcileTrigger;
+  appVersion: string;
   remoteUrl: string;
+  /** Phase in progress, or the one that failed once the run has finished with an error. */
+  phase?: ReconcilePhase;
+  /** Items read or pushed so far in the current phase. */
+  phaseItems?: number;
+  /** Paging offsets of the last chunk requested in the current phase; on failure, where it stopped. */
+  offsets?: Array<{ name: string; offset: number }>;
   localStorageIdentityKey?: string;
   remoteStorageIdentityKey?: string;
   onlyLocal?: OneSided;
@@ -249,4 +272,19 @@ export interface ReconcileRecord {
   corrected?: string[];
   verify?: { onlyLocal: number; onlyRemote: number; mismatched: string[] };
   error?: string;
+  errorStack?: string;
+  /** Set once the user has dismissed the result of a migration run. */
+  acknowledged?: boolean;
 }
+
+export type ReconcileOutcome = 'running' | 'clean' | 'differences' | 'failed';
+
+export const reconcileOutcome = (r: ReconcileRecord): ReconcileOutcome => {
+  if (!r.finishedAt) return 'running';
+  if (r.error) return 'failed';
+  const unresolved = r.spendConflicts?.some((c) => c.verdict.kind === 'unresolved') ?? false;
+  const v = r.verify;
+  return v && v.onlyLocal === 0 && v.onlyRemote === 0 && v.mismatched.length === 0 && !unresolved
+    ? 'clean'
+    : 'differences';
+};

@@ -40,11 +40,15 @@ export const CHROME_STORAGE_OBJECT_VERSION = 8;
  * Per-account wallet-data version (`Account.dataVersion`). Wallet-data migrations
  * run in initWallet for the account being opened; bump when adding one.
  *  1: legacy 'p 1sat' baskets re-filed
+ *  2: local and remote storage reconciled once (Repair Sync)
  */
-export const ACCOUNT_DATA_VERSION = 1;
+export const ACCOUNT_DATA_VERSION = 2;
 
 /** Default remote storage provider (active store for new wallets). */
 export const DEFAULT_STORAGE_REMOTE_URL = 'https://wallet.1sat.app';
+
+/** Yours support channel on Discord (Settings > Troubleshooting). */
+export const DISCORD_SUPPORT_URL = 'https://discord.gg/RD4uuhzMSh';
 
 /** Account service (`/account/status`) for the default storage provider. */
 export const DEFAULT_ACCOUNT_URL = 'https://accounts.1sat.app';

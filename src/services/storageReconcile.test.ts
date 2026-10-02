@@ -10,6 +10,8 @@ import {
   initialOffsets,
   isFinalChunk,
   matchesVerdict,
+  type ReconcileRecord,
+  reconcileOutcome,
   type StoreIndex,
 } from './storageReconcile';
 
@@ -139,5 +141,49 @@ describe('matchesVerdict', () => {
   test('unspent', () => {
     expect(matchesVerdict(store, `${A}.1`, { kind: 'unspent' })).toBe(true);
     expect(matchesVerdict(store, `${A}.0`, { kind: 'unspent' })).toBe(false);
+  });
+});
+
+describe('reconcileOutcome', () => {
+  const base: ReconcileRecord = {
+    startedAt: '2026-10-02T00:00:00.000Z',
+    trigger: 'migration',
+    appVersion: '5.1.0',
+    remoteUrl: 'https://wallet.1sat.app',
+  };
+  const finished = { ...base, finishedAt: '2026-10-02T00:01:00.000Z' };
+  const verified = { onlyLocal: 0, onlyRemote: 0, mismatched: [] };
+
+  test('running until finished', () => {
+    expect(reconcileOutcome(base)).toBe('running');
+  });
+
+  test('failed when an error was recorded', () => {
+    expect(reconcileOutcome({ ...finished, error: 'boom', verify: verified })).toBe('failed');
+  });
+
+  test('clean only when verified with nothing unresolved', () => {
+    expect(reconcileOutcome({ ...finished, verify: verified, spendConflicts: [] })).toBe('clean');
+    expect(reconcileOutcome({ ...finished, verify: { ...verified, onlyRemote: 1 } })).toBe('differences');
+    expect(
+      reconcileOutcome({
+        ...finished,
+        verify: verified,
+        spendConflicts: [
+          {
+            outpoint: `${A}.0`,
+            txid: A,
+            vout: 0,
+            local: B,
+            remote: null,
+            verdict: { kind: 'unresolved', reason: 'x' },
+          },
+        ],
+      }),
+    ).toBe('differences');
+  });
+
+  test('a finished run without a verify step is not clean', () => {
+    expect(reconcileOutcome(finished)).toBe('differences');
   });
 });

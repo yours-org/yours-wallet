@@ -19,13 +19,14 @@ import {
   isFinalChunk,
   matchesVerdict,
   oneSidedCount,
+  RECONCILE_RECORD_KEY,
+  type ReconcilePhase,
   type ReconcileRecord,
+  type ReconcileTrigger,
   type SpendVerdict,
   type StoreIndex,
   txidsToCheck,
 } from './storageReconcile';
-
-export const RECONCILE_RECORD_KEY = 'storageReconcileLastRun';
 
 /**
  * Sync state rows written by the reconcile are keyed under a separate reader
@@ -39,6 +40,8 @@ const MAX_ROUGH_SIZE = 10_000_000;
 const PUSH_MAX_ITEMS = 100;
 const PUSH_MAX_ROUGH_SIZE = 1_000_000;
 const SPENDS_BATCH = 100;
+
+type ChunkProgress = (offsets: sdk.RequestSyncChunkArgs['offsets'], items: number) => Promise<void>;
 
 const normalizeUrl = (url: string): string => url.replace(/\/+$/, '');
 
@@ -61,6 +64,7 @@ const readIndex = async (
   reader: sdk.WalletStorageProvider,
   identityKey: string,
   readerKey: string,
+  onChunk: ChunkProgress,
 ): Promise<StoreIndex> => {
   const index = emptyIndex();
   const args: sdk.RequestSyncChunkArgs = {
@@ -72,10 +76,13 @@ const readIndex = async (
     offsets: initialOffsets(),
   };
   for (;;) {
+    await onChunk(args.offsets, 0);
     const chunk = await reader.getSyncChunk(args);
     indexChunk(index, chunk);
     if (isFinalChunk(chunk)) return index;
-    if (advanceOffsets(args.offsets, chunk) === 0) throw new Error('Sync read made no progress');
+    const items = advanceOffsets(args.offsets, chunk);
+    if (items === 0) throw new Error('Sync read made no progress');
+    await onChunk(args.offsets, items);
   }
 };
 
@@ -92,6 +99,7 @@ const push = async (
   writerSettings: TableSettings,
   identityKey: string,
   full: boolean,
+  onChunk: ChunkProgress,
 ): Promise<{ inserts: number; updates: number }> => {
   const from: TableSettings = {
     ...readerSettings,
@@ -110,11 +118,13 @@ const push = async (
         PUSH_MAX_ITEMS,
       );
       if (since === 'none') args.since = undefined;
+      await onChunk(args.offsets, 0);
       const { user: _user, ...chunk } = await reader.getSyncChunk(args);
       const r = await writer.processSyncChunk(args, chunk);
       if (r.error) throw r.error;
       totals.inserts += r.inserts;
       totals.updates += r.updates;
+      await onChunk(args.offsets, r.inserts + r.updates);
       if (r.done) return;
     }
   };
@@ -168,18 +178,58 @@ const applyVerdict = async (
   return true;
 };
 
+const saveRecord = (record: ReconcileRecord) => chrome.storage.local.set({ [RECONCILE_RECORD_KEY]: record });
+
+export const readReconcileRecord = async (): Promise<ReconcileRecord | undefined> =>
+  (await chrome.storage.local.get(RECONCILE_RECORD_KEY))[RECONCILE_RECORD_KEY] as ReconcileRecord | undefined;
+
+/**
+ * A run cut short by the service worker stopping never reaches its finally
+ * block. Call at worker start so the record does not read as still running.
+ */
+export const finishInterruptedReconcile = async (): Promise<void> => {
+  const record = await readReconcileRecord();
+  if (!record || record.finishedAt) return;
+  await saveRecord({
+    ...record,
+    finishedAt: new Date().toISOString(),
+    error: 'Interrupted: the wallet restarted before the repair finished',
+  });
+};
+
 /**
  * Bring local and remote storage to the union of both, with conflicting
  * spends settled by the chain. Holds the storage sync lock throughout, so no
- * wallet activity interleaves. The record is saved even when a step fails.
+ * wallet activity interleaves. The record is saved as each phase starts and
+ * after every chunk, so the popup can show progress and a failure leaves the
+ * phase and offsets it stopped at.
  */
 export const reconcileStorage = async (
   storage: WalletStorageManager,
   services: OneSatServices,
   remoteUrl: string,
+  trigger: ReconcileTrigger,
 ): Promise<ReconcileRecord> => {
-  const record: ReconcileRecord = { startedAt: new Date().toISOString(), remoteUrl };
+  const record: ReconcileRecord = {
+    startedAt: new Date().toISOString(),
+    trigger,
+    appVersion: chrome.runtime.getManifest().version,
+    remoteUrl,
+  };
+  const enter = async (phase: ReconcilePhase) => {
+    record.phase = phase;
+    record.phaseItems = 0;
+    record.offsets = undefined;
+    await saveRecord(record);
+  };
+  const onChunk: ChunkProgress = async (offsets, items) => {
+    record.offsets = offsets.map((o) => ({ ...o }));
+    record.phaseItems = (record.phaseItems ?? 0) + items;
+    await saveRecord(record);
+  };
+
   try {
+    await saveRecord(record);
     const { identityKey } = await storage.getAuth();
     const { local, remote } = findStores(storage, remoteUrl);
 
@@ -189,12 +239,15 @@ export const reconcileStorage = async (
       record.localStorageIdentityKey = localSettings.storageIdentityKey;
       record.remoteStorageIdentityKey = remoteSettings.storageIdentityKey;
 
-      const localIndex = await readIndex(local, identityKey, localSettings.storageIdentityKey);
-      const remoteIndex = await readIndex(remote, identityKey, remoteSettings.storageIdentityKey);
+      await enter('read-local');
+      const localIndex = await readIndex(local, identityKey, localSettings.storageIdentityKey, onChunk);
+      await enter('read-remote');
+      const remoteIndex = await readIndex(remote, identityKey, remoteSettings.storageIdentityKey, onChunk);
       const diff = diffIndexes(localIndex, remoteIndex);
       record.onlyLocal = diff.onlyLocal;
       record.onlyRemote = diff.onlyRemote;
 
+      await enter('check-chain');
       const chain = await askChain(
         services,
         diff.spendConflicts.map((c) => c.outpoint),
@@ -206,20 +259,33 @@ export const reconcileStorage = async (
       }));
       record.spendConflicts = conflicts;
 
-      record.pushedToRemote = await push(local, localSettings, remote, remoteSettings, identityKey, true);
-      record.pushedToLocal = await push(remote, remoteSettings, local, localSettings, identityKey, true);
+      await enter('push-to-remote');
+      record.pushedToRemote = await push(local, localSettings, remote, remoteSettings, identityKey, true, onChunk);
+      await enter('push-to-local');
+      record.pushedToLocal = await push(remote, remoteSettings, local, localSettings, identityKey, true, onChunk);
 
+      await enter('apply-corrections');
       const { user } = await local.findOrInsertUser(identityKey);
       record.corrected = [];
       for (const c of conflicts) {
         if (await applyVerdict(local, user.userId, c.txid, c.vout, c.verdict)) record.corrected.push(c.outpoint);
       }
       if (record.corrected.length > 0) {
-        record.pushedCorrections = await push(local, localSettings, remote, remoteSettings, identityKey, false);
+        await enter('push-corrections');
+        record.pushedCorrections = await push(
+          local,
+          localSettings,
+          remote,
+          remoteSettings,
+          identityKey,
+          false,
+          onChunk,
+        );
       }
 
-      const localAfter = await readIndex(local, identityKey, localSettings.storageIdentityKey);
-      const remoteAfter = await readIndex(remote, identityKey, remoteSettings.storageIdentityKey);
+      await enter('verify');
+      const localAfter = await readIndex(local, identityKey, localSettings.storageIdentityKey, onChunk);
+      const remoteAfter = await readIndex(remote, identityKey, remoteSettings.storageIdentityKey, onChunk);
       const after = diffIndexes(localAfter, remoteAfter);
       record.verify = {
         onlyLocal: oneSidedCount(after.onlyLocal),
@@ -232,13 +298,18 @@ export const reconcileStorage = async (
           )
           .map((c) => c.outpoint),
       };
+      // Finished cleanly: the phase and offsets only matter when a run stops partway.
+      record.phase = undefined;
+      record.phaseItems = undefined;
+      record.offsets = undefined;
     });
     return record;
   } catch (error) {
     record.error = error instanceof Error ? error.message : String(error);
+    record.errorStack = error instanceof Error ? error.stack : undefined;
     throw error;
   } finally {
     record.finishedAt = new Date().toISOString();
-    await chrome.storage.local.set({ [RECONCILE_RECORD_KEY]: record });
+    await saveRecord(record);
   }
 };

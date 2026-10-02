@@ -20,6 +20,7 @@ import { Settings } from './pages/Settings';
 import { PageLoader } from './components/PageLoader';
 import { useServiceContext } from './hooks/useServiceContext';
 import { SyncingBlocks } from './components/SyncingBlocks';
+import { StorageRepairOverlay } from './components/StorageRepairOverlay';
 import { MasterRestore } from './pages/onboarding/MasterRestore';
 import { BlockHeightProvider } from './contexts/providers/BlockHeightProvider';
 import { SyncProvider } from './contexts/providers/SyncProvider';
@@ -87,6 +88,7 @@ export const App = () => {
             >
               <SnackbarProvider>
                 <SyncingBlocks />
+                <StorageRepairOverlay />
                 <Show when={!isLocked} whenFalseContent={<UnlockWallet onUnlock={handleUnlock} />}>
                   <UsbGate>
                     <UsbBackupRunner />

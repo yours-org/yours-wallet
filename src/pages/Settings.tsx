@@ -25,7 +25,10 @@ import {
   CheckCircle2,
   Minus,
   Usb,
+  LifeBuoy,
+  Wrench,
 } from 'lucide-react';
+import { FaDiscord } from 'react-icons/fa';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { QrCode } from '../components/QrCode';
@@ -38,7 +41,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
-import { FEE_PER_KB } from '../utils/constants';
+import { DISCORD_SUPPORT_URL, FEE_PER_KB } from '../utils/constants';
 import { ChromeStorageObject, UsbBackupAccountStatus, UsbSecurity } from '../services/types/chromeStorage.types';
 import {
   deleteHandle,
@@ -57,6 +60,8 @@ import { MasterBackupProgressEvent, streamDataToZip } from '../utils/masterExpor
 import { useSnackbar } from '../hooks/useSnackbar';
 import { PermissionsManager } from './PermissionsManager';
 import { StorageStatus } from './StorageStatus';
+import { REPAIR_PHASE_LABELS, useStorageRepair } from '../hooks/useStorageRepair';
+import type { ReconcileOutcome, ReconcileRecord } from '../services/storageReconcile';
 import { YoursIcon } from '../components/YoursIcon';
 import activeCircle from '../assets/active-circle.png';
 import ProgressBar from '@ramonak/react-progress-bar';
@@ -86,7 +91,8 @@ export type SettingsPage =
   | 'export-keys-qr'
   | 'storage'
   | 'permissions'
-  | 'usb-security';
+  | 'usb-security'
+  | 'troubleshooting';
 
 type DecisionType =
   | 'sign-out'
@@ -235,6 +241,19 @@ const SubPageHeader = ({ title, onBack }: SubPageHeaderProps) => (
   </div>
 );
 
+const describeRepair = (record: ReconcileRecord, outcome: ReconcileOutcome): string => {
+  switch (outcome) {
+    case 'running':
+      return record.phase ? `${REPAIR_PHASE_LABELS[record.phase]}...` : 'Starting...';
+    case 'clean':
+      return 'Local and remote match';
+    case 'differences':
+      return 'Finished with differences left';
+    case 'failed':
+      return `Failed: ${record.error ?? 'unknown error'}`;
+  }
+};
+
 // --- Main Component ---
 
 // Manifest version reflects what's actually loaded in the browser; the commit hash is
@@ -247,6 +266,7 @@ const buildInfo = `v${manifestVersion} · ${__BUILD_COMMIT__}`;
 export const Settings = () => {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
+  const { record: repairRecord, outcome: repairOutcome, runRepair } = useStorageRepair();
   const { query, handleSelect } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { chromeStorageService, keysService, lockWallet, wallet, apiContext } = useServiceContext();
@@ -982,6 +1002,18 @@ export const Settings = () => {
         />
       </Section>
 
+      {/* Help section */}
+      <Section title="Help">
+        <SettingRow
+          icon={<LifeBuoy size={16} />}
+          label="Troubleshooting"
+          description="Repair sync, repair log, and support"
+          onClick={() => setPage('troubleshooting')}
+          isFirst
+          isLast
+        />
+      </Section>
+
       {/* Danger Zone */}
       <Section title="Danger Zone">
         <SettingRow
@@ -1016,6 +1048,80 @@ export const Settings = () => {
       >
         {buildInfo}
       </div>
+    </motion.div>
+  );
+
+  const handleRepairSync = async () => {
+    if (repairOutcome === 'running') return;
+    try {
+      const response = await runRepair();
+      if (!response?.success) addSnackbar(response?.error ?? 'Repair failed', 'error');
+      else if (response.data?.outcome === 'clean') addSnackbar('Repair complete: local and remote match', 'success');
+      else addSnackbar('Repair finished with differences left', 'info');
+    } catch (error) {
+      addSnackbar(error instanceof Error ? error.message : 'Repair failed', 'error');
+    }
+  };
+
+  const handleCopyRepairLog = () => {
+    if (!repairRecord) return;
+    navigator.clipboard.writeText(JSON.stringify(repairRecord, null, 2));
+    addSnackbar('Repair log copied', 'success');
+  };
+
+  const troubleshootingPage = (
+    <motion.div
+      key="troubleshooting"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-20"
+    >
+      <SubPageHeader title="Troubleshooting" onBack={() => setPage('main')} />
+      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full">
+        <Section title="Storage">
+          <SettingRow
+            icon={<Wrench size={16} />}
+            label={repairOutcome === 'running' ? 'Repairing...' : 'Repair Sync'}
+            description="Check local and remote storage against each other and fix differences"
+            onClick={repairOutcome === 'running' ? undefined : handleRepairSync}
+            isFirst
+            isLast={!repairRecord}
+          />
+          {repairRecord && repairOutcome && (
+            <>
+              <Divider />
+              <SettingRow
+                icon={<Copy size={16} />}
+                label="Copy Repair Log"
+                description={
+                  <>
+                    {describeRepair(repairRecord, repairOutcome)}
+                    <br />
+                    {`${repairRecord.trigger === 'migration' ? 'After update' : 'Manual'} · ${new Date(
+                      repairRecord.finishedAt ?? repairRecord.startedAt,
+                    ).toLocaleString()}`}
+                  </>
+                }
+                onClick={handleCopyRepairLog}
+                isLast
+              />
+            </>
+          )}
+        </Section>
+
+        <Section title="Support">
+          <SettingRow
+            icon={<FaDiscord size={16} />}
+            label="Discord"
+            description="Ask the Yours team for help. Paste your repair log if sync looks wrong."
+            onClick={() => window.open(DISCORD_SUPPORT_URL, '_blank')}
+            isFirst
+            isLast
+          />
+        </Section>
+      </motion.div>
     </motion.div>
   );
 
@@ -1756,6 +1862,8 @@ export const Settings = () => {
             {page === 'export-keys-qr' && exportKeysAsQrCodePage}
 
             {page === 'usb-security' && usbSecurityPage}
+
+            {page === 'troubleshooting' && troubleshootingPage}
           </AnimatePresence>
         </div>
       </Show>

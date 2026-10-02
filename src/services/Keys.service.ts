@@ -6,6 +6,7 @@ import {
   MAINNET_ADDRESS_PREFIX,
   SWEEP_PATH,
   CHROME_STORAGE_OBJECT_VERSION,
+  ACCOUNT_DATA_VERSION,
 } from '../utils/constants';
 import { decrypt, encrypt, generateRandomSalt } from '../utils/crypto';
 import { derivePassKey } from './passKey';
@@ -63,6 +64,8 @@ export class KeysService {
           identityPubKey: keys.identityPubKey,
         },
         encryptedKeys,
+        // Nothing to migrate in a brand-new account's storage.
+        dataVersion: ACCOUNT_DATA_VERSION,
       },
     };
     await this.chromeStorageService.updateNested(key, update);
