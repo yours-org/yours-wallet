@@ -7,7 +7,6 @@ import { YoursEventName } from '../inject';
 import { sendMessage, sendMessageAsync } from '../utils/chromeHelpers';
 import {
   CHROME_STORAGE_OBJECT_VERSION,
-  WALLET_DATA_MIGRATION_VERSION,
   DEFAULT_ACCOUNT,
   DEFAULT_STORAGE_REMOTE_URL,
   FEE_PER_KB,
@@ -348,20 +347,9 @@ export class ChromeStorageService {
     if ((this.storage?.version ?? currentVersion) < 6) {
       await this.migrateToV6();
     }
-    // v7 is stamped by completeWalletDataMigration after the unlock-time basket
-    // re-file. Storage-only migrations past it must wait for that stamp, or a
-    // wallet still on v6 would jump ahead and never run the basket step.
-    const afterV6 = this.storage?.version ?? currentVersion;
-    if (afterV6 >= WALLET_DATA_MIGRATION_VERSION && afterV6 < 8) {
+    if ((this.storage?.version ?? currentVersion) < 8) {
       await this.migrateToV8();
     }
-  };
-
-  /** Basket re-file runs in initWallet (needs an unlocked wallet). */
-  completeWalletDataMigration = async (): Promise<void> => {
-    // Stamp the wallet-data version, not the latest schema version: set() re-reads
-    // storage and runMigrations then applies any storage-only steps that follow.
-    await this.set({ version: WALLET_DATA_MIGRATION_VERSION });
   };
 
   getAndSetStorage = async (): Promise<Partial<ChromeStorageObject> | undefined> => {

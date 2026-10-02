@@ -76,6 +76,8 @@ export interface Account {
   mneeBalance: MNEEBalance;
   pubKeys: PubKeys;
   storageConfig?: StorageConfig;
+  /** Wallet-data migrations completed for this account; see ACCOUNT_DATA_VERSION. Absent = 0. */
+  dataVersion?: number;
 }
 
 /** One registered USB drive. The matching secret lives only in the file on the drive. */

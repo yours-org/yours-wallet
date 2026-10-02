@@ -131,11 +131,11 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
   const remotes = info?.storageConfig?.remotes ?? [];
   const remotesKey = remotes.join(',');
   const stableRemotes = useMemo(() => remotes, [remotesKey]);
-  const stableKnownUrls = useMemo(() => KNOWN_PROVIDERS.map((p) => p.url), []);
+  const knownAccountUrls = useMemo(() => Object.fromEntries(KNOWN_PROVIDERS.map((p) => [p.url, p.accountUrl])), []);
   const { statusMap, loading: statusLoading } = useRemoteStatus(
     apiContext.wallet as any,
     stableRemotes,
-    stableKnownUrls,
+    knownAccountUrls,
   );
   const [busy, setBusy] = useState(false);
   const [busyAction, setBusyAction] = useState<'active' | 'remove' | null>(null);
@@ -235,11 +235,13 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
   const handleRepairSync = () => {
     if (repairing || syncing || busy) return;
     setRepairing(true);
-    addSnackbar('Repairing sync (local → remote)...', 'info');
+    addSnackbar('Reconciling local and remote storage...', 'info');
     chrome.runtime.sendMessage({ action: 'STORAGE_REPAIR_SYNC' }, (response) => {
       setRepairing(false);
       if (response?.success) {
-        addSnackbar('Repair complete — remote is active', 'success');
+        const { unresolved, verified } = response.data ?? {};
+        if (verified && !unresolved) addSnackbar('Repair complete — local and remote match', 'success');
+        else addSnackbar('Repair finished with differences left — details were saved', 'info');
         fetchInfo();
       } else if (response?.error) {
         addSnackbar(response.error, 'error');
@@ -787,7 +789,7 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
           {syncing ? 'Syncing...' : 'Sync Now'}
         </motion.button>
 
-        {/* Repair: local then remote — fixes config-only promote without full push */}
+        {/* Repair: full two-way reconcile of local and remote */}
         {remotes.length > 0 && (
           <motion.button
             whileTap={{ scale: 0.98 }}

@@ -33,10 +33,14 @@ export type RemoteStatusResult =
 
 /**
  * Fetch status from all configured remotes in parallel.
- * - Known provider URLs: AuthFetch to /account/status for full usage data
+ * - Known provider URLs: AuthFetch to the provider's account service /account/status for full usage data
  * - Custom URLs: AuthFetch to base URL as a liveness check (BRC-103 handshake)
  */
-export const useRemoteStatus = (wallet: WalletInterface | undefined, remotes: string[], knownUrls: string[]) => {
+export const useRemoteStatus = (
+  wallet: WalletInterface | undefined,
+  remotes: string[],
+  accountUrls: Record<string, string>,
+) => {
   const [statusMap, setStatusMap] = useState<Record<string, RemoteStatusResult>>({});
   const [loading, setLoading] = useState(false);
 
@@ -51,12 +55,12 @@ export const useRemoteStatus = (wallet: WalletInterface | undefined, remotes: st
 
     const results = await Promise.all(
       remotes.map(async (url): Promise<[string, RemoteStatusResult]> => {
-        const isKnown = knownUrls.includes(url);
+        const accountUrl = accountUrls[url];
 
-        if (isKnown) {
-          // Known provider: fetch /account/status for full usage data
+        if (accountUrl) {
+          // Known provider: fetch /account/status from its account service for full usage data
           try {
-            const statusUrl = `${url.replace(/\/$/, '')}/account/status`;
+            const statusUrl = `${accountUrl}/account/status`;
             const response = await authFetch.fetch(statusUrl, { method: 'GET' });
             if (!response.ok) {
               return [url, { status: 'error', error: `HTTP ${response.status}` }];
@@ -88,7 +92,7 @@ export const useRemoteStatus = (wallet: WalletInterface | undefined, remotes: st
 
     setStatusMap(Object.fromEntries(results));
     setLoading(false);
-  }, [wallet, remotes, knownUrls]);
+  }, [wallet, remotes, accountUrls]);
 
   useEffect(() => {
     fetchAll();

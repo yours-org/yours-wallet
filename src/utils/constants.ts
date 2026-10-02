@@ -32,15 +32,22 @@ export const DEFAULT_TWETCH_WALLET_PATH = 'm/0/0';
  * Storage schema version. Bump when adding a migration in ChromeStorageService.runMigrations.
  *  5: deviceId / showWelcome
  *  6: per-account storageConfig
- *  7: legacy 'p 1sat' baskets re-filed (runs in initWallet; needs an unlocked wallet)
+ *  7: stamped by v5.0.3–v5.1.0 after the unlock-time basket re-file; no storage change
  *  8: customFeeRate reset to FEE_PER_KB for every account (v5.0.4)
  */
 export const CHROME_STORAGE_OBJECT_VERSION = 8;
-/** Version stamped once the unlock-time basket migration has run. */
-export const WALLET_DATA_MIGRATION_VERSION = 7;
+/**
+ * Per-account wallet-data version (`Account.dataVersion`). Wallet-data migrations
+ * run in initWallet for the account being opened; bump when adding one.
+ *  1: legacy 'p 1sat' baskets re-filed
+ */
+export const ACCOUNT_DATA_VERSION = 1;
 
 /** Default remote storage provider (active store for new wallets). */
 export const DEFAULT_STORAGE_REMOTE_URL = 'https://wallet.1sat.app';
+
+/** Account service (`/account/status`) for the default storage provider. */
+export const DEFAULT_ACCOUNT_URL = 'https://accounts.1sat.app';
 
 export const LOCKUP_PREFIX = `97dfd76851bf465e8f715593b217714858bbe9570ff3bd5e33840a34e20ff026 02ba79df5f8ae7604a9830f03c7933028186aede0675a16f025dc4f8be8eec0382 1008ce7480da41702918d1ec8e6849ba32b4d65b1e40dc669c31a1e6306b266c 0 0`;
 

@@ -37,6 +37,7 @@ export default defineConfig({
   resolve: {
     alias: {
       path: 'path-browserify',
+      'xdelta3-wasm': resolve(__dirname, 'src/stubs/empty.ts'),
     },
     preserveSymlinks: true,
   },

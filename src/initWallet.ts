@@ -8,25 +8,22 @@ import {
   LocalWalletPermissionsManager,
   IndexedDbPermissionStore,
 } from '@1sat/wallet-browser';
-import {
-  syncAddresses,
-  syncMessages,
-  createContext as createActionContext,
-  migrateLegacyP1SatBaskets,
-} from '@1sat/actions';
+import { syncAddresses, syncMessages, createContext as createActionContext } from '@1sat/actions';
 import { createAssetPermissionModules } from '@1sat/permission-module';
 import type { WalletInterface } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { WALLET_DATA_MIGRATION_VERSION, MESSAGEBOX_URL } from './utils/constants';
+import { ACCOUNT_DATA_VERSION, MESSAGEBOX_URL } from './utils/constants';
 import type { Account, StorageConfig } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
 import { initSyncContext, type SyncContext } from './initSyncContext';
+import { refileLegacyBaskets } from './services/legacyBaskets';
 import { showOneSatPrompt } from './services/oneSatPrompt';
 
-// Admin originator for the extension (bypasses all permission checks)
-// Uses chrome-extension://<id> format to match what ChromeCWI sends
-const ADMIN_ORIGINATOR = `chrome-extension://${chrome.runtime.id}`;
+// Admin originator for the extension (bypasses all permission checks). The bare
+// extension ID, as ChromeCWI sends it: toolbox permission checks reject a URL
+// scheme, and no web page host can take this form.
+export const ADMIN_ORIGINATOR = chrome.runtime.id;
 
 /**
  * Wrap a wallet so every method call pre-binds `originator` to the supplied
@@ -271,16 +268,6 @@ export const initWallet = async (
   const adminWallet = withOriginator(wallet, ADMIN_ORIGINATOR);
 
   mark('permissions + sync context ready');
-  const storageVersion = chromeStorageService.storage?.version ?? 0;
-  if (storageVersion < WALLET_DATA_MIGRATION_VERSION) {
-    mark('legacy basket migration start');
-    try {
-      await migrateLegacyP1SatBaskets(baseWallet);
-      await chromeStorageService.completeWalletDataMigration();
-    } catch (err) {
-      console.error('[initWallet] legacy basket migration failed; will retry next unlock', err);
-    }
-  }
 
   const maxKeyIndex = account?.settings?.maxKeyIndex ?? 4; // default: 0-4 = 5 addresses
   const syncContext = await initSyncContext({
@@ -324,6 +311,20 @@ export const initWallet = async (
       console.error('[initWallet] beforeSync failed:', err);
     }
     mark('beforeSync done');
+  }
+
+  // After beforeSync so a restored backup's baskets are in storage before the check.
+  if ((account?.dataVersion ?? 0) < ACCOUNT_DATA_VERSION) {
+    mark('legacy basket migration start');
+    try {
+      await refileLegacyBaskets(storage);
+      await chromeStorageService.updateNested('accounts', {
+        [keys.identityAddress]: { dataVersion: ACCOUNT_DATA_VERSION } as unknown as Account,
+      });
+    } catch (err) {
+      console.error('[initWallet] legacy basket migration failed; will retry next open', err);
+    }
+    mark('legacy basket migration done');
   }
 
   console.log('[initWallet] Starting address sync...');

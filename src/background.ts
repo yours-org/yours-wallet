@@ -46,10 +46,11 @@ import {
   initOneSatPromptBridge,
 } from './services/oneSatPrompt';
 import type { PromptKind, UsbCheckRequest } from './promptProtocol';
-import { initWallet, openAccountStorageForBackup, type AccountContext } from './initWallet';
+import { ADMIN_ORIGINATOR, initWallet, openAccountStorageForBackup, type AccountContext } from './initWallet';
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
 import { repairStaleAccounts, usbRekey, type UsbRekeyRequest } from './services/usbRekeyBackground';
+import { reconcileStorage } from './services/storageReconcileBackground';
 import { USB_HANDLE_DB_NAME } from './services/UsbKey.service';
 import {
   isUsbRecoverySession,
@@ -1480,6 +1481,7 @@ if (isInServiceWorker) {
         sendResponse({ type: 'STORAGE_SYNC_BACKUPS', success: true, data: { log } });
       })
       .catch((error: unknown) => {
+        console.error('[STORAGE_SYNC_BACKUPS] updateBackups failed:', error);
         sendResponse({
           type: 'STORAGE_SYNC_BACKUPS',
           success: false,
@@ -1488,10 +1490,7 @@ if (isInServiceWorker) {
       });
   };
 
-  /**
-   * Repair local/remote divergence (e.g. v6 flipped remote-active without a full push).
-   * setActive(local) then setActive(remote) — merge both ways via toolbox, end remote-active.
-   */
+  /** Reconcile local and remote storage to the union of both; see storageReconcileBackground. */
   const processStorageRepairSync = async (sendResponse: CallbackResponse) => {
     try {
       await ensureWallet(true);
@@ -1521,21 +1520,19 @@ if (isInServiceWorker) {
         return;
       }
 
-      await accountContext.setActiveStorage('local');
-      await accountContext.setActiveStorage(remoteUrl);
-
-      const nextConfig = await updateStorageConfig((current) => {
-        const remotes = current.remotes ?? [];
-        const withTarget = remotes.includes(remoteUrl) ? remotes : [...remotes, remoteUrl];
-        return { ...current, activeRemote: remoteUrl, remotes: withTarget };
-      });
+      const record = await reconcileStorage(accountContext.storage, accountContext.syncContext.services, remoteUrl);
 
       sendResponse({
         type: 'STORAGE_REPAIR_SYNC',
         success: true,
-        data: { storageConfig: nextConfig },
+        data: {
+          unresolved: record.spendConflicts?.filter((c) => c.verdict.kind === 'unresolved').length ?? 0,
+          verified:
+            record.verify?.onlyLocal === 0 && record.verify.onlyRemote === 0 && !record.verify.mismatched.length,
+        },
       });
     } catch (error) {
+      console.error('[STORAGE_REPAIR_SYNC] reconcile failed:', error);
       sendResponse({
         type: 'STORAGE_REPAIR_SYNC',
         success: false,
@@ -2736,8 +2733,7 @@ if (isInServiceWorker) {
         }),
       );
 
-      const adminOriginator = `chrome-extension://${chrome.runtime.id}`;
-      const isAdmin = message.originator === adminOriginator;
+      const isAdmin = message.originator === ADMIN_ORIGINATOR;
       const usesSendAllSentinel = message.params.outputs?.some((o) => o.satoshis === 2099999999999999) === true;
       const signer = isAdmin && usesSendAllSentinel && accountContext?.baseWallet ? accountContext.baseWallet : w;
 

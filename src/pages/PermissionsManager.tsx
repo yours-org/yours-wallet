@@ -42,7 +42,7 @@ interface DomainEntry {
 
 const extractDomain = (originator: string): string => {
   try {
-    if (originator.startsWith('chrome-extension://')) {
+    if (originator === chrome.runtime.id) {
       return 'This wallet (internal)';
     }
     const url = new URL(originator.includes('://') ? originator : `https://${originator}`);

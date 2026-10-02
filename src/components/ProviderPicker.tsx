@@ -7,15 +7,17 @@ import { Theme } from '../theme.types';
 import { AuthFetch } from '@bsv/sdk';
 import type { WalletInterface } from '@bsv/sdk';
 import type { RemoteStatus, RemoteStatusResult } from '../hooks/useRemoteStatus';
-import { DEFAULT_STORAGE_REMOTE_URL } from '../utils/constants';
+import { DEFAULT_ACCOUNT_URL, DEFAULT_STORAGE_REMOTE_URL } from '../utils/constants';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-// Known providers only need identity + URL. Pricing comes from the server.
+// Known providers only need identity + URLs. Pricing comes from the account service.
 interface StorageProvider {
   id: string;
   name: string;
   url: string;
+  /** Base URL of the provider's account service (`/account/status`). */
+  accountUrl: string;
   description: string;
 }
 
@@ -25,6 +27,7 @@ export const KNOWN_PROVIDERS: StorageProvider[] = [
     id: 'a3e8c1d2-7f4b-4e9a-b6d0-1c5f8e2a9b3d',
     name: '1Sat Storage',
     url: DEFAULT_STORAGE_REMOTE_URL,
+    accountUrl: DEFAULT_ACCOUNT_URL,
     description: 'Official storage partner of Yours Wallet.',
   },
 ];
@@ -80,7 +83,7 @@ export const ProviderPicker = ({
   const [statusMap, setStatusMap] = useState<Record<string, RemoteStatusResult>>({});
   const [fetching, setFetching] = useState(true);
 
-  // Fetch /account/status from all known providers in parallel on mount
+  // Fetch /account/status from all known providers' account services in parallel on mount
   useEffect(() => {
     const fetchAll = async () => {
       setFetching(true);
@@ -88,7 +91,7 @@ export const ProviderPicker = ({
       const results = await Promise.all(
         KNOWN_PROVIDERS.map(async (p): Promise<[string, RemoteStatusResult]> => {
           try {
-            const res = await authFetch.fetch(`${p.url.replace(/\/$/, '')}/account/status`, { method: 'GET' });
+            const res = await authFetch.fetch(`${p.accountUrl}/account/status`, { method: 'GET' });
             if (!res.ok) return [p.url, { status: 'error', error: `HTTP ${res.status}` }];
             const data = (await res.json()) as RemoteStatus;
             return [p.url, { status: 'ok', data }];
