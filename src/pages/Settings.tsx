@@ -61,7 +61,7 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { PermissionsManager } from './PermissionsManager';
 import { StorageStatus } from './StorageStatus';
 import { REPAIR_PHASE_LABELS, useStorageRepair } from '../hooks/useStorageRepair';
-import type { ReconcileOutcome, ReconcileRecord } from '../services/storageReconcile';
+import { RECONCILE_RECORD_KEY, type ReconcileOutcome, type ReconcileRecord } from '../services/storageReconcile';
 import { YoursIcon } from '../components/YoursIcon';
 import activeCircle from '../assets/active-circle.png';
 import ProgressBar from '@ramonak/react-progress-bar';
@@ -277,6 +277,7 @@ export const Settings = () => {
     if (query === 'create-account') return 'create-account';
     if (query === 'restore-account') return 'restore-account';
     if (query === 'storage') return 'storage';
+    if (query === 'troubleshooting') return 'troubleshooting';
     return 'main';
   });
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
@@ -482,6 +483,7 @@ export const Settings = () => {
     else if (query === 'create-account') setPage('create-account');
     else if (query === 'restore-account') setPage('restore-account');
     else if (query === 'storage') setPage('storage');
+    else if (query === 'troubleshooting') setPage('troubleshooting');
   }, [query]);
 
   // Identity key comes from the wallet itself, not cached storage. The popup's
@@ -1053,11 +1055,16 @@ export const Settings = () => {
 
   const handleRepairSync = async () => {
     if (repairOutcome === 'running') return;
+    // Once a run starts, the overlay shows its result; only a refusal before
+    // that (no remote, wallet unavailable) needs a snackbar.
+    const before = repairRecord?.startedAt;
     try {
       const response = await runRepair();
-      if (!response?.success) addSnackbar(response?.error ?? 'Repair failed', 'error');
-      else if (response.data?.outcome === 'clean') addSnackbar('Repair complete: local and remote match', 'success');
-      else addSnackbar('Repair finished with differences left', 'info');
+      if (response?.success) return;
+      const after = (await chrome.storage.local.get(RECONCILE_RECORD_KEY))[RECONCILE_RECORD_KEY] as
+        | ReconcileRecord
+        | undefined;
+      if (after?.startedAt === before) addSnackbar(response?.error ?? 'Repair failed', 'error');
     } catch (error) {
       addSnackbar(error instanceof Error ? error.message : 'Repair failed', 'error');
     }
