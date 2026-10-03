@@ -46,19 +46,20 @@ export const formatNumberWithCommasAndDecimals = (number: number, decimalPlaces 
   return number.toLocaleString(undefined, options);
 };
 
+/** Balance display: up to `decimalPlaces` decimals, trailing zeros dropped (238,095 not 238,095.00000000). */
 export const formatLargeNumber = (number: number, decimalPlaces = 3): string => {
   if (isNaN(number)) {
     return 'Invalid Number';
   }
 
   if (number >= 1e9) {
-    return `${(number / 1e9).toFixed(decimalPlaces)} B`; // Billion
+    return `${removeTrailingZeros((number / 1e9).toFixed(decimalPlaces))} B`; // Billion
   } else if (number >= 1e6) {
-    return `${(number / 1e6).toFixed(decimalPlaces)} M`; // Million
+    return `${removeTrailingZeros((number / 1e6).toFixed(decimalPlaces))} M`; // Million
   }
 
   // For numbers below 1 million, use the existing formatting function
-  return formatNumberWithCommasAndDecimals(number, decimalPlaces);
+  return removeTrailingZeros(formatNumberWithCommasAndDecimals(number, decimalPlaces));
 };
 
 export const convertToTokenValue = (balance: number, decimals: number): number => {
