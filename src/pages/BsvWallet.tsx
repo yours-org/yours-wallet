@@ -1962,6 +1962,8 @@ export const BsvWallet = () => {
         <ManageTokens
           onBack={() => {
             setManageFavorites(false);
+            // Favorites are already saved; show them now rather than after the balance fetch.
+            setAccount(chromeStorageService.getCurrentAccountObject().account);
             getAndSetAccountAndBsv21s();
             setRandomKey(Math.random());
           }}
