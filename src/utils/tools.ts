@@ -191,6 +191,21 @@ export const getErrorMessage = (error: string | unknown | undefined) => {
     case 'overlay-validation-failed':
       return 'Could not validate tokens against the overlay!';
 
+    case 'token-not-active':
+      return 'The token overlay is not funded, so your tokens cannot be validated.';
+
+    case 'token-not-found':
+      return 'The token overlay has no record of this token.';
+
+    case 'tokens-queued':
+      return 'Your tokens are still waiting to be validated by the overlay. Try again shortly.';
+
+    case 'insufficient-valid-tokens':
+      return 'Not enough of your tokens are validated by the overlay to cover this transfer.';
+
+    case 'unvalidated-inputs':
+      return 'None of these tokens are validated by the overlay, so they were not swept.';
+
     case 'source-tx-not-found':
       return 'Source transaction not found!';
 

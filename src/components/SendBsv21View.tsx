@@ -10,11 +10,12 @@ import { getErrorMessage } from '../utils/tools';
 import { isUri } from '../utils/uri';
 import { Input } from './Input';
 import { SendConfirmation, type SendLineItem } from './SendConfirmation';
+import { Bsv21OverlayPrompt, type Bsv21OverlayIssue } from './Bsv21OverlayPrompt';
 import { Show } from './Show';
 import { CoinHistory } from './CoinHistory';
-import { ONESAT_MAINNET_CONTENT_URL, sendBsv21, type Bsv21Balance } from '@1sat/actions';
+import { ONESAT_MAINNET_CONTENT_URL, fundBsv21Overlay, sendBsv21, type Bsv21Balance } from '@1sat/actions';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, ShoppingCart, Send, Copy, Check, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ShoppingCart, Send, Copy, Check, Plus, Trash2 } from 'lucide-react';
 
 export interface Token {
   isConfirmed: boolean;
@@ -38,6 +39,19 @@ type Bsv21Recipient = {
   amountInput: string;
 };
 
+/** sendBsv21 errors that mean the overlay could not validate the transfer. */
+const OVERLAY_ISSUES: Record<string, Bsv21OverlayIssue> = {
+  'token-not-active': 'not-active',
+  'tokens-queued': 'queued',
+  'insufficient-valid-tokens': 'not-valid',
+  'token-not-found': 'not-found',
+};
+
+const WARN = '#F79009';
+
+/** Overlay status of the token, for the pill beside the token ID. */
+type OverlayStatus = 'active' | 'inactive' | 'unknown';
+
 const newRecipient = (): Bsv21Recipient => ({
   id: crypto.randomUUID(),
   address: '',
@@ -58,6 +72,14 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
     onConfirm: () => void;
   } | null>(null);
   const [successTxId, setSuccessTxId] = useState('');
+  const [overlayStatus, setOverlayStatus] = useState<OverlayStatus | null>(null);
+  const [overlayPrompt, setOverlayPrompt] = useState<{
+    issue: Bsv21OverlayIssue;
+    recipients: { address: string; amount: bigint }[];
+    total: bigint;
+    fundingSats?: number;
+  } | null>(null);
+  const [overlayProcessing, setOverlayProcessing] = useState<string | undefined>();
   const sentAtomicRef = useRef<bigint>(0n);
   const [copied, setCopied] = useState(false);
   const baseUrl = ONESAT_MAINNET_CONTENT_URL;
@@ -73,6 +95,23 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
     void onBack(sentAtomicRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [successTxId]);
+
+  const refreshOverlayStatus = async () => {
+    const bsv21 = apiContext.services?.bsv21;
+    if (!bsv21 || !token.info.id) return;
+    try {
+      const details = await bsv21.getTokenDetails(token.info.id, { fresh: true });
+      setOverlayStatus(details.status?.is_active ? 'active' : 'inactive');
+    } catch (error) {
+      console.error('[SendBsv21View] overlay status lookup failed:', error);
+      setOverlayStatus('unknown');
+    }
+  };
+
+  useEffect(() => {
+    void refreshOverlayStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token.info.id]);
 
   const toAtomic = (input: string): bigint | null => {
     if (!input || input === '.' || input === '0.') return null;
@@ -179,35 +218,104 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
       onConfirm: async () => {
         setSendConfirmation(null);
         setIsProcessing(true);
-
-        let sendRes: Awaited<ReturnType<typeof sendBsv21.execute>>;
-        try {
-          sendRes = await sendBsv21.execute(apiContext, {
-            tokenId: token.info.id!,
-            recipients: sendRecipients.map((r) => ({
-              amount: r.amount,
-              destination: { address: r.address },
-            })),
-          });
-        } catch (error) {
-          console.error('[SendBsv21View] sendBsv21.execute threw:', error);
-          setIsProcessing(false);
-          addSnackbar(getErrorMessage(error), 'error');
-          return;
-        }
-
-        if (!sendRes.txid || sendRes.error) {
-          console.error('[SendBsv21View] sendBsv21 error:', sendRes.error);
-          setIsProcessing(false);
-          addSnackbar(getErrorMessage(sendRes.error), 'error');
-          return;
-        }
-
-        sentAtomicRef.current = total;
-        setSuccessTxId(sendRes.txid);
-        addSnackbar('Tokens Sent!', 'success');
+        await runSend(sendRecipients, total, true);
       },
     });
+  };
+
+  /**
+   * Send through sendBsv21. With validateOverlay, an overlay error opens the
+   * overlay prompt so the user can fund the overlay or send unverified.
+   */
+  const runSend = async (
+    sendRecipients: { address: string; amount: bigint }[],
+    total: bigint,
+    validateOverlay: boolean,
+  ) => {
+    let sendRes: Awaited<ReturnType<typeof sendBsv21.execute>>;
+    try {
+      sendRes = await sendBsv21.execute(apiContext, {
+        tokenId: token.info.id!,
+        recipients: sendRecipients.map((r) => ({
+          amount: r.amount,
+          destination: { address: r.address },
+        })),
+        validateOverlay,
+      });
+    } catch (error) {
+      console.error('[SendBsv21View] sendBsv21.execute threw:', error);
+      setIsProcessing(false);
+      addSnackbar(getErrorMessage(error), 'error');
+      return;
+    }
+
+    if (!sendRes.txid || sendRes.error) {
+      console.error('[SendBsv21View] sendBsv21 error:', sendRes.error);
+      setIsProcessing(false);
+      const issue = validateOverlay && sendRes.error ? OVERLAY_ISSUES[sendRes.error] : undefined;
+      if (issue) {
+        await openOverlayPrompt(issue, sendRecipients, total);
+        return;
+      }
+      addSnackbar(getErrorMessage(sendRes.error), 'error');
+      return;
+    }
+
+    setOverlayPrompt(null);
+    sentAtomicRef.current = total;
+    setSuccessTxId(sendRes.txid);
+    addSnackbar('Tokens Sent!', 'success');
+  };
+
+  const openOverlayPrompt = async (
+    issue: Bsv21OverlayIssue,
+    sendRecipients: { address: string; amount: bigint }[],
+    total: bigint,
+  ) => {
+    let fundingSats: number | undefined;
+    if (issue === 'not-active') {
+      try {
+        const template = await apiContext.services!.bsv21.getFundingTemplate(token.info.id!);
+        fundingSats = template.outputs.reduce((sum, o) => sum + o.satoshis, 0) || undefined;
+      } catch (error) {
+        console.error('[SendBsv21View] funding template lookup failed:', error);
+      }
+    }
+    setOverlayPrompt({ issue, recipients: sendRecipients, total, fundingSats });
+  };
+
+  const handleFundOverlay = async () => {
+    setOverlayProcessing('Funding overlay...');
+    try {
+      const res = await fundBsv21Overlay.execute(apiContext, { tokenId: token.info.id! });
+      if (res.error === 'funding-not-needed') {
+        addSnackbar(`The ${tokenName} overlay is already funded. Try sending again.`, 'info');
+      } else if (res.error === 'funding-submit-failed') {
+        addSnackbar('Funding sent. The overlay will pick it up within about 20 minutes.', 'info');
+      } else if (res.error) {
+        addSnackbar(getErrorMessage(res.error), 'error');
+        return;
+      } else {
+        addSnackbar(`${tokenName} overlay funded. Your tokens will be validated shortly.`, 'success');
+      }
+      setOverlayPrompt(null);
+      await refreshOverlayStatus();
+    } catch (error) {
+      console.error('[SendBsv21View] fundBsv21Overlay threw:', error);
+      addSnackbar(getErrorMessage(error), 'error');
+    } finally {
+      setOverlayProcessing(undefined);
+    }
+  };
+
+  const handleSendUnverified = async () => {
+    if (!overlayPrompt) return;
+    setOverlayProcessing('Sending...');
+    try {
+      await runSend(overlayPrompt.recipients, overlayPrompt.total, false);
+    } finally {
+      setOverlayProcessing(undefined);
+    }
   };
 
   const gray = theme.color.global.gray;
@@ -270,21 +378,43 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
               </span>
             </div>
 
-            {/* Token ID copy chip */}
-            <Show when={!!token.info.id}>
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={handleCopyId}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full border-0 outline-none cursor-pointer"
-                style={{ background: `${gray}12` }}
-                title="Copy token ID"
-              >
-                {copied ? <Check size={10} style={{ color: accent }} /> : <Copy size={10} style={{ color: gray }} />}
-                <span className="text-[10px] font-mono" style={{ color: gray }}>
-                  {truncate(token.info.id, 8, 6)}
-                </span>
-              </motion.button>
-            </Show>
+            {/* Token ID copy chip, with the overlay status when it needs attention */}
+            <div className="flex items-center gap-1.5">
+              <Show when={!!token.info.id}>
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={handleCopyId}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full border-0 outline-none cursor-pointer"
+                  style={{ background: `${gray}12` }}
+                  title="Copy token ID"
+                >
+                  {copied ? <Check size={10} style={{ color: accent }} /> : <Copy size={10} style={{ color: gray }} />}
+                  <span className="text-[10px] font-mono" style={{ color: gray }}>
+                    {truncate(token.info.id, 8, 6)}
+                  </span>
+                </motion.button>
+              </Show>
+
+              <Show when={overlayStatus === 'inactive' || overlayStatus === 'unknown'}>
+                <div
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full"
+                  style={{ background: overlayStatus === 'inactive' ? `${WARN}1A` : `${gray}12` }}
+                  title={
+                    overlayStatus === 'inactive'
+                      ? 'The overlay is not funded for this token, so it cannot validate your tokens before you send them'
+                      : 'The overlay could not be reached'
+                  }
+                >
+                  <AlertTriangle size={10} style={{ color: overlayStatus === 'inactive' ? WARN : gray }} />
+                  <span
+                    className="text-[10px] font-semibold"
+                    style={{ color: overlayStatus === 'inactive' ? WARN : gray }}
+                  >
+                    {overlayStatus === 'inactive' ? 'Not validated' : 'Overlay offline'}
+                  </span>
+                </div>
+              </Show>
+            </div>
           </div>
 
           {/* Send form */}
@@ -444,6 +574,17 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
         isProcessing={isProcessing}
         onConfirm={() => sendConfirmation?.onConfirm()}
         onCancel={() => setSendConfirmation(null)}
+      />
+      <Bsv21OverlayPrompt
+        show={!!overlayPrompt}
+        theme={theme}
+        issue={overlayPrompt?.issue ?? 'not-active'}
+        tokenName={tokenName}
+        fundingSats={overlayPrompt?.fundingSats}
+        processingMessage={overlayProcessing}
+        onFund={() => void handleFundOverlay()}
+        onSendUnverified={() => void handleSendUnverified()}
+        onCancel={() => setOverlayPrompt(null)}
       />
     </Show>
   );
