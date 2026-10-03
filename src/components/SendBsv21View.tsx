@@ -12,6 +12,7 @@ import { Input } from './Input';
 import { SendConfirmation, type SendLineItem } from './SendConfirmation';
 import { Bsv21OverlayPrompt, type Bsv21OverlayIssue } from './Bsv21OverlayPrompt';
 import { Show } from './Show';
+import { SpeedBump } from './SpeedBump';
 import { CoinHistory } from './CoinHistory';
 import { ONESAT_MAINNET_CONTENT_URL, fundBsv21Overlay, sendBsv21, type Bsv21Balance } from '@1sat/actions';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -80,6 +81,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
     fundingSats?: number;
   } | null>(null);
   const [overlayProcessing, setOverlayProcessing] = useState<string | undefined>();
+  const [confirmUnverified, setConfirmUnverified] = useState(false);
   const sentAtomicRef = useRef<bigint>(0n);
   const [copied, setCopied] = useState(false);
   const baseUrl = ONESAT_MAINNET_CONTENT_URL;
@@ -583,8 +585,18 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
         fundingSats={overlayPrompt?.fundingSats}
         processingMessage={overlayProcessing}
         onFund={() => void handleFundOverlay()}
-        onSendUnverified={() => void handleSendUnverified()}
+        onSendUnverified={() => setConfirmUnverified(true)}
         onCancel={() => setOverlayPrompt(null)}
+      />
+      <SpeedBump
+        theme={theme}
+        showSpeedBump={confirmUnverified}
+        message={`Sending unverified skips the check that your ${tokenName} are valid. If any token this transfer spends is invalid, the whole transfer is invalid and every token in it is permanently lost, including the valid ones. Only continue if you trust where these tokens came from.`}
+        onCancel={() => setConfirmUnverified(false)}
+        onConfirm={() => {
+          setConfirmUnverified(false);
+          void handleSendUnverified();
+        }}
       />
     </Show>
   );
