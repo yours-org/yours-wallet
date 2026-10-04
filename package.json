@@ -4,19 +4,19 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@1sat/actions": "0.0.232",
-    "@1sat/client": "0.0.61",
-    "@1sat/connect": "0.0.103",
-    "@1sat/permission-module": "0.0.75",
-    "@1sat/permission-module-ui": "0.0.70",
-    "@1sat/sweep-ui": "0.0.110",
+    "@1sat/actions": "0.0.233",
+    "@1sat/client": "0.0.62",
+    "@1sat/connect": "0.0.104",
+    "@1sat/permission-module": "0.0.76",
+    "@1sat/permission-module-ui": "0.0.71",
+    "@1sat/sweep-ui": "0.0.111",
     "@1sat/templates": "0.0.43",
     "@1sat/types": "0.0.52",
     "@1sat/utils": "0.0.42",
-    "@1sat/wallet": "0.0.118",
-    "@1sat/wallet-browser": "0.0.104",
+    "@1sat/wallet": "0.0.119",
+    "@1sat/wallet-browser": "0.0.105",
     "@bsv/sdk": "^2.5.0",
-    "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.14.6",
+    "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.14.7",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@hello-pangea/dnd": "^18.0.1",
     "@mnee/ts-sdk": "^1.0.1",
@@ -89,11 +89,11 @@
     "vite-plugin-node-polyfills": "^0.24.0"
   },
   "overrides": {
-    "@1sat/client": "0.0.61",
+    "@1sat/client": "0.0.62",
     "@1sat/types": "0.0.52",
     "@1sat/templates": "0.0.43",
     "@1sat/utils": "0.0.42",
-    "@1sat/wallet": "0.0.118",
-    "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.14.6"
+    "@1sat/wallet": "0.0.119",
+    "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.14.7"
   }
 }
