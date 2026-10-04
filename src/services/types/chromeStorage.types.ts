@@ -14,6 +14,8 @@ import { StoredUtxo } from './bsv.types';
 
 export type Settings = {
   socialProfile: SocialProfile;
+  /** Default BRC-169 "from" handle, as `@handle@domain`; null or unset when none is chosen. */
+  defaultHandle?: string | null;
   favoriteTokens: string[];
   customFeeRate: number;
   /** Auto-lock timeout in minutes. Defaults to 10. */

@@ -37,11 +37,13 @@ import { SpeedBump } from '../components/SpeedBump';
 import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useIdentity, resolveImageUrl } from '../hooks/useIdentity';
+import { useHandles } from '../hooks/useHandles';
+import { formatHandle } from '../services/handles';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
-import { DISCORD_SUPPORT_URL, FEE_PER_KB } from '../utils/constants';
+import { DISCORD_SUPPORT_URL, FEE_PER_KB, HANDLE_REGISTRATION_URL } from '../utils/constants';
 import { ChromeStorageObject, UsbBackupAccountStatus, UsbSecurity } from '../services/types/chromeStorage.types';
 import {
   deleteHandle,
@@ -283,6 +285,7 @@ export const Settings = () => {
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const identity = useIdentity(apiContext, chromeStorageService);
+  const heldHandles = useHandles(apiContext.wallet);
   const [exportKeysQrData, setExportKeysAsQrData] = useState('');
   const [shouldVisibleExportedKeys, setShouldVisibleExportedKeys] = useState(false);
   const [enteredName, setEnteredName] = useState(identity.profile.name);
@@ -308,6 +311,9 @@ export const Settings = () => {
   const [backupDone, setBackupDone] = useState(false);
   const [backupError, setBackupError] = useState('');
   const currentAccount = chromeStorageService.getCurrentAccountObject();
+  const [defaultHandle, setDefaultHandle] = useState<string | null>(
+    currentAccount.account?.settings.defaultHandle ?? null,
+  );
   const [customFeeRate, setCustomFeeRate] = useState(currentAccount.account?.settings.customFeeRate ?? FEE_PER_KB);
   const [lockTimeout, setLockTimeout] = useState(currentAccount.account?.settings.lockTimeout ?? 10);
   const [selectedAccountIdentityAddress, setSelectedAccountIdentityAddress] = useState<string | undefined>();
@@ -801,6 +807,20 @@ export const Settings = () => {
     await chromeStorageService.updateNested(key, update);
     chrome.runtime.sendMessage({ action: 'UPDATE_FEE_RATE', feeRate: rate }).catch(() => {});
   }, [customFeeRate, chromeStorageService, currentAccount, addSnackbar]);
+
+  const handleSelectDefaultHandle = async (handle: string) => {
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) return;
+    setDefaultHandle(handle);
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [selectedAccount]: {
+        ...account,
+        settings: { ...account.settings, defaultHandle: handle },
+      },
+    };
+    await chromeStorageService.updateNested(key, update);
+  };
 
   const commitLockTimeout = useCallback(async () => {
     let minutes = lockTimeout;
@@ -1442,6 +1462,59 @@ export const Settings = () => {
           )}
         </motion.div>
       )}
+
+      {/* BRC-169 handles held as certificates; the chosen one is the default "from" */}
+      <div className="w-full mt-6">
+        <p className="text-[9px] uppercase tracking-wider mb-2" style={{ color: '#475467' }}>
+          Handles
+        </p>
+        {heldHandles.loading ? (
+          <div className="flex items-center justify-center py-3">
+            <Loader2 size={16} className="animate-spin" style={{ color: '#98A2B3' }} />
+          </div>
+        ) : heldHandles.error ? (
+          <p className="text-xs" style={{ color: '#F97066' }}>
+            {heldHandles.error}
+          </p>
+        ) : heldHandles.handles.length === 0 ? (
+          <p className="text-xs" style={{ color: '#98A2B3' }}>
+            No handles yet.{' '}
+            <button
+              onClick={() => window.open(HANDLE_REGISTRATION_URL, '_blank')}
+              className="underline cursor-pointer"
+              style={{ color: '#A1FF8B' }}
+            >
+              Register a handle
+            </button>
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {heldHandles.handles.map((h) => {
+              const value = formatHandle(h);
+              return (
+                <label
+                  key={h.serialNumber}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer"
+                  style={{ backgroundColor: '#17191E', border: '1px solid rgba(152,162,179,0.15)' }}
+                >
+                  <input
+                    type="radio"
+                    name="default-handle"
+                    checked={defaultHandle === value}
+                    onChange={() => handleSelectDefaultHandle(value)}
+                  />
+                  <span className="text-xs" style={{ color: '#FFFFFF' }}>
+                    {value}
+                  </span>
+                </label>
+              );
+            })}
+            <p className="text-[10px]" style={{ color: '#667085' }}>
+              The selected handle is your default "from".
+            </p>
+          </div>
+        )}
+      </div>
     </motion.div>
   );
 
