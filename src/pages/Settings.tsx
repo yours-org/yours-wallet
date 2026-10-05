@@ -61,7 +61,12 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { PermissionsManager } from './PermissionsManager';
 import { StorageStatus } from './StorageStatus';
 import { REPAIR_PHASE_LABELS, useStorageRepair } from '../hooks/useStorageRepair';
-import { RECONCILE_RECORD_KEY, type ReconcileOutcome, type ReconcileRecord } from '../services/storageReconcile';
+import {
+  RECONCILE_HISTORY_KEY,
+  RECONCILE_RECORD_KEY,
+  type ReconcileOutcome,
+  type ReconcileRecord,
+} from '../services/storageReconcile';
 import { YoursIcon } from '../components/YoursIcon';
 import activeCircle from '../assets/active-circle.png';
 import ProgressBar from '@ramonak/react-progress-bar';
@@ -1070,10 +1075,14 @@ export const Settings = () => {
     }
   };
 
-  const handleCopyRepairLog = () => {
+  const handleCopyRepairLog = async () => {
     if (!repairRecord) return;
-    navigator.clipboard.writeText(JSON.stringify(repairRecord, null, 2));
-    addSnackbar('Repair log copied', 'success');
+    // The recent finished runs, newest first; the live record covers a run still in progress.
+    const history = ((await chrome.storage.local.get(RECONCILE_HISTORY_KEY))[RECONCILE_HISTORY_KEY] ??
+      []) as ReconcileRecord[];
+    const runs = history.some((r) => r.startedAt === repairRecord.startedAt) ? history : [repairRecord, ...history];
+    navigator.clipboard.writeText(JSON.stringify(runs, null, 2));
+    addSnackbar(`Repair log copied (${runs.length} run${runs.length === 1 ? '' : 's'})`, 'success');
   };
 
   const troubleshootingPage = (

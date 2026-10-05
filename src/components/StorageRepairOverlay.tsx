@@ -15,9 +15,9 @@ const DIM = '#475467';
 /** The reconcile's phases, grouped into the few steps the user sees. */
 const STEPS: { label: string; phases: ReconcilePhase[] }[] = [
   { label: 'Reading wallet data', phases: ['read-local', 'read-remote'] },
-  { label: 'Checking spends on chain', phases: ['check-chain'] },
+  { label: 'Checking proofs and spends', phases: ['check-proofs', 'check-chain'] },
   { label: 'Syncing records', phases: ['push-to-remote', 'push-to-local', 'apply-corrections', 'push-corrections'] },
-  { label: 'Verifying', phases: ['verify'] },
+  { label: 'Verifying', phases: ['verify', 'verify-resync'] },
 ];
 
 type StepState = 'done' | 'active' | 'failed' | 'pending';

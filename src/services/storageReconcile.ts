@@ -8,6 +8,9 @@ import type { sdk } from '@bsv/wallet-toolbox-client';
 
 /** chrome.storage.local key holding the last reconcile run on this device. */
 export const RECONCILE_RECORD_KEY = 'storageReconcileLastRun';
+/** chrome.storage.local key holding the most recent finished runs, newest first. */
+export const RECONCILE_HISTORY_KEY = 'storageReconcileHistory';
+export const RECONCILE_HISTORY_LIMIT = 5;
 
 type TransactionStatus = sdk.TransactionStatus;
 
@@ -242,12 +245,36 @@ export type ReconcileTrigger = 'migration' | 'manual';
 export type ReconcilePhase =
   | 'read-local'
   | 'read-remote'
+  | 'check-proofs'
   | 'check-chain'
   | 'push-to-remote'
   | 'push-to-local'
   | 'apply-corrections'
   | 'push-corrections'
-  | 'verify';
+  | 'verify'
+  | 'verify-resync';
+
+/** A local proven-tx row the run checked because the server would refuse it. */
+export interface ProofRepair {
+  txid: string;
+  /** Found while reading local, in a chunk the server rejected, or among proofs copied in from the remote. */
+  stage: 'preflight' | 'rejected' | 'imported';
+  reason: string;
+  result: 'fixed' | 'refetched' | 'unrepaired';
+}
+
+export interface VerifyResult {
+  onlyLocal: number;
+  onlyRemote: number;
+  mismatched: string[];
+  /** Which records were still on one side only, for the log. */
+  onlyLocalKeys?: OneSided;
+  onlyRemoteKeys?: OneSided;
+}
+
+/** Both stores hold the same records and every settled spend matches. */
+export const isSettled = (v: VerifyResult): boolean =>
+  v.onlyLocal === 0 && v.onlyRemote === 0 && v.mismatched.length === 0;
 
 export interface ReconcileRecord {
   startedAt: string;
@@ -255,6 +282,8 @@ export interface ReconcileRecord {
   trigger: ReconcileTrigger;
   appVersion: string;
   remoteUrl: string;
+  /** Identity key of the account the run was for. */
+  identityKey?: string;
   /** Phase in progress, or the one that failed once the run has finished with an error. */
   phase?: ReconcilePhase;
   /** Items read or pushed so far in the current phase. */
@@ -269,8 +298,14 @@ export interface ReconcileRecord {
   pushedToLocal?: { inserts: number; updates: number };
   pushedCorrections?: { inserts: number; updates: number };
   spendConflicts?: Array<SpendConflict & { verdict: SpendVerdict }>;
+  proofRepairs?: ProofRepair[];
+  /** Chunks the server refused although every proof in them passed the checks here. */
+  rejectedChunks?: Array<{ message: string; txids: string[] }>;
   corrected?: string[];
-  verify?: { onlyLocal: number; onlyRemote: number; mismatched: string[] };
+  verify?: VerifyResult;
+  /** The first check, kept when it found differences and the run re-synced and checked again. */
+  firstVerify?: VerifyResult;
+  pushedOnResync?: { toRemote: { inserts: number; updates: number }; toLocal: { inserts: number; updates: number } };
   error?: string;
   errorStack?: string;
   /** Set once the user has dismissed the result of a migration run. */
@@ -283,8 +318,5 @@ export const reconcileOutcome = (r: ReconcileRecord): ReconcileOutcome => {
   if (!r.finishedAt) return 'running';
   if (r.error) return 'failed';
   const unresolved = r.spendConflicts?.some((c) => c.verdict.kind === 'unresolved') ?? false;
-  const v = r.verify;
-  return v && v.onlyLocal === 0 && v.onlyRemote === 0 && v.mismatched.length === 0 && !unresolved
-    ? 'clean'
-    : 'differences';
+  return r.verify && isSettled(r.verify) && !unresolved ? 'clean' : 'differences';
 };

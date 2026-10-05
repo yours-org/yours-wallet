@@ -11,12 +11,14 @@ import { sendMessageAsync } from '../utils/chromeHelpers';
 export const REPAIR_PHASE_LABELS: Record<ReconcilePhase, string> = {
   'read-local': 'Reading local storage',
   'read-remote': 'Reading remote storage',
+  'check-proofs': 'Repairing transaction proofs',
   'check-chain': 'Checking spends on chain',
   'push-to-remote': 'Copying local records to remote',
   'push-to-local': 'Copying remote records to local',
   'apply-corrections': 'Applying spend corrections',
   'push-corrections': 'Sending corrections to remote',
   verify: 'Verifying both stores match',
+  'verify-resync': 'Re-syncing changes made during the repair',
 };
 
 export type RepairResponse = { success: boolean; error?: string; data?: { outcome: ReconcileOutcome } };

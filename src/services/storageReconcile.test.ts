@@ -8,6 +8,7 @@ import {
   emptyIndex,
   indexChunk,
   initialOffsets,
+  isSettled,
   isFinalChunk,
   matchesVerdict,
   type ReconcileRecord,
@@ -185,5 +186,13 @@ describe('reconcileOutcome', () => {
 
   test('a finished run without a verify step is not clean', () => {
     expect(reconcileOutcome(finished)).toBe('differences');
+  });
+});
+
+describe('isSettled', () => {
+  test('settled only with nothing one-sided and nothing mismatched', () => {
+    expect(isSettled({ onlyLocal: 0, onlyRemote: 0, mismatched: [] })).toBe(true);
+    expect(isSettled({ onlyLocal: 0, onlyRemote: 2, mismatched: [] })).toBe(false);
+    expect(isSettled({ onlyLocal: 0, onlyRemote: 0, mismatched: [`${A}.0`] })).toBe(false);
   });
 });
