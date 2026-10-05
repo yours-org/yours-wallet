@@ -119,6 +119,8 @@ export interface ManifestAccount {
   /** Chunks the last full pass wrote: the compaction threshold scales with it. */
   snapshotChunks?: number;
   lastFullPassAt?: string;
+  /** When the last completed full pass started; a full-pass request after it forces a new one. */
+  lastFullPassStartedAt?: string;
   /** Which store was active when this generation started. A change forces a full pass. */
   storageMode?: StorageMode;
   /** Plaintext bytes written in this generation. */
@@ -215,6 +217,7 @@ export const finishPass = (entry: ManifestAccount, wroteAny: boolean, now: strin
     lastBackupAt: wroteAny || !entry.lastBackupAt ? now : entry.lastBackupAt,
     snapshotChunks: wasFullPass ? entry.chunkCount : entry.snapshotChunks,
     lastFullPassAt: wasFullPass ? now : entry.lastFullPassAt,
+    lastFullPassStartedAt: wasFullPass ? (passStartedAt ?? now) : entry.lastFullPassStartedAt,
   };
 };
 
@@ -224,10 +227,25 @@ export const finishPass = (entry: ManifestAccount, wroteAny: boolean, now: strin
  * floor), and not more often than `MIN_COMPACT_INTERVAL_MS`. By time: after
  * `FULL_PASS_INTERVAL_MS`. Always: when the active store changed, since rows
  * copied in from the other store carry timestamps the cursor already passed.
+ * Likewise when a storage repair asked for one (`Account.usbFullPassRequestedAt`)
+ * after the last full pass started: the repair copies remote rows into local
+ * with their original timestamps.
  */
-export const needsCompaction = (entry: ManifestAccount, storageMode: StorageMode, nowMs: number): boolean => {
+export const needsCompaction = (
+  entry: ManifestAccount,
+  storageMode: StorageMode,
+  nowMs: number,
+  fullPassRequestedAt?: string,
+): boolean => {
   if (!entry.complete) return false;
   if (entry.storageMode !== undefined && entry.storageMode !== storageMode) return true;
+  if (
+    fullPassRequestedAt &&
+    (!entry.lastFullPassStartedAt ||
+      new Date(fullPassRequestedAt).getTime() > new Date(entry.lastFullPassStartedAt).getTime())
+  ) {
+    return true;
+  }
   const lastFull = entry.lastFullPassAt ?? entry.lastBackupAt;
   const age = lastFull ? nowMs - new Date(lastFull).getTime() : Infinity;
   if (age >= FULL_PASS_INTERVAL_MS) return true;
@@ -669,7 +687,7 @@ const syncStick = async (
         live = newManifestEntry(identityKey, identityAddress, account.name, storageMode);
         manifest.accounts[identityAddress] = live;
         manifestDirty = true;
-      } else if (live && !building && needsCompaction(live, storageMode, Date.now())) {
+      } else if (live && !building && needsCompaction(live, storageMode, Date.now(), account.usbFullPassRequestedAt)) {
         // Generational compaction: the new full pass goes to a fresh folder
         // while `live` stays restorable. The swap happens when it completes.
         building = newManifestEntry(identityKey, identityAddress, account.name, storageMode);

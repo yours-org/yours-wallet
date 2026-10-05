@@ -394,7 +394,9 @@ export class WalletBackupService {
       // ── Legacy restore (keys only) ──────────────────────────────
       onProgress({ stage: 'importing', message: 'Detected older backup format. Restoring account keys...' });
 
-      const legacyStorage = this.stripUsbState(JSON.parse(chromeStorageJson) as LegacyChromeStorage);
+      const legacyStorage = this.reopenDataMigrations(
+        this.stripUsbState(JSON.parse(chromeStorageJson) as LegacyChromeStorage),
+      );
       const passKey = await this.verifyPasswordKey(legacyStorage, passwordKey);
 
       onProgress({ stage: 'importing', message: 'Restoring account settings...' });
@@ -426,7 +428,9 @@ export class WalletBackupService {
       throw new Error(`Unsupported backup version: ${(manifest as { version: number }).version}`);
     }
 
-    const backupChromeStorage = this.stripUsbState(JSON.parse(chromeStorageJson) as BackupChromeStorage);
+    const backupChromeStorage = this.reopenDataMigrations(
+      this.stripUsbState(JSON.parse(chromeStorageJson) as BackupChromeStorage),
+    );
     const passKey = await this.verifyPasswordKey(backupChromeStorage, passwordKey);
 
     onProgress({ stage: 'importing', message: 'Restoring account settings...' });
@@ -522,6 +526,19 @@ export class WalletBackupService {
       out[id] = { ...rest, encryptedKeys: reEncrypted };
     }
     return out;
+  }
+
+  /**
+   * A restored store can be days behind the remote, which is when the storage
+   * repair (wallet-data migration 2) matters most. Wind any account past it
+   * back to 1 so the repair runs the first time each restored account opens.
+   */
+  private static reopenDataMigrations<T extends { accounts: Record<string, Account> }>(storage: T): T {
+    const accounts: Record<string, Account> = {};
+    for (const [id, account] of Object.entries(storage.accounts || {})) {
+      accounts[id] = (account.dataVersion ?? 0) > 1 ? { ...account, dataVersion: 1 } : account;
+    }
+    return { ...storage, accounts };
   }
 
   /** Archives never carry USB state, but strip defensively so a hand-edited file can't smuggle it in. */

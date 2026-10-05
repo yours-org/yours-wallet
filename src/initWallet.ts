@@ -18,7 +18,7 @@ import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
 import { initSyncContext, type SyncContext } from './initSyncContext';
 import { refileLegacyBaskets } from './services/legacyBaskets';
-import { reconcileStorage } from './services/storageReconcileBackground';
+import { reconcileStorage, requestUsbFullPass } from './services/storageReconcileBackground';
 import { showOneSatPrompt } from './services/oneSatPrompt';
 
 // Admin originator for the extension (bypasses all permission checks). The bare
@@ -346,6 +346,9 @@ export const initWallet = async (
       mark('storage reconcile migration start');
       await reconcileStorage(storage, syncContext.services, remoteUrl, 'migration').catch((err) =>
         console.error('[initWallet] storage reconcile migration failed:', err),
+      );
+      await requestUsbFullPass(chromeStorageService, keys.identityAddress).catch((err) =>
+        console.error('[initWallet] could not request a USB full pass:', err),
       );
       mark('storage reconcile migration done');
     }

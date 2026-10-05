@@ -158,3 +158,41 @@ describe('cursor helpers', () => {
     expect(backupAad('ab', 'keys')).not.toBe(backupAad('cd', 'keys'));
   });
 });
+
+describe('repair full-pass requests', () => {
+  const now = Date.parse('2026-10-05T12:00:00.000Z');
+  const entry = {
+    identityKey: 'k',
+    identityAddress: 'a',
+    name: 'A',
+    dir: 'd',
+    chunkCount: 1,
+    offsets: [],
+    complete: true,
+    bytes: 0,
+    lastFullPassAt: '2026-10-05T11:00:00.000Z',
+    lastFullPassStartedAt: '2026-10-05T10:59:00.000Z',
+  } as unknown as Parameters<typeof needsCompaction>[0];
+
+  test('a request after the last full pass started forces one', () => {
+    expect(needsCompaction(entry, 'local', now, '2026-10-05T11:30:00.000Z')).toBe(true);
+    expect(needsCompaction(entry, 'local', now, '2026-10-05T10:00:00.000Z')).toBe(false);
+    expect(needsCompaction(entry, 'local', now)).toBe(false);
+  });
+
+  test('an entry that never recorded its full-pass start honours any request', () => {
+    const old = { ...entry, lastFullPassStartedAt: undefined };
+    expect(needsCompaction(old, 'local', now, '2026-01-01T00:00:00.000Z')).toBe(true);
+  });
+
+  test('finishPass records when a full pass started, and keeps it through incremental passes', () => {
+    const full = finishPass(
+      startPass({ ...entry, since: undefined }, '2026-10-05T12:00:00.000Z'),
+      true,
+      '2026-10-05T12:05:00.000Z',
+    );
+    expect(full.lastFullPassStartedAt).toBe('2026-10-05T12:00:00.000Z');
+    const inc = finishPass(startPass(full, '2026-10-05T13:00:00.000Z'), true, '2026-10-05T13:01:00.000Z');
+    expect(inc.lastFullPassStartedAt).toBe('2026-10-05T12:00:00.000Z');
+  });
+});

@@ -78,6 +78,12 @@ export interface Account {
   storageConfig?: StorageConfig;
   /** Wallet-data migrations completed for this account; see ACCOUNT_DATA_VERSION. Absent = 0. */
   dataVersion?: number;
+  /**
+   * Set when a storage repair finished: it copies remote rows into local with
+   * their original timestamps, which an incremental USB backup pass skips, so
+   * USB backup runs a full pass if its last one started before this.
+   */
+  usbFullPassRequestedAt?: string;
 }
 
 /** One registered USB drive. The matching secret lives only in the file on the drive. */

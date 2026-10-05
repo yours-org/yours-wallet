@@ -50,7 +50,11 @@ import { ADMIN_ORIGINATOR, initWallet, openAccountStorageForBackup, type Account
 import { HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
 import { repairStaleAccounts, usbRekey, type UsbRekeyRequest } from './services/usbRekeyBackground';
-import { finishInterruptedReconcile, reconcileStorage } from './services/storageReconcileBackground';
+import {
+  finishInterruptedReconcile,
+  reconcileStorage,
+  requestUsbFullPass,
+} from './services/storageReconcileBackground';
 import { reconcileOutcome } from './services/storageReconcile';
 import { USB_HANDLE_DB_NAME } from './services/UsbKey.service';
 import {
@@ -1526,12 +1530,18 @@ if (isInServiceWorker) {
         return;
       }
 
+      const identityAddress = account?.addresses?.identityAddress;
       const record = await reconcileStorage(
         accountContext.storage,
         accountContext.syncContext.services,
         remoteUrl,
         'manual',
-      );
+      ).finally(async () => {
+        if (!identityAddress) return;
+        await requestUsbFullPass(chromeStorageService, identityAddress).catch((err) =>
+          console.error('[STORAGE_REPAIR_SYNC] could not request a USB full pass:', err),
+        );
+      });
 
       sendResponse({
         type: 'STORAGE_REPAIR_SYNC',
