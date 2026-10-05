@@ -591,7 +591,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
       <SpeedBump
         theme={theme}
         showSpeedBump={confirmUnverified}
-        message={`Sending unverified skips the check that your ${tokenName} are valid. If any token this transfer spends is invalid, the whole transfer is invalid and every token in it is permanently lost, including the valid ones. Only continue if you trust where these tokens came from.`}
+        message={`If any ${tokenName} this transfer spends is invalid, the whole transfer is invalid and every token in it is lost for good, including the valid ones. Only send if you trust where they came from.`}
         onCancel={() => setConfirmUnverified(false)}
         onConfirm={() => {
           setConfirmUnverified(false);

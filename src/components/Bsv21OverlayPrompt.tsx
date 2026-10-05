@@ -34,22 +34,22 @@ const copy = (issue: Bsv21OverlayIssue, tokenName: string) => {
     case 'not-active':
       return {
         title: 'Overlay not funded',
-        body: `The overlay that validates ${tokenName} isn't funded, so it can't confirm your tokens before you send them. Funding it turns validation back on for everyone holding ${tokenName}.`,
+        body: `The overlay that checks ${tokenName} isn't funded, so your tokens can't be checked before sending. Funding it turns checks back on for all ${tokenName} holders.`,
       };
     case 'queued':
       return {
-        title: 'Still validating',
-        body: `The overlay is still working through ${tokenName} transfers and hasn't reached yours yet. Try again in a few minutes.`,
+        title: 'Still checking',
+        body: `Your ${tokenName} haven't been checked yet. Try again in a few minutes.`,
       };
     case 'not-valid':
       return {
-        title: 'Tokens not validated',
-        body: `The overlay doesn't recognize enough of your ${tokenName} as valid to cover this transfer.`,
+        title: 'Tokens not verified',
+        body: `Not enough of your ${tokenName} could be verified to cover this transfer.`,
       };
     case 'not-found':
       return {
         title: 'Unknown token',
-        body: `The overlay has no record of ${tokenName}, so it can't confirm your tokens before you send them.`,
+        body: `There's no record of ${tokenName}, so your tokens can't be checked before sending.`,
       };
   }
 };
@@ -118,7 +118,7 @@ export const Bsv21OverlayPrompt = (props: Bsv21OverlayPromptProps) => {
                       </span>
                     </div>
                     <p className="text-[11px] mt-1.5 leading-relaxed text-left px-1" style={{ color: gray }}>
-                      An estimate. If the overlay finds more history than expected, it may ask for a small top-up.
+                      Estimate. A small top-up may be needed later.
                     </p>
                   </div>
                 </Show>
@@ -135,8 +135,7 @@ export const Bsv21OverlayPrompt = (props: Bsv21OverlayPromptProps) => {
 
                 <div className="w-full mt-5 pt-4" style={{ borderTop: `1px solid ${gray}22` }}>
                   <p className="text-[11px] mb-2 leading-relaxed" style={{ color: gray }}>
-                    Sending unverified skips the check. If any token it spends is invalid, the whole transfer is invalid
-                    and every token in it is lost.
+                    Sending unverified could lose every token in the transfer.
                   </p>
                   <button
                     type="button"
@@ -144,7 +143,7 @@ export const Bsv21OverlayPrompt = (props: Bsv21OverlayPromptProps) => {
                     className="text-xs font-semibold bg-transparent border-0 outline-none cursor-pointer"
                     style={{ color: WARN }}
                   >
-                    Send unverified anyway
+                    Send unverified
                   </button>
                 </div>
               </motion.div>
