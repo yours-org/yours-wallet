@@ -14,6 +14,7 @@ import {
   ArrowUpDown,
   Loader2,
   RefreshCw,
+  AtSign,
 } from 'lucide-react';
 import bsvCoin from '../assets/bsv-coin.svg';
 import { Button } from '../components/Button';
@@ -131,6 +132,8 @@ export const BsvWallet = () => {
   // Get identityAddress from chrome storage (selected account)
   const identityAddress = chromeStorageService.getCurrentAccountObject().account?.addresses?.identityAddress || '';
   const [receiveAddress, setReceiveAddress] = useState<string>('');
+  const [copiedHandle, setCopiedHandle] = useState(false);
+  const defaultHandle = chromeStorageService.getCurrentAccountObject().account?.settings?.defaultHandle ?? null;
   // All derived MNEE deposit addresses for the account (not just the currently selected
   // receiveAddress), used so MNEE balance/history aggregate deposits made to any address.
   const [mneeAddresses, setMneeAddresses] = useState<string[]>([]);
@@ -619,6 +622,15 @@ export const BsvWallet = () => {
     });
   };
 
+  const handleCopyHandle = () => {
+    if (!defaultHandle) return;
+    navigator.clipboard.writeText(defaultHandle).then(() => {
+      addSnackbar('Copied!', 'success');
+      setCopiedHandle(true);
+      setTimeout(() => setCopiedHandle(false), 2000);
+    });
+  };
+
   const copyAddress = (address: string) => {
     navigator.clipboard.writeText(address).then(() => {
       addSnackbar('Copied!', 'success');
@@ -1030,6 +1042,34 @@ export const BsvWallet = () => {
           {copiedAddress ? 'Copied!' : 'Copy'}
         </span>
       </motion.button>
+
+      {/* BRC-169 handle: the default "from" handle, receivable at its messagebox */}
+      {defaultHandle && (
+        <motion.button
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleCopyHandle}
+          className="flex items-center gap-2 mt-2 px-4 py-3 rounded-xl w-full border-0 outline-none cursor-pointer text-left"
+          style={{ background: theme.color.global.row }}
+        >
+          {copiedHandle ? (
+            <Check size={16} style={{ color: theme.color.component.primaryButtonLeftGradient }} />
+          ) : (
+            <AtSign size={16} style={{ color: theme.color.global.gray }} />
+          )}
+          <span className="text-xs font-mono truncate flex-1" style={{ color: theme.color.global.contrast }}>
+            {defaultHandle}
+          </span>
+          <span className="text-xs shrink-0" style={{ color: theme.color.global.gray }}>
+            {copiedHandle ? 'Copied!' : 'Copy'}
+          </span>
+        </motion.button>
+      )}
+      {defaultHandle && (
+        <p className="text-[10px] text-center mt-2 max-w-[16rem]" style={{ color: theme.color.global.gray }}>
+          Wallets that support handles can pay this handle directly.
+        </p>
+      )}
 
       {/* Info text */}
       <Show
