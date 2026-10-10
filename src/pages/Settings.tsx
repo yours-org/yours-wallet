@@ -37,11 +37,15 @@ import { SpeedBump } from '../components/SpeedBump';
 import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useIdentity, resolveImageUrl } from '../hooks/useIdentity';
+import { useHandles } from '../hooks/useHandles';
+import { formatHandle, type HeldHandle } from '../services/handles';
+import { HANDLE_CERT_TYPE } from '@1sat/types';
+import { loadHandleDetails, setHandleProfile, type HandleDetails } from '../services/handleProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
-import { DISCORD_SUPPORT_URL, FEE_PER_KB } from '../utils/constants';
+import { DISCORD_SUPPORT_URL, FEE_PER_KB, HANDLE_REGISTRATION_URL } from '../utils/constants';
 import { ChromeStorageObject, UsbBackupAccountStatus, UsbSecurity } from '../services/types/chromeStorage.types';
 import {
   deleteHandle,
@@ -92,6 +96,7 @@ export type SettingsPage =
   | 'account-list'
   | 'edit-account'
   | 'identity'
+  | 'handle-detail'
   | 'export-keys-options'
   | 'export-keys-qr'
   | 'storage'
@@ -107,6 +112,7 @@ type DecisionType =
   | 'delete-account'
   | 'inscribe-avatar'
   | 'save-profile'
+  | 'relinquish-handle'
   | 'remove-usb-stick'
   | 'disable-usb-backup';
 
@@ -288,6 +294,7 @@ export const Settings = () => {
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const identity = useIdentity(apiContext, chromeStorageService);
+  const heldHandles = useHandles(apiContext.wallet);
   const [exportKeysQrData, setExportKeysAsQrData] = useState('');
   const [shouldVisibleExportedKeys, setShouldVisibleExportedKeys] = useState(false);
   const [enteredName, setEnteredName] = useState(identity.profile.name);
@@ -313,6 +320,16 @@ export const Settings = () => {
   const [backupDone, setBackupDone] = useState(false);
   const [backupError, setBackupError] = useState('');
   const currentAccount = chromeStorageService.getCurrentAccountObject();
+  const [defaultHandle, setDefaultHandle] = useState<string | null>(
+    currentAccount.account?.settings.defaultHandle ?? null,
+  );
+  const [selectedHandle, setSelectedHandle] = useState<HeldHandle | null>(null);
+  const [handleDetails, setHandleDetails] = useState<{
+    loading: boolean;
+    error: string | null;
+    details: HandleDetails | null;
+  }>({ loading: false, error: null, details: null });
+  const [handleSaving, setHandleSaving] = useState(false);
   const [customFeeRate, setCustomFeeRate] = useState(currentAccount.account?.settings.customFeeRate ?? FEE_PER_KB);
   const [lockTimeout, setLockTimeout] = useState(currentAccount.account?.settings.lockTimeout ?? 10);
   const [selectedAccountIdentityAddress, setSelectedAccountIdentityAddress] = useState<string | undefined>();
@@ -589,16 +606,67 @@ export const Settings = () => {
     setShowSpeedBump(true);
   };
 
+  const openHandle = async (h: HeldHandle) => {
+    setSelectedHandle(h);
+    setPage('handle-detail');
+    setHandleDetails({ loading: true, error: null, details: null });
+    setEnteredName('');
+    setEnteredImage('');
+    setAvatarPreview(null);
+    try {
+      const details = await loadHandleDetails(h);
+      setHandleDetails({ loading: false, error: null, details });
+      setEnteredName(details.profile?.name ?? '');
+      setEnteredImage(details.profile?.avatar ? `1sat://${details.profile.avatar.replace('_', '.')}` : '');
+    } catch (err) {
+      setHandleDetails({ loading: false, error: err instanceof Error ? err.message : String(err), details: null });
+    }
+  };
+
+  const handleRelinquishHandleIntent = () => {
+    if (!selectedHandle) return;
+    setDecisionType('relinquish-handle');
+    setSpeedBumpMessage(
+      `Remove ${formatHandle(selectedHandle)} from this wallet? The certificate is deleted here; the handle itself stays registered at ${selectedHandle.domain}.`,
+    );
+    setShowSpeedBump(true);
+  };
+
+  const handleRelinquishHandle = async () => {
+    if (!selectedHandle) return;
+    const value = formatHandle(selectedHandle);
+    try {
+      await apiContext.wallet.relinquishCertificate({
+        type: HANDLE_CERT_TYPE,
+        serialNumber: selectedHandle.serialNumber,
+        certifier: selectedHandle.certifier,
+      });
+      if (defaultHandle === value) await handleSelectDefaultHandle('');
+      addSnackbar('Handle removed from this wallet', 'success');
+      setSelectedHandle(null);
+      setPage('identity');
+      await heldHandles.refresh();
+    } catch (err) {
+      addSnackbar(err instanceof Error ? err.message : String(err), 'error');
+    }
+  };
+
   const handleSaveProfile = async () => {
-    const res = await identity.saveProfile({
-      name: enteredName,
-      image: enteredImage,
-      description: enteredDescription,
-    });
-    if (res.error) {
-      addSnackbar(res.error, 'error');
-    } else {
-      addSnackbar('Profile saved on-chain', 'success');
+    if (!selectedHandle || !handleDetails.details) return;
+    setHandleSaving(true);
+    try {
+      const avatar = enteredImage.startsWith('1sat://') ? enteredImage.slice(7).replace('.', '_') : null;
+      await setHandleProfile(apiContext.wallet, selectedHandle, handleDetails.details.messagebox, {
+        name: enteredName,
+        avatar,
+      });
+      addSnackbar('Profile saved', 'success');
+      const details = await loadHandleDetails(selectedHandle);
+      setHandleDetails({ loading: false, error: null, details });
+    } catch (err) {
+      addSnackbar(err instanceof Error ? err.message : String(err), 'error');
+    } finally {
+      setHandleSaving(false);
     }
   };
 
@@ -773,6 +841,11 @@ export const Settings = () => {
       setDecisionType(undefined);
       setShowSpeedBump(false);
     }
+    if (decisionType === 'relinquish-handle') {
+      setDecisionType(undefined);
+      setShowSpeedBump(false);
+      await handleRelinquishHandle();
+    }
     if (decisionType === 'remove-usb-stick') {
       setDecisionType(undefined);
       setShowSpeedBump(false);
@@ -806,6 +879,20 @@ export const Settings = () => {
     await chromeStorageService.updateNested(key, update);
     chrome.runtime.sendMessage({ action: 'UPDATE_FEE_RATE', feeRate: rate }).catch(() => {});
   }, [customFeeRate, chromeStorageService, currentAccount, addSnackbar]);
+
+  const handleSelectDefaultHandle = async (handle: string) => {
+    const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    if (!account || !selectedAccount) return;
+    setDefaultHandle(handle);
+    const key: keyof ChromeStorageObject = 'accounts';
+    const update: Partial<ChromeStorageObject['accounts']> = {
+      [selectedAccount]: {
+        ...account,
+        settings: { ...account.settings, defaultHandle: handle },
+      },
+    };
+    await chromeStorageService.updateNested(key, update);
+  };
 
   const commitLockTimeout = useCallback(async () => {
     let minutes = lockTimeout;
@@ -1339,24 +1426,92 @@ export const Settings = () => {
     >
       <SubPageHeader title="Identity" onBack={() => setPage('main')} />
 
-      {identity.loading && !identity.bapId ? (
+      {identityPubKey && (
+        <IdentifierRow
+          label="Identity Key"
+          value={identityPubKey}
+          copied={copiedIdentityKey}
+          onCopy={handleCopyIdentityKey}
+        />
+      )}
+
+      {/* BRC-169 handles held as certificates; the chosen one is the default "from" */}
+      <div className="w-full mt-6">
+        <p className="text-[9px] uppercase tracking-wider mb-2" style={{ color: '#475467' }}>
+          Handles
+        </p>
+        {heldHandles.loading ? (
+          <div className="flex items-center justify-center py-3">
+            <Loader2 size={16} className="animate-spin" style={{ color: '#98A2B3' }} />
+          </div>
+        ) : heldHandles.error ? (
+          <p className="text-xs" style={{ color: '#F97066' }}>
+            {heldHandles.error}
+          </p>
+        ) : heldHandles.handles.length === 0 ? (
+          <p className="text-xs" style={{ color: '#98A2B3' }}>
+            No handles yet.{' '}
+            <button
+              onClick={() => window.open(HANDLE_REGISTRATION_URL, '_blank')}
+              className="underline cursor-pointer"
+              style={{ color: '#A1FF8B' }}
+            >
+              Register a handle
+            </button>
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {heldHandles.handles.map((h) => {
+              const value = formatHandle(h);
+              return (
+                <button
+                  key={h.serialNumber}
+                  onClick={() => openHandle(h)}
+                  className="flex items-center gap-2 w-full px-3 py-2 rounded-lg cursor-pointer text-left"
+                  style={{ backgroundColor: '#17191E', border: '1px solid rgba(152,162,179,0.15)' }}
+                >
+                  <span className="text-xs flex-1" style={{ color: '#FFFFFF' }}>
+                    {value}
+                  </span>
+                  {defaultHandle === value && (
+                    <span className="text-[10px]" style={{ color: '#A1FF8B' }}>
+                      default
+                    </span>
+                  )}
+                  <ChevronRight size={14} style={{ color: '#667085' }} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+
+  const handleDetailPage = (
+    <motion.div
+      key="handle-detail"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-24"
+    >
+      <SubPageHeader
+        title={selectedHandle ? formatHandle(selectedHandle) : 'Handle'}
+        onBack={() => setPage('identity')}
+      />
+
+      {handleDetails.loading ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 size={24} className="animate-spin" style={{ color: '#98A2B3' }} />
         </div>
+      ) : handleDetails.error ? (
+        <p className="text-xs text-center" style={{ color: '#F97066' }}>
+          {handleDetails.error}
+        </p>
       ) : (
         <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-3">
-          {/* Intro text for first-time users */}
-          {!identity.isPublished && (
-            <motion.p
-              variants={rowVariant}
-              className="text-xs text-center"
-              style={{ color: '#98A2B3', lineHeight: 1.5 }}
-            >
-              Set up your on-chain identity so apps and other users can recognize you. Your profile is stored
-              permanently on the blockchain.
-            </motion.p>
-          )}
-
           {/* Avatar — tap to pick */}
           <motion.div variants={rowVariant} className="flex flex-col items-center">
             <button
@@ -1398,59 +1553,56 @@ export const Settings = () => {
           <motion.div variants={rowVariant} className="w-full">
             <Input
               theme={theme}
-              placeholder="Your name"
+              placeholder="Display name"
               type="text"
               onChange={(e) => setEnteredName(e.target.value)}
               value={enteredName}
             />
           </motion.div>
 
-          {/* Bio */}
           <motion.div variants={rowVariant} className="w-full">
-            <Input
-              theme={theme}
-              placeholder="A short bio..."
-              type="text"
-              onChange={(e) => setEnteredDescription(e.target.value)}
-              value={enteredDescription}
-            />
-          </motion.div>
-
-          {identity.error && (
-            <p className="text-xs text-center" style={{ color: '#F97066' }}>
-              {identity.error}
-            </p>
-          )}
-
-          {/* Save */}
-          <motion.div variants={rowVariant} className="w-full pb-6">
             <Button
               theme={theme}
               type="primary"
-              label={identity.isPublished ? 'Update Profile' : 'Create Identity'}
+              label="Save Profile"
               onClick={handleSaveProfile}
-              loading={identity.loading}
-              disabled={avatarUploading}
+              loading={handleSaving}
+              disabled={avatarUploading || !handleDetails.details}
             />
             <p className="text-[10px] text-center mt-1.5" style={{ color: '#667085' }}>
-              This will broadcast a small transaction
+              Signed by your key and kept at your mailbox
             </p>
           </motion.div>
 
-          {identity.bapId && identity.isPublished && (
-            <IdentifierRow label="BAP ID" value={identity.bapId} copied={copiedBapId} onCopy={handleCopyBapId} />
-          )}
+          <motion.div variants={rowVariant} className="w-full">
+            {selectedHandle && defaultHandle === formatHandle(selectedHandle) ? (
+              <p className="text-xs text-center" style={{ color: '#A1FF8B' }}>
+                This is your default "from" handle
+              </p>
+            ) : (
+              <Button
+                theme={theme}
+                type="secondary-outline"
+                label="Use as default"
+                onClick={() => selectedHandle && handleSelectDefaultHandle(formatHandle(selectedHandle))}
+              />
+            )}
+          </motion.div>
 
-          {identityPubKey && (
-            <IdentifierRow
-              label="Identity Key"
-              value={identityPubKey}
-              copied={copiedIdentityKey}
-              onCopy={handleCopyIdentityKey}
-            />
+          {handleDetails.details && (
+            <p className="text-[10px] text-center break-all" style={{ color: '#475467' }}>
+              Mailbox: {handleDetails.details.messagebox}
+            </p>
           )}
         </motion.div>
       )}
+
+      <div className="w-full mt-6">
+        <Button theme={theme} type="warn" label="Remove Handle" onClick={handleRelinquishHandleIntent} />
+        <p className="text-[10px] text-center mt-1.5" style={{ color: '#667085' }}>
+          Relinquishes the certificate from this wallet
+        </p>
+      </div>
     </motion.div>
   );
 
@@ -1845,6 +1997,7 @@ export const Settings = () => {
             {page === 'edit-account' && editAccount}
 
             {page === 'identity' && identityPage}
+            {page === 'handle-detail' && handleDetailPage}
 
             {page === 'permissions' && (
               <motion.div

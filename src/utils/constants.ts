@@ -49,6 +49,7 @@ export const DEFAULT_STORAGE_REMOTE_URL = 'https://wallet.1sat.app';
 
 /** Yours support channel on Discord (Settings > Troubleshooting). */
 export const DISCORD_SUPPORT_URL = 'https://discord.gg/RD4uuhzMSh';
+export const HANDLE_REGISTRATION_URL = 'https://accounts.1sat.app';
 
 /** Account service (`/account/status`) for the default storage provider. */
 export const DEFAULT_ACCOUNT_URL = 'https://accounts.1sat.app';
