@@ -35,6 +35,7 @@ export type SocialProfile = {
 
 export enum NetWork {
   Mainnet = 'mainnet',
+  Testnet = 'testnet',
 }
 
 export type SendMNEE = {

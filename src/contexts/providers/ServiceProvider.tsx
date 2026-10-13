@@ -1,7 +1,7 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { ChromeStorageService } from '../../services/ChromeStorage.service';
 import { KeysService } from '../../services/Keys.service';
-import { INACTIVITY_LIMIT } from '../../utils/constants';
+import { chainOf, endpointsOf, INACTIVITY_LIMIT } from '../../utils/constants';
 import { ServiceContext, ServiceContextProps } from '../ServiceContext';
 import { createContext } from '@1sat/actions';
 import { fetchExchangeRate } from '../../utils/wallet';
@@ -18,8 +18,8 @@ const initializeServices = async (onUsbRemoved: () => void) => {
   // USB key security: spend/sign calls from this page first confirm a
   // registered stick is present; two misses in a row lock the wallet.
   const chromeCWI = gateWalletOnUsb(createChromeCWI(), chromeStorageService, onUsbRemoved);
-  const chain = 'main' as const;
-  const services = new OneSatServices(chain);
+  const chain = chainOf(chromeStorageService.getNetwork());
+  const services = new OneSatServices(chain, endpointsOf(chain).services);
   // chromeCWI is the gated background wallet — module owns apply.
   const apiContext = createContext(chromeCWI, {
     chain,

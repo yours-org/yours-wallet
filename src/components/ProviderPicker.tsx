@@ -7,7 +7,7 @@ import { Theme } from '../theme.types';
 import { AuthFetch } from '@bsv/sdk';
 import type { WalletInterface } from '@bsv/sdk';
 import type { RemoteStatus, RemoteStatusResult } from '../hooks/useRemoteStatus';
-import { DEFAULT_ACCOUNT_URL, DEFAULT_STORAGE_REMOTE_URL } from '../utils/constants';
+import { endpointsOf, type WalletChain } from '../utils/constants';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -18,6 +18,7 @@ interface StorageProvider {
   url: string;
   /** Base URL of the provider's account service (`/account/status`). */
   accountUrl: string;
+  chain: WalletChain;
   description: string;
 }
 
@@ -26,9 +27,18 @@ export const KNOWN_PROVIDERS: StorageProvider[] = [
   {
     id: 'a3e8c1d2-7f4b-4e9a-b6d0-1c5f8e2a9b3d',
     name: '1Sat Storage',
-    url: DEFAULT_STORAGE_REMOTE_URL,
-    accountUrl: DEFAULT_ACCOUNT_URL,
+    url: endpointsOf('main').storage,
+    accountUrl: endpointsOf('main').account,
+    chain: 'main',
     description: 'Official storage partner of Yours Wallet.',
+  },
+  {
+    id: 'c41f0b6e-2d8a-4f3c-9e57-8a1d6b3e0f92',
+    name: '1Sat Storage (testnet)',
+    url: endpointsOf('test').storage,
+    accountUrl: endpointsOf('test').account,
+    chain: 'test',
+    description: 'Testnet storage.',
   },
 ];
 
@@ -57,6 +67,7 @@ function formatRate(pricing: RemoteStatus['pricing'], exchangeRate: number): str
 type Props = {
   theme: Theme;
   wallet: WalletInterface;
+  chain: WalletChain;
   existingRemotes: string[];
   exchangeRate: number;
   onSelectProvider: (url: string) => void;
@@ -69,6 +80,7 @@ type Props = {
 export const ProviderPicker = ({
   theme,
   wallet,
+  chain,
   existingRemotes,
   exchangeRate,
   onSelectProvider,
@@ -89,7 +101,7 @@ export const ProviderPicker = ({
       setFetching(true);
       const authFetch = new AuthFetch(wallet);
       const results = await Promise.all(
-        KNOWN_PROVIDERS.map(async (p): Promise<[string, RemoteStatusResult]> => {
+        KNOWN_PROVIDERS.filter((p) => p.chain === chain).map(async (p): Promise<[string, RemoteStatusResult]> => {
           try {
             const res = await authFetch.fetch(`${p.accountUrl}/account/status`, { method: 'GET' });
             if (!res.ok) return [p.url, { status: 'error', error: `HTTP ${res.status}` }];
@@ -187,7 +199,7 @@ export const ProviderPicker = ({
             </p>
 
             {/* Known providers */}
-            {KNOWN_PROVIDERS.map((provider) => {
+            {KNOWN_PROVIDERS.filter((p) => p.chain === chain).map((provider) => {
               const alreadyAdded = existingRemotes.includes(provider.url);
               const isExpanded = expandedProvider === provider.id;
               const result = statusMap[provider.url];

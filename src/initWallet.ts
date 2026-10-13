@@ -12,7 +12,7 @@ import { syncAddresses, syncMessages, createContext as createActionContext } fro
 import { createAssetPermissionModules } from '@1sat/permission-module';
 import type { WalletInterface } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { MESSAGEBOX_URL } from './utils/constants';
+import { chainOf, endpointsOf } from './utils/constants';
 import type { Account, StorageConfig } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
@@ -151,9 +151,11 @@ export const openAccountStorageForBackup = async (
   const { activeRemote, backups } = resolveStorageConfig(account?.storageConfig);
   const storageIdentityKey = await ensureStorageIdentityKey(chromeStorageService);
 
+  const chain = chainOf(chromeStorageService.getNetwork());
   const { storage, destroy, monitor } = await createWebWallet({
     privateKey: keys.identityWif,
-    chain: 'main',
+    chain,
+    servicesBaseUrl: endpointsOf(chain).services,
     feeModel: { model: 'sat/kb', value: chromeStorageService.getCustomFeeRate() },
     activeRemote,
     backups,
@@ -198,7 +200,7 @@ export const initWallet = async (
     throw new Error('No identity key found in decrypted keys');
   }
 
-  const chain = 'main' as const;
+  const chain = chainOf(chromeStorageService.getNetwork());
 
   // 2. Create wallet using browser factory. Storage topology comes from the
   // current account's persisted storageConfig. storageIdentityKey is
@@ -210,6 +212,7 @@ export const initWallet = async (
   const walletConfig: WebWalletConfig = {
     privateKey: keys.identityWif,
     chain,
+    servicesBaseUrl: endpointsOf(chain).services,
     feeModel: { model: 'sat/kb', value: chromeStorageService.getCustomFeeRate() },
     activeRemote,
     backups,
@@ -384,7 +387,7 @@ export const initWallet = async (
 
   // Sync incoming paymail payments from the message box (fire-and-forget)
   syncMessages
-    .execute(actionCtx, { messageboxUrl: MESSAGEBOX_URL })
+    .execute(actionCtx, { messageboxUrl: endpointsOf(chain).messagebox })
     .then((result) => {
       if (result.processed > 0 || result.failed > 0) {
         console.log('[initWallet] Message box sync complete:', result);

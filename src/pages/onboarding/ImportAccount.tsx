@@ -13,6 +13,8 @@ import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { WifKeys } from '../../services/types/keys.types';
 import { useNavigate } from 'react-router-dom';
+import { NetworkChoice } from '../../components/NetworkChoice';
+import { NetWork } from '../../services/types/provider.types';
 import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
 
 export type ImportAccountProps = {
@@ -43,6 +45,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
   const hiddenFileInput = useRef<HTMLInputElement>(null);
   const [accountName, setAccountName] = useState('');
   const [iconURL, setIconURL] = useState('');
+  const [network, setNetwork] = useState(NetWork.Mainnet);
 
   useEffect(() => {
     newWallet && hideMenu();
@@ -87,6 +90,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
           identityPk,
         },
         newWallet,
+        network,
       );
       if (!keys) {
         addSnackbar('An error occurred while creating the account! Make sure your password is correct.', 'error');
@@ -260,6 +264,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
         </Show>
+        <NetworkChoice network={network} onChange={setNetwork} theme={theme} />
         <div className="mt-3 w-full">
           <Button theme={theme} type="primary" label="Finish" disabled={explicitlyDisableButton || loading} isSubmit />
         </div>

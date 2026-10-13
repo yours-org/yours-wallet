@@ -1,15 +1,18 @@
-import { NetWork } from './types/provider.types';
 import {
   DEFAULT_RELAYX_ORD_PATH,
   DEFAULT_TWETCH_WALLET_PATH,
   DEFAULT_ACCOUNT,
-  MAINNET_ADDRESS_PREFIX,
+  addressPrefixOf,
+  chainOf,
+  defaultStorageConfig,
+  endpointsOf,
   SWEEP_PATH,
   CHROME_STORAGE_OBJECT_VERSION,
   ACCOUNT_DATA_VERSION,
 } from '../utils/constants';
 import { decrypt, encrypt, generateRandomSalt } from '../utils/crypto';
 import { derivePassKey } from './passKey';
+import { NetWork } from './types/provider.types';
 import { generateKeysFromTag, getKeys, getKeysFromWifs, Keys } from '../utils/keys';
 import { ChromeStorageService } from './ChromeStorage.service';
 import { ChromeStorageObject } from './types/chromeStorage.types';
@@ -33,7 +36,13 @@ export class KeysService {
     this.identityPubKey = '';
   }
 
-  private storeEncryptedKeys = async (passKey: string, salt: string, keys: Keys, encryptedKeys: string) => {
+  private storeEncryptedKeys = async (
+    passKey: string,
+    salt: string,
+    keys: Keys,
+    encryptedKeys: string,
+    network: NetWork,
+  ) => {
     const currentChromeObj = await this.chromeStorageService.getAndSetStorage();
     const totalAccounts = this.chromeStorageService.getAllAccounts().length;
     const accountNumber = currentChromeObj?.accountNumber ? currentChromeObj.accountNumber + 1 : totalAccounts + 1;
@@ -51,7 +60,8 @@ export class KeysService {
     const update: Partial<ChromeStorageObject['accounts']> = {
       [keys.identityAddress]: {
         ...DEFAULT_ACCOUNT,
-        network: NetWork.Mainnet,
+        network,
+        storageConfig: defaultStorageConfig(chainOf(network)),
         name: `Account ${accountNumber}`,
         addresses: {
           bsvAddress: keys.walletAddress,
@@ -104,8 +114,10 @@ export class KeysService {
     ordDerivation: string | null = null,
     identityDerivation: string | null = null,
     importWallet?: SupportedWalletImports,
+    network?: NetWork,
   ) => {
     const { passKey, salt } = await this.getPassKeyAndSalt(password, isNewWallet);
+    const chosen = network ?? this.chromeStorageService.getNetwork();
     switch (importWallet) {
       case 'relayx':
         ordDerivation = DEFAULT_RELAYX_ORD_PATH;
@@ -115,12 +127,13 @@ export class KeysService {
         break;
     }
 
-    const keys = getKeys(mnemonic, walletDerivation, ordDerivation, identityDerivation);
+    const chain = chainOf(chosen);
+    const keys = getKeys(mnemonic, walletDerivation, ordDerivation, identityDerivation, chain);
     if (mnemonic) {
-      this.sweepLegacy(keys);
+      this.sweepLegacy(keys, chain);
     }
     const encryptedKeys = await encrypt(JSON.stringify(keys), passKey);
-    await this.storeEncryptedKeys(passKey, salt, keys, encryptedKeys);
+    await this.storeEncryptedKeys(passKey, salt, keys, encryptedKeys, chosen);
     return keys;
   };
 
@@ -131,10 +144,10 @@ export class KeysService {
    *
    * Fire-and-forget — failures are logged but don't block onboarding.
    */
-  private sweepLegacy = async (keys: Keys) => {
+  private sweepLegacy = async (keys: Keys, chain: 'main' | 'test') => {
     try {
-      const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH);
-      const services = new OneSatServices('main');
+      const sweepWallet = generateKeysFromTag(keys.mnemonic, SWEEP_PATH, chain);
+      const services = new OneSatServices(chain, endpointsOf(chain).services);
 
       // Trigger the indexer to process this address before querying
       for await (const event of services.owner.getTxos(sweepWallet.address, { refresh: true, limit: 1 })) {
@@ -176,11 +189,17 @@ export class KeysService {
     }
   };
 
-  generateKeysFromWifAndStoreEncrypted = async (password: string, wifs: WifKeys, isNewWallet: boolean) => {
+  generateKeysFromWifAndStoreEncrypted = async (
+    password: string,
+    wifs: WifKeys,
+    isNewWallet: boolean,
+    network?: NetWork,
+  ) => {
     const { passKey, salt } = await this.getPassKeyAndSalt(password, isNewWallet);
-    const keys = getKeysFromWifs(wifs);
+    const chosen = network ?? this.chromeStorageService.getNetwork();
+    const keys = getKeysFromWifs(wifs, chainOf(chosen));
     const encryptedKeys = await encrypt(JSON.stringify(keys), passKey);
-    await this.storeEncryptedKeys(passKey, salt, keys as Keys, encryptedKeys);
+    await this.storeEncryptedKeys(passKey, salt, keys as Keys, encryptedKeys, chosen);
     return keys;
   };
 
@@ -200,13 +219,10 @@ export class KeysService {
       const d = await decrypt(encryptedKeys, passKey);
       const keys: Keys = JSON.parse(d);
 
-      const walletAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.walletAddress).data as number[], [
-        MAINNET_ADDRESS_PREFIX,
-      ]);
+      const prefix = addressPrefixOf(account.network);
+      const walletAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.walletAddress).data as number[], [prefix]);
 
-      const ordAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.ordAddress).data as number[], [
-        MAINNET_ADDRESS_PREFIX,
-      ]);
+      const ordAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.ordAddress).data as number[], [prefix]);
 
       this.bsvAddress = walletAddr;
       this.ordAddress = ordAddr;
@@ -216,7 +232,7 @@ export class KeysService {
       // identity address not available with wif or 1sat import
       if (keys.identityAddress) {
         const identityAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.identityAddress).data as number[], [
-          MAINNET_ADDRESS_PREFIX,
+          prefix,
         ]);
 
         this.identityAddress = identityAddr;

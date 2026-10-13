@@ -51,7 +51,7 @@ export const getTxFromRawTxFormat = (rawTx: string | number[], format: Transacti
 export const parseRawTransaction = async (tx: Transaction, apiContext: OneSatContext): Promise<ParseContext> => {
   const services = apiContext.services;
   if (!services) throw new Error('services unavailable');
-  const network = 'mainnet' as const;
+  const network = apiContext.chain === 'test' ? 'testnet' : 'mainnet';
 
   // Hydrate source transactions (needed so inputs can be decoded into spends)
   for (const input of tx.inputs) {

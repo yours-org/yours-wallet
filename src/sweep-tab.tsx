@@ -5,6 +5,8 @@ import ReactDOM from 'react-dom/client';
 import { SweepApp, configureServices, type LegacyKeys } from '@1sat/sweep-ui';
 import { createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
 import { createContext } from '@1sat/actions';
+import { chainOf, endpointsOf } from './utils/constants';
+import { NetWork } from './services/types/provider.types';
 import { decrypt } from './utils/crypto';
 import { cancelOwnedOrdLockListings } from './utils/cancelOrdLockListings';
 import './sweep-tab.css';
@@ -13,8 +15,6 @@ global.Buffer = Buffer;
 global.process = process;
 window.Buffer = Buffer;
 
-const SERVICES_BASE_URL = 'https://api.1sat.app';
-
 function SweepTab() {
   const [keys, setKeys] = useState<LegacyKeys | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +22,13 @@ function SweepTab() {
   const [wallet] = useState(() => createChromeCWI());
 
   useEffect(() => {
-    configureServices(SERVICES_BASE_URL);
+    void (async () => {
+      const stored = await chrome.storage.local.get(['accounts', 'selectedAccount']);
+      const selected = stored.selectedAccount as string | undefined;
+      const accounts = stored.accounts as Record<string, { network?: NetWork }> | undefined;
+      const chain = chainOf(selected && accounts ? accounts[selected]?.network : undefined);
+      configureServices(endpointsOf(chain).services);
+    })();
 
     chrome.storage.local.get(null, async (storage) => {
       try {
@@ -89,8 +95,12 @@ function SweepTab() {
     let cancelled = false;
     (async () => {
       try {
-        const services = new OneSatServices('main');
-        const apiContext = createContext(wallet, { chain: 'main', services, isBaseWallet: false });
+        const stored = await chrome.storage.local.get(['accounts', 'selectedAccount']);
+        const selected = stored.selectedAccount as string | undefined;
+        const accounts = stored.accounts as Record<string, { network?: NetWork }> | undefined;
+        const chain = chainOf(selected && accounts ? accounts[selected]?.network : undefined);
+        const services = new OneSatServices(chain, endpointsOf(chain).services);
+        const apiContext = createContext(wallet, { chain, services, isBaseWallet: false });
         if (cancelled) return;
         const res = await cancelOwnedOrdLockListings(apiContext, {
           sessionKey: 'sweep-tab-load',

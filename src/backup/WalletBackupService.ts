@@ -11,6 +11,7 @@ import type { ChromeStorageService } from '../services/ChromeStorage.service';
 import type { Account } from '../services/types/chromeStorage.types';
 import type { Theme } from '../theme.types';
 import { decrypt, encrypt } from '../utils/crypto';
+import { chainOf } from '../utils/constants';
 
 type Chain = 'main' | 'test';
 type SyncChunk = sdk.SyncChunk;
@@ -466,7 +467,7 @@ export class WalletBackupService {
         const v1Compat: BackupManifest = {
           version: 1,
           createdAt: manifest.createdAt,
-          chain: manifest.chain,
+          chain: chainOf(backupChromeStorage.accounts[acct.identityAddress]?.network),
           identityKey: acct.identityKey,
           chunkCount: acct.chunkCount,
         };

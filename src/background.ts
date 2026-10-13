@@ -47,7 +47,7 @@ import {
 } from './services/oneSatPrompt';
 import type { PromptKind, UsbCheckRequest } from './promptProtocol';
 import { ADMIN_ORIGINATOR, initWallet, openAccountStorageForBackup, type AccountContext } from './initWallet';
-import { HOSTED_YOURS_IMAGE } from './utils/constants';
+import { chainOf, HOSTED_YOURS_IMAGE } from './utils/constants';
 import { WalletBackupService } from './backup/WalletBackupService';
 import { repairStaleAccounts, usbRekey, type UsbRekeyRequest } from './services/usbRekeyBackground';
 import {
@@ -1202,7 +1202,11 @@ if (isInServiceWorker) {
               const am = accountContext.syncContext.addressManager;
               const newIndex = am.getMaxKeyIndex() + 1;
               const { derivations } = await deriveDepositAddresses.execute(
-                { wallet: accountContext.baseWallet, chain: 'main', isBaseWallet: true },
+                {
+                  wallet: accountContext.baseWallet,
+                  chain: chainOf(chromeStorageService.getNetwork()),
+                  isBaseWallet: true,
+                },
                 { startIndex: newIndex, count: 1 },
               );
               const newDerivation = derivations[0];

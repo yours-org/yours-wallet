@@ -1,9 +1,17 @@
 import { NetWork } from '../services/types/provider.types';
-import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
+import { ONESAT_MAINNET_CONTENT_URL, ONESAT_MAINNET_URL } from '@1sat/actions';
 
 export const URL_WHATSONCHAIN = 'https://whatsonchain.com/tx/';
 
 export const MAINNET_ADDRESS_PREFIX = 0x00;
+export const TESTNET_ADDRESS_PREFIX = 0x6f;
+
+export type WalletChain = 'main' | 'test';
+
+export const chainOf = (network?: NetWork): WalletChain => (network === NetWork.Testnet ? 'test' : 'main');
+
+export const addressPrefixOf = (network?: NetWork): number =>
+  network === NetWork.Testnet ? TESTNET_ADDRESS_PREFIX : MAINNET_ADDRESS_PREFIX;
 export const BSV_DECIMAL_CONVERSION = 100000000;
 export const FEE_PER_KB = 100;
 export const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
@@ -52,6 +60,32 @@ export const DISCORD_SUPPORT_URL = 'https://discord.gg/RD4uuhzMSh';
 
 /** Account service (`/account/status`) for the default storage provider. */
 export const DEFAULT_ACCOUNT_URL = 'https://accounts.1sat.app';
+
+/** Testnet hosts on rack until the live testnet hosts exist. */
+const TESTNET_SERVICES_URL = 'https://testnet-api.shruggr.cloud';
+const TESTNET_WALLET_URL = 'https://testnet-wallet.shruggr.cloud';
+
+export type ChainEndpoints = { services: string; storage: string; account: string; messagebox: string };
+
+export const endpointsOf = (chain: WalletChain): ChainEndpoints =>
+  chain === 'test'
+    ? {
+        services: TESTNET_SERVICES_URL,
+        storage: TESTNET_WALLET_URL,
+        account: TESTNET_WALLET_URL,
+        messagebox: TESTNET_WALLET_URL,
+      }
+    : {
+        services: ONESAT_MAINNET_URL,
+        storage: DEFAULT_STORAGE_REMOTE_URL,
+        account: DEFAULT_ACCOUNT_URL,
+        messagebox: MESSAGEBOX_URL,
+      };
+
+export const defaultStorageConfig = (chain: WalletChain) => {
+  const { storage } = endpointsOf(chain);
+  return { activeRemote: storage, remotes: [storage] };
+};
 
 export const LOCKUP_PREFIX = `97dfd76851bf465e8f715593b217714858bbe9570ff3bd5e33840a34e20ff026 02ba79df5f8ae7604a9830f03c7933028186aede0675a16f025dc4f8be8eec0382 1008ce7480da41702918d1ec8e6849ba32b4d65b1e40dc669c31a1e6306b266c 0 0`;
 

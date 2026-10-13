@@ -917,6 +917,7 @@ export const StorageStatus = ({ onBack }: StorageStatusProps) => {
         <ProviderPicker
           theme={theme}
           wallet={apiContext.wallet as any}
+          chain={apiContext.chain}
           existingRemotes={remotes}
           exchangeRate={exchangeRate}
           onSelectProvider={handleAddRemote}

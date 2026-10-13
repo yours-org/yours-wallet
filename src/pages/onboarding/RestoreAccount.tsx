@@ -22,6 +22,8 @@ import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { SupportedWalletImports } from '../../services/types/keys.types';
 import { SettingsPage } from '../Settings';
+import { NetworkChoice } from '../../components/NetworkChoice';
+import { NetWork } from '../../services/types/provider.types';
 import { YoursIcon } from '../../components/YoursIcon';
 import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
 
@@ -54,6 +56,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   const { keysService, chromeStorageService } = useServiceContext();
   const [accountName, setAccountName] = useState('');
   const [iconURL, setIconURL] = useState('');
+  const [network, setNetwork] = useState(NetWork.Mainnet);
   const hiddenYoursFileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -116,6 +119,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
         ordDerivation,
         identityDerivation,
         importWallet,
+        network,
       );
       if (!keys?.mnemonic) {
         addSnackbar('An error occurred while creating the account! Make sure your password is correct.', 'error');
@@ -482,6 +486,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
         </Show>
+        <NetworkChoice network={network} onChange={setNetwork} theme={theme} />
         <div className="mt-3 w-full">
           <Button theme={theme} type="primary" label="Finish" disabled={loading} isSubmit />
         </div>

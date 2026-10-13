@@ -11,6 +11,8 @@ import { useTheme } from '../../hooks/useTheme';
 import { sleep } from '../../utils/sleep';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { useNavigate } from 'react-router-dom';
+import { NetworkChoice } from '../../components/NetworkChoice';
+import { NetWork } from '../../services/types/provider.types';
 import { YoursIcon } from '../../components/YoursIcon';
 import { saveAccountDataToChromeStorage } from '../../utils/chromeStorageHelpers';
 
@@ -42,6 +44,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
   const [accountName, setAccountName] = useState('');
   const [iconURL, setIconURL] = useState('');
   const [copied, setCopied] = useState(false);
+  const [network, setNetwork] = useState(NetWork.Mainnet);
 
   useEffect(() => {
     newWallet && hideMenu();
@@ -66,7 +69,16 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
 
       await sleep(50);
 
-      const keys = await keysService.generateSeedAndStoreEncrypted(password, newWallet);
+      const keys = await keysService.generateSeedAndStoreEncrypted(
+        password,
+        newWallet,
+        undefined,
+        null,
+        null,
+        null,
+        undefined,
+        network,
+      );
 
       if (!keys?.mnemonic) {
         addSnackbar('An error occurred while creating the wallet!', 'error');
@@ -166,6 +178,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
             onChange={(e) => setPasswordConfirm(e.target.value)}
           />
         </Show>
+        <NetworkChoice network={network} onChange={setNetwork} theme={theme} />
 
         <Button
           theme={theme}
