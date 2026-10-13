@@ -64,6 +64,7 @@ export const DEFAULT_ACCOUNT_URL = 'https://accounts.1sat.app';
 /** Testnet hosts on rack until the live testnet hosts exist. */
 const TESTNET_SERVICES_URL = 'https://testnet-api.shruggr.cloud';
 const TESTNET_WALLET_URL = 'https://testnet-wallet.shruggr.cloud';
+const TESTNET_ACCOUNTS_URL = 'https://testnet-accounts.shruggr.cloud';
 
 export type ChainEndpoints = { services: string; storage: string; account: string; messagebox: string };
 
@@ -72,8 +73,8 @@ export const endpointsOf = (chain: WalletChain): ChainEndpoints =>
     ? {
         services: TESTNET_SERVICES_URL,
         storage: TESTNET_WALLET_URL,
-        account: TESTNET_WALLET_URL,
-        messagebox: TESTNET_WALLET_URL,
+        account: TESTNET_ACCOUNTS_URL,
+        messagebox: TESTNET_ACCOUNTS_URL,
       }
     : {
         services: ONESAT_MAINNET_URL,
