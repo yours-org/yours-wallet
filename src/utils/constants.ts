@@ -43,7 +43,7 @@ export const DEFAULT_TWETCH_WALLET_PATH = 'm/0/0';
  *  7: stamped by v5.0.3–v5.1.0 after the unlock-time basket re-file; no storage change
  *  8: customFeeRate reset to FEE_PER_KB for every account (v5.0.4)
  */
-export const CHROME_STORAGE_OBJECT_VERSION = 8;
+export const CHROME_STORAGE_OBJECT_VERSION = 11;
 /**
  * Per-account wallet-data version (`Account.dataVersion`). Wallet-data migrations
  * run in initWallet for the account being opened; bump when adding one.
