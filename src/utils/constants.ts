@@ -61,10 +61,10 @@ export const DISCORD_SUPPORT_URL = 'https://discord.gg/RD4uuhzMSh';
 /** Account service (`/account/status`) for the default storage provider. */
 export const DEFAULT_ACCOUNT_URL = 'https://accounts.1sat.app';
 
-/** Testnet hosts on rack until the live testnet hosts exist. */
-const TESTNET_SERVICES_URL = 'https://testnet-api.shruggr.cloud';
-const TESTNET_WALLET_URL = 'https://testnet-wallet.shruggr.cloud';
-const TESTNET_ACCOUNTS_URL = 'https://testnet-accounts.shruggr.cloud';
+/** Testnet hosts. */
+const TESTNET_SERVICES_URL = 'https://testnet.api.1sat.app';
+const TESTNET_WALLET_URL = 'https://testnet.wallet.1sat.app';
+const TESTNET_ACCOUNTS_URL = 'https://testnet.messagebox.1sat.app';
 
 export type ChainEndpoints = { services: string; storage: string; account: string; messagebox: string };
 
