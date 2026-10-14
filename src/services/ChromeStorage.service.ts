@@ -372,13 +372,17 @@ export class ChromeStorageService {
   };
 
   /**
-   * v5.1.2: a pre-release build could create an account with testnet-encoded
-   * keys while its wallet data went to the mainnet storage host and its first
-   * unlock derived mainnet addresses. Any coins it received are at the
-   * mainnet encoding of its keys. Re-encode such an account for mainnet (same
-   * keys, same storage, same addresses the user funded) and re-key it under
-   * its mainnet identity address. A real testnet account uses the testnet
-   * storage host and is left alone.
+   * v5.1.2: an account flagged testnet, with testnet-encoded addresses, whose
+   * wallet data lives on the mainnet storage host. Until this release the
+   * network flag was cosmetic, so such an account synced and received coins
+   * as mainnet; its coins are at the mainnet encoding of its keys. Sources:
+   * a pre-release build that paired testnet keys with the mainnet host, and
+   * the v6 / legacy-appState migrations above, which default storageConfig
+   * to the mainnet host regardless of network. Now that the flag is
+   * authoritative, resolve toward where the data is: re-encode the account
+   * for mainnet (same keys, same storage, same addresses the user funded)
+   * and re-key it under its mainnet identity address. A real testnet
+   * account uses the testnet storage host and is left alone.
    */
   private migrateToV10 = async (): Promise<void> => {
     const accounts = this.storage?.accounts ?? {};
