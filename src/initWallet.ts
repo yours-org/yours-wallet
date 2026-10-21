@@ -10,9 +10,10 @@ import {
 } from '@1sat/wallet-browser';
 import { syncAddresses, syncMessages, createContext as createActionContext } from '@1sat/actions';
 import { createAssetPermissionModules } from '@1sat/permission-module';
+import { createColorModule } from '@bsv/color-permission-module';
 import type { WalletInterface } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { chainOf, endpointsOf } from './utils/constants';
+import { chainOf, colorOverlayDefaultOf, endpointsOf } from './utils/constants';
 import type { Account, StorageConfig } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
@@ -20,6 +21,8 @@ import { initSyncContext, type SyncContext } from './initSyncContext';
 import { refileLegacyBaskets } from './services/legacyBaskets';
 import { reconcileStorage, requestUsbFullPass } from './services/storageReconcileBackground';
 import { showOneSatPrompt } from './services/oneSatPrompt';
+import { createColorOverlayProvider } from './services/colorOverlay';
+import { createColorTokenAccessHandler } from './services/colorConsent';
 
 // Admin originator for the extension (bypasses all permission checks). The bare
 // extension ID, as ChromeCWI sends it: toolbox permission checks reject a URL
@@ -254,12 +257,30 @@ export const initWallet = async (
     permissionStore,
   });
 
+  // 4b. 1Color (BRC-207) module for BRC-162 tokens: `p color` protocols,
+  //     baskets and labels. Overlay per token: the account's override from
+  //     Settings > Token overlays, else the chain default. Consent goes
+  //     through the same prompt window and permission store as the 1Sat modules.
+  const colorAccountId = chromeStorageService.getCurrentAccountObject().selectedAccount ?? keys.identityAddress;
+  const color = createColorModule({
+    wallet: baseWallet,
+    provider: createColorOverlayProvider({
+      defaultOrigin: colorOverlayDefaultOf(chain),
+      getOverrides: () => chromeStorageService.getColorOverlayOverrides(colorAccountId),
+    }),
+    requestTokenAccess: createColorTokenAccessHandler({
+      promptHandler: showOneSatPrompt,
+      permissionStore,
+      adminOriginator: ADMIN_ORIGINATOR,
+    }),
+  });
+
   // 5. Wrap with permissions manager for external app access control.
   // Grants persist in IndexedDB (off-chain) via LocalWalletPermissionsManager.
   const wallet = new LocalWalletPermissionsManager(
     baseWallet,
     ADMIN_ORIGINATOR,
-    { permissionModules: assetModules },
+    { permissionModules: { ...assetModules, color } },
     { store: permissionStore },
   );
 
@@ -399,6 +420,7 @@ export const initWallet = async (
 
   // Create close function
   const close = async () => {
+    color.dispose();
     await destroyWallet();
   };
 

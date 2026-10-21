@@ -27,6 +27,7 @@ import {
   Usb,
   LifeBuoy,
   Wrench,
+  Layers,
 } from 'lucide-react';
 import { FaDiscord } from 'react-icons/fa';
 import { Button } from '../components/Button';
@@ -60,6 +61,7 @@ import { MasterBackupProgressEvent, streamDataToZip } from '../utils/masterExpor
 import { useSnackbar } from '../hooks/useSnackbar';
 import { PermissionsManager } from './PermissionsManager';
 import { StorageStatus } from './StorageStatus';
+import { TokenOverlays } from './TokenOverlays';
 import { REPAIR_PHASE_LABELS, useStorageRepair } from '../hooks/useStorageRepair';
 import {
   RECONCILE_HISTORY_KEY,
@@ -97,7 +99,8 @@ export type SettingsPage =
   | 'storage'
   | 'permissions'
   | 'usb-security'
-  | 'troubleshooting';
+  | 'troubleshooting'
+  | 'token-overlays';
 
 type DecisionType =
   | 'sign-out'
@@ -1007,6 +1010,14 @@ export const Settings = () => {
             />
           }
         />
+        <Divider />
+        <SettingRow
+          icon={<Layers size={16} />}
+          label="Token overlays"
+          description="Overlay used for each 1Color token"
+          onClick={() => setPage('token-overlays')}
+          isLast
+        />
       </Section>
 
       {/* Help section */}
@@ -1880,6 +1891,20 @@ export const Settings = () => {
             {page === 'usb-security' && usbSecurityPage}
 
             {page === 'troubleshooting' && troubleshootingPage}
+
+            {page === 'token-overlays' && (
+              <motion.div
+                key="token-overlays"
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="w-full px-4 pb-4"
+              >
+                <SubPageHeader title="Token overlays" onBack={() => setPage('main')} />
+                <TokenOverlays />
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </Show>

@@ -83,6 +83,19 @@ export const endpointsOf = (chain: WalletChain): ChainEndpoints =>
         messagebox: MESSAGEBOX_URL,
       };
 
+/**
+ * 1Color (BRC-207) token overlay, per chain: where the color module submits
+ * token transactions and asks spendability/admission when no per-token
+ * override is set (Settings > Token overlays). An origin serving BRC-22
+ * `POST /submit` and BRC-24 `POST /lookup` at its root. No 1Color overlay runs
+ * on mainnet yet: undefined there, so a token without an override fails closed.
+ */
+export const COLOR_OVERLAY_URL: string | undefined = undefined;
+export const TESTNET_COLOR_OVERLAY_URL = 'https://swap.skein.nexus';
+
+export const colorOverlayDefaultOf = (chain: WalletChain): string | undefined =>
+  chain === 'test' ? TESTNET_COLOR_OVERLAY_URL : COLOR_OVERLAY_URL;
+
 export const defaultStorageConfig = (chain: WalletChain) => {
   const { storage } = endpointsOf(chain);
   return { activeRemote: storage, remotes: [storage] };

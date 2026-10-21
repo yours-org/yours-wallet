@@ -25,6 +25,7 @@ import {
   CurrentAccountObject,
   DeprecatedStorage,
   UsbSecurity,
+  ColorOverlayOverride,
 } from './types/chromeStorage.types';
 
 // passKey lives in chrome.storage.session (in-memory only, survives service worker idle,
@@ -488,6 +489,15 @@ export class ChromeStorageService {
     const account = accounts[selectedAccount];
     const { network } = account;
     return network ?? NetWork.Mainnet;
+  };
+
+  /**
+   * The account's 1Color per-token overlay overrides, read fresh from
+   * chrome.storage (the popup edits them while the background wallet runs).
+   */
+  getColorOverlayOverrides = async (accountId: string): Promise<ColorOverlayOverride[]> => {
+    const { accounts } = await this.get(['accounts']);
+    return accounts?.[accountId]?.settings?.colorOverlays ?? [];
   };
 
   getCustomFeeRate = (): number => {
