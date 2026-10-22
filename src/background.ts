@@ -57,6 +57,7 @@ import {
 } from './services/storageReconcileBackground';
 import { reconcileOutcome } from './services/storageReconcile';
 import { USB_HANDLE_DB_NAME } from './services/UsbKey.service';
+import { TokenActionMarks } from './services/tokenActionMark';
 import {
   isUsbRecoverySession,
   readUsbLastSeen,
@@ -603,6 +604,9 @@ let showUnlockUi: () => void = () => {
   console.warn('showUnlockUi called before initialization');
 };
 
+// Originators with a BRC-207 (`p color`) createAction in flight; see tokenActionMark.ts.
+const tokenActionMarks = new TokenActionMarks();
+
 /**
  * Bind permission callbacks to the WalletPermissionsManager.
  * These callbacks are triggered when an external app needs permission.
@@ -631,6 +635,13 @@ const bindPermissionCallbacks = (manager: LocalWalletPermissionsManager) => {
     'onSpendingAuthorizationRequested',
     async (request: PermissionRequest & { requestID: string }) => {
       console.log('Spending authorization requested:', request);
+      if (tokenActionMarks.has(request.originator)) {
+        // A BRC-207 token action: the color module's consent at signing shows the
+        // full sats picture and is the one prompt for it.
+        console.log('[background] spending auto-granted (ephemeral) inside a token action:', request.originator);
+        await manager.grantPermission({ requestID: request.requestID, ephemeral: true });
+        return;
+      }
       await showPermissionPrompt(request);
     },
   );
@@ -2758,7 +2769,9 @@ if (isInServiceWorker) {
       const usesSendAllSentinel = message.params.outputs?.some((o) => o.satoshis === 2099999999999999) === true;
       const signer = isAdmin && usesSendAllSentinel && accountContext?.baseWallet ? accountContext.baseWallet : w;
 
-      const result = await signer.createAction(message.params, message.originator);
+      const result = await tokenActionMarks.run(message.originator, message.params, () =>
+        signer.createAction(message.params, message.originator),
+      );
       console.log('[createAction] Success');
       sendResponse({
         type: CWIEventName.CREATE_ACTION,
