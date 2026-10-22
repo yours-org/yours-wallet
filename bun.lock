@@ -19,7 +19,7 @@
         "@bsv/color-permission-module": "npm:@bopen-io/color-permission-module@0.1.0",
         "@bsv/sdk": "npm:@bopen-io/sdk@4.0.1",
         "@bsv/templates": "npm:@bopen-io/templates@2.1.0",
-        "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.15.1",
+        "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.15.2",
         "@fortawesome/react-fontawesome": "^0.2.2",
         "@hello-pangea/dnd": "^18.0.1",
         "@mnee/ts-sdk": "^1.0.1",
@@ -89,7 +89,7 @@
     "@bsv/color-permission-module": "npm:@bopen-io/color-permission-module@0.1.0",
     "@bsv/sdk": "npm:@bopen-io/sdk@4.0.1",
     "@bsv/templates": "npm:@bopen-io/templates@2.1.0",
-    "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.15.1",
+    "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.15.2",
   },
   "packages": {
     "@1sat/actions": ["@1sat/actions@0.1.0", "", { "dependencies": { "@1sat/client": "0.1.0", "@1sat/templates": "0.1.0", "@1sat/types": "0.1.0", "@1sat/utils": "0.1.0", "@1sat/wallet": "0.1.0", "@bsv/color-permission-module": "npm:@bopen-io/color-permission-module@0.1.0", "@bsv/message-box-client": "^2.5.0", "@ipld/dag-cbor": "^10.0.2", "xdelta3-wasm": "^1.0.0" }, "peerDependencies": { "@bsv/sdk": "^4.0.0" } }, "sha512-ZUQVDUObZG/4edlDm8KH0H7Qbe7Z+IGyxn0eT0C9SAnkQBBs5pO+RNtNhnVsuLF56wVQ19kUVEwf76gy48u68Q=="],
@@ -192,7 +192,7 @@
 
     "@bsv/templates": ["@bopen-io/templates@2.1.0", "", { "peerDependencies": { "@bsv/sdk": "^2.1.6 || ^3.0.0 || ^4.0.0" } }, "sha512-spwSG3RogAzRMuc2/o8YmVNJuuHFIbWPpqUevnfc4/VLkp7K/G121v9awfoTyR+KwcryNpiJBWaJu2DdD91Nfw=="],
 
-    "@bsv/wallet-toolbox-client": ["@bopen-io/wallet-toolbox-client@2.15.1", "", { "dependencies": { "@noble/hashes": "2.4.0", "hash-wasm": "^4.12.0", "idb": "^8.0.3" }, "peerDependencies": { "@bsv/sdk": "^2.8.0 || ^3.0.0 || ^4.0.0" } }, "sha512-ctB7zS2fm0OtIthwJ0bARNteC+T0RBaLTSdichJt6i0Ebqk0zMTtVGRATi1y4ZDeckJTG+mYQFaD5HsdDP3hmQ=="],
+    "@bsv/wallet-toolbox-client": ["@bopen-io/wallet-toolbox-client@2.15.2", "", { "dependencies": { "@noble/hashes": "2.4.0", "hash-wasm": "^4.12.0", "idb": "^8.0.3" }, "peerDependencies": { "@bsv/sdk": "^2.8.0 || ^3.0.0 || ^4.0.0" } }, "sha512-vx4LvjOYo/7qqiswHHAxu6+lOANW43UNype0kX9FdIpnnB1VrRf522+OC4w7tGc/z4CzgE+cwKQCDQu9QbJfIg=="],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.28.2", "", { "os": "aix", "cpu": "ppc64" }, "sha512-XExcO+dvLKvVtNTibSTBej1NCAbaGhWn9Ww1ZPx80qsahhPFe/8jgWP0IchNe0F3HwkU7n8ejhH8bjonqht8mQ=="],
 
