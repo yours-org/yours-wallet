@@ -16,7 +16,7 @@
         "@1sat/utils": "0.1.0",
         "@1sat/wallet": "0.1.0",
         "@1sat/wallet-browser": "0.1.0",
-        "@bsv/color-permission-module": "npm:@bopen-io/color-permission-module@0.1.2",
+        "@bsv/color-permission-module": "npm:@bopen-io/color-permission-module@0.1.3",
         "@bsv/sdk": "npm:@bopen-io/sdk@4.0.1",
         "@bsv/templates": "npm:@bopen-io/templates@2.1.0",
         "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.15.2",
@@ -86,7 +86,7 @@
     "@1sat/types": "0.1.0",
     "@1sat/utils": "0.1.0",
     "@1sat/wallet": "0.1.0",
-    "@bsv/color-permission-module": "npm:@bopen-io/color-permission-module@0.1.2",
+    "@bsv/color-permission-module": "npm:@bopen-io/color-permission-module@0.1.3",
     "@bsv/sdk": "npm:@bopen-io/sdk@4.0.1",
     "@bsv/templates": "npm:@bopen-io/templates@2.1.0",
     "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.15.2",
@@ -184,7 +184,7 @@
 
     "@bsv/authsocket-client": ["@bsv/authsocket-client@2.1.8", "", { "dependencies": { "socket.io-client": "^4.8.3" }, "peerDependencies": { "@bsv/sdk": "^2.4.1 || ^3.0.0" } }, "sha512-EZ8ZfmsejkPZLY2rIB5nzVfog4rptgceRmdTNA5qxjd5N/9jax8OCUrtUyA2dhe4wTC+UAqujaBKwamiulEnsA=="],
 
-    "@bsv/color-permission-module": ["@bopen-io/color-permission-module@0.1.2", "", { "dependencies": { "@bsv/templates": "npm:@bopen-io/templates@^2.1.0" }, "peerDependencies": { "@bsv/sdk": "^4.0.0", "@bsv/wallet-toolbox-client": "^2.15.0" } }, "sha512-nIyE29q9N95ljtyWbQu20cwmGI3iWg2BWzEmtlxfq9WjJ+6Z9A+3w6jChYNjXYBettXOFAk+wLaFLE4qOvoEsg=="],
+    "@bsv/color-permission-module": ["@bopen-io/color-permission-module@0.1.3", "", { "dependencies": { "@bsv/templates": "npm:@bopen-io/templates@^2.1.0" }, "peerDependencies": { "@bsv/sdk": "^4.0.0", "@bsv/wallet-toolbox-client": "^2.15.0" } }, "sha512-ru1GfKdDP5AWkjo1GPV2kP+hIsMCp2OY/x+26VxcGVOSN0eMEKCFhb1ByfQHyZfz/lX98uT+32bR2gXFDqKTmQ=="],
 
     "@bsv/message-box-client": ["@bsv/message-box-client@2.6.0", "", { "dependencies": { "@bsv/authsocket-client": "^2.1.8" }, "peerDependencies": { "@bsv/sdk": "^2.8.6 || ^3.0.0" } }, "sha512-1owChMl4eRIkjC61U55bzgia5S+aXFIjKM3Lz8xktD+UH9ejVPbDMpMg6bGdw5t2QWPd8twAJvFv4k3ket6Klw=="],
 
