@@ -10,9 +10,10 @@ import {
 } from '@1sat/wallet-browser';
 import { syncAddresses, syncMessages, createContext as createActionContext } from '@1sat/actions';
 import { createAssetPermissionModules } from '@1sat/permission-module';
+import { createColorModule } from '@bsv/color-permission-module';
 import type { WalletInterface } from '@bsv/sdk';
 import { ChromeStorageService } from './services/ChromeStorage.service';
-import { chainOf, endpointsOf } from './utils/constants';
+import { chainOf, colorOverlayDefaultOf, endpointsOf } from './utils/constants';
 import type { Account, StorageConfig } from './services/types/chromeStorage.types';
 import { decrypt } from './utils/crypto';
 import type { Keys } from './utils/keys';
@@ -20,6 +21,8 @@ import { initSyncContext, type SyncContext } from './initSyncContext';
 import { refileLegacyBaskets } from './services/legacyBaskets';
 import { reconcileStorage, requestUsbFullPass } from './services/storageReconcileBackground';
 import { showOneSatPrompt } from './services/oneSatPrompt';
+import { createColorOverlayProvider } from './services/colorOverlay';
+import { createColorTokenAccessHandler } from './services/colorConsent';
 
 // Admin originator for the extension (bypasses all permission checks). The bare
 // extension ID, as ChromeCWI sends it: toolbox permission checks reject a URL
@@ -205,7 +208,12 @@ export const initWallet = async (
   // 2. Create wallet using browser factory. Storage topology comes from the
   // current account's persisted storageConfig. storageIdentityKey is
   // per-install and lazily materialized.
-  const { account } = chromeStorageService.getCurrentAccountObject();
+  const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+  // Key every per-account storage write by the account's map key. The address
+  // inside the encrypted blob is encoded for the chain the blob was written on,
+  // which can differ from the account's network; keying by it would create a
+  // phantom account entry.
+  const accountKey = selectedAccount ?? account?.addresses.identityAddress ?? keys.identityAddress;
   const { activeRemote, backups } = resolveStorageConfig(account?.storageConfig);
   const storageIdentityKey = await ensureStorageIdentityKey(chromeStorageService);
 
@@ -254,12 +262,30 @@ export const initWallet = async (
     permissionStore,
   });
 
+  // 4b. 1Color (BRC-207) module for BRC-162 tokens: `p color` protocols,
+  //     baskets and labels. Overlay per token: the account's override from
+  //     Settings > Token overlays, else the chain default. Consent goes
+  //     through the same prompt window and permission store as the 1Sat modules.
+  const colorAccountId = chromeStorageService.getCurrentAccountObject().selectedAccount ?? keys.identityAddress;
+  const color = createColorModule({
+    wallet: baseWallet,
+    provider: createColorOverlayProvider({
+      defaultOrigin: colorOverlayDefaultOf(chain),
+      getOverrides: () => chromeStorageService.getColorOverlayOverrides(colorAccountId),
+    }),
+    requestTokenAccess: createColorTokenAccessHandler({
+      promptHandler: showOneSatPrompt,
+      permissionStore,
+      adminOriginator: ADMIN_ORIGINATOR,
+    }),
+  });
+
   // 5. Wrap with permissions manager for external app access control.
   // Grants persist in IndexedDB (off-chain) via LocalWalletPermissionsManager.
   const wallet = new LocalWalletPermissionsManager(
     baseWallet,
     ADMIN_ORIGINATOR,
-    { permissionModules: assetModules },
+    { permissionModules: { ...assetModules, color } },
     { store: permissionStore },
   );
 
@@ -281,14 +307,16 @@ export const initWallet = async (
   });
 
   // 5b. Persist the primary address so other accounts can display it in the UI.
-  // Only set it if the account doesn't already have one — preserve the user's
-  // selection from the receive screen across lock/unlock and account switches.
-  if (!account?.primaryAddress) {
+  // Keep the user's receive-screen selection across lock/unlock and account
+  // switches, but replace it when it is no longer one of this account's derived
+  // addresses (wrong chain prefix, or a derivation protocol change) so the UI
+  // never shows an address sync does not watch.
+  const storedPrimary = account?.primaryAddress;
+  if (!storedPrimary || !syncContext.addressManager.isOurAddress(storedPrimary)) {
     const primaryAddress = syncContext.addressManager.getPrimaryAddress();
     if (primaryAddress) {
-      const identityAddress = keys.identityAddress;
       chromeStorageService.updateNested('accounts', {
-        [identityAddress]: { primaryAddress } as unknown as Account,
+        [accountKey]: { primaryAddress } as unknown as Account,
       });
     }
   }
@@ -322,7 +350,7 @@ export const initWallet = async (
   // would keep the reconcile's sync lock waiting.
   const stampDataVersion = (dataVersion: number) =>
     chromeStorageService.updateNested('accounts', {
-      [keys.identityAddress]: { dataVersion } as unknown as Account,
+      [accountKey]: { dataVersion } as unknown as Account,
     });
   // Steps run in order; each stamps its own version (see ACCOUNT_DATA_VERSION).
   let dataVersion = account?.dataVersion ?? 0;
@@ -350,7 +378,7 @@ export const initWallet = async (
       await reconcileStorage(storage, syncContext.services, remoteUrl, 'migration').catch((err) =>
         console.error('[initWallet] storage reconcile migration failed:', err),
       );
-      await requestUsbFullPass(chromeStorageService, keys.identityAddress).catch((err) =>
+      await requestUsbFullPass(chromeStorageService, accountKey).catch((err) =>
         console.error('[initWallet] could not request a USB full pass:', err),
       );
       mark('storage reconcile migration done');
@@ -399,6 +427,7 @@ export const initWallet = async (
 
   // Create close function
   const close = async () => {
+    color.dispose();
     await destroyWallet();
   };
 
