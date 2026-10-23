@@ -43,7 +43,7 @@ export const DEFAULT_TWETCH_WALLET_PATH = 'm/0/0';
  *  7: stamped by v5.0.3–v5.1.0 after the unlock-time basket re-file; no storage change
  *  8: customFeeRate reset to FEE_PER_KB for every account (v5.0.4)
  */
-export const CHROME_STORAGE_OBJECT_VERSION = 8;
+export const CHROME_STORAGE_OBJECT_VERSION = 11;
 /**
  * Per-account wallet-data version (`Account.dataVersion`). Wallet-data migrations
  * run in initWallet for the account being opened; bump when adding one.
@@ -57,6 +57,8 @@ export const DEFAULT_STORAGE_REMOTE_URL = 'https://wallet.1sat.app';
 
 /** Yours support channel on Discord (Settings > Troubleshooting). */
 export const DISCORD_SUPPORT_URL = 'https://discord.gg/RD4uuhzMSh';
+/** Testnet faucet users can hit for free test coins. */
+export const TESTNET_FAUCET_URL = 'https://faucet.bananablocks.com';
 
 /** Account service (`/account/status`) for the default storage provider. */
 export const DEFAULT_ACCOUNT_URL = 'https://accounts.1sat.app';

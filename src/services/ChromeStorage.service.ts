@@ -13,6 +13,7 @@ import {
   HOSTED_YOURS_IMAGE,
   INACTIVITY_LIMIT,
   MAINNET_ADDRESS_PREFIX,
+  TESTNET_ADDRESS_PREFIX,
 } from '../utils/constants';
 import { decrypt, encrypt } from '../utils/crypto';
 import { derivePassKey, type UsbUnlockMaterial } from './passKey';
@@ -340,7 +341,126 @@ export class ChromeStorageService {
     });
   };
 
+  /**
+   * v5.1.2: an account's chain is fixed by the prefix its keys were derived
+   * with. Older builds could leave `network: testnet` on an account whose keys
+   * (and therefore its identity address) are mainnet. Since the chain now
+   * drives key derivation, addresses, services and storage hosts, such an
+   * account would be run as testnet and show testnet addresses for real
+   * coins. Reset it to mainnet and drop its cached primary address so the
+   * next unlock re-derives a mainnet one.
+   */
+  private migrateToV9 = async (): Promise<void> => {
+    const accounts = this.storage?.accounts ?? {};
+    const updates: Record<string, Account> = {};
+    for (const [id, account] of Object.entries(accounts)) {
+      if (account.network !== NetWork.Testnet) continue;
+      let prefix: number | undefined;
+      try {
+        prefix = (Utils.fromBase58Check(account.addresses?.identityAddress || id).prefix as number[])[0];
+      } catch {
+        continue;
+      }
+      if (prefix !== MAINNET_ADDRESS_PREFIX) continue;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { primaryAddress: _stale, ...rest } = account;
+      updates[id] = { ...rest, network: NetWork.Mainnet };
+    }
+    await this.set({
+      version: 9,
+      ...(Object.keys(updates).length > 0 ? { accounts: { ...accounts, ...updates } } : {}),
+    });
+  };
+
+  /**
+   * v5.1.2: an account flagged testnet, with testnet-encoded addresses, whose
+   * wallet data lives on the mainnet storage host. Until this release the
+   * network flag was cosmetic, so such an account synced and received coins
+   * as mainnet; its coins are at the mainnet encoding of its keys. Sources:
+   * a pre-release build that paired testnet keys with the mainnet host, and
+   * the v6 / legacy-appState migrations above, which default storageConfig
+   * to the mainnet host regardless of network. Now that the flag is
+   * authoritative, resolve toward where the data is: re-encode the account
+   * for mainnet (same keys, same storage, same addresses the user funded)
+   * and re-key it under its mainnet identity address. A real testnet
+   * account uses the testnet storage host and is left alone.
+   */
+  private migrateToV10 = async (): Promise<void> => {
+    const accounts = this.storage?.accounts ?? {};
+    const next: Record<string, Account> = {};
+    let selectedAccount = this.storage?.selectedAccount;
+    let changed = false;
+    const toMainnet = (addr: string): string =>
+      Utils.toBase58Check(Utils.fromBase58Check(addr).data as number[], [MAINNET_ADDRESS_PREFIX]);
+
+    for (const [id, account] of Object.entries(accounts)) {
+      let prefix: number | undefined;
+      try {
+        prefix = (Utils.fromBase58Check(account.addresses?.identityAddress || id).prefix as number[])[0];
+      } catch {
+        next[id] = account;
+        continue;
+      }
+      const onMainnetStorage = account.storageConfig?.activeRemote === DEFAULT_STORAGE_REMOTE_URL;
+      if (account.network !== NetWork.Testnet || prefix !== TESTNET_ADDRESS_PREFIX || !onMainnetStorage) {
+        next[id] = account;
+        continue;
+      }
+      try {
+        const identityAddress = toMainnet(account.addresses.identityAddress || id);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { primaryAddress: _stale, ...rest } = account;
+        next[identityAddress] = {
+          ...rest,
+          network: NetWork.Mainnet,
+          addresses: {
+            identityAddress,
+            bsvAddress: account.addresses.bsvAddress ? toMainnet(account.addresses.bsvAddress) : '',
+            ordAddress: account.addresses.ordAddress ? toMainnet(account.addresses.ordAddress) : '',
+          },
+        };
+        if (selectedAccount === id) selectedAccount = identityAddress;
+        changed = true;
+      } catch {
+        next[id] = account;
+      }
+    }
+
+    await this.set({
+      version: 10,
+      ...(changed ? { accounts: next, selectedAccount } : {}),
+    });
+  };
+
+  /**
+   * v5.1.2: drop phantom account entries. A per-account write keyed by the
+   * wrong identity address (see initWallet accountKey) left entries holding
+   * only a primaryAddress or dataVersion and no keys; they cannot be unlocked
+   * and render as blank rows in the account list.
+   */
+  private migrateToV11 = async (): Promise<void> => {
+    const accounts = this.storage?.accounts ?? {};
+    const kept: Record<string, Account> = {};
+    let changed = false;
+    for (const [id, account] of Object.entries(accounts)) {
+      if (account?.encryptedKeys) kept[id] = account;
+      else changed = true;
+    }
+    let selectedAccount = this.storage?.selectedAccount;
+    if (changed && selectedAccount && !kept[selectedAccount]) {
+      selectedAccount = Object.keys(kept)[0];
+    }
+    await this.set({
+      version: 11,
+      ...(changed ? { accounts: kept, selectedAccount } : {}),
+    });
+  };
+
   private runMigrations = async (): Promise<void> => {
+    // Several migrations rewrite the whole accounts map. A USB re-key does the
+    // same; landing on top of it would put old encrypted keys back. Wait for
+    // the next load instead: the version stays put, so nothing is skipped.
+    if (this.storage?.keyRekey) return;
     const currentVersion = this.storage?.version ?? 0;
     if (currentVersion < 5) {
       await this.migrateToV5();
@@ -350,6 +470,15 @@ export class ChromeStorageService {
     }
     if ((this.storage?.version ?? currentVersion) < 8) {
       await this.migrateToV8();
+    }
+    if ((this.storage?.version ?? currentVersion) < 9) {
+      await this.migrateToV9();
+    }
+    if ((this.storage?.version ?? currentVersion) < 10) {
+      await this.migrateToV10();
+    }
+    if ((this.storage?.version ?? currentVersion) < 11) {
+      await this.migrateToV11();
     }
   };
 

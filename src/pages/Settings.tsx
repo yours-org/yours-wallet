@@ -62,6 +62,7 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { PermissionsManager } from './PermissionsManager';
 import { StorageStatus } from './StorageStatus';
 import { TokenOverlays } from './TokenOverlays';
+import { getAccountAvatar } from '../utils/accountAvatar';
 import { REPAIR_PHASE_LABELS, useStorageRepair } from '../hooks/useStorageRepair';
 import {
   RECONCILE_HISTORY_KEY,
@@ -275,7 +276,7 @@ export const Settings = () => {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
   const { record: repairRecord, outcome: repairOutcome, runRepair } = useStorageRepair();
-  const { query, handleSelect } = useBottomMenu();
+  const { query, handleSelect, isVisible: isMenuVisible } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { chromeStorageService, keysService, lockWallet, wallet, apiContext } = useServiceContext();
   // The USB Security Key page is reachable from two places; back returns to whichever opened it.
@@ -297,7 +298,6 @@ export const Settings = () => {
   const [enteredImage, setEnteredImage] = useState(identity.profile.image);
   const [enteredDescription, setEnteredDescription] = useState(identity.profile.description);
   const [enteredAccountName, setEnteredAccountName] = useState('');
-  const [enteredAccountIcon, setEnteredAccountIcon] = useState('');
   const [copiedBapId, setCopiedBapId] = useState(false);
   const [copiedIdentityKey, setCopiedIdentityKey] = useState(false);
   const [identityPubKey, setIdentityPubKey] = useState('');
@@ -628,7 +628,6 @@ export const Settings = () => {
       [selectedAccountIdentityAddress]: {
         ...account,
         name: enteredAccountName,
-        icon: enteredAccountIcon,
       },
     };
     await chromeStorageService.updateNested(key, update);
@@ -840,7 +839,9 @@ export const Settings = () => {
     const passwordKey = password && salt ? derivePasswordKey(password, salt) : undefined;
     // Populate overlay with all accounts
     const allAccounts = chromeStorageService.getAllAccounts();
-    setBackupAccounts(allAccounts.map((a) => ({ name: a.name, icon: a.icon || '', status: 'pending' })));
+    setBackupAccounts(
+      allAccounts.map((a) => ({ name: a.name, icon: getAccountAvatar(a, apiContext), status: 'pending' })),
+    );
     setBackupInProgress(true);
     setBackupDone(false);
     setBackupError('');
@@ -1484,7 +1485,6 @@ export const Settings = () => {
             onClick={() => {
               setSelectedAccountIdentityAddress(account.addresses.identityAddress);
               setEnteredAccountName(account.name);
-              setEnteredAccountIcon(account.icon);
               setPage('edit-account');
             }}
             className="flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors duration-150 bg-[#17191E] hover:bg-[#1f2128]"
@@ -1494,7 +1494,7 @@ export const Settings = () => {
           >
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <img
-                src={account.icon || activeCircle}
+                src={getAccountAvatar(account, apiContext) || activeCircle}
                 className="w-9 h-9 rounded-full object-cover flex-shrink-0"
                 alt={account.name}
               />
@@ -1537,18 +1537,6 @@ export const Settings = () => {
             type="text"
             onChange={(e) => setEnteredAccountName(e.target.value)}
             value={enteredAccountName}
-          />
-        </motion.div>
-        <motion.div variants={rowVariant}>
-          <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#98A2B3' }}>
-            Icon URL
-          </label>
-          <Input
-            theme={theme}
-            placeholder="https://..."
-            type="text"
-            onChange={(e) => setEnteredAccountIcon(e.target.value)}
-            value={enteredAccountIcon}
           />
         </motion.div>
         <motion.div variants={rowVariant} className="flex flex-col gap-2">
@@ -1772,6 +1760,8 @@ export const Settings = () => {
     </motion.div>
   );
 
+  const isAddAccountPage = page === 'create-account' || page === 'restore-account' || page === 'import-wif';
+
   return (
     <>
       <Show
@@ -1793,18 +1783,22 @@ export const Settings = () => {
         }
       >
         <div
-          className="flex flex-col items-center w-full overflow-x-hidden"
+          className="flex flex-col items-center w-full overflow-x-hidden self-start"
           style={{
             backgroundColor: '#010101',
-            minHeight: '100%',
-            height: 'calc(75%)',
+            // Stop the scroll area above the bottom nav so the last row of any
+            // sub page can scroll fully into view.
+            height: isMenuVisible ? 'calc(100% - 3.75rem)' : '100%',
             overflowY: 'auto',
           }}
         >
-          <TopNav />
+          {/* Add-account flows run full screen without the header. */}
+          <Show when={!isAddAccountPage}>
+            <TopNav />
 
-          {/* Page spacer for fixed TopNav */}
-          <div className="h-14 w-full flex-shrink-0" />
+            {/* Page spacer for fixed TopNav */}
+            <div className="h-14 w-full flex-shrink-0" />
+          </Show>
 
           {/* Page transitions */}
           <AnimatePresence mode="wait">

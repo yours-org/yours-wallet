@@ -44,15 +44,16 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
   const [explicitlyDisableButton, setExplicitlyDisableButton] = useState(false);
   const hiddenFileInput = useRef<HTMLInputElement>(null);
   const [accountName, setAccountName] = useState('');
-  const [iconURL, setIconURL] = useState('');
   const [network, setNetwork] = useState(NetWork.Mainnet);
 
+  // Run the whole flow full screen: the bottom nav would otherwise sit on top
+  // of the step buttons, and switching tabs mid-creation makes no sense.
   useEffect(() => {
-    newWallet && hideMenu();
+    hideMenu();
     return () => {
       showMenu();
     };
-  }, [hideMenu, showMenu, newWallet]);
+  }, [hideMenu, showMenu]);
 
   const handleImport = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -98,7 +99,7 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
       }
 
       await chromeStorageService.switchAccount(keys.identityAddress || identityPk);
-      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL);
+      await saveAccountDataToChromeStorage(chromeStorageService, accountName);
       setStep(3);
     } catch (error) {
       console.log(error);
@@ -240,13 +241,6 @@ export const ImportAccount = ({ onNavigateBack, newWallet = false }: ImportAccou
           type="text"
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
-        />
-        <Input
-          theme={theme}
-          placeholder="Icon URL"
-          type="text"
-          value={iconURL}
-          onChange={(e) => setIconURL(e.target.value)}
         />
         <Input
           theme={theme}
