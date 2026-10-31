@@ -42,16 +42,17 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
   const [loading, setLoading] = useState(false);
   const { keysService, chromeStorageService } = useServiceContext();
   const [accountName, setAccountName] = useState('');
-  const [iconURL, setIconURL] = useState('');
   const [copied, setCopied] = useState(false);
   const [network, setNetwork] = useState(NetWork.Mainnet);
 
+  // Run the whole flow full screen: the bottom nav would otherwise sit on top
+  // of the step buttons, and switching tabs mid-creation makes no sense.
   useEffect(() => {
-    newWallet && hideMenu();
+    hideMenu();
     return () => {
       showMenu();
     };
-  }, [hideMenu, showMenu, newWallet]);
+  }, [hideMenu, showMenu]);
 
   const handleKeyGeneration = async (event?: React.FormEvent<HTMLFormElement>) => {
     try {
@@ -91,7 +92,7 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
         return;
       }
       setIdentityAddress(keys.identityAddress);
-      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL);
+      await saveAccountDataToChromeStorage(chromeStorageService, accountName);
       setStep(2);
     } catch (error) {
       console.log(error);
@@ -154,13 +155,6 @@ export const CreateAccount = ({ onNavigateBack, newWallet = false }: CreateAccou
           type="text"
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
-        />
-        <Input
-          theme={theme}
-          placeholder="Icon URL"
-          type="text"
-          value={iconURL}
-          onChange={(e) => setIconURL(e.target.value)}
         />
         <Input
           theme={theme}

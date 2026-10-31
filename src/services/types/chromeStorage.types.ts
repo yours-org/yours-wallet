@@ -36,6 +36,19 @@ export type Settings = {
    * least once for this account (Done or Skip).
    */
   sweepCompleted?: boolean;
+  /**
+   * 1Color token overlays chosen per token (Settings > Token overlays), for
+   * this account's chain. A token without an entry uses the chain default
+   * (COLOR_OVERLAY_URL / TESTNET_COLOR_OVERLAY_URL). A list rather than a map:
+   * account writes deep-merge, so a removed map key would never be deleted.
+   */
+  colorOverlays?: ColorOverlayOverride[];
+};
+
+/** One per-token overlay override: asset id `<txid>_<vout>` → overlay origin. */
+export type ColorOverlayOverride = {
+  assetId: string;
+  origin: string;
 };
 
 /**
