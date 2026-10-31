@@ -728,7 +728,7 @@ if (isInServiceWorker) {
     await reinitPromise;
   };
 
-  const createNewPopup = (kind?: PromptKind, requestID?: string) => {
+  const createNewPopup = (kind?: PromptKind, requestID?: string, onCreated?: (id: number | undefined) => void) => {
     console.log('[background] createNewPopup called', kind, requestID);
     const params = new URLSearchParams();
     if (kind) params.set('kind', kind);
@@ -750,6 +750,7 @@ if (isInServiceWorker) {
         } else if (kind === 'usbCheck') {
           failPendingUsbChecks(USB_KEY_ABSENT_MESSAGE);
         }
+        onCreated?.(popupWindowId);
       },
     );
   };
@@ -760,53 +761,84 @@ if (isInServiceWorker) {
     });
   };
 
+  /**
+   * The popup being looked up or created, while that is in flight. Two prompts
+   * in the same instant must not both create a window: the second awaits the
+   * first's lookup/creation and then pushes its prompt into that window (the
+   * window takes queued prompts with GET_NEXT_PROMPT).
+   */
+  let popupOpening: Promise<number | undefined> | undefined;
+
+  /** Focus the open prompt window and push the prompt into it, else create one; resolves to the window's id. */
+  const focusOrCreatePopup = (kind: PromptKind, requestID?: string): Promise<number | undefined> =>
+    new Promise((resolve) => {
+      const reuse = (id: number) => {
+        popupWindowId = id;
+        notifyPromptWindow(kind, requestID);
+        resolve(id);
+      };
+      const create = () => createNewPopup(kind, requestID, resolve);
+
+      // Check if any popup window with our extension URL is already open
+      chrome.windows.getAll({ populate: true }, (windows) => {
+        const promptUrl = chrome.runtime.getURL('prompt.html');
+        const existingPopup = windows.find(
+          (w) => w.type === 'popup' && w.tabs?.some((tab) => tab.url?.startsWith(promptUrl)),
+        );
+
+        if (existingPopup) {
+          // Focus existing popup and push the new prompt into it
+          chrome.windows.update(existingPopup.id!, { focused: true });
+          reuse(existingPopup.id!);
+          return;
+        }
+
+        // Fast path: module-level variable still has the popup ID
+        if (popupWindowId) {
+          const id = popupWindowId;
+          chrome.windows
+            .update(id, { focused: true })
+            .then(() => reuse(id))
+            .catch(() => {
+              popupWindowId = undefined;
+              create();
+            });
+          return;
+        }
+
+        // Module-level var is lost after service worker suspension; check storage
+        chrome.storage.local.get('popupWindowId', (result) => {
+          if (result.popupWindowId) {
+            chrome.windows
+              .update(result.popupWindowId, { focused: true })
+              .then(() => reuse(result.popupWindowId))
+              .catch(() => {
+                chrome.storage.local.remove('popupWindowId');
+                create();
+              });
+          } else {
+            create();
+          }
+        });
+      });
+    });
+
   showPromptUi = (kind, requestID) => {
     console.log('[background] showPromptUi called', kind, requestID);
 
-    // Check if any popup window with our extension URL is already open
-    chrome.windows.getAll({ populate: true }, (windows) => {
-      const promptUrl = chrome.runtime.getURL('prompt.html');
-      const existingPopup = windows.find(
-        (w) => w.type === 'popup' && w.tabs?.some((tab) => tab.url?.startsWith(promptUrl)),
-      );
-
-      if (existingPopup) {
-        // Focus existing popup and push the new prompt into it
-        chrome.windows.update(existingPopup.id!, { focused: true });
-        popupWindowId = existingPopup.id;
-        notifyPromptWindow(kind, requestID);
-        return;
-      }
-
-      // Fast path: module-level variable still has the popup ID
-      if (popupWindowId) {
-        chrome.windows
-          .update(popupWindowId, { focused: true })
-          .then(() => notifyPromptWindow(kind, requestID))
-          .catch(() => {
-            popupWindowId = undefined;
-            createNewPopup(kind, requestID);
-          });
-        return;
-      }
-
-      // Module-level var is lost after service worker suspension; check storage
-      chrome.storage.local.get('popupWindowId', (result) => {
-        if (result.popupWindowId) {
-          chrome.windows
-            .update(result.popupWindowId, { focused: true })
-            .then(() => {
-              popupWindowId = result.popupWindowId;
-              notifyPromptWindow(kind, requestID);
-            })
-            .catch(() => {
-              chrome.storage.local.remove('popupWindowId');
-              createNewPopup(kind, requestID);
-            });
-        } else {
-          createNewPopup(kind, requestID);
-        }
+    if (popupOpening) {
+      // A popup is being looked up or created: wait for it, then queue into it.
+      popupOpening.then((id) => {
+        if (id) notifyPromptWindow(kind, requestID);
+        else showPromptUi(kind, requestID);
       });
+      return;
+    }
+
+    const opening = focusOrCreatePopup(kind, requestID);
+    popupOpening = opening;
+    opening.finally(() => {
+      if (popupOpening === opening) popupOpening = undefined;
     });
   };
 
