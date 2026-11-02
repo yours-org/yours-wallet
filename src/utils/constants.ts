@@ -1,12 +1,14 @@
 import { NetWork } from '../services/types/provider.types';
 import { ONESAT_MAINNET_CONTENT_URL, ONESAT_MAINNET_URL } from '@1sat/actions';
 
-export const URL_WHATSONCHAIN = 'https://whatsonchain.com/tx/';
-
 export const MAINNET_ADDRESS_PREFIX = 0x00;
 export const TESTNET_ADDRESS_PREFIX = 0x6f;
 
 export type WalletChain = 'main' | 'test';
+
+/** Block explorer transaction page for the given chain (bananablocks.com, or test.bananablocks.com on testnet). */
+export const explorerTxUrl = (txid: string, chain: WalletChain = 'main'): string =>
+  `https://${chain === 'test' ? 'test.' : ''}bananablocks.com/tx/${txid}`;
 
 export const chainOf = (network?: NetWork): WalletChain => (network === NetWork.Testnet ? 'test' : 'main');
 
