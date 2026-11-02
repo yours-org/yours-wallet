@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
 import { useTheme } from '../hooks/useTheme';
-import { URL_WHATSONCHAIN } from '../utils/constants';
+import { explorerTxUrl } from '../utils/constants';
 import { fetchBsv21History, fetchBsvHistory, fetchMneeHistory, type CoinTxSummary } from '../utils/coinHistory';
 import { truncate } from '../utils/format';
 import { Show } from './Show';
@@ -44,8 +44,6 @@ export const CoinHistory = ({ filter, pageSize = 25, refreshKey }: CoinHistoryPr
   const { isIntersecting, elementRef: sentinelRef } = useIntersectionObserver({
     rootMargin: '120px',
   });
-
-  const wocBaseUrl = URL_WHATSONCHAIN;
 
   const contrast = theme.color.global.contrast;
   const gray = theme.color.global.gray;
@@ -125,7 +123,7 @@ export const CoinHistory = ({ filter, pageSize = 25, refreshKey }: CoinHistoryPr
     }
   }, [isIntersecting, loading, loadingMore, hasMore, error, handleLoadMore]);
 
-  const openOnWoC = (txid: string) => window.open(`${wocBaseUrl}${txid}`, '_blank');
+  const openInExplorer = (txid: string) => window.open(explorerTxUrl(txid, apiContext.chain), '_blank');
 
   const directionIcon = (direction: CoinTxSummary['direction']) => {
     switch (direction) {
@@ -186,7 +184,7 @@ export const CoinHistory = ({ filter, pageSize = 25, refreshKey }: CoinHistoryPr
               key={`${item.txid}-${item.direction}`}
               whileHover={{ scale: 1.005 }}
               whileTap={{ scale: 0.99 }}
-              onClick={() => openOnWoC(item.txid)}
+              onClick={() => openInExplorer(item.txid)}
               className="flex items-center justify-between w-full px-3 py-2.5 rounded-xl border-0 outline-none cursor-pointer text-left"
               style={{
                 background: row,

@@ -14,6 +14,8 @@ import {
   ArrowUpDown,
   Loader2,
   RefreshCw,
+  FlaskConical,
+  ExternalLink,
 } from 'lucide-react';
 import bsvCoin from '../assets/bsv-coin.svg';
 import { Button } from '../components/Button';
@@ -38,6 +40,8 @@ import { sleep } from '../utils/sleep';
 import { isUri } from '../utils/uri';
 import { AssetRow } from '../components/AssetRow';
 import { BackupPromo } from '../components/BackupPromo';
+import { TESTNET_COLOR } from '../components/TestnetBadge';
+import { HOSTED_YOURS_IMAGE, TESTNET_FAUCET_URL } from '../utils/constants';
 import lockIcon from '../assets/lock.svg';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useServiceContext } from '../hooks/useServiceContext';
@@ -103,9 +107,11 @@ export const BsvWallet = () => {
   const { chromeStorageService, apiContext, keysService } = useServiceContext();
   const { profile: identityProfile } = useIdentity(apiContext, chromeStorageService);
   const avatarUrl = useMemo(() => {
-    if (!identityProfile.image || !apiContext.services) return '';
-    return resolveImageUrl(identityProfile.image, apiContext);
-  }, [identityProfile.image, apiContext]);
+    // BAP identity image first; a custom per-account icon only as a fallback.
+    if (identityProfile.image && apiContext.services) return resolveImageUrl(identityProfile.image, apiContext);
+    const icon = chromeStorageService.getCurrentAccountObject().account?.icon;
+    return icon && icon !== HOSTED_YOURS_IMAGE ? icon : '';
+  }, [identityProfile.image, apiContext, chromeStorageService]);
   const [avatarReady, setAvatarReady] = useState(false);
 
   // Pre-load the avatar image so it's decoded before we render it.
@@ -152,7 +158,9 @@ export const BsvWallet = () => {
   const [manageFavorites, setManageFavorites] = useState(false);
   const [account, setAccount] = useState<Account>();
   const [token, setToken] = useState<{ isConfirmed: boolean; info: Bsv21Balance } | null>(null);
-  const services = theme.settings.services;
+  const isTestnet = apiContext.chain === 'test';
+  // MNEE is a mainnet-only asset: hide it (and skip its balance fetches) on testnet.
+  const services = { ...theme.settings.services, mnee: theme.settings.services.mnee && !isTestnet };
   const [filteredTokens, setFilteredTokens] = useState<Bsv21Balance[]>([]);
   const [randomKey, setRandomKey] = useState(Math.random());
   // Bump to force a refresh of the per-coin CoinHistory list (e.g. after a successful send)
@@ -457,7 +465,7 @@ export const BsvWallet = () => {
 
   // Fetch MNEE balance once receiveAddress is available
   useEffect(() => {
-    if (receiveAddress) {
+    if (services.mnee && receiveAddress) {
       updateMneeBalance();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -466,7 +474,7 @@ export const BsvWallet = () => {
   // Refresh MNEE when the service worker's address sync finishes, the same trigger
   // that refreshes the BSV balance. Without this, MNEE was fetched exactly once.
   useEffect(() => {
-    if (!isSyncing && receiveAddress) {
+    if (services.mnee && !isSyncing && receiveAddress) {
       updateMneeBalance();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -474,7 +482,7 @@ export const BsvWallet = () => {
 
   // Check for legacy MNEE balance (old address) once wallet is ready
   useEffect(() => {
-    if (!apiContext?.services?.mnee) return;
+    if (!services.mnee || !apiContext?.services?.mnee) return;
     (async () => {
       try {
         const { account } = chromeStorageService.getCurrentAccountObject();
@@ -1138,9 +1146,38 @@ export const BsvWallet = () => {
         className="flex flex-col items-center w-full pt-14 pb-16 overflow-y-auto"
         style={{ minHeight: '100%' }}
       >
+        {/* ── Testnet banner + faucet ── */}
+        {isTestnet && (
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0 } }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="flex items-center justify-between gap-2 w-[92%] mb-4 px-4 py-2.5 rounded-xl"
+            style={{
+              background: 'rgba(253,176,34,0.08)',
+              border: '1px solid rgba(253,176,34,0.2)',
+            }}
+          >
+            <span className="flex items-center gap-2 text-xs leading-snug min-w-0" style={{ color: TESTNET_COLOR }}>
+              <FlaskConical size={14} className="shrink-0" />
+              <span>
+                <span style={{ fontWeight: 600 }}>Testnet account.</span> Coins have no real value.
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => window.open(TESTNET_FAUCET_URL, '_blank')}
+              className="flex items-center gap-1 shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold border-0 outline-none cursor-pointer"
+              style={{ background: 'rgba(253,176,34,0.18)', color: TESTNET_COLOR }}
+            >
+              Get coins
+              <ExternalLink size={11} />
+            </button>
+          </motion.div>
+        )}
+
         {/* ── Legacy migration banner ── */}
         <AnimatePresence>
-          {showMigrationBanner && (
+          {showMigrationBanner && !isTestnet && (
             <motion.button
               key="migration-banner"
               initial={{ opacity: 0, y: -8 }}
