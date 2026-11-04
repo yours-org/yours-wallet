@@ -63,10 +63,13 @@ import { YoursEventName } from '../inject';
 import { useSyncTracker } from '../hooks/useSyncTracker';
 import { getErrorMessage, isValidEmail } from '../utils/tools';
 import { UpgradeNotification } from '../components/UpgradeNotification';
-import { Bsv21TokensList } from '../components/Bsv21TokensList';
+import { TokensList } from '../components/TokensList';
 import { ManageTokens } from '../components/ManageTokens';
 import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { SendBsv21View } from '../components/SendBsv21View';
+import { SendOneColorView } from '../components/SendOneColorView';
+import { getOneColorBalances, oneColorTicker, type OneColorBalance } from '../services/oneColor';
+import { walletTokensOf, type WalletToken } from '../services/walletTokens';
 import { AssetPicker, type PickableAsset } from '../components/AssetPicker';
 import { SendConfirmation, type SendLineItem } from '../components/SendConfirmation';
 import { CoinHistory } from '../components/CoinHistory';
@@ -161,13 +164,18 @@ export const BsvWallet = () => {
   const [keysAlreadyBackedUp, setKeysAlreadyBackedUp] = useState(false);
   const [showMigrationBanner, setShowMigrationBanner] = useState(false);
   const [bsv21s, setBsv21s] = useState<Bsv21Balance[]>([]);
+  // 1Color (BRC-162) tokens the color module holds; a selected one opens the send view.
+  const [oneColors, setOneColors] = useState<OneColorBalance[]>([]);
+  const [oneColorToken, setOneColorToken] = useState<OneColorBalance | null>(null);
   const [manageFavorites, setManageFavorites] = useState(false);
   const [account, setAccount] = useState<Account>();
   const [token, setToken] = useState<{ isConfirmed: boolean; info: Bsv21Balance } | null>(null);
   const isTestnet = apiContext.chain === 'test';
   // MNEE is a mainnet-only asset: hide it (and skip its balance fetches) on testnet.
   const services = { ...theme.settings.services, mnee: theme.settings.services.mnee && !isTestnet };
-  const [filteredTokens, setFilteredTokens] = useState<Bsv21Balance[]>([]);
+  // 1Color tokens are the wallet's own, so a held one shows even where the theme leaves BSV21 off.
+  const tokensEnabled = services.bsv21 || oneColors.length > 0;
+  const [filteredTokens, setFilteredTokens] = useState<WalletToken[]>([]);
   const [randomKey, setRandomKey] = useState(Math.random());
   // Bump to force a refresh of the per-coin CoinHistory list (e.g. after a successful send)
   const [bsvHistoryRefreshKey, setBsvHistoryRefreshKey] = useState(0);
@@ -382,6 +390,15 @@ export const BsvWallet = () => {
     return res;
   };
 
+  /** 1Color balances from the wallet's own storage; a failure keeps the last list and never blocks the others. */
+  const getAndSetOneColors = async (): Promise<void> => {
+    try {
+      setOneColors(await getOneColorBalances(apiContext));
+    } catch (err) {
+      console.error('[BsvWallet] 1Color balances failed:', err);
+    }
+  };
+
   /** Order-independent fingerprint of token balances, for change detection. */
   const bsv21Signature = (tokens: Bsv21Balance[]) =>
     tokens
@@ -389,11 +406,14 @@ export const BsvWallet = () => {
       .sort()
       .join('|');
 
+  // Every fungible token held, both kinds, as the favourites list and Manage Tokens see them.
+  const walletTokens = useMemo(() => walletTokensOf(bsv21s, oneColors), [bsv21s, oneColors]);
+
   useEffect(() => {
-    if (!bsv21s || !account) return;
-    const filtered = bsv21s.filter((t) => t.id && account?.settings?.favoriteTokens?.includes(t.id));
-    setFilteredTokens(filtered);
-  }, [bsv21s, account]);
+    if (!account) return;
+    const favorites = account.settings?.favoriteTokens ?? [];
+    setFilteredTokens(walletTokens.filter((t) => favorites.includes(t.id)));
+  }, [walletTokens, account]);
 
   useEffect(() => {
     (async () => {
@@ -410,6 +430,7 @@ export const BsvWallet = () => {
       setShowMigrationBanner(!acct?.settings?.sweepStarted && !acct?.settings?.sweepCompleted);
       if (obj?.selectedAccount) {
         await getAndSetAccountAndBsv21s();
+        void getAndSetOneColors();
       }
     })();
 
@@ -584,6 +605,7 @@ export const BsvWallet = () => {
         getAndSetBsvBalance(),
         updateMneeBalance(),
         getAndSetAccountAndBsv21s(),
+        getAndSetOneColors(),
       ]);
       loadLocks && loadLocks();
       const unchanged =
@@ -934,15 +956,16 @@ export const BsvWallet = () => {
     navigate('/sweep');
   };
 
-  const handleTokenClick = (token: Bsv21Balance) => {
-    if (token.all.pending > 0n) {
+  const handleTokenClick = (t: WalletToken) => {
+    if (t.pending > 0n && t.confirmed === 0n) {
       addSnackbar('Pending tokens cannot be sent!', 'error', 2000);
       return;
     }
-    setToken({
-      isConfirmed: true,
-      info: token,
-    });
+    if (t.kind === '1color' && t.oneColor) {
+      setOneColorToken(t.oneColor);
+      return;
+    }
+    if (t.bsv21) setToken({ isConfirmed: true, info: t.bsv21 });
   };
 
   /** Fill the given MNEE recipient with (balance - already-assigned - fee). */
@@ -1412,20 +1435,20 @@ export const BsvWallet = () => {
           )}
         </motion.div>
 
-        {/* ── Favorite tokens ── */}
-        <Show when={services.bsv21}>
+        {/* ── Favorite tokens (BSV21 and 1Color) ── */}
+        <Show when={tokensEnabled}>
           <motion.div
             variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
             className="w-full"
           >
             {filteredTokens.length > 0 && (
-              <Bsv21TokensList
+              <TokensList
                 key={randomKey}
                 hideStatusLabels
                 tokens={filteredTokens}
                 theme={theme}
-                onTokenClick={(t: Bsv21Balance) => {
+                onTokenClick={(t) => {
                   setSendSource('main');
                   handleTokenClick(t);
                 }}
@@ -1435,7 +1458,7 @@ export const BsvWallet = () => {
         </Show>
 
         {/* ── Quick links (Manage Tokens) ── */}
-        <Show when={services.bsv21}>
+        <Show when={tokensEnabled}>
           <motion.div
             variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -1497,6 +1520,9 @@ export const BsvWallet = () => {
               }) as PickableAsset,
           )
       : []),
+    ...oneColors
+      .filter((t) => t.available > 0n)
+      .map((t) => ({ kind: '1color' as const, token: t, icon: t.icon || GENERIC_TOKEN_ICON }) as PickableAsset),
   ];
 
   const handleAssetSelected = (asset: PickableAsset) => {
@@ -1514,7 +1540,11 @@ export const BsvWallet = () => {
         return;
       case 'bsv21':
         setPageState('main');
-        handleTokenClick(asset.token);
+        setToken({ isConfirmed: true, info: asset.token });
+        return;
+      case '1color':
+        setPageState('main');
+        setOneColorToken(asset.token);
         return;
     }
   };
@@ -2045,9 +2075,10 @@ export const BsvWallet = () => {
             // Favorites are already saved; show them now rather than after the balance fetch.
             setAccount(chromeStorageService.getCurrentAccountObject().account);
             getAndSetAccountAndBsv21s();
+            void getAndSetOneColors();
             setRandomKey(Math.random());
           }}
-          tokens={bsv21s}
+          tokens={walletTokens}
           theme={theme}
         />
       </Show>
@@ -2087,6 +2118,31 @@ export const BsvWallet = () => {
           />
         )}
       </Show>
+      <Show when={!!oneColorToken}>
+        {oneColorToken && (
+          <SendOneColorView
+            token={oneColorToken}
+            onBack={(sentAtomic) => {
+              // Optimistic: the handoff spent the inputs, so the available balance drops at once.
+              if (sentAtomic && sentAtomic > 0n) {
+                const { assetId } = oneColorToken;
+                setOneColors((prev) =>
+                  prev.map((t) =>
+                    t.assetId === assetId
+                      ? { ...t, available: t.available > sentAtomic ? t.available - sentAtomic : 0n }
+                      : t,
+                  ),
+                );
+              }
+              setOneColorToken(null);
+              setPageState(sendSource);
+              Promise.all([getAndSetOneColors(), getAndSetBsvBalance()]).catch((err) =>
+                console.error(`[SendOneColorView ${oneColorTicker(oneColorToken)}] reconcile refresh failed:`, err),
+              );
+            }}
+          />
+        )}
+      </Show>
       <Show when={isProcessing && pageState === 'main'}>
         <PageLoader theme={theme} message="Loading wallet..." />
       </Show>
@@ -2096,7 +2152,7 @@ export const BsvWallet = () => {
       <Show when={isProcessing && pageState === 'sendMNEE'}>
         <PageLoader theme={theme} message="Sending MNEE..." />
       </Show>
-      <Show when={!isProcessing && pageState === 'main' && !token && !manageFavorites}>{main}</Show>
+      <Show when={!isProcessing && pageState === 'main' && !token && !oneColorToken && !manageFavorites}>{main}</Show>
       <Show when={!isProcessing && pageState === 'receive'}>{receive}</Show>
       <Show when={!isProcessing && pageState === 'asset-picker'}>{assetPickerView}</Show>
       <Show when={!isProcessing && pageState === 'send'}>{send}</Show>

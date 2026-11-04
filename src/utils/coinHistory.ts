@@ -12,6 +12,7 @@ import { getMneeHistory, type OneSatContext } from '@1sat/actions';
 import { buildTokenLabel } from '@1sat/types';
 import type { WalletAction } from '@bsv/sdk';
 import { BSV_DECIMAL_CONVERSION } from './constants';
+import { oneColorActionAmount, oneColorTicker } from '../services/oneColor';
 import { formatNumberWithCommasAndDecimals, showAmount, truncate } from './format';
 
 /** Baskets that indicate a non-BSV action (BSV list should exclude these). */
@@ -257,6 +258,62 @@ export const fetchBsv21History = async (
         description: a.description || undefined,
       };
     });
+};
+
+// ─── 1Color ──────────────────────────────────────────────────────────────────
+
+/** Actions read per page while scanning for an asset. */
+const ONE_COLOR_SCAN_PAGE = 100;
+/** Scanning stops after this many actions; older history for a busy wallet is cut off rather than read in full. */
+const ONE_COLOR_SCAN_MAX = 2000;
+
+/**
+ * 1Color actions carry the BRC-207 plan as hex chunks in their labels, with no
+ * per-asset label to query by, so the wallet's actions are read newest first
+ * with their locking scripts and each is decoded for the asset. A page is
+ * `opts.limit` matches after skipping `opts.offset` of them.
+ */
+export const fetchOneColorHistory = async (
+  ctx: OneSatContext,
+  assetId: string,
+  decimals: number,
+  symbol: string | undefined,
+  opts: FetchHistoryOpts = {},
+): Promise<CoinTxSummary[]> => {
+  const wantLimit = opts.limit ?? 50;
+  const skip = opts.offset ?? 0;
+  const sym = oneColorTicker({ sym: symbol, assetId });
+  const probe = await ctx.wallet.listActions({ labels: [], limit: 1, offset: 0 });
+  const matches: CoinTxSummary[] = [];
+  let end = probe.totalActions;
+  let scanned = 0;
+  while (end > 0 && matches.length < skip + wantLimit && scanned < ONE_COLOR_SCAN_MAX) {
+    const start = Math.max(0, end - ONE_COLOR_SCAN_PAGE);
+    const { actions } = await ctx.wallet.listActions({
+      labels: [],
+      includeOutputs: true,
+      includeOutputLockingScripts: true,
+      includeInputs: true,
+      includeInputSourceLockingScripts: true,
+      limit: end - start,
+      offset: start,
+    });
+    for (const a of actions.slice().reverse()) {
+      const moved = oneColorActionAmount(a, assetId);
+      if (!moved) continue;
+      const sign = moved.direction === 'sent' ? '-' : '+';
+      matches.push({
+        txid: a.txid,
+        direction: moved.direction,
+        amountDisplay: moved.amount > 0n ? `${sign}${showAmount(moved.amount, decimals)} ${sym}` : `${sym} transfer`,
+        amountSubdued: moved.amount === 0n,
+        description: a.description || undefined,
+      });
+    }
+    scanned += end - start;
+    end = start;
+  }
+  return matches.slice(skip, skip + wantLimit);
 };
 
 // ─── MNEE ────────────────────────────────────────────────────────────────────

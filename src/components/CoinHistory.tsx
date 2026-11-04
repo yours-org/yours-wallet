@@ -5,14 +5,21 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
 import { useTheme } from '../hooks/useTheme';
 import { explorerTxUrl } from '../utils/constants';
-import { fetchBsv21History, fetchBsvHistory, fetchMneeHistory, type CoinTxSummary } from '../utils/coinHistory';
+import {
+  fetchBsv21History,
+  fetchBsvHistory,
+  fetchMneeHistory,
+  fetchOneColorHistory,
+  type CoinTxSummary,
+} from '../utils/coinHistory';
 import { truncate } from '../utils/format';
 import { Show } from './Show';
 
 export type CoinHistoryFilter =
   | { type: 'bsv' }
   | { type: 'mnee'; addresses: string[] }
-  | { type: 'bsv21'; tokenId: string; decimals: number; symbol?: string };
+  | { type: 'bsv21'; tokenId: string; decimals: number; symbol?: string }
+  | { type: '1color'; assetId: string; decimals: number; symbol?: string };
 
 export type CoinHistoryProps = {
   filter: CoinHistoryFilter;
@@ -29,6 +36,8 @@ const filterKey = (filter: CoinHistoryFilter): string => {
       return `mnee:${filter.addresses.join(',')}`;
     case 'bsv21':
       return `bsv21:${filter.tokenId}`;
+    case '1color':
+      return `1color:${filter.assetId}`;
   }
 };
 
@@ -64,6 +73,11 @@ export const CoinHistory = ({ filter, pageSize = 25, refreshKey }: CoinHistoryPr
           });
         case 'bsv21':
           return fetchBsv21History(apiContext, filter.tokenId, filter.decimals, filter.symbol, {
+            offset,
+            limit: pageSize,
+          });
+        case '1color':
+          return fetchOneColorHistory(apiContext, filter.assetId, filter.decimals, filter.symbol, {
             offset,
             limit: pageSize,
           });
