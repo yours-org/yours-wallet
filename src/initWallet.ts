@@ -429,9 +429,10 @@ export const initWallet = async (
       console.error('[initWallet] Message box sync failed:', error);
     });
 
-  // Collect the metanet_inbox at the messagebox of every BRC-169 handle the
-  // wallet holds: once now, then on a timer (fire-and-forget).
-  const syncHandleInboxes = createHandleInboxSync(actionCtx);
+  // Collect the transaction-delivery box at the messagebox of every BRC-169
+  // handle the wallet holds: once now, then on a timer (fire-and-forget).
+  // 1Color receipts go to the chain's default color overlay first.
+  const syncHandleInboxes = createHandleInboxSync(actionCtx, { overlay: colorOverlayDefaultOf(chain) });
   void syncHandleInboxes();
   const handleInboxTimer = setInterval(() => void syncHandleInboxes(), HANDLE_INBOX_SYNC_INTERVAL_MS);
 
