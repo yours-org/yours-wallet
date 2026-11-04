@@ -43,7 +43,11 @@ export class TokenActionMarks {
   private counts = new Map<string, number>();
 
   /** Runs `fn` with the originator marked when `params` is a token action; unmarks in finally. */
-  async run<T>(originator: string | undefined, params: Pick<CreateActionArgs, 'labels'>, fn: () => Promise<T>): Promise<T> {
+  async run<T>(
+    originator: string | undefined,
+    params: Pick<CreateActionArgs, 'labels'>,
+    fn: () => Promise<T>,
+  ): Promise<T> {
     const key = normalizeTokenOriginator(originator);
     if (!key || !isColorAction(params)) return await fn();
     this.counts.set(key, (this.counts.get(key) ?? 0) + 1);
