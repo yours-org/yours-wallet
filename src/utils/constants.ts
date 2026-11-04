@@ -1,5 +1,6 @@
 import { NetWork } from '../services/types/provider.types';
 import { ONESAT_MAINNET_CONTENT_URL, ONESAT_MAINNET_URL } from '@1sat/actions';
+import genericTokenIcon from '../assets/generic-token.svg';
 
 export const MAINNET_ADDRESS_PREFIX = 0x00;
 export const TESTNET_ADDRESS_PREFIX = 0x6f;
@@ -22,8 +23,8 @@ export const HOSTED_YOURS_IMAGE = 'https://i.ibb.co/zGcthBv/yours-org-light.png'
 export const YOURS_DEV_WALLET = '1MtzWXQEYGp89bQ9U2nfrnuChFv37j6pV6';
 export const ONE_SAT_MARKET_URL = 'https://1sat.market/market';
 export const MESSAGEBOX_URL = 'https://messagebox.1sat.app';
-export const GENERIC_TOKEN_ICON =
-  'https://static-00.iconduck.com/assets.00/generic-cryptocurrency-icon-2048x2029-vzaeox5w.png';
+/** Bundled with the extension: a token with no icon of its own must not depend on a third-party host. */
+export const GENERIC_TOKEN_ICON = genericTokenIcon;
 export const KNOWN_BURN_ADDRESSES = ['1111111111111111111114oLvT2', '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'];
 
 // MNEE

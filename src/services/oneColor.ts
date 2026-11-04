@@ -62,8 +62,6 @@ export const decodeOneColor = (lockingScriptHex: string | undefined): OneColorTo
 export const oneColorTicker = (t: { sym?: string; assetId: string }): string =>
   t.sym || `${t.assetId.slice(0, 6)}…${t.assetId.slice(-4)}`;
 const PAGE = 1000;
-/** Icons larger than this are left out rather than inlined into every list render. */
-const MAX_ICON_BYTES = 256 * 1024;
 
 type HoldingOutput = Pick<WalletOutput, 'lockingScript' | 'tags'>;
 
@@ -112,7 +110,7 @@ export const assetInfoFromMetadata = (meta: OneColorMetadata | undefined): OneCo
   const info: OneColorAssetInfo = { dec: meta?.dec ?? 0 };
   if (meta?.sym) info.sym = meta.sym;
   const icon = meta?.icon;
-  if (icon && icon.bytes.length > 0 && icon.bytes.length <= MAX_ICON_BYTES && /^image\//.test(icon.mediaType)) {
+  if (icon && icon.bytes.length > 0 && /^image\//.test(icon.mediaType)) {
     info.icon = `data:${icon.mediaType};base64,${Utils.toBase64(Array.from(icon.bytes))}`;
   }
   return info;
