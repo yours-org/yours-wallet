@@ -23,6 +23,10 @@ import { reconcileStorage, requestUsbFullPass } from './services/storageReconcil
 import { showOneSatPrompt } from './services/oneSatPrompt';
 import { createColorOverlayProvider } from './services/colorOverlay';
 import { createColorTokenAccessHandler } from './services/colorConsent';
+import { createHandleInboxSync } from './services/handles';
+
+/** How often the BRC-169 handle inboxes are collected (matches the 1-minute inactivity-lock alarm). */
+const HANDLE_INBOX_SYNC_INTERVAL_MS = 60_000;
 
 // Admin originator for the extension (bypasses all permission checks). The bare
 // extension ID, as ChromeCWI sends it: toolbox permission checks reject a URL
@@ -425,9 +429,16 @@ export const initWallet = async (
       console.error('[initWallet] Message box sync failed:', error);
     });
 
+  // Collect the metanet_inbox at the messagebox of every BRC-169 handle the
+  // wallet holds: once now, then on a timer (fire-and-forget).
+  const syncHandleInboxes = createHandleInboxSync(actionCtx);
+  void syncHandleInboxes();
+  const handleInboxTimer = setInterval(() => void syncHandleInboxes(), HANDLE_INBOX_SYNC_INTERVAL_MS);
+
   // Create close function
   const close = async () => {
     color.dispose();
+    clearInterval(handleInboxTimer);
     await destroyWallet();
   };
 

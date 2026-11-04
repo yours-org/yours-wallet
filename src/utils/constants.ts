@@ -61,6 +61,7 @@ export const DEFAULT_STORAGE_REMOTE_URL = 'https://wallet.1sat.app';
 export const DISCORD_SUPPORT_URL = 'https://discord.gg/RD4uuhzMSh';
 /** Testnet faucet users can hit for free test coins. */
 export const TESTNET_FAUCET_URL = 'https://faucet.bananablocks.com';
+export const HANDLE_REGISTRATION_URL = 'https://accounts.1sat.app';
 
 /** Account service (`/account/status`) for the default storage provider. */
 export const DEFAULT_ACCOUNT_URL = 'https://accounts.1sat.app';
