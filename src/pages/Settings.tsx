@@ -659,7 +659,7 @@ export const Settings = () => {
     setHandleSaving(true);
     try {
       const avatar = enteredImage.startsWith('1sat://') ? enteredImage.slice(7).replace('.', '_') : null;
-      await setHandleProfile(apiContext.wallet, selectedHandle, handleDetails.details.messagebox, {
+      await setHandleProfile(apiContext.wallet, selectedHandle, {
         name: enteredName,
         avatar,
       });

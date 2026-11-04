@@ -1,22 +1,21 @@
 import { AuthFetch, ProtoWallet, Utils, type WalletInterface } from '@bsv/sdk';
-import * as dagCbor from '@ipld/dag-cbor';
-import { CID } from 'multiformats/cid';
-import { sha256 } from 'multiformats/hashes/sha2';
 import { resolveHandle, type HandleResolution } from '@1sat/client';
 import { decodeProfile, encodeProfile } from '@1sat/utils';
-import { outpointFromBytes, outpointToBytes } from '@1sat/templates';
-import { formatOrdinalOutpoint } from '@1sat/types';
+import { formatOrdinalOutpoint, outpointFromWire, outpointToWire, parseOutpoint } from '@1sat/types';
 import { formatHandle, type HeldHandle } from './handles';
 
 /**
  * A handle's profile (skein #104): the OpNS profile record, DAG-CBOR
  * `{domain, name?, avatar?}`, signed by the handle's key under this protocol,
- * kept by the holder on their mailbox instance and served by the host inside
- * the BRC-169 resolve answer as `profile: {record, signature}`.
+ * posted to the registrar (`POST <origin>/account/profile`, skein-onboard
+ * 0.4.0) and served by the host inside the BRC-169 resolve answer as
+ * `profile: {record, signature}`.
  */
 export const PROFILE_PROTOCOL: [1, string] = [1, 'metanet handles profile'];
 export const PROFILE_KEY_ID = '1';
-const PROFILE_HEAD = 'profile';
+
+/** What a skein router answers at every host name it serves: `{origin, domain}`. */
+export const SKEIN_HOST_PATH = '/.well-known/skein-host';
 
 /** The profile as edited: `avatar` is an outpoint, `txid_vout`. */
 export type HandleProfile = { name: string; avatar: string | null };
@@ -31,6 +30,22 @@ export type HandleDetails = {
 
 type ServedResolution = HandleResolution & {
   profile?: { record?: string; signature?: string };
+};
+
+/** `txid_vout` or `txid.vout` → its 36 bytes (txid internal order ‖ vout LE); throws on anything else. */
+export const avatarBytes = (s: string): number[] => {
+  try {
+    const { txid, vout } = parseOutpoint(formatOrdinalOutpoint(s.trim()));
+    return Array.from(outpointToWire(txid, vout));
+  } catch {
+    throw new Error(`The avatar is not an outpoint: ${s}`);
+  }
+};
+
+/** 36 outpoint bytes → `txid_vout`. */
+const outpointText = (bytes: number[] | Uint8Array): string => {
+  const { txid, vout } = outpointFromWire(bytes);
+  return `${txid}_${vout}`;
 };
 
 const resolveHeld = async (h: HeldHandle): Promise<ServedResolution> =>
@@ -53,7 +68,7 @@ export const loadHandleDetails = async (h: HeldHandle): Promise<HandleDetails> =
       });
       const d = decodeProfile(data);
       if (valid && d.domain === h.domain) {
-        const avatar = d.avatar ? outpointFromBytes(d.avatar) : null;
+        const avatar = d.avatar ? outpointText(d.avatar) : null;
         profile = { name: d.name ?? '', avatar };
       }
     } catch (error) {
@@ -63,26 +78,44 @@ export const loadHandleDetails = async (h: HeldHandle): Promise<HandleDetails> =
   return { resolution: a, messagebox: a.messagebox, identityKey: a.identityKey, profile };
 };
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const registrars = new Map<string, Promise<string>>();
 
 /**
- * Write the handle's profile as its owner: the record encoded and signed by
- * the wallet, then sent to the mailbox instance as two admin messages,
- * `objects` with the block and `head` naming it. Resolves once the host
- * serves the new record.
+ * The registrar origin for a handle domain: the `origin` the skein router
+ * answers at `https://<domain>/.well-known/skein-host`, read once per domain
+ * (a failed read is not kept).
  */
-export const setHandleProfile = async (
-  wallet: WalletInterface,
-  h: HeldHandle,
-  messagebox: string,
-  profile: HandleProfile,
-): Promise<void> => {
-  let avatar: number[] | undefined;
-  if (profile.avatar) {
-    const bytes = outpointToBytes(formatOrdinalOutpoint(profile.avatar));
-    if (!bytes) throw new Error(`The avatar is not an outpoint: ${profile.avatar}`);
-    avatar = bytes;
+export const registrarOrigin = (domain: string, fetchFn: typeof fetch = fetch): Promise<string> => {
+  const key = domain.toLowerCase();
+  let p = registrars.get(key);
+  if (!p) {
+    const at = `https://${key}${SKEIN_HOST_PATH}`;
+    p = (async () => {
+      const r = await fetchFn(at, { headers: { accept: 'application/json' } });
+      let body: { origin?: unknown } | undefined;
+      try {
+        body = await r.json();
+      } catch {
+        /* the status says it */
+      }
+      if (r.status !== 200 || typeof body?.origin !== 'string') {
+        throw new Error(`${at}: not a skein host (HTTP ${r.status})`);
+      }
+      return new URL(body.origin).origin;
+    })();
+    p.catch(() => registrars.delete(key));
+    registrars.set(key, p);
   }
+  return p;
+};
+
+/** The body of `POST /account/profile`: the record and the wallet's signature over its bytes. */
+export const profileRequestBody = async (
+  wallet: Pick<WalletInterface, 'createSignature'>,
+  h: Pick<HeldHandle, 'handle' | 'domain'>,
+  profile: HandleProfile,
+): Promise<{ handle: string; record: string; signature: string }> => {
+  const avatar = profile.avatar ? avatarBytes(profile.avatar) : undefined;
   const name = profile.name.trim();
   const record = encodeProfile({ domain: h.domain, ...(name ? { name } : {}), ...(avatar ? { avatar } : {}) });
   const { signature } = await wallet.createSignature({
@@ -91,42 +124,46 @@ export const setHandleProfile = async (
     counterparty: 'anyone',
     data: record,
   });
-  const block = dagCbor.encode({ profile: Uint8Array.from(record), signature: Uint8Array.from(signature) });
-  const cid = CID.createV1(dagCbor.code, await sha256.digest(block));
+  return { handle: h.handle, record: Utils.toBase64(record), signature: Utils.toHex(signature) };
+};
 
-  const base = messagebox.replace(/\/+$/, '');
-  const af = new AuthFetch(wallet);
-  // The instance answers signed; the key its answers carry is the recipient of its admin messages.
-  const probe = await af.fetch(`${base}/explore`, { method: 'GET' });
-  const identity = probe.headers.get('x-bsv-auth-identity-key');
-  if (!identity) throw new Error(`${base} gave no signed answer`);
-  const recipient = Uint8Array.from(Utils.toArray(identity, 'hex'));
+/** What the profile POST goes over: the wallet's BRC-104 session (@bsv/sdk `AuthFetch`). */
+export type SessionFetch = {
+  fetch(url: string, init: { method: string; headers: Record<string, string>; body: string }): Promise<Response>;
+};
 
-  const send = async (messageBox: string, body: unknown) => {
-    const r = await af.fetch(`${base}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/cbor' },
-      body: dagCbor.encode({ message: { recipient, messageBox, body: dagCbor.encode(body) } }) as unknown as BodyInit,
-    });
-    if (r.status !== 200) {
-      let text = '';
-      try {
-        const v = dagCbor.decode(new Uint8Array(await r.arrayBuffer())) as { description?: string };
-        text = v.description ?? '';
-      } catch {
-        /* no decodable body */
-      }
-      throw new Error(`${messageBox}: HTTP ${r.status} ${text}`.trim());
-    }
-  };
-  await send('objects', { records: [{ cid, bytes: block }] });
-  await send('head', { name: PROFILE_HEAD, tree: cid });
+const sessions = new WeakMap<WalletInterface, SessionFetch>();
+const sessionFor = (wallet: WalletInterface): SessionFetch => {
+  let af = sessions.get(wallet);
+  if (!af) sessions.set(wallet, (af = new AuthFetch(wallet) as unknown as SessionFetch));
+  return af;
+};
 
-  const want = Utils.toBase64(record);
-  for (let wait = 250; wait < 8000; wait *= 2) {
-    const a = await resolveHeld(h);
-    if (a.profile?.record === want) return;
-    await sleep(wait);
+/**
+ * Write the handle's profile as its owner: the record encoded and signed by
+ * the wallet, posted to `POST <registrar origin>/account/profile` over the
+ * wallet's BRC-104 session. A refusal is thrown with the host's own `error`
+ * text.
+ */
+export const setHandleProfile = async (
+  wallet: WalletInterface,
+  h: HeldHandle,
+  profile: HandleProfile,
+  deps: { session?: SessionFetch; fetch?: typeof fetch } = {},
+): Promise<void> => {
+  const body = await profileRequestBody(wallet, h, profile);
+  const origin = await registrarOrigin(h.domain, deps.fetch);
+  const r = await (deps.session ?? sessionFor(wallet)).fetch(`${origin}/account/profile`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  let v: { error?: unknown; profile?: { record?: string } } = {};
+  try {
+    v = await r.json();
+  } catch {
+    /* the status says it */
   }
-  throw new Error('Saved to your mailbox; the host does not serve it yet. Look again in a moment.');
+  if (r.status !== 200) throw new Error(typeof v?.error === 'string' ? v.error : `HTTP ${r.status}`);
+  if (v.profile?.record !== body.record) throw new Error('The host answered without the profile you signed.');
 };
