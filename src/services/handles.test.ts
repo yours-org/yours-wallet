@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { OneSatContext } from '@1sat/actions';
 import type { HandleResolution } from '@1sat/client';
-import { createHandleInboxSync, type HeldHandle } from './handles';
+import { autoDefaultHandle, createHandleInboxSync, type HeldHandle } from './handles';
 
 const ctx = { wallet: {} } as unknown as OneSatContext;
 const held = (handle: string, domain: string): HeldHandle => ({ handle, domain, certifier: 'c', serialNumber: handle });
@@ -79,5 +79,30 @@ describe('createHandleInboxSync', () => {
       console.error = err;
     }
     expect(calls).toEqual([{ messageboxUrl: 'https://bob.a.example' }]);
+  });
+});
+
+describe('autoDefaultHandle', () => {
+  const alice = held('alice', 'testnet.1sat.app');
+  const bob = held('bob', 'testnet.1sat.app');
+
+  test('one handle and no default: that handle', () => {
+    expect(autoDefaultHandle(null, [alice])).toBe('@alice@testnet.1sat.app');
+    expect(autoDefaultHandle('', [alice])).toBe('@alice@testnet.1sat.app');
+  });
+
+  test('one handle already the default: no change', () => {
+    expect(autoDefaultHandle('@alice@testnet.1sat.app', [alice])).toBeNull();
+  });
+
+  test('one handle and a default that is no longer held: that handle', () => {
+    expect(autoDefaultHandle('@gone@testnet.1sat.app', [alice])).toBe('@alice@testnet.1sat.app');
+  });
+
+  test('no handles or several: the setting is left alone', () => {
+    expect(autoDefaultHandle(null, [])).toBeNull();
+    expect(autoDefaultHandle('@gone@testnet.1sat.app', [])).toBeNull();
+    expect(autoDefaultHandle(null, [alice, bob])).toBeNull();
+    expect(autoDefaultHandle('@alice@testnet.1sat.app', [alice, bob])).toBeNull();
   });
 });

@@ -29,6 +29,7 @@ import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useIdentity, resolveImageUrl } from '../hooks/useIdentity';
+import { useHandles, useHandleAvatar } from '../hooks/useHandles';
 import { useTheme } from '../hooks/useTheme';
 import {
   BSV_DECIMAL_CONVERSION,
@@ -107,12 +108,15 @@ export const BsvWallet = () => {
   const { addSnackbar } = useSnackbar();
   const { chromeStorageService, apiContext, keysService } = useServiceContext();
   const { profile: identityProfile } = useIdentity(apiContext, chromeStorageService);
+  const { handles, defaultHandle } = useHandles(apiContext.wallet, chromeStorageService);
+  const handleAvatar = useHandleAvatar(handles, defaultHandle);
   const avatarUrl = useMemo(() => {
-    // BAP identity image first; a custom per-account icon only as a fallback.
+    // The default handle's avatar first, then the BAP identity image; a custom per-account icon only as a fallback.
+    if (handleAvatar && apiContext.services) return apiContext.services.ordfs.getContentUrl(handleAvatar);
     if (identityProfile.image && apiContext.services) return resolveImageUrl(identityProfile.image, apiContext);
     const icon = chromeStorageService.getCurrentAccountObject().account?.icon;
     return icon && icon !== HOSTED_YOURS_IMAGE ? icon : '';
-  }, [identityProfile.image, apiContext, chromeStorageService]);
+  }, [handleAvatar, identityProfile.image, apiContext, chromeStorageService]);
   const [avatarReady, setAvatarReady] = useState(false);
 
   // Pre-load the avatar image so it's decoded before we render it.
@@ -139,7 +143,6 @@ export const BsvWallet = () => {
   const identityAddress = chromeStorageService.getCurrentAccountObject().account?.addresses?.identityAddress || '';
   const [receiveAddress, setReceiveAddress] = useState<string>('');
   const [copiedHandle, setCopiedHandle] = useState(false);
-  const defaultHandle = chromeStorageService.getCurrentAccountObject().account?.settings?.defaultHandle ?? null;
   // All derived MNEE deposit addresses for the account (not just the currently selected
   // receiveAddress), used so MNEE balance/history aggregate deposits made to any address.
   const [mneeAddresses, setMneeAddresses] = useState<string[]>([]);

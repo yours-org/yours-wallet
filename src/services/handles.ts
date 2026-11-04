@@ -2,6 +2,8 @@ import { MasterCertificate, type WalletInterface } from '@bsv/sdk';
 import { HANDLE_CERT_TYPE } from '@1sat/types';
 import { resolveHandle, type HandleResolution } from '@1sat/client';
 import { syncTransactionInbox, type OneSatContext } from '@1sat/actions';
+import type { ChromeStorageService } from './ChromeStorage.service';
+import type { ChromeStorageObject } from './types/chromeStorage.types';
 
 /** A BRC-169 handle certificate held in the wallet, with its fields decrypted. */
 export type HeldHandle = {
@@ -38,6 +40,29 @@ export const listHandles = async (wallet: WalletInterface): Promise<HeldHandle[]
     }
   }
   return handles;
+};
+
+/**
+ * The default "from" handle the wallet should settle on, or null to leave the
+ * setting alone. A wallet holding exactly one handle has nothing to choose:
+ * that handle is the default, whether none was set or the set one is gone.
+ * With none or several, the setting is the user's.
+ */
+export const autoDefaultHandle = (current: string | null | undefined, handles: HeldHandle[]): string | null => {
+  if (handles.length !== 1) return null;
+  const only = formatHandle(handles[0]);
+  return current === only ? null : only;
+};
+
+/** Persist the account's default "from" handle (`''` clears it). */
+export const saveDefaultHandle = async (chromeStorageService: ChromeStorageService, handle: string): Promise<void> => {
+  const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
+  if (!account || !selectedAccount) return;
+  const key: keyof ChromeStorageObject = 'accounts';
+  const update: Partial<ChromeStorageObject['accounts']> = {
+    [selectedAccount]: { ...account, settings: { ...account.settings, defaultHandle: handle } },
+  };
+  await chromeStorageService.updateNested(key, update);
 };
 
 type CachedResolution = { resolution: HandleResolution; expiresAt: number };
