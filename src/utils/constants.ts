@@ -61,7 +61,6 @@ export const DEFAULT_STORAGE_REMOTE_URL = 'https://wallet.1sat.app';
 export const DISCORD_SUPPORT_URL = 'https://discord.gg/RD4uuhzMSh';
 /** Testnet faucet users can hit for free test coins. */
 export const TESTNET_FAUCET_URL = 'https://faucet.bananablocks.com';
-export const HANDLE_REGISTRATION_URL = 'https://accounts.1sat.app';
 
 /** Account service (`/account/status`) for the default storage provider. */
 export const DEFAULT_ACCOUNT_URL = 'https://accounts.1sat.app';
@@ -72,6 +71,13 @@ const TESTNET_WALLET_URL = 'https://testnet.wallet.1sat.app';
 const TESTNET_ACCOUNTS_URL = 'https://testnet.messagebox.1sat.app';
 
 export type ChainEndpoints = { services: string; storage: string; account: string; messagebox: string };
+
+/** Where a user registers a BRC-169 handle (Settings > Register a handle), per chain. */
+export const HANDLE_REGISTRATION_URL = 'https://accounts.1sat.app';
+export const TESTNET_HANDLE_REGISTRATION_URL = 'https://accounts.testnet.1sat.app/';
+
+export const handleRegistrationUrlOf = (chain: WalletChain): string =>
+  chain === 'test' ? TESTNET_HANDLE_REGISTRATION_URL : HANDLE_REGISTRATION_URL;
 
 export const endpointsOf = (chain: WalletChain): ChainEndpoints =>
   chain === 'test'

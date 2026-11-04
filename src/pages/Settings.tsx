@@ -46,7 +46,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
-import { DISCORD_SUPPORT_URL, FEE_PER_KB, HANDLE_REGISTRATION_URL } from '../utils/constants';
+import { chainOf, DISCORD_SUPPORT_URL, FEE_PER_KB, handleRegistrationUrlOf } from '../utils/constants';
 import { ChromeStorageObject, UsbBackupAccountStatus, UsbSecurity } from '../services/types/chromeStorage.types';
 import {
   deleteHandle,
@@ -1464,7 +1464,7 @@ export const Settings = () => {
           <p className="text-xs" style={{ color: '#98A2B3' }}>
             No handles yet.{' '}
             <button
-              onClick={() => window.open(HANDLE_REGISTRATION_URL, '_blank')}
+              onClick={() => window.open(handleRegistrationUrlOf(chainOf(chromeStorageService.getNetwork())), '_blank')}
               className="underline cursor-pointer"
               style={{ color: '#A1FF8B' }}
             >
