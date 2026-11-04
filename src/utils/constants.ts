@@ -102,7 +102,7 @@ export const endpointsOf = (chain: WalletChain): ChainEndpoints =>
  * on mainnet yet: undefined there, so a token without an override fails closed.
  */
 export const COLOR_OVERLAY_URL: string | undefined = undefined;
-export const TESTNET_COLOR_OVERLAY_URL = 'https://swap.skein.nexus';
+export const TESTNET_COLOR_OVERLAY_URL = 'https://testnet.openex.dev';
 
 export const colorOverlayDefaultOf = (chain: WalletChain): string | undefined =>
   chain === 'test' ? TESTNET_COLOR_OVERLAY_URL : COLOR_OVERLAY_URL;
