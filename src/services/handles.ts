@@ -44,17 +44,19 @@ type CachedResolution = { resolution: HandleResolution; expiresAt: number };
 
 export type HandleInboxSyncOptions = {
   /**
-   * The chain's 1Color overlay (BRC-22 base URL) that token receipts are
-   * submitted to before they are internalized. One overlay for every token:
-   * the per-token overrides (Settings > Token overlays) do not reach the sync.
+   * The 1Color overlay (BRC-22 base URL) for one token, which its receipts
+   * are submitted to before they are internalized; passed through to
+   * `syncTransactionInbox`, which calls it per asset received. The wallet
+   * passes the color overlay provider's `resolveOrigin` (the per-token
+   * override from Settings > Token overlays, else the chain default).
    */
-  overlay?: string;
+  overlayFor?: (assetId: string) => Promise<string | undefined>;
   /** For tests: stand-ins for the certificate listing, BRC-169 resolution and the inbox action. */
   listHandles?: (wallet: OneSatContext['wallet']) => Promise<HeldHandle[]>;
   resolveHandle?: (handle: string) => Promise<HandleResolution>;
   syncInbox?: (
     ctx: OneSatContext,
-    input: { messageboxUrl: string; overlay?: string },
+    input: { messageboxUrl: string; overlayFor?: (assetId: string) => Promise<string | undefined> },
   ) => ReturnType<typeof syncTransactionInbox.execute>;
 };
 
@@ -101,7 +103,10 @@ export const createHandleInboxSync = (ctx: OneSatContext, opts: HandleInboxSyncO
 
       for (const messageboxUrl of messageboxes) {
         try {
-          const result = await sync(ctx, { messageboxUrl, ...(opts.overlay ? { overlay: opts.overlay } : {}) });
+          const result = await sync(ctx, {
+            messageboxUrl,
+            ...(opts.overlayFor ? { overlayFor: opts.overlayFor } : {}),
+          });
           if (result.error) {
             console.error(`[handles] transaction inbox sync at ${messageboxUrl} failed:`, result.error);
           } else if (result.received.length > 0 || result.skipped.length > 0) {

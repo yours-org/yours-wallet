@@ -8,15 +8,16 @@ const held = (handle: string, domain: string): HeldHandle => ({ handle, domain, 
 const resolution = (messagebox: string, ttl = 60) => ({ messagebox, ttl }) as unknown as HandleResolution;
 
 describe('createHandleInboxSync', () => {
-  test('one transaction-inbox sync per distinct messagebox, with the overlay', async () => {
+  test('one transaction-inbox sync per distinct messagebox, with the overlay resolver', async () => {
     const boxes: Record<string, string> = {
       '@alice@testnet.1sat.app': 'https://alice.testnet.1sat.app',
       '@bob@testnet.1sat.app': 'https://bob.testnet.1sat.app',
       '@carol@other.example': 'https://alice.testnet.1sat.app',
     };
     const calls: unknown[] = [];
+    const overlayFor = async (_assetId: string) => 'https://swap.skein.nexus';
     const sync = createHandleInboxSync(ctx, {
-      overlay: 'https://swap.skein.nexus',
+      overlayFor,
       listHandles: async () => [
         held('alice', 'testnet.1sat.app'),
         held('bob', 'testnet.1sat.app'),
@@ -30,12 +31,14 @@ describe('createHandleInboxSync', () => {
     });
     await sync();
     expect(calls).toEqual([
-      { messageboxUrl: 'https://alice.testnet.1sat.app', overlay: 'https://swap.skein.nexus' },
-      { messageboxUrl: 'https://bob.testnet.1sat.app', overlay: 'https://swap.skein.nexus' },
+      { messageboxUrl: 'https://alice.testnet.1sat.app', overlayFor },
+      { messageboxUrl: 'https://bob.testnet.1sat.app', overlayFor },
     ]);
+    // The same resolver instance is passed through, untouched.
+    expect((calls[0] as { overlayFor: unknown }).overlayFor).toBe(overlayFor);
   });
 
-  test('no overlay: the input carries none; resolutions cached for their ttl', async () => {
+  test('no overlay resolver: the input carries none; resolutions cached for their ttl', async () => {
     const calls: unknown[] = [];
     let resolves = 0;
     const sync = createHandleInboxSync(ctx, {

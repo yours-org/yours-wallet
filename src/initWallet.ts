@@ -271,12 +271,13 @@ export const initWallet = async (
   //     Settings > Token overlays, else the chain default. Consent goes
   //     through the same prompt window and permission store as the 1Sat modules.
   const colorAccountId = chromeStorageService.getCurrentAccountObject().selectedAccount ?? keys.identityAddress;
+  const colorProvider = createColorOverlayProvider({
+    defaultOrigin: colorOverlayDefaultOf(chain),
+    getOverrides: () => chromeStorageService.getColorOverlayOverrides(colorAccountId),
+  });
   const color = createColorModule({
     wallet: baseWallet,
-    provider: createColorOverlayProvider({
-      defaultOrigin: colorOverlayDefaultOf(chain),
-      getOverrides: () => chromeStorageService.getColorOverlayOverrides(colorAccountId),
-    }),
+    provider: colorProvider,
     requestTokenAccess: createColorTokenAccessHandler({
       promptHandler: showOneSatPrompt,
       permissionStore,
@@ -431,8 +432,11 @@ export const initWallet = async (
 
   // Collect the transaction-delivery box at the messagebox of every BRC-169
   // handle the wallet holds: once now, then on a timer (fire-and-forget).
-  // 1Color receipts go to the chain's default color overlay first.
-  const syncHandleInboxes = createHandleInboxSync(actionCtx, { overlay: colorOverlayDefaultOf(chain) });
+  // 1Color receipts go first to each token's overlay, resolved as for sends:
+  // the Settings > Token overlays override, else the chain default.
+  const syncHandleInboxes = createHandleInboxSync(actionCtx, {
+    overlayFor: (assetId) => colorProvider.resolveOrigin(assetId),
+  });
   void syncHandleInboxes();
   const handleInboxTimer = setInterval(() => void syncHandleInboxes(), HANDLE_INBOX_SYNC_INTERVAL_MS);
 
