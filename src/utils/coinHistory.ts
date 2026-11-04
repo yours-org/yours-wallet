@@ -13,7 +13,7 @@ import { buildTokenLabel } from '@1sat/types';
 import type { WalletAction } from '@bsv/sdk';
 import { BSV_DECIMAL_CONVERSION } from './constants';
 import { oneColorActionAmount, oneColorTicker } from '../services/oneColor';
-import { formatNumberWithCommasAndDecimals, showAmount, truncate } from './format';
+import { formatMnee, formatNumberWithCommasAndDecimals, showAmount, truncate } from './format';
 
 /** Baskets that indicate a non-BSV action (BSV list should exclude these). */
 const NON_BSV_BASKETS = new Set(['bsv21', '1sat', 'ordinals', 'lock', 'opns', 'sigma', 'bsocial', 'bap']);
@@ -340,9 +340,7 @@ export const fetchMneeHistory = async (
     .map((h) => {
       const direction: CoinTxDirection = h.type === 'send' ? 'sent' : 'received';
       const sign = direction === 'sent' ? '-' : '+';
-      const amountDecimal = h.amount / 10 ** MNEE_DECIMALS;
-      const precision = Math.abs(amountDecimal) >= 0.01 ? 2 : MNEE_DECIMALS;
-      const amountDisplay = `${sign}${formatNumberWithCommasAndDecimals(amountDecimal, precision)} MNEE`;
+      const amountDisplay = `${sign}${formatMnee(h.amount / 10 ** MNEE_DECIMALS)} MNEE`;
 
       // Pick a reasonable counterparty label (first one, truncated)
       const counterparty = h.counterparties[0]?.address;

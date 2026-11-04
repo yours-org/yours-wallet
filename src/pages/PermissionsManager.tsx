@@ -6,6 +6,7 @@ import { Show } from '../components/Show';
 import { SpeedBump } from '../components/SpeedBump';
 import { useTheme } from '../hooks/useTheme';
 import { useSnackbar } from '../hooks/useSnackbar';
+import { formatBsv } from '../utils/format';
 
 /** Permission token as returned by WPM — passed through as-is from background */
 interface PermissionToken {
@@ -111,7 +112,7 @@ const friendlyBasketName = (name?: string): string => {
 };
 
 const formatSatoshis = (sats: number): string => {
-  if (sats >= 100_000_000) return `${(sats / 100_000_000).toFixed(8)} BSV`;
+  if (sats >= 100_000_000) return `${formatBsv(sats / 100_000_000)} BSV`;
   return `${sats.toLocaleString()} sats`;
 };
 

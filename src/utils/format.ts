@@ -1,10 +1,11 @@
 import { toToken, toTokenSat } from 'satoshi-token';
 
+/** Token amount for display: `amt` raw units at `dec` decimals, trailing zeros dropped (9000000 not 9000000.0000000). */
 export function showAmount(amt: bigint, dec: number): string {
   if (!Number.isFinite(dec) || dec < 0) {
     return amt.toString();
   }
-  return toToken(amt.toString(), dec, 'string');
+  return removeTrailingZeros(toToken(amt.toString(), dec, 'string'));
 }
 
 export function normalize(amt: string, dec: number): string {
@@ -65,6 +66,12 @@ export const formatLargeNumber = (number: number, decimalPlaces = 3): string => 
 export const convertToTokenValue = (balance: number, decimals: number): number => {
   return balance / Math.pow(10, decimals);
 };
+
+/** BSV for display: commas, up to 8 decimals, trailing zeros dropped (0.001 BSV, not 0.00100000 BSV). */
+export const formatBsv = (bsv: number): string => removeTrailingZeros(formatNumberWithCommasAndDecimals(bsv, 8));
+
+/** MNEE for display: commas, up to 5 decimals, trailing zeros dropped. */
+export const formatMnee = (mnee: number): string => removeTrailingZeros(formatNumberWithCommasAndDecimals(mnee, 5));
 
 export const removeTrailingZeros = (numStr: string): string => {
   if (numStr.includes('.')) {

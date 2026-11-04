@@ -37,7 +37,7 @@ import {
   MNEE_ICON_URL,
   MNEE_MOBILE_REFERRAL_LINK,
 } from '../utils/constants';
-import { formatNumberWithCommasAndDecimals, formatUSD } from '../utils/format';
+import { formatUSD, formatBsv, formatMnee } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import { isUri } from '../utils/uri';
 import { AssetRow } from '../components/AssetRow';
@@ -853,13 +853,13 @@ export const BsvWallet = () => {
     }
     const lineItems: SendLineItem[] = addressOrder.map((addr) => ({
       address: addr,
-      amount: `${formatNumberWithCommasAndDecimals(consolidated.get(addr)! / BSV_DECIMAL_CONVERSION, 8)} BSV`,
+      amount: `${formatBsv(consolidated.get(addr)! / BSV_DECIMAL_CONVERSION)} BSV`,
     }));
 
     setSendConfirmation({
       icon: bsvCoin,
       lineItems,
-      total: `${formatNumberWithCommasAndDecimals(totalSats / BSV_DECIMAL_CONVERSION, 8)} BSV`,
+      total: `${formatBsv(totalSats / BSV_DECIMAL_CONVERSION)} BSV`,
       onConfirm: async () => {
         setSendConfirmation(null);
         setIsProcessing(true);
@@ -934,7 +934,7 @@ export const BsvWallet = () => {
   };
 
   const getMneeLabel = () => {
-    return mneeTotal > 0 ? `Send ${mneeTotal.toFixed(5)} MNEE` : 'Enter Send Details';
+    return mneeTotal > 0 ? `Send ${formatMnee(mneeTotal)} MNEE` : 'Enter Send Details';
   };
 
   const handleDismissWelcome = async () => {
@@ -1593,7 +1593,7 @@ export const BsvWallet = () => {
           Balance
         </span>
         <span className="text-sm font-semibold font-mono" style={{ color: theme.color.global.contrast }}>
-          {formatNumberWithCommasAndDecimals(mneeBalance, 5)}
+          {formatMnee(mneeBalance)}
         </span>
         <span className="text-xs font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
           MNEE
@@ -1834,7 +1834,7 @@ export const BsvWallet = () => {
             Balance
           </span>
           <span className="text-sm font-semibold font-mono" style={{ color: theme.color.global.contrast }}>
-            {bsvBalance.toFixed(8)}
+            {formatBsv(bsvBalance)}
           </span>
           <span className="text-xs font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
             BSV
@@ -1854,7 +1854,7 @@ export const BsvWallet = () => {
             Balance
           </span>
           <span className="text-sm font-semibold font-mono" style={{ color: theme.color.global.contrast }}>
-            {bsvBalance.toFixed(8)}
+            {formatBsv(bsvBalance)}
           </span>
           <span className="text-xs font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
             BSV

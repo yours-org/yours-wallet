@@ -34,6 +34,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { checkUsbPresence } from '../services/usbPresence';
+import { formatBsv } from '../utils/format';
 
 const EXPLORER_BASE = 'https://bananablocks.com/tx/';
 
@@ -720,7 +721,7 @@ export const SweepMigration = () => {
                         className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
                         style={{ background: `${accent}18`, color: accent }}
                       >
-                        {(assets.totalBsv / 1e8).toFixed(8)} BSV
+                        {formatBsv(assets.totalBsv / 1e8)} BSV
                       </span>
                     </div>
                     {/* Row */}
