@@ -19,7 +19,7 @@ export type WalletToken = {
   dec: number;
   /** Spendable now. */
   confirmed: bigint;
-  /** Not spendable yet: unconfirmed (BSV21) or held by a pending send (1Color). */
+  /** Not part of the balance: unconfirmed (BSV21) or held by an unsent send (1Color). */
   pending: bigint;
   bsv21?: Bsv21Balance;
   oneColor?: OneColorBalance;
@@ -46,7 +46,7 @@ export const oneColorWalletToken = (t: OneColorBalance): WalletToken => ({
   icon: t.icon || GENERIC_TOKEN_ICON,
   dec: t.dec,
   confirmed: t.available,
-  pending: t.reserved,
+  pending: t.pending,
   oneColor: t,
 });
 

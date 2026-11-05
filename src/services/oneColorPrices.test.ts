@@ -120,13 +120,13 @@ describe('USD values', () => {
     expect(tokenUsdValue(150n, 2, 0.02, 50)).toBe(1.5);
   });
 
-  test('tokensUsdTotal counts priced 1Color holdings, available plus reserved, and nothing else', () => {
+  test('tokensUsdTotal counts priced 1Color balances only: no pending, no unpriced, no BSV21', () => {
     const prices = new Map([[A, 0.02]]);
     const total = tokensUsdTotal(
       [token(A, 100n, 50n, 2), token(B, 1000n, 0n, 0), token(A, 1n, 0n, 0, 'bsv21')],
       prices,
       50,
     );
-    expect(total).toBe(1.5);
+    expect(total).toBe(1);
   });
 });

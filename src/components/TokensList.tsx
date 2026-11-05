@@ -32,8 +32,8 @@ const pendingOf = (t: WalletToken) => ({
 
 /**
  * The fungible tokens (BSV21 and 1Color) in the favourites order, draggable
- * to reorder. One row per token: its whole balance, with the part that is not
- * spendable yet (unconfirmed, or held by a pending send) called out under it.
+ * to reorder. One row per token: its spendable balance, with any amount that
+ * is not part of it yet (unconfirmed, or held by an unsent send) noted under it.
  */
 export const TokensList = (props: TokensListProps) => {
   const { tokens: tokensProp, theme, onTokenClick, prices, bsvUsdRate = 0 } = props;
@@ -109,7 +109,6 @@ export const TokensList = (props: TokensListProps) => {
               <div className="w-full">
                 <AnimatePresence initial={false}>
                   {tokens.map((t, index) => {
-                    const total = t.confirmed + t.pending;
                     return (
                       <Draggable key={t.id} draggableId={t.id} index={index}>
                         {(provided) => (
@@ -127,13 +126,13 @@ export const TokensList = (props: TokensListProps) => {
                           >
                             <AssetRow
                               animate
-                              balance={Number(showAmount(total, t.dec))}
+                              balance={Number(showAmount(t.confirmed, t.dec))}
                               decimals={t.dec}
                               showPointer={true}
                               icon={t.icon}
                               ticker={truncate(t.name, 10, 0)}
                               pending={t.pending > 0n ? pendingOf(t) : undefined}
-                              usdBalance={tokenUsdValue(total, t.dec, prices?.get(t.id), bsvUsdRate)}
+                              usdBalance={tokenUsdValue(t.confirmed, t.dec, prices?.get(t.id), bsvUsdRate)}
                             />
                           </div>
                         )}

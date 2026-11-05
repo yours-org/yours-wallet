@@ -114,9 +114,9 @@ export const tokenUsdValue = (
   return whole * priceBsv * bsvUsdRate;
 };
 
-/** USD across every priced 1Color holding (available and reserved both belong to the wallet). */
+/** USD across every priced 1Color balance (the spendable amount; pending sends are not counted). */
 export const tokensUsdTotal = (tokens: WalletToken[], prices: Map<string, number>, bsvUsdRate: number): number =>
   tokens.reduce((sum, t) => {
     if (t.kind !== '1color') return sum;
-    return sum + (tokenUsdValue(t.confirmed + t.pending, t.dec, prices.get(t.id), bsvUsdRate) ?? 0);
+    return sum + (tokenUsdValue(t.confirmed, t.dec, prices.get(t.id), bsvUsdRate) ?? 0);
   }, 0);

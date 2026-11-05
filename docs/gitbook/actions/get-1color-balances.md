@@ -48,7 +48,7 @@ for (const o of outputs) {
 }
 ```
 
-Each output carries `color_state_available` or `color_state_reserved` (an input of a pending action, such as an unsent handoff).
+Each output carries `color_state_available` or `color_state_reserved`. Reserved means "an input of an action that is not proven yet", which covers two different things: an unsent handoff (`nosend`), whose tokens are still the wallet's until the recipient claims it, and a broadcast transaction (`unproven`, `sending`), whose inputs are already spent and whose change is listed as available. Treat `available` as the balance. To show what is held by unsent sends, look each reserved outpoint up in `listActions` (with `includeInputs`) and count only those whose spending action's `status` is `nosend`, `unsigned` or `nonfinal`; adding every reserved output to the balance counts a spent input and its change twice.
 
 ## Symbol, decimals and icon
 
@@ -79,7 +79,7 @@ Amounts are **`bigint`** in atomic units. Divide by `10 ** dec` only for display
 {% endhint %}
 
 {% hint style="info" %}
-A reserved amount is still yours. It is held by a signed-but-unsent action and returns to available when the action settles, expires or is aborted.
+Tokens held by an unsent handoff are still yours. They return to available when the action is aborted or expires, and leave the wallet when the recipient submits it.
 {% endhint %}
 
 {% hint style="info" %}

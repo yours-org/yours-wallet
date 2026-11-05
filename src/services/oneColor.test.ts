@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 import { OneColor } from '@1sat/templates';
-import { aggregateOneColorHoldings, assetInfoFromMetadata, normalizeHandle, oneColorActionAmount } from './oneColor';
+import type { ActionStatus, WalletInterface } from '@bsv/sdk';
+import {
+  aggregateOneColorHoldings,
+  assetInfoFromMetadata,
+  findSpendingStatuses,
+  normalizeHandle,
+  oneColorActionAmount,
+  pendingAmount,
+} from './oneColor';
 
 const ASSET = `${'ab'.repeat(32)}_0`;
 const OTHER = `${'cd'.repeat(32)}_0`;
@@ -9,25 +17,30 @@ const value = (assetId: string, amount: bigint) => OneColor.value(assetId, amoun
 const authority = (assetId: string) => OneColor.authority(assetId, { lock: pkh }).lock().toHex();
 
 describe('aggregateOneColorHoldings', () => {
-  test('sums value by asset, splitting reserved from available, and counts authorities', () => {
+  test('sums available value by asset, lists reserved outputs, and counts authorities', () => {
     const held = aggregateOneColorHoldings([
-      { lockingScript: value(ASSET, 100n), tags: ['p color', 'color_state_available'] },
-      { lockingScript: value(ASSET, 25n), tags: ['p color', 'color_state_reserved'] },
-      { lockingScript: value(ASSET, 5n), tags: ['color_state_available'] },
-      { lockingScript: authority(ASSET), tags: ['color_state_available'] },
-      { lockingScript: value(OTHER, 1n), tags: ['color_state_available'] },
+      { outpoint: 'a.0', lockingScript: value(ASSET, 100n), tags: ['p color', 'color_state_available'] },
+      { outpoint: 'b.0', lockingScript: value(ASSET, 25n), tags: ['p color', 'color_state_reserved'] },
+      { outpoint: 'c.0', lockingScript: value(ASSET, 5n), tags: ['color_state_available'] },
+      { outpoint: 'd.0', lockingScript: authority(ASSET), tags: ['color_state_available'] },
+      { outpoint: 'e.0', lockingScript: value(OTHER, 1n), tags: ['color_state_available'] },
     ]);
-    expect(held.get(ASSET)).toEqual({ assetId: ASSET, available: 105n, reserved: 25n, authorities: 1 });
-    expect(held.get(OTHER)).toEqual({ assetId: OTHER, available: 1n, reserved: 0n, authorities: 0 });
+    expect(held.get(ASSET)).toEqual({
+      assetId: ASSET,
+      available: 105n,
+      reservedOutputs: [{ outpoint: 'b.0', amount: 25n }],
+      authorities: 1,
+    });
+    expect(held.get(OTHER)).toEqual({ assetId: OTHER, available: 1n, reservedOutputs: [], authorities: 0 });
   });
 
   test('skips outputs that are not 1Color value or authority outputs', () => {
     const deploy = OneColor.deployValue(10n, { lock: pkh }).lock().toHex();
     const held = aggregateOneColorHoldings([
-      { lockingScript: deploy, tags: [] },
-      { lockingScript: '76a914' + '00'.repeat(20) + '88ac', tags: [] },
-      { lockingScript: 'zz', tags: [] },
-      { tags: [] },
+      { outpoint: 'a.0', lockingScript: deploy, tags: [] },
+      { outpoint: 'b.0', lockingScript: '76a914' + '00'.repeat(20) + '88ac', tags: [] },
+      { outpoint: 'c.0', lockingScript: 'zz', tags: [] },
+      { outpoint: 'd.0', tags: [] },
     ]);
     expect(held.size).toBe(0);
   });
@@ -63,6 +76,72 @@ describe('normalizeHandle', () => {
     expect(normalizeHandle('@alice')).toBeNull();
     expect(normalizeHandle('@a@b@c')).toBeNull();
     expect(normalizeHandle('')).toBeNull();
+  });
+});
+
+describe('reserved outputs: pending versus spent', () => {
+  type Spend = { txid: string; status: ActionStatus; inputs: string[] };
+  /** A wallet whose history is `spends`, oldest first, answering the newest-first paging. */
+  const walletWith = (spends: Spend[], pageLog: number[] = []) =>
+    ({
+      listActions: async (args: { limit?: number; offset?: number; includeInputs?: boolean }) => {
+        const offset = args.offset ?? 0;
+        const limit = args.limit ?? 10;
+        pageLog.push(limit);
+        return {
+          totalActions: spends.length,
+          actions: spends.slice(offset, offset + limit).map((s) => ({
+            txid: s.txid,
+            satoshis: 0,
+            status: s.status,
+            isOutgoing: true,
+            description: '',
+            version: 1,
+            lockTime: 0,
+            inputs: args.includeInputs
+              ? s.inputs.map((o) => ({ sourceOutpoint: o, sourceSatoshis: 1, inputDescription: '', sequenceNumber: 0 }))
+              : undefined,
+          })),
+        };
+      },
+    }) as unknown as Pick<WalletInterface, 'listActions'>;
+
+  test('a handoff input is pending; the input of a broadcast split is spent; an unknown one is pending', async () => {
+    const wallet = walletWith([
+      { txid: 'old', status: 'completed', inputs: ['x.0'] },
+      { txid: 'split', status: 'unproven', inputs: ['big.0'] },
+      { txid: 'handoff', status: 'nosend', inputs: ['split.0'] },
+    ]);
+    const reserved = [
+      { outpoint: 'big.0', amount: 10_000n },
+      { outpoint: 'split.0', amount: 1_000n },
+      { outpoint: 'older.0', amount: 7n },
+    ];
+    const statuses = await findSpendingStatuses(
+      wallet,
+      reserved.map((r) => r.outpoint),
+    );
+    expect(statuses.get('big.0')).toBe('unproven');
+    expect(statuses.get('split.0')).toBe('nosend');
+    expect(statuses.has('older.0')).toBe(false);
+    expect(pendingAmount(reserved, statuses)).toBe(1_007n);
+  });
+
+  test('scans newest first and stops once every outpoint is found', async () => {
+    const spends: Spend[] = [];
+    for (let i = 0; i < 250; i++) spends.push({ txid: `t${i}`, status: 'completed', inputs: [`t${i}.0`] });
+    spends.push({ txid: 'h', status: 'nosend', inputs: ['want.0'] });
+    const pages: number[] = [];
+    const statuses = await findSpendingStatuses(walletWith(spends, pages), ['want.0']);
+    expect(statuses.get('want.0')).toBe('nosend');
+    // One probe of 1, then a single page of 100 from the newest end.
+    expect(pages).toEqual([1, 100]);
+  });
+
+  test('nothing reserved means no history read at all', async () => {
+    const pages: number[] = [];
+    expect((await findSpendingStatuses(walletWith([], pages), [])).size).toBe(0);
+    expect(pages).toEqual([]);
   });
 });
 

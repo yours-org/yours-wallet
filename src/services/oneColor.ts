@@ -4,10 +4,19 @@
  *
  * Holdings come from the BRC-207 color module's `p color assets` view: one
  * `listOutputs` per page over every per-asset basket, each output tagged
- * `color_state_available` or `color_state_reserved` (an input of a pending
- * action). The output's locking script is decoded with the OneColor template
- * for its asset, role and amount; the view reports wallet state only and
- * never asks the overlay.
+ * `color_state_available` or `color_state_reserved`. The output's locking
+ * script is decoded with the OneColor template for its asset, role and
+ * amount; the view reports wallet state only and never asks the overlay.
+ *
+ * `reserved` is the module's word for "not spendable": the output is an input
+ * of an action that has not been proven yet. That covers two very different
+ * things. A handoff (`nosend`) is signed but unsent, so its tokens are still
+ * ours until the recipient claims it or it expires: those are *pending*. A
+ * broadcast transaction (`unproven`, `sending`) has already spent its inputs
+ * and its change is listed as available, so counting those inputs would
+ * count the same tokens twice. The balance here is `available`, and
+ * `pending` is the reserved amount held by unsent actions, found by looking
+ * each reserved outpoint up in the action history.
  *
  * Symbol, decimals and icon live on the asset's deploy output alone, so they
  * are read once per asset from the deploy transaction (`<txid>` of the asset
@@ -17,6 +26,7 @@ import {
   LockingScript,
   Transaction,
   Utils,
+  type ActionStatus,
   type WalletAction,
   type WalletInterface,
   type WalletOutput,
@@ -37,16 +47,29 @@ export type OneColorAssetInfo = {
 export type OneColorBalance = OneColorAssetInfo & {
   /** `<txid>_<vout>` */
   assetId: string;
-  /** Value units spendable now. */
+  /** Value units spendable now: the balance. */
   available: bigint;
-  /** Value units held by a pending action (a send not yet settled). */
-  reserved: bigint;
+  /** Value units held by unsent sends (handoffs the recipient has not claimed); not part of the balance. */
+  pending: bigint;
   /** Authority outputs held (available + reserved). */
+  authorities: number;
+};
+
+/** A value output the module reports as reserved, with what it is worth. */
+export type ReservedOutput = { outpoint: string; amount: bigint };
+
+export type OneColorHolding = {
+  assetId: string;
+  available: bigint;
+  reservedOutputs: ReservedOutput[];
   authorities: number;
 };
 
 const STATE_RESERVED = 'color_state_reserved';
 const COLOR_BASKET_PREFIX = 'p color ';
+
+/** Action statuses whose inputs are still the wallet's: signed or built, but not broadcast. */
+const UNSENT_STATUSES: ReadonlySet<ActionStatus> = new Set(['nosend', 'unsigned', 'nonfinal']);
 
 /** Decode a locking script as a 1Color output; null for anything else, including bad hex. */
 export const decodeOneColor = (lockingScriptHex: string | undefined): OneColorToken | null => {
@@ -63,13 +86,11 @@ export const oneColorTicker = (t: { sym?: string; assetId: string }): string =>
   t.sym || `${t.assetId.slice(0, 6)}…${t.assetId.slice(-4)}`;
 const PAGE = 1000;
 
-type HoldingOutput = Pick<WalletOutput, 'lockingScript' | 'tags'>;
+type HoldingOutput = Pick<WalletOutput, 'outpoint' | 'lockingScript' | 'tags'>;
 
-/** Group decoded token outputs by asset: amounts by state, authority count. */
-export const aggregateOneColorHoldings = (
-  outputs: HoldingOutput[],
-): Map<string, Pick<OneColorBalance, 'assetId' | 'available' | 'reserved' | 'authorities'>> => {
-  const byAsset = new Map<string, Pick<OneColorBalance, 'assetId' | 'available' | 'reserved' | 'authorities'>>();
+/** Group decoded token outputs by asset: available amount, reserved outputs, authority count. */
+export const aggregateOneColorHoldings = (outputs: HoldingOutput[]): Map<string, OneColorHolding> => {
+  const byAsset = new Map<string, OneColorHolding>();
   for (const o of outputs) {
     const token = decodeOneColor(o.lockingScript);
     if (!token?.tokenId || token.role === 'deploy') continue;
@@ -77,16 +98,64 @@ export const aggregateOneColorHoldings = (
     const entry = byAsset.get(token.tokenId) ?? {
       assetId: token.tokenId,
       available: 0n,
-      reserved: 0n,
+      reservedOutputs: [],
       authorities: 0,
     };
     if (token.role === 'authority') entry.authorities += 1;
-    else if (reserved) entry.reserved += token.amount;
+    else if (reserved) entry.reservedOutputs.push({ outpoint: o.outpoint, amount: token.amount });
     else entry.available += token.amount;
     byAsset.set(token.tokenId, entry);
   }
   return byAsset;
 };
+
+const STATUS_SCAN_PAGE = 100;
+const STATUS_SCAN_MAX = 2000;
+
+/**
+ * The status of the action spending each outpoint, from the action history
+ * newest first (reserved inputs belong to recent actions). Stops as soon as
+ * every outpoint is found, or after `STATUS_SCAN_MAX` actions.
+ */
+export const findSpendingStatuses = async (
+  wallet: Pick<WalletInterface, 'listActions'>,
+  outpoints: Iterable<string>,
+): Promise<Map<string, ActionStatus>> => {
+  const wanted = new Set(outpoints);
+  const found = new Map<string, ActionStatus>();
+  if (wanted.size === 0) return found;
+  const probe = await wallet.listActions({ labels: [], limit: 1, offset: 0 });
+  let end = probe.totalActions;
+  let scanned = 0;
+  while (end > 0 && found.size < wanted.size && scanned < STATUS_SCAN_MAX) {
+    const start = Math.max(0, end - STATUS_SCAN_PAGE);
+    const { actions } = await wallet.listActions({
+      labels: [],
+      includeInputs: true,
+      limit: end - start,
+      offset: start,
+    });
+    for (const a of actions) {
+      for (const i of a.inputs ?? []) {
+        if (wanted.has(i.sourceOutpoint) && !found.has(i.sourceOutpoint)) found.set(i.sourceOutpoint, a.status);
+      }
+    }
+    scanned += end - start;
+    end = start;
+  }
+  return found;
+};
+
+/**
+ * The reserved amount still the wallet's: inputs of unsent actions. An
+ * outpoint whose spender was not found in the scanned history is treated as
+ * pending rather than spent, the side that never hides tokens.
+ */
+export const pendingAmount = (reserved: ReservedOutput[], statuses: Map<string, ActionStatus>): bigint =>
+  reserved.reduce((sum, r) => {
+    const status = statuses.get(r.outpoint);
+    return status === undefined || UNSENT_STATUSES.has(status) ? sum + r.amount : sum;
+  }, 0n);
 
 /** Every token output the color module holds, across all assets. */
 export const listOneColorHoldings = async (wallet: WalletInterface): Promise<HoldingOutput[]> => {
@@ -144,16 +213,20 @@ export const getOneColorAssetInfo = (ctx: OneSatContext, assetId: string): Promi
 
 /** The wallet's 1Color balances, one per asset held, with display fields. */
 export const getOneColorBalances = async (ctx: OneSatContext): Promise<OneColorBalance[]> => {
-  const holdings = aggregateOneColorHoldings(await listOneColorHoldings(ctx.wallet));
+  const holdings = [...aggregateOneColorHoldings(await listOneColorHoldings(ctx.wallet)).values()];
+  const statuses = await findSpendingStatuses(
+    ctx.wallet,
+    holdings.flatMap((h) => h.reservedOutputs.map((r) => r.outpoint)),
+  );
   return Promise.all(
-    [...holdings.values()].map(async (h) => {
+    holdings.map(async ({ reservedOutputs, ...h }) => {
       let info: OneColorAssetInfo = { dec: 0 };
       try {
         info = await getOneColorAssetInfo(ctx, h.assetId);
       } catch (error) {
         console.error(`[oneColor] deploy of ${h.assetId} not readable:`, error);
       }
-      return { ...h, ...info };
+      return { ...h, pending: pendingAmount(reservedOutputs, statuses), ...info };
     }),
   );
 };

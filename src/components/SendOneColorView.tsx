@@ -121,7 +121,7 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
       console.error('[SendOneColorView] send1Color error:', res.error);
       setIsProcessing(false);
       if (res.txid) {
-        // The handoff exists but never reached the mailbox: the tokens stay reserved until it is settled or expires.
+        // The handoff exists but never reached the mailbox: the tokens stay pending until it is settled or expires.
         addSnackbar(`Built, but not delivered to ${handle}: ${getErrorMessage(res.error)}`, 'error', 6000);
       } else {
         addSnackbar(getErrorMessage(res.error), 'error');
@@ -196,14 +196,14 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
                 {truncate(token.assetId, 8, 6)}
               </span>
             </motion.button>
-            <Show when={token.reserved > 0n}>
+            <Show when={token.pending > 0n}>
               <div
                 className="px-2.5 py-1 rounded-full"
                 style={{ background: `${gray}12` }}
                 title="Held by a send that has not settled yet"
               >
                 <span className="text-[10px] font-semibold" style={{ color: gray }}>
-                  {showAmount(token.reserved, token.dec)} pending
+                  {showAmount(token.pending, token.dec)} pending
                 </span>
               </div>
             </Show>
