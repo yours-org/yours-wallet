@@ -71,9 +71,16 @@ const formatBsv = (sats: number): string => {
   return `${formatNumberWithCommasAndDecimals(bsv, 8).replace(/\.?0+$/, '')} BSV`;
 };
 
-const directionFromAction = (action: WalletAction): CoinTxDirection => {
-  if (action.isOutgoing) return 'sent';
+/**
+ * Direction of a BSV row from the action's net satoshis, which wallet-toolbox
+ * sets to the change in the wallet's spendable pool: negative when sats left
+ * it, positive when they came back. `isOutgoing` only says this wallet built
+ * the transaction, which is also true of a move back from a staging basket
+ * (an AMM swap undone), so it cannot decide the sign.
+ */
+export const directionFromAction = (action: Pick<WalletAction, 'satoshis'>): CoinTxDirection => {
   if (action.satoshis > 0) return 'received';
+  if (action.satoshis < 0) return 'sent';
   return 'transfer';
 };
 
@@ -110,7 +117,7 @@ export const fetchBsvHistory = async (ctx: OneSatContext, opts: FetchHistoryOpts
     .filter((a) => !isNonBsvAction(a))
     .map((a) => {
       const direction = directionFromAction(a);
-      const signedSats = a.satoshis; // positive = received, negative = sent (approx.)
+      const signedSats = a.satoshis; // positive = came back to the spendable pool, negative = left it
       const absSats = Math.abs(signedSats);
       const sign = direction === 'sent' ? '-' : direction === 'received' ? '+' : '';
       return {
