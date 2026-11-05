@@ -86,48 +86,63 @@ export const directionFromAction = (action: Pick<WalletAction, 'satoshis'>): Coi
 
 // ─── BSV ─────────────────────────────────────────────────────────────────────
 
+/** Baskets whose outputs are the wallet's spendable sats (`fund` is the sync's legacy name). */
+const SPENDABLE_BASKETS = new Set(['default', 'fund']);
+const BSV_SCAN_PAGE = 100;
+
+/**
+ * One BSV row for an action, or null when it belongs in another list or moved
+ * no money. The amount is the action's net change to the spendable pool. An
+ * action this wallet did not build (a receive the sync internalized) can carry
+ * a net of 0 while its outputs hold the sats, so those are summed instead.
+ */
+export const bsvRowOf = (a: WalletAction): CoinTxSummary | null => {
+  if (isNonBsvAction(a)) return null;
+  let signedSats = a.satoshis;
+  if (signedSats === 0 && !a.isOutgoing) {
+    signedSats = (a.outputs ?? [])
+      .filter((o) => o.basket !== undefined && SPENDABLE_BASKETS.has(o.basket))
+      .reduce((sum, o) => sum + o.satoshis, 0);
+  }
+  // Nothing moved in BSV terms: a token-only action, or a record with none of our sats.
+  if (signedSats === 0) return null;
+  const direction = directionFromAction({ satoshis: signedSats });
+  const sign = direction === 'sent' ? '-' : '+';
+  return {
+    txid: a.txid,
+    direction,
+    amountDisplay: `${sign}${formatBsv(Math.abs(signedSats))}`,
+    description: a.description || undefined,
+  };
+};
+
 export const fetchBsvHistory = async (ctx: OneSatContext, opts: FetchHistoryOpts = {}): Promise<CoinTxSummary[]> => {
   // listActions returns rows in DB insertion order (oldest-first) and gives no
-  // built-in way to ask for "newest first". So we probe to learn the total count,
-  // then fetch the NEWEST `limit` actions by computing the right DB offset.
-  // `opts.offset` here means "offset into the newest-first display order".
+  // built-in way to ask for "newest first", so the scan walks pages back from
+  // the newest action. Rows are filtered as they go, so `opts.offset` and
+  // `opts.limit` count displayed rows, and a page is full whenever older
+  // actions remain.
   const wantLimit = opts.limit ?? 50;
-  const skipFromNewest = opts.offset ?? 0;
-
+  const skip = opts.offset ?? 0;
   const probe = await ctx.wallet.listActions({ labels: [], limit: 1, offset: 0 });
-  const total = probe.totalActions;
-  const remaining = total - skipFromNewest;
-  if (remaining <= 0) return [];
-
-  const dbLimit = Math.min(wantLimit, remaining);
-  const dbOffset = remaining - dbLimit;
-
-  const result = await ctx.wallet.listActions({
-    labels: [],
-    includeLabels: true,
-    includeOutputs: true,
-    limit: dbLimit,
-    offset: dbOffset,
-  });
-
-  // We fetched the newest page; reverse so newest appears first within it.
-  return result.actions
-    .slice()
-    .reverse()
-    .filter((a) => !isNonBsvAction(a))
-    .map((a) => {
-      const direction = directionFromAction(a);
-      const signedSats = a.satoshis; // positive = came back to the spendable pool, negative = left it
-      const absSats = Math.abs(signedSats);
-      const sign = direction === 'sent' ? '-' : direction === 'received' ? '+' : '';
-      return {
-        txid: a.txid,
-        direction,
-        amountDisplay: `${sign}${formatBsv(absSats)}`,
-        amountSubdued: direction === 'transfer',
-        description: a.description || undefined,
-      };
+  const rows: CoinTxSummary[] = [];
+  let end = probe.totalActions;
+  while (end > 0 && rows.length < skip + wantLimit) {
+    const start = Math.max(0, end - BSV_SCAN_PAGE);
+    const { actions } = await ctx.wallet.listActions({
+      labels: [],
+      includeLabels: true,
+      includeOutputs: true,
+      limit: end - start,
+      offset: start,
     });
+    for (const a of actions.slice().reverse()) {
+      const row = bsvRowOf(a);
+      if (row) rows.push(row);
+    }
+    end = start;
+  }
+  return rows.slice(skip, skip + wantLimit);
 };
 
 // ─── BSV21 ───────────────────────────────────────────────────────────────────
