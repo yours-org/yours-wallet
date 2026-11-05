@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { YoursEventName } from '../inject';
-import { requestUsbBackup, runUsbBackup, usbBackupEnabled, usbBackupWipePending } from '../services/usbBackup';
+import {
+  requestUsbBackup,
+  runUsbBackup,
+  usbBackupEnabled,
+  usbBackupRanRecently,
+  usbBackupWipePending,
+} from '../services/usbBackup';
 import type { UsbSecurity } from '../services/types/chromeStorage.types';
 import { useServiceContext } from './useServiceContext';
 import type { SyncStatusMessage } from './useSyncTracker';
@@ -20,6 +26,8 @@ const COOLDOWN_MS = 20_000;
  * open followed by another the moment the wallet's own address sync ends:
  * - On open, wait briefly. If the address sync announces a start, the first
  *   run waits for its completion; otherwise it runs after the settle delay.
+ *   Either way the first run is skipped when a clean run finished in the last
+ *   few minutes (`USB_BACKUP_RECENT_MS`): reopening the popup is not a change.
  * - After any run, wallet-change events are ignored for a cooldown window.
  * - A one-minute timer catches anything that slipped through.
  * Does nothing while the feature is off.
@@ -53,12 +61,17 @@ export const useUsbBackupRunner = () => {
       await runUsbBackup(chromeStorageService);
       lastRunEnded.current = Date.now();
     };
+    /** The first run of this popup: only when the last clean run is not recent. */
+    const initialRun = async () => {
+      if (await usbBackupRanRecently()) return;
+      await run();
+    };
 
     const initialTimer = window.setTimeout(() => {
       // No address sync announced itself: run now. If one did, its completion runs us.
       if (!initialDone && !addressSyncRunning) {
         initialDone = true;
-        void run();
+        void initialRun();
       }
     }, INITIAL_SETTLE_MS);
 
@@ -73,7 +86,7 @@ export const useUsbBackupRunner = () => {
       addressSyncRunning = false;
       if (!initialDone) {
         initialDone = true;
-        void run();
+        void initialRun();
         return;
       }
       // A change after the first run: skip if a run just finished (it saw the change).
