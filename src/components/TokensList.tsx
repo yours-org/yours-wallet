@@ -7,6 +7,7 @@ import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import type { WalletToken } from '../services/walletTokens';
 import { Theme } from '../theme.types';
 import { showAmount, truncate } from '../utils/format';
+import { tokenUsdValue } from '../services/oneColorPrices';
 import { AssetRow } from './AssetRow';
 import { Show } from './Show';
 
@@ -14,6 +15,10 @@ export type TokensListProps = {
   tokens: WalletToken[];
   theme: Theme;
   hideStatusLabels?: boolean;
+  /** BSV per whole token by token id, for the tokens that have a pool price. */
+  prices?: Map<string, number>;
+  /** BSV/USD, for turning a token's BSV price into dollars. */
+  bsvUsdRate?: number;
   onTokenClick: (token: WalletToken) => void;
 };
 
@@ -22,7 +27,7 @@ export type TokensListProps = {
  * to reorder; a token with a pending amount is listed again under Pending.
  */
 export const TokensList = (props: TokensListProps) => {
-  const { tokens: tokensProp, theme, onTokenClick, hideStatusLabels = false } = props;
+  const { tokens: tokensProp, theme, onTokenClick, hideStatusLabels = false, prices, bsvUsdRate = 0 } = props;
   const { chromeStorageService } = useServiceContext();
   const [tokens, setTokens] = useState<WalletToken[]>([]);
 
@@ -131,7 +136,7 @@ export const TokensList = (props: TokensListProps) => {
                             showPointer={true}
                             icon={t.icon}
                             ticker={truncate(t.name, 10, 0)}
-                            usdBalance={0}
+                            usdBalance={tokenUsdValue(t.confirmed, t.dec, prices?.get(t.id), bsvUsdRate)}
                           />
                         </div>
                       )}
@@ -165,7 +170,7 @@ export const TokensList = (props: TokensListProps) => {
                         showPointer={true}
                         icon={t.icon}
                         ticker={t.name}
-                        usdBalance={0}
+                        usdBalance={tokenUsdValue(t.pending, t.dec, prices?.get(t.id), bsvUsdRate)}
                       />
                     </div>
                   ))}

@@ -24,7 +24,8 @@ export type AssetRowProps = {
   icon: string;
   ticker: string;
   balance: number;
-  usdBalance: number;
+  /** USD value; null when the asset has no price (shown as a dash). */
+  usdBalance: number | null;
   showPointer: boolean;
   isMNEE?: boolean;
   animate?: boolean;
@@ -99,7 +100,7 @@ export const AssetRow = (props: AssetRowProps) => {
               )}${isLock ? (isDisplaySat ? `${balance === 0.00000001 ? ' SAT' : ' SATS'}` : ' BSV') : ''}`}
             </span>
             <span className="text-xs mt-0.5 text-right" style={{ color: theme.color.global.gray }}>
-              {isLock ? `Block ${nextUnlock}` : formatUSD(usdBalance)}
+              {isLock ? `Block ${nextUnlock}` : usdBalance === null ? '—' : formatUSD(usdBalance)}
             </span>
           </div>
         }

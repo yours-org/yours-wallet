@@ -43,7 +43,7 @@ import { isUri } from '../utils/uri';
 import { AssetRow } from '../components/AssetRow';
 import { BackupPromo } from '../components/BackupPromo';
 import { TESTNET_COLOR } from '../components/TestnetBadge';
-import { HOSTED_YOURS_IMAGE, TESTNET_FAUCET_URL } from '../utils/constants';
+import { HOSTED_YOURS_IMAGE, TESTNET_FAUCET_URL, colorOverlayDefaultOf } from '../utils/constants';
 import lockIcon from '../assets/lock.svg';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useServiceContext } from '../hooks/useServiceContext';
@@ -69,6 +69,7 @@ import { Account, ChromeStorageObject } from '../services/types/chromeStorage.ty
 import { SendBsv21View } from '../components/SendBsv21View';
 import { SendOneColorView } from '../components/SendOneColorView';
 import { getOneColorBalances, oneColorTicker, type OneColorBalance } from '../services/oneColor';
+import { getOneColorPrices, tokensUsdTotal } from '../services/oneColorPrices';
 import { walletTokensOf, type WalletToken } from '../services/walletTokens';
 import { AssetPicker, type PickableAsset } from '../components/AssetPicker';
 import { SendConfirmation, type SendLineItem } from '../components/SendConfirmation';
@@ -166,6 +167,8 @@ export const BsvWallet = () => {
   const [bsv21s, setBsv21s] = useState<Bsv21Balance[]>([]);
   // 1Color (BRC-162) tokens the color module holds; a selected one opens the send view.
   const [oneColors, setOneColors] = useState<OneColorBalance[]>([]);
+  /** BSV per whole token by asset id, from the asset's exchange; a token with no pool is absent. */
+  const [oneColorPrices, setOneColorPrices] = useState<Map<string, number>>(new Map());
   const [oneColorToken, setOneColorToken] = useState<OneColorBalance | null>(null);
   const [manageFavorites, setManageFavorites] = useState(false);
   const [account, setAccount] = useState<Account>();
@@ -390,13 +393,28 @@ export const BsvWallet = () => {
     return res;
   };
 
-  /** 1Color balances from the wallet's own storage; a failure keeps the last list and never blocks the others. */
+  /** A 1Color asset's exchange: the account's overlay override, else the chain default (none on mainnet). */
+  const resolveOneColorOrigin = async (assetId: string): Promise<string | undefined> => {
+    const { selectedAccount } = chromeStorageService.getCurrentAccountObject();
+    const overrides = selectedAccount ? await chromeStorageService.getColorOverlayOverrides(selectedAccount) : [];
+    return overrides.find((o) => o.assetId === assetId)?.origin ?? colorOverlayDefaultOf(apiContext.chain);
+  };
+
+  /**
+   * 1Color balances from the wallet's own storage, then their prices from
+   * each asset's exchange. A failure keeps the last list and never blocks the
+   * others; an exchange that is down leaves its tokens unpriced.
+   */
   const getAndSetOneColors = async (): Promise<void> => {
+    let balances: OneColorBalance[];
     try {
-      setOneColors(await getOneColorBalances(apiContext));
+      balances = await getOneColorBalances(apiContext);
+      setOneColors(balances);
     } catch (err) {
       console.error('[BsvWallet] 1Color balances failed:', err);
+      return;
     }
+    setOneColorPrices(await getOneColorPrices(balances, resolveOneColorOrigin));
   };
 
   /** Order-independent fingerprint of token balances, for change detection. */
@@ -1297,7 +1315,11 @@ export const BsvWallet = () => {
                 className="text-4xl font-bold tracking-tight select-none"
                 style={{ color: theme.color.global.contrast, letterSpacing: '-0.02em' }}
               >
-                {formatUSD(bsvBalance * exchangeRate + (services.mnee ? mneeBalance : 0))}
+                {formatUSD(
+                  bsvBalance * exchangeRate +
+                    (services.mnee ? mneeBalance : 0) +
+                    tokensUsdTotal(walletTokens, oneColorPrices, exchangeRate),
+                )}
               </h1>
             )}
             <AnimatePresence>
@@ -1447,6 +1469,8 @@ export const BsvWallet = () => {
                 key={randomKey}
                 hideStatusLabels
                 tokens={filteredTokens}
+                prices={oneColorPrices}
+                bsvUsdRate={exchangeRate}
                 theme={theme}
                 onTokenClick={(t) => {
                   setSendSource('main');
