@@ -12,13 +12,15 @@ The current Yours Wallet integration depends on the following package versions (
 ```json
 {
   "dependencies": {
-    "@1sat/react": "0.0.x",
-    "@1sat/connect": "0.0.67",
-    "@1sat/actions": "0.0.166",
-    "@1sat/client": "0.0.38",
-    "@1sat/types": "0.0.31",
-    "@1sat/utils": "0.0.25",
-    "@bsv/sdk": "^2.0.13"
+    "@1sat/react": "0.1.1",
+    "@1sat/connect": "0.1.1",
+    "@1sat/actions": "0.1.2",
+    "@1sat/client": "0.1.1",
+    "@1sat/types": "0.1.1",
+    "@1sat/utils": "0.1.1",
+    "@1sat/templates": "0.1.1",
+    "@bsv/color-permission-module": "0.1.0",
+    "@bsv/sdk": "^4.0.0"
   }
 }
 ```
@@ -33,8 +35,16 @@ The current Yours Wallet integration depends on the following package versions (
 - **`@1sat/client`** — Backend services: `OneSatServices`, `MneeClient`, `BapClient`, `MneeConfig`, `MneeTransferStatus`, `MneeUtxo`.
 - **`@1sat/types`** — Shared TypeScript types: `Destination`, `AddressDerivation`, `P1SAT_PROTOCOL`, `CollectionTraits`, etc.
 - **`@bsv/sdk`** — Transaction primitives, BRC-100 `WalletInterface`, `PrivateKey`, `Utils`, `Transaction`, `Script`.
+- **`@1sat/templates`** — Script templates, including `OneColor` for BRC-162 outputs.
+- **`@bsv/color-permission-module`** — The BRC-207 `color` module Yours runs inside its permissions manager; dApps import only its naming helpers (`ColorPlan`, `assetBasket`, `colorProtocolID`, `ASSETS_SELECTOR`).
 
 ## Breaking changes
+
+### `@1sat/*` 0.1.x: 1Color tokens and `@bsv/sdk` 4
+
+- 1Color (BRC-162) support arrives with `@1sat/actions` 0.1.2: `deploy1Color`, `send1Color`, `syncTransactionInbox` and the receipt helpers. See [1Color Tokens](../concepts/one-color.md).
+- The wallet moved to `@bsv/sdk` 4. dApps on `@bsv/sdk` 2.x should upgrade with the `@1sat/*` 0.1.x set in one step.
+- BSV-21 is unchanged in this release. 1Color is the token format new deployments should use; BSV-21 tokens continue to work and will be merged into the 1Color section of the wallet UI.
 
 ### Pre-BRC-100 → BRC-100 era
 

@@ -12,6 +12,7 @@
 - [Baskets & Tags](concepts/baskets-and-tags.md)
 - [Derivations](concepts/derivations.md)
 - [Permissions](concepts/permissions.md)
+- [1Color Tokens](concepts/one-color.md)
 
 ## Actions
 
@@ -39,6 +40,13 @@
 
 - [mintCollection](actions/mint-collection.md)
 - [mintCollectionItem](actions/mint-collection-item.md)
+
+### 1Color Tokens
+
+- [1Color balances](actions/get-1color-balances.md)
+- [send1Color](actions/send-1color.md)
+- [deploy1Color](actions/deploy-1color.md)
+- [Receiving 1Color](actions/receive-1color.md)
 
 ### BSV-21 Tokens
 
