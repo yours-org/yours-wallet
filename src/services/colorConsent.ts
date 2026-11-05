@@ -11,8 +11,9 @@
  * - `color_access` for a basket: the same permission store the 1Sat modules'
  *   basket checks and the grouped-permission popup use. A stored basket grant
  *   for that app and that `p color` basket approves; an approved prompt stores one.
- * - the admin originator (the wallet's own background work) is approved without
- *   a prompt for `color_access` reads only, never for sends or signatures.
+ * - the admin originator (the wallet's own UI and background work) is approved
+ *   without a prompt for every request: an action started in the extension is
+ *   the user's own, and its views confirm before they call.
  */
 
 import type {
@@ -312,10 +313,9 @@ export const createColorTokenAccessHandler = (options: ColorTokenAccessOptions):
     }
 
     const originator = normalizeOriginator(app);
-    const isAdmin = app === adminOriginator || originator === adminNormalized;
+    if (app === adminOriginator || originator === adminNormalized) return true;
 
     if (msg.type === 'color_access') {
-      if (isAdmin) return true;
       // A basket read is covered by a stored basket grant; label reads (listActions)
       // have no grant shape in the store and prompt every time.
       const basket = msg.basket?.trim().toLowerCase();
