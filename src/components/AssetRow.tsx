@@ -1,8 +1,12 @@
 import { motion } from 'framer-motion';
+import { Info } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { formatLargeNumber, formatUSD } from '../utils/format';
 import { Show } from './Show';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
+
+/** Amber, matching the Get MNEE gradient, for the pending pill. */
+const PENDING_COLOR = '#f2b84b';
 
 const GradientButton = ({ onClick, theme }: { onClick?: () => void; theme: ReturnType<typeof useTheme>['theme'] }) => (
   <motion.button
@@ -33,8 +37,8 @@ export type AssetRowProps = {
   nextUnlock?: number;
   /** Decimal places for balance display. Defaults to 3. */
   decimals?: number;
-  /** The line under the ticker; defaults to "Balance" ("Next unlock" for locks). */
-  subtitle?: string;
+  /** Part of the balance not spendable yet: shown as an amber pill under the ticker, `hint` on hover. */
+  pending?: { label: string; hint: string };
   onGetMneeClick?: () => void;
   onClick?: () => void;
 };
@@ -53,7 +57,7 @@ export const AssetRow = (props: AssetRowProps) => {
     onGetMneeClick,
     animate = false,
     decimals,
-    subtitle,
+    pending,
   } = props;
   const { theme } = useTheme();
   const isDisplaySat = isLock && balance < 0.0001;
@@ -82,9 +86,23 @@ export const AssetRow = (props: AssetRowProps) => {
           <span className="text-sm font-semibold leading-tight" style={{ color: theme.color.global.contrast }}>
             {ticker}
           </span>
-          <span className="text-xs mt-0.5" style={{ color: theme.color.global.gray }}>
-            {subtitle ?? (isLock ? 'Next unlock' : 'Balance')}
-          </span>
+          <Show
+            when={!!pending}
+            whenFalseContent={
+              <span className="text-xs mt-0.5" style={{ color: theme.color.global.gray }}>
+                {isLock ? 'Next unlock' : 'Balance'}
+              </span>
+            }
+          >
+            <span
+              title={pending?.hint}
+              className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none cursor-help"
+              style={{ color: PENDING_COLOR, backgroundColor: `${PENDING_COLOR}26` }}
+            >
+              <Info size={10} strokeWidth={2.5} />
+              {pending?.label}
+            </span>
+          </Show>
         </div>
       </div>
 

@@ -21,6 +21,15 @@ export type TokensListProps = {
   onTokenClick: (token: WalletToken) => void;
 };
 
+/** The pending pill for a token: how much, and why it is not spendable yet. */
+const pendingOf = (t: WalletToken) => ({
+  label: `${showAmount(t.pending, t.dec)} pending`,
+  hint:
+    t.kind === '1color'
+      ? 'Held by a send that the recipient has not claimed yet. It becomes spendable again when that send settles or expires.'
+      : 'Waiting for the network to confirm it.',
+});
+
 /**
  * The fungible tokens (BSV21 and 1Color) in the favourites order, draggable
  * to reorder. One row per token: its whole balance, with the part that is not
@@ -123,7 +132,7 @@ export const TokensList = (props: TokensListProps) => {
                               showPointer={true}
                               icon={t.icon}
                               ticker={truncate(t.name, 10, 0)}
-                              subtitle={t.pending > 0n ? `${showAmount(t.pending, t.dec)} pending` : undefined}
+                              pending={t.pending > 0n ? pendingOf(t) : undefined}
                               usdBalance={tokenUsdValue(total, t.dec, prices?.get(t.id), bsvUsdRate)}
                             />
                           </div>
