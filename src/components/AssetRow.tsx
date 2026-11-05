@@ -33,6 +33,8 @@ export type AssetRowProps = {
   nextUnlock?: number;
   /** Decimal places for balance display. Defaults to 3. */
   decimals?: number;
+  /** The line under the ticker; defaults to "Balance" ("Next unlock" for locks). */
+  subtitle?: string;
   onGetMneeClick?: () => void;
   onClick?: () => void;
 };
@@ -51,6 +53,7 @@ export const AssetRow = (props: AssetRowProps) => {
     onGetMneeClick,
     animate = false,
     decimals,
+    subtitle,
   } = props;
   const { theme } = useTheme();
   const isDisplaySat = isLock && balance < 0.0001;
@@ -80,7 +83,7 @@ export const AssetRow = (props: AssetRowProps) => {
             {ticker}
           </span>
           <span className="text-xs mt-0.5" style={{ color: theme.color.global.gray }}>
-            {isLock ? 'Next unlock' : 'Balance'}
+            {subtitle ?? (isLock ? 'Next unlock' : 'Balance')}
           </span>
         </div>
       </div>

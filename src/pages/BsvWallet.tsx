@@ -1467,7 +1467,6 @@ export const BsvWallet = () => {
             {filteredTokens.length > 0 && (
               <TokensList
                 key={randomKey}
-                hideStatusLabels
                 tokens={filteredTokens}
                 prices={oneColorPrices}
                 bsvUsdRate={exchangeRate}

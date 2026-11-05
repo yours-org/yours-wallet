@@ -14,7 +14,6 @@ import { Show } from './Show';
 export type TokensListProps = {
   tokens: WalletToken[];
   theme: Theme;
-  hideStatusLabels?: boolean;
   /** BSV per whole token by token id, for the tokens that have a pool price. */
   prices?: Map<string, number>;
   /** BSV/USD, for turning a token's BSV price into dollars. */
@@ -24,10 +23,11 @@ export type TokensListProps = {
 
 /**
  * The fungible tokens (BSV21 and 1Color) in the favourites order, draggable
- * to reorder; a token with a pending amount is listed again under Pending.
+ * to reorder. One row per token: its whole balance, with the part that is not
+ * spendable yet (unconfirmed, or held by a pending send) called out under it.
  */
 export const TokensList = (props: TokensListProps) => {
-  const { tokens: tokensProp, theme, onTokenClick, hideStatusLabels = false, prices, bsvUsdRate = 0 } = props;
+  const { tokens: tokensProp, theme, onTokenClick, prices, bsvUsdRate = 0 } = props;
   const { chromeStorageService } = useServiceContext();
   const [tokens, setTokens] = useState<WalletToken[]>([]);
 
@@ -66,12 +66,9 @@ export const TokensList = (props: TokensListProps) => {
     await chromeStorageService.updateNested(key, update);
   };
 
-  const confirmedTokens = tokens.filter((t) => t.confirmed > 0n);
-  const pendingTokens = tokensProp.filter((t) => t.pending > 0n);
-
   return (
     <Show
-      when={tokens.length > 0 || hideStatusLabels}
+      when={tokens.length > 0}
       whenFalseContent={
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -93,89 +90,49 @@ export const TokensList = (props: TokensListProps) => {
       }
     >
       <DragDropContext onDragEnd={handleOnDragEnd}>
-        <Droppable droppableId="tokens-list">
+        <Droppable droppableId="tokens">
           {(provided) => (
             <div
               ref={provided.innerRef}
               {...provided.droppableProps}
               className="flex flex-col items-center overflow-y-auto overflow-x-hidden w-full"
-              style={hideStatusLabels ? undefined : { height: 'calc(100% - 4rem)' }}
             >
-              <Show when={!hideStatusLabels && confirmedTokens.length > 0}>
-                <div className="w-full px-5 pt-3 pb-1">
-                  <span
-                    className="text-[10px] font-semibold uppercase tracking-wider"
-                    style={{ color: theme.color.global.gray }}
-                  >
-                    Confirmed
-                  </span>
-                </div>
-              </Show>
-
               <div className="w-full">
                 <AnimatePresence initial={false}>
-                  {confirmedTokens.map((t, index) => (
-                    <Draggable key={t.id} draggableId={t.id} index={index}>
-                      {(provided) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          style={{
-                            ...provided.draggableProps.style,
-                            display: 'flex',
-                            justifyContent: 'center',
-                            width: '100%',
-                          }}
-                          onClick={() => onTokenClick(t)}
-                        >
-                          <AssetRow
-                            animate
-                            balance={Number(showAmount(t.confirmed, t.dec))}
-                            decimals={t.dec}
-                            showPointer={true}
-                            icon={t.icon}
-                            ticker={truncate(t.name, 10, 0)}
-                            usdBalance={tokenUsdValue(t.confirmed, t.dec, prices?.get(t.id), bsvUsdRate)}
-                          />
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
+                  {tokens.map((t, index) => {
+                    const total = t.confirmed + t.pending;
+                    return (
+                      <Draggable key={t.id} draggableId={t.id} index={index}>
+                        {(provided) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            style={{
+                              ...provided.draggableProps.style,
+                              display: 'flex',
+                              justifyContent: 'center',
+                              width: '100%',
+                            }}
+                            onClick={() => onTokenClick(t)}
+                          >
+                            <AssetRow
+                              animate
+                              balance={Number(showAmount(total, t.dec))}
+                              decimals={t.dec}
+                              showPointer={true}
+                              icon={t.icon}
+                              ticker={truncate(t.name, 10, 0)}
+                              subtitle={t.pending > 0n ? `${showAmount(t.pending, t.dec)} pending` : undefined}
+                              usdBalance={tokenUsdValue(total, t.dec, prices?.get(t.id), bsvUsdRate)}
+                            />
+                          </div>
+                        )}
+                      </Draggable>
+                    );
+                  })}
                 </AnimatePresence>
               </div>
-
-              <Show when={pendingTokens.length > 0}>
-                <Show when={!hideStatusLabels}>
-                  <div className="w-full px-5 pt-4 pb-1">
-                    <span
-                      className="text-[10px] font-semibold uppercase tracking-wider"
-                      style={{ color: theme.color.global.gray }}
-                    >
-                      Pending
-                    </span>
-                  </div>
-                </Show>
-                <div className="w-full">
-                  {pendingTokens.map((t) => (
-                    <div
-                      key={t.id}
-                      style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
-                      onClick={() => onTokenClick(t)}
-                    >
-                      <AssetRow
-                        animate
-                        balance={Number(showAmount(t.pending, t.dec))}
-                        decimals={t.dec}
-                        showPointer={true}
-                        icon={t.icon}
-                        ticker={t.name}
-                        usdBalance={tokenUsdValue(t.pending, t.dec, prices?.get(t.id), bsvUsdRate)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </Show>
 
               {provided.placeholder}
             </div>
