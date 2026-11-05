@@ -13,7 +13,7 @@ import { buildTokenLabel } from '@1sat/types';
 import type { WalletAction } from '@bsv/sdk';
 import { BSV_DECIMAL_CONVERSION } from './constants';
 import { oneColorActionAmount, oneColorTicker } from '../services/oneColor';
-import { formatMnee, formatNumberWithCommasAndDecimals, showAmount, truncate } from './format';
+import { formatMnee, formatNumberWithCommasAndDecimals, formatTokenAmount, truncate } from './format';
 
 /** Baskets that indicate a non-BSV action (BSV list should exclude these). */
 const NON_BSV_BASKETS = new Set(['bsv21', '1sat', 'ordinals', 'lock', 'opns', 'sigma', 'bsocial', 'bap']);
@@ -249,7 +249,8 @@ export const fetchBsv21History = async (
       const direction = tokenDirectionFromAction(a);
       const atomic = bsv21AmountFromAction(a, tokenId);
       const sign = direction === 'sent' ? '-' : '+';
-      const display = atomic > 0n ? `${sign}${showAmount(atomic, decimals)} ${sym}` : `${sym} transfer`;
+      // The history sits inside the token's own view, so the amount needs no unit.
+      const display = atomic > 0n ? `${sign}${formatTokenAmount(atomic, decimals)}` : `${sym} transfer`;
       return {
         txid: a.txid,
         direction,
@@ -305,7 +306,7 @@ export const fetchOneColorHistory = async (
       matches.push({
         txid: a.txid,
         direction: moved.direction,
-        amountDisplay: moved.amount > 0n ? `${sign}${showAmount(moved.amount, decimals)} ${sym}` : `${sym} transfer`,
+        amountDisplay: moved.amount > 0n ? `${sign}${formatTokenAmount(moved.amount, decimals)}` : `${sym} transfer`,
         amountSubdued: moved.amount === 0n,
         description: a.description || undefined,
       });
@@ -340,7 +341,7 @@ export const fetchMneeHistory = async (
     .map((h) => {
       const direction: CoinTxDirection = h.type === 'send' ? 'sent' : 'received';
       const sign = direction === 'sent' ? '-' : '+';
-      const amountDisplay = `${sign}${formatMnee(h.amount / 10 ** MNEE_DECIMALS)} MNEE`;
+      const amountDisplay = `${sign}${formatMnee(h.amount / 10 ** MNEE_DECIMALS)}`;
 
       // Pick a reasonable counterparty label (first one, truncated)
       const counterparty = h.counterparties[0]?.address;

@@ -8,6 +8,15 @@ export function showAmount(amt: bigint, dec: number): string {
   return removeTrailingZeros(toToken(amt.toString(), dec, 'string'));
 }
 
+/** `showAmount` with thousands separators in the whole part: 1,000,000 and 1,234.5, exact at any size. */
+export function formatTokenAmount(amt: bigint, dec: number): string {
+  const plain = showAmount(amt, dec);
+  const negative = plain.startsWith('-');
+  const [whole, fraction] = (negative ? plain.slice(1) : plain).split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${negative ? '-' : ''}${grouped}${fraction ? `.${fraction}` : ''}`;
+}
+
 export function normalize(amt: string, dec: number): string {
   if (!Number.isFinite(dec) || dec < 0) {
     return amt.split('.')[0];

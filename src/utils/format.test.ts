@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { normalize, removeTrailingZeros, showAmount } from './format';
+import { normalize, removeTrailingZeros, showAmount, formatTokenAmount } from './format';
 
 describe('showAmount', () => {
   test('drops trailing zeros after the point, and the point itself', () => {
@@ -26,5 +26,19 @@ describe('removeTrailingZeros', () => {
   test('leaves strings without a point alone', () => {
     expect(removeTrailingZeros('1000')).toBe('1000');
     expect(removeTrailingZeros('1,000.00')).toBe('1,000');
+  });
+});
+
+describe('formatTokenAmount', () => {
+  test('groups the whole part and keeps the trimmed fraction', () => {
+    expect(formatTokenAmount(1000000n, 0)).toBe('1,000,000');
+    expect(formatTokenAmount(123450n, 2)).toBe('1,234.5');
+    expect(formatTokenAmount(999n, 0)).toBe('999');
+    expect(formatTokenAmount(50n, 2)).toBe('0.5');
+    expect(formatTokenAmount(0n, 4)).toBe('0');
+  });
+
+  test('is exact above 2^53', () => {
+    expect(formatTokenAmount(90071992547409920000n, 2)).toBe('900,719,925,474,099,200');
   });
 });
