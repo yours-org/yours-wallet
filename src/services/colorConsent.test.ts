@@ -135,11 +135,17 @@ describe('createColorTokenAccessHandler', () => {
     expect(prompts).toHaveLength(0);
   });
 
-  test('admin sends and signatures still prompt', async () => {
+  test('admin sends, signatures and relinquishes are approved without a prompt', async () => {
     const { prompts, handler } = setup(false);
-    expect(await handler(ADMIN, JSON.stringify(send))).toBe(false);
-    expect(await handler(ADMIN, JSON.stringify({ type: 'color_signature', inputIndex: 0, ...facts }))).toBe(false);
-    expect(prompts).toHaveLength(2);
+    expect(await handler(ADMIN, JSON.stringify(send))).toBe(true);
+    expect(await handler(ADMIN, JSON.stringify({ type: 'color_signature', inputIndex: 0, ...facts }))).toBe(true);
+    expect(
+      await handler(
+        ADMIN,
+        JSON.stringify({ type: 'color_relinquish', assetId: ASSET, role: 'value', outpoint: `${'d'.repeat(64)}.0` }),
+      ),
+    ).toBe(true);
+    expect(prompts).toHaveLength(0);
   });
 
   test('an approved read stores a basket grant; the next read does not prompt', async () => {
