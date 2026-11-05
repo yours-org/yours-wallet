@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { OneColor } from '@1sat/templates';
-import type { ActionStatus, WalletInterface } from '@bsv/sdk';
+import { LockingScript, type ActionStatus, type WalletInterface } from '@bsv/sdk';
 import {
   aggregateOneColorHoldings,
   assetInfoFromMetadata,
@@ -210,5 +210,53 @@ describe('oneColorActionAmount', () => {
       ASSET,
     );
     expect(r).toEqual({ direction: 'transfer', amount: 0n });
+  });
+
+  // An AMM pool: a 1Color value output whose lock is a covenant, not P2PKH.
+  const covenant = LockingScript.fromHex('6a28' + 'ab'.repeat(40)); // OP_RETURN <state>
+  const pool = (amount: bigint) => OneColor.value(ASSET, amount, { lock: covenant }).lock().toHex();
+
+  test('an LP close: the pool input is not ours, the tokens that come to us are received', () => {
+    const r = oneColorActionAmount(
+      { ...base, inputs: [inp(pool(5000n))], outputs: [out(value(ASSET, 5000n), 0, 'p color abc')] },
+      ASSET,
+    );
+    expect(r).toEqual({ direction: 'received', amount: 5000n });
+  });
+
+  test('a pool deploy: our tokens go into the pool, so they are sent', () => {
+    const r = oneColorActionAmount(
+      {
+        ...base,
+        inputs: [inp(value(ASSET, 6000n))],
+        outputs: [out(pool(5000n), 0), out(value(ASSET, 1000n), 1, 'p color abc')],
+      },
+      ASSET,
+    );
+    expect(r).toEqual({ direction: 'sent', amount: 5000n });
+  });
+
+  test('a swap that buys tokens: the pool continues with less and we receive the difference', () => {
+    const r = oneColorActionAmount(
+      {
+        ...base,
+        inputs: [inp(pool(5000n))],
+        outputs: [out(pool(4000n), 0), out(value(ASSET, 1000n), 1, 'p color abc')],
+      },
+      ASSET,
+    );
+    expect(r).toEqual({ direction: 'received', amount: 1000n });
+  });
+
+  test('a swap that sells tokens: ours go in, the pool continues with more, change comes back', () => {
+    const r = oneColorActionAmount(
+      {
+        ...base,
+        inputs: [inp(pool(4000n)), inp(value(ASSET, 1500n))],
+        outputs: [out(pool(5000n), 0), out(value(ASSET, 500n), 1, 'p color abc')],
+      },
+      ASSET,
+    );
+    expect(r).toEqual({ direction: 'sent', amount: 1000n });
   });
 });

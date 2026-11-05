@@ -242,12 +242,16 @@ export type OneColorActionAmount = { direction: 'sent' | 'received' | 'transfer'
 /**
  * What one wallet action did with an asset, from its decoded inputs and
  * outputs (`listActions` with locking scripts). Value outputs filed in a
- * `p color` basket are this wallet's; any other value output of the asset
- * went to someone else. A deploy at this action's own outpoint counts as the
- * asset arriving. `null` when the action touches no output of the asset.
+ * `p color` basket are this wallet's. Inputs are this wallet's when their
+ * lock is P2PKH: the module only ever holds tokens behind P2PKH, while a
+ * covenant such as an AMM pool is somebody else's output even though this
+ * wallet may have signed the transaction (an LP close, a swap). The amount
+ * is the net of what came to us and what left us; outputs to others are not
+ * counted, so a swap's pool continuation does not read as a send. A deploy at
+ * this action's own outpoint counts as the asset arriving. `null` when the
+ * action touches no output of the asset.
  */
 export const oneColorActionAmount = (action: WalletAction, assetId: string): OneColorActionAmount | null => {
-  let toOthers = 0n;
   let toUs = 0n;
   let fromUs = 0n;
   let involved = false;
@@ -259,17 +263,29 @@ export const oneColorActionAmount = (action: WalletAction, assetId: string): One
     involved = true;
     if (t.role === 'authority') continue;
     if (o.basket?.startsWith(COLOR_BASKET_PREFIX)) toUs += t.amount;
-    else toOthers += t.amount;
   }
   for (const i of action.inputs ?? []) {
     const t = decodeOneColor(i.sourceLockingScript);
     if (t?.tokenId !== assetId) continue;
     involved = true;
-    if (t.role === 'value') fromUs += t.amount;
+    if (t.role === 'value' && isP2pkh(t.lock)) fromUs += t.amount;
   }
   if (!involved) return null;
-  if (toOthers > 0n) return { direction: 'sent', amount: toOthers };
-  if (fromUs === 0n && toUs > 0n) return { direction: 'received', amount: toUs };
-  if (fromUs > toUs) return { direction: 'sent', amount: fromUs - toUs };
+  const net = toUs - fromUs;
+  if (net > 0n) return { direction: 'received', amount: net };
+  if (net < 0n) return { direction: 'sent', amount: -net };
   return { direction: 'transfer', amount: 0n };
+};
+
+/** OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG, and nothing else. */
+const isP2pkh = (lock: LockingScript): boolean => {
+  const c = lock.chunks;
+  return (
+    c.length === 5 &&
+    c[0].op === 0x76 &&
+    c[1].op === 0xa9 &&
+    c[2].data?.length === 20 &&
+    c[3].op === 0x88 &&
+    c[4].op === 0xac
+  );
 };
