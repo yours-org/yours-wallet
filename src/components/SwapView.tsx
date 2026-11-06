@@ -727,7 +727,7 @@ export const SwapView = (props: SwapViewProps) => {
           confirm.
         </p>
 
-        <div className="px-4 mt-auto">
+        <div className="px-4 mt-auto sticky bottom-0 pt-3 pb-1" style={{ background: bg }}>
           {primaryButton('Review swap', () => setScreen('confirm'), !(q && amountValid))}
         </div>
       </>
@@ -801,7 +801,7 @@ export const SwapView = (props: SwapViewProps) => {
           Anything a pool can&apos;t fill is returned to your wallet automatically.
         </p>
 
-        <div className="flex flex-col gap-2 mt-auto">
+        <div className="flex flex-col gap-2 mt-auto sticky bottom-0 pt-3 pb-1" style={{ background: bg }}>
           <motion.button
             type="button"
             whileTap={starting ? undefined : { scale: 0.97 }}
@@ -956,7 +956,7 @@ export const SwapView = (props: SwapViewProps) => {
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 mt-6">
+        <div className="flex flex-col gap-2 mt-auto sticky bottom-0 pt-3 pb-1" style={{ background: bg }}>
           {outlinedButton('Back to Coins', onBack)}
           {showStop ? (
             <button
@@ -1068,7 +1068,7 @@ export const SwapView = (props: SwapViewProps) => {
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-2 mt-6">
+        <div className="flex flex-col gap-2 mt-auto sticky bottom-0 pt-3 pb-1" style={{ background: bg }}>
           {primaryButton('Done', onBack)}
           {outlinedButton('Swap again', swapAgain)}
         </div>
