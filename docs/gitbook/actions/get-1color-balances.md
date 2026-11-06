@@ -23,10 +23,6 @@ const available = BigInt(totalOutputs); // atomic units; authority: the count of
 
 ## Every holding
 
-{% hint style="warning" %}
-With `@bsv/color-permission-module` 0.1.3 on wallet-toolbox 2.15, the `p color assets` selector returns at most the first ten token outputs by txid, whatever `limit` you pass: the module asks the toolbox for the underlying listing without a page size, and the toolbox pages every result to its default of ten. Yours reads the toolbox listing directly for its own balances. Until the module is fixed, treat the selector as incomplete for wallets holding more than ten token outputs, and prefer `p color balance <assetTag>` for an asset you already know.
-{% endhint %}
-
 ```ts
 import { ASSETS_SELECTOR } from '@bsv/color-permission-module';
 import { OneColor } from '@1sat/templates';

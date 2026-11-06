@@ -15,7 +15,7 @@
     "@1sat/utils": "0.1.1",
     "@1sat/wallet": "0.1.2",
     "@1sat/wallet-browser": "0.1.2",
-    "@bsv/color-permission-module": "^0.1.0",
+    "@bsv/color-permission-module": "npm:@bopen-io/color-permission-module@0.2.1",
     "@bsv/sdk": "^4.0.0",
     "@bsv/templates": "^2.1.0",
     "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.15.3",
@@ -99,6 +99,6 @@
     "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.15.3",
     "@bsv/sdk": "^4.0.0",
     "@bsv/templates": "^2.1.0",
-    "@bsv/color-permission-module": "^0.1.0"
+    "@bsv/color-permission-module": "npm:@bopen-io/color-permission-module@0.2.1"
   }
 }
