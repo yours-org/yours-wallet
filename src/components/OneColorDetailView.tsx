@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowLeftRight,
   ArrowUpFromLine,
+  Droplets,
   ExternalLink,
   Info,
   Loader2,
@@ -19,6 +20,7 @@ import { ammSiteUrlOf, GENERIC_TOKEN_ICON } from '../utils/constants';
 import { formatUSD, showAmount } from '../utils/format';
 import { getErrorMessage } from '../utils/tools';
 import { CoinHistory } from './CoinHistory';
+import { PriceChart } from './PriceChart';
 import { SendConfirmation, type SendLineItem } from './SendConfirmation';
 import { Show } from './Show';
 
@@ -264,71 +266,127 @@ export const OneColorDetailView = ({
           </span>
         </div>
 
-        {/* Balance */}
-        <div className="flex flex-col items-center w-full px-4 mb-3 gap-1">
-          <span className="text-xs" style={{ color: gray }}>
-            Balance
-          </span>
-          <span className="text-[32px] font-bold leading-tight break-all text-center" style={{ color: contrast }}>
-            {showAmount(token.available, token.dec)}
-          </span>
-          <span className="text-sm" style={{ color: gray }}>
-            {usdValue !== undefined ? formatUSD(usdValue) : 'No market price yet'}
-          </span>
-          <Show when={token.pending > 0n}>
-            <span
-              title="Held by a send that the recipient has not claimed yet. It becomes spendable again when that send settles or expires."
-              className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold leading-none cursor-help"
-              style={{ color: PENDING_COLOR, backgroundColor: `${PENDING_COLOR}26` }}
-            >
-              <Info size={10} strokeWidth={2.5} />
-              {showAmount(token.pending, token.dec)} pending
-            </span>
-          </Show>
-        </div>
-
-        {/* Exchange status line */}
-        <div className="flex items-center justify-center gap-2 px-4 mb-4 min-h-[18px] text-xs" style={{ color: gray }}>
-          {state === 'loading' && (
-            <motion.div
-              className="h-3 w-40 rounded-full"
-              style={{ backgroundColor: row }}
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-              aria-hidden
+        {/* With a pool: the price chart leads, and the balance is a compact card under it */}
+        <Show when={state === 'pools'}>
+          <div className="w-full mb-3">
+            <PriceChart
+              tokenId={token.assetId}
+              ticker={ticker}
+              dec={token.dec}
+              bsvUsdRate={bsvUsdRate}
+              currentSatsPerToken={statusPriceBsv !== undefined ? statusPriceBsv * SATS_PER_BSV : null}
             />
-          )}
-          {state === 'pools' && (
-            <>
-              {tokensPerBsv !== undefined && (
-                <>
-                  <span>
-                    Price{' '}
-                    <span style={{ color: contrast }}>
-                      1 BSV = {tokensPerBsv} {ticker}
-                    </span>
+          </div>
+          <div className="px-4 mb-4">
+            <div
+              className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
+              style={{ background: row, border: ROW_BORDER }}
+            >
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs" style={{ color: gray }}>
+                  Your balance
+                </span>
+                <span className="text-base font-bold truncate" style={{ color: contrast }}>
+                  {showAmount(token.available, token.dec)} {ticker}
+                </span>
+                <Show when={token.pending > 0n}>
+                  <span
+                    title="Held by a send that the recipient has not claimed yet. It becomes spendable again when that send settles or expires."
+                    className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold leading-none cursor-help self-start"
+                    style={{ color: PENDING_COLOR, backgroundColor: `${PENDING_COLOR}26` }}
+                  >
+                    <Info size={10} strokeWidth={2.5} />
+                    {showAmount(token.pending, token.dec)} pending
                   </span>
-                  {divider}
-                </>
-              )}
-              <span>
-                Pools <span style={{ color: contrast }}>{status?.pools}</span>
+                </Show>
+              </div>
+              <div className="flex flex-col items-end flex-shrink-0">
+                <span className="text-xs" style={{ color: gray }}>
+                  Value
+                </span>
+                <span className="text-base font-bold" style={{ color: contrast }}>
+                  {usdValue !== undefined ? formatUSD(usdValue) : '—'}
+                </span>
+                <span className="text-[11px]" style={{ color: gray }}>
+                  {status?.pools === 1 ? '1 pool' : `${status?.pools ?? 0} pools`}
+                </span>
+              </div>
+            </div>
+          </div>
+        </Show>
+
+        {/* Balance (no chart) */}
+        <Show when={state !== 'pools'}>
+          <div className="flex flex-col items-center w-full px-4 mb-3 gap-1">
+            <span className="text-xs" style={{ color: gray }}>
+              Balance
+            </span>
+            <span className="text-[32px] font-bold leading-tight break-all text-center" style={{ color: contrast }}>
+              {showAmount(token.available, token.dec)}
+            </span>
+            <span className="text-sm" style={{ color: gray }}>
+              {usdValue !== undefined ? formatUSD(usdValue) : 'No market price yet'}
+            </span>
+            <Show when={token.pending > 0n}>
+              <span
+                title="Held by a send that the recipient has not claimed yet. It becomes spendable again when that send settles or expires."
+                className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold leading-none cursor-help"
+                style={{ color: PENDING_COLOR, backgroundColor: `${PENDING_COLOR}26` }}
+              >
+                <Info size={10} strokeWidth={2.5} />
+                {showAmount(token.pending, token.dec)} pending
               </span>
-            </>
-          )}
-          {state === 'no-pool' && (
-            <>
-              <Info size={12} />
-              <span>Listed on Open Exchange · no pool yet</span>
-            </>
-          )}
-          {state === 'unlisted' && (
-            <>
-              <Info size={12} />
-              <span>Not on Open Exchange</span>
-            </>
-          )}
-        </div>
+            </Show>
+          </div>
+        </Show>
+
+        {/* Exchange status line (the chart covers it when there is a pool) */}
+        <Show when={state !== 'pools'}>
+          <div
+            className="flex items-center justify-center gap-2 px-4 mb-4 min-h-[18px] text-xs"
+            style={{ color: gray }}
+          >
+            {state === 'loading' && (
+              <motion.div
+                className="h-3 w-40 rounded-full"
+                style={{ backgroundColor: row }}
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                aria-hidden
+              />
+            )}
+            {state === 'pools' && (
+              <>
+                {tokensPerBsv !== undefined && (
+                  <>
+                    <span>
+                      Price{' '}
+                      <span style={{ color: contrast }}>
+                        1 BSV = {tokensPerBsv} {ticker}
+                      </span>
+                    </span>
+                    {divider}
+                  </>
+                )}
+                <span>
+                  Pools <span style={{ color: contrast }}>{status?.pools}</span>
+                </span>
+              </>
+            )}
+            {state === 'no-pool' && (
+              <>
+                <Info size={12} />
+                <span>Listed on Open Exchange · no pool yet</span>
+              </>
+            )}
+            {state === 'unlisted' && (
+              <>
+                <Info size={12} />
+                <span>Not on Open Exchange</span>
+              </>
+            )}
+          </div>
+        </Show>
 
         {/* Actions */}
         <div className="flex flex-col items-center w-full mb-5">
@@ -349,6 +407,28 @@ export const OneColorDetailView = ({
             </p>
           </Show>
         </div>
+
+        {/* Provide liquidity: a small link out to the pool site, when there is one on this chain */}
+        <Show when={state === 'pools' && !!ammSiteUrl}>
+          <div className="px-4 mb-5">
+            <a
+              href={ammSiteUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl no-underline"
+              style={{ background: 'rgba(23,25,30,0.6)', border: ROW_BORDER, color: contrast }}
+            >
+              <Droplets size={15} style={{ color: '#A1FF8B', flexShrink: 0 }} />
+              <div className="flex flex-col flex-1 min-w-0">
+                <span className="text-xs font-semibold">Provide liquidity</span>
+                <span className="text-[10px] truncate" style={{ color: gray }}>
+                  Earn a share of {ticker} swap fees on {ammSiteUrl ? hostOf(ammSiteUrl) : ''}
+                </span>
+              </div>
+              <ExternalLink size={12} style={{ color: gray, flexShrink: 0 }} />
+            </a>
+          </div>
+        </Show>
 
         {/* Reserved by a swap: in flight, or left behind when the wallet stopped mid-swap */}
         <Show when={hasReserved}>

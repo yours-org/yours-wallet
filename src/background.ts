@@ -56,7 +56,7 @@ import {
 import { chainOf, HOSTED_YOURS_IMAGE, swapExchangeOriginOf } from './utils/constants';
 import { createClient as createAmmClient } from '@dcasegr/amm-client';
 import { createSwapService, type SwapClient } from './services/swapBackground';
-import { SWAP_ACTIONS, SWAP_PROGRESS_EVENT, type SwapQuoteRequest } from './services/swapTypes';
+import { SWAP_ACTIONS, SWAP_PROGRESS_EVENT, type SwapCandleTf, type SwapQuoteRequest } from './services/swapTypes';
 import { WalletBackupService } from './backup/WalletBackupService';
 import { repairStaleAccounts, usbRekey, type UsbRekeyRequest } from './services/usbRekeyBackground';
 import {
@@ -116,7 +116,16 @@ const swapService = createSwapService({
 });
 
 const processSwap = async (
-  message: { action: string; request?: SwapQuoteRequest; jobId?: string; tokenId?: string },
+  message: {
+    action: string;
+    request?: SwapQuoteRequest;
+    jobId?: string;
+    tokenId?: string;
+    dec?: number;
+    tf?: SwapCandleTf;
+    from?: number;
+    to?: number;
+  },
   sendResponse: CallbackResponse,
 ) => {
   const type = message.action;
@@ -154,6 +163,15 @@ const processSwap = async (
         break;
       case SWAP_ACTIONS.MOVE_BACK_SATS:
         data = await swapService.moveBackSats();
+        break;
+      case SWAP_ACTIONS.CANDLES:
+        data = await swapService.candles(
+          message.tokenId!,
+          message.dec ?? 0,
+          message.tf ?? '15m',
+          message.from ?? 0,
+          message.to ?? Date.now(),
+        );
         break;
       default:
         throw new Error(`Unknown swap action ${type}`);
@@ -1262,6 +1280,7 @@ if (isInServiceWorker) {
         case SWAP_ACTIONS.ENABLE_TOKEN:
         case SWAP_ACTIONS.MOVE_BACK:
         case SWAP_ACTIONS.MOVE_BACK_SATS:
+        case SWAP_ACTIONS.CANDLES:
           void processSwap(message, sendResponse);
           return true;
         case 'STORAGE_SYNC_BACKUPS':

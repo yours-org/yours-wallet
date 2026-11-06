@@ -117,6 +117,11 @@ export type SwapListedToken = {
   marginalPrice: number | null;
 };
 
+/** One price candle's close, sats per whole token, at time `t` (ms). */
+export type SwapCandle = { t: number; close: number };
+
+export type SwapCandleTf = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+
 /** Popup → background actions. */
 export const SWAP_ACTIONS = {
   QUOTE: 'SWAP_QUOTE',
@@ -129,6 +134,7 @@ export const SWAP_ACTIONS = {
   ENABLE_TOKEN: 'SWAP_ENABLE_TOKEN',
   MOVE_BACK: 'SWAP_MOVE_BACK',
   MOVE_BACK_SATS: 'SWAP_MOVE_BACK_SATS',
+  CANDLES: 'SWAP_CANDLES',
 } as const;
 
 /** Background → popup broadcast carrying a job after each change. */

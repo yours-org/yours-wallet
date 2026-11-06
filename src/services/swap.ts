@@ -7,6 +7,8 @@ import { sendMessageAsync } from '../utils/chromeHelpers';
 import {
   SWAP_ACTIONS,
   SWAP_PROGRESS_EVENT,
+  type SwapCandle,
+  type SwapCandleTf,
   type SwapJob,
   type SwapListedToken,
   type SwapQuote,
@@ -35,6 +37,8 @@ export const swapEnableToken = (tokenId: string) => call<boolean>({ action: SWAP
 export const swapMoveBack = (tokenId: string) =>
   call<{ txid: string; amount: string }>({ action: SWAP_ACTIONS.MOVE_BACK, tokenId });
 export const swapMoveBackSats = () => call<{ txid: string; amount: string }>({ action: SWAP_ACTIONS.MOVE_BACK_SATS });
+export const swapCandles = (tokenId: string, dec: number, tf: SwapCandleTf, from: number, to: number) =>
+  call<SwapCandle[]>({ action: SWAP_ACTIONS.CANDLES, tokenId, dec, tf, from, to });
 
 /** Follow every job the background reports; returns the unsubscribe. */
 export const onSwapProgress = (cb: (job: SwapJob) => void): (() => void) => {

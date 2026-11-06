@@ -1,5 +1,11 @@
 import { describe, expect, mock, test } from 'bun:test';
-import { createSwapService, quoteErrorText, type ClientProgress, type SwapClient } from './swapBackground';
+import {
+  createSwapService,
+  quoteErrorText,
+  satsPerWholeToken,
+  type ClientProgress,
+  type SwapClient,
+} from './swapBackground';
 import type { SwapJob, SwapQuoteRequest } from './swapTypes';
 
 const req: SwapQuoteRequest = {
@@ -56,6 +62,11 @@ const fakeClient = (
   moveBackStagedSats: async () => ({ txid: 'back-sats', amount: 500n }),
   myTokens: async () => [{ tokenId: req.token.tokenId, inSwaps: 123n }],
   swapBasketSats: async () => 4500,
+  candles: async () => [
+    { t: 1000, c: { sats: 100n, tokens: 2_000n } },
+    { t: 2000, c: { sats: 150n, tokens: 2_000n } },
+    { t: 3000, c: { sats: 0n, tokens: 0n } },
+  ],
 });
 
 const settled = async (service: ReturnType<typeof createSwapService>, id: string) => {
@@ -216,5 +227,25 @@ describe('quoteErrorText', () => {
       'Minimum 12.5 NANNER per trade, the smallest a pool accepts.',
     );
     expect(quoteErrorText('No pool to swap against')).toBe('No pool to swap against');
+  });
+});
+
+describe('candles', () => {
+  test('closes come back as sats per whole token, oldest first, empty pairs dropped', async () => {
+    const client = fakeClient(async () => ({
+      status: 'filled',
+      stop: 'filled',
+      legs: [],
+      totalIn: 0n,
+      totalOut: 0n,
+      unfilled: 0n,
+    }));
+    const service = createSwapService({ client: () => client, broadcast: () => {} });
+    // 2,000 base units at 2 decimals = 20 whole tokens: 100 sats / 20 = 5 sats per token.
+    expect(await service.candles('t', 2, '15m', 0, 5000)).toEqual([
+      { t: 1000, close: 5 },
+      { t: 2000, close: 7.5 },
+    ]);
+    expect(satsPerWholeToken({ sats: 10n, tokens: 0n }, 0)).toBe(0);
   });
 });

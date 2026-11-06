@@ -10,6 +10,8 @@
  */
 import { errorKind } from '@dcasegr/amm-client';
 import type {
+  SwapCandle,
+  SwapCandleTf,
   SwapJob,
   SwapLeg,
   SwapListedToken,
@@ -77,6 +79,11 @@ export interface SwapClient {
   myTokens: () => Promise<Array<{ tokenId: string; inSwaps: Bigintish }>>;
   /** Sats sitting in the swap basket. */
   swapBasketSats: () => Promise<number>;
+  /** The exchange's price candles for a token, oldest first; prices as sats/tokens pairs in base units. */
+  candles: (
+    tokenId: string,
+    o: { tf: SwapCandleTf; from: number; to: number; series?: 'fill' | 'market' },
+  ) => Promise<Array<{ t: number; c: { sats: Bigintish; tokens: Bigintish } }>>;
 }
 
 export interface SwapServiceOptions {
@@ -126,6 +133,12 @@ export const toWireQuote = (request: SwapQuoteRequest, q: ClientQuote): SwapQuot
 });
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** A sats/tokens price pair (base units) as sats per whole token; 0 when the pair has no tokens. */
+export const satsPerWholeToken = (p: { sats: Bigintish; tokens: Bigintish }, dec: number): number => {
+  const tokens = Number(p.tokens) / 10 ** dec;
+  return tokens > 0 ? Number(p.sats) / tokens : 0;
+};
 
 /**
  * The client's minimum-size refusal ("No pool here takes a swap this small: at least 50000 sats.")
@@ -351,13 +364,27 @@ export const createSwapService = (opts: SwapServiceOptions) => {
     return { txid: r.txid, amount: r.amount.toString() };
   };
 
+  /** Close prices over a window, as sats per whole token (the `market` series: the mid, what the stats price is). */
+  const candles = async (
+    tokenId: string,
+    dec: number,
+    tf: SwapCandleTf,
+    from: number,
+    to: number,
+  ): Promise<SwapCandle[]> => {
+    const rows = await requireClient().candles(tokenId, { tf, from, to, series: 'market' });
+    return rows
+      .map((c) => ({ t: c.t, close: satsPerWholeToken(c.c, dec) }))
+      .filter((c) => Number.isFinite(c.close) && c.close > 0);
+  };
+
   /** Return the sats a swap staged and never spent (a swap the wallet stopped mid-way). */
   const moveBackSats = async (): Promise<{ txid: string; amount: string }> => {
     const r = await requireClient().moveBackStagedSats();
     return { txid: r.txid, amount: r.amount.toString() };
   };
 
-  return { quote, start, get, list, cancel, tokenStatus, listedTokens, enableToken, moveBack, moveBackSats };
+  return { quote, start, get, list, cancel, tokenStatus, listedTokens, enableToken, moveBack, moveBackSats, candles };
 };
 
 export type SwapService = ReturnType<typeof createSwapService>;
