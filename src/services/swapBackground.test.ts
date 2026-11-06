@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from 'bun:test';
-import { createSwapService, type ClientProgress, type SwapClient } from './swapBackground';
+import { createSwapService, quoteErrorText, type ClientProgress, type SwapClient } from './swapBackground';
 import type { SwapJob, SwapQuoteRequest } from './swapTypes';
 
 const req: SwapQuoteRequest = {
@@ -204,5 +204,17 @@ describe('swap service', () => {
     const off = createSwapService({ client: () => undefined, broadcast: () => {} });
     expect(await off.tokenStatus(mine)).toMatchObject({ available: false, listed: false, canList: false });
     await expect(off.quote(req)).rejects.toThrow('not available');
+  });
+});
+
+describe('quoteErrorText', () => {
+  test('rewords the minimum-size refusal, in BSV for a buy', () => {
+    expect(quoteErrorText('No pool here takes a swap this small: at least 50000 sats.')).toBe(
+      'Minimum 0.0005 BSV per trade, the smallest a pool accepts.',
+    );
+    expect(quoteErrorText('No pool here takes a swap this small: at least 12.5 NANNER.')).toBe(
+      'Minimum 12.5 NANNER per trade, the smallest a pool accepts.',
+    );
+    expect(quoteErrorText('No pool to swap against')).toBe('No pool to swap against');
   });
 });

@@ -127,6 +127,21 @@ export const toWireQuote = (request: SwapQuoteRequest, q: ClientQuote): SwapQuot
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
+/**
+ * The client's minimum-size refusal ("No pool here takes a swap this small: at least 50000 sats.")
+ * as the exchange's own app words it, with sats shown as BSV. Other messages pass through.
+ */
+export const quoteErrorText = (msg: string): string => {
+  const m = /takes a swap this small: at least (\d+(?:\.\d+)?) (\S+?)\.?$/.exec(msg);
+  if (!m) return msg;
+  const [, amount, unit] = m;
+  const shown =
+    unit === 'sats'
+      ? `${(Number(amount) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 8 })} BSV`
+      : `${amount} ${unit}`;
+  return `Minimum ${shown} per trade, the smallest a pool accepts.`;
+};
+
 /** How long a finished job stays listable, so a popup reopened later still sees the outcome. */
 export const SWAP_JOB_TTL_MS = 30 * 60 * 1000;
 
@@ -153,7 +168,12 @@ export const createSwapService = (opts: SwapServiceOptions) => {
   const quoteNow = async (req: SwapQuoteRequest) => {
     const client = requireClient();
     const held = await client.tokenPools(req.token.tokenId);
-    const q = client.quoteSwap(clientRequest(req), held, { sym: req.token.sym, dec: req.token.dec });
+    let q: ClientQuote;
+    try {
+      q = client.quoteSwap(clientRequest(req), held, { sym: req.token.sym, dec: req.token.dec });
+    } catch (e) {
+      throw new Error(quoteErrorText(message(e)));
+    }
     if (q.legs.length === 0) throw new Error('No pool can fill this swap within your slippage setting.');
     return { client, q };
   };

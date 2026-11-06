@@ -95,3 +95,21 @@ export const compactAmount = (full: string): string => {
   const frac = fracRaw.slice(0, keep).replace(/0+$/, '');
   return `${negative ? '-' : ''}${grouped}${frac ? `.${frac}` : ''}`;
 };
+
+/** Why a swap stopped before filling everything, as the exchange's own app words it. */
+export const stopText = (stop: string | undefined): string => {
+  switch (stop) {
+    case 'cancelled':
+      return 'You stopped the swap.';
+    case 'floor':
+      return 'The next part would have ended up outside your slippage setting.';
+    case 'min':
+      return 'What was left is below the smallest trade a pool accepts.';
+    case 'no_pool':
+      return 'No pool was left to fill the rest.';
+    case 'fees':
+      return 'What was left was too small to cover the network fee.';
+    default:
+      return '';
+  }
+};

@@ -9,6 +9,7 @@ import {
   swapErrorText,
   tokensPerBsv,
   compactAmount,
+  stopText,
 } from './swapViewHelpers';
 
 describe('parseAmount', () => {
@@ -79,5 +80,15 @@ describe('compactAmount', () => {
     expect(compactAmount('1000')).toBe('1,000');
     expect(compactAmount('12.50')).toBe('12.5');
     expect(compactAmount('0')).toBe('0');
+  });
+});
+
+describe('stopText', () => {
+  test('names each early stop and says nothing for a full fill', () => {
+    expect(stopText('min')).toContain('smallest trade');
+    expect(stopText('fees')).toContain('network fee');
+    expect(stopText('cancelled')).toBe('You stopped the swap.');
+    expect(stopText('filled')).toBe('');
+    expect(stopText(undefined)).toBe('');
   });
 });

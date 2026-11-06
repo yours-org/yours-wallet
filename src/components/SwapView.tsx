@@ -32,6 +32,7 @@ import {
   acceptsAmountInput,
   bpsToPercentText,
   compactAmount,
+  stopText,
   formatRate,
   parseAmount,
   shortOutpoint,
@@ -1020,7 +1021,7 @@ export const SwapView = (props: SwapViewProps) => {
             <div className="flex items-start gap-2">
               <Info size={16} className="flex-shrink-0 mt-0.5" style={{ color: red }} />
               <span className="text-xs" style={{ color: contrast }}>
-                {swapErrorText(j.errorKind, j.error)}
+                {j.error ? swapErrorText(j.errorKind, j.error) : stopText(r?.stop) || 'Nothing was filled.'}
               </span>
             </div>
             {j.recovered ? (
@@ -1040,6 +1041,7 @@ export const SwapView = (props: SwapViewProps) => {
             <div className="flex flex-col gap-1 text-xs" style={{ color: contrast }}>
               <span>
                 Filled {fmt(totalIn, pay.dec)} of {fmt(totalIn + unfilled, pay.dec)} {pay.ticker}.
+                {stopText(r?.stop) ? ` ${stopText(r?.stop)}` : ''}
               </span>
               {returned && 'txid' in returned ? (
                 <span>
