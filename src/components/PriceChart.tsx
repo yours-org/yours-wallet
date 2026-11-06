@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import { Skeleton } from './Skeleton';
 import { swapCandles } from '../services/swap';
 import type { SwapCandle } from '../services/swapTypes';
 import {
@@ -143,9 +143,16 @@ export const PriceChart = ({ tokenId, ticker, dec, bsvUsdRate, currentSatsPerTok
             {scrub ? formatPointTime(scrub.t, shownRange) : 'Price'}
           </span>
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-[24px] font-bold leading-tight" style={{ color: contrast, letterSpacing: '-0.02em' }}>
-              {formatPrice(priceIn(shownSats, currency, bsvUsdRate), currency)}
-            </span>
+            {loading && candles.length === 0 && shownSats === 0 ? (
+              <Skeleton className="h-7 w-36 rounded-md my-0.5" />
+            ) : (
+              <span
+                className="text-[24px] font-bold leading-tight"
+                style={{ color: contrast, letterSpacing: '-0.02em' }}
+              >
+                {formatPrice(priceIn(shownSats, currency, bsvUsdRate), currency)}
+              </span>
+            )}
             {!scrub && (
               <span className="text-[13px] font-semibold" style={{ color: change === null ? gray : up ? GREEN : red }}>
                 {formatChange(change)}
@@ -188,8 +195,19 @@ export const PriceChart = ({ tokenId, ticker, dec, bsvUsdRate, currentSatsPerTok
       {/* The chart */}
       <div className="relative w-full mt-2" style={{ height: H }}>
         {loading && candles.length === 0 ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Loader2 size={18} className="animate-spin" style={{ color: gray }} />
+          <div className="absolute inset-0 flex flex-col justify-end px-4 pb-3" aria-hidden>
+            {/* A faint wave stands in for the line until the candles arrive */}
+            <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block w-full h-full">
+              <motion.path
+                d="M0,100 C40,92 60,112 100,98 S160,70 200,78 S260,52 300,58 S340,38 360,42"
+                fill="none"
+                stroke="rgba(255,255,255,0.10)"
+                strokeWidth={2}
+                vectorEffect="non-scaling-stroke"
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            </svg>
           </div>
         ) : failed || candles.length < 2 ? (
           <div className="absolute inset-0 flex items-center justify-center px-6">
@@ -219,8 +237,17 @@ export const PriceChart = ({ tokenId, ticker, dec, bsvUsdRate, currentSatsPerTok
                   <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
                 </linearGradient>
               </defs>
-              <path d={paths.area} fill={`url(#fill-${tokenId.slice(0, 8)})`} />
-              <path
+              {/* Keyed by range so a new window draws itself in again */}
+              <motion.path
+                key={`area-${shownRange}`}
+                d={paths.area}
+                fill={`url(#fill-${tokenId.slice(0, 8)})`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+              />
+              <motion.path
+                key={`line-${shownRange}`}
                 d={paths.line}
                 fill="none"
                 stroke={lineColor}
@@ -228,6 +255,9 @@ export const PriceChart = ({ tokenId, ticker, dec, bsvUsdRate, currentSatsPerTok
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
+                initial={{ pathLength: 0, opacity: 0.6 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 0.9, ease: 'easeOut' }}
               />
               {scrub && (
                 <>

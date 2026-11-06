@@ -65,6 +65,7 @@ import { useSyncTracker } from '../hooks/useSyncTracker';
 import { getErrorMessage, isValidEmail } from '../utils/tools';
 import { UpgradeNotification } from '../components/UpgradeNotification';
 import { TokensList } from '../components/TokensList';
+import { AssetRowSkeleton, Skeleton } from '../components/Skeleton';
 import { ManageTokens } from '../components/ManageTokens';
 import { Account } from '../services/types/chromeStorage.types';
 import { SendBsv21View } from '../components/SendBsv21View';
@@ -1029,7 +1030,7 @@ export const BsvWallet = () => {
         >
           <div className="flex items-center gap-2">
             {!balanceReady ? (
-              <Loader2 size={28} className="animate-spin" style={{ color: theme.color.global.gray }} />
+              <Skeleton className="h-9 w-40 rounded-lg" />
             ) : (
               <h1
                 title={isSyncing ? 'Syncing…' : 'Balance'}
@@ -1193,6 +1194,12 @@ export const BsvWallet = () => {
             transition={{ duration: 0.3, ease: 'easeOut' }}
             className="w-full"
           >
+            {!oneColorsReady && filteredTokens.length === 0 && (
+              <div className="w-full px-4 flex flex-col gap-2">
+                <AssetRowSkeleton />
+                <AssetRowSkeleton />
+              </div>
+            )}
             {filteredTokens.length > 0 && (
               <TokensList
                 key={randomKey}
