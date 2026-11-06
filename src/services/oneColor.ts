@@ -32,7 +32,7 @@ import {
   type WalletOutput,
 } from '@bsv/sdk';
 import { OneColor, type OneColorMetadata, type OneColorToken } from '@1sat/templates';
-import { ASSETS_SELECTOR } from '@bsv/color-permission-module';
+import { sdk } from '@bsv/wallet-toolbox-client';
 import type { OneSatContext } from '@1sat/actions';
 
 export type OneColorAssetInfo = {
@@ -66,6 +66,7 @@ export type OneColorHolding = {
 };
 
 const STATE_RESERVED = 'color_state_reserved';
+const STATE_AVAILABLE = 'color_state_available';
 const COLOR_BASKET_PREFIX = 'p color ';
 
 /** Action statuses whose inputs are still the wallet's: signed or built, but not broadcast. */
@@ -163,18 +164,35 @@ export const pendingAmount = (reserved: ReservedOutput[], statuses: Map<string, 
     return status === undefined || UNSENT_STATUSES.has(status) ? sum + r.amount : sum;
   }, 0n);
 
-/** Every token output the color module holds, across all assets. */
-export const listOneColorHoldings = async (wallet: WalletInterface): Promise<HoldingOutput[]> => {
+/**
+ * Every token output the color module holds, across all assets.
+ *
+ * Read from the toolbox's basket-prefix listing directly, not the module's
+ * `p color assets` selector. The module asks the toolbox for that listing
+ * without a page size, and the toolbox's action-batch overlay slices every
+ * result to the default ten outputs, so the selector never shows more than
+ * the first ten token outputs by txid (color-permission-module 0.1.3 on
+ * wallet-toolbox-client 2.15.3). The state tag is derived the way the
+ * module derives it: an output that is not spendable is reserved.
+ */
+export const listOneColorHoldings = async (wallet: Pick<WalletInterface, 'listOutputs'>): Promise<HoldingOutput[]> => {
   const outputs: HoldingOutput[] = [];
   for (let offset = 0; ; offset += PAGE) {
     const page = await wallet.listOutputs({
-      basket: ASSETS_SELECTOR,
+      basket: sdk.specOpBasketPrefixOutputs,
+      tags: [COLOR_BASKET_PREFIX.trim()],
       include: 'locking scripts',
       includeTags: true,
       limit: PAGE,
       offset,
     });
-    outputs.push(...page.outputs);
+    outputs.push(
+      ...page.outputs.map((o) => ({
+        outpoint: o.outpoint,
+        lockingScript: o.lockingScript,
+        tags: [...(o.tags ?? []), o.spendable ? STATE_AVAILABLE : STATE_RESERVED],
+      })),
+    );
     if (page.outputs.length < PAGE || outputs.length >= Number(page.totalOutputs)) break;
   }
   return outputs;

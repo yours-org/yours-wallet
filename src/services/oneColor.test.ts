@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test';
+import { sdk } from '@bsv/wallet-toolbox-client';
 import { OneColor } from '@1sat/templates';
 import { LockingScript, type ActionStatus, type WalletInterface } from '@bsv/sdk';
 import {
   aggregateOneColorHoldings,
+  listOneColorHoldings,
   assetInfoFromMetadata,
   findSpendingStatuses,
   normalizeHandle,
@@ -67,6 +69,37 @@ describe('aggregateOneColorHoldings', () => {
       { outpoint: 'd.0', tags: [] },
     ]);
     expect(held.size).toBe(0);
+  });
+});
+
+describe('listOneColorHoldings', () => {
+  test('reads the basket-prefix listing in full pages and tags reserved outputs by spendability', async () => {
+    const calls: unknown[] = [];
+    const all = Array.from({ length: 1203 }, (_, i) => ({
+      outpoint: `${i.toString(16).padStart(64, '0')}.0`,
+      satoshis: 1,
+      spendable: i % 7 !== 0,
+      lockingScript: value(`${DEPLOY_TXID}_0`, 1n),
+      tags: ['p color'],
+    }));
+    const wallet = {
+      listOutputs: async (args: { basket: string; tags?: string[]; limit?: number; offset?: number }) => {
+        calls.push(args);
+        const start = args.offset ?? 0;
+        return { totalOutputs: all.length, outputs: all.slice(start, start + (args.limit ?? 10)) };
+      },
+    };
+    const held = await listOneColorHoldings(wallet as never);
+    expect(calls.length).toBe(2);
+    expect(calls[0]).toMatchObject({
+      basket: sdk.specOpBasketPrefixOutputs,
+      tags: ['p color'],
+      limit: 1000,
+      offset: 0,
+    });
+    expect(held.length).toBe(1203);
+    expect(held[0].tags).toEqual(['p color', 'color_state_reserved']);
+    expect(held[1].tags).toEqual(['p color', 'color_state_available']);
   });
 });
 
