@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, ExternalLink, Loader2 } from 'lucide-react';
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
@@ -8,6 +8,7 @@ import { explorerTxUrl } from '../utils/constants';
 import { fetchBsv21History, fetchBsvHistory, fetchOneColorHistory, type CoinTxSummary } from '../utils/coinHistory';
 import { truncate } from '../utils/format';
 import { Show } from './Show';
+import { AssetRowSkeleton } from './Skeleton';
 
 export type CoinHistoryFilter =
   | { type: 'bsv' }
@@ -16,6 +17,8 @@ export type CoinHistoryFilter =
 
 export type CoinHistoryProps = {
   filter: CoinHistoryFilter;
+  /** The section label. */
+  title?: string;
   pageSize?: number;
   /** Bump to force a refetch (e.g. after a successful send). */
   refreshKey?: number | string;
@@ -32,7 +35,7 @@ const filterKey = (filter: CoinHistoryFilter): string => {
   }
 };
 
-export const CoinHistory = ({ filter, pageSize = 25, refreshKey }: CoinHistoryProps) => {
+export const CoinHistory = ({ filter, pageSize = 25, refreshKey, title = 'Recent activity' }: CoinHistoryProps) => {
   const { apiContext, chromeStorageService } = useServiceContext();
   const { theme } = useTheme();
   const [items, setItems] = useState<CoinTxSummary[]>([]);
@@ -123,37 +126,48 @@ export const CoinHistory = ({ filter, pageSize = 25, refreshKey }: CoinHistoryPr
 
   const openInExplorer = (txid: string) => window.open(explorerTxUrl(txid, apiContext.chain), '_blank');
 
-  const directionIcon = (direction: CoinTxSummary['direction'], kind?: CoinTxSummary['kind']) => {
-    if (kind === 'swap') return <ArrowLeftRight size={12} style={{ color: accent }} />;
-    switch (direction) {
+  /** Money in (received, a swap that paid out) reads in the accent; money out in gray. */
+  const inbound = (item: CoinTxSummary): boolean =>
+    item.kind === 'swap' ? item.amountDisplay.startsWith('+') : item.direction === 'received';
+
+  const directionIcon = (item: CoinTxSummary) => {
+    const color = inbound(item) ? accent : gray;
+    if (item.kind === 'swap') return <ArrowLeftRight size={12} strokeWidth={2.5} style={{ color }} />;
+    switch (item.direction) {
       case 'received':
-        return <ArrowDownLeft size={12} style={{ color: accent }} />;
+        return <ArrowDownLeft size={12} strokeWidth={2.5} style={{ color }} />;
       case 'sent':
-        return <ArrowUpRight size={12} style={{ color: gray }} />;
+        return <ArrowUpRight size={12} strokeWidth={2.5} style={{ color }} />;
       default:
-        return <ArrowLeftRight size={12} style={{ color: gray }} />;
+        return <ArrowLeftRight size={12} strokeWidth={2.5} style={{ color }} />;
     }
   };
 
-  const amountColor = (item: CoinTxSummary): string => {
-    if (item.amountSubdued) return gray;
-    return item.direction === 'received' ? accent : contrast;
-  };
+  const amountColor = (item: CoinTxSummary): string => (item.amountSubdued || !inbound(item) ? gray : accent);
+
+  const rowLabel = (item: CoinTxSummary): string =>
+    item.kind === 'swap'
+      ? 'Swap'
+      : item.direction === 'sent'
+        ? 'Sent'
+        : item.direction === 'received'
+          ? 'Received'
+          : 'Transfer';
 
   return (
     <div className="w-full flex flex-col mt-6">
       {/* Section header */}
       <div className="flex items-center px-1 mb-2">
-        <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: gray }}>
-          Recent Activity
+        <span className="text-xs font-semibold" style={{ color: gray }}>
+          {title}
         </span>
-        <div className="flex-1 ml-3 h-px opacity-20" style={{ backgroundColor: gray }} />
       </div>
 
-      {/* Loading state */}
+      {/* Loading state: rows in their own shape */}
       <Show when={loading}>
-        <div className="flex items-center justify-center py-6">
-          <Loader2 size={16} className="animate-spin" style={{ color: gray }} />
+        <div className="flex flex-col gap-1.5">
+          <AssetRowSkeleton />
+          <AssetRowSkeleton />
         </div>
       </Show>
 
@@ -181,43 +195,42 @@ export const CoinHistory = ({ filter, pageSize = 25, refreshKey }: CoinHistoryPr
           {items.map((item) => (
             <motion.button
               key={`${item.txid}-${item.direction}`}
-              whileHover={{ scale: 1.005 }}
+              type="button"
               whileTap={{ scale: 0.99 }}
               onClick={() => openInExplorer(item.txid)}
-              className="flex items-center justify-between w-full px-3 py-2.5 rounded-xl border-0 outline-none cursor-pointer text-left"
-              style={{
-                background: row,
-                border: `1px solid ${gray}14`,
-              }}
+              title="View on the explorer"
+              className="flex items-center justify-between w-full px-3 py-2.5 rounded-xl outline-none cursor-pointer text-left"
+              style={{ background: row, border: '1px solid rgba(255,255,255,0.06)' }}
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <div
-                  className="flex items-center justify-center w-7 h-7 rounded-full flex-shrink-0"
-                  style={{ background: `${gray}18` }}
+                  className="flex items-center justify-center rounded-full flex-shrink-0"
+                  style={{
+                    width: 26,
+                    height: 26,
+                    background: inbound(item) ? 'rgba(161,255,139,0.12)' : 'rgba(255,255,255,0.06)',
+                  }}
                 >
-                  {directionIcon(item.direction, item.kind)}
+                  {directionIcon(item)}
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-semibold leading-tight" style={{ color: contrast }}>
-                    {item.kind === 'swap'
-                      ? 'Swap'
-                      : item.direction === 'sent'
-                        ? 'Sent'
-                        : item.direction === 'received'
-                          ? 'Received'
-                          : 'Transfer'}
+                  <span className="text-[13px] font-semibold leading-tight" style={{ color: contrast }}>
+                    {rowLabel(item)}
                   </span>
-                  <span className="text-[10px] mt-0.5 truncate font-mono" style={{ color: gray, maxWidth: '10rem' }}>
-                    {item.description || truncate(item.txid, 6, 4)}
+                  <span
+                    className={`text-[11px] mt-0.5 truncate ${item.description ? '' : 'font-mono'}`}
+                    style={{ color: gray, maxWidth: '11rem' }}
+                  >
+                    {item.description || truncate(item.txid, 8, 6)}
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                <span className="text-xs font-bold text-right whitespace-nowrap" style={{ color: amountColor(item) }}>
-                  {item.amountDisplay}
-                </span>
-                <ExternalLink size={11} style={{ color: accent }} />
-              </div>
+              <span
+                className="text-[13px] font-semibold text-right whitespace-nowrap flex-shrink-0 ml-2"
+                style={{ color: amountColor(item) }}
+              >
+                {item.amountDisplay}
+              </span>
             </motion.button>
           ))}
         </div>

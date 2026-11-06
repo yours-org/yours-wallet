@@ -551,10 +551,8 @@ export const OneColorDetailView = ({
 
         {/* History */}
         <div className="w-full px-4">
-          <span className="text-xs font-semibold" style={{ color: gray }}>
-            History
-          </span>
           <CoinHistory
+            title="History"
             filter={{ type: '1color', assetId: token.assetId, decimals: token.dec, symbol: token.sym }}
             refreshKey={refreshKey}
           />
