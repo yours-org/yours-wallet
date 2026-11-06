@@ -20,6 +20,7 @@ import type { Keys } from './utils/keys';
 import { initSyncContext, type SyncContext } from './initSyncContext';
 import { refileLegacyBaskets } from './services/legacyBaskets';
 import { reconcileStorage, requestUsbFullPass } from './services/storageReconcileBackground';
+import { pushBackups, recordBackupPush } from './services/backupSync';
 import { showOneSatPrompt } from './services/oneSatPrompt';
 import { createColorOverlayProvider } from './services/colorOverlay';
 import { createColorTokenAccessHandler } from './services/colorConsent';
@@ -27,6 +28,8 @@ import { createHandleInboxSync } from './services/handles';
 
 /** How often the BRC-169 handle inboxes are collected (matches the 1-minute inactivity-lock alarm). */
 const HANDLE_INBOX_SYNC_INTERVAL_MS = 60_000;
+/** Active store → backups, while the wallet is open. Incremental after the first run. */
+const BACKUP_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
 // Admin originator for the extension (bypasses all permission checks). The bare
 // extension ID, as ChromeCWI sends it: toolbox permission checks reject a URL
@@ -391,6 +394,17 @@ export const initWallet = async (
     await stampDataVersion(2);
   }
 
+  // The active store is the source of truth; every other registered store is
+  // a backup brought up to date from it: once after the address sync on
+  // open, then on a timer. Never throws; failures are logged and recorded.
+  const pushBackupsAndRecord = async () => {
+    const t = Date.now();
+    const results = await pushBackups(storage);
+    if (results.length > 0) console.log(`[initWallet] backup push (${Date.now() - t}ms):`, results);
+    await recordBackupPush(results);
+  };
+  const backupTimer = setInterval(() => void pushBackupsAndRecord(), BACKUP_SYNC_INTERVAL_MS);
+
   console.log('[initWallet] Starting address sync...');
   sendSyncStatus({ status: 'start', addressCount: maxKeyIndex + 1 });
 
@@ -402,7 +416,6 @@ export const initWallet = async (
       },
     })
     .then(async (result) => {
-      sendSyncStatus({ status: 'complete', ...result });
       console.log('[initWallet] Address sync complete:', result);
       if (options?.afterSync) {
         try {
@@ -411,11 +424,17 @@ export const initWallet = async (
           console.error('[initWallet] afterSync failed:', err);
         }
       }
+      // Backups catch up before `complete` goes out: the USB backup runs on
+      // that message and reads the local store, which must hold this sync's
+      // rows first when a remote is active.
+      await pushBackupsAndRecord();
+      sendSyncStatus({ status: 'complete', ...result });
     })
-    .catch((error: unknown) => {
+    .catch(async (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
-      sendSyncStatus({ status: 'error', message });
       console.error('[initWallet] Address sync failed:', error);
+      await pushBackupsAndRecord();
+      sendSyncStatus({ status: 'error', message });
     });
 
   // Sync incoming paymail payments from the message box (fire-and-forget)
@@ -444,6 +463,7 @@ export const initWallet = async (
   const close = async () => {
     color.dispose();
     clearInterval(handleInboxTimer);
+    clearInterval(backupTimer);
     await destroyWallet();
   };
 
