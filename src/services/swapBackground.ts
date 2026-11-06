@@ -72,6 +72,11 @@ export interface SwapClient {
   enableTokenPaid: (tokenId: string) => Promise<unknown>;
   defaults: () => Promise<{ enablePriceSats?: number }>;
   moveBackTokens: (tokenId: string) => Promise<{ txid: string; amount: Bigintish }>;
+  moveBackStagedSats: () => Promise<{ txid: string; amount: Bigintish }>;
+  /** The wallet's tokens as the exchange client sees them, with what sits in the swap basket. */
+  myTokens: () => Promise<Array<{ tokenId: string; inSwaps: Bigintish }>>;
+  /** Sats sitting in the swap basket. */
+  swapBasketSats: () => Promise<number>;
 }
 
 export interface SwapServiceOptions {
@@ -273,12 +278,16 @@ export const createSwapService = (opts: SwapServiceOptions) => {
       pools: 0,
       marginalPrice: null,
       canList: false,
+      reservedTokens: '0',
+      reservedSats: '0',
     };
     if (!client) return none;
-    const [hosted, enabled, candidates] = await Promise.all([
+    const [hosted, enabled, candidates, mine, basketSats] = await Promise.all([
       client.hostedTokens().catch(() => [] as ClientHosted[]),
       client.enabledList().catch(() => []),
       client.tokensToEnable().catch(() => []),
+      client.myTokens().catch(() => []),
+      client.swapBasketSats().catch(() => 0),
     ]);
     const h = hosted.find((t) => t.tokenId === tokenId);
     const listed = enabled.some((t) => t.tokenId === tokenId && t.status === 'enabled');
@@ -294,6 +303,8 @@ export const createSwapService = (opts: SwapServiceOptions) => {
       marginalPrice: h?.marginalPrice ?? null,
       canList,
       listFeeSats,
+      reservedTokens: (mine.find((t) => t.tokenId === tokenId)?.inSwaps ?? 0n).toString(),
+      reservedSats: Math.max(0, Math.floor(basketSats)).toString(),
     };
   };
 
@@ -320,7 +331,13 @@ export const createSwapService = (opts: SwapServiceOptions) => {
     return { txid: r.txid, amount: r.amount.toString() };
   };
 
-  return { quote, start, get, list, cancel, tokenStatus, listedTokens, enableToken, moveBack };
+  /** Return the sats a swap staged and never spent (a swap the wallet stopped mid-way). */
+  const moveBackSats = async (): Promise<{ txid: string; amount: string }> => {
+    const r = await requireClient().moveBackStagedSats();
+    return { txid: r.txid, amount: r.amount.toString() };
+  };
+
+  return { quote, start, get, list, cancel, tokenStatus, listedTokens, enableToken, moveBack, moveBackSats };
 };
 
 export type SwapService = ReturnType<typeof createSwapService>;

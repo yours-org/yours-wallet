@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowDownToLine, ArrowLeft, ArrowLeftRight, ArrowUpFromLine, ExternalLink, Info } from 'lucide-react';
+import {
+  ArrowDownToLine,
+  ArrowLeft,
+  ArrowLeftRight,
+  ArrowUpFromLine,
+  ExternalLink,
+  Info,
+  Loader2,
+  RotateCcw,
+} from 'lucide-react';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { oneColorTicker, type OneColorBalance } from '../services/oneColor';
-import { swapEnableToken, swapTokenStatus } from '../services/swap';
+import { swapEnableToken, swapJobs, swapMoveBack, swapMoveBackSats, swapTokenStatus } from '../services/swap';
 import type { SwapTokenStatus } from '../services/swapTypes';
 import { ammSiteUrlOf, GENERIC_TOKEN_ICON } from '../utils/constants';
 import { formatUSD, showAmount } from '../utils/format';
@@ -68,10 +77,25 @@ export const OneColorDetailView = ({
   const [statusKey, setStatusKey] = useState(0);
   const [confirmList, setConfirmList] = useState<SendLineItem[] | null>(null);
   const [isListing, setIsListing] = useState(false);
+  /** A swap of this token the background is still running: its reserved funds are spoken for. */
+  const [swapInFlight, setSwapInFlight] = useState(false);
+  const [returning, setReturning] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    swapJobs()
+      .then((jobs) => {
+        if (cancelled) return;
+        setSwapInFlight(
+          jobs.some(
+            (j) => j.quote.request.token.tokenId === token.assetId && j.phase !== 'done' && j.phase !== 'failed',
+          ),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setSwapInFlight(false);
+      });
     swapTokenStatus(token.assetId)
       .then((s) => {
         if (!cancelled) setStatus(s);
@@ -147,6 +171,26 @@ export const OneColorDetailView = ({
       setConfirmList(null);
     }
   }, [token.assetId, ticker, addSnackbar]);
+
+  const reservedTokens = status ? BigInt(status.reservedTokens || '0') : 0n;
+  const reservedSats = status ? BigInt(status.reservedSats || '0') : 0n;
+  const hasReserved = reservedTokens > 0n || reservedSats > 0n;
+
+  /** Return what an unfinished swap staged: the token first, then the sats. */
+  const returnReserved = useCallback(async () => {
+    setReturning(true);
+    try {
+      if (reservedTokens > 0n) await swapMoveBack(token.assetId);
+      if (reservedSats > 0n) await swapMoveBackSats();
+      addSnackbar('Reserved funds are back in your wallet.', 'success', 3000);
+      setStatusKey((k) => k + 1);
+    } catch (err) {
+      console.error('[OneColorDetailView] return reserved failed:', err);
+      addSnackbar(getErrorMessage(err), 'error');
+    } finally {
+      setReturning(false);
+    }
+  }, [token.assetId, reservedTokens, reservedSats, addSnackbar]);
 
   const actionButton = (
     label: string,
@@ -305,6 +349,41 @@ export const OneColorDetailView = ({
             </p>
           </Show>
         </div>
+
+        {/* Reserved by a swap: in flight, or left behind when the wallet stopped mid-swap */}
+        <Show when={hasReserved}>
+          <div className="px-4 mb-5">
+            <div
+              className="flex flex-col gap-2 rounded-xl"
+              style={{ background: row, border: ROW_BORDER, padding: 14 }}
+            >
+              <span className="text-sm font-semibold" style={{ color: contrast }}>
+                {swapInFlight ? 'A swap is in progress' : 'Reserved by a swap that did not finish'}
+              </span>
+              <span className="text-xs leading-relaxed" style={{ color: gray }}>
+                {reservedTokens > 0n ? `${showAmount(reservedTokens, token.dec)} ${ticker}` : ''}
+                {reservedTokens > 0n && reservedSats > 0n ? ' and ' : ''}
+                {reservedSats > 0n ? `${showAmount(reservedSats, 8)} BSV` : ''}
+                {swapInFlight
+                  ? ' is held for it. It lands or comes back when the swap finishes.'
+                  : ' is held in the swap basket. Return it to your balance; nothing is lost.'}
+              </span>
+              {!swapInFlight && (
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => void returnReserved()}
+                  disabled={returning}
+                  className="flex items-center justify-center gap-1.5 w-full mt-1 py-2.5 rounded-2xl text-xs font-semibold outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ background: 'transparent', border: '1px solid #34D399', color: '#A1FF8B' }}
+                >
+                  {returning ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+                  {returning ? 'Returning…' : 'Return to wallet'}
+                </motion.button>
+              )}
+            </div>
+          </div>
+        </Show>
 
         {/* Status card */}
         <Show when={state === 'no-pool' || state === 'unlisted'}>

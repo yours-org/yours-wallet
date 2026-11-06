@@ -152,6 +152,9 @@ const processSwap = async (
       case SWAP_ACTIONS.MOVE_BACK:
         data = await swapService.moveBack(message.tokenId!);
         break;
+      case SWAP_ACTIONS.MOVE_BACK_SATS:
+        data = await swapService.moveBackSats();
+        break;
       default:
         throw new Error(`Unknown swap action ${type}`);
     }
@@ -1259,6 +1262,7 @@ if (isInServiceWorker) {
         case SWAP_ACTIONS.LISTED_TOKENS:
         case SWAP_ACTIONS.ENABLE_TOKEN:
         case SWAP_ACTIONS.MOVE_BACK:
+        case SWAP_ACTIONS.MOVE_BACK_SATS:
           void processSwap(message, sendResponse);
           return true;
         case 'STORAGE_SYNC_BACKUPS':

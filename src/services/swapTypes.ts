@@ -99,6 +99,13 @@ export type SwapTokenStatus = {
   canList: boolean;
   /** The exchange's one-time listing fee, sats, when it publishes one. */
   listFeeSats?: number;
+  /**
+   * Funds held in the exchange's swap basket for this token: staged by a swap
+   * that has not landed (in flight, or abandoned when the wallet stopped).
+   * Base units for the token, sats for BSV. "0" when nothing is held.
+   */
+  reservedTokens: string;
+  reservedSats: string;
 };
 
 export type SwapListedToken = {
@@ -121,6 +128,7 @@ export const SWAP_ACTIONS = {
   LISTED_TOKENS: 'SWAP_LISTED_TOKENS',
   ENABLE_TOKEN: 'SWAP_ENABLE_TOKEN',
   MOVE_BACK: 'SWAP_MOVE_BACK',
+  MOVE_BACK_SATS: 'SWAP_MOVE_BACK_SATS',
 } as const;
 
 /** Background → popup broadcast carrying a job after each change. */

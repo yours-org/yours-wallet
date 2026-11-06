@@ -34,6 +34,7 @@ export const swapListedTokens = () => call<SwapListedToken[]>({ action: SWAP_ACT
 export const swapEnableToken = (tokenId: string) => call<boolean>({ action: SWAP_ACTIONS.ENABLE_TOKEN, tokenId });
 export const swapMoveBack = (tokenId: string) =>
   call<{ txid: string; amount: string }>({ action: SWAP_ACTIONS.MOVE_BACK, tokenId });
+export const swapMoveBackSats = () => call<{ txid: string; amount: string }>({ action: SWAP_ACTIONS.MOVE_BACK_SATS });
 
 /** Follow every job the background reports; returns the unsubscribe. */
 export const onSwapProgress = (cb: (job: SwapJob) => void): (() => void) => {

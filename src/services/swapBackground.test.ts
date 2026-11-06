@@ -53,6 +53,9 @@ const fakeClient = (
   enableTokenPaid: async () => ({}),
   defaults: async () => ({ enablePriceSats: 10_000 }),
   moveBackTokens: mock(async () => ({ txid: 'back', amount: 7n })),
+  moveBackStagedSats: async () => ({ txid: 'back-sats', amount: 500n }),
+  myTokens: async () => [{ tokenId: req.token.tokenId, inSwaps: 123n }],
+  swapBasketSats: async () => 4500,
 });
 
 const settled = async (service: ReturnType<typeof createSwapService>, id: string) => {
@@ -185,7 +188,11 @@ describe('swap service', () => {
       pools: 2,
       marginalPrice: 0.4,
       canList: false,
+      listFeeSats: undefined,
+      reservedTokens: '123',
+      reservedSats: '4500',
     });
+    expect(await service.moveBackSats()).toEqual({ txid: 'back-sats', amount: '500' });
     const mine = 'cd'.repeat(32) + '_0';
     expect(await service.tokenStatus(mine)).toMatchObject({
       available: true,
