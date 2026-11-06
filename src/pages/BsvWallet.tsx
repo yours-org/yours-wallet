@@ -111,7 +111,7 @@ export const BsvWallet = () => {
   const location = useLocation();
   const { updateBalance, isSyncing, syncMessage } = useSyncTracker();
   const urlParams = new URLSearchParams(location.search);
-  const { handleSelect, query } = useBottomMenu();
+  const { handleSelect, query, showMenu, hideMenu } = useBottomMenu();
   const isReload = urlParams.get('reload') === 'true' || query === 'reload';
   urlParams.delete('reload');
   const [pageState, setPageState] = useState<PageState>('main');
@@ -196,6 +196,13 @@ export const BsvWallet = () => {
   const isTestnet = apiContext.chain === 'test';
   /** Swaps need an exchange on this chain (none on mainnet yet). */
   const swapAvailable = !!swapExchangeOriginOf(apiContext.chain);
+  /** The swap flow takes the whole popup: no top nav, no bottom menu, so its steps have room. */
+  const fullScreen = pageState === 'swap';
+  useEffect(() => {
+    if (fullScreen) hideMenu();
+    else showMenu();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullScreen]);
   // MNEE is a mainnet-only asset: hide it (and skip its balance fetches) on testnet.
   const services = { ...theme.settings.services, mnee: theme.settings.services.mnee && !isTestnet };
   const balanceReady = !balanceLoading && oneColorsReady && (mneeReady || !services.mnee);
@@ -2154,7 +2161,7 @@ export const BsvWallet = () => {
 
   return (
     <>
-      <TopNav />
+      {!fullScreen && <TopNav />}
       {showBackupPromo && (
         <BackupPromo
           theme={theme}
