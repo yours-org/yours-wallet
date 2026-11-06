@@ -1,12 +1,12 @@
 ---
-description: List an ordinal for sale via OrdLock at a fixed BSV price. Currently disabled in Yours Wallet.
+description: List an ordinal for sale via OrdLock at a fixed BSV price.
 icon: tag
 ---
 
 # listOrdinal
 
-{% hint style="danger" %}
-**Listing creation is currently disabled in Yours Wallet** (OPL-4694). Calling `listOrdinal` through the wallet fails closed with a deprecation error until the replacement listing contract ships. Buying others' listings and cancelling your own still work. The wallet also cancels any OrdLock listings it owns when the Ordinals tab loads and before a BSV sweep. See `docs/ordlock-listing-disable.md` in the repo.
+{% hint style="info" %}
+Listings use the OrdLock v2 contract (wallet tag `ordlock2`). Legacy v1 listings (tag `ordlock`) can still be bought and cancelled; the wallet cancels its own v1 listings when the Ordinals tab loads and before a BSV sweep, and never touches v2 listings.
 {% endhint %}
 
 **Package:** `@1sat/actions`

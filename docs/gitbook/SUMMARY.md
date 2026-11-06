@@ -31,7 +31,7 @@
 
 ### Marketplace
 
-- [listOrdinal (disabled)](actions/list-ordinal.md)
+- [listOrdinal](actions/list-ordinal.md)
 - [purchaseOrdinal](actions/purchase-ordinal.md)
 - [cancelListing](actions/cancel-listing.md)
 - [deriveCancelAddress](actions/derive-cancel-address.md)

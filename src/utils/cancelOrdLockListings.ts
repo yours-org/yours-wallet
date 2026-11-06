@@ -1,17 +1,14 @@
 /**
- * ORDLOCK transition helper — cancel wallet-owned OrdLock listings and recover
- * the ordinals into the wallet. Shared by OrdWallet load/refresh and BSV
- * sweep/send-all paths (OPL-4696).
+ * Legacy OrdLock v1 purge (OPL-4696): cancel wallet-owned v1 listings and
+ * recover the ordinals, on Ordinals load and before sweep / send-all.
  *
- * Create of new OrdLock listings is disabled elsewhere (ORDLOCK_LISTING_DISABLED).
- * Buy of others' listings and manual cancel stay enabled.
+ * The wallet creates listings with the OrdLock v2 contract (tag `ordlock2`,
+ * `sellOrdinal`). Only v1 listings (tag `ordlock`) are purged here; v2
+ * listings are left alone. Buy and manual cancel work for both.
  */
 import type { WalletOutput } from '@bsv/sdk';
 import { cancelOrdinalListing, listOrdinals, type OneSatContext } from '@1sat/actions';
 import { readAssetIdTag } from '@1sat/types';
-
-export const ORDLOCK_LISTING_DISABLED_MESSAGE =
-  'OrdLock listing creation is deprecated pending a replacement contract. Existing listings can still be cancelled or bought.';
 
 const ORDLOCK_TAG = 'ordlock';
 
