@@ -124,6 +124,7 @@ export const OneColorDetailView = ({
 
   const state = exchangeStateOf(status, loading);
   const buyEnabled = state === 'pools' && !!status;
+  const holdsSome = token.available > 0n;
   // The chart layout is chosen before the exchange answers when the Coins page already
   // priced the token from a pool, so the page does not open in one shape and snap into another.
   const chartLayout = state === 'pools' || (state === 'loading' && priceBsv !== undefined && priceBsv > 0);
@@ -413,17 +414,20 @@ export const OneColorDetailView = ({
           <div className="flex w-[88%]" style={{ gap: 10 }}>
             {actionButton('Receive', ArrowDownToLine, onReceive)}
             {actionButton(
-              'Buy',
+              // Nothing held yet: the only direction is buying. Held: swap covers both.
+              holdsSome ? 'Swap' : 'Buy',
               ArrowLeftRight,
               () => status && onBuy(status),
               buyEnabled,
-              buyEnabled ? `Buy ${ticker} with BSV` : buyDisabledReason,
+              buyEnabled ? (holdsSome ? `Swap ${ticker} and BSV` : `Buy ${ticker} with BSV`) : buyDisabledReason,
             )}
             {actionButton('Send', ArrowUpFromLine, onSend)}
           </div>
           <Show when={buyEnabled}>
             <p className="text-[11px] text-center mt-2 px-6" style={{ color: gray }}>
-              Buy opens Swap with BSV → {ticker} filled in. Flip there to sell.
+              {holdsSome
+                ? `Opens with BSV → ${ticker} filled in. Flip to sell.`
+                : `Opens Swap with BSV → ${ticker} filled in.`}
             </p>
           </Show>
         </div>
