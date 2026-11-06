@@ -108,6 +108,27 @@ export const TESTNET_COLOR_OVERLAY_URL = 'https://testnet.openex.dev';
 export const colorOverlayDefaultOf = (chain: WalletChain): string | undefined =>
   chain === 'test' ? TESTNET_COLOR_OVERLAY_URL : COLOR_OVERLAY_URL;
 
+/**
+ * Open Exchange, per chain: where the wallet quotes and runs 1Color swaps
+ * (`@dcasegr/amm-client`). The same origin as the token overlay. Undefined
+ * means no swap UI on that chain.
+ */
+export const swapExchangeOriginOf = (chain: WalletChain): string | undefined => colorOverlayDefaultOf(chain);
+
+/**
+ * The site where a user opens a liquidity pool for a token that has none, per
+ * chain. Shown as a link from the coin detail page. Mainnet has no site yet:
+ * undefined, and the page says so instead of linking.
+ */
+export const AMM_SITE_URL: string | undefined = undefined;
+export const TESTNET_AMM_SITE_URL = 'https://1sat-amm.vercel.app/';
+export const ammSiteUrlOf = (chain: WalletChain): string | undefined =>
+  chain === 'test' ? TESTNET_AMM_SITE_URL : AMM_SITE_URL;
+
+/** Swap defaults: slippage the quote tolerates and the most pools one swap may split across. */
+export const SWAP_DEFAULT_SLIPPAGE_PCT = 1;
+export const SWAP_MAX_SOURCES = 5;
+
 export const defaultStorageConfig = (chain: WalletChain) => {
   const { storage } = endpointsOf(chain);
   return { activeRemote: storage, remotes: [storage] };

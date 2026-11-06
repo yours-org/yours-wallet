@@ -139,7 +139,8 @@ export const CoinHistory = ({ filter, pageSize = 25, refreshKey }: CoinHistoryPr
 
   const openInExplorer = (txid: string) => window.open(explorerTxUrl(txid, apiContext.chain), '_blank');
 
-  const directionIcon = (direction: CoinTxSummary['direction']) => {
+  const directionIcon = (direction: CoinTxSummary['direction'], kind?: CoinTxSummary['kind']) => {
+    if (kind === 'swap') return <ArrowLeftRight size={12} style={{ color: accent }} />;
     switch (direction) {
       case 'received':
         return <ArrowDownLeft size={12} style={{ color: accent }} />;
@@ -210,11 +211,17 @@ export const CoinHistory = ({ filter, pageSize = 25, refreshKey }: CoinHistoryPr
                   className="flex items-center justify-center w-7 h-7 rounded-full flex-shrink-0"
                   style={{ background: `${gray}18` }}
                 >
-                  {directionIcon(item.direction)}
+                  {directionIcon(item.direction, item.kind)}
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-semibold leading-tight" style={{ color: contrast }}>
-                    {item.direction === 'sent' ? 'Sent' : item.direction === 'received' ? 'Received' : 'Transfer'}
+                    {item.kind === 'swap'
+                      ? 'Swap'
+                      : item.direction === 'sent'
+                        ? 'Sent'
+                        : item.direction === 'received'
+                          ? 'Received'
+                          : 'Transfer'}
                   </span>
                   <span className="text-[10px] mt-0.5 truncate font-mono" style={{ color: gray, maxWidth: '10rem' }}>
                     {item.description || truncate(item.txid, 6, 4)}

@@ -27,9 +27,17 @@ const NON_BSV_LABEL_PREFIXES = ['p 1sat '];
 
 export type CoinTxDirection = 'sent' | 'received' | 'transfer';
 
+/** The Open Exchange client labels every swap action it builds. */
+export const AMM_SWAP_LABEL = 'amm-swap';
+
+/** A row's kind beyond its direction: a swap leg (or its staging/return) rather than a plain send. */
+export const historyKindOf = (labels: string[] | undefined): 'swap' | undefined =>
+  labels?.includes(AMM_SWAP_LABEL) ? 'swap' : undefined;
+
 export type CoinTxSummary = {
   txid: string;
   direction: CoinTxDirection;
+  kind?: 'swap';
   amountDisplay: string;
   amountSubdued?: boolean;
   description?: string;
@@ -328,6 +336,7 @@ export const fetchOneColorHistory = async (
       matches.push({
         txid: a.txid,
         direction: moved.direction,
+        kind: historyKindOf(a.labels),
         amountDisplay: moved.amount > 0n ? `${sign}${formatTokenAmount(moved.amount, decimals)}` : `${sym} transfer`,
         amountSubdued: moved.amount === 0n,
         description: a.description || undefined,

@@ -17,6 +17,7 @@ import {
   FlaskConical,
   ExternalLink,
   AtSign,
+  ArrowLeftRight,
 } from 'lucide-react';
 import bsvCoin from '../assets/bsv-coin.svg';
 import { Button } from '../components/Button';
@@ -43,7 +44,12 @@ import { isUri } from '../utils/uri';
 import { AssetRow } from '../components/AssetRow';
 import { BackupPromo } from '../components/BackupPromo';
 import { TESTNET_COLOR } from '../components/TestnetBadge';
-import { HOSTED_YOURS_IMAGE, TESTNET_FAUCET_URL, colorOverlayDefaultOf } from '../utils/constants';
+import {
+  HOSTED_YOURS_IMAGE,
+  TESTNET_FAUCET_URL,
+  colorOverlayDefaultOf,
+  swapExchangeOriginOf,
+} from '../utils/constants';
 import lockIcon from '../assets/lock.svg';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useServiceContext } from '../hooks/useServiceContext';
@@ -68,6 +74,9 @@ import { ManageTokens } from '../components/ManageTokens';
 import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
 import { SendBsv21View } from '../components/SendBsv21View';
 import { SendOneColorView } from '../components/SendOneColorView';
+import { OneColorDetailView } from '../components/OneColorDetailView';
+import { SwapView } from '../components/SwapView';
+import type { SwapTokenRef } from '../services/swapTypes';
 import { getOneColorBalances, oneColorTicker, type OneColorBalance } from '../services/oneColor';
 import { getOneColorPrices, tokensUsdTotal } from '../services/oneColorPrices';
 import { walletTokensOf, type WalletToken } from '../services/walletTokens';
@@ -84,7 +93,7 @@ import type { Keys } from '../utils/keys';
 
 // CopyAddressed feedback state hook — used in receive view
 
-type PageState = 'main' | 'receive' | 'send' | 'sendMNEE' | 'getMNEE' | 'asset-picker';
+type PageState = 'main' | 'receive' | 'send' | 'sendMNEE' | 'getMNEE' | 'asset-picker' | 'swap';
 type AmountType = 'bsv' | 'usd';
 
 export type Recipient = {
@@ -173,10 +182,20 @@ export const BsvWallet = () => {
   const [oneColorsReady, setOneColorsReady] = useState(false);
   const [mneeReady, setMneeReady] = useState(false);
   const [oneColorToken, setOneColorToken] = useState<OneColorBalance | null>(null);
+  /** The 1Color token whose detail page is open (tapping its row on Coins). Send, Receive and Buy start from it. */
+  const [oneColorDetail, setOneColorDetail] = useState<OneColorBalance | null>(null);
+  /** Bumped when a send or swap finished, so the detail page's history reloads. */
+  const [detailRefreshKey, setDetailRefreshKey] = useState('');
+  /** The token the swap page opens with (a detail page's Buy); undefined from the Coins page Swap button. */
+  const [swapToken, setSwapToken] = useState<(SwapTokenRef & { icon?: string }) | undefined>(undefined);
+  /** Receive opened from a 1Color token's detail page: the page says how that token arrives. */
+  const [receiveContext, setReceiveContext] = useState<OneColorBalance | null>(null);
   const [manageFavorites, setManageFavorites] = useState(false);
   const [account, setAccount] = useState<Account>();
   const [token, setToken] = useState<{ isConfirmed: boolean; info: Bsv21Balance } | null>(null);
   const isTestnet = apiContext.chain === 'test';
+  /** Swaps need an exchange on this chain (none on mainnet yet). */
+  const swapAvailable = !!swapExchangeOriginOf(apiContext.chain);
   // MNEE is a mainnet-only asset: hide it (and skip its balance fetches) on testnet.
   const services = { ...theme.settings.services, mnee: theme.settings.services.mnee && !isTestnet };
   const balanceReady = !balanceLoading && oneColorsReady && (mneeReady || !services.mnee);
@@ -988,12 +1007,12 @@ export const BsvWallet = () => {
   };
 
   const handleTokenClick = (t: WalletToken) => {
-    if (t.pending > 0n && t.confirmed === 0n) {
+    if (t.pending > 0n && t.confirmed === 0n && t.kind !== '1color') {
       addSnackbar('Pending tokens cannot be sent!', 'error', 2000);
       return;
     }
     if (t.kind === '1color' && t.oneColor) {
-      setOneColorToken(t.oneColor);
+      setOneColorDetail(t.oneColor);
       return;
     }
     if (t.bsv21) setToken({ isConfirmed: true, info: t.bsv21 });
@@ -1053,6 +1072,8 @@ export const BsvWallet = () => {
         <motion.button
           whileTap={{ scale: 0.9 }}
           onClick={() => {
+            // Opened from a token's detail page: back lands on that page, which stays mounted under `main`.
+            setReceiveContext(null);
             setPageState('main');
             getAndSetBsvBalance();
           }}
@@ -1061,10 +1082,37 @@ export const BsvWallet = () => {
         >
           <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
         </motion.button>
+        {receiveContext && (
+          <img
+            src={receiveContext.icon || GENERIC_TOKEN_ICON}
+            alt=""
+            className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+          />
+        )}
         <h2 className="text-base font-bold tracking-tight flex-1" style={{ color: theme.color.global.contrast }}>
-          Receive Assets
+          {receiveContext ? `Receive ${oneColorTicker(receiveContext)}` : 'Receive Assets'}
         </h2>
       </div>
+
+      {/* A 1Color token arrives through the handle, not an address: say so before the QR. */}
+      {receiveContext && (
+        <p className="text-xs text-center mb-4 max-w-[18rem]" style={{ color: theme.color.global.gray }}>
+          {defaultHandle ? (
+            <>
+              Share your handle{' '}
+              <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
+                {defaultHandle}
+              </span>{' '}
+              to receive {oneColorTicker(receiveContext)}. Addresses below are for BSV, MNEE and Ordinals.
+            </>
+          ) : (
+            <>
+              {oneColorTicker(receiveContext)} arrives through a handle. Register one in Settings &gt; Identity to
+              receive it; the addresses below are for BSV, MNEE and Ordinals.
+            </>
+          )}
+        </p>
+      )}
 
       {/* QR code */}
       <QrCode address={receiveAddress} onClick={handleCopyToClipboard} />
@@ -1401,6 +1449,25 @@ export const BsvWallet = () => {
             <ArrowDownToLine size={16} strokeWidth={2.5} />
             Receive
           </motion.button>
+          {swapAvailable && (
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+              onClick={() => {
+                setSwapToken(undefined);
+                setPageState('swap');
+              }}
+              className="flex flex-1 items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-sm border-0 outline-none cursor-pointer"
+              style={{
+                background: `linear-gradient(135deg, ${theme.color.component.primaryButtonLeftGradient}, ${theme.color.component.primaryButtonRightGradient})`,
+                color: theme.color.component.primaryButtonText,
+              }}
+            >
+              <ArrowLeftRight size={16} strokeWidth={2.5} />
+              Swap
+            </motion.button>
+          )}
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.96 }}
@@ -2187,6 +2254,7 @@ export const BsvWallet = () => {
               }
               setOneColorToken(null);
               setPageState(sendSource);
+              if (sentAtomic && sentAtomic > 0n) setDetailRefreshKey(`send-${Date.now()}`);
               Promise.all([getAndSetOneColors(), getAndSetBsvBalance()]).catch((err) =>
                 console.error(`[SendOneColorView ${oneColorTicker(oneColorToken)}] reconcile refresh failed:`, err),
               );
@@ -2203,7 +2271,60 @@ export const BsvWallet = () => {
       <Show when={isProcessing && pageState === 'sendMNEE'}>
         <PageLoader theme={theme} message="Sending MNEE..." />
       </Show>
-      <Show when={!isProcessing && pageState === 'main' && !token && !oneColorToken && !manageFavorites}>{main}</Show>
+      <Show
+        when={!isProcessing && pageState === 'main' && !token && !oneColorToken && !oneColorDetail && !manageFavorites}
+      >
+        {main}
+      </Show>
+      <Show when={!isProcessing && pageState === 'main' && !!oneColorDetail && !oneColorToken && !manageFavorites}>
+        {oneColorDetail && (
+          <OneColorDetailView
+            token={oneColors.find((t) => t.assetId === oneColorDetail.assetId) ?? oneColorDetail}
+            priceBsv={oneColorPrices.get(oneColorDetail.assetId)}
+            bsvUsdRate={exchangeRate}
+            chain={apiContext.chain}
+            refreshKey={detailRefreshKey}
+            onBack={() => setOneColorDetail(null)}
+            onReceive={() => {
+              setReceiveContext(oneColorDetail);
+              setPageState('receive');
+            }}
+            onSend={() => {
+              if (oneColorDetail.available === 0n) {
+                addSnackbar('Nothing spendable yet: the balance is pending.', 'info', 2500);
+                return;
+              }
+              setSendSource('main');
+              setOneColorToken(oneColorDetail);
+            }}
+            onBuy={() => {
+              setSwapToken({
+                tokenId: oneColorDetail.assetId,
+                sym: oneColorTicker(oneColorDetail),
+                dec: oneColorDetail.dec,
+                icon: oneColorDetail.icon,
+              });
+              setPageState('swap');
+            }}
+          />
+        )}
+      </Show>
+      <Show when={!isProcessing && pageState === 'swap'}>
+        <SwapView
+          token={swapToken}
+          initialSide="buy"
+          bsvBalanceSats={BigInt(Math.round(bsvBalance * 1e8))}
+          bsvUsdRate={exchangeRate}
+          heldTokens={oneColors}
+          onBack={() => setPageState('main')}
+          onFinished={() => {
+            setDetailRefreshKey(`swap-${Date.now()}`);
+            Promise.all([getAndSetOneColors(), getAndSetBsvBalance()]).catch((err) =>
+              console.error('[SwapView] balance refresh failed:', err),
+            );
+          }}
+        />
+      </Show>
       <Show when={!isProcessing && pageState === 'receive'}>{receive}</Show>
       <Show when={!isProcessing && pageState === 'asset-picker'}>{assetPickerView}</Show>
       <Show when={!isProcessing && pageState === 'send'}>{send}</Show>

@@ -46,8 +46,17 @@ import {
   initOneSatPromptBridge,
 } from './services/oneSatPrompt';
 import type { PromptKind, UsbCheckRequest } from './promptProtocol';
-import { ADMIN_ORIGINATOR, initWallet, openAccountStorageForBackup, type AccountContext } from './initWallet';
-import { chainOf, HOSTED_YOURS_IMAGE } from './utils/constants';
+import {
+  ADMIN_ORIGINATOR,
+  initWallet,
+  openAccountStorageForBackup,
+  withOriginator,
+  type AccountContext,
+} from './initWallet';
+import { chainOf, HOSTED_YOURS_IMAGE, swapExchangeOriginOf } from './utils/constants';
+import { createClient as createAmmClient } from '@dcasegr/amm-client';
+import { createSwapService, type SwapClient } from './services/swapBackground';
+import { SWAP_ACTIONS, SWAP_PROGRESS_EVENT, type SwapQuoteRequest } from './services/swapTypes';
 import { WalletBackupService } from './backup/WalletBackupService';
 import { repairStaleAccounts, usbRekey, type UsbRekeyRequest } from './services/usbRekeyBackground';
 import {
@@ -76,6 +85,82 @@ const isInServiceWorker = self?.document === undefined;
 
 // Account context - null if locked or not initialized
 let accountContext: AccountContext | null = null;
+
+// ─── Swaps ──────────────────────────────────────────────────────────────────
+// The exchange client is bound to the live wallet, so it is rebuilt whenever
+// the account context changes (unlock, account switch). One per context.
+let ammClientFor: { context: AccountContext; client: SwapClient } | null = null;
+const swapClient = (): SwapClient | undefined => {
+  if (!accountContext) return undefined;
+  const origin = swapExchangeOriginOf(chainOf(chromeStorageService.getNetwork()));
+  if (!origin) return undefined;
+  if (ammClientFor?.context !== accountContext) {
+    ammClientFor = {
+      context: accountContext,
+      client: createAmmClient({
+        origin,
+        feeRateSatsPerKb: chromeStorageService.getCustomFeeRate(),
+        wallet: withOriginator(accountContext.wallet, ADMIN_ORIGINATOR),
+      }) as unknown as SwapClient,
+    };
+  }
+  return ammClientFor.client;
+};
+const swapService = createSwapService({
+  client: swapClient,
+  broadcast: (job) => {
+    chrome.runtime.sendMessage({ action: SWAP_PROGRESS_EVENT, data: job }).catch(() => {
+      // No popup open: the job keeps running; the popup reads it back with SWAP_STATUS.
+    });
+  },
+});
+
+const processSwap = async (
+  message: { action: string; request?: SwapQuoteRequest; jobId?: string; tokenId?: string },
+  sendResponse: CallbackResponse,
+) => {
+  const type = message.action;
+  try {
+    await ensureWallet(true);
+    let data: unknown;
+    switch (type) {
+      case SWAP_ACTIONS.QUOTE:
+        data = await swapService.quote(message.request!);
+        break;
+      case SWAP_ACTIONS.START:
+        data = await swapService.start(message.request!);
+        break;
+      case SWAP_ACTIONS.STATUS:
+        data = swapService.get(message.jobId!) ?? null;
+        break;
+      case SWAP_ACTIONS.LIST_JOBS:
+        data = swapService.list();
+        break;
+      case SWAP_ACTIONS.CANCEL:
+        data = swapService.cancel(message.jobId!);
+        break;
+      case SWAP_ACTIONS.TOKEN_STATUS:
+        data = await swapService.tokenStatus(message.tokenId!);
+        break;
+      case SWAP_ACTIONS.LISTED_TOKENS:
+        data = await swapService.listedTokens();
+        break;
+      case SWAP_ACTIONS.ENABLE_TOKEN:
+        await swapService.enableToken(message.tokenId!);
+        data = true;
+        break;
+      case SWAP_ACTIONS.MOVE_BACK:
+        data = await swapService.moveBack(message.tokenId!);
+        break;
+      default:
+        throw new Error(`Unknown swap action ${type}`);
+    }
+    sendResponse({ type, success: true, data });
+  } catch (error) {
+    console.error(`[${type}] failed:`, error);
+    sendResponse({ type, success: false, error: error instanceof Error ? error.message : String(error) });
+  }
+};
 // Set while wallet is reinitializing (e.g. account switch) to prevent
 // ensureWallet from launching a popup during the transition.
 let reinitPromise: Promise<WalletInterface | null> | null = null;
@@ -939,6 +1024,7 @@ if (isInServiceWorker) {
       // Address management (popup internal)
       'GET_DEPOSIT_ADDRESSES',
       'GENERATE_NEW_ADDRESS',
+      ...Object.values(SWAP_ACTIONS),
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -1163,6 +1249,17 @@ if (isInServiceWorker) {
           return true;
         case 'STORAGE_GET_INFO':
           processStorageGetInfo(sendResponse);
+          return true;
+        case SWAP_ACTIONS.QUOTE:
+        case SWAP_ACTIONS.START:
+        case SWAP_ACTIONS.STATUS:
+        case SWAP_ACTIONS.LIST_JOBS:
+        case SWAP_ACTIONS.CANCEL:
+        case SWAP_ACTIONS.TOKEN_STATUS:
+        case SWAP_ACTIONS.LISTED_TOKENS:
+        case SWAP_ACTIONS.ENABLE_TOKEN:
+        case SWAP_ACTIONS.MOVE_BACK:
+          void processSwap(message, sendResponse);
           return true;
         case 'STORAGE_SYNC_BACKUPS':
           processStorageSyncBackups(sendResponse);

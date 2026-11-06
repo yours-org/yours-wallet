@@ -12,7 +12,6 @@ import { getErrorMessage } from '../utils/tools';
 import { Input } from './Input';
 import { SendConfirmation, type SendLineItem } from './SendConfirmation';
 import { Show } from './Show';
-import { CoinHistory } from './CoinHistory';
 
 export type SendOneColorViewProps = {
   token: OneColorBalance;
@@ -153,8 +152,10 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
         {/* Header */}
         <div className="flex items-center gap-3 px-4 mb-5">
           <motion.button
+            type="button"
             whileTap={{ scale: 0.9 }}
             onClick={() => onBack()}
+            aria-label="Back"
             className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 outline-none border-none cursor-pointer"
             style={{ backgroundColor: '#17191E' }}
           >
@@ -272,16 +273,21 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
             </motion.div>
           </AnimatePresence>
 
-          <p className="text-[10px] text-center px-2" style={{ color: gray }}>
-            Delivered to the handle's mailbox and claimed when their wallet next syncs.
-          </p>
+          <div className="flex flex-col gap-0.5 px-2">
+            <p className="text-[10px] text-center" style={{ color: gray }}>
+              Delivered to the handle's mailbox and claimed when their wallet next syncs.
+            </p>
+            <p className="text-[10px] text-center" style={{ color: gray }}>
+              Sending 1Color tokens to a plain address is coming; for now a handle is the destination.
+            </p>
+          </div>
 
           <motion.button
             whileHover={!submitDisabled ? { scale: 1.02 } : undefined}
             whileTap={!submitDisabled ? { scale: 0.98 } : undefined}
             type="submit"
             disabled={submitDisabled}
-            className="flex items-center justify-center gap-2 w-full h-11 mt-1 rounded-xl text-sm font-bold outline-none border-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-2 w-full py-3 mt-1 rounded-2xl text-[14px] font-semibold outline-none border-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
               background: `linear-gradient(135deg, ${accent}, ${accentRight})`,
               color: theme.color.component.primaryButtonText,
@@ -291,13 +297,6 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
             {isProcessing ? 'Sending...' : 'Send'}
           </motion.button>
         </form>
-
-        <div className="w-full px-4">
-          <CoinHistory
-            filter={{ type: '1color', assetId: token.assetId, decimals: token.dec, symbol: token.sym }}
-            refreshKey={successTxId}
-          />
-        </div>
       </motion.div>
       <SendConfirmation
         show={!!sendConfirmation}

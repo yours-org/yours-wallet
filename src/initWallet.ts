@@ -43,7 +43,7 @@ export const ADMIN_ORIGINATOR = chrome.runtime.id;
  * still applies, permission prompts are short-circuited via the
  * `isAdminOriginator` check inside the manager.
  */
-function withOriginator(wallet: WalletInterface, originator: string): WalletInterface {
+export function withOriginator(wallet: WalletInterface, originator: string): WalletInterface {
   return new Proxy(wallet, {
     get(target, prop, receiver) {
       const value = Reflect.get(target, prop, receiver);
