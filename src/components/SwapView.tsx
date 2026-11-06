@@ -409,7 +409,10 @@ export const SwapView = (props: SwapViewProps) => {
         aria-label="Back"
         whileTap={{ scale: 0.9 }}
         onClick={() => {
+          // Back steps through the flow: picker → form, confirm → form; done → leave.
+          // Progress leaves too (the swap keeps running in the background).
           if (screen === 'form' && pickerOpen && token) setPickerOpen(false);
+          else if (screen === 'confirm' && !starting) setScreen('form');
           else onBack();
         }}
         className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 outline-none border-none cursor-pointer"
