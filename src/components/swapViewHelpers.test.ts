@@ -8,6 +8,7 @@ import {
   subtractCushion,
   swapErrorText,
   tokensPerBsv,
+  compactAmount,
 } from './swapViewHelpers';
 
 describe('parseAmount', () => {
@@ -66,5 +67,17 @@ describe('rates and fees', () => {
   test('swapErrorText', () => {
     expect(swapErrorText('stale_pool', 'x')).toContain('price moved');
     expect(swapErrorText(undefined, 'boom')).toBe('boom');
+  });
+});
+
+describe('compactAmount', () => {
+  test('trims the fraction to what the size warrants and groups thousands', () => {
+    expect(compactAmount('245278.8768858')).toBe('245,278.87');
+    expect(compactAmount('0.001')).toBe('0.001');
+    expect(compactAmount('0.00123456789')).toBe('0.001234');
+    expect(compactAmount('1.23456789')).toBe('1.2345');
+    expect(compactAmount('1000')).toBe('1,000');
+    expect(compactAmount('12.50')).toBe('12.5');
+    expect(compactAmount('0')).toBe('0');
   });
 });

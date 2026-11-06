@@ -28,10 +28,10 @@ import type {
 import { GENERIC_TOKEN_ICON, SWAP_DEFAULT_SLIPPAGE_PCT, SWAP_MAX_SOURCES } from '../utils/constants';
 import { formatUSD, showAmount } from '../utils/format';
 import { getErrorMessage } from '../utils/tools';
-import { SendConfirmation } from './SendConfirmation';
 import {
   acceptsAmountInput,
   bpsToPercentText,
+  compactAmount,
   formatRate,
   parseAmount,
   shortOutpoint,
@@ -89,7 +89,8 @@ const safeBig = (s: string | undefined): bigint => {
     return 0n;
   }
 };
-const fmt = (s: string | bigint | undefined, dec: number) => showAmount(typeof s === 'bigint' ? s : safeBig(s), dec);
+const fmt = (s: string | bigint | undefined, dec: number) =>
+  compactAmount(showAmount(typeof s === 'bigint' ? s : safeBig(s), dec));
 const satsToUsd = (sats: bigint, rate: number) => (Number(sats) / 1e8) * rate;
 
 export const SwapView = (props: SwapViewProps) => {
@@ -735,22 +736,97 @@ export const SwapView = (props: SwapViewProps) => {
 
   // ---- Confirm -------------------------------------------------------------
 
-  const confirmProps = (() => {
+  const renderConfirm = () => {
     const q = liveQuote;
     if (!q || !payAsset || !recvAsset) return null;
-    const fees = q.fees ? q.fees.lpBps + q.fees.validatorBps + q.fees.commissionBps : 0;
-    const out = `${fmt(q.amountOut, recvAsset.dec)} ${recvAsset.ticker}`;
-    return {
-      lineItems: [
-        { address: 'You pay', amount: `${fmt(q.amountIn, payAsset.dec)} ${payAsset.ticker}` },
-        { address: 'You receive', amount: `≈ ${out}` },
-        { address: 'At least', amount: `${fmt(q.minAmountOut, recvAsset.dec)} ${recvAsset.ticker}` },
-        { address: 'Route', amount: poolsText(q.legs) },
-        { address: 'Fees', amount: `${bpsToPercentText(fees)}% + ~${minerSats(q).toString()} sats` },
-      ],
-      total: `≈ ${out}`,
-    };
-  })();
+    const feeTotalBps = q.fees ? q.fees.lpBps + q.fees.validatorBps + q.fees.commissionBps : 0;
+    const valueRow = (label: string, value: string, strong = false) => (
+      <div
+        className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
+        style={{ background: row, border: CARD_BORDER }}
+      >
+        <span className="text-xs" style={{ color: gray }}>
+          {label}
+        </span>
+        <span className="text-sm font-semibold text-right" style={{ color: strong ? accent : contrast }}>
+          {value}
+        </span>
+      </div>
+    );
+    return (
+      <div className="flex flex-col px-4 flex-1">
+        <div className="flex flex-col items-center text-center mt-2 mb-5">
+          <div className="flex items-center gap-3 mb-4">
+            <img src={payAsset.icon} alt="" className="w-11 h-11 rounded-full object-cover" />
+            <div className="flex items-center" style={{ gap: 6 }}>
+              {[0.35, 0.65, 1].map((o) => (
+                <span
+                  key={o}
+                  className="rounded-full"
+                  style={{ width: 5, height: 5, background: accent, opacity: o }}
+                />
+              ))}
+            </div>
+            <img src={recvAsset.icon} alt="" className="w-11 h-11 rounded-full object-cover" />
+          </div>
+          <h2 className="text-lg font-bold m-0" style={{ color: contrast }}>
+            Confirm swap
+          </h2>
+          <p className="text-xs m-0 mt-1" style={{ color: gray }}>
+            Nothing leaves your wallet until you confirm.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {valueRow('You pay', `${fmt(q.amountIn, payAsset.dec)} ${payAsset.ticker}`)}
+          {valueRow('You receive', `≈ ${fmt(q.amountOut, recvAsset.dec)} ${recvAsset.ticker}`)}
+          {valueRow('At least', `${fmt(q.minAmountOut, recvAsset.dec)} ${recvAsset.ticker}`, true)}
+          <div
+            className="flex flex-col gap-1.5 px-4 py-3 rounded-xl text-[12px]"
+            style={{ background: 'rgba(23,25,30,0.6)', border: CARD_BORDER }}
+          >
+            <QuoteRow label="Slippage" gray={gray} contrast={contrast}>
+              {slippagePct}%
+            </QuoteRow>
+            <QuoteRow label="Route" gray={gray} contrast={contrast}>
+              {q.legs === 1 ? '1 pool' : `up to ${q.legs} pools, one after another`}
+            </QuoteRow>
+            <QuoteRow label="Fees" gray={gray} contrast={contrast}>
+              {bpsToPercentText(feeTotalBps)}% + ~{minerSats(q).toString()} sats
+            </QuoteRow>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-center mt-4 mb-4 px-2" style={{ color: gray }}>
+          Anything a pool can&apos;t fill is returned to your wallet automatically.
+        </p>
+
+        <div className="flex flex-col gap-2 mt-auto">
+          <motion.button
+            type="button"
+            whileTap={starting ? undefined : { scale: 0.97 }}
+            disabled={starting}
+            onClick={() => void confirmSwap()}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-bold border-none outline-none cursor-pointer disabled:cursor-not-allowed"
+            style={{ background: primaryGradient, color: primaryText, opacity: starting ? 0.6 : 1 }}
+          >
+            {starting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} strokeWidth={2.5} />}
+            {starting ? 'Starting the swap…' : 'Confirm swap'}
+          </motion.button>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.97 }}
+            disabled={starting}
+            onClick={() => setScreen('form')}
+            className="w-full py-3 rounded-2xl text-[13px] font-semibold outline-none cursor-pointer"
+            style={{ background: 'transparent', color: gray, border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            Cancel
+          </motion.button>
+        </div>
+      </div>
+    );
+  };
 
   // ---- Progress / done -----------------------------------------------------
 
@@ -1063,24 +1139,11 @@ export const SwapView = (props: SwapViewProps) => {
           </div>
         ) : null}
 
-        {(screen === 'form' || screen === 'confirm') && (pickerOpen ? renderPicker() : renderForm())}
+        {screen === 'form' && (pickerOpen ? renderPicker() : renderForm())}
+        {screen === 'confirm' && renderConfirm()}
         {screen === 'progress' && job ? renderProgress(job) : null}
         {screen === 'done' && job ? renderDone(job) : null}
       </motion.div>
-
-      <SendConfirmation
-        show={screen === 'confirm' && !!confirmProps}
-        theme={theme}
-        title="Confirm swap"
-        confirmLabel="Confirm swap"
-        processingMessage="Starting the swap..."
-        icon={tokenAsset?.icon}
-        lineItems={confirmProps?.lineItems ?? []}
-        total={confirmProps?.total}
-        isProcessing={starting}
-        onConfirm={() => void confirmSwap()}
-        onCancel={() => setScreen('form')}
-      />
     </>
   );
 };

@@ -73,3 +73,25 @@ export const swapErrorText = (kind: string | undefined, message: string | undefi
       return message || 'The swap failed.';
   }
 };
+
+/**
+ * An amount for reading, not for copying: thousands separators and a fraction
+ * trimmed to what the size warrants (2 places from a thousand up, 4 from one
+ * up, else the first 4 significant decimals, at most 8). `full` is the exact
+ * decimal string the wallet shows elsewhere (`showAmount`).
+ */
+export const compactAmount = (full: string): string => {
+  const negative = full.startsWith('-');
+  const [intRaw, fracRaw = ''] = (negative ? full.slice(1) : full).split('.');
+  const int = intRaw.replace(/^0+(?=\d)/, '') || '0';
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  let keep: number;
+  if (int.length > 3) keep = 2;
+  else if (int !== '0') keep = 4;
+  else {
+    const lead = fracRaw.match(/^0*/)?.[0].length ?? 0;
+    keep = Math.min(8, lead + 4);
+  }
+  const frac = fracRaw.slice(0, keep).replace(/0+$/, '');
+  return `${negative ? '-' : ''}${grouped}${frac ? `.${frac}` : ''}`;
+};
