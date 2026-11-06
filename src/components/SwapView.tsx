@@ -121,6 +121,7 @@ export const SwapView = (props: SwapViewProps) => {
   const [amountInput, setAmountInput] = useState('');
   const [slippagePct, setSlippagePct] = useState<number>(SWAP_DEFAULT_SLIPPAGE_PCT);
   const [slippageOpen, setSlippageOpen] = useState(false);
+  const [feesOpen, setFeesOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(!initialToken);
   const [listed, setListed] = useState<SwapListedToken[] | null>(null);
   const [listedError, setListedError] = useState(false);
@@ -216,7 +217,12 @@ export const SwapView = (props: SwapViewProps) => {
       seen.add(l.tokenId);
       rows.push({ ref: { tokenId: l.tokenId, sym: l.sym, dec: l.dec, icon: l.icon }, pools: l.pools, held: false });
     }
-    return rows;
+    // Swappable tokens first; the ones with no pool (greyed, not selectable) sink to the bottom.
+    // A stable sort keeps held-before-listed within each group.
+    return rows
+      .map((r, i) => ({ r, i }))
+      .sort((a, b) => Number(a.r.pools === 0) - Number(b.r.pools === 0) || a.i - b.i)
+      .map(({ r }) => r);
   }, [heldTokens, listed, listedById]);
 
   // ---- Quoting -------------------------------------------------------------
@@ -543,9 +549,7 @@ export const SwapView = (props: SwapViewProps) => {
     const recvSatsValue = q ? (side === 'buy' ? safeBig(q.amountIn) : safeBig(q.amountOut)) : null;
     const impactPct = q ? q.impactBps / 100 : 0;
     const impactColor = impactPct <= 1 ? GREEN : impactPct <= 3 ? AMBER : red;
-    const feeBits = q?.fees
-      ? `${bpsToPercentText(q.fees.lpBps)}% LP · ${bpsToPercentText(q.fees.validatorBps)}% validator · `
-      : '';
+    const feeTotalBps = q?.fees ? q.fees.lpBps + q.fees.validatorBps + q.fees.commissionBps : 0;
 
     return (
       <>
@@ -670,9 +674,43 @@ export const SwapView = (props: SwapViewProps) => {
             <QuoteRow label="Route" gray={gray} contrast={contrast}>
               {poolsText(q.legs)}
             </QuoteRow>
-            <QuoteRow label="Fees" gray={gray} contrast={contrast}>
-              {feeBits}~{minerSats(q).toString()} sats miner
-            </QuoteRow>
+            <button
+              type="button"
+              onClick={() => setFeesOpen((o) => !o)}
+              aria-expanded={feesOpen}
+              className="flex items-center justify-between gap-3 w-full bg-transparent border-0 outline-none cursor-pointer p-0 text-[12px]"
+              style={{ color: gray, fontFamily: 'inherit' }}
+            >
+              <span className="flex items-center gap-1">
+                Fees
+                <ChevronDown
+                  size={12}
+                  style={{ transform: feesOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
+                />
+              </span>
+              <span style={{ color: contrast }}>
+                {bpsToPercentText(feeTotalBps)}% + ~{minerSats(q).toString()} sats
+              </span>
+            </button>
+            {feesOpen && q.fees ? (
+              <div
+                className="flex flex-col gap-1.5 pl-3 text-[11px]"
+                style={{ borderLeft: '2px solid rgba(255,255,255,0.08)' }}
+              >
+                <QuoteRow label="Liquidity providers" gray={gray} contrast={contrast}>
+                  {bpsToPercentText(q.fees.lpBps)}%
+                </QuoteRow>
+                <QuoteRow label="Validator" gray={gray} contrast={contrast}>
+                  {bpsToPercentText(q.fees.validatorBps)}%
+                </QuoteRow>
+                <QuoteRow label="Marketplace" gray={gray} contrast={contrast}>
+                  {bpsToPercentText(q.fees.commissionBps)}%
+                </QuoteRow>
+                <QuoteRow label="Miner" gray={gray} contrast={contrast}>
+                  ~{minerSats(q).toString()} sats across {poolsText(q.legs)}
+                </QuoteRow>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
