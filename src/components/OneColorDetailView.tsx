@@ -21,6 +21,7 @@ import { displayAmount, formatTokenAmount, formatUSD } from '../utils/format';
 import { getErrorMessage } from '../utils/tools';
 import { CoinHistory } from './CoinHistory';
 import { PriceChart } from './PriceChart';
+import { Skeleton } from './Skeleton';
 import { SendConfirmation, type SendLineItem } from './SendConfirmation';
 import { Show } from './Show';
 
@@ -123,6 +124,9 @@ export const OneColorDetailView = ({
 
   const state = exchangeStateOf(status, loading);
   const buyEnabled = state === 'pools' && !!status;
+  // The chart layout is chosen before the exchange answers when the Coins page already
+  // priced the token from a pool, so the page does not open in one shape and snap into another.
+  const chartLayout = state === 'pools' || (state === 'loading' && priceBsv !== undefined && priceBsv > 0);
   const wholeTokens = Number(token.available) / 10 ** token.dec;
   const usdValue = priceBsv !== undefined && priceBsv > 0 ? priceBsv * bsvUsdRate * wholeTokens : undefined;
   // Prefer the wallet's own pool read; fall back to the exchange's marginal price.
@@ -267,7 +271,7 @@ export const OneColorDetailView = ({
         </div>
 
         {/* With a pool: the price chart leads, and the balance is a compact card under it */}
-        <Show when={state === 'pools'}>
+        <Show when={chartLayout}>
           <div className="w-full mb-3">
             <PriceChart
               tokenId={token.assetId}
@@ -312,7 +316,15 @@ export const OneColorDetailView = ({
                   {usdValue !== undefined ? formatUSD(usdValue) : '—'}
                 </span>
                 <span className="text-[11px]" style={{ color: gray }}>
-                  {status?.pools === 1 ? '1 pool' : `${status?.pools ?? 0} pools`}
+                  {status ? (
+                    status.pools === 1 ? (
+                      '1 pool'
+                    ) : (
+                      `${status.pools} pools`
+                    )
+                  ) : (
+                    <Skeleton className="h-3 w-12 inline-block" />
+                  )}
                 </span>
               </div>
             </div>
@@ -320,7 +332,7 @@ export const OneColorDetailView = ({
         </Show>
 
         {/* Balance (no chart) */}
-        <Show when={state !== 'pools'}>
+        <Show when={!chartLayout}>
           <div className="flex flex-col items-center w-full px-4 mb-3 gap-1">
             <span className="text-xs" style={{ color: gray }}>
               Balance
@@ -349,7 +361,7 @@ export const OneColorDetailView = ({
         </Show>
 
         {/* Exchange status line (the chart covers it when there is a pool) */}
-        <Show when={state !== 'pools'}>
+        <Show when={!chartLayout}>
           <div
             className="flex items-center justify-center gap-2 px-4 mb-4 min-h-[18px] text-xs"
             style={{ color: gray }}
@@ -417,7 +429,7 @@ export const OneColorDetailView = ({
         </div>
 
         {/* Provide liquidity: a small link out to the pool site, when there is one on this chain */}
-        <Show when={state === 'pools' && !!ammSiteUrl}>
+        <Show when={chartLayout && !!ammSiteUrl}>
           <div className="px-4 mb-5">
             <a
               href={ammSiteUrl}
