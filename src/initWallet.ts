@@ -400,7 +400,12 @@ export const initWallet = async (
   const pushBackupsAndRecord = async () => {
     const t = Date.now();
     const results = await pushBackups(storage);
-    if (results.length > 0) console.log(`[initWallet] backup push (${Date.now() - t}ms):`, results);
+    if (results.length > 0) {
+      const summary = results
+        .map((r) => (r.error ? `${r.storageName}: FAILED ${r.error}` : `${r.storageName}: +${r.inserts} ~${r.updates}`))
+        .join('; ');
+      console.log(`[initWallet] backup push (${Date.now() - t}ms): ${summary}`);
+    }
     await recordBackupPush(results);
   };
   const backupTimer = setInterval(() => void pushBackupsAndRecord(), BACKUP_SYNC_INTERVAL_MS);
