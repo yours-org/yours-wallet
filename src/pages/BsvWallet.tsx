@@ -169,6 +169,10 @@ export const BsvWallet = () => {
   const [oneColors, setOneColors] = useState<OneColorBalance[]>([]);
   /** BSV per whole token by asset id, from the asset's exchange; a token with no pool is absent. */
   const [oneColorPrices, setOneColorPrices] = useState<Map<string, number>>(new Map());
+  // The headline figure waits for every part of it to answer once (or fail),
+  // so it does not show BSV alone and then jump when the token values arrive.
+  const [oneColorsReady, setOneColorsReady] = useState(false);
+  const [mneeReady, setMneeReady] = useState(false);
   const [oneColorToken, setOneColorToken] = useState<OneColorBalance | null>(null);
   const [manageFavorites, setManageFavorites] = useState(false);
   const [account, setAccount] = useState<Account>();
@@ -176,6 +180,7 @@ export const BsvWallet = () => {
   const isTestnet = apiContext.chain === 'test';
   // MNEE is a mainnet-only asset: hide it (and skip its balance fetches) on testnet.
   const services = { ...theme.settings.services, mnee: theme.settings.services.mnee && !isTestnet };
+  const balanceReady = !balanceLoading && oneColorsReady && (mneeReady || !services.mnee);
   // 1Color tokens are the wallet's own, so a held one shows even where the theme leaves BSV21 off.
   const tokensEnabled = services.bsv21 || oneColors.length > 0;
   const [filteredTokens, setFilteredTokens] = useState<WalletToken[]>([]);
@@ -329,6 +334,7 @@ export const BsvWallet = () => {
   };
 
   const MNEE_FETCH_RETRIES = 2;
+  const BALANCE_READY_CAP_MS = 8_000;
 
   const updateMneeBalance = async (attempt = 0): Promise<number | undefined> => {
     if (!receiveAddress || !apiContext) return;
@@ -353,6 +359,7 @@ export const BsvWallet = () => {
       const addresses = [...seen];
       setMneeAddresses(addresses.length ? addresses : [receiveAddress]);
       setMneeBalance(totalDecimal);
+      setMneeReady(true);
 
       // Update MNEE balance in Chrome storage
       const { account } = chromeStorageService.getCurrentAccountObject();
@@ -377,6 +384,8 @@ export const BsvWallet = () => {
       // zero until the page remounts, so retry with a short backoff.
       if (attempt < MNEE_FETCH_RETRIES) {
         setTimeout(() => void updateMneeBalance(attempt + 1), 2000 * (attempt + 1));
+      } else {
+        setMneeReady(true);
       }
       return undefined;
     }
@@ -406,15 +415,15 @@ export const BsvWallet = () => {
    * others; an exchange that is down leaves its tokens unpriced.
    */
   const getAndSetOneColors = async (): Promise<void> => {
-    let balances: OneColorBalance[];
     try {
-      balances = await getOneColorBalances(apiContext);
+      const balances = await getOneColorBalances(apiContext);
       setOneColors(balances);
+      setOneColorPrices(await getOneColorPrices(balances, resolveOneColorOrigin));
     } catch (err) {
       console.error('[BsvWallet] 1Color balances failed:', err);
-      return;
+    } finally {
+      setOneColorsReady(true);
     }
-    setOneColorPrices(await getOneColorPrices(balances, resolveOneColorOrigin));
   };
 
   /** Order-independent fingerprint of token balances, for change detection. */
@@ -449,6 +458,8 @@ export const BsvWallet = () => {
       if (obj?.selectedAccount) {
         await getAndSetAccountAndBsv21s();
         void getAndSetOneColors();
+      } else {
+        setOneColorsReady(true);
       }
     })();
 
@@ -464,9 +475,12 @@ export const BsvWallet = () => {
         });
         if (response?.success && response.data) {
           setReceiveAddress(response.data);
+        } else {
+          setMneeReady(true); // no address, so no MNEE lookup will run
         }
       } catch (error) {
         console.error('Failed to get receive address:', error);
+        setMneeReady(true);
       }
     })();
   }, []);
@@ -506,6 +520,15 @@ export const BsvWallet = () => {
     loadLocks && loadLocks();
     getAndSetBsvBalance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Whatever is still outstanding after this long, show the figure with what we have.
+  useEffect(() => {
+    const cap = setTimeout(() => {
+      setOneColorsReady(true);
+      setMneeReady(true);
+    }, BALANCE_READY_CAP_MS);
+    return () => clearTimeout(cap);
   }, []);
 
   // Fetch MNEE balance once receiveAddress is available
@@ -1307,7 +1330,7 @@ export const BsvWallet = () => {
           className="flex flex-col items-center mt-1"
         >
           <div className="flex items-center gap-2">
-            {balanceLoading ? (
+            {!balanceReady ? (
               <Loader2 size={28} className="animate-spin" style={{ color: theme.color.global.gray }} />
             ) : (
               <h1
@@ -1323,7 +1346,7 @@ export const BsvWallet = () => {
               </h1>
             )}
             <AnimatePresence>
-              {isSyncing && !balanceLoading && (
+              {isSyncing && balanceReady && (
                 <motion.div
                   key="sync-spinner"
                   initial={{ opacity: 0, scale: 0.8 }}
@@ -1337,7 +1360,7 @@ export const BsvWallet = () => {
                 </motion.div>
               )}
             </AnimatePresence>
-            {!isSyncing && !balanceLoading && (
+            {!isSyncing && balanceReady && (
               <motion.button
                 whileHover={{ opacity: 1 }}
                 whileTap={{ scale: 0.9 }}
