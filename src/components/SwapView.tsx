@@ -485,6 +485,7 @@ export const SwapView = (props: SwapViewProps) => {
 
   const openPicker = () => {
     setSlippageOpen(false);
+    setPickerQuery('');
     setPickerOpen(true);
   };
 
@@ -495,9 +496,11 @@ export const SwapView = (props: SwapViewProps) => {
   // bottom, greyed, and say why.
   const renderPicker = () => {
     const q = pickerQuery.trim().toLowerCase();
+    // Selling: only what the wallet holds can be sold. Buying: everything the exchange lists.
+    const candidates = side === 'sell' ? pickerRows.filter((r) => r.held) : pickerRows;
     const rows = q
-      ? pickerRows.filter(({ ref }) => tickerOf(ref).toLowerCase().includes(q) || ref.tokenId.includes(q))
-      : pickerRows;
+      ? candidates.filter(({ ref }) => tickerOf(ref).toLowerCase().includes(q) || ref.tokenId.includes(q))
+      : candidates;
     const poolsText = (n: number) => (n === 1 ? '1 pool' : `${n} pools`);
     return (
       <div className="flex flex-col items-center w-full px-4">
@@ -539,9 +542,11 @@ export const SwapView = (props: SwapViewProps) => {
             <p className="text-sm text-center" style={{ color: gray }}>
               {q
                 ? `No tokens match "${pickerQuery}"`
-                : listedError
-                  ? 'Could not load the exchange’s tokens.'
-                  : 'No tokens are listed on the exchange yet.'}
+                : side === 'sell'
+                  ? 'You hold no 1Color tokens to sell.'
+                  : listedError
+                    ? 'Could not load the exchange’s tokens.'
+                    : 'No tokens are listed on the exchange yet.'}
             </p>
           </div>
         ) : (
@@ -952,7 +957,7 @@ export const SwapView = (props: SwapViewProps) => {
             Swapping {pay.ticker} for {recv.ticker}
           </h2>
           <p className="text-xs m-0" style={{ color: gray }}>
-            Runs in the background. You can close this and check back from Coins.
+            Runs in the background. You can leave this screen and check back from the token's page.
           </p>
         </div>
 
@@ -1013,7 +1018,7 @@ export const SwapView = (props: SwapViewProps) => {
         </div>
 
         <div className="flex flex-col gap-2 mt-auto sticky bottom-0 pt-3 pb-1" style={{ background: bg }}>
-          {outlinedButton('Back to Coins', onBack)}
+          {outlinedButton('Back to wallet', onBack)}
           {showStop ? (
             <button
               type="button"
@@ -1153,7 +1158,15 @@ export const SwapView = (props: SwapViewProps) => {
   );
 
   const title =
-    screen === 'progress' ? 'Swap in progress' : screen === 'done' ? 'Swap' : pickerOpen ? 'Choose token' : 'Swap';
+    screen === 'progress'
+      ? 'Swap in progress'
+      : screen === 'confirm'
+        ? 'Review swap'
+        : screen === 'done'
+          ? 'Swap'
+          : pickerOpen
+            ? 'Choose token'
+            : 'Swap';
 
   return (
     <>

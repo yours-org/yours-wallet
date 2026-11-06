@@ -110,7 +110,7 @@ export const OneColorDetailView = ({
     return () => {
       cancelled = true;
     };
-  }, [token.assetId, statusKey]);
+  }, [token.assetId, statusKey, refreshKey]);
 
   const ticker = oneColorTicker(token);
   const gray = theme.color.global.gray;

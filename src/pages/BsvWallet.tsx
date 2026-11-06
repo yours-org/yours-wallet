@@ -72,6 +72,7 @@ import { SendOneColorView } from '../components/SendOneColorView';
 import { OneColorDetailView } from '../components/OneColorDetailView';
 import { SwapView } from '../components/SwapView';
 import type { SwapTokenRef } from '../services/swapTypes';
+import { onSwapProgress } from '../services/swap';
 import { getOneColorBalances, oneColorTicker, type OneColorBalance } from '../services/oneColor';
 import { getOneColorPrices, tokensUsdTotal } from '../services/oneColorPrices';
 import { walletTokensOf, type WalletToken } from '../services/walletTokens';
@@ -183,6 +184,21 @@ export const BsvWallet = () => {
   const swapAvailable = !!swapExchangeOriginOf(apiContext.chain);
   /** The swap flow takes the whole popup: no top nav, no bottom menu, so its steps have room. */
   const fullScreen = pageState === 'swap';
+
+  // A swap runs in the background and can finish after its screen was left:
+  // refresh balances and the token page's history whenever one does.
+  useEffect(() => {
+    const seen = new Set<string>();
+    return onSwapProgress((job) => {
+      if ((job.phase !== 'done' && job.phase !== 'failed') || seen.has(job.id)) return;
+      seen.add(job.id);
+      setDetailRefreshKey(`swap-${job.id}`);
+      Promise.all([getAndSetOneColors(), getAndSetBsvBalance()]).catch((err) =>
+        console.error('[BsvWallet] balance refresh after swap failed:', err),
+      );
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (fullScreen) hideMenu();
     else showMenu();
