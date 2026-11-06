@@ -1,10 +1,10 @@
 import validate from 'bitcoin-address-validation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { WalletOutput } from '@bsv/sdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Check, ImageOff, Send, Tag, X } from 'lucide-react';
 import { cancelOrdinalListing, listOrdinals, sellOrdinal, sendOrdinals } from '@1sat/actions';
-import { ORDLOCK_TAG, ORDLOCK_V2_TAG, readAssetIdTag } from '@1sat/types';
+import { ORDLOCK_V2_TAG, readAssetIdTag } from '@1sat/types';
 import { Ordinal } from '../components/Ordinal';
 import { PageLoader } from '../components/PageLoader';
 import { Show } from '../components/Show';
@@ -17,15 +17,13 @@ import { TopNav } from '../components/TopNav';
 import { getErrorMessage } from '../utils/tools';
 import { useIntersectionObserver } from '../hooks/useIntersectObserver';
 import { getTagValue, getOutputName, hasTag, resolveOriginOutpoint } from '../utils/format';
-import { cancelOwnedOrdLockListings } from '../utils/cancelOrdLockListings';
 
 type Addresses = Record<string, string>;
 type PageState = 'main' | 'transfer' | 'list' | 'cancel';
 type FilterTab = 'all' | 'listings' | 'ordinals';
 
-/** Listed for sale under either OrdLock contract: v2, which the wallet creates, or legacy v1. */
-const isListedOutput = (o: WalletOutput): boolean =>
-  o.tags?.some((t) => t === ORDLOCK_TAG || t === ORDLOCK_V2_TAG) ?? false;
+/** Listed for sale with the OrdLock v2 contract. Legacy v1 listings were all cancelled (OPL-4696) and are not shown. */
+const isListedOutput = (o: WalletOutput): boolean => o.tags?.includes(ORDLOCK_V2_TAG) ?? false;
 
 // ─── animation variants ───────────────────────────────────────────────────────
 
@@ -190,8 +188,6 @@ export const OrdWallet = () => {
   const { theme } = useTheme();
   const [pageState, setPageState] = useState<PageState>('main');
   const { apiContext } = useServiceContext();
-  // Legacy OrdLock v1 purge (OPL-4696): auto-cancel session guard, once per OrdWallet mount.
-  const ordLockCancelSessionRef = useRef<string | null>(null);
 
   /** Build an ORDFS content URL via the 1sat client. Pass the outpoint through
    *  in its native `txid.vout` form. */
@@ -260,40 +256,6 @@ export const OrdWallet = () => {
 
   // ── data loading (unchanged) ────────────────────────────────────────────────
 
-  // Legacy OrdLock v1 purge (OPL-4696): cancel wallet-owned v1 listings once per OrdWallet
-  // mount. Listings the wallet creates are v2 (`ordlock2`) and are left alone.
-  const maybeAutoCancelOrdLocks = async (outputs: WalletOutput[]) => {
-    if (!apiContext) return;
-    const listed = outputs.filter((o) => o.tags?.includes(ORDLOCK_TAG));
-    if (listed.length === 0) return;
-    if (!ordLockCancelSessionRef.current) {
-      ordLockCancelSessionRef.current = `ord-load-${Date.now()}`;
-    }
-    const res = await cancelOwnedOrdLockListings(apiContext, {
-      outputs: listed,
-      sessionKey: ordLockCancelSessionRef.current,
-    });
-    if (res.cancelled > 0) {
-      addSnackbar(
-        res.cancelled === 1
-          ? 'Cancelled 1 OrdLock listing and recovered the ordinal.'
-          : `Cancelled ${res.cancelled} OrdLock listings and recovered ordinals.`,
-        'success',
-      );
-      try {
-        const { outputs: again } = await listOrdinals.execute(apiContext, { limit: 50, offset: 0 });
-        const filteredAgain = again.filter((o) => {
-          const contentType = getTagValue(o.tags, 'type');
-          return contentType !== 'panda/tag' && contentType !== 'yours/tag';
-        });
-        setOrdinals(filteredAgain);
-        setFrom(again.length.toString());
-      } catch (err) {
-        console.warn('[OrdWallet] post-cancel refresh failed', err);
-      }
-    }
-  };
-
   const loadOrdinals = useCallback(async () => {
     if (!apiContext) return;
     if (ordinals.length === 0) setIsProcessing(true);
@@ -329,14 +291,6 @@ export const OrdWallet = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Once legacy v1 listings appear after load, cancel→recover (session-deduped).
-  useEffect(() => {
-    if (ordinals.some((o) => o.tags?.includes(ORDLOCK_TAG))) {
-      void maybeAutoCancelOrdLocks(ordinals);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordinals]);
-
   // ── state helpers (unchanged) ───────────────────────────────────────────────
 
   const resetSendState = () => {
@@ -358,7 +312,6 @@ export const OrdWallet = () => {
 
     setOrdinals(filtered);
     setFrom(outputs.length.toString());
-    void maybeAutoCancelOrdLocks(filtered);
   };
 
   const requireAssetId = (output: WalletOutput): string | undefined => {

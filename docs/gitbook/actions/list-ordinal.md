@@ -6,7 +6,7 @@ icon: tag
 # listOrdinal
 
 {% hint style="info" %}
-Listings use the OrdLock v2 contract (wallet tag `ordlock2`). Legacy v1 listings (tag `ordlock`) can still be bought and cancelled; the wallet cancels its own v1 listings when the Ordinals tab loads and before a BSV sweep, and never touches v2 listings.
+Listings use the OrdLock v2 contract (wallet tag `ordlock2`). Legacy v1 listings were cancelled wallet-wide in September 2026 and the wallet no longer shows them.
 {% endhint %}
 
 **Package:** `@1sat/actions`
