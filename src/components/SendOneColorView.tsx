@@ -273,14 +273,9 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
             </motion.div>
           </AnimatePresence>
 
-          <div className="flex flex-col gap-0.5 px-2">
-            <p className="text-[10px] text-center" style={{ color: gray }}>
-              Delivered to the handle's mailbox and claimed when their wallet next syncs.
-            </p>
-            <p className="text-[10px] text-center" style={{ color: gray }}>
-              Sending 1Color tokens to a plain address is coming; for now a handle is the destination.
-            </p>
-          </div>
+          <p className="text-[10px] text-center px-2" style={{ color: gray }}>
+            Delivered to the handle's mailbox and claimed when their wallet next syncs.
+          </p>
 
           <motion.button
             whileHover={!submitDisabled ? { scale: 1.02 } : undefined}

@@ -764,7 +764,7 @@ export const BsvWallet = () => {
           />
         )}
         <h2 className="text-base font-bold tracking-tight flex-1" style={{ color: theme.color.global.contrast }}>
-          {receiveContext ? `Receive ${oneColorTicker(receiveContext)}` : 'Receive Assets'}
+          {receiveContext ? `Receive ${oneColorTicker(receiveContext)}` : 'Receive'}
         </h2>
       </div>
 
@@ -798,7 +798,7 @@ export const BsvWallet = () => {
           whileTap={{ scale: 0.98 }}
           onClick={handleCopyToClipboard}
           className="flex items-center gap-2 mt-5 px-4 py-3 rounded-xl w-full border-0 outline-none cursor-pointer text-left"
-          style={{ background: theme.color.global.row }}
+          style={{ background: theme.color.global.row, border: '1px solid rgba(255,255,255,0.06)' }}
         >
           <AnimatePresence mode="wait">
             {copiedAddress ? (
@@ -839,7 +839,7 @@ export const BsvWallet = () => {
           whileTap={{ scale: 0.98 }}
           onClick={handleCopyHandle}
           className="flex items-center gap-2 mt-2 px-4 py-3 rounded-xl w-full border-0 outline-none cursor-pointer text-left"
-          style={{ background: theme.color.global.row }}
+          style={{ background: theme.color.global.row, border: '1px solid rgba(255,255,255,0.06)' }}
         >
           {copiedHandle ? (
             <Check size={16} style={{ color: theme.color.component.primaryButtonLeftGradient }} />
@@ -854,43 +854,48 @@ export const BsvWallet = () => {
           </span>
         </motion.button>
       )}
-      {defaultHandle && (
-        <p className="text-[10px] text-center mt-2 max-w-[16rem]" style={{ color: theme.color.global.gray }}>
-          Wallets that support handles can pay this handle directly.
-        </p>
-      )}
 
       {/* Info text */}
       {!receiveContext && (
-        <p className="text-xs text-center mt-4 mb-2 max-w-[16rem]" style={{ color: theme.color.global.gray }}>
+        <p
+          className="text-[11px] text-center mt-3 mb-1 max-w-[18rem] leading-relaxed"
+          style={{ color: theme.color.global.gray }}
+        >
           You may safely send{' '}
           <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
             BSV and 1Sat NFTs
           </span>{' '}
           to these addresses.
+          {defaultHandle ? ' Wallets that support handles can pay your handle directly.' : ''}
         </p>
       )}
 
       {/* Deposit Addresses */}
       {!receiveContext && depositAddresses.length > 0 && (
         <div className="w-full mt-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold" style={{ color: theme.color.global.contrast }}>
-              My Deposit Addresses
-            </h3>
+          <div className="flex items-center justify-between mb-2 px-1">
+            <span className="text-xs font-semibold" style={{ color: theme.color.global.gray }}>
+              Deposit addresses
+            </span>
             <motion.button
+              type="button"
               whileTap={{ scale: 0.95 }}
               onClick={handleGenerateAddress}
               disabled={generatingAddress}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.65rem] font-semibold border-0 outline-none cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold outline-none cursor-pointer"
               style={{
-                background: 'rgba(161,255,139,0.12)',
+                background: 'transparent',
+                border: '1px solid #34D399',
                 color: '#A1FF8B',
                 opacity: generatingAddress ? 0.5 : 1,
               }}
             >
-              {generatingAddress ? <Loader2 size={10} className="animate-spin" /> : <Plus size={10} />}
-              New Address
+              {generatingAddress ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <Plus size={11} strokeWidth={2.5} />
+              )}
+              New address
             </motion.button>
           </div>
 
@@ -906,31 +911,45 @@ export const BsvWallet = () => {
                     setReceiveAddress(d.address);
                     setPrimaryAddress(d.address);
                   }}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg w-full border-0 outline-none cursor-pointer text-left"
+                  type="button"
+                  aria-pressed={isSelected}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl w-full outline-none cursor-pointer text-left"
                   style={{
                     background: isSelected ? 'rgba(161,255,139,0.08)' : theme.color.global.row,
-                    border: isSelected ? '1px solid rgba(161,255,139,0.25)' : '1px solid transparent',
+                    border: isSelected ? '1px solid rgba(161,255,139,0.35)' : '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
+                  <span
+                    className="flex items-center justify-center rounded-full flex-shrink-0"
+                    style={{
+                      width: 8,
+                      height: 8,
+                      background: isSelected ? '#34D399' : 'rgba(255,255,255,0.12)',
+                    }}
+                    aria-hidden
+                  />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[0.65rem] font-mono truncate" style={{ color: theme.color.global.contrast }}>
+                    <p className="text-xs font-mono truncate" style={{ color: theme.color.global.contrast }}>
                       {d.address}
                     </p>
-                    <p className="text-[0.55rem] mt-0.5" style={{ color: theme.color.global.gray }}>
+                    <p className="text-[10px] mt-0.5" style={{ color: theme.color.global.gray }}>
+                      {isSelected ? 'Shown above · ' : ''}
                       {d.derivationPrefix} {d.derivationSuffix}
                     </p>
                   </div>
-                  <motion.div
+                  <motion.span
+                    role="button"
+                    aria-label="Copy address"
                     whileTap={{ scale: 0.85 }}
                     onClick={(e) => {
                       e.stopPropagation();
                       copyAddress(d.address);
                     }}
-                    className="flex-shrink-0 p-1 rounded"
-                    style={{ color: theme.color.global.gray }}
+                    className="flex-shrink-0 p-1.5 rounded-lg"
+                    style={{ color: theme.color.global.gray, background: 'rgba(255,255,255,0.06)' }}
                   >
                     <Copy size={12} />
-                  </motion.div>
+                  </motion.span>
                 </motion.button>
               );
             })}
