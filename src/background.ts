@@ -218,7 +218,7 @@ const dropWalletContext = (reason: string) => {
  * The initialization currently in flight, whoever started it (startup, unlock,
  * account switch, restore). ensureWallet() waits on it so popup calls that arrive
  * while the wallet is being built are queued instead of failing with
- * "Wallet not available" — which left the first MNEE lookup after an unlock at zero.
+ * "Wallet not available" — which left the first balance lookup after an unlock at zero.
  */
 let initInFlight: Promise<WalletInterface | null> | null = null;
 
@@ -434,7 +434,6 @@ const startupInitPromise = chromeStorageService
       'counterpartyPermissionRequest',
       'oneSatPermissionRequest',
       'transactionApprovalRequest',
-      'sendMNEERequest',
     ]);
 
     // Only initialize wallet if it's within the active session window.

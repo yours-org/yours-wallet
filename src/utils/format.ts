@@ -79,9 +79,6 @@ export const convertToTokenValue = (balance: number, decimals: number): number =
 /** BSV for display: commas, up to 8 decimals, trailing zeros dropped (0.001 BSV, not 0.00100000 BSV). */
 export const formatBsv = (bsv: number): string => removeTrailingZeros(formatNumberWithCommasAndDecimals(bsv, 8));
 
-/** MNEE for display: commas, up to 5 decimals, trailing zeros dropped. */
-export const formatMnee = (mnee: number): string => removeTrailingZeros(formatNumberWithCommasAndDecimals(mnee, 5));
-
 export const removeTrailingZeros = (numStr: string): string => {
   if (numStr.includes('.')) {
     return numStr.replace(/(\.\d*?[1-9])0+$|\.0*$/, '$1');

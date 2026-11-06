@@ -359,7 +359,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
             </span>
           </div>
 
-          {/* Balance chip — matches the BSV / MNEE send views */}
+          {/* Balance chip — matches the BSV send view */}
           <div className="flex flex-col items-center w-full mb-5 gap-1.5">
             <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{ background: row }}>
               <Show when={!!token.info.icon && token.info.icon.length > 0}>

@@ -27,11 +27,6 @@ export const MESSAGEBOX_URL = 'https://messagebox.1sat.app';
 export const GENERIC_TOKEN_ICON = genericTokenIcon;
 export const KNOWN_BURN_ADDRESSES = ['1111111111111111111114oLvT2', '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'];
 
-// MNEE
-export const MNEE_ICON_URL = `${ONESAT_MAINNET_CONTENT_URL}/9c7f7f1788c6382d5ac737a4052334cf150b52d1e46c484ecfb1d6e00184f263_0`;
-export const MNEE_DECIMALS = 5;
-export const MNEE_MOBILE_REFERRAL_LINK = 'https://rockwalletllc.pxf.io/6ygyKG';
-
 // DERIVATION PATHS
 export const DEFAULT_WALLET_PATH = "m/44'/236'/0'/1/0";
 export const DEFAULT_ORD_PATH = "m/44'/236'/1'/0/0";
@@ -177,7 +172,6 @@ export const DEFAULT_ACCOUNT = {
     customFeeRate: FEE_PER_KB,
   },
   balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
-  mneeBalance: { amount: 0, decimalAmount: 0 },
   encryptedKeys: '',
   derivationTags: [],
   icon: HOSTED_YOURS_IMAGE,

@@ -32,13 +32,8 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { useIdentity, resolveImageUrl } from '../hooks/useIdentity';
 import { useHandles, useHandleAvatar } from '../hooks/useHandles';
 import { useTheme } from '../hooks/useTheme';
-import {
-  BSV_DECIMAL_CONVERSION,
-  GENERIC_TOKEN_ICON,
-  MNEE_ICON_URL,
-  MNEE_MOBILE_REFERRAL_LINK,
-} from '../utils/constants';
-import { formatUSD, formatBsv, formatMnee } from '../utils/format';
+import { BSV_DECIMAL_CONVERSION, GENERIC_TOKEN_ICON } from '../utils/constants';
+import { formatUSD, formatBsv } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import { isUri } from '../utils/uri';
 import { AssetRow } from '../components/AssetRow';
@@ -71,7 +66,7 @@ import { getErrorMessage, isValidEmail } from '../utils/tools';
 import { UpgradeNotification } from '../components/UpgradeNotification';
 import { TokensList } from '../components/TokensList';
 import { ManageTokens } from '../components/ManageTokens';
-import { Account, ChromeStorageObject } from '../services/types/chromeStorage.types';
+import { Account } from '../services/types/chromeStorage.types';
 import { SendBsv21View } from '../components/SendBsv21View';
 import { SendOneColorView } from '../components/SendOneColorView';
 import { OneColorDetailView } from '../components/OneColorDetailView';
@@ -83,17 +78,11 @@ import { walletTokensOf, type WalletToken } from '../services/walletTokens';
 import { AssetPicker, type PickableAsset } from '../components/AssetPicker';
 import { SendConfirmation, type SendLineItem } from '../components/SendConfirmation';
 import { CoinHistory } from '../components/CoinHistory';
-import { getMneeBalance, sendMnee, deriveDepositAddresses, ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
-import { MNEE_PROTOCOLS, mneeKeyDerivations } from '../utils/mneeDerivations';
-import { MneeClient } from '@1sat/client';
-import { PrivateKey } from '@bsv/sdk';
-import { getLegacyMneeBalance, sweepLegacyMnee } from '../utils/sweepLegacyMnee';
-import { decrypt } from '../utils/crypto';
-import type { Keys } from '../utils/keys';
+import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 
 // CopyAddressed feedback state hook — used in receive view
 
-type PageState = 'main' | 'receive' | 'send' | 'sendMNEE' | 'getMNEE' | 'asset-picker' | 'swap';
+type PageState = 'main' | 'receive' | 'send' | 'asset-picker' | 'swap';
 type AmountType = 'bsv' | 'usd';
 
 export type Recipient = {
@@ -155,9 +144,6 @@ export const BsvWallet = () => {
   const identityAddress = chromeStorageService.getCurrentAccountObject().account?.addresses?.identityAddress || '';
   const [receiveAddress, setReceiveAddress] = useState<string>('');
   const [copiedHandle, setCopiedHandle] = useState(false);
-  // All derived MNEE deposit addresses for the account (not just the currently selected
-  // receiveAddress), used so MNEE balance/history aggregate deposits made to any address.
-  const [mneeAddresses, setMneeAddresses] = useState<string[]>([]);
   const [depositAddresses, setDepositAddresses] = useState<
     { address: string; index: number; derivationPrefix: string; derivationSuffix: string }[]
   >([]);
@@ -180,7 +166,6 @@ export const BsvWallet = () => {
   // The headline figure waits for every part of it to answer once (or fail),
   // so it does not show BSV alone and then jump when the token values arrive.
   const [oneColorsReady, setOneColorsReady] = useState(false);
-  const [mneeReady, setMneeReady] = useState(false);
   const [oneColorToken, setOneColorToken] = useState<OneColorBalance | null>(null);
   /** The 1Color token whose detail page is open (tapping its row on Coins). Send, Receive and Buy start from it. */
   const [oneColorDetail, setOneColorDetail] = useState<OneColorBalance | null>(null);
@@ -203,51 +188,15 @@ export const BsvWallet = () => {
     else showMenu();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullScreen]);
-  // MNEE is a mainnet-only asset: hide it (and skip its balance fetches) on testnet.
-  const services = { ...theme.settings.services, mnee: theme.settings.services.mnee && !isTestnet };
-  const balanceReady = !balanceLoading && oneColorsReady && (mneeReady || !services.mnee);
+  const services = theme.settings.services;
+  const balanceReady = !balanceLoading && oneColorsReady;
   // 1Color tokens are the wallet's own, so a held one shows even where the theme leaves BSV21 off.
   const tokensEnabled = services.bsv21 || oneColors.length > 0;
   const [filteredTokens, setFilteredTokens] = useState<WalletToken[]>([]);
   const [randomKey, setRandomKey] = useState(Math.random());
   // Bump to force a refresh of the per-coin CoinHistory list (e.g. after a successful send)
   const [bsvHistoryRefreshKey, setBsvHistoryRefreshKey] = useState(0);
-  const [mneeHistoryRefreshKey, setMneeHistoryRefreshKey] = useState(0);
-  const [mneeBalance, setMneeBalance] = useState(0);
   const [copiedAddress, setCopiedAddress] = useState(false);
-
-  // Legacy MNEE sweep state
-  const [legacyMneeBalance, setLegacyMneeBalance] = useState(0);
-  const [legacyMneeAddress, setLegacyMneeAddress] = useState('');
-  const [legacyMneeSweeping, setLegacyMneeSweeping] = useState(false);
-  const [legacyMneeSweepMsg, setLegacyMneeSweepMsg] = useState('');
-  const [showLegacyMneePrompt, setShowLegacyMneePrompt] = useState(false);
-
-  // MNEE supports multi-recipient at the action level, so the UI mirrors BSV's pattern
-  type MneeRecipient = { id: string; address: string; amount: number | null };
-  const [mneeRecipients, setMneeRecipients] = useState<MneeRecipient[]>([
-    { id: crypto.randomUUID(), address: '', amount: null },
-  ]);
-
-  const addMneeRecipient = () => {
-    setMneeRecipients((prev) => [...prev, { id: crypto.randomUUID(), address: '', amount: null }]);
-  };
-
-  const removeMneeRecipient = (id: string) => {
-    if (mneeRecipients.length > 1) {
-      setMneeRecipients((prev) => prev.filter((r) => r.id !== id));
-    }
-  };
-
-  const updateMneeRecipient = (id: string, field: 'address' | 'amount', value: string | number | null) => {
-    setMneeRecipients((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
-  };
-
-  const resetMneeRecipients = () => {
-    setMneeRecipients([{ id: crypto.randomUUID(), address: '', amount: null }]);
-  };
-
-  const mneeTotal = mneeRecipients.reduce((acc, r) => acc + (r.amount ?? 0), 0);
 
   const [recipients, setRecipients] = useState<Recipient[]>([
     { id: crypto.randomUUID(), address: '', satSendAmount: null, usdSendAmount: null, amountType: 'bsv' },
@@ -308,113 +257,7 @@ export const BsvWallet = () => {
     return { totalBsv, totalUsd };
   };
 
-  // BIP44-style gap limit for MNEE address discovery. `settings.maxKeyIndex` only advances
-  // when the user clicks "+ New Address" in this browser session, so a restored wallet (or one
-  // used across multiple devices) has no local record of higher indices that were previously
-  // funded elsewhere. Rather than deriving/checking unbounded addresses, probe ahead in bounded
-  // batches and stop as soon as a full batch comes back with no MNEE activity — mirrors standard
-  // HD wallet address-discovery behavior instead of scanning indefinitely.
-  const MNEE_GAP_LIMIT = 20;
-  const MNEE_MAX_GAP_SCANS = 10; // hard cap: at most 200 addresses probed ahead per call
-
-  /** Extend and persist maxKeyIndex if any higher, not-yet-tracked address has an MNEE balance. */
-  const discoverMneeMaxKeyIndex = async (knownMaxKeyIndex: number): Promise<number> => {
-    if (!apiContext) return knownMaxKeyIndex;
-    let maxKeyIndex = knownMaxKeyIndex;
-    let scanStart = knownMaxKeyIndex + 1;
-
-    for (let scan = 0; scan < MNEE_MAX_GAP_SCANS; scan++) {
-      const fundedIndices: number[] = [];
-      for (const protocolID of MNEE_PROTOCOLS) {
-        const { derivations } = await deriveDepositAddresses.execute(apiContext, {
-          startIndex: scanStart,
-          count: MNEE_GAP_LIMIT,
-          protocolID,
-        });
-        const batchAddresses = derivations.map((d) => d.address);
-        const res = await getMneeBalance.execute(apiContext, { addresses: batchAddresses });
-        for (const b of res.balances ?? []) {
-          if (b.decimalAmount <= 0) continue;
-          const i = batchAddresses.indexOf(b.address);
-          if (i >= 0) fundedIndices.push(scanStart + i);
-        }
-      }
-
-      if (fundedIndices.length === 0) break;
-
-      maxKeyIndex = Math.max(maxKeyIndex, ...fundedIndices);
-      scanStart += MNEE_GAP_LIMIT;
-    }
-
-    if (maxKeyIndex > knownMaxKeyIndex) {
-      const { account } = chromeStorageService.getCurrentAccountObject();
-      if (account) {
-        await chromeStorageService.updateNested('accounts', {
-          [identityAddress]: { settings: { ...account.settings, maxKeyIndex } } as unknown as Account,
-        });
-      }
-    }
-
-    return maxKeyIndex;
-  };
-
-  const MNEE_FETCH_RETRIES = 2;
   const BALANCE_READY_CAP_MS = 8_000;
-
-  const updateMneeBalance = async (attempt = 0): Promise<number | undefined> => {
-    if (!receiveAddress || !apiContext) return;
-    try {
-      // Aggregate MNEE balance across all derived deposit addresses for this account,
-      // not just the currently selected receive address, since MNEE can be deposited
-      // to any previously derived address.
-      const { account: acctForMnee } = chromeStorageService.getCurrentAccountObject();
-      const knownMaxKeyIndex = acctForMnee?.settings?.maxKeyIndex ?? 4; // default: 0-4 = 5 addresses
-      const maxKeyIndex = await discoverMneeMaxKeyIndex(knownMaxKeyIndex);
-      const derivations = mneeKeyDerivations(0, maxKeyIndex + 1);
-      const res = await getMneeBalance.execute(apiContext, { derivations });
-      const seen = new Set((res.balances ?? []).map((b) => b.address));
-      let totalDecimal = res.totalDecimal;
-      let totalAtomic = res.totalAtomic;
-      if (receiveAddress && !seen.has(receiveAddress)) {
-        const extra = await getMneeBalance.execute(apiContext, { addresses: [receiveAddress] });
-        totalDecimal += extra.totalDecimal;
-        totalAtomic += extra.totalAtomic;
-        for (const b of extra.balances ?? []) seen.add(b.address);
-      }
-      const addresses = [...seen];
-      setMneeAddresses(addresses.length ? addresses : [receiveAddress]);
-      setMneeBalance(totalDecimal);
-      setMneeReady(true);
-
-      // Update MNEE balance in Chrome storage
-      const { account } = chromeStorageService.getCurrentAccountObject();
-      if (!account) return totalDecimal;
-
-      const key: keyof ChromeStorageObject = 'accounts';
-      const update: Partial<ChromeStorageObject['accounts']> = {
-        [identityAddress]: {
-          ...account,
-          mneeBalance: {
-            amount: totalAtomic,
-            decimalAmount: totalDecimal,
-          },
-        },
-      };
-      await chromeStorageService.updateNested(key, update);
-      return totalDecimal;
-    } catch (error) {
-      console.error(`Failed to update MNEE balance (attempt ${attempt + 1}):`, error);
-      // The first fetch can race service-worker initialization (e.g. storage migration
-      // right after an upgrade). A failed lookup would otherwise leave the balance at
-      // zero until the page remounts, so retry with a short backoff.
-      if (attempt < MNEE_FETCH_RETRIES) {
-        setTimeout(() => void updateMneeBalance(attempt + 1), 2000 * (attempt + 1));
-      } else {
-        setMneeReady(true);
-      }
-      return undefined;
-    }
-  };
 
   const resetRecipientErrors = () => {
     setRecipients((prev) => [...prev.map((r) => ({ ...r, error: undefined }))]);
@@ -500,12 +343,9 @@ export const BsvWallet = () => {
         });
         if (response?.success && response.data) {
           setReceiveAddress(response.data);
-        } else {
-          setMneeReady(true); // no address, so no MNEE lookup will run
         }
       } catch (error) {
         console.error('Failed to get receive address:', error);
-        setMneeReady(true);
       }
     })();
   }, []);
@@ -551,97 +391,14 @@ export const BsvWallet = () => {
   useEffect(() => {
     const cap = setTimeout(() => {
       setOneColorsReady(true);
-      setMneeReady(true);
     }, BALANCE_READY_CAP_MS);
     return () => clearTimeout(cap);
   }, []);
 
-  // Fetch MNEE balance once receiveAddress is available
-  useEffect(() => {
-    if (services.mnee && receiveAddress) {
-      updateMneeBalance();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [receiveAddress]);
-
-  // Refresh MNEE when the service worker's address sync finishes, the same trigger
-  // that refreshes the BSV balance. Without this, MNEE was fetched exactly once.
-  useEffect(() => {
-    if (services.mnee && !isSyncing && receiveAddress) {
-      updateMneeBalance();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSyncing]);
-
-  // Check for legacy MNEE balance (old address) once wallet is ready
-  useEffect(() => {
-    if (!services.mnee || !apiContext?.services?.mnee) return;
-    (async () => {
-      try {
-        const { account } = chromeStorageService.getCurrentAccountObject();
-        const passKey = await chromeStorageService.getPassKey();
-        if (!account?.encryptedKeys || !passKey) return;
-        const decrypted = await decrypt(account.encryptedKeys, passKey);
-        const keys: Keys = JSON.parse(decrypted);
-        if (!keys.walletWif) return;
-        const legacyAddr = PrivateKey.fromWif(keys.walletWif).toPublicKey().toAddress();
-        setLegacyMneeAddress(legacyAddr);
-        const balance = await getLegacyMneeBalance(apiContext.services!.mnee, legacyAddr);
-        setLegacyMneeBalance(balance);
-      } catch (err) {
-        console.error('[legacyMneeCheck]', err);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [receiveAddress, apiContext?.services?.mnee]);
-
-  const handleSweepLegacyMnee = async () => {
-    if (!apiContext?.services?.mnee) return;
-    setLegacyMneeSweeping(true);
-    setLegacyMneeSweepMsg('Starting...');
-    try {
-      const { account } = chromeStorageService.getCurrentAccountObject();
-      const passKey = await chromeStorageService.getPassKey();
-      if (!account?.encryptedKeys || !passKey) throw new Error('Keys unavailable');
-      const decrypted = await decrypt(account.encryptedKeys, passKey);
-      const keys: Keys = JSON.parse(decrypted);
-      if (!keys.walletWif) throw new Error('No legacy wallet key');
-
-      // Derive the BRC-29 destination address
-      const derivationResult = await deriveDepositAddresses.execute(apiContext, {
-        startIndex: 0,
-        count: 1,
-      });
-      const destinationAddress = derivationResult.derivations[0]?.address;
-      if (!destinationAddress) throw new Error('Could not derive destination address');
-
-      const result = await sweepLegacyMnee({
-        mneeClient: apiContext.services.mnee,
-        legacyPrivateKey: PrivateKey.fromWif(keys.walletWif),
-        destinationAddress,
-        onProgress: setLegacyMneeSweepMsg,
-      });
-
-      if (result.error) {
-        addSnackbar(`Sweep failed: ${result.error}`, 'error');
-      } else {
-        addSnackbar(`Moved $${result.amount?.toFixed(2)} MNEE to your new wallet!`, 'success');
-        setLegacyMneeBalance(0);
-        updateMneeBalance();
-        setMneeHistoryRefreshKey((k) => k + 1);
-      }
-    } catch (err) {
-      addSnackbar(`Sweep failed: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
-    } finally {
-      setLegacyMneeSweeping(false);
-      setShowLegacyMneePrompt(false);
-    }
-  };
-
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   /**
-   * Re-sync addresses, then reload BSV, MNEE, and BSV-21 balances.
+   * Re-sync addresses, then reload BSV, BSV-21, and 1Color balances.
    * With `notifyIfUnchanged`, tell the user when nothing moved so a manual refresh
    * that finds no new funds does not look like it silently failed.
    */
@@ -652,7 +409,6 @@ export const BsvWallet = () => {
     // Snapshot before: BSV in satoshis (not USD, so a rate tick is not "a change").
     const before = {
       sats: Math.round(bsvBalance * 100_000_000),
-      mnee: mneeBalance,
       tokens: bsv21Signature(bsv21s),
     };
     let synced = true;
@@ -667,15 +423,13 @@ export const BsvWallet = () => {
       console.error('[refreshUtxos] syncAddresses failed:', err);
     }
     try {
-      const [sats, mnee, tokens] = await Promise.all([
+      const [sats, tokens] = await Promise.all([
         getAndSetBsvBalance(),
-        updateMneeBalance(),
         getAndSetAccountAndBsv21s(),
         getAndSetOneColors(),
       ]);
       loadLocks && loadLocks();
-      const unchanged =
-        sats === before.sats && mnee !== undefined && mnee === before.mnee && bsv21Signature(tokens) === before.tokens;
+      const unchanged = sats === before.sats && bsv21Signature(tokens) === before.tokens;
       if (notifyIfUnchanged && synced && unchanged) {
         addSnackbar('Balances are up to date. Incoming transactions can take one confirmation to appear.', 'info');
       }
@@ -786,94 +540,6 @@ export const BsvWallet = () => {
     } finally {
       setGeneratingAddress(false);
     }
-  };
-
-  const handleSendMNEE = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    await sleep(25);
-
-    // Validate all recipients
-    for (const r of mneeRecipients) {
-      if (!r.address || r.amount === null || r.amount === undefined) {
-        addSnackbar('All recipients must have an address and amount!', 'info');
-        return;
-      }
-      if (!isValidEmail(r.address) && !validate(r.address)) {
-        addSnackbar('All recipients must have a valid BSV or Paymail address!', 'info');
-        return;
-      }
-      if (r.amount <= 0.00001) {
-        addSnackbar('Minimum send amount is 0.00001 MNEE per recipient!', 'error');
-        return;
-      }
-    }
-
-    if (mneeTotal > mneeBalance) {
-      addSnackbar('Insufficient MNEE balance!', 'error');
-      return;
-    }
-
-    if (!apiContext) {
-      addSnackbar('Wallet not ready.', 'error');
-      return;
-    }
-
-    // Consolidate duplicate addresses by summing amounts
-    const mneeConsolidated = new Map<string, number>();
-    const mneeOrder: string[] = [];
-    for (const r of mneeRecipients) {
-      mneeConsolidated.set(r.address, (mneeConsolidated.get(r.address) ?? 0) + (r.amount as number));
-      if (!mneeOrder.includes(r.address)) mneeOrder.push(r.address);
-    }
-    const lineItems: SendLineItem[] = mneeOrder.map((addr) => ({
-      address: addr,
-      amount: `$${mneeConsolidated.get(addr)!.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })} MNEE`,
-    }));
-
-    setSendConfirmation({
-      icon: MNEE_ICON_URL,
-      lineItems,
-      total: `$${mneeTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })} MNEE`,
-      onConfirm: async () => {
-        setSendConfirmation(null);
-        setIsProcessing(true);
-
-        try {
-          const { account: acctForSend } = chromeStorageService.getCurrentAccountObject();
-          const sendCount = (acctForSend?.settings?.maxKeyIndex ?? 4) + 1;
-
-          addSnackbar('Transaction initiated. Processing...', 'info');
-
-          const res = await sendMnee.execute(apiContext, {
-            recipients: mneeRecipients.map((r) => ({ address: r.address, amount: r.amount as number })),
-            derivations: mneeKeyDerivations(0, sendCount),
-          });
-
-          if (res.error) {
-            addSnackbar(`Transaction failed: ${res.error}`, 'error');
-            setIsProcessing(false);
-            return;
-          }
-
-          resetMneeRecipients();
-          setMneeBalance((prev) => Math.max(0, prev - mneeTotal));
-          updateMneeBalance().catch((err) => console.error('[handleSendMNEE] reconcile refresh failed:', err));
-          setMneeHistoryRefreshKey((k) => k + 1);
-          setPageState('main');
-          addSnackbar('Transaction Successful!', 'success');
-        } catch (error: unknown) {
-          console.error('MNEE transfer error:', error);
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          if (errorMessage.includes('status: 423')) {
-            addSnackbar('The sending or receiving address may be frozen. Please contact support.', 'error');
-          } else {
-            addSnackbar(getErrorMessage(errorMessage) || 'Transfer failed. Please try again.', 'error');
-          }
-        } finally {
-          setIsProcessing(false);
-        }
-      },
-    });
   };
 
   const handleSendBsv = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -993,10 +659,6 @@ export const BsvWallet = () => {
       : 'Enter Send Details';
   };
 
-  const getMneeLabel = () => {
-    return mneeTotal > 0 ? `Send ${formatMnee(mneeTotal)} MNEE` : 'Enter Send Details';
-  };
-
   const handleDismissWelcome = async () => {
     await chromeStorageService.update({ showWelcome: false });
     setShowWelcome(false);
@@ -1026,25 +688,6 @@ export const BsvWallet = () => {
       return;
     }
     if (t.bsv21) setToken({ isConfirmed: true, info: t.bsv21 });
-  };
-
-  /** Fill the given MNEE recipient with (balance - already-assigned - fee). */
-  const handleFillMaxMnee = async (id: string) => {
-    const assignedElsewhere = mneeRecipients.reduce((acc, r) => (r.id === id ? acc : acc + (r.amount ?? 0)), 0);
-    const available = Math.max(0, mneeBalance - assignedElsewhere);
-
-    if (!apiContext?.services?.mnee) {
-      updateMneeRecipient(id, 'amount', available);
-      return;
-    }
-    try {
-      const config = await apiContext.services.mnee.getConfig();
-      const atomicAvailable = MneeClient.toAtomicAmount(available);
-      const fee = config.fees.find((f) => atomicAvailable >= f.min && atomicAvailable <= f.max)?.fee || 0;
-      updateMneeRecipient(id, 'amount', MneeClient.fromAtomicAmount(Math.max(0, atomicAvailable - fee)));
-    } catch {
-      updateMneeRecipient(id, 'amount', available);
-    }
   };
 
   // Fetch deposit addresses when entering receive view and sync selected index to primaryAddress
@@ -1198,26 +841,13 @@ export const BsvWallet = () => {
 
       {/* Info text */}
       {!receiveContext && (
-        <Show
-          when={services.ordinals || services.bsv21}
-          whenFalseContent={
-            <p className="text-xs text-center mt-4 mb-2 max-w-[16rem]" style={{ color: theme.color.global.gray }}>
-              You may safely send{' '}
-              <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
-                Bitcoin SV (BSV)
-              </span>{' '}
-              to this address.
-            </p>
-          }
-        >
-          <p className="text-xs text-center mt-4 mb-2 max-w-[16rem]" style={{ color: theme.color.global.gray }}>
-            You may safely send{' '}
-            <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
-              BSV, MNEE, and Ordinals
-            </span>{' '}
-            to this address.
-          </p>
-        </Show>
+        <p className="text-xs text-center mt-4 mb-2 max-w-[16rem]" style={{ color: theme.color.global.gray }}>
+          You may safely send{' '}
+          <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
+            BSV and 1Sat NFTs
+          </span>{' '}
+          to these addresses.
+        </p>
       )}
 
       {/* Deposit Addresses */}
@@ -1390,11 +1020,7 @@ export const BsvWallet = () => {
                 className="text-4xl font-bold tracking-tight select-none"
                 style={{ color: theme.color.global.contrast, letterSpacing: '-0.02em' }}
               >
-                {formatUSD(
-                  bsvBalance * exchangeRate +
-                    (services.mnee ? mneeBalance : 0) +
-                    tokensUsdTotal(walletTokens, oneColorPrices, exchangeRate),
-                )}
+                {formatUSD(bsvBalance * exchangeRate + tokensUsdTotal(walletTokens, oneColorPrices, exchangeRate))}
               </h1>
             )}
             <AnimatePresence>
@@ -1527,28 +1153,6 @@ export const BsvWallet = () => {
               setPageState('send');
             }}
           />
-          <Show when={services.mnee}>
-            <AssetRow
-              balance={mneeBalance}
-              icon={MNEE_ICON_URL}
-              ticker="MNEE USD"
-              decimals={5}
-              usdBalance={mneeBalance}
-              showPointer={mneeBalance > 0 || legacyMneeBalance > 0}
-              isMNEE
-              onGetMneeClick={() => setPageState('getMNEE')}
-              onClick={() => {
-                if (legacyMneeBalance > 0) {
-                  setShowLegacyMneePrompt(true);
-                  return;
-                }
-                if (mneeBalance > 0) {
-                  setSendSource('main');
-                  setPageState('sendMNEE');
-                }
-              }}
-            />
-          </Show>
           {lockData && (
             <Show when={services.locks && lockData.totalLocked > 0}>
               <AssetRow
@@ -1625,17 +1229,6 @@ export const BsvWallet = () => {
       balance: bsvBalance,
       usdBalance: bsvBalance * exchangeRate,
     },
-    ...(services.mnee
-      ? [
-          {
-            kind: 'mnee' as const,
-            ticker: 'MNEE' as const,
-            icon: MNEE_ICON_URL,
-            balance: mneeBalance,
-            usdBalance: mneeBalance,
-          },
-        ]
-      : []),
     ...(services.bsv21
       ? bsv21s
           .filter((t) => t.all.confirmed > 0n)
@@ -1663,13 +1256,6 @@ export const BsvWallet = () => {
       case 'bsv':
         setPageState('send');
         return;
-      case 'mnee':
-        if (legacyMneeBalance > 0) {
-          setShowLegacyMneePrompt(true);
-          return;
-        }
-        setPageState('sendMNEE');
-        return;
       case 'bsv21':
         setPageState('main');
         setToken({ isConfirmed: true, info: asset.token });
@@ -1683,246 +1269,6 @@ export const BsvWallet = () => {
 
   const assetPickerView = (
     <AssetPicker assets={pickableAssets} onBack={() => setPageState('main')} onSelect={handleAssetSelected} />
-  );
-
-  const sendMNEE = (
-    <motion.div
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto overflow-x-hidden self-start"
-      style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
-    >
-      {/* Header */}
-      <div className="flex items-center gap-3 w-full mb-5">
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          onClick={() => {
-            setPageState(sendSource);
-            resetMneeRecipients();
-          }}
-          className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 border-0 outline-none cursor-pointer"
-          style={{ background: '#17191E' }}
-        >
-          <ArrowLeft size={16} style={{ color: '#FFFFFF' }} />
-        </motion.button>
-        <div className="flex items-center gap-2 flex-1">
-          <img src={MNEE_ICON_URL} className="w-6 h-6 rounded-full" alt="MNEE" />
-          <h2 className="text-base font-bold tracking-tight" style={{ color: theme.color.global.contrast }}>
-            Send MNEE
-          </h2>
-        </div>
-      </div>
-
-      {/* Balance chip (display-only; per-recipient MAX is inside each card) */}
-      <div
-        className="flex items-center gap-2 px-4 py-2 rounded-full mb-5"
-        style={{ background: theme.color.global.row }}
-      >
-        <img src={MNEE_ICON_URL} alt="MNEE" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
-        <span className="text-xs" style={{ color: theme.color.global.gray }}>
-          Balance
-        </span>
-        <span className="text-sm font-semibold font-mono" style={{ color: theme.color.global.contrast }}>
-          {formatMnee(mneeBalance)}
-        </span>
-        <span className="text-xs font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
-          MNEE
-        </span>
-      </div>
-
-      {/* Form */}
-      <form noValidate onSubmit={(e) => handleSendMNEE(e)} className="flex flex-col items-center w-full gap-3">
-        {/* Recipient cards */}
-        <AnimatePresence>
-          {mneeRecipients.map((recipient, idx) => (
-            <motion.div
-              key={recipient.id}
-              initial={{ opacity: 0, y: 12, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.96 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
-              className="w-full rounded-2xl p-4 flex flex-col gap-3"
-              style={{ background: theme.color.global.row }}
-            >
-              {/* Card header */}
-              <div className="flex items-center justify-between">
-                <span
-                  className="text-[10px] font-semibold uppercase tracking-widest"
-                  style={{ color: theme.color.global.gray }}
-                >
-                  {mneeRecipients.length > 1 ? `Recipient ${idx + 1}` : 'Recipient'}
-                </span>
-                {mneeRecipients.length > 1 && (
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    type="button"
-                    onClick={() => removeMneeRecipient(recipient.id)}
-                    className="flex items-center justify-center w-6 h-6 rounded-full border-0 outline-none cursor-pointer"
-                    style={{ background: '#ff444415', color: '#ff4444' }}
-                  >
-                    <Trash2 size={12} />
-                  </motion.button>
-                )}
-              </div>
-
-              {/* Address input */}
-              <Input
-                theme={theme}
-                placeholder="Enter Address"
-                type="text"
-                onChange={(e) => updateMneeRecipient(recipient.id, 'address', e.target.value)}
-                value={recipient.address}
-              />
-
-              {/* Amount input + MAX */}
-              <div
-                className="flex items-center w-[85%] mx-auto rounded-xl border"
-                style={{
-                  backgroundColor: theme.color.global.row,
-                  borderColor: theme.color.global.gray + '40',
-                }}
-              >
-                <input
-                  placeholder="Enter MNEE Amount"
-                  type="number"
-                  step="0.00001"
-                  className="flex-1 bg-transparent h-9 px-4 text-sm outline-none border-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
-                  style={{
-                    color: theme.color.global.contrast,
-                    fontFamily: "'Inter', Arial, Helvetica, sans-serif",
-                  }}
-                  value={recipient.amount !== null && recipient.amount !== undefined ? recipient.amount : ''}
-                  onChange={(e) => {
-                    const inputValue = e.target.value;
-                    updateMneeRecipient(recipient.id, 'amount', inputValue === '' ? null : Number(inputValue));
-                  }}
-                  onWheel={(e) => {
-                    (e.target as HTMLInputElement).blur();
-                    e.stopPropagation();
-                    setTimeout(() => (e.target as HTMLInputElement).focus(), 0);
-                  }}
-                />
-                {mneeRecipients.length === 1 && (
-                  <motion.button
-                    whileTap={{ scale: 0.93 }}
-                    type="button"
-                    onClick={() => handleFillMaxMnee(recipient.id)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 mr-1.5 rounded-lg border-0 outline-none cursor-pointer shrink-0"
-                    style={{ background: `${theme.color.component.primaryButtonLeftGradient}18` }}
-                    title="Fill with available MNEE (minus fee)"
-                  >
-                    <span
-                      className="text-[11px] font-bold"
-                      style={{ color: theme.color.component.primaryButtonLeftGradient }}
-                    >
-                      MAX
-                    </span>
-                  </motion.button>
-                )}
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        {/* Add recipient */}
-        <motion.button
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.98 }}
-          type="button"
-          onClick={addMneeRecipient}
-          className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border-0 outline-none cursor-pointer"
-          style={{
-            background: `${theme.color.component.primaryButtonLeftGradient}10`,
-            border: `1px dashed ${theme.color.component.primaryButtonLeftGradient}40`,
-          }}
-        >
-          <Plus size={14} style={{ color: theme.color.component.primaryButtonLeftGradient }} />
-          <span className="text-sm font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
-            Add Recipient
-          </span>
-        </motion.button>
-
-        {/* Send button */}
-        <Button
-          theme={theme}
-          type="primary"
-          label={getMneeLabel()}
-          disabled={
-            isProcessing ||
-            mneeTotal <= 0 ||
-            mneeRecipients.some((r) => !r.address || r.amount === null || r.amount === undefined || r.amount <= 0)
-          }
-          isSubmit
-        />
-      </form>
-
-      <CoinHistory
-        filter={{
-          type: 'mnee',
-          addresses: mneeAddresses.length ? mneeAddresses : receiveAddress ? [receiveAddress] : [],
-        }}
-        refreshKey={mneeHistoryRefreshKey}
-      />
-    </motion.div>
-  );
-
-  const getMnee = (
-    <motion.div
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto overflow-x-hidden self-start"
-      style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
-    >
-      {/* Header */}
-      <div className="flex items-center w-full mb-5 mt-2">
-        <motion.button
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.92 }}
-          onClick={() => setPageState('main')}
-          className="flex items-center justify-center w-8 h-8 rounded-full border-0 outline-none cursor-pointer mr-3"
-          style={{ background: theme.color.global.row, color: theme.color.global.gray }}
-        >
-          <ArrowLeft size={16} />
-        </motion.button>
-        <h2 className="text-base font-bold tracking-tight" style={{ color: theme.color.global.contrast }}>
-          Get MNEE
-        </h2>
-      </div>
-
-      {/* Info card */}
-      <div className="w-full rounded-2xl p-5 mb-5" style={{ background: theme.color.global.row }}>
-        <div className="flex items-center gap-3 mb-3">
-          <img src={MNEE_ICON_URL} className="w-10 h-10 rounded-full" alt="MNEE" />
-          <div>
-            <p className="text-sm font-bold" style={{ color: theme.color.global.contrast }}>
-              MNEE Stablecoin
-            </p>
-            <p className="text-xs" style={{ color: theme.color.global.gray }}>
-              1 MNEE = $1.00 USD
-            </p>
-          </div>
-        </div>
-        <p className="text-xs leading-relaxed" style={{ color: theme.color.global.gray }}>
-          MNEE is the{' '}
-          <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
-            first USD-backed stablecoin
-          </span>{' '}
-          on the BSV blockchain. Each token is fully collateralized with US T-bills and cash equivalents.
-        </p>
-      </div>
-
-      {/* QR code */}
-      <QrCode link={MNEE_MOBILE_REFERRAL_LINK} onClick={handleCopyToClipboard} />
-
-      <p className="text-xs font-semibold mt-4 mb-5" style={{ color: theme.color.global.gray }}>
-        Scan with your mobile device to get started
-      </p>
-    </motion.div>
   );
 
   const send = (
@@ -2282,9 +1628,6 @@ export const BsvWallet = () => {
       <Show when={isProcessing && pageState === 'send'}>
         <PageLoader theme={theme} message="Sending BSV..." />
       </Show>
-      <Show when={isProcessing && pageState === 'sendMNEE'}>
-        <PageLoader theme={theme} message="Sending MNEE..." />
-      </Show>
       <Show
         when={!isProcessing && pageState === 'main' && !token && !oneColorToken && !oneColorDetail && !manageFavorites}
       >
@@ -2342,8 +1685,6 @@ export const BsvWallet = () => {
       <Show when={!isProcessing && pageState === 'receive'}>{receive}</Show>
       <Show when={!isProcessing && pageState === 'asset-picker'}>{assetPickerView}</Show>
       <Show when={!isProcessing && pageState === 'send'}>{send}</Show>
-      <Show when={!isProcessing && pageState === 'sendMNEE'}>{sendMNEE}</Show>
-      <Show when={!isProcessing && pageState === 'getMNEE'}>{getMnee}</Show>
       <SendConfirmation
         show={!!sendConfirmation}
         theme={theme}
@@ -2354,87 +1695,6 @@ export const BsvWallet = () => {
         onConfirm={() => sendConfirmation?.onConfirm()}
         onCancel={() => setSendConfirmation(null)}
       />
-
-      {/* Legacy MNEE sweep prompt */}
-      <AnimatePresence>
-        {showLegacyMneePrompt && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="flex items-center justify-center"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundColor: theme.color.global.walletBackground,
-              zIndex: 100,
-            }}
-          >
-            <Show
-              when={legacyMneeSweeping}
-              whenFalseContent={
-                <motion.div
-                  initial={{ scale: 0.95, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex flex-col items-center text-center px-6 w-full"
-                >
-                  <img src={MNEE_ICON_URL} alt="MNEE" className="w-12 h-12 rounded-full mb-4" />
-                  <h2 className="text-xl font-bold mb-2" style={{ color: theme.color.global.contrast }}>
-                    Legacy MNEE Found
-                  </h2>
-                  <p className="text-sm mb-2 leading-relaxed" style={{ color: theme.color.global.gray }}>
-                    You have{' '}
-                    <span className="font-semibold" style={{ color: theme.color.global.contrast }}>
-                      $
-                      {legacyMneeBalance.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 5,
-                      })}{' '}
-                      MNEE
-                    </span>{' '}
-                    at your legacy address. Move it to your new wallet?
-                  </p>
-                  <p
-                    className="text-[0.65rem] font-mono break-all mb-6 cursor-pointer"
-                    style={{ color: theme.color.global.gray }}
-                    title="Copy legacy address"
-                    onClick={() => {
-                      navigator.clipboard
-                        .writeText(legacyMneeAddress)
-                        .then(() => addSnackbar('Legacy address copied!', 'success'));
-                    }}
-                  >
-                    {legacyMneeAddress}
-                  </p>
-                  <div className="flex items-center gap-3 w-[87%]">
-                    <div className="flex-1">
-                      <Button
-                        theme={theme}
-                        type="secondary-outline"
-                        label="Later"
-                        onClick={() => {
-                          setShowLegacyMneePrompt(false);
-                          if (mneeBalance > 0) {
-                            setSendSource('main');
-                            setPageState('sendMNEE');
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <Button theme={theme} type="primary" label="Move MNEE" onClick={handleSweepLegacyMnee} />
-                    </div>
-                  </div>
-                </motion.div>
-              }
-            >
-              <PageLoader theme={theme} message={legacyMneeSweepMsg || 'Moving MNEE...'} />
-            </Show>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </>
   );
 };

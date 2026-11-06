@@ -1,19 +1,19 @@
 /**
  * Per-coin transaction history fetchers.
  *
- * Three different backends depending on the coin type:
- * - BSV:   wallet.listActions() + negative filter (exclude any 'p 1sat '-labeled action + non-BSV baskets)
- * - BSV21: wallet.listActions({ labels: [buildTokenLabel(tokenId)] }) — server-side filtered by P-label
- * - MNEE:  getMneeHistory.execute() — purpose-built action with rich per-tx metadata
+ * Different backends depending on the coin type:
+ * - BSV:    wallet.listActions() + negative filter (exclude any 'p 1sat '-labeled action + non-BSV baskets)
+ * - BSV21:  wallet.listActions({ labels: [buildTokenLabel(tokenId)] }) — server-side filtered by P-label
+ * - 1Color: wallet.listActions() decoded per asset (see fetchOneColorHistory)
  *
- * All three return the same `CoinTxSummary` shape so the UI stays agnostic.
+ * All return the same `CoinTxSummary` shape so the UI stays agnostic.
  */
-import { getMneeHistory, type OneSatContext } from '@1sat/actions';
+import type { OneSatContext } from '@1sat/actions';
 import { buildTokenLabel } from '@1sat/types';
 import type { WalletAction } from '@bsv/sdk';
 import { BSV_DECIMAL_CONVERSION } from './constants';
 import { oneColorActionAmount, oneColorTicker } from '../services/oneColor';
-import { formatMnee, formatNumberWithCommasAndDecimals, formatTokenAmount, truncate } from './format';
+import { formatNumberWithCommasAndDecimals, formatTokenAmount, truncate } from './format';
 
 /** Baskets that indicate a non-BSV action (BSV list should exclude these). */
 const NON_BSV_BASKETS = new Set(['bsv21', '1sat', 'ordinals', 'lock', 'opns', 'sigma', 'bsocial', 'bap']);
@@ -48,11 +48,6 @@ export type CoinTxSummary = {
 
 export type FetchHistoryOpts = {
   offset?: number;
-  limit?: number;
-};
-
-export type FetchMneeHistoryOpts = {
-  fromScore?: number;
   limit?: number;
 };
 
@@ -346,47 +341,4 @@ export const fetchOneColorHistory = async (
     end = start;
   }
   return matches.slice(skip, skip + wantLimit);
-};
-
-// ─── MNEE ────────────────────────────────────────────────────────────────────
-
-const MNEE_DECIMALS = 5;
-
-export const fetchMneeHistory = async (
-  ctx: OneSatContext,
-  addresses: string[],
-  opts: FetchMneeHistoryOpts = {},
-): Promise<CoinTxSummary[]> => {
-  if (!addresses.length) return [];
-  const result = await getMneeHistory.execute(ctx, {
-    addresses,
-    limit: opts.limit ?? 50,
-    fromScore: opts.fromScore,
-  });
-
-  // Sort by score descending → newest first. (The API usually returns them this way
-  // already, but sorting explicitly makes ordering independent of backend behavior.)
-  return result.history
-    .slice()
-    .sort((a, b) => b.score - a.score)
-    .map((h) => {
-      const direction: CoinTxDirection = h.type === 'send' ? 'sent' : 'received';
-      const sign = direction === 'sent' ? '-' : '+';
-      const amountDisplay = `${sign}${formatMnee(h.amount / 10 ** MNEE_DECIMALS)}`;
-
-      // Pick a reasonable counterparty label (first one, truncated)
-      const counterparty = h.counterparties[0]?.address;
-
-      return {
-        txid: h.txid,
-        direction,
-        amountDisplay,
-        status: h.status,
-        height: h.height,
-        counterparty,
-        description: counterparty
-          ? `${direction === 'sent' ? 'to' : 'from'} ${truncate(counterparty, 6, 4)}`
-          : undefined,
-      };
-    });
 };

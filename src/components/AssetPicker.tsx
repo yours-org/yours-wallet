@@ -9,7 +9,6 @@ import { Show } from './Show';
 
 export type PickableAsset =
   | { kind: 'bsv'; ticker: 'BSV'; icon: string; balance: number; usdBalance: number }
-  | { kind: 'mnee'; ticker: 'MNEE'; icon: string; balance: number; usdBalance: number }
   | { kind: 'bsv21'; token: Bsv21Balance; icon: string }
   | { kind: '1color'; token: OneColorBalance; icon: string };
 
@@ -37,11 +36,6 @@ const getDisplayBalance = (asset: PickableAsset): { primary: string; secondary: 
       return {
         primary: `${formatLargeNumber(asset.balance, 3)} BSV`,
         secondary: formatUSD(asset.usdBalance),
-      };
-    case 'mnee':
-      return {
-        primary: formatUSD(asset.usdBalance),
-        secondary: `${formatLargeNumber(asset.balance, 5)} MNEE`,
       };
     case 'bsv21': {
       const confirmed = asset.token.all.confirmed;

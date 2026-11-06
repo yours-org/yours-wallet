@@ -7,7 +7,7 @@ import { PageLoader } from './PageLoader';
 
 export type SendLineItem = {
   address: string;
-  amount: string; // pre-formatted display string (e.g. "0.005 BSV", "$1.50 MNEE", "100 TOKEN")
+  amount: string; // pre-formatted display string (e.g. "0.005 BSV", "100 TOKEN")
 };
 
 export type SendConfirmationProps = {
