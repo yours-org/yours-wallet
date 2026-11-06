@@ -1565,7 +1565,7 @@ if (isInServiceWorker) {
     }
 
     try {
-      const { account } = chromeStorageService.getCurrentAccountObject();
+      const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
       const config: StorageConfig = account?.storageConfig ?? { remotes: [] };
       const remoteUrl = config.activeRemote || config.remotes?.[0];
       if (!remoteUrl) {
@@ -1577,7 +1577,9 @@ if (isInServiceWorker) {
         return;
       }
 
-      const identityAddress = account?.addresses?.identityAddress;
+      // The accounts map key, as initWallet keys it: the identity address in
+      // the key blob can be encoded for another chain than the account's.
+      const identityAddress = selectedAccount ?? account?.addresses?.identityAddress;
       const record = await reconcileStorage(
         accountContext.storage,
         accountContext.syncContext.services,
