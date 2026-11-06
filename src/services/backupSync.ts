@@ -23,6 +23,10 @@ export interface BackupPushResult {
   error?: string;
 }
 
+/** True when a push copied or changed at least one row in some backup. */
+export const pushChangedRows = (results: BackupPushResult[]): boolean =>
+  results.some((r) => !r.error && r.inserts + r.updates > 0);
+
 let inFlight: Promise<BackupPushResult[]> | undefined;
 
 /** Push the active store to every backup store. Serialized: a call during a push waits for it and returns its result. */

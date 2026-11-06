@@ -20,7 +20,7 @@ import type { Keys } from './utils/keys';
 import { initSyncContext, type SyncContext } from './initSyncContext';
 import { refileLegacyBaskets } from './services/legacyBaskets';
 import { reconcileStorage, requestUsbFullPass } from './services/storageReconcileBackground';
-import { pushBackups, recordBackupPush } from './services/backupSync';
+import { pushBackups, pushChangedRows, recordBackupPush } from './services/backupSync';
 import { showOneSatPrompt } from './services/oneSatPrompt';
 import { createColorOverlayProvider } from './services/colorOverlay';
 import { createColorTokenAccessHandler } from './services/colorConsent';
@@ -407,6 +407,15 @@ export const initWallet = async (
       console.log(`[initWallet] backup push (${Date.now() - t}ms): ${summary}`);
     }
     await recordBackupPush(results);
+    // With a remote active, the local store is a backup and the USB backup
+    // copies it. Rows a push merges in keep their timestamps from the remote,
+    // which the USB runner's incremental cursor has usually already passed;
+    // ask it for a full pass, as the storage repair does.
+    if (activeRemote && pushChangedRows(results)) {
+      await requestUsbFullPass(chromeStorageService, accountKey).catch((err) =>
+        console.error('[initWallet] could not request a USB full pass:', err),
+      );
+    }
   };
   const backupTimer = setInterval(() => void pushBackupsAndRecord(), BACKUP_SYNC_INTERVAL_MS);
 

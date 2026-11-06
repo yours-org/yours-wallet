@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { describe, expect, test } from 'bun:test';
 import { PrivateKey } from '@bsv/sdk';
 import { StorageIdb, StorageProvider, WalletStorageManager } from '@bsv/wallet-toolbox-client';
-import { pushBackups } from './backupSync';
+import { pushBackups, pushChangedRows } from './backupSync';
 import { initialOffsets } from './usbBackupBackground';
 
 const identityKey = PrivateKey.fromRandom().toPublicKey().toString();
@@ -68,5 +68,14 @@ describe('pushBackups', () => {
       offsets: initialOffsets(),
     });
     expect(chunk.outputBaskets?.map((b) => b.name)).toContain('usb sees this');
+  });
+});
+
+describe('pushChangedRows', () => {
+  test('counts inserts and updates, not a failed store', () => {
+    expect(pushChangedRows([])).toBe(false);
+    expect(pushChangedRows([{ storageName: 'wallet', inserts: 0, updates: 0 }])).toBe(false);
+    expect(pushChangedRows([{ storageName: 'wallet', inserts: 0, updates: 2 }])).toBe(true);
+    expect(pushChangedRows([{ storageName: 'wallet', inserts: 5, updates: 0, error: 'offline' }])).toBe(false);
   });
 });
