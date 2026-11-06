@@ -71,6 +71,7 @@ import { Account } from '../services/types/chromeStorage.types';
 import { SendBsv21View } from '../components/SendBsv21View';
 import { SendOneColorView } from '../components/SendOneColorView';
 import { OneColorDetailView } from '../components/OneColorDetailView';
+import { BsvDetailView } from '../components/BsvDetailView';
 import { SwapView } from '../components/SwapView';
 import type { SwapTokenRef } from '../services/swapTypes';
 import { onSwapProgress } from '../services/swap';
@@ -169,6 +170,8 @@ export const BsvWallet = () => {
   // so it does not show BSV alone and then jump when the token values arrive.
   const [oneColorsReady, setOneColorsReady] = useState(false);
   const [oneColorToken, setOneColorToken] = useState<OneColorBalance | null>(null);
+  /** The BSV page is open (tapping the BSV row on Coins). Receive, Swap and Send start from it. */
+  const [bsvDetail, setBsvDetail] = useState(false);
   /** The 1Color token whose detail page is open (tapping its row on Coins). Send, Receive and Buy start from it. */
   const [oneColorDetail, setOneColorDetail] = useState<OneColorBalance | null>(null);
   /** Bumped when a send or swap finished, so the detail page's history reloads. */
@@ -188,7 +191,8 @@ export const BsvWallet = () => {
    * picker, a token's page, swap, manage tokens) takes the whole popup: no top
    * nav, no bottom menu. Only the Coins list itself shows them.
    */
-  const fullScreen = pageState !== 'main' || !!token || !!oneColorToken || !!oneColorDetail || manageFavorites;
+  const fullScreen =
+    pageState !== 'main' || !!token || !!oneColorToken || !!oneColorDetail || bsvDetail || manageFavorites;
 
   // A swap runs in the background and can finish after its screen was left:
   // refresh balances and the token page's history whenever one does.
@@ -1188,10 +1192,7 @@ export const BsvWallet = () => {
             decimals={8}
             usdBalance={bsvBalance * exchangeRate}
             showPointer={true}
-            onClick={() => {
-              setSendSource('main');
-              setPageState('send');
-            }}
+            onClick={() => setBsvDetail(true)}
           />
           {lockData && (
             <Show when={services.locks && lockData.totalLocked > 0}>
@@ -1547,10 +1548,6 @@ export const BsvWallet = () => {
           isSubmit
         />
       </form>
-
-      <div className="w-full px-4">
-        <CoinHistory filter={{ type: 'bsv' }} refreshKey={bsvHistoryRefreshKey} />
-      </div>
     </motion.div>
   );
 
@@ -1675,9 +1672,39 @@ export const BsvWallet = () => {
         <PageLoader theme={theme} message="Sending BSV..." />
       </Show>
       <Show
-        when={!isProcessing && pageState === 'main' && !token && !oneColorToken && !oneColorDetail && !manageFavorites}
+        when={
+          !isProcessing &&
+          pageState === 'main' &&
+          !token &&
+          !oneColorToken &&
+          !oneColorDetail &&
+          !bsvDetail &&
+          !manageFavorites
+        }
       >
         {main}
+      </Show>
+      <Show when={!isProcessing && pageState === 'main' && bsvDetail && !oneColorDetail && !token && !manageFavorites}>
+        <BsvDetailView
+          balanceBsv={bsvBalance}
+          bsvUsdRate={exchangeRate}
+          chain={apiContext.chain}
+          swapAvailable={swapAvailable}
+          refreshKey={bsvHistoryRefreshKey}
+          onBack={() => setBsvDetail(false)}
+          onReceive={() => {
+            setReceiveContext(null);
+            setPageState('receive');
+          }}
+          onSend={() => {
+            setSendSource('main');
+            setPageState('send');
+          }}
+          onSwap={() => {
+            setSwapToken(undefined);
+            setPageState('swap');
+          }}
+        />
       </Show>
       <Show when={!isProcessing && pageState === 'main' && !!oneColorDetail && !oneColorToken && !manageFavorites}>
         {oneColorDetail && (
