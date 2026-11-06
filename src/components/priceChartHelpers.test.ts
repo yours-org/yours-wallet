@@ -79,5 +79,6 @@ describe('price chart helpers', () => {
     expect(formatPrice(12.5, 'USD')).toBe('$12.50');
     expect(formatPrice(0.00000423, 'BSV')).toBe('0.00000423 BSV');
     expect(formatPrice(0, 'USD')).toBe('$0.00');
+    expect(formatPrice(0.0000123456, 'USD')).toBe('$0.0₄123');
   });
 });

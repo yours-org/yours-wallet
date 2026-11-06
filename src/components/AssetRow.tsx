@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Info } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
-import { formatLargeNumber, formatUSD } from '../utils/format';
+import { displayNumber, formatUSD } from '../utils/format';
 import { Show } from './Show';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 
@@ -20,6 +20,10 @@ export type AssetRowProps = {
   nextUnlock?: number;
   /** Decimal places for balance display. Defaults to 3. */
   decimals?: number;
+  /** The balance already formatted (a token amount); `balance` is then only used for the sat/BSV logic. */
+  balanceText?: string;
+  /** The exact amount, shown on hover when `balanceText` is compacted. */
+  balanceTitle?: string;
   /** Part of the balance not spendable yet: shown as an amber pill under the ticker, `hint` on hover. */
   pending?: { label: string; hint: string };
   onClick?: () => void;
@@ -38,6 +42,8 @@ export const AssetRow = (props: AssetRowProps) => {
     animate = false,
     decimals,
     pending,
+    balanceText,
+    balanceTitle,
   } = props;
   const { theme } = useTheme();
   const isDisplaySat = isLock && balance < 0.0001;
@@ -87,11 +93,17 @@ export const AssetRow = (props: AssetRowProps) => {
 
       {/* Right: balance */}
       <div className="flex flex-col items-end mr-3 min-w-0 max-w-[45%]">
-        <span className="text-sm font-semibold text-right leading-tight" style={{ color: theme.color.global.contrast }}>
-          {`${formatLargeNumber(
-            isDisplaySat ? balance * BSV_DECIMAL_CONVERSION : balance,
-            displayDecimals,
-          )}${isLock ? (isDisplaySat ? `${balance === 0.00000001 ? ' SAT' : ' SATS'}` : ' BSV') : ''}`}
+        <span
+          className="text-sm font-semibold text-right leading-tight"
+          style={{ color: theme.color.global.contrast }}
+          title={balanceTitle}
+        >
+          {balanceText ??
+            `${
+              isDisplaySat
+                ? Math.round(balance * BSV_DECIMAL_CONVERSION).toLocaleString()
+                : displayNumber(Number(balance.toFixed(displayDecimals)))
+            }${isLock ? (isDisplaySat ? `${balance === 0.00000001 ? ' SAT' : ' SATS'}` : ' BSV') : ''}`}
         </span>
         <span className="text-xs mt-0.5 text-right" style={{ color: theme.color.global.gray }}>
           {isLock ? `Block ${nextUnlock}` : usdBalance === null ? '—' : formatUSD(usdBalance)}

@@ -7,7 +7,7 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { normalizeHandle, oneColorTicker, type OneColorBalance } from '../services/oneColor';
 import { GENERIC_TOKEN_ICON } from '../utils/constants';
-import { normalize, showAmount, truncate } from '../utils/format';
+import { displayAmount, formatTokenAmount, normalize, showAmount, truncate } from '../utils/format';
 import { getErrorMessage } from '../utils/tools';
 import { Input } from './Input';
 import { SendConfirmation, type SendLineItem } from './SendConfirmation';
@@ -90,7 +90,7 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
       addSnackbar('Amount exceeds available balance.', 'error');
       return;
     }
-    const amountText = `${showAmount(atomic, token.dec)} ${ticker}`;
+    const amountText = `${formatTokenAmount(atomic, token.dec)} ${ticker}`;
     setSendConfirmation({
       lineItems: [{ address: handle, amount: amountText }],
       total: amountText,
@@ -178,7 +178,7 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
               Available
             </span>
             <span className="text-sm font-semibold font-mono" style={{ color: contrast }}>
-              {showAmount(maxAmount, token.dec)}
+              {displayAmount(maxAmount, token.dec)}
             </span>
             <span className="text-xs font-semibold" style={{ color: accent }}>
               {ticker}
@@ -204,7 +204,7 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
                 title="Held by a send that has not settled yet"
               >
                 <span className="text-[10px] font-semibold" style={{ color: gray }}>
-                  {showAmount(token.pending, token.dec)} pending
+                  {displayAmount(token.pending, token.dec)} pending
                 </span>
               </div>
             </Show>

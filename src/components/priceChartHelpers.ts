@@ -92,8 +92,12 @@ export const formatPrice = (value: number, currency: ChartCurrency): string => {
   if (currency === 'USD') {
     if (value >= 1)
       return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const digits = Math.min(12, Math.max(2, -Math.floor(Math.log10(value)) + 2));
-    return `$${value.toFixed(digits).replace(/0+$/, '')}`;
+    const digits = Math.min(14, Math.max(2, -Math.floor(Math.log10(value)) + 2));
+    const plain = value.toFixed(digits).replace(/0+$/, '');
+    // Sub-cent prices: fold the run of zeros into a subscript count ($0.0₄123), as Phantom does.
+    const m = /^0\.(0{4,})(\d+)$/.exec(plain);
+    if (m) return `$0.0${subscriptDigits(m[1].length)}${m[2].slice(0, 3)}`;
+    return `$${plain}`;
   }
   const text =
     value >= 1
@@ -101,6 +105,13 @@ export const formatPrice = (value: number, currency: ChartCurrency): string => {
       : value.toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
   return `${text} BSV`;
 };
+
+const SUBSCRIPTS = '₀₁₂₃₄₅₆₇₈₉';
+const subscriptDigits = (n: number): string =>
+  String(n)
+    .split('')
+    .map((d) => SUBSCRIPTS[Number(d)])
+    .join('');
 
 export const formatChange = (pct: number | null): string =>
   pct === null ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(Math.abs(pct) >= 10 ? 1 : 2)}%`;

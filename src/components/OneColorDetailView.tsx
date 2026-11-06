@@ -17,7 +17,7 @@ import { oneColorTicker, type OneColorBalance } from '../services/oneColor';
 import { swapEnableToken, swapJobs, swapMoveBack, swapMoveBackSats, swapTokenStatus } from '../services/swap';
 import type { SwapTokenStatus } from '../services/swapTypes';
 import { ammSiteUrlOf, GENERIC_TOKEN_ICON } from '../utils/constants';
-import { formatUSD, showAmount } from '../utils/format';
+import { displayAmount, formatTokenAmount, formatUSD } from '../utils/format';
 import { getErrorMessage } from '../utils/tools';
 import { CoinHistory } from './CoinHistory';
 import { PriceChart } from './PriceChart';
@@ -286,8 +286,12 @@ export const OneColorDetailView = ({
                 <span className="text-xs" style={{ color: gray }}>
                   Your balance
                 </span>
-                <span className="text-base font-bold truncate" style={{ color: contrast }}>
-                  {showAmount(token.available, token.dec)} {ticker}
+                <span
+                  className="text-base font-bold truncate"
+                  style={{ color: contrast }}
+                  title={`${formatTokenAmount(token.available, token.dec)} ${ticker}`}
+                >
+                  {displayAmount(token.available, token.dec)} {ticker}
                 </span>
                 <Show when={token.pending > 0n}>
                   <span
@@ -296,7 +300,7 @@ export const OneColorDetailView = ({
                     style={{ color: PENDING_COLOR, backgroundColor: `${PENDING_COLOR}26` }}
                   >
                     <Info size={10} strokeWidth={2.5} />
-                    {showAmount(token.pending, token.dec)} pending
+                    {displayAmount(token.pending, token.dec)} pending
                   </span>
                 </Show>
               </div>
@@ -321,8 +325,12 @@ export const OneColorDetailView = ({
             <span className="text-xs" style={{ color: gray }}>
               Balance
             </span>
-            <span className="text-[32px] font-bold leading-tight break-all text-center" style={{ color: contrast }}>
-              {showAmount(token.available, token.dec)}
+            <span
+              className="text-[32px] font-bold leading-tight break-all text-center"
+              style={{ color: contrast }}
+              title={formatTokenAmount(token.available, token.dec)}
+            >
+              {displayAmount(token.available, token.dec)}
             </span>
             <span className="text-sm" style={{ color: gray }}>
               {usdValue !== undefined ? formatUSD(usdValue) : 'No market price yet'}
@@ -334,7 +342,7 @@ export const OneColorDetailView = ({
                 style={{ color: PENDING_COLOR, backgroundColor: `${PENDING_COLOR}26` }}
               >
                 <Info size={10} strokeWidth={2.5} />
-                {showAmount(token.pending, token.dec)} pending
+                {displayAmount(token.pending, token.dec)} pending
               </span>
             </Show>
           </div>
@@ -441,9 +449,9 @@ export const OneColorDetailView = ({
                 {swapInFlight ? 'A swap is in progress' : 'Reserved by a swap that did not finish'}
               </span>
               <span className="text-xs leading-relaxed" style={{ color: gray }}>
-                {reservedTokens > 0n ? `${showAmount(reservedTokens, token.dec)} ${ticker}` : ''}
+                {reservedTokens > 0n ? `${displayAmount(reservedTokens, token.dec)} ${ticker}` : ''}
                 {reservedTokens > 0n && reservedSats > 0n ? ' and ' : ''}
-                {reservedSats > 0n ? `${showAmount(reservedSats, 8)} BSV` : ''}
+                {reservedSats > 0n ? `${displayAmount(reservedSats, 8)} BSV` : ''}
                 {swapInFlight
                   ? ' is held for it. It lands or comes back when the swap finishes.'
                   : ' is held in the swap basket. Return it to your balance; nothing is lost.'}

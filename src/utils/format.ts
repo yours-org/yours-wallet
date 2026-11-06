@@ -17,6 +17,35 @@ export function formatTokenAmount(amt: bigint, dec: number): string {
   return `${negative ? '-' : ''}${grouped}${fraction ? `.${fraction}` : ''}`;
 }
 
+/**
+ * An amount for reading, the way Phantom and Coinbase show balances: thousands
+ * separators, and a fraction trimmed to what the size warrants (2 places from a
+ * thousand up, 4 from one up, else the first 4 significant decimals, at most
+ * 8), trailing zeros dropped. Never for an input or a confirmation: those use
+ * the exact amount (`formatTokenAmount`, `showAmount`).
+ */
+export function compactDecimal(full: string): string {
+  const negative = full.startsWith('-');
+  const [intRaw, fracRaw = ''] = (negative ? full.slice(1) : full).split('.');
+  const int = intRaw.replace(/^0+(?=\d)/, '') || '0';
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  let keep: number;
+  if (int.length > 3) keep = 2;
+  else if (int !== '0') keep = 4;
+  else {
+    const lead = fracRaw.match(/^0*/)?.[0].length ?? 0;
+    keep = Math.min(8, lead + 4);
+  }
+  const frac = fracRaw.slice(0, keep).replace(/0+$/, '');
+  return `${negative ? '-' : ''}${grouped}${frac ? `.${frac}` : ''}`;
+}
+
+/** `compactDecimal` of a token amount in raw units at `dec` decimals. */
+export const displayAmount = (amt: bigint, dec: number): string => compactDecimal(showAmount(amt, dec));
+
+/** `compactDecimal` of a plain number (a BSV balance, a USD-free quantity). */
+export const displayNumber = (n: number): string => (Number.isFinite(n) ? compactDecimal(n.toFixed(8)) : '—');
+
 export function normalize(amt: string, dec: number): string {
   if (!Number.isFinite(dec) || dec < 0) {
     return amt.split('.')[0];

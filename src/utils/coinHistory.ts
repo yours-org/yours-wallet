@@ -13,7 +13,7 @@ import { buildTokenLabel } from '@1sat/types';
 import type { WalletAction } from '@bsv/sdk';
 import { BSV_DECIMAL_CONVERSION } from './constants';
 import { oneColorActionAmount, oneColorTicker } from '../services/oneColor';
-import { formatNumberWithCommasAndDecimals, formatTokenAmount, truncate } from './format';
+import { displayAmount, formatNumberWithCommasAndDecimals, truncate } from './format';
 
 /** Baskets that indicate a non-BSV action (BSV list should exclude these). */
 const NON_BSV_BASKETS = new Set(['bsv21', '1sat', 'ordinals', 'lock', 'opns', 'sigma', 'bsocial', 'bap']);
@@ -275,7 +275,7 @@ export const fetchBsv21History = async (
       const atomic = bsv21AmountFromAction(a, tokenId);
       const sign = direction === 'sent' ? '-' : '+';
       // The history sits inside the token's own view, so the amount needs no unit.
-      const display = atomic > 0n ? `${sign}${formatTokenAmount(atomic, decimals)}` : `${sym} transfer`;
+      const display = atomic > 0n ? `${sign}${displayAmount(atomic, decimals)}` : `${sym} transfer`;
       return {
         txid: a.txid,
         direction,
@@ -332,7 +332,7 @@ export const fetchOneColorHistory = async (
         txid: a.txid,
         direction: moved.direction,
         kind: historyKindOf(a.labels),
-        amountDisplay: moved.amount > 0n ? `${sign}${formatTokenAmount(moved.amount, decimals)}` : `${sym} transfer`,
+        amountDisplay: moved.amount > 0n ? `${sign}${displayAmount(moved.amount, decimals)}` : `${sym} transfer`,
         amountSubdued: moved.amount === 0n,
         description: a.description || undefined,
       });

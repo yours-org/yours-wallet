@@ -6,7 +6,7 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
 import type { WalletToken } from '../services/walletTokens';
 import { Theme } from '../theme.types';
-import { showAmount, truncate } from '../utils/format';
+import { displayAmount, formatTokenAmount, showAmount, truncate } from '../utils/format';
 import { tokenUsdValue } from '../services/oneColorPrices';
 import { AssetRow } from './AssetRow';
 import { Show } from './Show';
@@ -23,7 +23,7 @@ export type TokensListProps = {
 
 /** The pending pill for a token: how much, and why it is not spendable yet. */
 const pendingOf = (t: WalletToken) => ({
-  label: `${showAmount(t.pending, t.dec)} pending`,
+  label: `${displayAmount(t.pending, t.dec)} pending`,
   hint:
     t.kind === '1color'
       ? 'Held by a send that the recipient has not claimed yet. It becomes spendable again when that send settles or expires.'
@@ -127,6 +127,8 @@ export const TokensList = (props: TokensListProps) => {
                             <AssetRow
                               animate
                               balance={Number(showAmount(t.confirmed, t.dec))}
+                              balanceText={displayAmount(t.confirmed, t.dec)}
+                              balanceTitle={`${formatTokenAmount(t.confirmed, t.dec)} ${t.name}`}
                               decimals={t.dec}
                               showPointer={true}
                               icon={t.icon}

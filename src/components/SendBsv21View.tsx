@@ -4,7 +4,7 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { ONE_SAT_MARKET_URL } from '../utils/constants';
-import { showAmount, normalize, truncate } from '../utils/format';
+import { formatTokenAmount, normalize, showAmount, truncate } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import { getErrorMessage } from '../utils/tools';
 import { isUri } from '../utils/uri';
@@ -205,7 +205,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
     }
     const lineItems: SendLineItem[] = tokenOrder.map((addr) => ({
       address: addr,
-      amount: `${showAmount(tokenConsolidated.get(addr)!, token.info.dec)} ${tokenName}`,
+      amount: `${formatTokenAmount(tokenConsolidated.get(addr)!, token.info.dec)} ${tokenName}`,
     }));
 
     const tokenIcon = token.info.icon
@@ -216,7 +216,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
     setSendConfirmation({
       icon: tokenIcon,
       lineItems,
-      total: `${showAmount(total, token.info.dec)} ${tokenName}`,
+      total: `${formatTokenAmount(total, token.info.dec)} ${tokenName}`,
       onConfirm: async () => {
         setSendConfirmation(null);
         setIsProcessing(true);
