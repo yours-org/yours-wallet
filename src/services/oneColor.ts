@@ -88,23 +88,29 @@ const PAGE = 1000;
 
 type HoldingOutput = Pick<WalletOutput, 'outpoint' | 'lockingScript' | 'tags'>;
 
+/**
+ * The asset an output belongs to. A deploy output carries no asset id in its
+ * script: it is the asset, `<txid>_0`, and a fixed-supply deploy is also the
+ * holder's first value output (an authority deploy, amount 0, its first
+ * authority output). The module files it in the asset's basket like any other.
+ */
+const assetIdOf = (token: OneColorToken, outpoint: string): string | undefined =>
+  token.tokenId ?? (token.role === 'deploy' ? `${outpoint.split('.')[0]}_0` : undefined);
+
 /** Group decoded token outputs by asset: available amount, reserved outputs, authority count. */
 export const aggregateOneColorHoldings = (outputs: HoldingOutput[]): Map<string, OneColorHolding> => {
   const byAsset = new Map<string, OneColorHolding>();
   for (const o of outputs) {
     const token = decodeOneColor(o.lockingScript);
-    if (!token?.tokenId || token.role === 'deploy') continue;
+    const assetId = token && assetIdOf(token, o.outpoint);
+    if (!token || !assetId) continue;
     const reserved = (o.tags ?? []).includes(STATE_RESERVED);
-    const entry = byAsset.get(token.tokenId) ?? {
-      assetId: token.tokenId,
-      available: 0n,
-      reservedOutputs: [],
-      authorities: 0,
-    };
-    if (token.role === 'authority') entry.authorities += 1;
+    const entry = byAsset.get(assetId) ?? { assetId, available: 0n, reservedOutputs: [], authorities: 0 };
+    const authority = token.role === 'authority' || (token.role === 'deploy' && token.amount === 0n);
+    if (authority) entry.authorities += 1;
     else if (reserved) entry.reservedOutputs.push({ outpoint: o.outpoint, amount: token.amount });
     else entry.available += token.amount;
-    byAsset.set(token.tokenId, entry);
+    byAsset.set(assetId, entry);
   }
   return byAsset;
 };

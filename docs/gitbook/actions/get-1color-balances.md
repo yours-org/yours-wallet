@@ -39,12 +39,16 @@ const { outputs, totalOutputs } = await wallet.listOutputs({
 const byAsset = new Map<string, { available: bigint; reserved: bigint; authorities: number }>();
 for (const o of outputs) {
   const token = OneColor.decode(LockingScript.fromHex(o.lockingScript!));
-  if (!token?.tokenId || token.role === 'deploy') continue;
-  const entry = byAsset.get(token.tokenId) ?? { available: 0n, reserved: 0n, authorities: 0 };
-  if (token.role === 'authority') entry.authorities += 1;
+  if (!token) continue;
+  // A deploy output carries no asset id: it *is* the asset, <txid>_0. A fixed-supply
+  // deploy is the holder's first value output; an authority deploy (amount 0) its first authority.
+  const assetId = token.tokenId ?? (token.role === 'deploy' ? `${o.outpoint.split('.')[0]}_0` : undefined);
+  if (!assetId) continue;
+  const entry = byAsset.get(assetId) ?? { available: 0n, reserved: 0n, authorities: 0 };
+  if (token.role === 'authority' || (token.role === 'deploy' && token.amount === 0n)) entry.authorities += 1;
   else if (o.tags?.includes('color_state_reserved')) entry.reserved += token.amount;
   else entry.available += token.amount;
-  byAsset.set(token.tokenId, entry);
+  byAsset.set(assetId, entry);
 }
 ```
 

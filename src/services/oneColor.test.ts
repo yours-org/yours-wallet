@@ -13,6 +13,7 @@ import {
 const ASSET = `${'ab'.repeat(32)}_0`;
 const OTHER = `${'cd'.repeat(32)}_0`;
 const pkh = new Array(20).fill(7);
+const DEPLOY_TXID = 'ab'.repeat(32);
 const value = (assetId: string, amount: bigint) => OneColor.value(assetId, amount, { lock: pkh }).lock().toHex();
 const authority = (assetId: string) => OneColor.authority(assetId, { lock: pkh }).lock().toHex();
 
@@ -34,10 +35,33 @@ describe('aggregateOneColorHoldings', () => {
     expect(held.get(OTHER)).toEqual({ assetId: OTHER, available: 1n, reservedOutputs: [], authorities: 0 });
   });
 
-  test('skips outputs that are not 1Color value or authority outputs', () => {
+  test("a fixed-supply deploy is the asset's first value output, keyed <txid>_0", () => {
     const deploy = OneColor.deployValue(10n, { lock: pkh }).lock().toHex();
     const held = aggregateOneColorHoldings([
-      { outpoint: 'a.0', lockingScript: deploy, tags: [] },
+      { outpoint: `${DEPLOY_TXID}.0`, lockingScript: deploy, tags: ['color_state_available'] },
+      { outpoint: 'b.0', lockingScript: value(`${DEPLOY_TXID}_0`, 5n), tags: ['color_state_available'] },
+    ]);
+    expect(held.get(`${DEPLOY_TXID}_0`)).toEqual({
+      assetId: `${DEPLOY_TXID}_0`,
+      available: 15n,
+      reservedOutputs: [],
+      authorities: 0,
+    });
+  });
+
+  test("an authority deploy counts as the asset's first authority", () => {
+    const deploy = OneColor.deployAuthority({ lock: pkh }).lock().toHex();
+    const held = aggregateOneColorHoldings([{ outpoint: `${DEPLOY_TXID}.0`, lockingScript: deploy, tags: [] }]);
+    expect(held.get(`${DEPLOY_TXID}_0`)).toEqual({
+      assetId: `${DEPLOY_TXID}_0`,
+      available: 0n,
+      reservedOutputs: [],
+      authorities: 1,
+    });
+  });
+
+  test('skips outputs that are not 1Color outputs', () => {
+    const held = aggregateOneColorHoldings([
       { outpoint: 'b.0', lockingScript: '76a914' + '00'.repeat(20) + '88ac', tags: [] },
       { outpoint: 'c.0', lockingScript: 'zz', tags: [] },
       { outpoint: 'd.0', tags: [] },
