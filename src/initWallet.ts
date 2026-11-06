@@ -397,7 +397,15 @@ export const initWallet = async (
   // The active store is the source of truth; every other registered store is
   // a backup brought up to date from it: once after the address sync on
   // open, then on a timer. Never throws; failures are logged and recorded.
-  const pushBackupsAndRecord = async () => {
+  const pushBackupsAndRecord = async (announce = false) => {
+    // On open the popup is waiting on this step; say so, since the first
+    // catch-up on a wallet with a lot of history can take a while.
+    if (announce && (storage._backups?.length ?? 0) > 0) {
+      sendSyncStatus({
+        status: 'backup',
+        message: activeRemote ? 'Updating the backup on this device…' : 'Updating remote backups…',
+      });
+    }
     const t = Date.now();
     const results = await pushBackups(storage);
     if (results.length > 0) {
@@ -441,13 +449,13 @@ export const initWallet = async (
       // Backups catch up before `complete` goes out: the USB backup runs on
       // that message and reads the local store, which must hold this sync's
       // rows first when a remote is active.
-      await pushBackupsAndRecord();
+      await pushBackupsAndRecord(true);
       sendSyncStatus({ status: 'complete', ...result });
     })
     .catch(async (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       console.error('[initWallet] Address sync failed:', error);
-      await pushBackupsAndRecord();
+      await pushBackupsAndRecord(true);
       sendSyncStatus({ status: 'error', message });
     });
 

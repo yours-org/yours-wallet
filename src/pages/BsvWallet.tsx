@@ -101,7 +101,7 @@ export const BsvWallet = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const { updateBalance, isSyncing } = useSyncTracker();
+  const { updateBalance, isSyncing, syncMessage } = useSyncTracker();
   const urlParams = new URLSearchParams(location.search);
   const { handleSelect, query } = useBottomMenu();
   const isReload = urlParams.get('reload') === 'true' || query === 'reload';
@@ -1374,6 +1374,21 @@ export const BsvWallet = () => {
               </motion.button>
             )}
           </div>
+          <AnimatePresence>
+            {isSyncing && syncMessage && (
+              <motion.p
+                key="sync-message"
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="text-xs mt-1 select-none"
+                style={{ color: theme.color.global.gray }}
+              >
+                {syncMessage}
+              </motion.p>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* ── Action buttons ── */}
