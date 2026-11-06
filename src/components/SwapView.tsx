@@ -247,11 +247,18 @@ export const SwapView = (props: SwapViewProps) => {
   const formVisible = screen === 'form' && !pickerOpen;
 
   useEffect(() => {
-    // Any change invalidates the old quote; a pending answer for it is dropped.
+    // A change to the inputs invalidates the old quote; a pending answer for it is dropped.
     quoteSeq.current++;
     setQuote(null);
     setQuoteError('');
     setQuoteLoading(false);
+    // requestKey stands for request's content.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestKey]);
+
+  useEffect(() => {
+    // Quote while the form is on screen. Leaving it (the picker, the confirm step) only stops the
+    // timers: the quote the user is confirming must stay.
     if (!request || !formVisible) return;
     setQuoteLoading(true);
     const debounce = setTimeout(() => void runQuote(request, false), QUOTE_DEBOUNCE_MS);
@@ -259,8 +266,8 @@ export const SwapView = (props: SwapViewProps) => {
     return () => {
       clearTimeout(debounce);
       clearInterval(refresh);
+      setQuoteLoading(false);
     };
-    // requestKey stands for request's content.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestKey, formVisible, runQuote]);
 
