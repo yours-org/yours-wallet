@@ -2,11 +2,11 @@
  * 1Color (BRC-162) tokens the wallet holds, for the popup's token list and
  * send view.
  *
- * Holdings come from the BRC-207 color module's `p color assets` view: one
- * `listOutputs` per page over every per-asset basket, each output tagged
- * `color_state_available` or `color_state_reserved`. The output's locking
- * script is decoded with the OneColor template for its asset, role and
- * amount; the view reports wallet state only and never asks the overlay.
+ * Holdings come from one read of the toolbox's basket-prefix listing: every
+ * output in the color module's per-asset baskets, with its locking script
+ * and nothing else. The script is decoded with the OneColor template for its
+ * asset, role and amount; an output that is not spendable is `reserved`. The
+ * read reports wallet state only and never asks the overlay.
  *
  * `reserved` is the module's word for "not spendable": the output is an input
  * of an action that has not been proven yet. That covers two very different
@@ -65,8 +65,6 @@ export type OneColorHolding = {
   authorities: number;
 };
 
-const STATE_RESERVED = 'color_state_reserved';
-const STATE_AVAILABLE = 'color_state_available';
 const COLOR_BASKET_PREFIX = 'p color ';
 
 /** Action statuses whose inputs are still the wallet's: signed or built, but not broadcast. */
@@ -85,9 +83,10 @@ export const decodeOneColor = (lockingScriptHex: string | undefined): OneColorTo
 /** What the lists call a token: its symbol, else a short asset id. */
 export const oneColorTicker = (t: { sym?: string; assetId: string }): string =>
   t.sym || `${t.assetId.slice(0, 6)}…${t.assetId.slice(-4)}`;
-const PAGE = 1000;
+/** The basket-prefix listing's own ceiling: it has no paging and refuses a wallet holding more. */
+const LISTING_LIMIT = 10_000;
 
-type HoldingOutput = Pick<WalletOutput, 'outpoint' | 'lockingScript' | 'tags'>;
+type HoldingOutput = Pick<WalletOutput, 'outpoint' | 'lockingScript' | 'spendable'>;
 
 /**
  * The asset an output belongs to. A deploy output carries no asset id in its
@@ -105,7 +104,7 @@ export const aggregateOneColorHoldings = (outputs: HoldingOutput[]): Map<string,
     const token = decodeOneColor(o.lockingScript);
     const assetId = token && assetIdOf(token, o.outpoint);
     if (!token || !assetId) continue;
-    const reserved = (o.tags ?? []).includes(STATE_RESERVED);
+    const reserved = !o.spendable;
     const entry = byAsset.get(assetId) ?? { assetId, available: 0n, reservedOutputs: [], authorities: 0 };
     const authority = token.role === 'authority' || (token.role === 'deploy' && token.amount === 0n);
     if (authority) entry.authorities += 1;
@@ -167,35 +166,20 @@ export const pendingAmount = (reserved: ReservedOutput[], statuses: Map<string, 
 /**
  * Every token output the color module holds, across all assets.
  *
- * Read from the toolbox's basket-prefix listing directly, not the module's
- * `p color assets` selector. The module asks the toolbox for that listing
- * without a page size, and the toolbox's action-batch overlay slices every
- * result to the default ten outputs, so the selector never shows more than
- * the first ten token outputs by txid (color-permission-module 0.1.3 on
- * wallet-toolbox-client 2.15.3). The state tag is derived the way the
- * module derives it: an output that is not spendable is reserved.
+ * One call to the toolbox's basket-prefix listing, which returns every output
+ * in the `p color` baskets whatever page is asked for; the limit is that
+ * listing's ceiling. Only locking scripts are read: no tags, custom
+ * instructions or transactions. An output that is not spendable is an input
+ * of an action that has not been proven yet.
  */
 export const listOneColorHoldings = async (wallet: Pick<WalletInterface, 'listOutputs'>): Promise<HoldingOutput[]> => {
-  const outputs: HoldingOutput[] = [];
-  for (let offset = 0; ; offset += PAGE) {
-    const page = await wallet.listOutputs({
-      basket: sdk.specOpBasketPrefixOutputs,
-      tags: [COLOR_BASKET_PREFIX.trim()],
-      include: 'locking scripts',
-      includeTags: true,
-      limit: PAGE,
-      offset,
-    });
-    outputs.push(
-      ...page.outputs.map((o) => ({
-        outpoint: o.outpoint,
-        lockingScript: o.lockingScript,
-        tags: [...(o.tags ?? []), o.spendable ? STATE_AVAILABLE : STATE_RESERVED],
-      })),
-    );
-    if (page.outputs.length < PAGE || outputs.length >= Number(page.totalOutputs)) break;
-  }
-  return outputs;
+  const { outputs } = await wallet.listOutputs({
+    basket: sdk.specOpBasketPrefixOutputs,
+    tags: [COLOR_BASKET_PREFIX.trim()],
+    include: 'locking scripts',
+    limit: LISTING_LIMIT,
+  });
+  return outputs.map(({ outpoint, lockingScript, spendable }) => ({ outpoint, lockingScript, spendable }));
 };
 
 /** The deploy's display fields as the list shows them. */

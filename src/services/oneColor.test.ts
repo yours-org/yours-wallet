@@ -22,11 +22,11 @@ const authority = (assetId: string) => OneColor.authority(assetId, { lock: pkh }
 describe('aggregateOneColorHoldings', () => {
   test('sums available value by asset, lists reserved outputs, and counts authorities', () => {
     const held = aggregateOneColorHoldings([
-      { outpoint: 'a.0', lockingScript: value(ASSET, 100n), tags: ['p color', 'color_state_available'] },
-      { outpoint: 'b.0', lockingScript: value(ASSET, 25n), tags: ['p color', 'color_state_reserved'] },
-      { outpoint: 'c.0', lockingScript: value(ASSET, 5n), tags: ['color_state_available'] },
-      { outpoint: 'd.0', lockingScript: authority(ASSET), tags: ['color_state_available'] },
-      { outpoint: 'e.0', lockingScript: value(OTHER, 1n), tags: ['color_state_available'] },
+      { outpoint: 'a.0', lockingScript: value(ASSET, 100n), spendable: true },
+      { outpoint: 'b.0', lockingScript: value(ASSET, 25n), spendable: false },
+      { outpoint: 'c.0', lockingScript: value(ASSET, 5n), spendable: true },
+      { outpoint: 'd.0', lockingScript: authority(ASSET), spendable: true },
+      { outpoint: 'e.0', lockingScript: value(OTHER, 1n), spendable: true },
     ]);
     expect(held.get(ASSET)).toEqual({
       assetId: ASSET,
@@ -40,8 +40,8 @@ describe('aggregateOneColorHoldings', () => {
   test("a fixed-supply deploy is the asset's first value output, keyed <txid>_0", () => {
     const deploy = OneColor.deployValue(10n, { lock: pkh }).lock().toHex();
     const held = aggregateOneColorHoldings([
-      { outpoint: `${DEPLOY_TXID}.0`, lockingScript: deploy, tags: ['color_state_available'] },
-      { outpoint: 'b.0', lockingScript: value(`${DEPLOY_TXID}_0`, 5n), tags: ['color_state_available'] },
+      { outpoint: `${DEPLOY_TXID}.0`, lockingScript: deploy, spendable: true },
+      { outpoint: 'b.0', lockingScript: value(`${DEPLOY_TXID}_0`, 5n), spendable: true },
     ]);
     expect(held.get(`${DEPLOY_TXID}_0`)).toEqual({
       assetId: `${DEPLOY_TXID}_0`,
@@ -53,7 +53,7 @@ describe('aggregateOneColorHoldings', () => {
 
   test("an authority deploy counts as the asset's first authority", () => {
     const deploy = OneColor.deployAuthority({ lock: pkh }).lock().toHex();
-    const held = aggregateOneColorHoldings([{ outpoint: `${DEPLOY_TXID}.0`, lockingScript: deploy, tags: [] }]);
+    const held = aggregateOneColorHoldings([{ outpoint: `${DEPLOY_TXID}.0`, lockingScript: deploy, spendable: true }]);
     expect(held.get(`${DEPLOY_TXID}_0`)).toEqual({
       assetId: `${DEPLOY_TXID}_0`,
       available: 0n,
@@ -64,42 +64,42 @@ describe('aggregateOneColorHoldings', () => {
 
   test('skips outputs that are not 1Color outputs', () => {
     const held = aggregateOneColorHoldings([
-      { outpoint: 'b.0', lockingScript: '76a914' + '00'.repeat(20) + '88ac', tags: [] },
-      { outpoint: 'c.0', lockingScript: 'zz', tags: [] },
-      { outpoint: 'd.0', tags: [] },
+      { outpoint: 'b.0', lockingScript: '76a914' + '00'.repeat(20) + '88ac', spendable: true },
+      { outpoint: 'c.0', lockingScript: 'zz', spendable: true },
+      { outpoint: 'd.0', spendable: true },
     ]);
     expect(held.size).toBe(0);
   });
 });
 
 describe('listOneColorHoldings', () => {
-  test('reads the basket-prefix listing in full pages and tags reserved outputs by spendability', async () => {
-    const calls: unknown[] = [];
+  test('reads the basket-prefix listing once, locking scripts only, and keeps each output spendability', async () => {
+    const calls: Record<string, unknown>[] = [];
     const all = Array.from({ length: 1203 }, (_, i) => ({
       outpoint: `${i.toString(16).padStart(64, '0')}.0`,
       satoshis: 1,
       spendable: i % 7 !== 0,
       lockingScript: value(`${DEPLOY_TXID}_0`, 1n),
-      tags: ['p color'],
     }));
     const wallet = {
-      listOutputs: async (args: { basket: string; tags?: string[]; limit?: number; offset?: number }) => {
+      // As the toolbox answers this listing: every output, whatever page is asked for.
+      listOutputs: async (args: Record<string, unknown>) => {
         calls.push(args);
-        const start = args.offset ?? 0;
-        return { totalOutputs: all.length, outputs: all.slice(start, start + (args.limit ?? 10)) };
+        return { totalOutputs: all.length, outputs: all };
       },
     };
     const held = await listOneColorHoldings(wallet as never);
-    expect(calls.length).toBe(2);
-    expect(calls[0]).toMatchObject({
-      basket: sdk.specOpBasketPrefixOutputs,
-      tags: ['p color'],
-      limit: 1000,
-      offset: 0,
-    });
+    expect(calls).toEqual([
+      {
+        basket: sdk.specOpBasketPrefixOutputs,
+        tags: ['p color'],
+        include: 'locking scripts',
+        limit: 10_000,
+      },
+    ]);
     expect(held.length).toBe(1203);
-    expect(held[0].tags).toEqual(['p color', 'color_state_reserved']);
-    expect(held[1].tags).toEqual(['p color', 'color_state_available']);
+    expect(held[0]).toEqual({ outpoint: all[0].outpoint, lockingScript: all[0].lockingScript, spendable: false });
+    expect(held[1].spendable).toBe(true);
   });
 });
 
