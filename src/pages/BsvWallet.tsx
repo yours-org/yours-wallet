@@ -183,8 +183,12 @@ export const BsvWallet = () => {
   const isTestnet = apiContext.chain === 'test';
   /** Swaps need an exchange on this chain (none on mainnet yet). */
   const swapAvailable = !!swapExchangeOriginOf(apiContext.chain);
-  /** The swap flow takes the whole popup: no top nav, no bottom menu, so its steps have room. */
-  const fullScreen = pageState === 'swap';
+  /**
+   * Every drill-in page (anything with a back arrow: receive, send, the asset
+   * picker, a token's page, swap, manage tokens) takes the whole popup: no top
+   * nav, no bottom menu. Only the Coins list itself shows them.
+   */
+  const fullScreen = pageState !== 'main' || !!token || !!oneColorToken || !!oneColorDetail || manageFavorites;
 
   // A swap runs in the background and can finish after its screen was left:
   // refresh balances and the token page's history whenever one does.
@@ -734,7 +738,7 @@ export const BsvWallet = () => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto overflow-x-hidden self-start"
+      className="flex flex-col items-center w-full pt-3 pb-4 px-4 overflow-y-auto overflow-x-hidden self-start"
       style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header row */}
@@ -1300,7 +1304,7 @@ export const BsvWallet = () => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto overflow-x-hidden self-start"
+      className="flex flex-col items-center w-full pt-3 pb-4 px-4 overflow-y-auto overflow-x-hidden self-start"
       style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header */}

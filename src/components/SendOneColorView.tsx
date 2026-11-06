@@ -146,7 +146,7 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 16 }}
         transition={{ type: 'spring', stiffness: 320, damping: 35 }}
-        className="flex flex-col w-full pt-14 pb-20 overflow-y-auto overflow-x-hidden self-start"
+        className="flex flex-col w-full pt-3 pb-4 overflow-y-auto overflow-x-hidden self-start"
         style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
       >
         {/* Header */}
