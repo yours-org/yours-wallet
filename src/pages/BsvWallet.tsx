@@ -721,9 +721,12 @@ export const BsvWallet = () => {
     });
   };
 
+  /** The handle as people type and share it: without the leading '@' the wallet stores. */
+  const handleDisplay = defaultHandle ? defaultHandle.replace(/^@/, '') : '';
+
   const handleCopyHandle = () => {
     if (!defaultHandle) return;
-    navigator.clipboard.writeText(defaultHandle).then(() => {
+    navigator.clipboard.writeText(handleDisplay).then(() => {
       addSnackbar('Copied!', 'success');
       setCopiedHandle(true);
       setTimeout(() => setCopiedHandle(false), 2000);
@@ -1105,63 +1108,65 @@ export const BsvWallet = () => {
       {receiveContext && (
         <p className="text-xs text-center mb-4 max-w-[18rem]" style={{ color: theme.color.global.gray }}>
           {defaultHandle ? (
-            <>
-              Share your handle{' '}
-              <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
-                {defaultHandle}
-              </span>{' '}
-              to receive {oneColorTicker(receiveContext)}. Addresses below are for BSV, MNEE and Ordinals.
-            </>
+            <>Share your handle to receive {oneColorTicker(receiveContext)}.</>
           ) : (
             <>
               {oneColorTicker(receiveContext)} arrives through a handle. Register one in Settings &gt; Identity to
-              receive it; the addresses below are for BSV, MNEE and Ordinals.
+              receive it.
             </>
           )}
         </p>
       )}
 
-      {/* QR code */}
-      <QrCode address={receiveAddress} onClick={handleCopyToClipboard} />
+      {/* QR code: the handle for a 1Color token, else the address */}
+      {receiveContext ? (
+        defaultHandle ? (
+          <QrCode address={handleDisplay} onClick={handleCopyHandle} />
+        ) : null
+      ) : (
+        <QrCode address={receiveAddress} onClick={handleCopyToClipboard} />
+      )}
 
-      {/* Address copy row */}
-      <motion.button
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={handleCopyToClipboard}
-        className="flex items-center gap-2 mt-5 px-4 py-3 rounded-xl w-full border-0 outline-none cursor-pointer text-left"
-        style={{ background: theme.color.global.row }}
-      >
-        <AnimatePresence mode="wait">
-          {copiedAddress ? (
-            <motion.div
-              key="check"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0 }}
-              transition={{ duration: 0.18 }}
-            >
-              <Check size={16} style={{ color: theme.color.component.primaryButtonLeftGradient }} />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="copy"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0 }}
-              transition={{ duration: 0.18 }}
-            >
-              <Copy size={16} style={{ color: theme.color.global.gray }} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <span className="text-xs font-mono truncate flex-1" style={{ color: theme.color.global.contrast }}>
-          {receiveAddress}
-        </span>
-        <span className="text-xs shrink-0" style={{ color: theme.color.global.gray }}>
-          {copiedAddress ? 'Copied!' : 'Copy'}
-        </span>
-      </motion.button>
+      {/* Address copy row (not for a 1Color token: it arrives through the handle) */}
+      {!receiveContext && (
+        <motion.button
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleCopyToClipboard}
+          className="flex items-center gap-2 mt-5 px-4 py-3 rounded-xl w-full border-0 outline-none cursor-pointer text-left"
+          style={{ background: theme.color.global.row }}
+        >
+          <AnimatePresence mode="wait">
+            {copiedAddress ? (
+              <motion.div
+                key="check"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                transition={{ duration: 0.18 }}
+              >
+                <Check size={16} style={{ color: theme.color.component.primaryButtonLeftGradient }} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="copy"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                transition={{ duration: 0.18 }}
+              >
+                <Copy size={16} style={{ color: theme.color.global.gray }} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <span className="text-xs font-mono truncate flex-1" style={{ color: theme.color.global.contrast }}>
+            {receiveAddress}
+          </span>
+          <span className="text-xs shrink-0" style={{ color: theme.color.global.gray }}>
+            {copiedAddress ? 'Copied!' : 'Copy'}
+          </span>
+        </motion.button>
+      )}
 
       {/* BRC-169 handle: the default "from" handle, receivable at its messagebox */}
       {defaultHandle && (
@@ -1178,7 +1183,7 @@ export const BsvWallet = () => {
             <AtSign size={16} style={{ color: theme.color.global.gray }} />
           )}
           <span className="text-xs font-mono truncate flex-1" style={{ color: theme.color.global.contrast }}>
-            {defaultHandle}
+            {handleDisplay}
           </span>
           <span className="text-xs shrink-0" style={{ color: theme.color.global.gray }}>
             {copiedHandle ? 'Copied!' : 'Copy'}
@@ -1192,29 +1197,31 @@ export const BsvWallet = () => {
       )}
 
       {/* Info text */}
-      <Show
-        when={services.ordinals || services.bsv21}
-        whenFalseContent={
+      {!receiveContext && (
+        <Show
+          when={services.ordinals || services.bsv21}
+          whenFalseContent={
+            <p className="text-xs text-center mt-4 mb-2 max-w-[16rem]" style={{ color: theme.color.global.gray }}>
+              You may safely send{' '}
+              <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
+                Bitcoin SV (BSV)
+              </span>{' '}
+              to this address.
+            </p>
+          }
+        >
           <p className="text-xs text-center mt-4 mb-2 max-w-[16rem]" style={{ color: theme.color.global.gray }}>
             You may safely send{' '}
             <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
-              Bitcoin SV (BSV)
+              BSV, MNEE, and Ordinals
             </span>{' '}
             to this address.
           </p>
-        }
-      >
-        <p className="text-xs text-center mt-4 mb-2 max-w-[16rem]" style={{ color: theme.color.global.gray }}>
-          You may safely send{' '}
-          <span className="font-semibold" style={{ color: theme.color.component.primaryButtonLeftGradient }}>
-            BSV, MNEE, and Ordinals
-          </span>{' '}
-          to this address.
-        </p>
-      </Show>
+        </Show>
+      )}
 
       {/* Deposit Addresses */}
-      {depositAddresses.length > 0 && (
+      {!receiveContext && depositAddresses.length > 0 && (
         <div className="w-full mt-6">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xs font-semibold" style={{ color: theme.color.global.contrast }}>
