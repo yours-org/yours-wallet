@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Info,
   Loader2,
+  Search,
   SlidersHorizontal,
   X,
 } from 'lucide-react';
@@ -127,6 +128,7 @@ export const SwapView = (props: SwapViewProps) => {
   const [pickerOpen, setPickerOpen] = useState(!initialToken);
   const [listed, setListed] = useState<SwapListedToken[] | null>(null);
   const [listedError, setListedError] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
   const [quote, setQuote] = useState<SwapQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState('');
@@ -485,71 +487,121 @@ export const SwapView = (props: SwapViewProps) => {
 
   // ---- Form ----------------------------------------------------------------
 
-  const renderPicker = () => (
-    <div className="flex flex-col px-4 gap-2">
-      <span className="text-xs font-semibold mb-1" style={{ color: gray }}>
-        {side === 'sell' ? 'Choose a token to sell' : 'Choose a token to buy'}
-      </span>
-      {pickerRows.length === 0 && listed !== null ? (
-        <div
-          className="rounded-xl px-4 py-6 text-center text-xs"
-          style={{ background: row, border: CARD_BORDER, color: gray }}
-        >
-          {listedError ? 'Could not load the exchange’s tokens.' : 'No tokens are listed on the exchange yet.'}
-        </div>
-      ) : null}
-      {pickerRows.map(({ ref, pools, held }) => {
-        const muted = pools === 0;
-        const selected = token?.tokenId === ref.tokenId;
-        const heldBal = heldById.get(ref.tokenId);
-        return (
-          <motion.button
-            key={ref.tokenId}
-            type="button"
-            whileTap={muted ? undefined : { scale: 0.98 }}
-            onClick={() => pick(ref, pools)}
-            aria-disabled={muted}
-            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl outline-none cursor-pointer text-left"
+  // The same picker the send flow uses (AssetPicker): a search box, a section label and
+  // one row per token with its balance on the right. Tokens with no pool sit at the
+  // bottom, greyed, and say why.
+  const renderPicker = () => {
+    const q = pickerQuery.trim().toLowerCase();
+    const rows = q
+      ? pickerRows.filter(({ ref }) => tickerOf(ref).toLowerCase().includes(q) || ref.tokenId.includes(q))
+      : pickerRows;
+    const poolsText = (n: number) => (n === 1 ? '1 pool' : `${n} pools`);
+    return (
+      <div className="flex flex-col items-center w-full px-4">
+        <div className="relative w-full mb-4">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ color: gray }}
+          />
+          <input
+            type="text"
+            aria-label="Search tokens"
+            placeholder="Search tokens..."
+            value={pickerQuery}
+            onChange={(e) => setPickerQuery(e.target.value)}
+            className="w-full h-10 pl-9 pr-4 rounded-xl text-sm outline-none border transition-all duration-200"
             style={{
-              background: row,
-              border: selected ? `1px solid ${accent}55` : CARD_BORDER,
-              opacity: muted ? 0.45 : 1,
+              backgroundColor: row,
+              borderColor: gray + '40',
+              color: contrast,
+              fontFamily: "'Inter', Arial, Helvetica, sans-serif",
             }}
-          >
-            <img
-              src={ref.icon || GENERIC_TOKEN_ICON}
-              alt=""
-              className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-            />
-            <div className="flex flex-col flex-1 min-w-0">
-              <span className="text-sm font-semibold truncate" style={{ color: contrast }}>
-                {tickerOf(ref)}
-              </span>
-              <span className="text-[11px] truncate" style={{ color: gray }}>
-                {held && heldBal ? `Balance ${fmt(heldBal.available, heldBal.dec)}` : shortOutpoint(ref.tokenId)}
-              </span>
-            </div>
-            {pools === null ? (
-              <Loader2 size={14} className="animate-spin" style={{ color: gray }} />
-            ) : muted ? (
-              <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ color: gray, background: `${gray}1F` }}>
-                no pool
-              </span>
-            ) : (
-              <span className="text-xs" style={{ color: gray }}>
-                Pools {pools}
-              </span>
-            )}
-          </motion.button>
-        );
-      })}
-      {listed === null ? (
-        <div className="flex items-center justify-center py-4">
-          <Loader2 size={18} className="animate-spin" style={{ color: gray }} />
+          />
         </div>
-      ) : null}
-    </div>
-  );
+
+        <div className="flex items-center w-full mb-2 px-1">
+          <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: gray }}>
+            {side === 'sell' ? 'Select a token to sell' : 'Select a token to buy'}
+          </span>
+          <div className="flex-1 ml-3 h-px opacity-20" style={{ backgroundColor: gray }} />
+        </div>
+
+        {listed === null && rows.length === 0 ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 size={18} className="animate-spin" style={{ color: gray }} />
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-2 w-full">
+            <p className="text-sm text-center" style={{ color: gray }}>
+              {q
+                ? `No tokens match "${pickerQuery}"`
+                : listedError
+                  ? 'Could not load the exchange’s tokens.'
+                  : 'No tokens are listed on the exchange yet.'}
+            </p>
+          </div>
+        ) : (
+          <div className="w-full flex flex-col gap-2">
+            {rows.map(({ ref, pools, held }) => {
+              const muted = pools === 0;
+              const selected = token?.tokenId === ref.tokenId;
+              const heldBal = heldById.get(ref.tokenId);
+              const primary =
+                held && heldBal
+                  ? `${fmt(heldBal.available, heldBal.dec)} ${tickerOf(ref)}`
+                  : pools
+                    ? poolsText(pools)
+                    : '—';
+              const secondary =
+                pools === null ? 'Checking…' : muted ? 'No pool yet' : held && heldBal ? poolsText(pools) : 'Listed';
+              return (
+                <motion.button
+                  key={ref.tokenId}
+                  type="button"
+                  whileHover={muted ? undefined : { scale: 1.01 }}
+                  whileTap={muted ? undefined : { scale: 0.99 }}
+                  onClick={() => pick(ref, pools)}
+                  aria-disabled={muted}
+                  className="flex items-center justify-between w-full px-3 py-3 rounded-xl outline-none cursor-pointer text-left"
+                  style={{
+                    background: row,
+                    border: selected ? `1px solid ${accent}55` : `1px solid ${gray}14`,
+                    opacity: muted ? 0.45 : 1,
+                  }}
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <img
+                      src={ref.icon || GENERIC_TOKEN_ICON}
+                      alt={tickerOf(ref)}
+                      className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                    />
+                    <div className="flex flex-col items-start min-w-0">
+                      <span className="text-sm font-semibold leading-tight" style={{ color: contrast }}>
+                        {tickerOf(ref)}
+                      </span>
+                      <span className="text-[10px] mt-0.5 font-mono truncate max-w-[10rem]" style={{ color: gray }}>
+                        {ref.tokenId}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end min-w-0 max-w-[40%] ml-3">
+                    <span className="text-sm font-semibold text-right leading-tight" style={{ color: contrast }}>
+                      {primary}
+                    </span>
+                    <span className="text-xs mt-0.5 text-right" style={{ color: gray }}>
+                      {secondary}
+                    </span>
+                  </div>
+                </motion.button>
+              );
+            })}
+          </div>
+        )}
+        <div aria-hidden className="h-4 w-full flex-shrink-0"></div>
+      </div>
+    );
+  };
 
   const renderForm = () => {
     const q = liveQuote;
