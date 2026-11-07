@@ -2,7 +2,6 @@ import { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PrivateKey } from '@bsv/sdk';
 import { prepareSweepInputs, sweepBsv, sweepOrdinals, sweepBsv21 } from '@1sat/actions';
-import { cancelOwnedOrdLockListings } from '../utils/cancelOrdLockListings';
 import { scanAddress, type ScannedAssets, type EnrichedOrdinal, type TokenBalance } from '../sweep/scanner';
 import type { IndexedOutput } from '@1sat/types';
 import { Button } from '../components/Button';
@@ -34,6 +33,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { checkUsbPresence } from '../services/usbPresence';
+import { formatBsv } from '../utils/format';
 
 const EXPLORER_BASE = 'https://bananablocks.com/tx/';
 
@@ -247,20 +247,6 @@ export const SweepMigration = () => {
     if (!legacyKeys) return;
     setStep('sweeping');
     const results: SweepTxResult[] = [];
-
-    // OPL-4696: cancel wallet-owned OrdLock listings before sweep (fail soft).
-    try {
-      setCurrentSweepOp('Cancelling OrdLock listings...');
-      const cancelRes = await cancelOwnedOrdLockListings(apiContext, {
-        force: true,
-        sessionKey: 'sweep-migration',
-      });
-      if (cancelRes.cancelled > 0) {
-        console.log('[SweepMigration] auto-cancelled OrdLock listings', cancelRes);
-      }
-    } catch (err) {
-      console.warn('[SweepMigration] OrdLock auto-cancel failed (continuing sweep)', err);
-    }
 
     if (selection.sweepBsv && assets.funding.length > 0) {
       setCurrentSweepOp('Sweeping BSV...');
@@ -720,7 +706,7 @@ export const SweepMigration = () => {
                         className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
                         style={{ background: `${accent}18`, color: accent }}
                       >
-                        {(assets.totalBsv / 1e8).toFixed(8)} BSV
+                        {formatBsv(assets.totalBsv / 1e8)} BSV
                       </span>
                     </div>
                     {/* Row */}

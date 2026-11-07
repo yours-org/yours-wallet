@@ -677,7 +677,8 @@ export class WalletBackupService {
             knownTxids: [],
           },
         );
-        return result.totalOutputs;
+        // @bsv/sdk 4: totalOutputs is a string only for `p <module> balance` queries; this one is a count.
+        return Number(result.totalOutputs);
       });
       console.log(`[WalletBackupService] post-restore UTXO review: ${released} released`);
       return released;

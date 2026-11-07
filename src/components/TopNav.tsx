@@ -8,10 +8,13 @@ import { truncate } from '../utils/format';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { useBottomMenu } from '../hooks/useBottomMenu';
+import { TestnetBadge, TESTNET_COLOR } from './TestnetBadge';
+import { NetWork } from '../services/types/provider.types';
+import { getAccountAvatar } from '../utils/accountAvatar';
 
 export const TopNav = () => {
   const { theme } = useTheme();
-  const { chromeStorageService, wallet, setIsSwitchingAccount } = useServiceContext();
+  const { chromeStorageService, wallet, setIsSwitchingAccount, apiContext } = useServiceContext();
   const { handleSelect } = useBottomMenu();
   const { addSnackbar } = useSnackbar();
   const [dropdownVisible, setDropdownVisible] = useState(false);
@@ -20,6 +23,7 @@ export const TopNav = () => {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const toggleRef = useRef<HTMLDivElement | null>(null);
   const accountObj = chromeStorageService.getCurrentAccountObject();
+  const isTestnet = accountObj.account?.network === NetWork.Testnet;
 
   const handleCopyToClipboard = (bsvAddress: string) => {
     navigator.clipboard.writeText(bsvAddress).then(() => {
@@ -81,7 +85,10 @@ export const TopNav = () => {
   return (
     <div
       className="flex items-center justify-between fixed top-0 w-full z-10 px-4 h-14"
-      style={{ backgroundColor: theme.color.global.walletBackground }}
+      style={{
+        backgroundColor: theme.color.global.walletBackground,
+        boxShadow: isTestnet ? `inset 0 -2px 0 ${TESTNET_COLOR}` : undefined,
+      }}
     >
       {/* Left: Logo + account switcher */}
       <div className="flex items-center gap-2 relative">
@@ -93,7 +100,7 @@ export const TopNav = () => {
 
         {/* Account avatar */}
         <img
-          src={accountObj.account?.icon ?? activeCircle}
+          src={accountObj.account ? getAccountAvatar(accountObj.account, apiContext) : activeCircle}
           className="w-5 h-5 rounded-full object-cover"
           alt="Account"
         />
@@ -136,7 +143,7 @@ export const TopNav = () => {
                     style={{ opacity: switchingTo && !isSwitching ? 0.4 : 1 }}
                     onClick={() => handleSwitchAccount(account.addresses.identityAddress)}
                   >
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       {isSwitching ? (
                         <Loader2
                           size={16}
@@ -144,11 +151,16 @@ export const TopNav = () => {
                           style={{ color: theme.color.component.primaryButtonLeftGradient }}
                         />
                       ) : (
-                        <img src={account.icon} className="w-6 h-6 rounded-full object-cover" alt={account.name} />
+                        <img
+                          src={getAccountAvatar(account, apiContext)}
+                          className="w-6 h-6 rounded-full object-cover"
+                          alt={account.name}
+                        />
                       )}
-                      <span className="text-sm font-semibold" style={{ color: theme.color.global.contrast }}>
+                      <span className="text-sm font-semibold truncate" style={{ color: theme.color.global.contrast }}>
                         {account.name}
                       </span>
+                      {account.network === NetWork.Testnet && <TestnetBadge size="tag" />}
                     </div>
                     {account.primaryAddress && (
                       <div className="flex items-center gap-1.5">
@@ -207,15 +219,18 @@ export const TopNav = () => {
         </AnimatePresence>
       </div>
 
-      {/* Right: GitHub */}
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.92 }}
-        className="p-2 rounded-lg transition-colors hover:bg-white/5"
-        onClick={() => window.open(theme.settings.repo, '_blank')}
-      >
-        <Github size={18} color={theme.color.global.gray} />
-      </motion.button>
+      {/* Right: testnet indicator + GitHub */}
+      <div className="flex items-center gap-1.5">
+        {isTestnet && <TestnetBadge />}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.92 }}
+          className="p-2 rounded-lg transition-colors hover:bg-white/5"
+          onClick={() => window.open(theme.settings.repo, '_blank')}
+        >
+          <Github size={18} color={theme.color.global.gray} />
+        </motion.button>
+      </div>
     </div>
   );
 };

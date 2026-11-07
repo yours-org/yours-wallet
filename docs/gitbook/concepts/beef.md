@@ -7,7 +7,7 @@ icon: layer-group
 
 **BEEF** stands for **Background Evaluation Extended Format**. It is a binary serialization of a transaction together with its ancestry — enough data for a verifier to confirm the inputs are valid SPV-style.
 
-In Yours Wallet, BEEF appears whenever you need to spend an existing on-chain output: transfer an ordinal, list it for sale (listing is currently disabled), cancel a listing, register an OpNS name, etc.
+In Yours Wallet, BEEF appears whenever you need to spend an existing on-chain output: transfer an ordinal, list it for sale, cancel a listing, register an OpNS name, etc.
 
 ## The fetch-first pattern
 

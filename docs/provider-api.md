@@ -222,9 +222,9 @@ const result = await ctx.wallet.createAction(args);
 
 ## Marketplace (OrdLock)
 
-> **Listing creation is currently disabled** (OPL-4694). `listOrdinal` fails closed with a deprecation error until the replacement listing contract ships. Purchase and cancel still work, and the wallet auto-cancels its own OrdLock listings on Ordinals load and before a BSV sweep. See `docs/ordlock-listing-disable.md`.
+Listings use the OrdLock v2 contract (wallet tag `ordlock2`). Legacy v1 listings were cancelled wallet-wide in September 2026 and the wallet no longer shows them.
 
-### List for Sale (disabled)
+### List for Sale
 
 ```tsx
 import { getOrdinals, listOrdinal } from '@1sat/actions';

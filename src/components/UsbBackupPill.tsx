@@ -5,7 +5,6 @@ import { useTheme } from '../hooks/useTheme';
 import { onUsbBackup } from '../services/usbBackup';
 
 const DONE_VISIBLE_MS = 2500;
-const REVEAL_DELAY_MS = 1500;
 const AMBER = '#FBBF24';
 
 type PillState =
@@ -24,10 +23,9 @@ export const UsbBackupPill = () => {
   const progressDismissed = useRef(false);
   const dismissedError = useRef<string | undefined>(undefined);
   const doneTimer = useRef<number | undefined>(undefined);
-  // A run that finds nothing to write is over in a second or two. Hold the
-  // progress pill back briefly so those never flash; a run that is still
-  // going after the delay is worth showing.
-  const revealTimer = useRef<number | undefined>(undefined);
+  // Most runs walk every account and find nothing to write. The progress pill
+  // appears only once a run has written something to the key; until then the
+  // latest progress is kept aside so the pill opens on the right account.
   const latestSyncing = useRef<PillState | null>(null);
   const revealed = useRef(false);
 
@@ -35,10 +33,6 @@ export const UsbBackupPill = () => {
     const clearDoneTimer = () => {
       if (doneTimer.current) window.clearTimeout(doneTimer.current);
       doneTimer.current = undefined;
-    };
-    const clearRevealTimer = () => {
-      if (revealTimer.current) window.clearTimeout(revealTimer.current);
-      revealTimer.current = undefined;
     };
     const showSyncing = (next: PillState) => {
       latestSyncing.current = next;
@@ -48,13 +42,8 @@ export const UsbBackupPill = () => {
       switch (e.phase) {
         case 'start':
           clearDoneTimer();
-          clearRevealTimer();
           revealed.current = false;
           latestSyncing.current = { kind: 'syncing', accountIndex: 0, totalAccounts: e.totalAccounts };
-          revealTimer.current = window.setTimeout(() => {
-            revealed.current = true;
-            if (latestSyncing.current && !progressDismissed.current) setState(latestSyncing.current);
-          }, REVEAL_DELAY_MS);
           break;
         case 'account':
           showSyncing({
@@ -65,6 +54,8 @@ export const UsbBackupPill = () => {
           });
           break;
         case 'chunk':
+          // The first write of the run: now there is something worth showing.
+          if (!progressDismissed.current) revealed.current = true;
           showSyncing({
             ...(latestSyncing.current?.kind === 'syncing'
               ? latestSyncing.current
@@ -74,7 +65,6 @@ export const UsbBackupPill = () => {
           break;
         case 'done':
           clearDoneTimer();
-          clearRevealTimer();
           latestSyncing.current = null;
           if (!e.changed || progressDismissed.current) {
             setState(null);
@@ -85,7 +75,6 @@ export const UsbBackupPill = () => {
           break;
         case 'error':
           clearDoneTimer();
-          clearRevealTimer();
           if (dismissedError.current === e.message) {
             setState(null);
             break;
@@ -93,7 +82,6 @@ export const UsbBackupPill = () => {
           setState({ kind: 'error', message: e.message });
           break;
         case 'idle':
-          clearRevealTimer();
           latestSyncing.current = null;
           // A run that produced no start (no readable key) or was mid-progress
           // leaves nothing to show; a done flash or error stays on screen.

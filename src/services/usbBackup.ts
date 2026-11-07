@@ -440,6 +440,29 @@ export const requestUsbBackup = (chromeStorageService: ChromeStorageService, del
   }, delayMs);
 };
 
+/** chrome.storage.local key: when a run last finished with every present key written and no error (ms). */
+export const USB_BACKUP_LAST_RUN_KEY = 'usbBackupLastRunAt';
+/** A run this recent is not repeated just because the popup opened again. */
+export const USB_BACKUP_RECENT_MS = 5 * 60_000;
+
+/** Whether a clean run finished within `USB_BACKUP_RECENT_MS`; false when nothing is recorded or storage is unavailable. */
+export const usbBackupRanRecently = async (now = Date.now()): Promise<boolean> => {
+  try {
+    const last = (await chrome.storage.local.get(USB_BACKUP_LAST_RUN_KEY))[USB_BACKUP_LAST_RUN_KEY];
+    return typeof last === 'number' && now - last < USB_BACKUP_RECENT_MS;
+  } catch {
+    return false;
+  }
+};
+
+const recordCleanRun = async (): Promise<void> => {
+  try {
+    await chrome.storage.local.set({ [USB_BACKUP_LAST_RUN_KEY]: Date.now() });
+  } catch {
+    // Not recorded: the next open runs again, which is the safe side.
+  }
+};
+
 /**
  * Run now (serialised). If a run is in progress, waits for it and then runs
  * once more, so a caller always gets a result that reflects the current state.
@@ -469,12 +492,16 @@ export const runUsbBackup = async (chromeStorageService: ChromeStorageService): 
     const again = await runUsbBackup(chromeStorageService);
     const merged = { ...again, changed: result.changed || again.changed, errors: [...result.errors, ...again.errors] };
     // The inner call already emitted done/idle for its own result; re-emit with the merged one.
+    if (merged.ran && merged.errors.length === 0) await recordCleanRun();
     if (merged.ran && merged.errors.length === 0 && result.changed && !again.changed) {
       emit({ phase: 'done', stickId: 'all', changed: true });
     }
     return merged;
   }
-  if (result.ran && result.errors.length === 0) emit({ phase: 'done', stickId: 'all', changed: result.changed });
+  if (result.ran && result.errors.length === 0) {
+    await recordCleanRun();
+    emit({ phase: 'done', stickId: 'all', changed: result.changed });
+  }
   emit({ phase: 'idle' });
   return result;
 };

@@ -23,6 +23,13 @@ export const AvatarPicker = ({ theme, apiContext, onSelectExisting, onUploadNew,
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  // A pasted outpoint that is not among the wallet's own ordinals is looked up
+  // on the configured ORDFS server so it can be picked like any other image.
+  const [lookup, setLookup] = useState<{
+    status: 'loading' | 'found' | 'not-image' | 'not-found';
+    outpoint: string;
+    contentType?: string;
+  } | null>(null);
   const offsetRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -87,6 +94,43 @@ export const AvatarPicker = ({ theme, apiContext, onSelectExisting, onUploadNew,
         return name.toLowerCase().includes(q) || origin.toLowerCase().includes(q);
       })
     : imageOrdinals;
+
+  // `txid_vout`, `txid.vout` or `txid:vout`, normalized to the ORDFS `txid_vout` form.
+  const enteredOutpoint = (() => {
+    const m = searchTerm
+      .trim()
+      .toLowerCase()
+      .match(/^([0-9a-f]{64})[_.:](\d+)$/);
+    return m ? `${m[1]}_${Number(m[2])}` : null;
+  })();
+
+  useEffect(() => {
+    if (!enteredOutpoint || filtered.length > 0) {
+      setLookup(null);
+      return;
+    }
+    let cancelled = false;
+    setLookup({ status: 'loading', outpoint: enteredOutpoint });
+    const timer = setTimeout(async () => {
+      try {
+        const meta = await apiContext.services!.ordfs.getMetadata(enteredOutpoint);
+        if (cancelled) return;
+        const contentType = meta.contentType ?? '';
+        setLookup({
+          status: contentType.startsWith('image/') ? 'found' : 'not-image',
+          outpoint: enteredOutpoint,
+          contentType,
+        });
+      } catch {
+        if (!cancelled) setLookup({ status: 'not-found', outpoint: enteredOutpoint });
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enteredOutpoint, filtered.length, apiContext]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -187,6 +231,38 @@ export const AvatarPicker = ({ theme, apiContext, onSelectExisting, onUploadNew,
               <div className="flex items-center justify-center py-8">
                 <Loader2 size={20} className="animate-spin" style={{ color: '#98A2B3' }} />
               </div>
+            ) : filtered.length === 0 && lookup ? (
+              lookup.status === 'loading' ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 size={20} className="animate-spin" style={{ color: '#98A2B3' }} />
+                </div>
+              ) : lookup.status === 'found' ? (
+                <div className="grid grid-cols-4 gap-2">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    className="aspect-square rounded-lg overflow-hidden relative group"
+                    style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+                    onClick={() => onSelectExisting(`1sat://${lookup.outpoint.replace('_', '.')}`)}
+                    title={lookup.outpoint}
+                  >
+                    <img
+                      src={getContentUrl(lookup.outpoint)}
+                      className="w-full h-full object-cover"
+                      alt={lookup.outpoint}
+                      loading="lazy"
+                    />
+                  </motion.button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 gap-2">
+                  <ImageIcon size={24} style={{ color: '#475467' }} />
+                  <p className="text-xs" style={{ color: '#667085' }}>
+                    {lookup.status === 'not-image'
+                      ? `Not an image (${lookup.contentType || 'unknown type'})`
+                      : 'Outpoint not found on the ORDFS server'}
+                  </p>
+                </div>
+              )
             ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2">
                 <ImageIcon size={24} style={{ color: '#475467' }} />

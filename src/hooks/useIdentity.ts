@@ -90,23 +90,22 @@ export const useIdentity = (apiContext: OneSatContext, chromeStorageService?: Ch
     error: null,
   });
 
+  // Writes only socialProfile (updateNested deep-merges) under the account the
+  // profile was fetched for. Spreading the whole current account here would
+  // race account creation/switching and file one account's profile under another.
   const cacheToStorage = useCallback(
-    (profile: IdentityProfile) => {
+    (identityAddress: string, profile: IdentityProfile) => {
       if (!chromeStorageService) return;
-      const { account } = chromeStorageService.getCurrentAccountObject();
-      if (!account) return;
       const key: keyof ChromeStorageObject = 'accounts';
       const update: Partial<ChromeStorageObject['accounts']> = {
-        [account.addresses.identityAddress]: {
-          ...account,
+        [identityAddress]: {
           settings: {
-            ...account.settings,
             socialProfile: {
               displayName: profile.name,
               avatar: profile.image,
             },
           },
-        },
+        } as unknown as ChromeStorageObject['accounts'][string],
       };
       chromeStorageService.updateNested(key, update);
     },
@@ -115,6 +114,9 @@ export const useIdentity = (apiContext: OneSatContext, chromeStorageService?: Ch
 
   const loadIdentity = useCallback(async () => {
     setState((s) => ({ ...s, loading: true, error: null }));
+    // apiContext is bound to the account selected now; remember which so the
+    // async result lands on that account even if the selection changes meanwhile.
+    const identityAddress = chromeStorageService?.getCurrentAccountObject().account?.addresses.identityAddress;
     try {
       const [bapId, resolvedId] = await Promise.all([computeBapId(apiContext), resolveBapId(apiContext)]);
 
@@ -132,7 +134,7 @@ export const useIdentity = (apiContext: OneSatContext, chromeStorageService?: Ch
         }
       }
 
-      if (isPublished) cacheToStorage(profile);
+      if (isPublished && identityAddress) cacheToStorage(identityAddress, profile);
       setState({ bapId, isPublished, profile, loading: false, error: null });
     } catch (err) {
       setState((s) => ({
@@ -141,7 +143,7 @@ export const useIdentity = (apiContext: OneSatContext, chromeStorageService?: Ch
         error: err instanceof Error ? err.message : String(err),
       }));
     }
-  }, [apiContext, cacheToStorage]);
+  }, [apiContext, cacheToStorage, chromeStorageService]);
 
   useEffect(() => {
     loadIdentity();

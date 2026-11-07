@@ -1,12 +1,15 @@
 import { NetWork } from '../services/types/provider.types';
 import { ONESAT_MAINNET_CONTENT_URL, ONESAT_MAINNET_URL } from '@1sat/actions';
-
-export const URL_WHATSONCHAIN = 'https://whatsonchain.com/tx/';
+import genericTokenIcon from '../assets/generic-token.svg';
 
 export const MAINNET_ADDRESS_PREFIX = 0x00;
 export const TESTNET_ADDRESS_PREFIX = 0x6f;
 
 export type WalletChain = 'main' | 'test';
+
+/** Block explorer transaction page for the given chain (bananablocks.com, or test.bananablocks.com on testnet). */
+export const explorerTxUrl = (txid: string, chain: WalletChain = 'main'): string =>
+  `https://${chain === 'test' ? 'test.' : ''}bananablocks.com/tx/${txid}`;
 
 export const chainOf = (network?: NetWork): WalletChain => (network === NetWork.Testnet ? 'test' : 'main');
 
@@ -20,14 +23,9 @@ export const HOSTED_YOURS_IMAGE = 'https://i.ibb.co/zGcthBv/yours-org-light.png'
 export const YOURS_DEV_WALLET = '1MtzWXQEYGp89bQ9U2nfrnuChFv37j6pV6';
 export const ONE_SAT_MARKET_URL = 'https://1sat.market/market';
 export const MESSAGEBOX_URL = 'https://messagebox.1sat.app';
-export const GENERIC_TOKEN_ICON =
-  'https://static-00.iconduck.com/assets.00/generic-cryptocurrency-icon-2048x2029-vzaeox5w.png';
+/** Bundled with the extension: a token with no icon of its own must not depend on a third-party host. */
+export const GENERIC_TOKEN_ICON = genericTokenIcon;
 export const KNOWN_BURN_ADDRESSES = ['1111111111111111111114oLvT2', '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'];
-
-// MNEE
-export const MNEE_ICON_URL = `${ONESAT_MAINNET_CONTENT_URL}/9c7f7f1788c6382d5ac737a4052334cf150b52d1e46c484ecfb1d6e00184f263_0`;
-export const MNEE_DECIMALS = 5;
-export const MNEE_MOBILE_REFERRAL_LINK = 'https://rockwalletllc.pxf.io/6ygyKG';
 
 // DERIVATION PATHS
 export const DEFAULT_WALLET_PATH = "m/44'/236'/0'/1/0";
@@ -43,7 +41,7 @@ export const DEFAULT_TWETCH_WALLET_PATH = 'm/0/0';
  *  7: stamped by v5.0.3–v5.1.0 after the unlock-time basket re-file; no storage change
  *  8: customFeeRate reset to FEE_PER_KB for every account (v5.0.4)
  */
-export const CHROME_STORAGE_OBJECT_VERSION = 8;
+export const CHROME_STORAGE_OBJECT_VERSION = 11;
 /**
  * Per-account wallet-data version (`Account.dataVersion`). Wallet-data migrations
  * run in initWallet for the account being opened; bump when adding one.
@@ -57,6 +55,8 @@ export const DEFAULT_STORAGE_REMOTE_URL = 'https://wallet.1sat.app';
 
 /** Yours support channel on Discord (Settings > Troubleshooting). */
 export const DISCORD_SUPPORT_URL = 'https://discord.gg/RD4uuhzMSh';
+/** Testnet faucet users can hit for free test coins. */
+export const TESTNET_FAUCET_URL = 'https://faucet.bananablocks.com';
 
 /** Account service (`/account/status`) for the default storage provider. */
 export const DEFAULT_ACCOUNT_URL = 'https://accounts.1sat.app';
@@ -67,6 +67,13 @@ const TESTNET_WALLET_URL = 'https://testnet.wallet.1sat.app';
 const TESTNET_ACCOUNTS_URL = 'https://testnet.messagebox.1sat.app';
 
 export type ChainEndpoints = { services: string; storage: string; account: string; messagebox: string };
+
+/** Where a user registers a BRC-169 handle (Settings > Register a handle), per chain. */
+export const HANDLE_REGISTRATION_URL = 'https://accounts.1sat.app';
+export const TESTNET_HANDLE_REGISTRATION_URL = 'https://accounts.testnet.1sat.app/';
+
+export const handleRegistrationUrlOf = (chain: WalletChain): string =>
+  chain === 'test' ? TESTNET_HANDLE_REGISTRATION_URL : HANDLE_REGISTRATION_URL;
 
 export const endpointsOf = (chain: WalletChain): ChainEndpoints =>
   chain === 'test'
@@ -82,6 +89,40 @@ export const endpointsOf = (chain: WalletChain): ChainEndpoints =>
         account: DEFAULT_ACCOUNT_URL,
         messagebox: MESSAGEBOX_URL,
       };
+
+/**
+ * 1Color (BRC-207) token overlay, per chain: where the color module submits
+ * token transactions and asks spendability/admission when no per-token
+ * override is set (Settings > Token overlays). An origin serving BRC-22
+ * `POST /submit` and BRC-24 `POST /lookup` at its root. No 1Color overlay runs
+ * on mainnet yet: undefined there, so a token without an override fails closed.
+ */
+export const COLOR_OVERLAY_URL: string | undefined = undefined;
+export const TESTNET_COLOR_OVERLAY_URL = 'https://testnet.openex.dev';
+
+export const colorOverlayDefaultOf = (chain: WalletChain): string | undefined =>
+  chain === 'test' ? TESTNET_COLOR_OVERLAY_URL : COLOR_OVERLAY_URL;
+
+/**
+ * Open Exchange, per chain: where the wallet quotes and runs 1Color swaps
+ * (`@dcasegr/amm-client`). The same origin as the token overlay. Undefined
+ * means no swap UI on that chain.
+ */
+export const swapExchangeOriginOf = (chain: WalletChain): string | undefined => colorOverlayDefaultOf(chain);
+
+/**
+ * The site where a user opens a liquidity pool for a token that has none, per
+ * chain. Shown as a link from the coin detail page. Mainnet has no site yet:
+ * undefined, and the page says so instead of linking.
+ */
+export const AMM_SITE_URL: string | undefined = undefined;
+export const TESTNET_AMM_SITE_URL = 'https://1sat-amm.vercel.app/';
+export const ammSiteUrlOf = (chain: WalletChain): string | undefined =>
+  chain === 'test' ? TESTNET_AMM_SITE_URL : AMM_SITE_URL;
+
+/** Swap defaults: slippage the quote tolerates and the most pools one swap may split across. */
+export const SWAP_DEFAULT_SLIPPAGE_PCT = 1;
+export const SWAP_MAX_SOURCES = 5;
 
 export const defaultStorageConfig = (chain: WalletChain) => {
   const { storage } = endpointsOf(chain);
@@ -131,7 +172,6 @@ export const DEFAULT_ACCOUNT = {
     customFeeRate: FEE_PER_KB,
   },
   balance: { bsv: 0, satoshis: 0, usdInCents: 0 },
-  mneeBalance: { amount: 0, decimalAmount: 0 },
   encryptedKeys: '',
   derivationTags: [],
   icon: HOSTED_YOURS_IMAGE,
