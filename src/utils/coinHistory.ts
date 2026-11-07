@@ -1,19 +1,19 @@
 /**
  * Per-coin transaction history fetchers.
  *
- * Three different backends depending on the coin type:
- * - BSV:   wallet.listActions() + negative filter (exclude any 'p 1sat '-labeled action + non-BSV baskets)
- * - BSV21: wallet.listActions({ labels: [buildTokenLabel(tokenId)] }) — server-side filtered by P-label
- * - MNEE:  getMneeHistory.execute() — purpose-built action with rich per-tx metadata
+ * Different backends depending on the coin type:
+ * - BSV:    wallet.listActions() + negative filter (exclude any 'p 1sat '-labeled action + non-BSV baskets)
+ * - BSV21:  wallet.listActions({ labels: [buildTokenLabel(tokenId)] }) — server-side filtered by P-label
+ * - 1Color: wallet.listActions() decoded per asset (see fetchOneColorHistory)
  *
- * All three return the same `CoinTxSummary` shape so the UI stays agnostic.
+ * All return the same `CoinTxSummary` shape so the UI stays agnostic.
  */
-import { getMneeHistory, type OneSatContext } from '@1sat/actions';
+import type { OneSatContext } from '@1sat/actions';
 import { buildTokenLabel } from '@1sat/types';
 import type { WalletAction } from '@bsv/sdk';
 import { BSV_DECIMAL_CONVERSION } from './constants';
 import { oneColorActionAmount, oneColorTicker } from '../services/oneColor';
-import { formatMnee, formatNumberWithCommasAndDecimals, formatTokenAmount, truncate } from './format';
+import { displayAmount, formatNumberWithCommasAndDecimals, truncate } from './format';
 
 /** Baskets that indicate a non-BSV action (BSV list should exclude these). */
 const NON_BSV_BASKETS = new Set(['bsv21', '1sat', 'ordinals', 'lock', 'opns', 'sigma', 'bsocial', 'bap']);
@@ -27,9 +27,17 @@ const NON_BSV_LABEL_PREFIXES = ['p 1sat '];
 
 export type CoinTxDirection = 'sent' | 'received' | 'transfer';
 
+/** The Open Exchange client labels every swap action it builds. */
+export const AMM_SWAP_LABEL = 'amm-swap';
+
+/** A row's kind beyond its direction: a swap leg (or its staging/return) rather than a plain send. */
+export const historyKindOf = (labels: string[] | undefined): 'swap' | undefined =>
+  labels?.includes(AMM_SWAP_LABEL) ? 'swap' : undefined;
+
 export type CoinTxSummary = {
   txid: string;
   direction: CoinTxDirection;
+  kind?: 'swap';
   amountDisplay: string;
   amountSubdued?: boolean;
   description?: string;
@@ -40,11 +48,6 @@ export type CoinTxSummary = {
 
 export type FetchHistoryOpts = {
   offset?: number;
-  limit?: number;
-};
-
-export type FetchMneeHistoryOpts = {
-  fromScore?: number;
   limit?: number;
 };
 
@@ -272,7 +275,7 @@ export const fetchBsv21History = async (
       const atomic = bsv21AmountFromAction(a, tokenId);
       const sign = direction === 'sent' ? '-' : '+';
       // The history sits inside the token's own view, so the amount needs no unit.
-      const display = atomic > 0n ? `${sign}${formatTokenAmount(atomic, decimals)}` : `${sym} transfer`;
+      const display = atomic > 0n ? `${sign}${displayAmount(atomic, decimals)}` : `${sym} transfer`;
       return {
         txid: a.txid,
         direction,
@@ -328,7 +331,8 @@ export const fetchOneColorHistory = async (
       matches.push({
         txid: a.txid,
         direction: moved.direction,
-        amountDisplay: moved.amount > 0n ? `${sign}${formatTokenAmount(moved.amount, decimals)}` : `${sym} transfer`,
+        kind: historyKindOf(a.labels),
+        amountDisplay: moved.amount > 0n ? `${sign}${displayAmount(moved.amount, decimals)}` : `${sym} transfer`,
         amountSubdued: moved.amount === 0n,
         description: a.description || undefined,
       });
@@ -337,47 +341,4 @@ export const fetchOneColorHistory = async (
     end = start;
   }
   return matches.slice(skip, skip + wantLimit);
-};
-
-// ─── MNEE ────────────────────────────────────────────────────────────────────
-
-const MNEE_DECIMALS = 5;
-
-export const fetchMneeHistory = async (
-  ctx: OneSatContext,
-  addresses: string[],
-  opts: FetchMneeHistoryOpts = {},
-): Promise<CoinTxSummary[]> => {
-  if (!addresses.length) return [];
-  const result = await getMneeHistory.execute(ctx, {
-    addresses,
-    limit: opts.limit ?? 50,
-    fromScore: opts.fromScore,
-  });
-
-  // Sort by score descending → newest first. (The API usually returns them this way
-  // already, but sorting explicitly makes ordering independent of backend behavior.)
-  return result.history
-    .slice()
-    .sort((a, b) => b.score - a.score)
-    .map((h) => {
-      const direction: CoinTxDirection = h.type === 'send' ? 'sent' : 'received';
-      const sign = direction === 'sent' ? '-' : '+';
-      const amountDisplay = `${sign}${formatMnee(h.amount / 10 ** MNEE_DECIMALS)}`;
-
-      // Pick a reasonable counterparty label (first one, truncated)
-      const counterparty = h.counterparties[0]?.address;
-
-      return {
-        txid: h.txid,
-        direction,
-        amountDisplay,
-        status: h.status,
-        height: h.height,
-        counterparty,
-        description: counterparty
-          ? `${direction === 'sent' ? 'to' : 'from'} ${truncate(counterparty, 6, 4)}`
-          : undefined,
-      };
-    });
 };

@@ -4,7 +4,7 @@ import { useServiceContext } from '../hooks/useServiceContext';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { ONE_SAT_MARKET_URL } from '../utils/constants';
-import { showAmount, normalize, truncate } from '../utils/format';
+import { formatTokenAmount, normalize, showAmount, truncate } from '../utils/format';
 import { sleep } from '../utils/sleep';
 import { getErrorMessage } from '../utils/tools';
 import { isUri } from '../utils/uri';
@@ -205,7 +205,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
     }
     const lineItems: SendLineItem[] = tokenOrder.map((addr) => ({
       address: addr,
-      amount: `${showAmount(tokenConsolidated.get(addr)!, token.info.dec)} ${tokenName}`,
+      amount: `${formatTokenAmount(tokenConsolidated.get(addr)!, token.info.dec)} ${tokenName}`,
     }));
 
     const tokenIcon = token.info.icon
@@ -216,7 +216,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
     setSendConfirmation({
       icon: tokenIcon,
       lineItems,
-      total: `${showAmount(total, token.info.dec)} ${tokenName}`,
+      total: `${formatTokenAmount(total, token.info.dec)} ${tokenName}`,
       onConfirm: async () => {
         setSendConfirmation(null);
         setIsProcessing(true);
@@ -338,7 +338,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 16 }}
           transition={{ type: 'spring', stiffness: 320, damping: 35 }}
-          className="flex flex-col w-full pt-14 pb-20 overflow-y-auto overflow-x-hidden self-start"
+          className="flex flex-col w-full pt-3 pb-4 overflow-y-auto overflow-x-hidden self-start"
           style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
         >
           {/* Header */}
@@ -359,7 +359,7 @@ export const SendBsv21View = ({ token, onBack }: SendBsv21ViewProps) => {
             </span>
           </div>
 
-          {/* Balance chip — matches the BSV / MNEE send views */}
+          {/* Balance chip — matches the BSV send view */}
           <div className="flex flex-col items-center w-full mb-5 gap-1.5">
             <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{ background: row }}>
               <Show when={!!token.info.icon && token.info.icon.length > 0}>

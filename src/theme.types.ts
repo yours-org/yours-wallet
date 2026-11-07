@@ -3,7 +3,6 @@ export type ThemeServices = {
   ordinals: boolean;
   bsv21: boolean;
   apps: boolean;
-  mnee: boolean;
 };
 
 export type ThemeSettings = {

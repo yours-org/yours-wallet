@@ -7,7 +7,7 @@ import { PageLoader } from './PageLoader';
 
 export type SendLineItem = {
   address: string;
-  amount: string; // pre-formatted display string (e.g. "0.005 BSV", "$1.50 MNEE", "100 TOKEN")
+  amount: string; // pre-formatted display string (e.g. "0.005 BSV", "100 TOKEN")
 };
 
 export type SendConfirmationProps = {
@@ -17,6 +17,10 @@ export type SendConfirmationProps = {
   lineItems: SendLineItem[];
   total?: string; // pre-formatted total (e.g. "0.01 BSV")
   isProcessing?: boolean;
+  /** Wording for other speedbumps (a swap, a listing); the defaults are the send's. */
+  title?: string;
+  confirmLabel?: string;
+  processingMessage?: string;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -27,7 +31,19 @@ const truncateAddress = (addr: string) => {
 };
 
 export const SendConfirmation = (props: SendConfirmationProps) => {
-  const { show, theme, icon, lineItems, total, isProcessing = false, onConfirm, onCancel } = props;
+  const {
+    show,
+    theme,
+    icon,
+    lineItems,
+    total,
+    isProcessing = false,
+    title = 'Confirm Send',
+    confirmLabel = 'Send',
+    processingMessage = 'Sending...',
+    onConfirm,
+    onCancel,
+  } = props;
 
   const contrast = theme.color.global.contrast;
   const gray = theme.color.global.gray;
@@ -106,7 +122,7 @@ export const SendConfirmation = (props: SendConfirmationProps) => {
 
                 {/* Title */}
                 <h2 className="text-xl font-bold mb-4" style={{ color: contrast }}>
-                  Confirm Send
+                  {title}
                 </h2>
 
                 {/* Line items */}
@@ -148,13 +164,13 @@ export const SendConfirmation = (props: SendConfirmationProps) => {
                     <Button theme={theme} type="secondary-outline" label="Cancel" onClick={onCancel} />
                   </div>
                   <div className="flex-1">
-                    <Button theme={theme} type="primary" label="Send" onClick={onConfirm} />
+                    <Button theme={theme} type="primary" label={confirmLabel} onClick={onConfirm} />
                   </div>
                 </div>
               </motion.div>
             }
           >
-            <PageLoader theme={theme} message="Sending..." />
+            <PageLoader theme={theme} message={processingMessage} />
           </Show>
         </motion.div>
       )}

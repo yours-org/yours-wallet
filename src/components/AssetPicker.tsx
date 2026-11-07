@@ -4,12 +4,11 @@ import { useMemo, useState } from 'react';
 import type { Bsv21Balance } from '@1sat/actions';
 import { oneColorTicker, type OneColorBalance } from '../services/oneColor';
 import { useTheme } from '../hooks/useTheme';
-import { formatLargeNumber, formatUSD, showAmount } from '../utils/format';
+import { displayAmount, displayNumber, formatUSD } from '../utils/format';
 import { Show } from './Show';
 
 export type PickableAsset =
   | { kind: 'bsv'; ticker: 'BSV'; icon: string; balance: number; usdBalance: number }
-  | { kind: 'mnee'; ticker: 'MNEE'; icon: string; balance: number; usdBalance: number }
   | { kind: 'bsv21'; token: Bsv21Balance; icon: string }
   | { kind: '1color'; token: OneColorBalance; icon: string };
 
@@ -35,17 +34,12 @@ const getDisplayBalance = (asset: PickableAsset): { primary: string; secondary: 
   switch (asset.kind) {
     case 'bsv':
       return {
-        primary: `${formatLargeNumber(asset.balance, 3)} BSV`,
+        primary: `${displayNumber(asset.balance)} BSV`,
         secondary: formatUSD(asset.usdBalance),
-      };
-    case 'mnee':
-      return {
-        primary: formatUSD(asset.usdBalance),
-        secondary: `${formatLargeNumber(asset.balance, 5)} MNEE`,
       };
     case 'bsv21': {
       const confirmed = asset.token.all.confirmed;
-      const display = showAmount(confirmed, asset.token.dec);
+      const display = displayAmount(confirmed, asset.token.dec);
       const sym = asset.token.sym || 'Token';
       return {
         primary: `${display} ${sym}`,
@@ -55,7 +49,7 @@ const getDisplayBalance = (asset: PickableAsset): { primary: string; secondary: 
     case '1color': {
       const { available, dec } = asset.token;
       return {
-        primary: `${showAmount(available, dec)} ${oneColorTicker(asset.token)}`,
+        primary: `${displayAmount(available, dec)} ${oneColorTicker(asset.token)}`,
         secondary: available > 0n ? '1Color' : 'No balance',
       };
     }
@@ -88,7 +82,7 @@ export const AssetPicker = ({ onBack, onSelect, assets }: AssetPickerProps) => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="flex flex-col items-center w-full pt-14 pb-20 px-4 overflow-y-auto overflow-x-hidden self-start"
+      className="flex flex-col items-center w-full pt-3 pb-4 px-4 overflow-y-auto overflow-x-hidden self-start"
       style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header */}

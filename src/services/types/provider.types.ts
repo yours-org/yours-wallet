@@ -23,11 +23,6 @@ export type Balance = {
   usdInCents: number;
 };
 
-export type MNEEBalance = {
-  amount: number;
-  decimalAmount: number;
-};
-
 export type SocialProfile = {
   displayName: string;
   avatar: string;
@@ -37,11 +32,6 @@ export enum NetWork {
   Mainnet = 'mainnet',
   Testnet = 'testnet',
 }
-
-export type SendMNEE = {
-  address: string;
-  amount: number;
-};
 
 export type TransactionFormat = 'tx' | 'beef' | 'ef';
 

@@ -1,28 +1,12 @@
 import { motion } from 'framer-motion';
 import { Info } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
-import { formatLargeNumber, formatUSD } from '../utils/format';
+import { displayNumber, formatUSD } from '../utils/format';
 import { Show } from './Show';
 import { BSV_DECIMAL_CONVERSION } from '../utils/constants';
 
-/** Amber, matching the Get MNEE gradient, for the pending pill. */
+/** Amber, for the pending pill. */
 const PENDING_COLOR = '#f2b84b';
-
-const GradientButton = ({ onClick, theme }: { onClick?: () => void; theme: ReturnType<typeof useTheme>['theme'] }) => (
-  <motion.button
-    whileHover={{ scale: 1.03 }}
-    whileTap={{ scale: 0.97 }}
-    onClick={onClick}
-    className="text-xs font-bold px-4 py-2 rounded-xl mr-3 cursor-pointer border-0 outline-none"
-    style={{
-      background: 'linear-gradient(135deg, #de973f, #f9dd63)',
-      color: theme.color.global.row,
-      minWidth: '7rem',
-    }}
-  >
-    Get MNEE
-  </motion.button>
-);
 
 export type AssetRowProps = {
   icon: string;
@@ -31,15 +15,17 @@ export type AssetRowProps = {
   /** USD value; null when the asset has no price (shown as a dash). */
   usdBalance: number | null;
   showPointer: boolean;
-  isMNEE?: boolean;
   animate?: boolean;
   isLock?: boolean;
   nextUnlock?: number;
   /** Decimal places for balance display. Defaults to 3. */
   decimals?: number;
+  /** The balance already formatted (a token amount); `balance` is then only used for the sat/BSV logic. */
+  balanceText?: string;
+  /** The exact amount, shown on hover when `balanceText` is compacted. */
+  balanceTitle?: string;
   /** Part of the balance not spendable yet: shown as an amber pill under the ticker, `hint` on hover. */
   pending?: { label: string; hint: string };
-  onGetMneeClick?: () => void;
   onClick?: () => void;
 };
 
@@ -52,17 +38,16 @@ export const AssetRow = (props: AssetRowProps) => {
     isLock,
     nextUnlock,
     onClick,
-    isMNEE,
     showPointer,
-    onGetMneeClick,
     animate = false,
     decimals,
     pending,
+    balanceText,
+    balanceTitle,
   } = props;
   const { theme } = useTheme();
   const isDisplaySat = isLock && balance < 0.0001;
   const displayDecimals = decimals ?? (isDisplaySat ? 0 : 3);
-  const isMneeBalanceZero = !!isMNEE && usdBalance === 0;
 
   return (
     <motion.div
@@ -107,27 +92,23 @@ export const AssetRow = (props: AssetRowProps) => {
       </div>
 
       {/* Right: balance */}
-      <Show
-        when={isMneeBalanceZero}
-        whenFalseContent={
-          <div className="flex flex-col items-end mr-3 min-w-0 max-w-[45%]">
-            <span
-              className="text-sm font-semibold text-right leading-tight"
-              style={{ color: theme.color.global.contrast }}
-            >
-              {`${formatLargeNumber(
-                isDisplaySat ? balance * BSV_DECIMAL_CONVERSION : balance,
-                displayDecimals,
-              )}${isLock ? (isDisplaySat ? `${balance === 0.00000001 ? ' SAT' : ' SATS'}` : ' BSV') : ''}`}
-            </span>
-            <span className="text-xs mt-0.5 text-right" style={{ color: theme.color.global.gray }}>
-              {isLock ? `Block ${nextUnlock}` : usdBalance === null ? '—' : formatUSD(usdBalance)}
-            </span>
-          </div>
-        }
-      >
-        <GradientButton theme={theme} onClick={onGetMneeClick} />
-      </Show>
+      <div className="flex flex-col items-end mr-3 min-w-0 max-w-[45%]">
+        <span
+          className="text-sm font-semibold text-right leading-tight"
+          style={{ color: theme.color.global.contrast }}
+          title={balanceTitle}
+        >
+          {balanceText ??
+            `${
+              isDisplaySat
+                ? Math.round(balance * BSV_DECIMAL_CONVERSION).toLocaleString()
+                : displayNumber(Number(balance.toFixed(displayDecimals)))
+            }${isLock ? (isDisplaySat ? `${balance === 0.00000001 ? ' SAT' : ' SATS'}` : ' BSV') : ''}`}
+        </span>
+        <span className="text-xs mt-0.5 text-right" style={{ color: theme.color.global.gray }}>
+          {isLock ? `Block ${nextUnlock}` : usdBalance === null ? '—' : formatUSD(usdBalance)}
+        </span>
+      </div>
     </motion.div>
   );
 };

@@ -7,7 +7,6 @@ import {
   TaggedDerivationResponse,
   Broadcast,
   SocialProfile,
-  MNEEBalance,
 } from './provider.types';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
@@ -88,7 +87,6 @@ export interface Account {
   /** BRC-29 primary receive address (index 0, "yours" prefix). Persisted on wallet init. */
   primaryAddress?: string;
   balance: Balance;
-  mneeBalance: MNEEBalance;
   pubKeys: PubKeys;
   storageConfig?: StorageConfig;
   /** Wallet-data migrations completed for this account; see ACCOUNT_DATA_VERSION. Absent = 0. */

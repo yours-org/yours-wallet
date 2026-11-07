@@ -7,12 +7,11 @@ import { useSnackbar } from '../hooks/useSnackbar';
 import { useTheme } from '../hooks/useTheme';
 import { normalizeHandle, oneColorTicker, type OneColorBalance } from '../services/oneColor';
 import { GENERIC_TOKEN_ICON } from '../utils/constants';
-import { normalize, showAmount, truncate } from '../utils/format';
+import { displayAmount, formatTokenAmount, normalize, showAmount, truncate } from '../utils/format';
 import { getErrorMessage } from '../utils/tools';
 import { Input } from './Input';
 import { SendConfirmation, type SendLineItem } from './SendConfirmation';
 import { Show } from './Show';
-import { CoinHistory } from './CoinHistory';
 
 export type SendOneColorViewProps = {
   token: OneColorBalance;
@@ -91,7 +90,7 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
       addSnackbar('Amount exceeds available balance.', 'error');
       return;
     }
-    const amountText = `${showAmount(atomic, token.dec)} ${ticker}`;
+    const amountText = `${formatTokenAmount(atomic, token.dec)} ${ticker}`;
     setSendConfirmation({
       lineItems: [{ address: handle, amount: amountText }],
       total: amountText,
@@ -147,14 +146,16 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 16 }}
         transition={{ type: 'spring', stiffness: 320, damping: 35 }}
-        className="flex flex-col w-full pt-14 pb-20 overflow-y-auto overflow-x-hidden self-start"
+        className="flex flex-col w-full pt-3 pb-4 overflow-y-auto overflow-x-hidden self-start"
         style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-4 mb-5">
           <motion.button
+            type="button"
             whileTap={{ scale: 0.9 }}
             onClick={() => onBack()}
+            aria-label="Back"
             className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 outline-none border-none cursor-pointer"
             style={{ backgroundColor: '#17191E' }}
           >
@@ -177,7 +178,7 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
               Available
             </span>
             <span className="text-sm font-semibold font-mono" style={{ color: contrast }}>
-              {showAmount(maxAmount, token.dec)}
+              {displayAmount(maxAmount, token.dec)}
             </span>
             <span className="text-xs font-semibold" style={{ color: accent }}>
               {ticker}
@@ -203,7 +204,7 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
                 title="Held by a send that has not settled yet"
               >
                 <span className="text-[10px] font-semibold" style={{ color: gray }}>
-                  {showAmount(token.pending, token.dec)} pending
+                  {displayAmount(token.pending, token.dec)} pending
                 </span>
               </div>
             </Show>
@@ -281,7 +282,7 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
             whileTap={!submitDisabled ? { scale: 0.98 } : undefined}
             type="submit"
             disabled={submitDisabled}
-            className="flex items-center justify-center gap-2 w-full h-11 mt-1 rounded-xl text-sm font-bold outline-none border-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-2 w-full py-3 mt-1 rounded-2xl text-[14px] font-semibold outline-none border-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
               background: `linear-gradient(135deg, ${accent}, ${accentRight})`,
               color: theme.color.component.primaryButtonText,
@@ -291,13 +292,6 @@ export const SendOneColorView = ({ token, onBack }: SendOneColorViewProps) => {
             {isProcessing ? 'Sending...' : 'Send'}
           </motion.button>
         </form>
-
-        <div className="w-full px-4">
-          <CoinHistory
-            filter={{ type: '1color', assetId: token.assetId, decimals: token.dec, symbol: token.sym }}
-            refreshKey={successTxId}
-          />
-        </div>
       </motion.div>
       <SendConfirmation
         show={!!sendConfirmation}

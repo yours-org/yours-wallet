@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'bun:test';
-import { normalize, removeTrailingZeros, showAmount, formatTokenAmount } from './format';
+import {
+  normalize,
+  removeTrailingZeros,
+  showAmount,
+  formatTokenAmount,
+  compactDecimal,
+  displayAmount,
+  displayNumber,
+} from './format';
 
 describe('showAmount', () => {
   test('drops trailing zeros after the point, and the point itself', () => {
@@ -40,5 +48,20 @@ describe('formatTokenAmount', () => {
 
   test('is exact above 2^53', () => {
     expect(formatTokenAmount(90071992547409920000n, 2)).toBe('900,719,925,474,099,200');
+  });
+});
+
+describe('displayAmount', () => {
+  test('groups thousands and trims the fraction to the size', () => {
+    expect(compactDecimal('245278.8768858')).toBe('245,278.87');
+    expect(compactDecimal('500000000')).toBe('500,000,000');
+    expect(compactDecimal('1.23456789')).toBe('1.2345');
+    expect(compactDecimal('0.00123456789')).toBe('0.001234');
+    expect(compactDecimal('12.50')).toBe('12.5');
+    expect(compactDecimal('0')).toBe('0');
+    expect(displayAmount(2646227469473n, 7)).toBe('264,622.74');
+    expect(displayAmount(150n, 2)).toBe('1.5');
+    expect(displayNumber(4.21083311)).toBe('4.2108');
+    expect(displayNumber(0.00005)).toBe('0.00005');
   });
 });

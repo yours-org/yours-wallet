@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { bsvRowOf, directionFromAction } from './coinHistory';
+import { bsvRowOf, directionFromAction, historyKindOf } from './coinHistory';
 
 describe('directionFromAction', () => {
   test('follows the sign of the net satoshis, not who built the transaction', () => {
@@ -51,5 +51,13 @@ describe('bsvRowOf', () => {
   test('token and ordinal actions belong to other lists', () => {
     expect(bsvRowOf({ ...base, satoshis: -200, isOutgoing: true, labels: ['p 1sat transfer'] })).toBeNull();
     expect(bsvRowOf({ ...base, satoshis: -200, isOutgoing: true, outputs: [out(1, 'ordinals')] })).toBeNull();
+  });
+});
+
+describe('historyKindOf', () => {
+  test('an action the exchange client labelled is a swap row', () => {
+    expect(historyKindOf(['amm-swap', 'p color'])).toBe('swap');
+    expect(historyKindOf(['p color'])).toBeUndefined();
+    expect(historyKindOf(undefined)).toBeUndefined();
   });
 });
