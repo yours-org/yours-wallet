@@ -19,7 +19,7 @@
     "@bsv/sdk": "^4.0.0",
     "@bsv/templates": "^2.1.0",
     "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.15.3",
-    "@dcasegr/amm-client": "0.44.3",
+    "@dcasegr/amm-client": "0.53.0",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@hello-pangea/dnd": "^18.0.1",
     "@ramonak/react-progress-bar": "^5.2.0",

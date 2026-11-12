@@ -20,7 +20,7 @@
         "@bsv/sdk": "^4.0.0",
         "@bsv/templates": "^2.1.0",
         "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.15.3",
-        "@dcasegr/amm-client": "0.44.3",
+        "@dcasegr/amm-client": "0.53.0",
         "@fortawesome/react-fontawesome": "^0.2.2",
         "@hello-pangea/dnd": "^18.0.1",
         "@ramonak/react-progress-bar": "^5.2.0",
@@ -199,9 +199,9 @@
 
     "@cto.af/wtf8": ["@cto.af/wtf8@1.0.0", "", {}, "sha512-qI0XnZxcj/FmASB8XXWqG49bSIzu0I/02deAjhnTni9IZ7KMRVlh8EFLE+mmJlMA169lET6rTCFhEsZSjOwlhA=="],
 
-    "@dcasegr/amm-client": ["@dcasegr/amm-client@0.44.3", "", { "dependencies": { "@1sat/actions": "0.1.5", "@dcasegr/amm-engine": "0.44.3", "cbor2": "^2.3.0" }, "peerDependencies": { "@1sat/templates": "^0.1.1", "@bsv/color-permission-module": "^0.1.0", "@bsv/sdk": "^4.0.0" } }, "sha512-H1g0uWh6uBFhTAk1KRYVfjkzVojIHSbItERxCh7Gvsxz+5KZ6m+HzkpD1vO4wKZ2KZHMMHyIKFzeE+WV5lN7iA=="],
+    "@dcasegr/amm-client": ["@dcasegr/amm-client@0.53.0", "", { "dependencies": { "@1sat/actions": "0.1.5", "@dcasegr/amm-engine": "0.53.0", "cbor2": "^2.3.0" }, "peerDependencies": { "@1sat/templates": "^0.1.1", "@bsv/color-permission-module": "^0.1.0", "@bsv/sdk": "^4.0.0" } }, "sha512-dpnpokeRkUSqqken3uKqwkh0rMwZWaU3k1il8a4wnTiS+pq6DDw3F5WSMIUp3jbMEeq3QiWBgKMQsqrtrAJi6g=="],
 
-    "@dcasegr/amm-engine": ["@dcasegr/amm-engine@0.44.3", "", {}, "sha512-yAy8rEoOdZN3oecykOPGNTd+ownKWwU3M/bf9kDxWvdxU+BACZxYf+xrKIV0djiz2veptpTORHqYKXHLPzqPBg=="],
+    "@dcasegr/amm-engine": ["@dcasegr/amm-engine@0.53.0", "", {}, "sha512-48GmkMViO8F7Yhma4cbCHxsQG6VvctwflIpGz0Jd6Tr7uVH3o8x5KnMYa3IEiljSw/mXT0SNUcwNPICBTDmC7A=="],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.28.2", "", { "os": "aix", "cpu": "ppc64" }, "sha512-XExcO+dvLKvVtNTibSTBej1NCAbaGhWn9Ww1ZPx80qsahhPFe/8jgWP0IchNe0F3HwkU7n8ejhH8bjonqht8mQ=="],
 
