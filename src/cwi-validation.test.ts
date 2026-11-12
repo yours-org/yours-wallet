@@ -61,6 +61,60 @@ async function rejection(action: string, args: unknown, field?: string) {
 }
 
 describe('CWI runtime validation and message round trips', () => {
+  const insertionTx = new Transaction(
+    1,
+    [],
+    [{ satoshis: 1, lockingScript: LockingScript.fromHex('51') }],
+    0,
+  ).toAtomicBEEF();
+  const basketCalls = (basket: string): Array<[string, unknown]> => [
+    ['listOutputs', { basket }],
+    ['relinquishOutput', { basket, output: '01'.repeat(32) + '.0' }],
+    [
+      'createAction',
+      {
+        description: 'Basket namespace regression control',
+        outputs: [
+          { lockingScript: '51', satoshis: 1, outputDescription: 'Valid first output', basket: 'valid first basket' },
+          { lockingScript: '51', satoshis: 1, outputDescription: 'Namespace checked output', basket },
+        ],
+      },
+    ],
+    [
+      'internalizeAction',
+      {
+        tx: insertionTx,
+        description: 'Basket namespace import control',
+        outputs: [{ outputIndex: 0, protocol: 'basket insertion', insertionRemittance: { basket } }],
+      },
+    ],
+  ];
+
+  for (const basket of ['a'.repeat(297) + 'é', 'a'.repeat(298) + 'é', 'tpnil-uhrp', 'tpnil_underscore', 'unicode 💰']) {
+    for (const [action, args] of basketCalls(basket)) {
+      test(`rejects basket namespace characters through ${action} (${Buffer.byteLength(basket)} bytes)`, async () => {
+        await rejection(action, args, 'basket');
+      });
+    }
+  }
+
+  for (const basket of ['a'.repeat(299), 'a'.repeat(300), '  VALID basket 12  ', 'p ordinal valid']) {
+    test(`preserves valid basket argument controls (${Buffer.byteLength(basket)} bytes)`, async () => {
+      const harness = bridge();
+      try {
+        for (const [action, args] of basketCalls(basket)) {
+          const original = json(args);
+          await (harness.wallet as any)[action](args);
+          expect(args).toEqual(original);
+          expect(harness.calls.at(-1).params).toEqual(original);
+        }
+        expect(harness.calls).toHaveLength(4);
+      } finally {
+        harness.close();
+      }
+    });
+  }
+
   for (const [action, args] of [
     ['signAction', { ...signArgs, options: { ...signArgs.options, returnTXIDOnly: null } }],
     ['signAction', { ...signArgs, spends: null }],
