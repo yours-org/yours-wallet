@@ -212,7 +212,7 @@ describe('CWI runtime validation and message round trips', () => {
           };
           try {
             await expect((harness.wallet as any)[method](args)).rejects.toThrow();
-            expect(prompts).toBe(seekPermission === false ? 0 : 1);
+            expect(prompts).toBe(seekPermission === true ? 1 : 0);
             expect(discoveries).toBe(0);
             expect(harness.calls[0].params).toEqual(args);
           } finally {

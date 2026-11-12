@@ -174,21 +174,52 @@ describe('standing monthly spending allowance', () => {
     },
   );
 
-  test('other pending actions are retained when two requests overlap', async () => {
+  test('serializes overlapping creations so one affordable action can use the allowance', async () => {
     const f = await fixture();
     let release!: () => void;
+    let entered!: () => void;
     const barrier = new Promise<void>((resolve) => (release = resolve));
+    const firstCreated = new Promise<void>((resolve) => (entered = resolve));
     let arrivals = 0;
     f.setAfterCreate(async () => {
-      if (++arrivals === 2) release();
-      await barrier;
+      if (++arrivals === 1) {
+        entered();
+        await barrier;
+      }
     });
     const manager = f.manager();
-    const results = await Promise.allSettled([f.pay(manager, 47), f.pay(manager, 17)]);
-    expect(results.every((result) => result.status === 'rejected')).toBe(true);
-    expect(f.signed).toHaveLength(0);
-    expect(f.aborted).toHaveLength(2);
-    expect(f.prompts.length).toBeGreaterThan(0);
+    const first = f.pay(manager, 47);
+    await firstCreated;
+    const second = f.pay(manager, 17);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(arrivals).toBe(1);
+    release();
+    const results = await Promise.allSettled([first, second]);
+    expect(results.map((result) => result.status)).toEqual(['fulfilled', 'rejected']);
+    expect(f.signed).toHaveLength(1);
+    expect(f.aborted).toHaveLength(1);
+    expect(f.prompts).toHaveLength(1);
+    expect(f.history.map((entry) => entry.satoshis)).toEqual([-70]);
+  });
+
+  test('overlapping affordable actions still use the exact fee-inclusive cap', async () => {
+    const f = await fixture();
+    const manager = f.manager();
+    await Promise.all([f.pay(manager, 11), f.pay(manager, 43)]);
+    expect(f.signed).toHaveLength(2);
+    expect(f.prompts).toHaveLength(0);
+    expect(f.aborted).toHaveLength(0);
+    expect(f.history.reduce((sum, entry) => sum - entry.satoshis, 0)).toBe(100);
+  });
+
+  test('a failed creation releases its origin queue for the next request', async () => {
+    const f = await fixture();
+    const manager = f.manager();
+    const results = await Promise.allSettled([f.pay(manager, -1), f.pay(manager, 11)]);
+    expect(results.map((result) => result.status)).toEqual(['rejected', 'fulfilled']);
+    expect(f.signed).toHaveLength(1);
+    expect(f.history.map((entry) => entry.satoshis)).toEqual([-34]);
   });
 
   test.each([

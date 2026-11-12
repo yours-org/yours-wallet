@@ -120,11 +120,11 @@ round trips and the production minifier.
 
 ## Discovery permission intent and normalized baskets
 
-Identity and attribute discovery forward the caller's `seekPermission` value to
-the protocol permission check. An explicit `false` can use a prior valid grant
-but cannot open a new permission request; omission and `true` preserve the
-existing request flow. Both ESM and CommonJS exports are tested through public
-CWI and the actual permissions managers.
+Identity and attribute discovery apply BRC-100's `BooleanDefaultFalse` to the
+protocol permission check. Omission and explicit `false` can use a prior valid
+grant and cannot open a new permission request. Explicit `true` permits seeking
+consent. Both ESM and CommonJS exports are tested through public CWI and the
+actual permissions managers.
 
 Internalization and output relinquishment now forward the validated normalized
 basket to storage, matching creation and listing. The patch copies only the
@@ -140,3 +140,31 @@ normalization. Noncanonical aliases of `default`, `admin...` and `p ...` are
 rejected before permission routing; exact reserved names remain subject to their
 existing manager/module ownership. This prevents a raw alias from receiving an
 ordinary grant before storage normalizes it into a reserved namespace.
+
+## Linkage scope and concurrent allowance progress
+
+Specific linkage authorization includes the revealed counterparty together
+with the protocol and applicable level-2 key. The existing grant key separately
+binds the verifier and privileged state. A legacy grant that omitted the peer
+does not authorize a new scoped request. The underlying BRC-69 derivation,
+encryption context, proofs and returned fields remain unchanged; tests decrypt
+the actual result independently.
+
+Protocol permission indexes use the same bounded full-name digest mechanism
+as long basket indexes. Lookup, mint and renewal paths retain short valid tags;
+long tags use SHA-256, while authenticated token fields must still match the
+complete protocol name and counterparty. The prompt retains the full scope.
+
+Action creation uses a per-manager, per-origin FIFO queue from staging through
+authorization and finalization. One affordable action can complete before the
+next request counts its debit; other pending, held and signed actions remain in
+the allowance calculation. Failures release the queue, and admin-originator
+operations retain their existing path. This queue is internal to the manager
+and adds no public API or persistent state. Tests cover competing over-cap
+requests, two requests totaling the exact fee-inclusive cap, failed requests,
+existing reservations and source-map preservation. The new compiled spans are
+recorded in `native-linkage-discovery-patch/` and `origin-action-queue-patch/`.
+
+Retire these corrections when the pinned upstream manager provides equivalent
+peer-scoped grants, discovery defaults, bounded protocol indexes and serialized
+allowance decisions, with the same exported-manager regressions passing.
