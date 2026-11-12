@@ -102,6 +102,20 @@ beforeAll(async () => {
   if (!address || typeof address === 'string') throw new Error('No owned loopback fixture address');
   origin = `http://127.0.0.1:${address.port}`;
   browser = await puppeteer.launch({ headless: true });
+  expect(browser.process()?.spawnargs).not.toContain('--no-sandbox');
+  expect(browser.process()?.spawnargs).not.toContain('--disable-setuid-sandbox');
+  if (process.platform === 'linux') {
+    const sandbox = await browser.newPage();
+    try {
+      await sandbox.goto('chrome://sandbox');
+      const status = await sandbox.evaluate(() => document.body.innerText);
+      expect(status).toMatch(/PID namespaces\s+Yes/);
+      expect(status).toMatch(/Seccomp-BPF sandbox\s+Yes/);
+      console.log(JSON.stringify({ browser: await browser.version(), sandbox: status }));
+    } finally {
+      await sandbox.close();
+    }
+  }
 }, 60_000);
 
 afterAll(async () => {
