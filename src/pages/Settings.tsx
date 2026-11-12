@@ -27,6 +27,10 @@ import {
   Usb,
   LifeBuoy,
   Wrench,
+  Layers,
+  AtSign,
+  Mail,
+  Trash2,
 } from 'lucide-react';
 import { FaDiscord } from 'react-icons/fa';
 import { Button } from '../components/Button';
@@ -37,11 +41,15 @@ import { SpeedBump } from '../components/SpeedBump';
 import { TopNav } from '../components/TopNav';
 import { useBottomMenu } from '../hooks/useBottomMenu';
 import { useIdentity, resolveImageUrl } from '../hooks/useIdentity';
+import { useHandles, useHandleAvatar } from '../hooks/useHandles';
+import { formatHandle, type HeldHandle } from '../services/handles';
+import { HANDLE_CERT_TYPE } from '@1sat/types';
+import { loadHandleDetails, setHandleProfile, type HandleDetails } from '../services/handleProfile';
 import { useTheme } from '../hooks/useTheme';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { YoursEventName } from '../inject';
 import { sendMessage } from '../utils/chromeHelpers';
-import { DISCORD_SUPPORT_URL, FEE_PER_KB } from '../utils/constants';
+import { chainOf, DISCORD_SUPPORT_URL, FEE_PER_KB, handleRegistrationUrlOf } from '../utils/constants';
 import { ChromeStorageObject, UsbBackupAccountStatus, UsbSecurity } from '../services/types/chromeStorage.types';
 import {
   deleteHandle,
@@ -60,6 +68,8 @@ import { MasterBackupProgressEvent, streamDataToZip } from '../utils/masterExpor
 import { useSnackbar } from '../hooks/useSnackbar';
 import { PermissionsManager } from './PermissionsManager';
 import { StorageStatus } from './StorageStatus';
+import { TokenOverlays } from './TokenOverlays';
+import { getAccountAvatar } from '../utils/accountAvatar';
 import { REPAIR_PHASE_LABELS, useStorageRepair } from '../hooks/useStorageRepair';
 import {
   RECONCILE_HISTORY_KEY,
@@ -92,12 +102,14 @@ export type SettingsPage =
   | 'account-list'
   | 'edit-account'
   | 'identity'
+  | 'handle-detail'
   | 'export-keys-options'
   | 'export-keys-qr'
   | 'storage'
   | 'permissions'
   | 'usb-security'
-  | 'troubleshooting';
+  | 'troubleshooting'
+  | 'token-overlays';
 
 type DecisionType =
   | 'sign-out'
@@ -106,7 +118,7 @@ type DecisionType =
   | 'export-keys-qr-code'
   | 'delete-account'
   | 'inscribe-avatar'
-  | 'save-profile'
+  | 'relinquish-handle'
   | 'remove-usb-stick'
   | 'disable-usb-backup';
 
@@ -203,27 +215,6 @@ const Section = ({ title, children }: SectionProps) => (
   </motion.div>
 );
 
-type IdentifierRowProps = {
-  label: string;
-  value: string;
-  copied: boolean;
-  onCopy: () => void;
-};
-
-const IdentifierRow = ({ label, value, copied, onCopy }: IdentifierRowProps) => (
-  <motion.div variants={rowVariant} onClick={onCopy} className="w-full cursor-pointer pt-1" title={`Copy ${label}`}>
-    <div className="flex items-center justify-center gap-1.5">
-      <span className="text-[9px] uppercase tracking-wider" style={{ color: '#475467' }}>
-        {label}
-      </span>
-      <span className="text-[10px] font-mono" style={{ color: '#475467' }}>
-        {value.length > 40 ? `${value.slice(0, 12)}...${value.slice(-8)}` : value}
-      </span>
-      {copied ? <Check size={10} style={{ color: '#34D399' }} /> : <Copy size={10} style={{ color: '#475467' }} />}
-    </div>
-  </motion.div>
-);
-
 type SubPageHeaderProps = {
   title: string;
   onBack: () => void;
@@ -272,7 +263,7 @@ export const Settings = () => {
   const { theme } = useTheme();
   const { addSnackbar } = useSnackbar();
   const { record: repairRecord, outcome: repairOutcome, runRepair } = useStorageRepair();
-  const { query, handleSelect } = useBottomMenu();
+  const { query, handleSelect, isVisible: isMenuVisible } = useBottomMenu();
   const [showSpeedBump, setShowSpeedBump] = useState(false);
   const { chromeStorageService, keysService, lockWallet, wallet, apiContext } = useServiceContext();
   // The USB Security Key page is reachable from two places; back returns to whichever opened it.
@@ -288,13 +279,15 @@ export const Settings = () => {
   const [speedBumpMessage, setSpeedBumpMessage] = useState('');
   const [decisionType, setDecisionType] = useState<DecisionType | undefined>();
   const identity = useIdentity(apiContext, chromeStorageService);
+  const heldHandles = useHandles(apiContext.wallet, chromeStorageService);
+  const { defaultHandle, setDefaultHandle } = heldHandles;
+  const identityAvatar = useHandleAvatar(heldHandles.handles, defaultHandle);
   const [exportKeysQrData, setExportKeysAsQrData] = useState('');
   const [shouldVisibleExportedKeys, setShouldVisibleExportedKeys] = useState(false);
-  const [enteredName, setEnteredName] = useState(identity.profile.name);
-  const [enteredImage, setEnteredImage] = useState(identity.profile.image);
-  const [enteredDescription, setEnteredDescription] = useState(identity.profile.description);
+  // The handle profile form (Settings > Identity > handle): name and avatar outpoint as edited.
+  const [enteredName, setEnteredName] = useState('');
+  const [enteredImage, setEnteredImage] = useState('');
   const [enteredAccountName, setEnteredAccountName] = useState('');
-  const [enteredAccountIcon, setEnteredAccountIcon] = useState('');
   const [copiedBapId, setCopiedBapId] = useState(false);
   const [copiedIdentityKey, setCopiedIdentityKey] = useState(false);
   const [identityPubKey, setIdentityPubKey] = useState('');
@@ -313,6 +306,13 @@ export const Settings = () => {
   const [backupDone, setBackupDone] = useState(false);
   const [backupError, setBackupError] = useState('');
   const currentAccount = chromeStorageService.getCurrentAccountObject();
+  const [selectedHandle, setSelectedHandle] = useState<HeldHandle | null>(null);
+  const [handleDetails, setHandleDetails] = useState<{
+    loading: boolean;
+    error: string | null;
+    details: HandleDetails | null;
+  }>({ loading: false, error: null, details: null });
+  const [handleSaving, setHandleSaving] = useState(false);
   const [customFeeRate, setCustomFeeRate] = useState(currentAccount.account?.settings.customFeeRate ?? FEE_PER_KB);
   const [lockTimeout, setLockTimeout] = useState(currentAccount.account?.settings.lockTimeout ?? 10);
   const [selectedAccountIdentityAddress, setSelectedAccountIdentityAddress] = useState<string | undefined>();
@@ -579,26 +579,67 @@ export const Settings = () => {
     }
   };
 
-  const handleSaveProfileIntent = () => {
-    setDecisionType('save-profile');
+  const openHandle = async (h: HeldHandle) => {
+    setSelectedHandle(h);
+    setPage('handle-detail');
+    setHandleDetails({ loading: true, error: null, details: null });
+    setEnteredName('');
+    setEnteredImage('');
+    setAvatarPreview(null);
+    try {
+      const details = await loadHandleDetails(h);
+      setHandleDetails({ loading: false, error: null, details });
+      setEnteredName(details.profile?.name ?? '');
+      setEnteredImage(details.profile?.avatar ? `1sat://${details.profile.avatar.replace('_', '.')}` : '');
+    } catch (err) {
+      setHandleDetails({ loading: false, error: err instanceof Error ? err.message : String(err), details: null });
+    }
+  };
+
+  const handleRelinquishHandleIntent = () => {
+    if (!selectedHandle) return;
+    setDecisionType('relinquish-handle');
     setSpeedBumpMessage(
-      identity.isPublished
-        ? 'Updating your profile will broadcast a transaction. A small fee will be deducted from your wallet.'
-        : 'This will create your on-chain identity and save your profile. A small fee will be deducted from your wallet.',
+      `Remove ${formatHandle(selectedHandle)} from this wallet? The wallet forgets the certificate and cannot get it back on its own. The handle itself stays registered at ${selectedHandle.domain}.`,
     );
     setShowSpeedBump(true);
   };
 
+  const handleRelinquishHandle = async () => {
+    if (!selectedHandle) return;
+    const value = formatHandle(selectedHandle);
+    try {
+      await apiContext.wallet.relinquishCertificate({
+        type: HANDLE_CERT_TYPE,
+        serialNumber: selectedHandle.serialNumber,
+        certifier: selectedHandle.certifier,
+      });
+      if (defaultHandle === value) await setDefaultHandle('');
+      addSnackbar('Handle removed from this wallet', 'success');
+      setSelectedHandle(null);
+      setPage('identity');
+      await heldHandles.refresh();
+    } catch (err) {
+      addSnackbar(err instanceof Error ? err.message : String(err), 'error');
+    }
+  };
+
   const handleSaveProfile = async () => {
-    const res = await identity.saveProfile({
-      name: enteredName,
-      image: enteredImage,
-      description: enteredDescription,
-    });
-    if (res.error) {
-      addSnackbar(res.error, 'error');
-    } else {
-      addSnackbar('Profile saved on-chain', 'success');
+    if (!selectedHandle || !handleDetails.details) return;
+    setHandleSaving(true);
+    try {
+      const avatar = enteredImage.startsWith('1sat://') ? enteredImage.slice(7).replace('.', '_') : null;
+      await setHandleProfile(apiContext.wallet, selectedHandle, {
+        name: enteredName,
+        avatar,
+      });
+      addSnackbar('Profile saved', 'success');
+      const details = await loadHandleDetails(selectedHandle);
+      setHandleDetails({ loading: false, error: null, details });
+    } catch (err) {
+      addSnackbar(err instanceof Error ? err.message : String(err), 'error');
+    } finally {
+      setHandleSaving(false);
     }
   };
 
@@ -625,7 +666,6 @@ export const Settings = () => {
       [selectedAccountIdentityAddress]: {
         ...account,
         name: enteredAccountName,
-        icon: enteredAccountIcon,
       },
     };
     await chromeStorageService.updateNested(key, update);
@@ -657,14 +697,6 @@ export const Settings = () => {
     setSelectedAccountIdentityAddress(undefined);
     setPage('main');
   };
-
-  useEffect(() => {
-    if (identity.loading || identity.error) return;
-    setEnteredName(identity.profile.name);
-    setEnteredImage(identity.profile.image);
-    setEnteredDescription(identity.profile.description);
-    setAvatarPreview(null);
-  }, [identity.loading, identity.error, identity.profile]);
 
   const exportKeys = async (password: string) => {
     const keys = await keysService.retrieveKeys(password);
@@ -768,10 +800,10 @@ export const Settings = () => {
       setDecisionType(undefined);
       setShowSpeedBump(false);
     }
-    if (decisionType === 'save-profile') {
-      handleSaveProfile();
+    if (decisionType === 'relinquish-handle') {
       setDecisionType(undefined);
       setShowSpeedBump(false);
+      await handleRelinquishHandle();
     }
     if (decisionType === 'remove-usb-stick') {
       setDecisionType(undefined);
@@ -837,7 +869,9 @@ export const Settings = () => {
     const passwordKey = password && salt ? derivePasswordKey(password, salt) : undefined;
     // Populate overlay with all accounts
     const allAccounts = chromeStorageService.getAllAccounts();
-    setBackupAccounts(allAccounts.map((a) => ({ name: a.name, icon: a.icon || '', status: 'pending' })));
+    setBackupAccounts(
+      allAccounts.map((a) => ({ name: a.name, icon: getAccountAvatar(a, apiContext), status: 'pending' })),
+    );
     setBackupInProgress(true);
     setBackupDone(false);
     setBackupError('');
@@ -969,7 +1003,7 @@ export const Settings = () => {
         <SettingRow
           icon={<Fingerprint size={16} />}
           label="Identity"
-          description="On-chain BAP identity and profile"
+          description="Handles, profile, and identity keys"
           onClick={() => setPage('identity')}
           isFirst
         />
@@ -1006,6 +1040,14 @@ export const Settings = () => {
               style={{ width: '5rem', margin: 0 }}
             />
           }
+        />
+        <Divider />
+        <SettingRow
+          icon={<Layers size={16} />}
+          label="Token overlays"
+          description="Overlay used for each 1Color token"
+          onClick={() => setPage('token-overlays')}
+          isLast
         />
       </Section>
 
@@ -1328,6 +1370,13 @@ export const Settings = () => {
 
   const avatarSrc = avatarPreview || (enteredImage ? resolveImageUrl(enteredImage, apiContext) : '');
 
+  const truncateKey = (value: string) => (value.length > 24 ? `${value.slice(0, 10)}…${value.slice(-8)}` : value);
+  const copyIcon = (copied: boolean) =>
+    copied ? <Check size={16} style={{ color: '#34D399' }} /> : <Copy size={16} style={{ color: '#98A2B3' }} />;
+  const registrationDomain = new URL(handleRegistrationUrlOf(chainOf(chromeStorageService.getNetwork()))).host;
+  const openRegistration = () =>
+    window.open(handleRegistrationUrlOf(chainOf(chromeStorageService.getNetwork())), '_blank');
+
   const identityPage = (
     <motion.div
       key="identity"
@@ -1339,118 +1388,246 @@ export const Settings = () => {
     >
       <SubPageHeader title="Identity" onBack={() => setPage('main')} />
 
-      {identity.loading && !identity.bapId ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 size={24} className="animate-spin" style={{ color: '#98A2B3' }} />
-        </div>
-      ) : (
-        <motion.div variants={stagger} initial="initial" animate="animate" className="w-full space-y-3">
-          {/* Intro text for first-time users */}
-          {!identity.isPublished && (
-            <motion.p
-              variants={rowVariant}
-              className="text-xs text-center"
-              style={{ color: '#98A2B3', lineHeight: 1.5 }}
-            >
-              Set up your on-chain identity so apps and other users can recognize you. Your profile is stored
-              permanently on the blockchain.
-            </motion.p>
-          )}
+      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full">
+        {/* Who this wallet is: the default handle and its avatar */}
+        <motion.div variants={rowVariant} className="flex flex-col items-center mb-6">
+          <div
+            className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center"
+            style={{
+              background: identityAvatar ? undefined : 'linear-gradient(135deg, #A1FF8B, #34D399)',
+              border: '2px solid rgba(161,255,139,0.3)',
+            }}
+          >
+            {identityAvatar && apiContext.services ? (
+              <img
+                src={apiContext.services.ordfs.getContentUrl(identityAvatar)}
+                className="w-full h-full object-cover"
+                alt="Avatar"
+              />
+            ) : (
+              <UserCircle size={36} color="#010101" />
+            )}
+          </div>
+          <p className="text-base font-bold mt-3" style={{ color: '#FFFFFF' }}>
+            {defaultHandle ?? 'No handle yet'}
+          </p>
+          <p className="text-xs mt-0.5" style={{ color: '#98A2B3' }}>
+            {defaultHandle ? 'Your default handle' : 'Register one to be paid by name'}
+          </p>
+        </motion.div>
 
-          {/* Avatar — tap to pick */}
-          <motion.div variants={rowVariant} className="flex flex-col items-center">
-            <button
-              onClick={() => setShowAvatarPicker(true)}
-              className="relative cursor-pointer group"
-              disabled={avatarUploading}
-            >
-              <div
-                className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center"
-                style={{
-                  background: avatarSrc ? undefined : 'linear-gradient(135deg, #A1FF8B, #34D399)',
-                  border: '2px solid rgba(161,255,139,0.3)',
-                }}
+        {/* BRC-169 handles held as certificates; the chosen one is the default "from" */}
+        <Section title="Handles">
+          {heldHandles.loading ? (
+            <div className="flex items-center justify-center py-4 bg-[#17191E]">
+              <Loader2 size={16} className="animate-spin" style={{ color: '#98A2B3' }} />
+            </div>
+          ) : heldHandles.error ? (
+            <p className="px-4 py-3 text-xs bg-[#17191E]" style={{ color: '#F97066' }}>
+              {heldHandles.error}
+            </p>
+          ) : (
+            heldHandles.handles.map((h, i) => {
+              const value = formatHandle(h);
+              const isDefault = defaultHandle === value;
+              return (
+                <div key={h.serialNumber}>
+                  <SettingRow
+                    icon={<AtSign size={16} />}
+                    label={value}
+                    description={isDefault ? 'Default handle' : undefined}
+                    right={
+                      isDefault ? (
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle2 size={14} style={{ color: '#A1FF8B' }} />
+                          <ChevronRight size={16} color="#98A2B3" />
+                        </div>
+                      ) : undefined
+                    }
+                    onClick={() => openHandle(h)}
+                    isFirst={i === 0}
+                  />
+                  <Divider />
+                </div>
+              );
+            })
+          )}
+          <SettingRow
+            icon={<Plus size={16} />}
+            label="Register a handle"
+            description={`Opens ${registrationDomain}`}
+            onClick={openRegistration}
+            isFirst={!heldHandles.loading && !heldHandles.error && heldHandles.handles.length === 0}
+            isLast
+          />
+        </Section>
+
+        <Section title="Identifiers">
+          <SettingRow
+            icon={<Key size={16} />}
+            label="Identity Key"
+            description={identityPubKey ? truncateKey(identityPubKey) : 'Loading…'}
+            right={identityPubKey ? copyIcon(copiedIdentityKey) : undefined}
+            onClick={identityPubKey ? handleCopyIdentityKey : undefined}
+            isFirst
+            isLast={!identity.bapId}
+          />
+          {identity.bapId && (
+            <>
+              <Divider />
+              <SettingRow
+                icon={<Fingerprint size={16} />}
+                label="BAP ID"
+                description={truncateKey(identity.bapId)}
+                right={copyIcon(copiedBapId)}
+                onClick={handleCopyBapId}
+                isLast
+              />
+            </>
+          )}
+        </Section>
+      </motion.div>
+    </motion.div>
+  );
+
+  const selectedIsDefault = !!selectedHandle && defaultHandle === formatHandle(selectedHandle);
+
+  const handleDetailPage = (
+    <motion.div
+      key="handle-detail"
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="w-full px-4 pb-24"
+    >
+      <SubPageHeader
+        title={selectedHandle ? formatHandle(selectedHandle) : 'Handle'}
+        onBack={() => setPage('identity')}
+      />
+
+      <motion.div variants={stagger} initial="initial" animate="animate" className="w-full">
+        {/* Profile: the name and avatar the host serves for this handle */}
+        <motion.div
+          variants={rowVariant}
+          className="w-full rounded-xl p-4 mb-4 flex flex-col items-center"
+          style={{ backgroundColor: '#17191E', border: '1px solid rgba(152,162,179,0.12)' }}
+        >
+          {handleDetails.loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 size={24} className="animate-spin" style={{ color: '#98A2B3' }} />
+            </div>
+          ) : handleDetails.error ? (
+            <p className="text-xs text-center py-4" style={{ color: '#F97066' }}>
+              {handleDetails.error}
+            </p>
+          ) : (
+            <>
+              <button
+                onClick={() => setShowAvatarPicker(true)}
+                className="relative cursor-pointer group"
+                disabled={avatarUploading}
               >
-                {avatarSrc ? (
-                  <img src={avatarSrc} className="w-full h-full object-cover" alt="Avatar" />
-                ) : (
-                  <UserCircle size={36} color="#010101" />
-                )}
-                {avatarUploading && (
-                  <div className="absolute inset-0 rounded-full flex items-center justify-center bg-black/60">
-                    <Loader2 size={20} className="animate-spin" style={{ color: '#fff' }} />
-                  </div>
-                )}
+                <div
+                  className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center"
+                  style={{
+                    background: avatarSrc ? undefined : 'linear-gradient(135deg, #A1FF8B, #34D399)',
+                    border: '2px solid rgba(161,255,139,0.3)',
+                  }}
+                >
+                  {avatarSrc ? (
+                    <img src={avatarSrc} className="w-full h-full object-cover" alt="Avatar" />
+                  ) : (
+                    <UserCircle size={36} color="#010101" />
+                  )}
+                  {avatarUploading && (
+                    <div className="absolute inset-0 rounded-full flex items-center justify-center bg-black/60">
+                      <Loader2 size={20} className="animate-spin" style={{ color: '#fff' }} />
+                    </div>
+                  )}
+                </div>
+                <div
+                  className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full flex items-center justify-center"
+                  style={{ background: '#1D2939', border: '2px solid #010101' }}
+                >
+                  <Camera size={12} style={{ color: '#D0D5DD' }} />
+                </div>
+              </button>
+              <p className="text-[10px] mt-1.5 mb-4" style={{ color: '#667085' }}>
+                Tap to change photo
+              </p>
+              <Input
+                theme={theme}
+                placeholder="Display name"
+                type="text"
+                onChange={(e) => setEnteredName(e.target.value)}
+                value={enteredName}
+              />
+              <div className="w-full mt-3">
+                <Button
+                  theme={theme}
+                  type="primary"
+                  label="Save profile"
+                  onClick={handleSaveProfile}
+                  loading={handleSaving}
+                  disabled={avatarUploading || !handleDetails.details}
+                />
               </div>
-              <div
-                className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full flex items-center justify-center"
-                style={{ background: '#1D2939', border: '2px solid #010101' }}
-              >
-                <Camera size={12} style={{ color: '#D0D5DD' }} />
-              </div>
-            </button>
-            <p className="text-[10px] mt-1.5" style={{ color: '#667085' }}>
-              Tap to change
-            </p>
-          </motion.div>
-
-          {/* Name */}
-          <motion.div variants={rowVariant} className="w-full">
-            <Input
-              theme={theme}
-              placeholder="Your name"
-              type="text"
-              onChange={(e) => setEnteredName(e.target.value)}
-              value={enteredName}
-            />
-          </motion.div>
-
-          {/* Bio */}
-          <motion.div variants={rowVariant} className="w-full">
-            <Input
-              theme={theme}
-              placeholder="A short bio..."
-              type="text"
-              onChange={(e) => setEnteredDescription(e.target.value)}
-              value={enteredDescription}
-            />
-          </motion.div>
-
-          {identity.error && (
-            <p className="text-xs text-center" style={{ color: '#F97066' }}>
-              {identity.error}
-            </p>
-          )}
-
-          {/* Save */}
-          <motion.div variants={rowVariant} className="w-full pb-6">
-            <Button
-              theme={theme}
-              type="primary"
-              label={identity.isPublished ? 'Update Profile' : 'Create Identity'}
-              onClick={handleSaveProfile}
-              loading={identity.loading}
-              disabled={avatarUploading}
-            />
-            <p className="text-[10px] text-center mt-1.5" style={{ color: '#667085' }}>
-              This will broadcast a small transaction
-            </p>
-          </motion.div>
-
-          {identity.bapId && identity.isPublished && (
-            <IdentifierRow label="BAP ID" value={identity.bapId} copied={copiedBapId} onCopy={handleCopyBapId} />
-          )}
-
-          {identityPubKey && (
-            <IdentifierRow
-              label="Identity Key"
-              value={identityPubKey}
-              copied={copiedIdentityKey}
-              onCopy={handleCopyIdentityKey}
-            />
+              <p className="text-[10px] text-center mt-2" style={{ color: '#667085' }}>
+                Signed by your key and served by {selectedHandle?.domain}
+              </p>
+            </>
           )}
         </motion.div>
-      )}
+
+        <Section title="Handle">
+          <SettingRow
+            icon={<AtSign size={16} />}
+            label={selectedIsDefault ? 'Default handle' : 'Use as default'}
+            description={
+              selectedIsDefault ? 'Shown on your wallet and used when you send' : 'Show this handle and send from it'
+            }
+            right={
+              selectedIsDefault ? (
+                <CheckCircle2 size={16} style={{ color: '#A1FF8B' }} />
+              ) : (
+                <span className="text-xs font-semibold" style={{ color: '#A1FF8B' }}>
+                  Set
+                </span>
+              )
+            }
+            onClick={
+              selectedIsDefault ? undefined : () => selectedHandle && setDefaultHandle(formatHandle(selectedHandle))
+            }
+            isFirst
+          />
+          <Divider />
+          <SettingRow
+            icon={<Mail size={16} />}
+            label="Mailbox"
+            description={
+              handleDetails.details
+                ? new URL(handleDetails.details.messagebox).host
+                : handleDetails.loading
+                  ? 'Loading…'
+                  : 'Unavailable'
+            }
+            isLast
+          />
+        </Section>
+
+        <Section title="Danger zone">
+          <SettingRow
+            icon={<Trash2 size={16} />}
+            label="Remove from this wallet"
+            description={`Stays registered at ${selectedHandle?.domain ?? 'its host'}. No undo in the wallet.`}
+            onClick={handleRelinquishHandleIntent}
+            danger
+            isFirst
+            isLast
+          />
+        </Section>
+      </motion.div>
     </motion.div>
   );
 
@@ -1473,7 +1650,6 @@ export const Settings = () => {
             onClick={() => {
               setSelectedAccountIdentityAddress(account.addresses.identityAddress);
               setEnteredAccountName(account.name);
-              setEnteredAccountIcon(account.icon);
               setPage('edit-account');
             }}
             className="flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors duration-150 bg-[#17191E] hover:bg-[#1f2128]"
@@ -1483,7 +1659,7 @@ export const Settings = () => {
           >
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <img
-                src={account.icon || activeCircle}
+                src={getAccountAvatar(account, apiContext) || activeCircle}
                 className="w-9 h-9 rounded-full object-cover flex-shrink-0"
                 alt={account.name}
               />
@@ -1526,18 +1702,6 @@ export const Settings = () => {
             type="text"
             onChange={(e) => setEnteredAccountName(e.target.value)}
             value={enteredAccountName}
-          />
-        </motion.div>
-        <motion.div variants={rowVariant}>
-          <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#98A2B3' }}>
-            Icon URL
-          </label>
-          <Input
-            theme={theme}
-            placeholder="https://..."
-            type="text"
-            onChange={(e) => setEnteredAccountIcon(e.target.value)}
-            value={enteredAccountIcon}
           />
         </motion.div>
         <motion.div variants={rowVariant} className="flex flex-col gap-2">
@@ -1761,6 +1925,8 @@ export const Settings = () => {
     </motion.div>
   );
 
+  const isAddAccountPage = page === 'create-account' || page === 'restore-account' || page === 'import-wif';
+
   return (
     <>
       <Show
@@ -1782,18 +1948,22 @@ export const Settings = () => {
         }
       >
         <div
-          className="flex flex-col items-center w-full overflow-x-hidden"
+          className="flex flex-col items-center w-full overflow-x-hidden self-start"
           style={{
             backgroundColor: '#010101',
-            minHeight: '100%',
-            height: 'calc(75%)',
+            // Stop the scroll area above the bottom nav so the last row of any
+            // sub page can scroll fully into view.
+            height: isMenuVisible ? 'calc(100% - 3.75rem)' : '100%',
             overflowY: 'auto',
           }}
         >
-          <TopNav />
+          {/* Add-account flows run full screen without the header. */}
+          <Show when={!isAddAccountPage}>
+            <TopNav />
 
-          {/* Page spacer for fixed TopNav */}
-          <div className="h-14 w-full flex-shrink-0" />
+            {/* Page spacer for fixed TopNav */}
+            <div className="h-14 w-full flex-shrink-0" />
+          </Show>
 
           {/* Page transitions */}
           <AnimatePresence mode="wait">
@@ -1845,6 +2015,7 @@ export const Settings = () => {
             {page === 'edit-account' && editAccount}
 
             {page === 'identity' && identityPage}
+            {page === 'handle-detail' && handleDetailPage}
 
             {page === 'permissions' && (
               <motion.div
@@ -1880,6 +2051,20 @@ export const Settings = () => {
             {page === 'usb-security' && usbSecurityPage}
 
             {page === 'troubleshooting' && troubleshootingPage}
+
+            {page === 'token-overlays' && (
+              <motion.div
+                key="token-overlays"
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="w-full px-4 pb-4"
+              >
+                <SubPageHeader title="Token overlays" onBack={() => setPage('main')} />
+                <TokenOverlays />
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </Show>

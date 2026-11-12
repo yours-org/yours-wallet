@@ -1,18 +1,19 @@
 /**
  * Per-coin transaction history fetchers.
  *
- * Three different backends depending on the coin type:
- * - BSV:   wallet.listActions() + negative filter (exclude any 'p 1sat '-labeled action + non-BSV baskets)
- * - BSV21: wallet.listActions({ labels: [buildTokenLabel(tokenId)] }) — server-side filtered by P-label
- * - MNEE:  getMneeHistory.execute() — purpose-built action with rich per-tx metadata
+ * Different backends depending on the coin type:
+ * - BSV:    wallet.listActions() + negative filter (exclude any 'p 1sat '-labeled action + non-BSV baskets)
+ * - BSV21:  wallet.listActions({ labels: [buildTokenLabel(tokenId)] }) — server-side filtered by P-label
+ * - 1Color: wallet.listActions() decoded per asset (see fetchOneColorHistory)
  *
- * All three return the same `CoinTxSummary` shape so the UI stays agnostic.
+ * All return the same `CoinTxSummary` shape so the UI stays agnostic.
  */
-import { getMneeHistory, type OneSatContext } from '@1sat/actions';
+import type { OneSatContext } from '@1sat/actions';
 import { buildTokenLabel } from '@1sat/types';
 import type { WalletAction } from '@bsv/sdk';
 import { BSV_DECIMAL_CONVERSION } from './constants';
-import { formatNumberWithCommasAndDecimals, showAmount, truncate } from './format';
+import { oneColorActionAmount, oneColorTicker } from '../services/oneColor';
+import { displayAmount, formatNumberWithCommasAndDecimals, truncate } from './format';
 
 /** Baskets that indicate a non-BSV action (BSV list should exclude these). */
 const NON_BSV_BASKETS = new Set(['bsv21', '1sat', 'ordinals', 'lock', 'opns', 'sigma', 'bsocial', 'bap']);
@@ -26,9 +27,17 @@ const NON_BSV_LABEL_PREFIXES = ['p 1sat '];
 
 export type CoinTxDirection = 'sent' | 'received' | 'transfer';
 
+/** The Open Exchange client labels every swap action it builds. */
+export const AMM_SWAP_LABEL = 'amm-swap';
+
+/** A row's kind beyond its direction: a swap leg (or its staging/return) rather than a plain send. */
+export const historyKindOf = (labels: string[] | undefined): 'swap' | undefined =>
+  labels?.includes(AMM_SWAP_LABEL) ? 'swap' : undefined;
+
 export type CoinTxSummary = {
   txid: string;
   direction: CoinTxDirection;
+  kind?: 'swap';
   amountDisplay: string;
   amountSubdued?: boolean;
   description?: string;
@@ -39,11 +48,6 @@ export type CoinTxSummary = {
 
 export type FetchHistoryOpts = {
   offset?: number;
-  limit?: number;
-};
-
-export type FetchMneeHistoryOpts = {
-  fromScore?: number;
   limit?: number;
 };
 
@@ -70,56 +74,78 @@ const formatBsv = (sats: number): string => {
   return `${formatNumberWithCommasAndDecimals(bsv, 8).replace(/\.?0+$/, '')} BSV`;
 };
 
-const directionFromAction = (action: WalletAction): CoinTxDirection => {
-  if (action.isOutgoing) return 'sent';
+/**
+ * Direction of a BSV row from the action's net satoshis, which wallet-toolbox
+ * sets to the change in the wallet's spendable pool: negative when sats left
+ * it, positive when they came back. `isOutgoing` only says this wallet built
+ * the transaction, which is also true of a move back from a staging basket
+ * (an AMM swap undone), so it cannot decide the sign.
+ */
+export const directionFromAction = (action: Pick<WalletAction, 'satoshis'>): CoinTxDirection => {
   if (action.satoshis > 0) return 'received';
+  if (action.satoshis < 0) return 'sent';
   return 'transfer';
 };
 
 // ─── BSV ─────────────────────────────────────────────────────────────────────
 
+/** Baskets whose outputs are the wallet's spendable sats (`fund` is the sync's legacy name). */
+const SPENDABLE_BASKETS = new Set(['default', 'fund']);
+const BSV_SCAN_PAGE = 100;
+
+/**
+ * One BSV row for an action, or null when it belongs in another list or moved
+ * no money. The amount is the action's net change to the spendable pool. An
+ * action this wallet did not build (a receive the sync internalized) can carry
+ * a net of 0 while its outputs hold the sats, so those are summed instead.
+ */
+export const bsvRowOf = (a: WalletAction): CoinTxSummary | null => {
+  if (isNonBsvAction(a)) return null;
+  let signedSats = a.satoshis;
+  if (signedSats === 0 && !a.isOutgoing) {
+    signedSats = (a.outputs ?? [])
+      .filter((o) => o.basket !== undefined && SPENDABLE_BASKETS.has(o.basket))
+      .reduce((sum, o) => sum + o.satoshis, 0);
+  }
+  // Nothing moved in BSV terms: a token-only action, or a record with none of our sats.
+  if (signedSats === 0) return null;
+  const direction = directionFromAction({ satoshis: signedSats });
+  const sign = direction === 'sent' ? '-' : '+';
+  return {
+    txid: a.txid,
+    direction,
+    amountDisplay: `${sign}${formatBsv(Math.abs(signedSats))}`,
+    description: a.description || undefined,
+  };
+};
+
 export const fetchBsvHistory = async (ctx: OneSatContext, opts: FetchHistoryOpts = {}): Promise<CoinTxSummary[]> => {
   // listActions returns rows in DB insertion order (oldest-first) and gives no
-  // built-in way to ask for "newest first". So we probe to learn the total count,
-  // then fetch the NEWEST `limit` actions by computing the right DB offset.
-  // `opts.offset` here means "offset into the newest-first display order".
+  // built-in way to ask for "newest first", so the scan walks pages back from
+  // the newest action. Rows are filtered as they go, so `opts.offset` and
+  // `opts.limit` count displayed rows, and a page is full whenever older
+  // actions remain.
   const wantLimit = opts.limit ?? 50;
-  const skipFromNewest = opts.offset ?? 0;
-
+  const skip = opts.offset ?? 0;
   const probe = await ctx.wallet.listActions({ labels: [], limit: 1, offset: 0 });
-  const total = probe.totalActions;
-  const remaining = total - skipFromNewest;
-  if (remaining <= 0) return [];
-
-  const dbLimit = Math.min(wantLimit, remaining);
-  const dbOffset = remaining - dbLimit;
-
-  const result = await ctx.wallet.listActions({
-    labels: [],
-    includeLabels: true,
-    includeOutputs: true,
-    limit: dbLimit,
-    offset: dbOffset,
-  });
-
-  // We fetched the newest page; reverse so newest appears first within it.
-  return result.actions
-    .slice()
-    .reverse()
-    .filter((a) => !isNonBsvAction(a))
-    .map((a) => {
-      const direction = directionFromAction(a);
-      const signedSats = a.satoshis; // positive = received, negative = sent (approx.)
-      const absSats = Math.abs(signedSats);
-      const sign = direction === 'sent' ? '-' : direction === 'received' ? '+' : '';
-      return {
-        txid: a.txid,
-        direction,
-        amountDisplay: `${sign}${formatBsv(absSats)}`,
-        amountSubdued: direction === 'transfer',
-        description: a.description || undefined,
-      };
+  const rows: CoinTxSummary[] = [];
+  let end = probe.totalActions;
+  while (end > 0 && rows.length < skip + wantLimit) {
+    const start = Math.max(0, end - BSV_SCAN_PAGE);
+    const { actions } = await ctx.wallet.listActions({
+      labels: [],
+      includeLabels: true,
+      includeOutputs: true,
+      limit: end - start,
+      offset: start,
     });
+    for (const a of actions.slice().reverse()) {
+      const row = bsvRowOf(a);
+      if (row) rows.push(row);
+    }
+    end = start;
+  }
+  return rows.slice(skip, skip + wantLimit);
 };
 
 // ─── BSV21 ───────────────────────────────────────────────────────────────────
@@ -248,7 +274,8 @@ export const fetchBsv21History = async (
       const direction = tokenDirectionFromAction(a);
       const atomic = bsv21AmountFromAction(a, tokenId);
       const sign = direction === 'sent' ? '-' : '+';
-      const display = atomic > 0n ? `${sign}${showAmount(atomic, decimals)} ${sym}` : `${sym} transfer`;
+      // The history sits inside the token's own view, so the amount needs no unit.
+      const display = atomic > 0n ? `${sign}${displayAmount(atomic, decimals)}` : `${sym} transfer`;
       return {
         txid: a.txid,
         direction,
@@ -259,47 +286,59 @@ export const fetchBsv21History = async (
     });
 };
 
-// ─── MNEE ────────────────────────────────────────────────────────────────────
+// ─── 1Color ──────────────────────────────────────────────────────────────────
 
-const MNEE_DECIMALS = 5;
+/** Actions read per page while scanning for an asset. */
+const ONE_COLOR_SCAN_PAGE = 100;
+/** Scanning stops after this many actions; older history for a busy wallet is cut off rather than read in full. */
+const ONE_COLOR_SCAN_MAX = 2000;
 
-export const fetchMneeHistory = async (
+/**
+ * 1Color actions carry the BRC-207 plan as hex chunks in their labels, with no
+ * per-asset label to query by, so the wallet's actions are read newest first
+ * with their locking scripts and each is decoded for the asset. A page is
+ * `opts.limit` matches after skipping `opts.offset` of them.
+ */
+export const fetchOneColorHistory = async (
   ctx: OneSatContext,
-  addresses: string[],
-  opts: FetchMneeHistoryOpts = {},
+  assetId: string,
+  decimals: number,
+  symbol: string | undefined,
+  opts: FetchHistoryOpts = {},
 ): Promise<CoinTxSummary[]> => {
-  if (!addresses.length) return [];
-  const result = await getMneeHistory.execute(ctx, {
-    addresses,
-    limit: opts.limit ?? 50,
-    fromScore: opts.fromScore,
-  });
-
-  // Sort by score descending → newest first. (The API usually returns them this way
-  // already, but sorting explicitly makes ordering independent of backend behavior.)
-  return result.history
-    .slice()
-    .sort((a, b) => b.score - a.score)
-    .map((h) => {
-      const direction: CoinTxDirection = h.type === 'send' ? 'sent' : 'received';
-      const sign = direction === 'sent' ? '-' : '+';
-      const amountDecimal = h.amount / 10 ** MNEE_DECIMALS;
-      const precision = Math.abs(amountDecimal) >= 0.01 ? 2 : MNEE_DECIMALS;
-      const amountDisplay = `${sign}${formatNumberWithCommasAndDecimals(amountDecimal, precision)} MNEE`;
-
-      // Pick a reasonable counterparty label (first one, truncated)
-      const counterparty = h.counterparties[0]?.address;
-
-      return {
-        txid: h.txid,
-        direction,
-        amountDisplay,
-        status: h.status,
-        height: h.height,
-        counterparty,
-        description: counterparty
-          ? `${direction === 'sent' ? 'to' : 'from'} ${truncate(counterparty, 6, 4)}`
-          : undefined,
-      };
+  const wantLimit = opts.limit ?? 50;
+  const skip = opts.offset ?? 0;
+  const sym = oneColorTicker({ sym: symbol, assetId });
+  const probe = await ctx.wallet.listActions({ labels: [], limit: 1, offset: 0 });
+  const matches: CoinTxSummary[] = [];
+  let end = probe.totalActions;
+  let scanned = 0;
+  while (end > 0 && matches.length < skip + wantLimit && scanned < ONE_COLOR_SCAN_MAX) {
+    const start = Math.max(0, end - ONE_COLOR_SCAN_PAGE);
+    const { actions } = await ctx.wallet.listActions({
+      labels: [],
+      includeOutputs: true,
+      includeOutputLockingScripts: true,
+      includeInputs: true,
+      includeInputSourceLockingScripts: true,
+      limit: end - start,
+      offset: start,
     });
+    for (const a of actions.slice().reverse()) {
+      const moved = oneColorActionAmount(a, assetId);
+      if (!moved) continue;
+      const sign = moved.direction === 'sent' ? '-' : '+';
+      matches.push({
+        txid: a.txid,
+        direction: moved.direction,
+        kind: historyKindOf(a.labels),
+        amountDisplay: moved.amount > 0n ? `${sign}${displayAmount(moved.amount, decimals)}` : `${sym} transfer`,
+        amountSubdued: moved.amount === 0n,
+        description: a.description || undefined,
+      });
+    }
+    scanned += end - start;
+    end = start;
+  }
+  return matches.slice(skip, skip + wantLimit);
 };

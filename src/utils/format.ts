@@ -1,11 +1,50 @@
 import { toToken, toTokenSat } from 'satoshi-token';
 
+/** Token amount for display: `amt` raw units at `dec` decimals, trailing zeros dropped (9000000 not 9000000.0000000). */
 export function showAmount(amt: bigint, dec: number): string {
   if (!Number.isFinite(dec) || dec < 0) {
     return amt.toString();
   }
-  return toToken(amt.toString(), dec, 'string');
+  return removeTrailingZeros(toToken(amt.toString(), dec, 'string'));
 }
+
+/** `showAmount` with thousands separators in the whole part: 1,000,000 and 1,234.5, exact at any size. */
+export function formatTokenAmount(amt: bigint, dec: number): string {
+  const plain = showAmount(amt, dec);
+  const negative = plain.startsWith('-');
+  const [whole, fraction] = (negative ? plain.slice(1) : plain).split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${negative ? '-' : ''}${grouped}${fraction ? `.${fraction}` : ''}`;
+}
+
+/**
+ * An amount for reading, the way Phantom and Coinbase show balances: thousands
+ * separators, and a fraction trimmed to what the size warrants (2 places from a
+ * thousand up, 4 from one up, else the first 4 significant decimals, at most
+ * 8), trailing zeros dropped. Never for an input or a confirmation: those use
+ * the exact amount (`formatTokenAmount`, `showAmount`).
+ */
+export function compactDecimal(full: string): string {
+  const negative = full.startsWith('-');
+  const [intRaw, fracRaw = ''] = (negative ? full.slice(1) : full).split('.');
+  const int = intRaw.replace(/^0+(?=\d)/, '') || '0';
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  let keep: number;
+  if (int.length > 3) keep = 2;
+  else if (int !== '0') keep = 4;
+  else {
+    const lead = fracRaw.match(/^0*/)?.[0].length ?? 0;
+    keep = Math.min(8, lead + 4);
+  }
+  const frac = fracRaw.slice(0, keep).replace(/0+$/, '');
+  return `${negative ? '-' : ''}${grouped}${frac ? `.${frac}` : ''}`;
+}
+
+/** `compactDecimal` of a token amount in raw units at `dec` decimals. */
+export const displayAmount = (amt: bigint, dec: number): string => compactDecimal(showAmount(amt, dec));
+
+/** `compactDecimal` of a plain number (a BSV balance, a USD-free quantity). */
+export const displayNumber = (n: number): string => (Number.isFinite(n) ? compactDecimal(n.toFixed(8)) : '—');
 
 export function normalize(amt: string, dec: number): string {
   if (!Number.isFinite(dec) || dec < 0) {
@@ -65,6 +104,9 @@ export const formatLargeNumber = (number: number, decimalPlaces = 3): string => 
 export const convertToTokenValue = (balance: number, decimals: number): number => {
   return balance / Math.pow(10, decimals);
 };
+
+/** BSV for display: commas, up to 8 decimals, trailing zeros dropped (0.001 BSV, not 0.00100000 BSV). */
+export const formatBsv = (bsv: number): string => removeTrailingZeros(formatNumberWithCommasAndDecimals(bsv, 8));
 
 export const removeTrailingZeros = (numStr: string): string => {
   if (numStr.includes('.')) {

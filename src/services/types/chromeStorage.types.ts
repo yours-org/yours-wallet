@@ -7,13 +7,14 @@ import {
   TaggedDerivationResponse,
   Broadcast,
   SocialProfile,
-  MNEEBalance,
 } from './provider.types';
 import { Theme } from '../../theme.types';
 import { StoredUtxo } from './bsv.types';
 
 export type Settings = {
   socialProfile: SocialProfile;
+  /** Default BRC-169 "from" handle, as `@handle@domain`; null or unset when none is chosen. */
+  defaultHandle?: string | null;
   favoriteTokens: string[];
   customFeeRate: number;
   /** Auto-lock timeout in minutes. Defaults to 10. */
@@ -36,6 +37,19 @@ export type Settings = {
    * least once for this account (Done or Skip).
    */
   sweepCompleted?: boolean;
+  /**
+   * 1Color token overlays chosen per token (Settings > Token overlays), for
+   * this account's chain. A token without an entry uses the chain default
+   * (COLOR_OVERLAY_URL / TESTNET_COLOR_OVERLAY_URL). A list rather than a map:
+   * account writes deep-merge, so a removed map key would never be deleted.
+   */
+  colorOverlays?: ColorOverlayOverride[];
+};
+
+/** One per-token overlay override: asset id `<txid>_<vout>` → overlay origin. */
+export type ColorOverlayOverride = {
+  assetId: string;
+  origin: string;
 };
 
 /**
@@ -73,7 +87,6 @@ export interface Account {
   /** BRC-29 primary receive address (index 0, "yours" prefix). Persisted on wallet init. */
   primaryAddress?: string;
   balance: Balance;
-  mneeBalance: MNEEBalance;
   pubKeys: PubKeys;
   storageConfig?: StorageConfig;
   /** Wallet-data migrations completed for this account; see ACCOUNT_DATA_VERSION. Absent = 0. */

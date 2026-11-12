@@ -14,6 +14,9 @@ import {
   usbBackupEnabled,
   usbBackupTotalBytes,
   usbBackupWipePending,
+  USB_BACKUP_LAST_RUN_KEY,
+  USB_BACKUP_RECENT_MS,
+  usbBackupRanRecently,
 } from './usbBackup';
 import type { UsbSecurity } from './types/chromeStorage.types';
 
@@ -194,5 +197,38 @@ describe('repair full-pass requests', () => {
     expect(full.lastFullPassStartedAt).toBe('2026-10-05T12:00:00.000Z');
     const inc = finishPass(startPass(full, '2026-10-05T13:00:00.000Z'), true, '2026-10-05T13:01:00.000Z');
     expect(inc.lastFullPassStartedAt).toBe('2026-10-05T12:00:00.000Z');
+  });
+});
+
+describe('usbBackupRanRecently', () => {
+  const withStorage = async (stored: Record<string, unknown> | 'throws', fn: () => Promise<void>) => {
+    const saved = (globalThis as { chrome?: unknown }).chrome;
+    (globalThis as { chrome?: unknown }).chrome = {
+      storage: {
+        local: {
+          get: async () => {
+            if (stored === 'throws') throw new Error('no storage');
+            return stored;
+          },
+        },
+      },
+    };
+    try {
+      await fn();
+    } finally {
+      (globalThis as { chrome?: unknown }).chrome = saved;
+    }
+  };
+
+  test('true inside the window, false past it, when unset, or when storage is unavailable', async () => {
+    const now = 1_000_000_000;
+    await withStorage({ [USB_BACKUP_LAST_RUN_KEY]: now - USB_BACKUP_RECENT_MS + 1 }, async () =>
+      expect(await usbBackupRanRecently(now)).toBe(true),
+    );
+    await withStorage({ [USB_BACKUP_LAST_RUN_KEY]: now - USB_BACKUP_RECENT_MS }, async () =>
+      expect(await usbBackupRanRecently(now)).toBe(false),
+    );
+    await withStorage({}, async () => expect(await usbBackupRanRecently(now)).toBe(false));
+    await withStorage('throws', async () => expect(await usbBackupRanRecently(now)).toBe(false));
   });
 });

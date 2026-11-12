@@ -230,18 +230,21 @@ export class KeysService {
       this.ordPubKey = keys.ordPubKey;
 
       // identity address not available with wif or 1sat import
+      let identityAddr: string | undefined;
       if (keys.identityAddress) {
-        const identityAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.identityAddress).data as number[], [
-          prefix,
-        ]);
+        identityAddr = Utils.toBase58Check(Utils.fromBase58Check(keys.identityAddress).data as number[], [prefix]);
 
         this.identityAddress = identityAddr;
         this.identityPubKey = keys.identityPubKey;
       }
 
+      // Every address follows the account's network, including the identity
+      // address: callers key storage writes by it, so it must match the
+      // account's map key even if the encrypted blob was written for another chain.
       return Object.assign({}, keys, {
         ordAddress: ordAddr,
         walletAddress: walletAddr,
+        ...(identityAddr ? { identityAddress: identityAddr } : {}),
       });
     } catch (error) {
       console.error('Error in retrieveKeys:', error instanceof Error ? error.message : 'Unknown error');

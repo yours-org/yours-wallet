@@ -5,7 +5,7 @@ icon: house
 
 # Yours Wallet
 
-Yours Wallet is an open-source, non-custodial BSV wallet delivered as a Chrome extension. It manages BSV, 1Sat Ordinals, BSV-21 tokens, MNEE stablecoin, and on-chain BAP identity. It is built on the [BRC-100](concepts/brc-100.md) wallet standard.
+Yours Wallet is an open-source, non-custodial BSV wallet delivered as a Chrome extension. It manages BSV, 1Sat Ordinals, 1Color and BSV-21 tokens, MNEE stablecoin, and on-chain BAP identity. It is built on the [BRC-100](concepts/brc-100.md) wallet standard.
 
 dApps integrate via the `@1sat/actions` package using a uniform pattern: create a context once, then call `action.execute(ctx, input)` for every operation.
 
@@ -25,6 +25,7 @@ The fast path:
 - On-chain identity: publish a BAP profile (name, avatar, bio) directly to the blockchain.
 - Multi-account: switch between accounts within a single wallet.
 - Ordinals: view, transfer, list, cancel listings, mint collections, inscribe.
+- 1Color tokens (BRC-162): the BRC-207 color module runs inside the wallet, so any BRC-100 dApp can deploy, send and receive 1Color tokens with plain `createAction` / `listOutputs` calls. Sends go to BRC-169 handles.
 - BSV-21 tokens: balances and sends with full atomic precision.
 - MNEE stablecoin: native send / receive
 
@@ -40,6 +41,7 @@ The five things you must understand to use the SDK correctly:
 - [Baskets & Tags](concepts/baskets-and-tags.md) — how outputs are organized
 - [Derivations](concepts/derivations.md) — P1SAT deposit-address derivation
 - [Permissions](concepts/permissions.md) — every operation may prompt the user
+- [1Color Tokens](concepts/one-color.md) — BRC-162 tokens through the wallet's BRC-207 module
 
 ### Actions
 
@@ -49,7 +51,8 @@ Use the [SUMMARY](SUMMARY.md) sidebar for the complete index, or jump to:
 
 - Payments — [sendBsv](actions/send-bsv.md), [sendAllBsv](actions/send-all-bsv.md), [listOutputs](actions/list-outputs.md)
 - Ordinals — [getOrdinals](actions/get-ordinals.md), [transferOrdinals](actions/transfer-ordinals.md), [inscribe](actions/inscribe.md), [burnOrdinals](actions/burn-ordinals.md)
-- Marketplace — [listOrdinal](actions/list-ordinal.md) (currently disabled), [purchaseOrdinal](actions/purchase-ordinal.md), [cancelListing](actions/cancel-listing.md)
+- Marketplace — [listOrdinal](actions/list-ordinal.md), [purchaseOrdinal](actions/purchase-ordinal.md), [cancelListing](actions/cancel-listing.md)
+- 1Color — [1Color balances](actions/get-1color-balances.md), [send1Color](actions/send-1color.md), [deploy1Color](actions/deploy-1color.md), [Receiving 1Color](actions/receive-1color.md)
 - BSV-21 — [getBsv21Balances](actions/get-bsv21-balances.md), [sendBsv21](actions/send-bsv21.md)
 - MNEE — [deriveDepositAddresses](actions/derive-deposit-addresses.md), [sendMnee](actions/send-mnee.md), [getMneeBalance](actions/get-mnee-balance.md)
 - Identity — [getProfile](actions/get-profile.md), [updateProfile](actions/update-profile.md), [publishIdentity](actions/publish-identity.md)

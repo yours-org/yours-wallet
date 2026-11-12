@@ -21,6 +21,10 @@ const { outputs } = await wallet.listOutputs({
 const totalSats = outputs.reduce((sum, o) => sum + o.satoshis, 0);
 ```
 
+### Module-owned baskets
+
+Baskets whose name starts with `p color` belong to the wallet's 1Color module. Each asset has a value basket `p color <assetId>` and an authority basket `p color <assetId> authority`; `p color assets` and `p color balance <assetId>` are read-only selectors the module answers rather than real baskets. Outputs there carry `color_state_available` or `color_state_reserved`. See [1Color Tokens](one-color.md).
+
 ## Tags
 
 Tags are string annotations on individual outputs. Ordinal outputs carry well-known tags:

@@ -3,12 +3,10 @@ import process from 'process';
 import { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { SweepApp, configureServices, type LegacyKeys } from '@1sat/sweep-ui';
-import { createChromeCWI, OneSatServices } from '@1sat/wallet-browser';
-import { createContext } from '@1sat/actions';
+import { createChromeCWI } from '@1sat/wallet-browser';
 import { chainOf, endpointsOf } from './utils/constants';
 import { NetWork } from './services/types/provider.types';
 import { decrypt } from './utils/crypto';
-import { cancelOwnedOrdLockListings } from './utils/cancelOrdLockListings';
 import './sweep-tab.css';
 
 global.Buffer = Buffer;
@@ -87,35 +85,6 @@ function SweepTab() {
       setLoading(false);
     });
   }, []);
-
-  // OPL-4696: cancel wallet-owned OrdLock listings once when sweep tab unlocks.
-  // Hooks must run unconditionally (before early returns).
-  useEffect(() => {
-    if (loading || error || !keys) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const stored = await chrome.storage.local.get(['accounts', 'selectedAccount']);
-        const selected = stored.selectedAccount as string | undefined;
-        const accounts = stored.accounts as Record<string, { network?: NetWork }> | undefined;
-        const chain = chainOf(selected && accounts ? accounts[selected]?.network : undefined);
-        const services = new OneSatServices(chain, endpointsOf(chain).services);
-        const apiContext = createContext(wallet, { chain, services, isBaseWallet: false });
-        if (cancelled) return;
-        const res = await cancelOwnedOrdLockListings(apiContext, {
-          sessionKey: 'sweep-tab-load',
-        });
-        if (res.cancelled > 0) {
-          console.log('[sweep-tab] auto-cancelled OrdLock listings', res);
-        }
-      } catch (err) {
-        console.warn('[sweep-tab] OrdLock auto-cancel failed (continuing)', err);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [loading, error, keys, wallet]);
 
   if (loading) {
     return (

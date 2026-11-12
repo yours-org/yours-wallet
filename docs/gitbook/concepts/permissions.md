@@ -21,6 +21,8 @@ Operations fall into permission buckets:
 
 Each prompt may be a one-time grant or a session-long grant, depending on the user's choice in the wallet UI.
 
+1Color operations add their own prompts: a token read (`color_access`) is covered by a stored basket grant after the first approval, while a token send, an app-built signature and a relinquish always prompt with the full facts of the transaction. See [1Color Tokens](one-color.md#consent-and-permissions).
+
 ## Handling rejection
 
 When the user denies a prompt, the action returns `error: 'user-rejected'` (or throws — depends on the action):

@@ -10,6 +10,7 @@ import { knownProtocol, protocolLabel, securityLevelLabel } from '../../utils/pr
 import type { PermissionRequest as PermissionRequestType } from '@bsv/wallet-toolbox-client';
 import { useServiceContext } from '../../hooks/useServiceContext';
 import { confirmUsbForApproval } from '../../services/usbPresence';
+import { formatBsv } from '../../utils/format';
 
 export type PermissionRequestProps = {
   request: PermissionRequestType & { requestID: string };
@@ -51,7 +52,7 @@ const getPermissionDescription = (request: PermissionRequestType): string => {
 
 const formatSatoshis = (sats: number): string => {
   if (sats >= 100000000) {
-    return `${(sats / 100000000).toFixed(8)} BSV`;
+    return `${formatBsv(sats / 100000000)} BSV`;
   }
   return `${sats.toLocaleString()} satoshis`;
 };

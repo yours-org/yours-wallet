@@ -55,16 +55,17 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
   const [identityDerivation, setIdentityDerivation] = useState<string | null>(null);
   const { keysService, chromeStorageService } = useServiceContext();
   const [accountName, setAccountName] = useState('');
-  const [iconURL, setIconURL] = useState('');
   const [network, setNetwork] = useState(NetWork.Mainnet);
   const hiddenYoursFileInput = useRef<HTMLInputElement>(null);
 
+  // Run the whole flow full screen: the bottom nav would otherwise sit on top
+  // of the step buttons, and switching tabs mid-creation makes no sense.
   useEffect(() => {
-    newWallet && hideMenu();
+    hideMenu();
     return () => {
       showMenu();
     };
-  }, [hideMenu, showMenu, newWallet]);
+  }, [hideMenu, showMenu]);
 
   const handleExpertToggle = () => setIsExpertImport(!isExpertImport);
 
@@ -131,7 +132,7 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
       const objKeys = Object.keys(chromeObject.accounts);
       if (!objKeys) throw new Error('Object identity address not found');
       await chromeStorageService.switchAccount(keys.identityAddress);
-      await saveAccountDataToChromeStorage(chromeStorageService, accountName, iconURL);
+      await saveAccountDataToChromeStorage(chromeStorageService, accountName);
 
       setStep(4);
     } catch (error) {
@@ -462,13 +463,6 @@ export const RestoreAccount = ({ onNavigateBack, newWallet = false }: RestoreAcc
           type="text"
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
-        />
-        <Input
-          theme={theme}
-          placeholder="Icon URL"
-          type="text"
-          value={iconURL}
-          onChange={(e) => setIconURL(e.target.value)}
         />
         <Input
           theme={theme}

@@ -7,6 +7,8 @@ export type SyncStatusMessage = {
   data:
     | { status: 'start'; addressCount: number }
     | { status: 'progress'; pending: number; done: number; failed: number; message?: string }
+    /** A step after the address sync that can take a while, such as the backup push; shown as text. */
+    | { status: 'backup'; message: string }
     | { status: 'complete' }
     | { status: 'error'; message: string };
 };
@@ -14,6 +16,10 @@ export type SyncStatusMessage = {
 /** Safety net — if we see `start` but no `complete` arrives in this window,
  *  assume the sync finished (or the message was dropped) and stop spinning. */
 const SYNC_STUCK_TIMEOUT_MS = 30_000;
+/** A backup push on a wallet with a lot of history can take minutes; give it a longer safety window. */
+const BACKUP_STUCK_TIMEOUT_MS = 15 * 60_000;
+/** A quick push should not flash a message; show it only once the step has visibly taken a moment. */
+const MESSAGE_REVEAL_DELAY_MS = 1_500;
 
 export const useSyncTracker = () => {
   const { theme } = useTheme();
@@ -23,6 +29,8 @@ export const useSyncTracker = () => {
   // a sync happening. Otherwise the UI can get stuck when the popup mounts
   // after the service worker already finished (or dropped) its `complete` event.
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | undefined>(undefined);
+  const messageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const completeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const stuckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -41,12 +49,17 @@ export const useSyncTracker = () => {
         clearTimeout(stuckTimeoutRef.current);
         stuckTimeoutRef.current = null;
       }
+      if (messageTimeoutRef.current) {
+        clearTimeout(messageTimeoutRef.current);
+        messageTimeoutRef.current = null;
+      }
     };
 
     const finishSync = () => {
       setUpdateBalance(true);
       setIsSyncing(false);
       setPendingCount(0);
+      setSyncMessage(undefined);
       clearAllTimers();
     };
 
@@ -72,6 +85,16 @@ export const useSyncTracker = () => {
 
         case 'progress':
           setPendingCount(data.pending);
+          break;
+
+        case 'backup':
+          if (stuckTimeoutRef.current) clearTimeout(stuckTimeoutRef.current);
+          stuckTimeoutRef.current = setTimeout(() => {
+            console.warn('[syncTracker] No `complete` received after the backup step — stopping spinner.');
+            finishSync();
+          }, BACKUP_STUCK_TIMEOUT_MS);
+          if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+          messageTimeoutRef.current = setTimeout(() => setSyncMessage(data.message), MESSAGE_REVEAL_DELAY_MS);
           break;
 
         case 'complete':
@@ -100,5 +123,6 @@ export const useSyncTracker = () => {
     updateBalance,
     theme,
     isSyncing,
+    syncMessage,
   };
 };

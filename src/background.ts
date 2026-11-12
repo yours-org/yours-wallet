@@ -46,8 +46,17 @@ import {
   initOneSatPromptBridge,
 } from './services/oneSatPrompt';
 import type { PromptKind, UsbCheckRequest } from './promptProtocol';
-import { ADMIN_ORIGINATOR, initWallet, openAccountStorageForBackup, type AccountContext } from './initWallet';
-import { chainOf, HOSTED_YOURS_IMAGE } from './utils/constants';
+import {
+  ADMIN_ORIGINATOR,
+  initWallet,
+  openAccountStorageForBackup,
+  withOriginator,
+  type AccountContext,
+} from './initWallet';
+import { chainOf, HOSTED_YOURS_IMAGE, swapExchangeOriginOf } from './utils/constants';
+import { createClient as createAmmClient } from '@dcasegr/amm-client';
+import { createSwapService, type SwapClient } from './services/swapBackground';
+import { SWAP_ACTIONS, SWAP_PROGRESS_EVENT, type SwapCandleTf, type SwapQuoteRequest } from './services/swapTypes';
 import { WalletBackupService } from './backup/WalletBackupService';
 import { repairStaleAccounts, usbRekey, type UsbRekeyRequest } from './services/usbRekeyBackground';
 import {
@@ -57,6 +66,7 @@ import {
 } from './services/storageReconcileBackground';
 import { reconcileOutcome } from './services/storageReconcile';
 import { USB_HANDLE_DB_NAME } from './services/UsbKey.service';
+import { TokenActionMarks } from './services/tokenActionMark';
 import {
   isUsbRecoverySession,
   readUsbLastSeen,
@@ -75,6 +85,103 @@ const isInServiceWorker = self?.document === undefined;
 
 // Account context - null if locked or not initialized
 let accountContext: AccountContext | null = null;
+
+// ─── Swaps ──────────────────────────────────────────────────────────────────
+// The exchange client is bound to the live wallet, so it is rebuilt whenever
+// the account context changes (unlock, account switch). One per context.
+let ammClientFor: { context: AccountContext; client: SwapClient } | null = null;
+const swapClient = (): SwapClient | undefined => {
+  if (!accountContext) return undefined;
+  const origin = swapExchangeOriginOf(chainOf(chromeStorageService.getNetwork()));
+  if (!origin) return undefined;
+  if (ammClientFor?.context !== accountContext) {
+    ammClientFor = {
+      context: accountContext,
+      client: createAmmClient({
+        origin,
+        feeRateSatsPerKb: chromeStorageService.getCustomFeeRate(),
+        wallet: withOriginator(accountContext.wallet, ADMIN_ORIGINATOR),
+      }) as unknown as SwapClient,
+    };
+  }
+  return ammClientFor.client;
+};
+const swapService = createSwapService({
+  client: swapClient,
+  broadcast: (job) => {
+    chrome.runtime.sendMessage({ action: SWAP_PROGRESS_EVENT, data: job }).catch(() => {
+      // No popup open: the job keeps running; the popup reads it back with SWAP_STATUS.
+    });
+  },
+});
+
+const processSwap = async (
+  message: {
+    action: string;
+    request?: SwapQuoteRequest;
+    jobId?: string;
+    tokenId?: string;
+    dec?: number;
+    tf?: SwapCandleTf;
+    from?: number;
+    to?: number;
+  },
+  sendResponse: CallbackResponse,
+) => {
+  const type = message.action;
+  try {
+    await ensureWallet(true);
+    let data: unknown;
+    switch (type) {
+      case SWAP_ACTIONS.QUOTE:
+        data = await swapService.quote(message.request!);
+        break;
+      case SWAP_ACTIONS.START:
+        data = await swapService.start(message.request!);
+        break;
+      case SWAP_ACTIONS.STATUS:
+        data = swapService.get(message.jobId!) ?? null;
+        break;
+      case SWAP_ACTIONS.LIST_JOBS:
+        data = swapService.list();
+        break;
+      case SWAP_ACTIONS.CANCEL:
+        data = swapService.cancel(message.jobId!);
+        break;
+      case SWAP_ACTIONS.TOKEN_STATUS:
+        data = await swapService.tokenStatus(message.tokenId!);
+        break;
+      case SWAP_ACTIONS.LISTED_TOKENS:
+        data = await swapService.listedTokens();
+        break;
+      case SWAP_ACTIONS.ENABLE_TOKEN:
+        await swapService.enableToken(message.tokenId!);
+        data = true;
+        break;
+      case SWAP_ACTIONS.MOVE_BACK:
+        data = await swapService.moveBack(message.tokenId!);
+        break;
+      case SWAP_ACTIONS.MOVE_BACK_SATS:
+        data = await swapService.moveBackSats();
+        break;
+      case SWAP_ACTIONS.CANDLES:
+        data = await swapService.candles(
+          message.tokenId!,
+          message.dec ?? 0,
+          message.tf ?? '15m',
+          message.from ?? 0,
+          message.to ?? Date.now(),
+        );
+        break;
+      default:
+        throw new Error(`Unknown swap action ${type}`);
+    }
+    sendResponse({ type, success: true, data });
+  } catch (error) {
+    console.error(`[${type}] failed:`, error);
+    sendResponse({ type, success: false, error: error instanceof Error ? error.message : String(error) });
+  }
+};
 // Set while wallet is reinitializing (e.g. account switch) to prevent
 // ensureWallet from launching a popup during the transition.
 let reinitPromise: Promise<WalletInterface | null> | null = null;
@@ -129,7 +236,7 @@ const dropWalletContext = (reason: string) => {
  * The initialization currently in flight, whoever started it (startup, unlock,
  * account switch, restore). ensureWallet() waits on it so popup calls that arrive
  * while the wallet is being built are queued instead of failing with
- * "Wallet not available" — which left the first MNEE lookup after an unlock at zero.
+ * "Wallet not available" — which left the first balance lookup after an unlock at zero.
  */
 let initInFlight: Promise<WalletInterface | null> | null = null;
 
@@ -345,7 +452,6 @@ const startupInitPromise = chromeStorageService
       'counterpartyPermissionRequest',
       'oneSatPermissionRequest',
       'transactionApprovalRequest',
-      'sendMNEERequest',
     ]);
 
     // Only initialize wallet if it's within the active session window.
@@ -603,6 +709,9 @@ let showUnlockUi: () => void = () => {
   console.warn('showUnlockUi called before initialization');
 };
 
+// Originators with a BRC-207 (`p color`) createAction in flight; see tokenActionMark.ts.
+const tokenActionMarks = new TokenActionMarks();
+
 /**
  * Bind permission callbacks to the WalletPermissionsManager.
  * These callbacks are triggered when an external app needs permission.
@@ -631,6 +740,13 @@ const bindPermissionCallbacks = (manager: LocalWalletPermissionsManager) => {
     'onSpendingAuthorizationRequested',
     async (request: PermissionRequest & { requestID: string }) => {
       console.log('Spending authorization requested:', request);
+      if (tokenActionMarks.has(request.originator)) {
+        // A BRC-207 token action: the color module's consent at signing shows the
+        // full sats picture and is the one prompt for it.
+        console.log('[background] spending auto-granted (ephemeral) inside a token action:', request.originator);
+        await manager.grantPermission({ requestID: request.requestID, ephemeral: true });
+        return;
+      }
       await showPermissionPrompt(request);
     },
   );
@@ -717,7 +833,7 @@ if (isInServiceWorker) {
     await reinitPromise;
   };
 
-  const createNewPopup = (kind?: PromptKind, requestID?: string) => {
+  const createNewPopup = (kind?: PromptKind, requestID?: string, onCreated?: (id: number | undefined) => void) => {
     console.log('[background] createNewPopup called', kind, requestID);
     const params = new URLSearchParams();
     if (kind) params.set('kind', kind);
@@ -739,6 +855,7 @@ if (isInServiceWorker) {
         } else if (kind === 'usbCheck') {
           failPendingUsbChecks(USB_KEY_ABSENT_MESSAGE);
         }
+        onCreated?.(popupWindowId);
       },
     );
   };
@@ -749,53 +866,84 @@ if (isInServiceWorker) {
     });
   };
 
+  /**
+   * The popup being looked up or created, while that is in flight. Two prompts
+   * in the same instant must not both create a window: the second awaits the
+   * first's lookup/creation and then pushes its prompt into that window (the
+   * window takes queued prompts with GET_NEXT_PROMPT).
+   */
+  let popupOpening: Promise<number | undefined> | undefined;
+
+  /** Focus the open prompt window and push the prompt into it, else create one; resolves to the window's id. */
+  const focusOrCreatePopup = (kind: PromptKind, requestID?: string): Promise<number | undefined> =>
+    new Promise((resolve) => {
+      const reuse = (id: number) => {
+        popupWindowId = id;
+        notifyPromptWindow(kind, requestID);
+        resolve(id);
+      };
+      const create = () => createNewPopup(kind, requestID, resolve);
+
+      // Check if any popup window with our extension URL is already open
+      chrome.windows.getAll({ populate: true }, (windows) => {
+        const promptUrl = chrome.runtime.getURL('prompt.html');
+        const existingPopup = windows.find(
+          (w) => w.type === 'popup' && w.tabs?.some((tab) => tab.url?.startsWith(promptUrl)),
+        );
+
+        if (existingPopup) {
+          // Focus existing popup and push the new prompt into it
+          chrome.windows.update(existingPopup.id!, { focused: true });
+          reuse(existingPopup.id!);
+          return;
+        }
+
+        // Fast path: module-level variable still has the popup ID
+        if (popupWindowId) {
+          const id = popupWindowId;
+          chrome.windows
+            .update(id, { focused: true })
+            .then(() => reuse(id))
+            .catch(() => {
+              popupWindowId = undefined;
+              create();
+            });
+          return;
+        }
+
+        // Module-level var is lost after service worker suspension; check storage
+        chrome.storage.local.get('popupWindowId', (result) => {
+          if (result.popupWindowId) {
+            chrome.windows
+              .update(result.popupWindowId, { focused: true })
+              .then(() => reuse(result.popupWindowId))
+              .catch(() => {
+                chrome.storage.local.remove('popupWindowId');
+                create();
+              });
+          } else {
+            create();
+          }
+        });
+      });
+    });
+
   showPromptUi = (kind, requestID) => {
     console.log('[background] showPromptUi called', kind, requestID);
 
-    // Check if any popup window with our extension URL is already open
-    chrome.windows.getAll({ populate: true }, (windows) => {
-      const promptUrl = chrome.runtime.getURL('prompt.html');
-      const existingPopup = windows.find(
-        (w) => w.type === 'popup' && w.tabs?.some((tab) => tab.url?.startsWith(promptUrl)),
-      );
-
-      if (existingPopup) {
-        // Focus existing popup and push the new prompt into it
-        chrome.windows.update(existingPopup.id!, { focused: true });
-        popupWindowId = existingPopup.id;
-        notifyPromptWindow(kind, requestID);
-        return;
-      }
-
-      // Fast path: module-level variable still has the popup ID
-      if (popupWindowId) {
-        chrome.windows
-          .update(popupWindowId, { focused: true })
-          .then(() => notifyPromptWindow(kind, requestID))
-          .catch(() => {
-            popupWindowId = undefined;
-            createNewPopup(kind, requestID);
-          });
-        return;
-      }
-
-      // Module-level var is lost after service worker suspension; check storage
-      chrome.storage.local.get('popupWindowId', (result) => {
-        if (result.popupWindowId) {
-          chrome.windows
-            .update(result.popupWindowId, { focused: true })
-            .then(() => {
-              popupWindowId = result.popupWindowId;
-              notifyPromptWindow(kind, requestID);
-            })
-            .catch(() => {
-              chrome.storage.local.remove('popupWindowId');
-              createNewPopup(kind, requestID);
-            });
-        } else {
-          createNewPopup(kind, requestID);
-        }
+    if (popupOpening) {
+      // A popup is being looked up or created: wait for it, then queue into it.
+      popupOpening.then((id) => {
+        if (id) notifyPromptWindow(kind, requestID);
+        else showPromptUi(kind, requestID);
       });
+      return;
+    }
+
+    const opening = focusOrCreatePopup(kind, requestID);
+    popupOpening = opening;
+    opening.finally(() => {
+      if (popupOpening === opening) popupOpening = undefined;
     });
   };
 
@@ -896,6 +1044,7 @@ if (isInServiceWorker) {
       // Address management (popup internal)
       'GET_DEPOSIT_ADDRESSES',
       'GENERATE_NEW_ADDRESS',
+      ...Object.values(SWAP_ACTIONS),
     ];
 
     if (noAuthRequired.includes(message.action)) {
@@ -1120,6 +1269,19 @@ if (isInServiceWorker) {
           return true;
         case 'STORAGE_GET_INFO':
           processStorageGetInfo(sendResponse);
+          return true;
+        case SWAP_ACTIONS.QUOTE:
+        case SWAP_ACTIONS.START:
+        case SWAP_ACTIONS.STATUS:
+        case SWAP_ACTIONS.LIST_JOBS:
+        case SWAP_ACTIONS.CANCEL:
+        case SWAP_ACTIONS.TOKEN_STATUS:
+        case SWAP_ACTIONS.LISTED_TOKENS:
+        case SWAP_ACTIONS.ENABLE_TOKEN:
+        case SWAP_ACTIONS.MOVE_BACK:
+        case SWAP_ACTIONS.MOVE_BACK_SATS:
+        case SWAP_ACTIONS.CANDLES:
+          void processSwap(message, sendResponse);
           return true;
         case 'STORAGE_SYNC_BACKUPS':
           processStorageSyncBackups(sendResponse);
@@ -1522,7 +1684,7 @@ if (isInServiceWorker) {
     }
 
     try {
-      const { account } = chromeStorageService.getCurrentAccountObject();
+      const { account, selectedAccount } = chromeStorageService.getCurrentAccountObject();
       const config: StorageConfig = account?.storageConfig ?? { remotes: [] };
       const remoteUrl = config.activeRemote || config.remotes?.[0];
       if (!remoteUrl) {
@@ -1534,7 +1696,9 @@ if (isInServiceWorker) {
         return;
       }
 
-      const identityAddress = account?.addresses?.identityAddress;
+      // The accounts map key, as initWallet keys it: the identity address in
+      // the key blob can be encoded for another chain than the account's.
+      const identityAddress = selectedAccount ?? account?.addresses?.identityAddress;
       const record = await reconcileStorage(
         accountContext.storage,
         accountContext.syncContext.services,
@@ -2758,7 +2922,9 @@ if (isInServiceWorker) {
       const usesSendAllSentinel = message.params.outputs?.some((o) => o.satoshis === 2099999999999999) === true;
       const signer = isAdmin && usesSendAllSentinel && accountContext?.baseWallet ? accountContext.baseWallet : w;
 
-      const result = await signer.createAction(message.params, message.originator);
+      const result = await tokenActionMarks.run(message.originator, message.params, () =>
+        signer.createAction(message.params, message.originator),
+      );
       console.log('[createAction] Success');
       sendResponse({
         type: CWIEventName.CREATE_ACTION,

@@ -123,10 +123,11 @@ See [Derivations](concepts/derivations.md) and [sendMnee](actions/send-mnee.md).
 4. MNEE `sendMnee.amount` MUST be a `number` in decimal MNEE, AND `sendMnee` requires the `derivations` array (not just addresses).
 5. MNEE addresses are derived via `deriveDepositAddresses` with the default `'1sat'` prefix (omit `prefix` to use the default).
 6. BSV-21 amounts are **`bigint | string`** in atomic units; tokenIds use **underscore** format `txid_vout` (not dot). BSV-21 recipients use a `Destination` object (typically `{ address: '...' }`), not a bare address string.
-7. Outpoints are `txid.vout` format (dot, not colon).
-8. Wrap calls in try/catch even if you check `result.error` — network errors throw.
-9. Key wallet data by `identityKey` from `useWallet` to avoid cross-account cache leakage.
-10. When in doubt, the source of truth is the per-action page here in these docs.
+7. 1Color amounts are **`bigint | string`** in atomic units; the asset id is `txid_vout`. `send1Color` takes only a **handle** destination (`{ handle: '@name@domain' }`), and the recipient receives through their messagebox. Balances come from `wallet.listOutputs` with the `p color assets` / `p color balance <assetId>` selectors, not from an action. See [1Color Tokens](concepts/one-color.md).
+8. Outpoints are `txid.vout` format (dot, not colon).
+9. Wrap calls in try/catch even if you check `result.error` — network errors throw.
+10. Key wallet data by `identityKey` from `useWallet` to avoid cross-account cache leakage.
+11. When in doubt, the source of truth is the per-action page here in these docs.
 
 ## Common errors to handle gracefully
 

@@ -1,20 +1,15 @@
-import type { Bsv21Balance } from '@1sat/actions';
-import { ONESAT_MAINNET_CONTENT_URL } from '@1sat/actions';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Search, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useServiceContext } from '../hooks/useServiceContext';
 import { Theme } from '../theme.types';
-import { GENERIC_TOKEN_ICON } from '../utils/constants';
 import { truncate } from '../utils/format';
-import { isUri } from '../utils/uri';
 import { ChromeStorageObject } from '../services/types/chromeStorage.types';
+import type { WalletToken } from '../services/walletTokens';
 import { ToggleSwitch } from './ToggleSwitch';
 
-const resolveIcon = (icon: string) => (isUri(icon) ? icon : `${ONESAT_MAINNET_CONTENT_URL}/${icon}`);
-
 export type ManageTokensProps = {
-  tokens: Bsv21Balance[];
+  tokens: WalletToken[];
   theme: Theme;
   onBack: () => void;
 };
@@ -51,19 +46,10 @@ export const ManageTokens = (props: ManageTokensProps) => {
     await chromeStorageService.updateNested(key, update);
   };
 
-  const getTokenName = (b: Bsv21Balance): string => b.sym || 'Null';
-
+  const q = searchQuery.toLowerCase();
   const filteredTokens = tokensProp
-    .filter(
-      (b) =>
-        getTokenName(b).toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (b?.id && b.id.toLowerCase().includes(searchQuery.toLowerCase())),
-    )
-    .sort((a, b) => {
-      const aLabel = a.sym ?? '';
-      const bLabel = b.sym ?? '';
-      return aLabel.toLowerCase().localeCompare(bLabel.toLowerCase());
-    });
+    .filter((t) => t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q))
+    .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 
   return (
     <motion.div
@@ -71,7 +57,7 @@ export const ManageTokens = (props: ManageTokensProps) => {
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: '100%', opacity: 0 }}
       transition={{ type: 'spring', stiffness: 320, damping: 35 }}
-      className="flex flex-col items-center w-full pt-14 pb-20 overflow-y-auto overflow-x-hidden self-start"
+      className="flex flex-col items-center w-full pt-3 pb-4 overflow-y-auto overflow-x-hidden self-start"
       style={{ height: '100%', backgroundColor: theme.color.global.walletBackground }}
     >
       {/* Header */}
@@ -115,7 +101,7 @@ export const ManageTokens = (props: ManageTokensProps) => {
         <AnimatePresence initial={false}>
           {filteredTokens.length > 0 ? (
             filteredTokens.map((t, i) => {
-              const isFav = !!(t?.id && favoriteTokens.includes(t.id));
+              const isFav = favoriteTokens.includes(t.id);
               return (
                 <motion.div
                   key={t.id}
@@ -131,20 +117,17 @@ export const ManageTokens = (props: ManageTokensProps) => {
                 >
                   {/* Left: icon + name */}
                   <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={t.icon ? resolveIcon(t.icon) : GENERIC_TOKEN_ICON}
-                      alt={getTokenName(t)}
-                      className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                    />
+                    <img src={t.icon} alt={t.name} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
                     <div className="flex flex-col items-start min-w-0">
                       <span
                         className="text-sm font-semibold leading-tight"
                         style={{ color: theme.color.global.contrast }}
                       >
-                        {getTokenName(t)}
+                        {t.name}
                       </span>
                       <span className="text-xs mt-0.5" style={{ color: theme.color.global.gray }}>
-                        {t?.id ? truncate(t.id, 5, 5) : ''}
+                        {truncate(t.id, 5, 5)}
+                        {t.kind === '1color' ? ' · 1Color' : ''}
                       </span>
                     </div>
                   </div>
@@ -153,7 +136,7 @@ export const ManageTokens = (props: ManageTokensProps) => {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <motion.button
                       whileTap={{ scale: 0.85 }}
-                      onClick={() => t?.id && handleToggleFavorite(t.id)}
+                      onClick={() => handleToggleFavorite(t.id)}
                       className="outline-none border-none bg-transparent cursor-pointer p-1"
                     >
                       <Star
@@ -165,7 +148,7 @@ export const ManageTokens = (props: ManageTokensProps) => {
                         }}
                       />
                     </motion.button>
-                    <ToggleSwitch on={isFav} theme={theme} onChange={() => t?.id && handleToggleFavorite(t.id)} />
+                    <ToggleSwitch on={isFav} theme={theme} onChange={() => handleToggleFavorite(t.id)} />
                   </div>
                 </motion.div>
               );
