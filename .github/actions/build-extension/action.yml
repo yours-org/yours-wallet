@@ -18,6 +18,10 @@ runs:
       shell: bash
       run: bun install --frozen-lockfile
 
+    - name: Install the locked Puppeteer browser for UI tests
+      shell: bash
+      run: node node_modules/puppeteer/lib/puppeteer/node/cli.js browsers install chrome
+
     - name: Check formatting
       shell: bash
       run: bun run format:check
