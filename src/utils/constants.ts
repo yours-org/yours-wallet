@@ -120,6 +120,18 @@ export const TESTNET_AMM_SITE_URL = 'https://1sat-amm.vercel.app/';
 export const ammSiteUrlOf = (chain: WalletChain): string | undefined =>
   chain === 'test' ? TESTNET_AMM_SITE_URL : AMM_SITE_URL;
 
+/**
+ * The site's pools page with this token selected (`/pools?token=<txid>_<vout>`), so
+ * "Open a pool" and "Provide liquidity" land on the token rather than the home page.
+ */
+export const ammPoolsUrlOf = (chain: WalletChain, assetId: string): string | undefined => {
+  const site = ammSiteUrlOf(chain);
+  if (!site) return undefined;
+  const url = new URL('pools', site);
+  url.searchParams.set('token', assetId);
+  return url.toString();
+};
+
 /** Swap defaults: slippage the quote tolerates and the most pools one swap may split across. */
 export const SWAP_DEFAULT_SLIPPAGE_PCT = 1;
 export const SWAP_MAX_SOURCES = 5;

@@ -16,7 +16,7 @@ import { useTheme } from '../hooks/useTheme';
 import { oneColorTicker, type OneColorBalance } from '../services/oneColor';
 import { swapEnableToken, swapJobs, swapMoveBack, swapMoveBackSats, swapTokenStatus } from '../services/swap';
 import type { SwapTokenStatus } from '../services/swapTypes';
-import { ammSiteUrlOf, GENERIC_TOKEN_ICON } from '../utils/constants';
+import { ammPoolsUrlOf, ammSiteUrlOf, GENERIC_TOKEN_ICON } from '../utils/constants';
 import { displayAmount, formatTokenAmount, formatUSD } from '../utils/format';
 import { getErrorMessage } from '../utils/tools';
 import { CoinHistory } from './CoinHistory';
@@ -142,6 +142,7 @@ export const OneColorDetailView = ({
       ? (1 / statusPriceBsv).toLocaleString(undefined, { maximumSignificantDigits: 6 })
       : undefined;
   const ammSiteUrl = ammSiteUrlOf(chain);
+  const ammPoolsUrl = ammPoolsUrlOf(chain, token.assetId);
 
   const buyDisabledReason =
     state === 'loading'
@@ -436,7 +437,7 @@ export const OneColorDetailView = ({
         <Show when={chartLayout && !!ammSiteUrl}>
           <div className="px-4 mb-5">
             <a
-              href={ammSiteUrl}
+              href={ammPoolsUrl}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl no-underline"
@@ -507,7 +508,7 @@ export const OneColorDetailView = ({
                   </span>
                   {ammSiteUrl ? (
                     <a
-                      href={ammSiteUrl}
+                      href={ammPoolsUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="flex items-center justify-center gap-1.5 mt-1 py-2.5 rounded-2xl text-xs font-semibold no-underline"
