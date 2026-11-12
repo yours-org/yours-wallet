@@ -22,17 +22,36 @@ runs:
       shell: bash
       run: node node_modules/puppeteer/lib/puppeteer/node/cli.js browsers install chrome
 
-    # Reuse the runner's installed Chrome helper without disabling AppArmor or
-    # Chromium isolation: chromium/src/docs/security/apparmor-userns-restrictions.md
-    - name: Select the runner-owned Linux sandbox helper
+    # Exact executable exception from Chromium's AppArmor guidance. The test
+    # requires PID and Seccomp isolation; the host-wide restriction stays on.
+    - name: Allow the exact test browser to create its Linux sandbox
       if: runner.os == 'Linux'
       shell: bash
       run: |
-        test -x /opt/google/chrome/chrome-sandbox
-        test -u /opt/google/chrome/chrome-sandbox
-        test "$(stat -c '%u' /opt/google/chrome/chrome-sandbox)" = 0
-        sha256sum /opt/google/chrome/chrome-sandbox
-        echo 'CHROME_DEVEL_SANDBOX=/opt/google/chrome/chrome-sandbox' >> "$GITHUB_ENV"
+        browser_path="$(node --input-type=module -e "import puppeteer from 'puppeteer'; console.log(await puppeteer.executablePath())")"
+        [[ "$browser_path" =~ ^/[a-zA-Z0-9._/-]+/chrome$ ]]
+        test -x "$browser_path"
+        stat -c '%n %U %a' "$browser_path"
+        sha256sum "$browser_path"
+        if [[ -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+          restriction="$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)"
+          echo "AppArmor user namespace restriction: $restriction"
+          if [[ "$restriction" == 1 ]]; then
+            [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+            profile_name="yours-wallet-ui-tests-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            profile_path="/etc/apparmor.d/$profile_name"
+            marker="$RUNNER_TEMP/$profile_name.created"
+            test ! -e "$profile_path"
+            test ! -e "$marker"
+            profile_file="$(mktemp)"
+            printf 'abi <abi/4.0>,\ninclude <tunables/global>\nprofile %s "%s" flags=(unconfined) {\n  userns,\n}\n' "$profile_name" "$browser_path" > "$profile_file"
+            touch "$marker"
+            sudo install -o root -g root -m 0644 "$profile_file" "$profile_path"
+            rm "$profile_file"
+            sudo apparmor_parser -r "$profile_path"
+            cat "$profile_path"
+          fi
+        fi
 
     - name: Check formatting
       shell: bash
@@ -45,6 +64,22 @@ runs:
     - name: Test public wallet behavior
       shell: bash
       run: bun run test
+
+    - name: Remove the temporary test browser AppArmor exception
+      if: always() && runner.os == 'Linux'
+      shell: bash
+      run: |
+        [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+        profile_name="yours-wallet-ui-tests-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+        profile_path="/etc/apparmor.d/$profile_name"
+        marker="$RUNNER_TEMP/$profile_name.created"
+        if [[ -f "$marker" ]]; then
+          if [[ -f "$profile_path" ]]; then
+            sudo apparmor_parser -R "$profile_path"
+            sudo rm "$profile_path"
+          fi
+          rm "$marker"
+        fi
 
     - name: Build
       shell: bash
