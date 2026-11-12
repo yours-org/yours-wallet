@@ -16,6 +16,12 @@ export interface CwiErrorEnvelope extends Partial<ReviewActionPayload> {
   parameter?: string;
   totalSatoshisNeeded?: number;
   moreSatoshisNeeded?: number;
+  cleanupFailure?: {
+    operation: 'abortAction';
+    status: 'unconfirmed';
+    reference: string;
+    message: string;
+  };
 }
 
 export function serializeCwiError(error: unknown): CwiErrorEnvelope {
@@ -73,6 +79,22 @@ export function serializeCwiError(error: unknown): CwiErrorEnvelope {
   if (name === 'WERR_INSUFFICIENT_FUNDS') {
     if (typeof value?.totalSatoshisNeeded === 'number') envelope.totalSatoshisNeeded = value.totalSatoshisNeeded;
     if (typeof value?.moreSatoshisNeeded === 'number') envelope.moreSatoshisNeeded = value.moreSatoshisNeeded;
+  }
+  // Failed cleanup is secondary to the operation's original structured error.
+  // Copy only the declared public receipt, never an Error's stack or cause.
+  const cleanup = value?.cleanupFailure as Partial<NonNullable<CwiErrorEnvelope['cleanupFailure']>> | undefined;
+  if (
+    cleanup?.operation === 'abortAction' &&
+    cleanup.status === 'unconfirmed' &&
+    typeof cleanup.reference === 'string' &&
+    typeof cleanup.message === 'string'
+  ) {
+    envelope.cleanupFailure = {
+      operation: 'abortAction',
+      status: 'unconfirmed',
+      reference: cleanup.reference,
+      message: cleanup.message,
+    };
   }
   return envelope;
 }

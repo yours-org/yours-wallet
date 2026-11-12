@@ -30,7 +30,7 @@ Their new `standing-allowance.map` files retain original upstream mappings and
 source content outside edited spans, and map edited spans to explicitly marked
 patch source content. The original toolbox maps remain as upstream records.
 The smaller local-manager maps are replaced equivalently. This accounts for
-most patch bytes; the runtime changes are limited to the four corrections described here.
+most patch bytes; the runtime changes are limited to the corrections described here.
 
 `src/spending-allowance.test.ts` exercises the actual exported managers and
 permission store with deterministic wallet/storage fixtures and real BEEF
@@ -40,7 +40,7 @@ pagination, signed net values, preflight/settings reads and CommonJS behavior.
 `src/spending-allowance.maps.test.ts` validates mapping bounds and new logic.
 
 Retire both patches together when an upstream package release carries equivalent
-current-reference accounting. Verify both suites and the production build
+accounting, permission boundaries and public transaction behavior. Verify both suites and the production build
 before removing the patch bindings; never replace the fix with a larger grant
 or an unsigned-action filter. These source changes need a new built-artifact
 identity and do not change evidence from an earlier wallet archive.
@@ -79,3 +79,41 @@ The existing final-result `knownTxids` trimming remains unchanged.
 `src/known-input-hydration.test.ts` exercises actual createAction/signAction,
 all three source paths, script verification, final trimming, unknown/missing or
 mismatched evidence, abort cleanup and explicit abort failure.
+
+## Public transaction options
+
+The permissions manager accepts a non-admin caller's explicit
+`signAndProcess: true` by staging internally, applying the same spending and
+fee authorization, and finalizing only after approval. The original validated
+request still decides whether an unfinished input or explicit `false` requires
+a later `signAction`. The trusted admin direct path remains unchanged.
+
+For `returnTXIDOnly`, both automatic and explicit finalization request full
+transaction bytes internally and verify them against the authorized template.
+Only then does the public response omit `tx`. Deferred actions remember the
+create-time setting; an omitted sign-time setting inherits it and an explicit
+boolean overrides it. The tracking ends with action ownership, including abort.
+BRC-177 protected actions retain their prohibition on omitting required proof
+bytes. Invalid raw option values are validated before the internal override.
+Failed signing retains the existing automatic abort and fail-closed behavior;
+this patch does not invent a repeated-abort success guarantee.
+
+`src/transaction-options.test.ts` runs the actual exported managers, permission
+store, SDK validation and real BEEF decoding against an explicit wallet/storage
+fixture. It covers defaults, admin and non-admin requests, fee-inclusive denial,
+staging, inherited and overridden settings, hostile final transactions, missing
+bytes, cross-origin access, cleanup and safe source reuse, failed cleanup,
+protected actions, CommonJS, and source maps. The existing patch maps also carry
+separate `transaction-options-patch/` source spans for this correction.
+
+## Primary operation errors and cleanup
+
+A failed automatic or explicit finalization still blocks the reference and
+attempts abort. If abort also fails or does not confirm success, the original
+operation error retains its SDK identity and recovery payload. A separate
+`cleanupFailure` receipt reports that the abort remains unconfirmed; the
+reference stays blocked and is never represented as safely reusable. The CWI
+codec carries only that receipt's declared public fields, alongside the original
+error, through Chrome JSON serialization. Tests cover both create/sign paths,
+throwing and inconclusive cleanup, frozen primary errors, real event/content
+round trips and the production minifier.

@@ -23,6 +23,7 @@ test('minified production codec preserves stable SDK names and public recovery p
         import { WERR_REVIEW_ACTIONS, WERR_INVALID_PARAMETER, WERR_INSUFFICIENT_FUNDS } from ${JSON.stringify(resolve('node_modules/@bsv/sdk/dist/esm/mod.js'))};
         export function run() {
           const errors = [new WERR_REVIEW_ACTIONS([{txid:'ab'.repeat(32),status:'failed'}], [], 'ab'.repeat(32), [1,2,255], ['ab'.repeat(32)+'.0']), new WERR_INVALID_PARAMETER('basket', 'a valid string'), new WERR_INSUFFICIENT_FUNDS(100, 5)];
+          Object.assign(errors[0], { cleanupFailure: { operation: 'abortAction', status: 'unconfirmed', reference: 'AQID', message: 'Action is already terminal and cannot be aborted.', stack: 'private stack' } });
           return errors.map(error => ({ constructorName: error.constructor.name, wire: serializeCwiError(error), revived: reviveCwiError(JSON.parse(JSON.stringify(serializeCwiError(error)))) }));
         }
       `
@@ -56,6 +57,12 @@ test('minified production codec preserves stable SDK names and public recovery p
   for (const key of ['reviewActionResults', 'sendWithResults', 'txid', 'tx', 'noSendChange'])
     expect(values[0].revived[key]).toEqual(values[0].wire[key]);
   expect(values[0].revived.tx).toEqual([1, 2, 255]);
+  expect(values[0].revived.cleanupFailure).toEqual({
+    operation: 'abortAction',
+    status: 'unconfirmed',
+    reference: 'AQID',
+    message: 'Action is already terminal and cannot be aborted.',
+  });
   expect(values[1].revived.parameter).toBe('basket');
   expect(values[2].revived.totalSatoshisNeeded).toBe(100);
   expect(values[2].revived.moreSatoshisNeeded).toBe(5);
