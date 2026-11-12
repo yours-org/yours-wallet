@@ -95,5 +95,9 @@
     "@1sat/utils": "0.0.43",
     "@1sat/wallet": "0.0.121",
     "@bsv/wallet-toolbox-client": "npm:@bopen-io/wallet-toolbox-client@2.14.8"
+  },
+  "patchedDependencies": {
+    "@bopen-io/wallet-toolbox-client@2.14.8": "patches/@bopen-io%2Fwallet-toolbox-client@2.14.8.patch",
+    "@1sat/wallet@0.0.121": "patches/@1sat%2Fwallet@0.0.121.patch"
   }
 }

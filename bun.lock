@@ -78,6 +78,10 @@
       },
     },
   },
+  "patchedDependencies": {
+    "@1sat/wallet@0.0.121": "patches/@1sat%2Fwallet@0.0.121.patch",
+    "@bopen-io/wallet-toolbox-client@2.14.8": "patches/@bopen-io%2Fwallet-toolbox-client@2.14.8.patch",
+  },
   "overrides": {
     "@1sat/client": "0.0.64",
     "@1sat/templates": "0.0.44",

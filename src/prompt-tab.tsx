@@ -3,11 +3,6 @@ import process from 'process';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
-import type {
-  CounterpartyPermissionRequest,
-  GroupedPermissionRequest,
-  PermissionRequest,
-} from '@bsv/wallet-toolbox-client';
 import { UnlockWallet } from './components/UnlockWallet';
 import { PageLoader } from './components/PageLoader';
 import { BottomMenuProvider } from './contexts/providers/BottomMenuProvider';
@@ -16,14 +11,9 @@ import { SnackbarProvider } from './contexts/providers/SnackbarProvider';
 import { ThemeProvider } from './contexts/providers/ThemeProvider';
 import { useServiceContext } from './hooks/useServiceContext';
 import { useTheme } from './hooks/useTheme';
-import { CounterpartyPermissionRequestPage } from './pages/requests/CounterpartyPermissionRequest';
-import { GroupedPermissionRequestPage } from './pages/requests/GroupedPermissionRequest';
-import { OneSatPermissionRequestPage } from './pages/requests/OneSatPermissionRequest';
-import { PermissionRequestPage } from './pages/requests/PermissionRequest';
-import { UsbCheckRequestPage } from './pages/requests/UsbCheckRequest';
-import type { OneSatPromptStorageEntry } from './services/oneSatPrompt';
 import { sendMessageAsync } from './utils/chromeHelpers';
-import type { PromptKind, UsbCheckRequest } from './promptProtocol';
+import type { PromptKind } from './promptProtocol';
+import { PromptRequestView, type PendingPromptScreen } from './components/PromptRequestView';
 import './index.css';
 
 global.Buffer = Buffer;
@@ -35,11 +25,7 @@ type PromptScreen =
   | { kind: 'expired' }
   | { kind: 'waiting' }
   | { kind: 'unlock' }
-  | { kind: 'permission'; requestID: string; payload: PermissionRequest & { requestID: string } }
-  | { kind: 'groupedPermission'; requestID: string; payload: GroupedPermissionRequest }
-  | { kind: 'counterpartyPermission'; requestID: string; payload: CounterpartyPermissionRequest }
-  | { kind: 'oneSatPermission'; requestID: string; payload: OneSatPromptStorageEntry }
-  | { kind: 'usbCheck'; requestID: string; payload: UsbCheckRequest };
+  | PendingPromptScreen;
 
 const WAITING_CLOSE_MS = 10000;
 const EXPIRED_CLOSE_MS = 2000;
@@ -186,21 +172,7 @@ const PromptApp = () => {
           </p>
         )}
         {screen.kind === 'unlock' && <UnlockWallet onUnlock={() => void advance()} />}
-        {screen.kind === 'permission' && (
-          <PermissionRequestPage request={screen.payload} onResponse={() => void advance()} />
-        )}
-        {screen.kind === 'groupedPermission' && (
-          <GroupedPermissionRequestPage request={screen.payload} onResponse={() => void advance()} />
-        )}
-        {screen.kind === 'counterpartyPermission' && (
-          <CounterpartyPermissionRequestPage request={screen.payload} onResponse={() => void advance()} />
-        )}
-        {screen.kind === 'oneSatPermission' && (
-          <OneSatPermissionRequestPage request={screen.payload} onResponse={() => void advance()} />
-        )}
-        {screen.kind === 'usbCheck' && (
-          <UsbCheckRequestPage request={screen.payload} onResponse={() => void advance()} />
-        )}
+        {'requestID' in screen && <PromptRequestView screen={screen} onResponse={() => void advance()} />}
       </div>
     </MemoryRouter>
   );

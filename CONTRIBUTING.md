@@ -56,7 +56,7 @@ Navigate to your fork on GitHub and create a pull request into `yours-org/yours-
 
 ## Continuous Integration
 
-Every pull request runs the same checks as a release build: `bun run format:check`, `bun run typecheck`, a full extension build, and `bun run verify:build`. Run them locally before pushing to avoid a red check. CI must pass before a pull request can be merged.
+Every pull request runs the same checks as a release build: `bun run format:check`, `bun run typecheck`, `bun run test`, a full extension build, and `bun run verify:build`. Run them locally before pushing to avoid a red check. CI must pass before a pull request can be merged.
 
 Releases are cut from `main` by maintainers and built by GitHub Actions. See [docs/releasing.md](docs/releasing.md).
 
