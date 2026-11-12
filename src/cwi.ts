@@ -4,13 +4,14 @@
  */
 
 import type { WalletInterface } from '@bsv/sdk';
-import { createEventCWI, CWIEventName } from '@1sat/wallet-browser';
+import { CWIEventName } from '@1sat/wallet-browser';
+import { createStructuredEventCWI } from './cwi-transport';
 
 // Re-export for backwards compatibility
 export { CWIEventName };
 
 // Create the CWI instance for browser pages (uses CustomEvent pattern)
-export const CWI = createEventCWI();
+export const CWI = createStructuredEventCWI();
 
 // Inject CWI on window
 if (typeof window !== 'undefined') {

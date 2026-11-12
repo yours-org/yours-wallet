@@ -1,5 +1,6 @@
 // Import CWI to inject window.CWI (BRC-100 WalletInterface)
 import './cwi';
+import type { CwiErrorEnvelope } from './cwi-errors';
 
 // Event types for yours-wallet specific events
 export enum YoursEventName {
@@ -49,6 +50,7 @@ export type ResponseEventDetail = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
   error?: string | undefined | boolean;
+  walletError?: CwiErrorEnvelope;
 };
 
 export type ResponseEvent = {

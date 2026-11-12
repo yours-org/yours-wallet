@@ -1,6 +1,9 @@
 /* global chrome */
 import { RequestParams, ResponseEventDetail, YoursEventName } from './inject';
 import { CWIEventName } from './cwi';
+import { isCWIEventName } from '@1sat/wallet-browser';
+import { validateCwiRequest } from './cwi-validation';
+import { cwiFailure } from './cwi-errors';
 import type {
   ListOutputsArgs,
   RelinquishOutputArgs,
@@ -817,7 +820,12 @@ if (isInServiceWorker) {
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  chrome.runtime.onMessage.addListener((message: any, sender, sendResponse: CallbackResponse) => {
+  chrome.runtime.onMessage.addListener((message: any, sender, rawSendResponse: CallbackResponse) => {
+    const sendResponse: CallbackResponse = (response) => {
+      if (isCWIEventName(message.action) && !response.success && !response.walletError) {
+        rawSendResponse({ ...response, ...cwiFailure(response.error) });
+      } else rawSendResponse(response);
+    };
     console.log(
       '[background] Received message:',
       message.action,
@@ -842,6 +850,13 @@ if (isInServiceWorker) {
         sendResponse({ type: message.action, success: false, error: 'Invalid origin' });
         return true;
       }
+    }
+
+    try {
+      validateCwiRequest(message.action, message.params);
+    } catch (error) {
+      sendResponse({ type: message.action, success: false, ...cwiFailure(error) });
+      return true;
     }
 
     // Actions that don't require authorization
@@ -1370,7 +1385,7 @@ if (isInServiceWorker) {
         sendResponse({
           type: message.action,
           success: false,
-          error: error.message || 'Wallet unavailable',
+          ...cwiFailure(error),
         });
         if (!isFromExtension) void closeDappPopupIfIdle();
       });
@@ -2394,7 +2409,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.WAIT_FOR_AUTHENTICATION,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
   };
@@ -2417,7 +2432,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.LIST_OUTPUTS,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2437,7 +2452,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.GET_NETWORK,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2457,7 +2472,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.GET_HEIGHT,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2477,7 +2492,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.GET_HEADER_FOR_HEIGHT,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2508,7 +2523,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.GET_PUBLIC_KEY,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2531,7 +2546,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.LIST_ACTIONS,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2557,7 +2572,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.VERIFY_SIGNATURE,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2625,7 +2640,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.CREATE_HMAC,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2651,7 +2666,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.VERIFY_HMAC,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2679,7 +2694,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.CREATE_SIGNATURE,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2703,7 +2718,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.ENCRYPT,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2727,7 +2742,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.DECRYPT,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2774,7 +2789,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.CREATE_ACTION,
         success: false,
-        error: errorMessage,
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2807,7 +2822,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.SIGN_ACTION,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2830,7 +2845,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.ABORT_ACTION,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2853,7 +2868,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.INTERNALIZE_ACTION,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2876,7 +2891,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.RELINQUISH_OUTPUT,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2899,7 +2914,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.REVEAL_COUNTERPARTY_KEY_LINKAGE,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2922,7 +2937,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.REVEAL_SPECIFIC_KEY_LINKAGE,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2945,7 +2960,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.ACQUIRE_CERTIFICATE,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2967,7 +2982,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.LIST_CERTIFICATES,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -2990,7 +3005,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.PROVE_CERTIFICATE,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -3013,7 +3028,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.RELINQUISH_CERTIFICATE,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -3035,7 +3050,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.DISCOVER_BY_IDENTITY_KEY,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;
@@ -3057,7 +3072,7 @@ if (isInServiceWorker) {
       sendResponse({
         type: CWIEventName.DISCOVER_BY_ATTRIBUTES,
         success: false,
-        error: error instanceof Error ? error.message : JSON.stringify(error),
+        ...cwiFailure(error),
       });
     }
     return true;

@@ -26,6 +26,10 @@ runs:
       shell: bash
       run: bun run typecheck
 
+    - name: Test public wallet behavior
+      shell: bash
+      run: bun run test
+
     - name: Build
       shell: bash
       run: bun run build
