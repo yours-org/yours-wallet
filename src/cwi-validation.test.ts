@@ -1,5 +1,17 @@
 import { describe, expect, test } from 'bun:test';
-import { LockingScript, PrivateKey, ProtoWallet, Transaction, WERR_REVIEW_ACTIONS } from '@bsv/sdk';
+import {
+  LockingScript,
+  PrivateKey,
+  ProtoWallet,
+  Transaction,
+  WERR_REVIEW_ACTIONS,
+  Validation,
+  KeyDeriver,
+  MerklePath,
+} from '@bsv/sdk';
+import { InMemoryPermissionStore, LocalWalletPermissionsManager } from '@1sat/wallet';
+import { WalletPermissionsManager, Wallet } from '@bsv/wallet-toolbox-client';
+import { createRequire } from 'node:module';
 import { createStructuredEventCWI } from './cwi-transport';
 import { installCwiContentBridge } from './cwi-content';
 import { validateCwiRequest } from './cwi-validation';
@@ -61,6 +73,202 @@ async function rejection(action: string, args: unknown, field?: string) {
 }
 
 describe('CWI runtime validation and message round trips', () => {
+  for (const [format, WalletClass] of [
+    ['ESM', Wallet],
+    ['CJS', createRequire(import.meta.url)('@bsv/wallet-toolbox-client').Wallet],
+  ] as const) {
+    test(`${format} actual Wallet persists, queries and relinquishes the same normalized basket through CWI`, async () => {
+      const root = new Transaction(1, [], [{ satoshis: 100, lockingScript: LockingScript.fromHex('51') }], 0);
+      const txid = root.id('hex'),
+        outpoint = `${txid}.0`,
+        keyDeriver = new KeyDeriver(new PrivateKey(21));
+      root.merklePath = new MerklePath(1, [[{ offset: 0, hash: txid, txid: true }]]);
+      const stored = new Map<string, Set<string>>(),
+        calls: any[] = [];
+      const storage = {
+        setServices() {},
+        _authId: { identityKey: keyDeriver.identityKey },
+        getSettings: () => ({ storageIdentityKey: keyDeriver.identityKey, storageName: 'Normalization fixture' }),
+        async createAction(args: any) {
+          calls.push({ method: 'createAction', args: structuredClone(args) });
+          throw new Error('Fixture stops before reservation');
+        },
+        async internalizeAction(args: any) {
+          calls.push({ method: 'internalizeAction', args: structuredClone(args) });
+          stored.set(args.outputs[0].insertionRemittance.basket, new Set([outpoint]));
+          return { accepted: true, txid };
+        },
+        async listOutputs(args: any) {
+          calls.push({ method: 'listOutputs', args: structuredClone(args) });
+          const outputs = [...(stored.get(args.basket) ?? [])].map((output) => ({
+            outpoint: output,
+            satoshis: 100,
+            spendable: true,
+          }));
+          return { outputs, totalOutputs: outputs.length };
+        },
+        async relinquishOutput(args: any) {
+          calls.push({ method: 'relinquishOutput', args: structuredClone(args) });
+          return stored.get(args.basket)?.delete(args.output) ? 1 : 0;
+        },
+      };
+      const wallet = new WalletClass({
+        chain: 'test',
+        keyDeriver,
+        storage: storage as any,
+        actionBatchMode: 'legacy',
+        services: {
+          getChainTracker: async () => ({
+            isValidRootForHeight: async (hash: string, height: number) => hash === txid && height === 1,
+            currentHeight: async () => 10,
+          }),
+        } as any,
+      });
+      const harness = bridge((action, args) => (wallet as any)[action](args));
+      const basket = '  UPPER fixture tokens  ',
+        canonical = 'upper fixture tokens';
+      const insertion = {
+        tx: root.toAtomicBEEF(),
+        description: 'Import normalized basket output',
+        labels: ['retained label'],
+        seekPermission: false,
+        outputs: [
+          {
+            outputIndex: 0,
+            protocol: 'basket insertion',
+            insertionRemittance: { basket, tags: ['retained tag'], customInstructions: 'Retain EXACT metadata.' },
+          },
+        ],
+      };
+      const original = json(insertion);
+      try {
+        await expect(
+          harness.wallet.createAction({
+            description: 'Create normalized basket output',
+            outputs: [{ satoshis: 1, lockingScript: '51', basket, outputDescription: 'Normalized recipient output' }],
+          }),
+        ).rejects.toThrow('Fixture stops before reservation');
+        expect(calls[0].args.outputs[0].basket).toBe(canonical);
+        await (harness.wallet.internalizeAction as any)(insertion);
+        expect(insertion).toEqual(original);
+        const imported = calls.find((call) => call.method === 'internalizeAction').args;
+        expect(imported.outputs[0].insertionRemittance).toEqual({
+          ...insertion.outputs[0].insertionRemittance,
+          basket: canonical,
+        });
+        expect(imported.labels).toEqual(insertion.labels);
+        expect(imported.description).toBe(insertion.description);
+        expect(imported.seekPermission).toBe(false);
+        expect(
+          (await harness.wallet.listOutputs({ basket: canonical })).outputs.map((output) => output.outpoint),
+        ).toEqual([outpoint]);
+        expect((await harness.wallet.listOutputs({ basket })).outputs.map((output) => output.outpoint)).toEqual([
+          outpoint,
+        ]);
+        const removal = { basket, output: outpoint },
+          savedRemoval = json(removal);
+        expect(await harness.wallet.relinquishOutput(removal)).toEqual({ relinquished: true });
+        expect(removal).toEqual(savedRemoval);
+        expect(calls.find((call) => call.method === 'relinquishOutput').args).toEqual({
+          basket: canonical,
+          output: outpoint,
+        });
+        expect((await harness.wallet.listOutputs({ basket: canonical })).outputs).toEqual([]);
+      } finally {
+        harness.close();
+      }
+    });
+  }
+  for (const [format, Manager] of [
+    ['ESM', WalletPermissionsManager],
+    ['CJS', createRequire(import.meta.url)('@bsv/wallet-toolbox-client').WalletPermissionsManager],
+  ] as const) {
+    for (const method of ['discoverByIdentityKey', 'discoverByAttributes'] as const) {
+      for (const seekPermission of [false, true, undefined]) {
+        test(`${format} ${method} preserves seekPermission=${seekPermission} through CWI and the actual permission manager`, async () => {
+          let prompts = 0,
+            discoveries = 0;
+          const manager = new Manager(
+            {
+              async listOutputs() {
+                return { outputs: [], totalOutputs: 0 };
+              },
+              async [method]() {
+                discoveries++;
+                return { certificates: [], totalCertificates: 0 };
+              },
+            } as any,
+            'yours-wallet',
+            { seekPermissionsForIdentityResolution: true },
+          );
+          manager.bindCallback('onProtocolPermissionRequested', async (event: any) => {
+            prompts++;
+            await manager.denyPermission(event.requestID);
+          });
+          const harness = bridge((action, args, origin) => (manager as any)[action](args, origin));
+          const args = {
+            ...(method === 'discoverByIdentityKey' ? { identityKey: peer } : { attributes: { name: 'Alice' } }),
+            ...(seekPermission === undefined ? {} : { seekPermission }),
+          };
+          try {
+            await expect((harness.wallet as any)[method](args)).rejects.toThrow();
+            expect(prompts).toBe(seekPermission === false ? 0 : 1);
+            expect(discoveries).toBe(0);
+            expect(harness.calls[0].params).toEqual(args);
+          } finally {
+            harness.close();
+          }
+        });
+      }
+    }
+  }
+  for (const method of ['discoverByIdentityKey', 'discoverByAttributes'] as const) {
+    test(`${method} reuses an existing local identity-resolution grant with seekPermission=false`, async () => {
+      const store = new InMemoryPermissionStore();
+      let prompts = 0,
+        discoveries = 0;
+      await store.putGrant({
+        key: {
+          type: 'protocol',
+          originator: 'customer.example',
+          privileged: false,
+          protocolLevel: 1,
+          protocolName: 'identity resolution',
+          counterparty: '',
+        },
+        expiry: 0,
+        grantedAt: Date.now(),
+      });
+      const manager = new LocalWalletPermissionsManager(
+        {
+          async [method]() {
+            discoveries++;
+            return { certificates: [], totalCertificates: 0 };
+          },
+        } as any,
+        'yours-wallet',
+        { seekPermissionsForIdentityResolution: true },
+        { store },
+      );
+      manager.bindCallback('onProtocolPermissionRequested', async (event: any) => {
+        prompts++;
+        await manager.denyPermission(event.requestID);
+      });
+      const harness = bridge((action, args, origin) => (manager as any)[action](args, origin));
+      try {
+        await expect(
+          (harness.wallet as any)[method]({
+            ...(method === 'discoverByIdentityKey' ? { identityKey: peer } : { attributes: { name: 'Alice' } }),
+            seekPermission: false,
+          }),
+        ).resolves.toEqual({ certificates: [], totalCertificates: 0 });
+        expect(prompts).toBe(0);
+        expect(discoveries).toBe(1);
+      } finally {
+        harness.close();
+      }
+    });
+  }
   const insertionTx = new Transaction(
     1,
     [],
@@ -75,7 +283,7 @@ describe('CWI runtime validation and message round trips', () => {
       {
         description: 'Basket namespace regression control',
         outputs: [
-          { lockingScript: '51', satoshis: 1, outputDescription: 'Valid first output', basket: 'valid first basket' },
+          { lockingScript: '51', satoshis: 1, outputDescription: 'Valid first output', basket: 'valid first tokens' },
           { lockingScript: '51', satoshis: 1, outputDescription: 'Namespace checked output', basket },
         ],
       },
@@ -90,7 +298,21 @@ describe('CWI runtime validation and message round trips', () => {
     ],
   ];
 
-  for (const basket of ['a'.repeat(297) + 'é', 'a'.repeat(298) + 'é', 'tpnil-uhrp', 'tpnil_underscore', 'unicode 💰']) {
+  for (const basket of [
+    'a'.repeat(297) + 'é',
+    'a'.repeat(298) + 'é',
+    'tpnil-uhrp',
+    'tpnil_underscore',
+    'unicode 💰',
+    'abcd',
+    'abc  def',
+    'abc basket',
+    '  abcd  ',
+    '  ABC BASKET  ',
+    ' DEFAULT ',
+    'Admin records',
+    ' P tokens',
+  ]) {
     for (const [action, args] of basketCalls(basket)) {
       test(`rejects basket namespace characters through ${action} (${Buffer.byteLength(basket)} bytes)`, async () => {
         await rejection(action, args, 'basket');
@@ -98,7 +320,87 @@ describe('CWI runtime validation and message round trips', () => {
     }
   }
 
-  for (const basket of ['a'.repeat(299), 'a'.repeat(300), '  VALID basket 12  ', 'p ordinal valid']) {
+  for (const basket of [' DEFAULT ', 'Admin records', ' P tokens']) {
+    test(`blocks ${JSON.stringify(basket)} before a real manager can route its alias as an ordinary grant`, async () => {
+      const store = new InMemoryPermissionStore(),
+        originator = 'customer.example';
+      await store.putGrant({ key: { type: 'basket', originator, basket }, expiry: 0, grantedAt: Date.now() });
+      const reads: string[] = [];
+      const manager = new LocalWalletPermissionsManager(
+        {
+          async listOutputs(args: any) {
+            // Actual SDK normalization at the underlying wallet boundary.
+            const normalized = Validation.validateListOutputsArgs(args);
+            reads.push(normalized.basket);
+            return { outputs: [], totalOutputs: 0 };
+          },
+        } as any,
+        'yours-wallet',
+        { encryptWalletMetadata: false },
+        { store },
+      );
+      // A direct call reproduces the historical raw routing mismatch. This
+      // bypasses the CWI gate deliberately and is not a native-wallet claim.
+      await manager.listOutputs({ basket }, originator);
+      expect(reads).toEqual([basket.trim().toLowerCase()]);
+      reads.length = 0;
+      const harness = bridge((action, args, origin) => (manager as any)[action](args, origin));
+      try {
+        await expect(harness.wallet.listOutputs({ basket })).rejects.toThrow('canonical spelling');
+        expect(harness.calls).toHaveLength(0);
+        expect(reads).toEqual([]);
+      } finally {
+        harness.close();
+      }
+    });
+  }
+
+  test('keeps exact reserved spelling on the actual manager reservation and module routes', async () => {
+    const store = new InMemoryPermissionStore(),
+      reads: string[] = [],
+      modules: string[] = [];
+    const manager = new LocalWalletPermissionsManager(
+      {
+        async listOutputs(args: any) {
+          reads.push(args.basket);
+          return { outputs: [], totalOutputs: 0 };
+        },
+      } as any,
+      'yours-wallet',
+      {
+        encryptWalletMetadata: false,
+        permissionModules: {
+          tokens: {
+            onRequest: async (request: any) => {
+              modules.push(request.args.basket);
+              return { args: request.args };
+            },
+            onResponse: async (response: any) => response,
+          },
+        },
+      },
+      { store },
+    );
+    const harness = bridge((action, args, origin) => (manager as any)[action](args, origin));
+    try {
+      for (const basket of ['default', 'admin records'])
+        await expect(harness.wallet.listOutputs({ basket })).rejects.toThrow('admin-only');
+      await harness.wallet.listOutputs({ basket: 'p tokens' });
+      expect(modules).toEqual(['p tokens']);
+      expect(reads).toEqual(['p tokens']);
+    } finally {
+      harness.close();
+    }
+  });
+
+  for (const basket of [
+    'abcde',
+    '  ABCDE  ',
+    'a'.repeat(299),
+    'a'.repeat(300),
+    '  VALID basket 12  ',
+    'p ordinal valid',
+  ]) {
     test(`preserves valid basket argument controls (${Buffer.byteLength(basket)} bytes)`, async () => {
       const harness = bridge();
       try {
@@ -121,7 +423,7 @@ describe('CWI runtime validation and message round trips', () => {
     ['signAction', { ...signArgs, reference: '!invalid!' }],
     ['listActions', { labels: [null] }],
     ['listOutputs', { basket: null }],
-    ['listOutputs', { basket: 'valid basket', tags: [null] }],
+    ['listOutputs', { basket: 'valid tokens', tags: [null] }],
     ['relinquishOutput', { basket: null, output: '01'.repeat(32) + '.0' }],
     ['getPublicKey', { ...cryptoArgs, protocolID: [0, 'UPPERCASE cwi'] }],
     ['getPublicKey', { ...cryptoArgs, privileged: null }],
@@ -214,7 +516,7 @@ describe('CWI runtime validation and message round trips', () => {
     // A real serialized Atomic BEEF control isolates metadata validation from
     // malformed-envelope errors; it is not a funded or broadcast transaction.
     const tx = new Transaction(1, [], [{ satoshis: 1, lockingScript: LockingScript.fromHex('51') }], 0).toAtomicBEEF();
-    const insertionRemittance = { basket: 'valid basket', tags: ['valid tag'] };
+    const insertionRemittance = { basket: 'valid tokens', tags: ['valid tag'] };
     const output = { outputIndex: 0, protocol: 'basket insertion' as const, insertionRemittance };
     const args = { tx, outputs: [output], description: 'Import a valid transaction', labels: ['valid label'] };
     const harness = bridge();

@@ -1,12 +1,28 @@
 import { validateWalletArgs, WERR_INVALID_PARAMETER } from '@bsv/sdk';
 import { isCWIEventName } from '@1sat/wallet-browser';
 
-/** BRC-100 basket namespaces permit ASCII letters, numbers and spaces only.
+/** BRC-100 basket namespace rules (wallet/0100.md at39a643ff148a8dcd23ec08986a8ddeb7d5713743):
+ * at least5 characters, ASCII letters/numbers/spaces, no consecutive spaces or
+ * redundant " basket" suffix. SDK validation separately checks the300-byte limit.
  * Match the SDK's identifier normalization without changing caller arguments.
  * Permission modules still decide ownership of reserved namespaces. */
 function validateBasketNamespace(basket: unknown): void {
-  if (typeof basket === 'string' && !/^[a-z0-9 ]+$/.test(basket.trim().toLowerCase())) {
+  if (typeof basket !== 'string') return;
+  const normalized = basket.trim().toLowerCase();
+  if (!/^[a-z0-9 ]+$/.test(normalized)) {
     throw new WERR_INVALID_PARAMETER('basket', 'a name containing only lowercase letters, numbers and spaces');
+  }
+  if (normalized.length < 5) throw new WERR_INVALID_PARAMETER('basket', 'at least 5 characters after normalization');
+  if (normalized.includes('  ')) throw new WERR_INVALID_PARAMETER('basket', 'a name without consecutive spaces');
+  if (normalized.endsWith(' basket'))
+    throw new WERR_INVALID_PARAMETER('basket', 'a name without the redundant " basket" suffix');
+  // The permission manager routes these namespaces before the underlying SDK
+  // normalizes identifiers. An alias must not enter an ordinary grant path.
+  if (
+    basket !== normalized &&
+    (normalized === 'default' || normalized.startsWith('admin') || normalized.startsWith('p '))
+  ) {
+    throw new WERR_INVALID_PARAMETER('basket', 'the canonical spelling of a reserved basket namespace');
   }
 }
 

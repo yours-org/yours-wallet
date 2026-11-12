@@ -117,3 +117,26 @@ codec carries only that receipt's declared public fields, alongside the original
 error, through Chrome JSON serialization. Tests cover both create/sign paths,
 throwing and inconclusive cleanup, frozen primary errors, real event/content
 round trips and the production minifier.
+
+## Discovery permission intent and normalized baskets
+
+Identity and attribute discovery forward the caller's `seekPermission` value to
+the protocol permission check. An explicit `false` can use a prior valid grant
+but cannot open a new permission request; omission and `true` preserve the
+existing request flow. Both ESM and CommonJS exports are tested through public
+CWI and the actual permissions managers.
+
+Internalization and output relinquishment now forward the validated normalized
+basket to storage, matching creation and listing. The patch copies only the
+normalized basket field, preserving other request metadata and caller objects.
+Real Wallet tests prove an uppercase/space-padded insertion can be listed and
+relinquished by its canonical basket through CWI.
+
+The public CWI argument gate also enforces the pinned
+[BRC-100 basket namespace rules](https://github.com/bsv-blockchain/BRCs/blob/39a643ff148a8dcd23ec08986a8ddeb7d5713743/wallet/0100.md):
+at least five normalized characters, ASCII letters/numbers/spaces, no consecutive
+spaces and no redundant ` basket` suffix. Ordinary names retain SDK trim/lowercase
+normalization. Noncanonical aliases of `default`, `admin...` and `p ...` are
+rejected before permission routing; exact reserved names remain subject to their
+existing manager/module ownership. This prevents a raw alias from receiving an
+ordinary grant before storage normalizes it into a reserved namespace.
